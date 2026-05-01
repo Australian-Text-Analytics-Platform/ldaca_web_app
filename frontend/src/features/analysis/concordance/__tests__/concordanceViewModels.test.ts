@@ -58,18 +58,18 @@ describe('concordanceViewModels', () => {
     const rows = buildDispersionRows(grouped);
 
     expect(rows).toHaveLength(2);
-    expect(rows[0].speaker).toBe('A');
-    expect(rows[0].CONC_dispersion).toEqual(grouped[0]);
-    expect(rows[1].CONC_dispersion).toEqual(grouped[1]);
-    expect(rows[0]).not.toHaveProperty('CONC_left_context');
-    expect(rows[0]).not.toHaveProperty('CONC_matched_text');
+    expect(rows[0]!.speaker).toBe('A');
+    expect(rows[0]!.CONC_dispersion).toEqual(grouped[0]);
+    expect(rows[1]!.CONC_dispersion).toEqual(grouped[1]);
+    expect(rows[0]!).not.toHaveProperty('CONC_left_context');
+    expect(rows[0]!).not.toHaveProperty('CONC_matched_text');
   });
 
   it('computes a proportional bar width from the longest text in the table', () => {
     const rows = buildDispersionRows(grouped);
     const longestTextLength = 'alpha beta alpha'.length;
 
-    expect(getDispersionBarWidthPercent(rows[0], 'text', longestTextLength)).toBe(100);
-    expect(getDispersionBarWidthPercent(rows[1], 'text', longestTextLength)).toBeCloseTo(68.75);
+    expect(getDispersionBarWidthPercent(rows[0]!, 'text', longestTextLength)).toBe(100);
+    expect(getDispersionBarWidthPercent(rows[1]!, 'text', longestTextLength)).toBeCloseTo(68.75);
   });
 });

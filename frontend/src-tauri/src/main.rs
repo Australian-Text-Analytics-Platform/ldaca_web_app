@@ -13,6 +13,14 @@ use tauri::{path::BaseDirectory, AppHandle, Manager, State};
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
+#[cfg(unix)]
+use std::os::unix::process::CommandExt as UnixCommandExt;
+
+/// Windows: CREATE_NEW_PROCESS_GROUP groups the backend so we can later
+/// terminate it (and any subprocesses it spawns) as a single unit.
+#[cfg(target_os = "windows")]
+const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+
 /// Windows: CREATE_NO_WINDOW flag prevents a visible console window when
 /// spawning the backend Python process.
 #[cfg(target_os = "windows")]
@@ -59,9 +67,12 @@ impl BackendProcessHandle {
                             return;
                         }
                         println!(
-                            "Backend {} did not exit after SIGTERM; requesting immediate termination",
+                            "Backend {} did not exit after SIGTERM; sending SIGKILL to process group",
                             self.pid
                         );
+                        send_sigkill_group(self.pid);
+                        let _ = child.wait();
+                        return;
                     }
                     Err(err) => {
                         eprintln!("Failed to send SIGTERM to backend {}: {}", self.pid, err);
@@ -91,6 +102,32 @@ fn make_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
     Box::new(io::Error::new(io::ErrorKind::Other, message.into()))
 }
 
+/// Strip the Windows extended-length path prefix (`\\?\`) from a path, if
+/// present. On non-Windows platforms this is a no-op.
+///
+/// Paths with the `\\?\` prefix bypass the Win32 path-normalization layer,
+/// which means forward slashes are no longer accepted as separators. Some
+/// Python libraries (notably Jinja2's template loaders used by pandas Styler)
+/// join directory and file names with `/` internally, producing mixed-separator
+/// paths like `\\?\C:\...\templates/html.tpl` that the kernel cannot resolve.
+/// Stripping the prefix gives Python ordinary drive-letter paths that behave
+/// identically to what a user would see in Explorer.
+fn strip_unc_prefix(path: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(s) = path.to_str() {
+            if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+                // \\?\UNC\server\share -> \\server\share
+                return PathBuf::from(format!(r"\\{}", rest));
+            }
+            if let Some(rest) = s.strip_prefix(r"\\?\") {
+                return PathBuf::from(rest);
+            }
+        }
+    }
+    path.to_path_buf()
+}
+
 fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std::error::Error>> {
     if let Some(python_override) = path_from_env("LDACA_BACKEND_PYTHON") {
         let runtime_dir = path_from_env("LDACA_BACKEND_RUNTIME")
@@ -102,8 +139,8 @@ fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std
             })?;
 
         return Ok(BackendRuntime {
-            root: runtime_dir,
-            python: python_override,
+            root: strip_unc_prefix(&runtime_dir),
+            python: strip_unc_prefix(&python_override),
         });
     }
 
@@ -123,9 +160,16 @@ fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std
         ))
     })?;
 
+    // Strip any Windows extended-length `\\?\` prefix so paths forwarded to
+    // Python (PYTHONHOME, PYTHONPATH, LDACA_BACKEND_RUNTIME, current_dir, …)
+    // are ordinary drive-letter paths. Python libraries such as Jinja2's
+    // template loaders (used by pandas Styler for `.tpl` files) join paths
+    // with forward slashes internally; the `\\?\` prefix disables Win32 path
+    // normalization and rejects mixed separators, producing spurious
+    // "'html.tpl' not found in search path" errors otherwise.
     Ok(BackendRuntime {
-        root: runtime_dir,
-        python: python_path,
+        root: strip_unc_prefix(&runtime_dir),
+        python: strip_unc_prefix(&python_path),
     })
 }
 
@@ -504,12 +548,15 @@ fn spawn_backend_process(
     backend_port: u16,
     env_overrides: &HashMap<String, String>,
 ) -> io::Result<BackendProcessHandle> {
-    let mut command = Command::new(&runtime.python);
+    let runtime_root = &runtime.root;
+    let runtime_python = &runtime.python;
+
+    let mut command = Command::new(runtime_python);
     command
         .arg("-m")
         .arg("ldaca_web_app.cli")
         .arg("--backend")
-        .current_dir(&runtime.root)
+        .current_dir(runtime_root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -517,15 +564,15 @@ fn spawn_backend_process(
     command.env("PYTHONUNBUFFERED", "1");
     command.env("BACKEND_PORT", backend_port.to_string());
     command.env("LDACA_BACKEND_PORT", backend_port.to_string());
-    command.env("LDACA_BACKEND_RUNTIME", runtime.root.as_os_str());
-    command.env("LDACA_BACKEND_PYTHON", runtime.python.as_os_str());
+    command.env("LDACA_BACKEND_RUNTIME", runtime_root.as_os_str());
+    command.env("LDACA_BACKEND_PYTHON", runtime_python.as_os_str());
 
     // Ensure packaged Python runtime is relocatable across machines.
     // `pyvenv.cfg` may contain build-machine absolute paths; use managed-python
     // as PYTHONHOME and venv site-packages as PYTHONPATH.
-    let managed_python_home = find_managed_python_home(&runtime.root);
+    let managed_python_home = find_managed_python_home(runtime_root);
 
-    let venv_site_packages = find_venv_site_packages(&runtime.root);
+    let venv_site_packages = find_venv_site_packages(runtime_root);
 
     if let Some(ref home) = managed_python_home {
         println!(
@@ -575,9 +622,18 @@ fn spawn_backend_process(
         backend_port
     );
 
-    // On Windows, suppress the console window for the Python child process.
+    // On Windows, suppress the console window for the Python child process
+    // and put it in its own process group so we can later signal the whole
+    // group (uvicorn + any worker subprocesses) on shutdown.
     #[cfg(target_os = "windows")]
-    command.creation_flags(CREATE_NO_WINDOW);
+    command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
+
+    // On Unix, give the child its own process group (becomes group leader
+    // with pgid == pid). This lets `kill(-pid, SIGTERM)` reach uvicorn AND
+    // any worker subprocesses it has spawned, so a single SIGTERM tears the
+    // whole tree down rather than orphaning workers that keep the port held.
+    #[cfg(unix)]
+    command.process_group(0);
 
     let mut child = command.spawn()?;
     if let Some(stdout) = child.stdout.take() {
@@ -629,17 +685,31 @@ fn get_backend_url(state: State<BackendState>) -> String {
     state.url.clone()
 }
 
-/// Send SIGTERM to a process (Unix)
+/// Send SIGTERM to a process group (Unix). The child was spawned with
+/// `process_group(0)` so its pgid equals its pid; passing `-pid` to `kill`
+/// signals every member of the group, including any worker subprocesses
+/// uvicorn may have spawned.
 #[cfg(unix)]
 fn send_sigterm(pid: u32) -> io::Result<()> {
     if pid == 0 {
         return Ok(());
     }
-    let result = unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) };
+    let result = unsafe { libc::kill(-(pid as libc::pid_t), libc::SIGTERM) };
     if result == 0 {
         Ok(())
     } else {
         Err(io::Error::last_os_error())
+    }
+}
+
+/// Send SIGKILL to the same process group as a last resort.
+#[cfg(unix)]
+fn send_sigkill_group(pid: u32) {
+    if pid == 0 {
+        return;
+    }
+    unsafe {
+        libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
     }
 }
 
@@ -660,7 +730,139 @@ fn wait_for_child_exit(child: &mut std::process::Child, timeout: Duration) -> bo
     }
 }
 
+/// Application identifier — must match `identifier` in tauri.conf.json. Used to
+/// scope the per-user pidfile under the OS app-local data directory.
+const APP_IDENTIFIER: &str = "au.edu.ldaca.text-analytics";
+
+/// Per-user file recording the most recent backend PID, used to detect and
+/// reap orphans left behind when the previous Tauri process crashed or was
+/// force-quit (so its CloseRequested handler never ran).
+fn pidfile_path() -> Option<PathBuf> {
+    let base: PathBuf;
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var_os("HOME")?;
+        base = PathBuf::from(home).join("Library").join("Application Support");
+    }
+    #[cfg(target_os = "linux")]
+    {
+        base = std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        base = PathBuf::from(std::env::var_os("LOCALAPPDATA")?);
+    }
+    Some(base.join(APP_IDENTIFIER).join("backend.pid"))
+}
+
+fn write_pidfile(pid: u32) {
+    let Some(path) = pidfile_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        if let Err(err) = std::fs::create_dir_all(parent) {
+            eprintln!("Could not create pidfile dir {}: {}", parent.display(), err);
+            return;
+        }
+    }
+    if let Err(err) = std::fs::write(&path, pid.to_string()) {
+        eprintln!("Could not write pidfile {}: {}", path.display(), err);
+    } else {
+        println!("Wrote backend pidfile {} (pid {})", path.display(), pid);
+    }
+}
+
+fn delete_pidfile() {
+    if let Some(path) = pidfile_path() {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+/// Returns true if a process with the given pid is currently alive and owned
+/// by the current user.
+#[cfg(unix)]
+fn process_is_alive(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    // kill(pid, 0) performs permission/existence checks without delivering a
+    // signal: returns 0 if alive, -1 with errno=ESRCH if no such process.
+    unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+}
+
+#[cfg(windows)]
+fn process_is_alive(_pid: u32) -> bool {
+    // Conservative: assume alive and let taskkill no-op if it isn't. Avoids
+    // pulling in winapi just for OpenProcess.
+    true
+}
+
+/// Read any stale pidfile from a previous run and force-terminate the
+/// recorded backend process (and its process group / tree) so the port it
+/// was holding becomes free again. Best-effort; failures are logged.
+fn reap_stale_backend() {
+    let Some(path) = pidfile_path() else {
+        return;
+    };
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(pid) = content.trim().parse::<u32>() else {
+        let _ = std::fs::remove_file(&path);
+        return;
+    };
+
+    if !process_is_alive(pid) {
+        let _ = std::fs::remove_file(&path);
+        return;
+    }
+
+    println!("Reaping stale backend pid {} from {}", pid, path.display());
+
+    #[cfg(unix)]
+    {
+        // Send SIGTERM to the whole group first (the previous run spawned the
+        // child with process_group(0), so pgid == pid). Wait briefly for a
+        // clean exit, then escalate to SIGKILL on the group.
+        unsafe {
+            libc::kill(-(pid as libc::pid_t), libc::SIGTERM);
+        }
+        let deadline = Instant::now() + Duration::from_millis(3000);
+        while Instant::now() < deadline {
+            if !process_is_alive(pid) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        if process_is_alive(pid) {
+            unsafe {
+                libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        // /T terminates the entire process tree, /F forces it. Errors are
+        // expected when the pid is already gone — ignore them.
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/T", "/PID", &pid.to_string()])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+    }
+
+    let _ = std::fs::remove_file(&path);
+}
+
 fn main() {
+    // Reap any backend left behind by a previous Tauri process that crashed
+    // or was force-quit before its CloseRequested handler ran. Must happen
+    // before find_available_port() so that the port the orphan was holding
+    // becomes available again.
+    reap_stale_backend();
+
     // Find an available port for the backend (try 8001-8010)
     let backend_port = match find_available_port(8001, 8010) {
         Some(port) => port,
@@ -684,6 +886,7 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(backend_state)
         .invoke_handler(tauri::generate_handler![get_backend_url])
         .setup(move |app| {
@@ -712,6 +915,7 @@ fn main() {
             let runtime_env = load_runtime_env(&runtime.root)?;
             let process = spawn_backend_process(&runtime, backend_port, &runtime_env)?;
             let backend_pid = process.pid();
+            write_pidfile(backend_pid);
             let state: State<BackendState> = app.state();
             *state.process.lock().unwrap() = Some(process);
 
@@ -755,6 +959,7 @@ fn main() {
                         println!("Shutting down backend PID {}", process.pid());
                         process.shutdown();
                     }
+                    delete_pidfile();
                     let _ = window_clone.close();
                 });
             }
@@ -774,6 +979,7 @@ fn main() {
                             process.shutdown();
                         }
                     }
+                    delete_pidfile();
                 }
             });
         }

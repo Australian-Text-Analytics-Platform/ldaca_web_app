@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 
 import { Button } from '../../../components/ui/button';
 import {
@@ -114,19 +114,21 @@ export function DetachColumnsDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDetaching}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={(event) => {
-              event.preventDefault();
-              void handleDetachConfirm();
-            }}
-            disabled={isDetaching}
-          >
-            {isDetaching ? (
-              <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Detaching…</span>
-            ) : (
-              'Detach'
-            )}
-          </AlertDialogAction>
+          <Button asChild size="sm" disabled={isDetaching}>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDetachConfirm();
+              }}
+              disabled={isDetaching}
+            >
+              {isDetaching ? (
+                <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Adding to Workspace…</span>
+              ) : (
+                <span className="inline-flex items-center gap-2"><Plus className="h-4 w-4" />Add to Workspace</span>
+              )}
+            </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

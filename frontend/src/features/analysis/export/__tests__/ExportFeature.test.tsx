@@ -43,6 +43,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: () => null,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => null,
+}));
+
 vi.mock('@/components/ui/select', async () => {
   const ReactModule = await import('react');
   const SelectContext = ReactModule.createContext<{

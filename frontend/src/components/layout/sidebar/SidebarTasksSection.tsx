@@ -23,7 +23,19 @@ type SidebarTasksSectionProps = {
   connectionError: string | null;
   onReconnect: () => void;
   onClearTask: (task: SidebarTaskRecord) => void;
+  /**
+   * Called by the auto-fade timer for successful tasks. Should only remove the
+   * task from the local UI list without invoking the backend clear API,
+   * because the backing analysis task may still be needed by an open dialog
+   * (e.g. Topic Modelling "Add to Workspace" detach flow).
+   */
+  onAutoDismissTask?: (task: SidebarTaskRecord) => void;
 };
+
+// Auto-fade timing for successfully completed tasks. The task remains fully
+// visible for VISIBLE_MS, then fades over FADE_MS before being cleared.
+const SUCCESS_VISIBLE_MS = 7000;
+const SUCCESS_FADE_MS = 1000;
 
 const normalizeTimestamp = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -45,6 +57,7 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
   connectionError,
   onReconnect,
   onClearTask,
+  onAutoDismissTask,
 }) => {
   const sortedTasks = Array.isArray(tasks)
     ? tasks
@@ -56,7 +69,91 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
         })
     : [];
 
-  const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? STATUS_META.default;
+  // Auto-fade and clear successfully completed tasks. Failed/cancelled tasks
+  // are kept on screen until the user dismisses them manually.
+  const [fadingTaskIds, setFadingTaskIds] = React.useState<Set<string>>(() => new Set());
+  const taskTimersRef = React.useRef<Map<string, { fadeTimer: number; clearTimer: number }>>(
+    new Map(),
+  );
+  const onClearTaskRef = React.useRef(onClearTask);
+  React.useEffect(() => {
+    onClearTaskRef.current = onClearTask;
+  }, [onClearTask]);
+  const onAutoDismissTaskRef = React.useRef(onAutoDismissTask);
+  React.useEffect(() => {
+    onAutoDismissTaskRef.current = onAutoDismissTask;
+  }, [onAutoDismissTask]);
+
+  React.useEffect(() => {
+    const visibleSuccessful = new Map<string, SidebarTaskRecord>();
+    for (const task of tasks) {
+      if (task.state === 'successful' && task.task_id) {
+        visibleSuccessful.set(task.task_id, task);
+      }
+    }
+
+    const timers = taskTimersRef.current;
+
+    // Schedule fade/clear for newly successful tasks.
+    visibleSuccessful.forEach((task, taskId) => {
+      if (timers.has(taskId)) return;
+      const fadeTimer = window.setTimeout(() => {
+        setFadingTaskIds((prev) => {
+          if (prev.has(taskId)) return prev;
+          const next = new Set(prev);
+          next.add(taskId);
+          return next;
+        });
+      }, SUCCESS_VISIBLE_MS);
+      const clearTimer = window.setTimeout(() => {
+        timers.delete(taskId);
+        setFadingTaskIds((prev) => {
+          if (!prev.has(taskId)) return prev;
+          const next = new Set(prev);
+          next.delete(taskId);
+          return next;
+        });
+        try {
+          // Auto-fade should only dismiss from the UI; do NOT call the backend
+          // clear API, because an open analysis dialog (e.g. Topic Modelling
+          // detach) may still need the task record on the server.
+          const dismiss = onAutoDismissTaskRef.current ?? onClearTaskRef.current;
+          dismiss(task);
+        } catch (error) {
+          console.error('SidebarTasksSection: auto-clear failed', error);
+        }
+      }, SUCCESS_VISIBLE_MS + SUCCESS_FADE_MS);
+      timers.set(taskId, { fadeTimer, clearTimer });
+    });
+
+    // Cancel timers for tasks that are no longer visible/successful.
+    timers.forEach((handles, taskId) => {
+      if (!visibleSuccessful.has(taskId)) {
+        window.clearTimeout(handles.fadeTimer);
+        window.clearTimeout(handles.clearTimer);
+        timers.delete(taskId);
+        setFadingTaskIds((prev) => {
+          if (!prev.has(taskId)) return prev;
+          const next = new Set(prev);
+          next.delete(taskId);
+          return next;
+        });
+      }
+    });
+  }, [tasks]);
+
+  React.useEffect(() => {
+    const timers = taskTimersRef.current;
+    return () => {
+      timers.forEach((handles) => {
+        window.clearTimeout(handles.fadeTimer);
+        window.clearTimeout(handles.clearTimer);
+      });
+      timers.clear();
+    };
+  }, []);
+
+  const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? STATUS_META['default']!;
 
   const connectionLabel = connectionError
     ? connectionError
@@ -101,8 +198,9 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
               <div
                 key={task.task_id}
                 className={cn(
-                  'rounded-md border border-border/40 bg-background px-3 py-2',
-                  isComplete && 'py-1.5'
+                  'rounded-md border border-border/40 bg-background px-3 py-2 transition-opacity duration-1000 ease-out',
+                  isComplete && 'py-1.5',
+                  fadingTaskIds.has(task.task_id) && 'opacity-0 pointer-events-none'
                 )}
               >
                 <div className="flex items-start justify-between gap-3">

@@ -209,8 +209,19 @@ export const useTokenFrequencyPreferences = ({
       .split(',')
       .map((word) => word.trim().toLowerCase())
       .filter(Boolean);
-    words.sort((a, b) => a.localeCompare(b));
     setStopWords(words.join(', '));
+    setAppliedStopSet(new Set(words));
+    void saveStopWordsToBackend(words);
+  };
+
+  const sortStopWords = () => {
+    const words = stopWords
+      .split(',')
+      .map((word) => word.trim().toLowerCase())
+      .filter(Boolean);
+    words.sort((a, b) => a.localeCompare(b));
+    const sorted = words.join(', ');
+    setStopWords(sorted);
     setAppliedStopSet(new Set(words));
     void saveStopWordsToBackend(words);
   };
@@ -240,6 +251,37 @@ export const useTokenFrequencyPreferences = ({
 
   const handleTokenLimitBlur = () => {
     void applyTokenLimitWithValidation();
+  };
+
+  // Programmatically apply a numeric cloud-side token limit (used by the
+  // separate "List display limit" control in the panel: changes there cap
+  // the cloud limit at 100, and we want that to flow through the same
+  // persistence + state path as the cloud input itself).
+  const applyTokenLimit = async (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return;
+    const { limit: normalizedLimit } = clampDisplayTokenLimit(Math.floor(value));
+    const targetLimit = Math.min(normalizedLimit, maxTokenLimitInput);
+    setTokenLimitInput(String(targetLimit));
+    setTokenLimitError(null);
+    if (targetLimit === effectiveTokenLimit) {
+      applyTokenLimitState(targetLimit);
+      return;
+    }
+    if (!results) {
+      applyTokenLimitState(targetLimit);
+      return;
+    }
+    setIsApplyingTokenLimit(true);
+    try {
+      await persistTokenPreferences({ token_limit: targetLimit });
+      updateResultsPreferencesLocally({ tokenLimit: targetLimit });
+      applyTokenLimitState(targetLimit);
+    } catch (error) {
+      console.error('Failed to update token limit', error);
+      setTokenLimitError('Failed to update token limit. Please try again.');
+    } finally {
+      setIsApplyingTokenLimit(false);
+    }
   };
 
   const handleFillDefaultStopWords = async () => {
@@ -277,8 +319,10 @@ export const useTokenFrequencyPreferences = ({
     effectiveTokenLimit,
     applyTokenLimitState,
     applyStopSetFromText,
+    sortStopWords,
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
+    applyTokenLimit,
     handleFillDefaultStopWords,
     persistTokenPreferences,
     resetPreferenceUiState,

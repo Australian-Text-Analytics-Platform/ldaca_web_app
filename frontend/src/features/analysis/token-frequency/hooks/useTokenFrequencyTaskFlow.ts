@@ -237,7 +237,7 @@ export const useTokenFrequencyTaskFlow = ({
       .filter(Boolean);
 
     if (!current.map((word) => word.toLowerCase()).includes(tokenNormalized)) {
-      const updated = [...current, token].join(', ');
+      const updated = [token, ...current].join(', ');
       setStopWords(updated);
       applyStopSetFromText(updated);
     }

@@ -239,7 +239,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value,
                 }}
               />
             </CardContent>
-            <CardFooter className="flex w-full flex-col gap-6 border-t px-4 !pt-4">
+            <CardFooter className="flex w-full flex-col gap-4 border-t px-4 !pt-4">
               <div className="flex w-full flex-col gap-3">
                 <Label htmlFor={timeInputId}>Time</Label>
                 <div className="relative flex w-full items-center">

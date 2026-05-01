@@ -25,8 +25,8 @@ const BlockingScreen: React.FC<BlockingScreenProps> = ({
   showLogo = true,
 }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-xl text-center space-y-6 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
+    <div className="min-h-dvh bg-linear-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-xl text-center space-y-4 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
         {showLogo && (
           <div className="flex justify-center">
             <img
@@ -37,7 +37,7 @@ const BlockingScreen: React.FC<BlockingScreenProps> = ({
           </div>
         )}
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-gray-900">{title}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
           <p className="text-base text-gray-600">{description}</p>
         </div>
         <div className="flex flex-col items-center space-y-3">

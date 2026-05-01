@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Filter, Loader2, Plus } from 'lucide-react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Tag } from '../../../components/ui/tag';
@@ -18,7 +18,6 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
     schemaState,
     conditionBuilder,
     newNodeInput,
-    summaryText,
     isFiltering,
     applyFilter,
     applyButtonDisabled,
@@ -29,13 +28,14 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
   const { hasSelection, hasSchema, isSchemaLoading } = schemaState;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Filter data
+                <Filter className="h-5 w-5" />
+                Filter Data
                 <HelpIcon
                   targetKey="preprocessing.filter.tab"
                   label="Filter sub-tab overview"
@@ -52,30 +52,32 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6 pt-0">
-          <NodeSelectionPanel
-            selectedNodes={selectionPanel.selectedNodes}
-            nodeColumnSelections={selectionPanel.nodeColumnSelections}
-            onColumnChange={selectionPanel.onColumnChange}
-            nodeColors={selectionPanel.nodeColors}
-            onColorChange={selectionPanel.onColorChange}
-            defaultPalette={selectionPanel.defaultPalette}
-            maxCompare={1}
-            className="rounded-lg border border-border/60 bg-muted/40"
-            showColorPicker={false}
-            showColumnPicker={false}
-            showHeaderLabel
-            showShape
-            disabled={selectionPanel.disabled}
-            originalCount={selectedNodesOriginalCount}
-            headerAddon={
-              <HelpIcon
-                targetKey="preprocessing.common.node-selection"
-                label="Selected data blocks"
-                className="h-4 w-4 text-muted-foreground"
-              />
-            }
-          />
+        <CardContent className="space-y-4 pt-0">
+          <div data-hint-id="preprocessing.filter.node-selection">
+            <NodeSelectionPanel
+              selectedNodes={selectionPanel.selectedNodes}
+              nodeColumnSelections={selectionPanel.nodeColumnSelections}
+              onColumnChange={selectionPanel.onColumnChange}
+              nodeColors={selectionPanel.nodeColors}
+              onColorChange={selectionPanel.onColorChange}
+              defaultPalette={selectionPanel.defaultPalette}
+              maxCompare={1}
+              className="rounded-lg border border-border/60 bg-muted/40"
+              showColorPicker={false}
+              showColumnPicker={false}
+              showHeaderLabel
+              showShape
+              disabled={selectionPanel.disabled}
+              originalCount={selectedNodesOriginalCount}
+              headerAddon={
+                <HelpIcon
+                  targetKey="preprocessing.common.node-selection"
+                  label="Selected data blocks"
+                  className="h-4 w-4 text-muted-foreground"
+                />
+              }
+            />
+          </div>
 
           {hasSelection && isSchemaLoading && (
             <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
@@ -114,15 +116,16 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
             renderConditionMetadata={conditionBuilder.renderConditionMetadata}
             shouldHideOperatorSelect={conditionBuilder.shouldHideOperatorSelect}
             getOperatorOptions={conditionBuilder.getOperatorOptions}
+            getColumnHintId={(_condition, index) => (index === 0 ? 'preprocessing.filter.condition-column' : undefined)}
           />
+        </CardContent>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="block text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
-                New data block name
-              </label>
-              <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
-            </div>
+        <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
+          <div className="flex flex-1 items-center gap-2">
+            <label className="shrink-0 text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
+              New data block name
+            </label>
+            <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
             <input
               id="filter-new-node-name"
               type="text"
@@ -131,19 +134,23 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
               onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: newNodeInput.value, setValue: newNodeInput.setValue })}
               placeholder={newNodeInput.placeholder}
               disabled={newNodeInput.disabled}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-        </CardContent>
-
-        <CardFooter className="flex flex-col gap-3 border-t border-border bg-muted/20 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-muted-foreground">{summaryText}</div>
-          <div className="flex items-center gap-2">
-            <Button onClick={applyFilter} disabled={applyButtonDisabled} className="w-full sm:w-auto">
-              {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
-            </Button>
-            <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
-          </div>
+          <Button size="sm" onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
+            {isFiltering ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding to workspace…
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Workspace
+              </>
+            )}
+          </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
 
@@ -166,8 +173,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
         pageSize={preview.pageSize}
         documentColumn={getNodeDocumentColumn(props.selectedNode)}
         onPageSizeChange={preview.onPageSizeChange}
-        onPreviousPage={preview.onPreviousPage}
-        onNextPage={preview.onNextPage}
+        onPageChange={preview.onPageChange}
       />
     </div>
   );

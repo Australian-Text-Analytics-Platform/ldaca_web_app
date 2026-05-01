@@ -17,7 +17,7 @@ describe('deriveNodeDisplayResults', () => {
     const node = makeNode(buildRows(rawTokens));
     const stopWords = new Set(['the', 'and', 'of']);
 
-    const [result] = deriveNodeDisplayResults([node], stopWords, 3);
+    const result = deriveNodeDisplayResults([node], stopWords, 3)[0]!;
 
     expect(result.displayRows).toHaveLength(3);
     expect(result.displayRows.map((r) => r.token)).toEqual(['apple', 'banana', 'cherry']);
@@ -33,7 +33,7 @@ describe('deriveNodeDisplayResults', () => {
     const node = makeNode(buildRows(rawTokens));
     const stopWords = new Set(rawTokens.filter((t) => t.startsWith('stop')));
 
-    const [result] = deriveNodeDisplayResults([node], stopWords, 5);
+    const result = deriveNodeDisplayResults([node], stopWords, 5)[0]!;
 
     expect(result.displayRows).toHaveLength(5);
     expect(result.displayRows.every((r) => r.token.startsWith('content'))).toBe(true);
@@ -43,7 +43,7 @@ describe('deriveNodeDisplayResults', () => {
     const node = makeNode(buildRows(['a', 'the', 'b', 'c']));
     const stopWords = new Set(['the']);
 
-    const [result] = deriveNodeDisplayResults([node], stopWords, 100);
+    const result = deriveNodeDisplayResults([node], stopWords, 100)[0]!;
 
     expect(result.displayRows.map((r) => r.token)).toEqual(['a', 'b', 'c']);
   });
@@ -52,7 +52,7 @@ describe('deriveNodeDisplayResults', () => {
     const tokens = Array.from({ length: 50 }, (_, i) => `token${i}`);
     const node = makeNode(buildRows(tokens));
 
-    const [result] = deriveNodeDisplayResults([node], new Set(), null);
+    const result = deriveNodeDisplayResults([node], new Set(), null)[0]!;
 
     expect(result.displayRows).toHaveLength(50);
   });
@@ -61,7 +61,7 @@ describe('deriveNodeDisplayResults', () => {
     const node = makeNode(buildRows(['the', 'a', 'hello', 'world']));
     const stopWords = new Set(['the', 'a']);
 
-    const [result] = deriveNodeDisplayResults([node], stopWords, null);
+    const result = deriveNodeDisplayResults([node], stopWords, null)[0]!;
 
     expect(result.filteredOutCount).toBe(2);
     expect(result.filteredRows).toHaveLength(2);

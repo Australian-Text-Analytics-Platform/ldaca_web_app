@@ -13,6 +13,12 @@ import type {
 import { analysisServerRequestLockQueryKey, type ServerLockAnalysisType } from './useAnalysisServerRequestLock';
 import type { AnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
 
+interface CachedServerLock {
+  hasServerRequest: boolean;
+  currentTaskId: string | null;
+  serverRequest: Record<string, unknown> | null;
+}
+
 /** Minimal shape for accessing common result fields via type assertion */
 interface AnalysisResultLike {
   state?: string;
@@ -135,23 +141,40 @@ export function useAnalysisFeature<TResult = unknown>(
     setLocalTaskId(null);
   }, [config.workspaceId]);
 
-  // ---- Refresh server request lock after a task is created/changed ----
-  // Synchronous analysis flows (Sequential, Concordance) return results
-  // directly from the API and never emit SSE task_changed events, so the
-  // polling-based handleTaskRefresh never fires for them. Invalidating
-  // when localTaskId changes covers both sync and async flows.
+  // Returns the cached server-lock data (fetched once by useAnalysisServerRequestLock).
+  // Used to avoid refetching /current and /request during hydration.
+  const readServerLockCache = useCallback((): CachedServerLock | null => {
+    if (!configRef.current.workspaceId) return null;
+    return queryClient.getQueryData<CachedServerLock>(
+      analysisServerRequestLockQueryKey(
+        configRef.current.analysisType,
+        configRef.current.workspaceId,
+      ),
+    ) ?? null;
+  }, [queryClient]);
+
+  // Invalidate the server-lock query only when the local task id truly diverges
+  // from the cached currentTaskId. Previously this fired on every localTaskId
+  // change (including ones produced by hydration itself), doubling /current
+  // and /request traffic.
   useEffect(() => {
-    if (localTaskId && config.workspaceId) {
-      void queryClient.invalidateQueries({
-        queryKey: analysisServerRequestLockQueryKey(config.analysisType, config.workspaceId),
-      });
-    }
-  }, [localTaskId, config.workspaceId, config.analysisType, queryClient]);
+    if (!localTaskId || !config.workspaceId) return;
+    const cached = readServerLockCache();
+    if (cached && cached.currentTaskId === localTaskId) return;
+    void queryClient.invalidateQueries({
+      queryKey: analysisServerRequestLockQueryKey(config.analysisType, config.workspaceId),
+    });
+  }, [localTaskId, config.workspaceId, config.analysisType, queryClient, readServerLockCache]);
 
   // ---- Task status ref (for async access inside resolveTaskId) ----
   const taskStatusRef = useRef<AnalysisTaskStatus | null>(null);
 
   // ---- Task ID resolution ----
+  // Prefers, in order: locally-tracked ID → cached result metadata → cached
+  // server-lock currentTaskId (populated by useAnalysisServerRequestLock) →
+  // in-memory task-flow status → caller-supplied extras → network /current.
+  // The server-lock cache check means we almost never need to hit /current
+  // on hydration because the lock query fires on mount.
   const resolveTaskId = async (): Promise<string | null> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return null;
@@ -160,11 +183,13 @@ export function useAnalysisFeature<TResult = unknown>(
       (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id ?? null;
     const status = taskStatusRef.current;
     const extra = cfg.getExtraTaskIdCandidates?.() ?? [];
+    const cachedLock = readServerLockCache();
 
     return resolveAnalysisTaskId({
       candidateIds: [
         localTaskIdRef.current,
         metadataTaskId,
+        cachedLock?.currentTaskId ?? null,
         status?.activeTaskId,
         status?.runningTask?.task_id,
         status?.queuedTask?.task_id,
@@ -186,7 +211,9 @@ export function useAnalysisFeature<TResult = unknown>(
     });
   }; // stable — uses refs internally
 
-  // ---- Result fetch with dedup ----
+  // Fetches a task result, deduped against concurrent fetches (from either
+  // hydration or the task-flow terminal-refresh) and against identical
+  // already-applied results. Also updates lastFetchedRef + isRunning.
   const fetchAndApplyResult = async (
       taskId: string | null,
       expectedState: 'successful' | 'failed',
@@ -201,11 +228,9 @@ export function useAnalysisFeature<TResult = unknown>(
         return;
       }
 
-      // In-flight dedup
       if (fetchingTaskIdRef.current === resolvedTaskId) {
         return;
       }
-      // Already-fetched dedup
       if (
         lastFetchedRef.current.taskId === resolvedTaskId &&
         lastFetchedRef.current.state === expectedState
@@ -228,8 +253,6 @@ export function useAnalysisFeature<TResult = unknown>(
           setIsRunning(false);
           lastFetchedRef.current = { taskId: resolvedTaskId, state };
         }
-      } catch (_err) {
-        // best effort
       } finally {
         fetchingTaskIdRef.current = null;
       }
@@ -295,6 +318,13 @@ export function useAnalysisFeature<TResult = unknown>(
   }, [taskStatus.tasks, taskStatus.runningTask, setIsRunning]);
 
   // ---- Hydration ----
+  // `fetchRequest` and `fetchResult` below are deliberately cache-aware:
+  // - `fetchRequest` returns the serverRequest already fetched by
+  //   useAnalysisServerRequestLock (same endpoint, same task id) instead of
+  //   hitting the network a second time.
+  // - `fetchResult` shares fetchingTaskIdRef/lastFetchedRef with
+  //   fetchAndApplyResult so a terminal-refresh + hydration racing for the
+  //   same task id only produces one /result request.
   const { hydrateFromServer, hydrationState } = useAnalysisHydration({
     workspaceId: config.workspaceId,
     analysisKey: config.analysisType,
@@ -302,15 +332,37 @@ export function useAnalysisFeature<TResult = unknown>(
     resolveTaskId,
     onTaskIdResolved: setLocalTaskId,
     fetchRequest: config.fetchRequest
-      ? (taskId) =>
-          taskId
-            ? configRef.current.fetchRequest?.(taskId, configRef.current.getAuthHeaders()) ?? null
-            : null
+      ? async (taskId) => {
+          if (!taskId) return null;
+          const cached = readServerLockCache();
+          if (cached && cached.currentTaskId === taskId && cached.serverRequest) {
+            return cached.serverRequest;
+          }
+          return (
+            configRef.current.fetchRequest?.(
+              taskId,
+              configRef.current.getAuthHeaders(),
+            ) ?? null
+          );
+        }
       : undefined,
-    fetchResult: (taskId) =>
-      taskId
-        ? configRef.current.fetchResult(taskId, configRef.current.getAuthHeaders())
-        : null,
+    fetchResult: async (taskId) => {
+      if (!taskId) return null;
+      if (fetchingTaskIdRef.current === taskId) return null;
+      const last = lastFetchedRef.current;
+      if (last.taskId === taskId && (last.state === 'successful' || last.state === 'failed')) {
+        return null;
+      }
+      fetchingTaskIdRef.current = taskId;
+      try {
+        return await configRef.current.fetchResult(
+          taskId,
+          configRef.current.getAuthHeaders(),
+        );
+      } finally {
+        fetchingTaskIdRef.current = null;
+      }
+    },
     applyRequest: config.onHydratedRequest
       ? (request: unknown | null | undefined) =>
           configRef.current.onHydratedRequest?.(request ?? null)
@@ -319,8 +371,6 @@ export function useAnalysisFeature<TResult = unknown>(
       ? (result: TResult | null | undefined) =>
           configRef.current.onHydratedResult?.(result ?? null)
       : undefined,
-    autoHydrateOnFocus: false,
-    autoHydrateOnVisibility: false,
   });
 
   // Gate: hydrate exactly once per workspace per tab activation

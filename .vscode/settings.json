@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "npm run test": true,
+        "npm run lint": true,
+        "uvx": true,
+        "uv": true
+    }
+}

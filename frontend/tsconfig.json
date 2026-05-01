@@ -8,6 +8,8 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
@@ -15,7 +17,6 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "types": ["vite/client", "vitest", "node"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

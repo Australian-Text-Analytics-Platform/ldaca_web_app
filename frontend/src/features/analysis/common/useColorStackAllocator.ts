@@ -33,7 +33,7 @@ export const useColorStackAllocator = (
   const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
   
   // Internal refs for stack management (not part of render state)
-  const stackRef = useRef<string[]>([...colors].reverse()); // Reverse so first pop gives first color
+  const stackRef = useRef<string[]>(colors.toReversed()); // Reverse so first pop gives first color
   const assignedRef = useRef<Map<string, string>>(new Map());
   const lastColorsKeyRef = useRef<string>(colorsKey);
 
@@ -54,7 +54,7 @@ export const useColorStackAllocator = (
   // Sync allocator with active node IDs
   useEffect(() => {
     if (lastColorsKeyRef.current !== colorsKey) {
-      stackRef.current = [...colors].reverse();
+      stackRef.current = colors.toReversed();
       assignedRef.current.clear();
       lastColorsKeyRef.current = colorsKey;
     }

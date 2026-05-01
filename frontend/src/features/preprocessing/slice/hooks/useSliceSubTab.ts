@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { nodesApi, type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
@@ -87,8 +88,7 @@ interface SlicePreviewConfig {
   readyMessage: string;
   page: number;
   pageSize: number;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
 
@@ -153,6 +153,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     isLoading,
     onAlert,
   } = props;
+  const { getAuthHeaders } = useAuth();
 
   const [mode, setMode] = useState<SamplingMode>('slice');
   const [offsetInput, setOffsetInput] = useState('0');
@@ -217,7 +218,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const sliceNodeSelections: NodeColumnSelection[] = selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : [];
 
-  const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: DEFAULT_PALETTE[0] } : {};
+  const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: DEFAULT_PALETTE[0]! } : {};
 
   const hasSelection = Boolean(selectedNodeId);
 
@@ -378,7 +379,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
         pagination: (response?.pagination as PreviewPagination) ?? null,
       };
     }
-    const response = await nodesApi.data(request.nodeId, page, pageSize);
+    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -404,18 +405,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   });
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
-
-  const handlePreviewPrev = () => {
-    if (previewPagination?.has_prev && !previewLoading) {
-      setPreviewPage(Math.max(1, currentPreviewPage - 1));
-    }
-  };
-
-  const handlePreviewNext = () => {
-    if (previewPagination?.has_next && !previewLoading) {
-      setPreviewPage(currentPreviewPage + 1);
-    }
-  };
 
   const previewReadyMessage = !hasSelection
     ? 'Select a data block to preview output rows.'
@@ -548,8 +537,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       readyMessage: previewReadyMessage,
       page: currentPreviewPage,
       pageSize: previewPageSize,
-      onPreviousPage: handlePreviewPrev,
-      onNextPage: handlePreviewNext,
+      onPageChange: setPreviewPage,
       onPageSizeChange: setPreviewPageSize,
     },
     showActivityTag: isSlicing || isLoading.operations,

@@ -77,7 +77,7 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
       {nodes.map((node, index) => {
         const nodeId = derivedNodeIds[index];
         if (!nodeId) return null;
-        const color = nodeColors[nodeId] || (palette.length ? palette[index % palette.length] : '#000000');
+        const color = (nodeColors[nodeId] || (palette.length ? palette[index % palette.length] : '#000000')) as string;
         const title = getNodeTitle(node, nodeId, index);
         return (
           <Card

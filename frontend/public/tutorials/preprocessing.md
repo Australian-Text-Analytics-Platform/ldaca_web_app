@@ -6,13 +6,15 @@
 
 ![Preprocessing screenshot](tutorials/assets/preprocessing.png)
 
-The Data Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each tab lets you transform data in a specific way, and every action creates a **new data block** so the original data blocks are not overwritten and all operations are recoverable. There are currently six tool tabs in this section:
+The Data Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each tab lets you transform data in a specific way, and every action creates a **new data block** so the original data blocks are not overwritten and all operations are recoverable. There are currently seven tool tabs in this section:
+
 1. Filter - Create a subset of the selected data block based on one or more filter conditions.
 2. Sample - Create a subset of the selected data block by either randomly sampling a certain fraction or number of rows, or by slicing a contiguous chunk of rows from the data block.
 3. Join - Create a new data block by linking two selected data blocks on columns with common values.
 4. Stack - Create a new data block by vertically stacking two selected data blocks that share identical column headers.
 5. Find - Use Regular Expressions (RegEx) to match text patterns in the selected text column, then remove, replace, or extract the matched text into the same column or a new column in the data block.
 6. Create - Combine the contents of two or more columns and save the result as a new column in the data block.
+7. Polars Expression - Write Polars expressions in Python for advanced transformations including filtering, column creation, selection, sorting, and grouped aggregation.
 
 In order to process relevant data block(s) in any tab, the user needs to:
 
@@ -48,6 +50,7 @@ The filter tool keeps only the rows that match defined conditions. Use it to rem
 ![Filter conditions screenshot](tutorials/assets/preprocessing/filter_conditions.png)
 
 Define one or more column-based filter conditions. Each condition can be configured differently depending on the data type of the selected column. All conditions can be combined using either AND or OR logic.
+
 1. Use the "Add Condition" button to add additional conditions.
 2. Select the combining logic for all conditions. The app does not support mixed logic chains (e.g. a mix of AND and OR).
 3. Any individual condition can be negated by checking its "Negate" checkbox.
@@ -97,8 +100,8 @@ The random seed controls the reproducibility of the random sampling process. Set
 
 - Use any non-negative integer (e.g. 0, 42, 12345).
 - Remember the seed value when you want consistent, reproducible results.
-- If you would like to have a **True Random** subset of selected data block, check the *No Random See* box after the seed control. 
-  - **Warning**: This will not only generate a random sample with unknown seed (*unreproducible*) at the time of creation, but also randomly redraw the sample everytime it is accessed or analysed again. *This randomness will be passed to all derived child data blocks if you elect to sample without a seed, and the results are subject to change at each analysis.* Please only use this option for exploring the dataset.
+- If you would like to have a **True Random** subset of selected data block, check the _No Random See_ box after the seed control.
+  - **Warning**: This will not only generate a random sample with unknown seed (_unreproducible_) at the time of creation, but also randomly redraw the sample everytime it is accessed or analysed again. _This randomness will be passed to all derived child data blocks if you elect to sample without a seed, and the results are subject to change at each analysis._ Please only use this option for exploring the dataset.
 
 <h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 
@@ -132,7 +135,7 @@ The column pickers let you choose which column to match in each data block.
 
 - Pick columns that represent the same identifier in both data blocks.
 - Clean, consistent IDs produce the best joins.
-- The app will *guess* and pre-populate the columns most likely to share common values between the two data blocks, but you are responsible for selecting the correct joining columns and join type.
+- The app will _guess_ and pre-populate the columns most likely to share common values between the two data blocks, but you are responsible for selecting the correct joining columns and join type.
 
 <h3 id="help-preprocessing-join-type">Join type selector</h3>
 
@@ -239,5 +242,25 @@ Practice exercise:
 1. Select a dataset with at least two numeric columns.
 2. In the Basic tab, drag two columns into the builder.
 3. Add the computed column and confirm it appears in the preview.
+
+<h2 id="help-preprocessing-expression-section">Polars Expression</h2>
+
+The **Polars Expression** tab gives advanced users direct access to the Polars expression language. Write Python-style Polars expressions that are validated and executed on the server. This is useful when you need full control over transformations that go beyond the graphical tools.
+
+There are five context modes available:
+
+- **Filter** — supply a boolean expression to keep only matching rows.
+- **With Columns** — add or overwrite columns using one or more expressions.
+- **Select** — choose and transform specific columns.
+- **Sort** — sort the data block by one or more expressions, with optional descending order.
+- **Group By** — group by a key expression and apply aggregations.
+
+Each mode includes a syntax hint box showing the expected expression format and examples. Use the **Preview** button to validate and inspect results before applying.
+
+Practice exercise:
+
+1. Select a dataset and switch to the **Filter** context.
+2. Write a boolean expression such as `pl.col("age") > 18`.
+3. Click **Preview** to inspect results, then **Add to Workspace** to create a filtered data block.
 
 [← Back to tutorial index](./index.md)

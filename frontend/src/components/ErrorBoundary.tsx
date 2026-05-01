@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error Boundary caught an error:', error, errorInfo);
   }
 
@@ -31,7 +31,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.setState({ hasError: false, error: undefined });
   };
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       const Fallback = this.props.fallback || DefaultErrorFallback;
       return <Fallback error={this.state.error} resetError={this.resetError} />;
@@ -74,7 +74,7 @@ function DefaultErrorFallback({
       </button>
     </div>
     
-    {process.env.NODE_ENV === 'development' && error?.stack && (
+    {import.meta.env.DEV && error?.stack && (
       <details className="mt-6 w-full max-w-2xl">
         <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
           Show Error Details

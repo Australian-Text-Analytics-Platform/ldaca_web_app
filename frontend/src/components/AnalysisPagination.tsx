@@ -274,22 +274,22 @@ export const AnalysisPagination = ({
   return (
     <div
       className={cn(
-        'grid grid-cols-[auto_1fr_auto] items-center gap-3 border-t border-border bg-muted/40 px-4 py-3',
+        'flex flex-wrap items-center gap-3 border-t border-border bg-muted/40 px-4 py-3',
         className,
       )}
     >
       {/* Left: Page size selector */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {onPageSizeChange && (
           <>
-            <Label htmlFor="analysis-rows-per-page" className="text-sm text-muted-foreground whitespace-nowrap">
+            <Label htmlFor="analysis-rows-per-page" className="whitespace-nowrap text-sm text-muted-foreground">
               {pageSizeLabel}
             </Label>
             <Select
               value={String(pageSize)}
               onValueChange={(val) => onPageSizeChange(Number(val))}
             >
-              <SelectTrigger className="w-20 h-9" id="analysis-rows-per-page">
+              <SelectTrigger className="h-9 w-20" id="analysis-rows-per-page">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent align="start">
@@ -302,16 +302,16 @@ export const AnalysisPagination = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {pageSizeSummary ? (
-              <span className="text-sm text-muted-foreground whitespace-nowrap">{pageSizeSummary}</span>
-            ) : null}
           </>
         )}
+        {pageSizeSummary ? (
+          <span className="text-sm text-muted-foreground">{pageSizeSummary}</span>
+        ) : null}
       </div>
 
       {/* Center: Pagination buttons */}
-      <Pagination className="mx-auto w-auto">
-        <PaginationContent>
+      <Pagination className="w-auto min-w-0 flex-1 basis-40">
+        <PaginationContent className="flex-wrap">
           <PaginationItem>
             <PaginationPrevious
               href="#"
@@ -369,10 +369,12 @@ export const AnalysisPagination = ({
         </PaginationContent>
       </Pagination>
 
-      {/* Right: Extra controls (e.g. Detach) */}
-      <div className="flex items-center justify-end gap-2">
-        {children}
-      </div>
+      {/* Right: Extra controls (e.g. Add to Workspace) */}
+      {children ? (
+        <div className="flex items-center gap-2">
+          {children}
+        </div>
+      ) : null}
     </div>
   );
 };

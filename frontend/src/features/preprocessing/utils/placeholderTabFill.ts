@@ -6,6 +6,22 @@ interface PlaceholderTabFillArgs {
   setValue: (value: string) => void;
 }
 
+const scheduleCaretRestore = (input: HTMLInputElement, value: string) => {
+  const restore = () => {
+    if (document.activeElement !== input) {
+      return;
+    }
+    input.setSelectionRange(value.length, value.length);
+  };
+
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(restore);
+    return;
+  }
+
+  setTimeout(restore, 0);
+};
+
 export const acceptPlaceholderOnTab = ({ event, value, setValue }: PlaceholderTabFillArgs) => {
   if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
     return;
@@ -20,5 +36,7 @@ export const acceptPlaceholderOnTab = ({ event, value, setValue }: PlaceholderTa
     return;
   }
 
+  event.preventDefault();
   setValue(placeholder);
+  scheduleCaretRestore(event.currentTarget, placeholder);
 };

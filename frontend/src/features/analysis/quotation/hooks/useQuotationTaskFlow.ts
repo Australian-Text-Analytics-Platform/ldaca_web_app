@@ -5,12 +5,13 @@ import type {
   QuotationResultQuery,
   QuotationEngineConfig,
   QuotationDetachRequest,
+  QuotationMaterializeRequest,
 } from '../../../../api/text';
 import { textApi } from '../../../../api/text';
 import { getNodeIdentifier, restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 
-const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
 
 type EngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
 
@@ -66,6 +67,8 @@ interface QuotationActions {
   setIsLoadingQuotations: (value: boolean) => void;
   setHasLoaded: (value: boolean) => void;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setNodeMaterializing?: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setMaterializeTaskIds?: Dispatch<SetStateAction<Record<string, string>>>;
   showErrorDialog: (message: string) => void;
   baseHandlePageChange: (page: number) => void;
   baseHandlePageSizeChange: (pageSize: number) => void;
@@ -85,6 +88,10 @@ interface QuotationLock {
     request: QuotationRequest,
   ) => Promise<QuotationAnalysisResponse>;
   detachQuotation: (nodeId: string, request: QuotationDetachRequest) => Promise<void>;
+  materializeQuotation?: (
+    nodeId: string,
+    request: QuotationMaterializeRequest,
+  ) => Promise<{ metadata?: { task_id?: string } } | undefined>;
   openEngineDialog: () => void;
 }
 
@@ -113,6 +120,8 @@ export function useQuotationTaskFlow({
     setIsLoadingQuotations,
     setHasLoaded,
     setNodeDetaching,
+    setNodeMaterializing,
+    setMaterializeTaskIds,
     showErrorDialog,
     baseHandlePageChange,
     baseHandlePageSizeChange,
@@ -126,6 +135,7 @@ export function useQuotationTaskFlow({
     resolveTaskId,
     quotationSearch,
     detachQuotation,
+    materializeQuotation,
     openEngineDialog,
   },
 }: Params) {
@@ -213,17 +223,12 @@ export function useQuotationTaskFlow({
     const column = overrides?.columnOverride || selection?.column;
     if (!column) return null;
 
-    const st = nodeState[nodeId] || {
-      currentPage: 1,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sortBy: undefined,
-      descending: false,
-    };
-    const page = overrides?.page ?? st.currentPage ?? 1;
-    const pageSize = overrides?.pageSize ?? st.pageSize ?? DEFAULT_PAGE_SIZE;
-    const sortBy = overrides?.sortBy ?? st.sortBy;
+    const st = nodeState[nodeId];
+    const page = overrides?.page ?? st?.currentPage ?? 1;
+    const pageSize = overrides?.pageSize ?? st?.pageSize;
+    const sortBy = overrides?.sortBy ?? st?.sortBy;
     const descending: boolean =
-      overrides?.descending ?? st.descending ?? false;
+      overrides?.descending ?? st?.descending ?? false;
 
     const enginePayload = buildEngineRequest();
     if (!enginePayload) {
@@ -239,11 +244,13 @@ export function useQuotationTaskFlow({
     const requestPayload: QuotationRequest = {
       column,
       page,
-      page_size: pageSize,
       sort_by: sortBy ?? undefined,
       descending,
       engine: engineConfigForRequest,
     };
+    if (pageSize !== undefined) {
+      requestPayload.page_size = pageSize;
+    }
 
     try {
       const result = await quotationSearch(nodeId, requestPayload);
@@ -416,7 +423,7 @@ export function useQuotationTaskFlow({
     });
   };
 
-  const handleDetach = async (nodeId: string, selectedColumns?: string[]) => {
+  const handleDetach = async (nodeId: string, selectedColumns?: string[], materializedPath?: string | null) => {
     const selection = activeSelections.find((s) => s.nodeId === nodeId);
     if (!selection?.column) return;
     setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
@@ -435,11 +442,59 @@ export function useQuotationTaskFlow({
             ? { type: 'remote', url: enginePayload.url }
             : { type: 'local' },
         ...(selectedColumns && selectedColumns.length > 0 ? { selected_columns: selectedColumns } : {}),
+        ...(materializedPath ? { materialized_path: materializedPath } : {}),
       });
     } catch (e: unknown) {
       showErrorDialog(getErrorMessage(e));
     } finally {
       setNodeDetaching((prev) => ({ ...prev, [nodeId]: false }));
+    }
+  };
+
+  const handleMaterialize = async (nodeId: string) => {
+    const selection = activeSelections.find((s) => s.nodeId === nodeId);
+    if (!selection?.column) return;
+    if (!materializeQuotation) return;
+
+    const parentTaskId = await resolveTaskId();
+    if (!parentTaskId) {
+      showErrorDialog('No quotation task to materialize.');
+      return;
+    }
+
+    setNodeMaterializing?.((prev) => ({ ...prev, [nodeId]: true }));
+    try {
+      const enginePayload = buildEngineRequest();
+      if (!enginePayload) {
+        openEngineDialog();
+        setNodeMaterializing?.((prev) => {
+          if (!prev[nodeId]) return prev;
+          const { [nodeId]: _removed, ...next } = prev;
+          void _removed;
+          return next;
+        });
+        return;
+      }
+      const resp = await materializeQuotation(nodeId, {
+        parent_task_id: parentTaskId,
+        column: selection.column,
+        engine:
+          enginePayload.type === 'remote'
+            ? { type: 'remote', url: enginePayload.url }
+            : { type: 'local' },
+      });
+      const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
+      if (taskId && setMaterializeTaskIds) {
+        setMaterializeTaskIds((prev) => ({ ...prev, [nodeId]: taskId }));
+      }
+    } catch (e: unknown) {
+      showErrorDialog(getErrorMessage(e));
+      setNodeMaterializing?.((prev) => {
+        if (!prev[nodeId]) return prev;
+        const { [nodeId]: _removed, ...next } = prev;
+        void _removed;
+        return next;
+      });
     }
   };
 
@@ -454,5 +509,6 @@ export function useQuotationTaskFlow({
     handlePageSizeChange,
     handleSort,
     handleDetach,
+    handleMaterialize,
   };
 }

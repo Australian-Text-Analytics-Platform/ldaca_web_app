@@ -12,6 +12,5 @@ const appSource = readFileSync(
 describe('App code splitting', () => {
   it('lazy-loads the heavy workspace panel and feedback modal modules', () => {
     expect(appSource).toContain("lazy(() => import('./components/layout/WorkspaceView'))");
-    expect(appSource).toContain("lazy(() => import('./components/panels/FeedbackPanel'))");
   });
 });

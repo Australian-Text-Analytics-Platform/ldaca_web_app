@@ -49,7 +49,9 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.toml',
+            'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
+            'polars-text/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -61,7 +63,8 @@ jobs:
         with:
           path: |
             ~/AppData/Local/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock',
+            'backend/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
@@ -97,7 +100,7 @@ jobs:
         shell: pwsh
         run: |
           Set-StrictMode -Version Latest
-          $runtimeDir = "target\release\backend-runtime"
+          $runtimeDir = "frontend\src-tauri\target\release\backend-runtime"
           $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
 
           if (-not (Test-Path (Join-Path $runtimeDir "runtime-manifest.json"))) {
@@ -111,6 +114,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ldaca-desktop-windows-msi
-          path: target/release/bundle/msi/*.msi
+          path: frontend/src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 14

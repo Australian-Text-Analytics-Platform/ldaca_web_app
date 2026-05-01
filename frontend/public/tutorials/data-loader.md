@@ -85,7 +85,7 @@ Use this option to load curated sample datasets for exploration and testing.
 - A selection of sample datasets is bundled with the application.
 - These datasets are intended for first-time users to become familiar with the application's capabilities.
 - All sample data is publicly available and may be freely tested or removed.
-- If sample data is used to generate a research output, please cite <img alt="citemark" src="tutorials/assets/citemark.png" style="display: inline; height: 1em; vertical-align: middle;"> the dataset appropriately.
+- If sample data is used to generate a research output, please cite <img alt="citemark" src="references/assets/mark_ref.png" style="display: inline; height: 1em; vertical-align: middle;"> the dataset appropriately.
 
 <h2 id="help-data-loader-import-ldaca-button">Import from LDaCA</h2>
 

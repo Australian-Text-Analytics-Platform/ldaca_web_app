@@ -1,4 +1,6 @@
 import type { NodeResultView } from '../../tokenFrequencyAdapters';
+import { wildcardToRegExp } from '../../tokenFrequencyAdapters';
+import { useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
@@ -13,6 +15,25 @@ type TokenFrequencySingleTokenSectionProps = {
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
+  /**
+   * Which sub-view the parent results panel is showing. The component always
+   * mounts both the word cloud and the bar list so that download refs remain
+   * registered when switching tabs, and toggles visibility via the `hidden`
+   * Tailwind class. Defaults to 'cloud' for backward compatibility with
+   * callers (and tests) that haven't been updated to pass this prop.
+   */
+  view?: 'cloud' | 'list';
+  /**
+   * Optional wildcard filter applied to bar list rows in list view. Empty
+   * string means "no filter". Cloud rendering is unaffected.
+   */
+  tokenFilter?: string;
+  /**
+   * Maximum number of rows to show in the list view per node. The cloud view
+   * continues to use the cloud-side display limit (`displayRows`). When
+   * undefined, falls back to the cloud-side limit (`displayRows`).
+   */
+  listLimit?: number;
 };
 
 const VISIBLE_BAR_ROWS = 10;
@@ -28,10 +49,62 @@ export const TokenFrequencySingleTokenSection = ({
   onDownloadWordCloud,
   onDownloadFrequencyCsv,
   registerWordCloudRef,
+  view = 'cloud',
+  tokenFilter = '',
+  listLimit,
 }: TokenFrequencySingleTokenSectionProps) => {
+  // Refs for each per-node list scroll container, used to synchronise vertical
+  // scrolling across the side-by-side list view. We keep refs on the
+  // component (not on each Card) so the parent can broadcast scroll events.
+  const listScrollRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const isSyncingScrollRef = useRef(false);
+
+  const handleListScroll = (sourceIndex: number) => (event: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingScrollRef.current) {
+      // Avoid feedback loops while we propagate scrollTop to siblings.
+      return;
+    }
+    const source = event.currentTarget;
+    isSyncingScrollRef.current = true;
+    try {
+      for (let i = 0; i < listScrollRefs.current.length; i += 1) {
+        if (i === sourceIndex) continue;
+        const target = listScrollRefs.current[i];
+        if (target && target !== source && target.scrollTop !== source.scrollTop) {
+          target.scrollTop = source.scrollTop;
+        }
+      }
+    } finally {
+      isSyncingScrollRef.current = false;
+    }
+  };
+
   const singleNodeLayoutClassName = nodeDisplayResults.length <= 1
-    ? 'grid grid-cols-1 gap-6'
-    : 'grid grid-cols-1 gap-6 xl:grid-cols-2';
+    ? 'grid grid-cols-1 gap-4'
+    : 'grid grid-cols-1 gap-4 xl:grid-cols-2';
+
+  // Width (in ch) of the rank gutter inside each list card. Sized to the
+  // largest *original* list length (after stop-word filtering, capped by the
+  // list display limit) across cards so ranks don't shift when filtering.
+  const tokenFilterTrimmed = tokenFilter.trim();
+  const tokenFilterRegex = tokenFilterTrimmed ? wildcardToRegExp(tokenFilterTrimmed) : null;
+  const matchesTokenFilter = (token: string): boolean => {
+    if (!tokenFilterTrimmed) return true;
+    if (!tokenFilterRegex) {
+      return token.toLowerCase().includes(tokenFilterTrimmed.toLowerCase());
+    }
+    return tokenFilterRegex.test(token);
+  };
+  const listSliceCapForGutter = typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
+    ? Math.floor(listLimit)
+    : Number.POSITIVE_INFINITY;
+  const maxRowCount = nodeDisplayResults.reduce((acc, item) => {
+    const filtered = Array.isArray(item.filteredRows) ? item.filteredRows : [];
+    const listed = Math.min(filtered.length, listSliceCapForGutter);
+    const fallback = Array.isArray(item.displayRows) ? item.displayRows.length : 0;
+    return Math.max(acc, listed > 0 ? listed : fallback);
+  }, 0);
+  const rankWidthCh = Math.max(2, String(maxRowCount).length + 1);
 
   return (
     <div className={singleNodeLayoutClassName} data-testid="token-frequency-single-layout">
@@ -39,7 +112,21 @@ export const TokenFrequencySingleTokenSection = ({
         const nodeKey = result.nodeId || result.displayName || `node-${index}`;
         const color = getColorForNode(result.nodeId || result.displayName, index);
         const displayRows = Array.isArray(result.displayRows) ? result.displayRows : [];
+        // List view uses its own (typically larger) cap on the full
+        // stop-word-filtered list, so it can show more rows than the cloud.
+        // Falls back to the cloud cap when no list limit is provided.
+        const filteredRowsAll = Array.isArray(result.filteredRows) ? result.filteredRows : displayRows;
+        const listSliceCap = typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
+          ? Math.floor(listLimit)
+          : displayRows.length;
+        const listSourceRows = filteredRowsAll.slice(0, listSliceCap);
+        // Then apply the wildcard filter for list view; cloud view stays unaffected.
+        // Preserve each row's original 1-based rank so filtering doesn't renumber rows.
+        const filteredListRows: Array<{ row: typeof listSourceRows[number]; rank: number }> = listSourceRows
+          .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
+          .filter(({ row }) => matchesTokenFilter(String(row?.token ?? '')));
         const maxFrequency = Math.max(1, ...displayRows.map((row) => Number(row.frequency) || 0));
+        const listMaxFrequency = Math.max(1, ...filteredListRows.map(({ row }) => Number(row.frequency) || 0));
         const words = displayRows.map((item) => ({
           text: String(item?.token ?? ''),
           value: Number(item?.frequency) || 0,
@@ -61,24 +148,34 @@ export const TokenFrequencySingleTokenSection = ({
                   {result.displayName}
                 </CardTitle>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end" data-testid={`token-frequency-actions-${nodeKey}`}>
-                  <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud(nodeKey, result.displayName)}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Word Cloud
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onDownloadFrequencyCsv(result.displayName, Array.isArray(result.filteredRows) ? result.filteredRows : result.rows)}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Frequencies
-                  </Button>
+                  {view === 'cloud' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label="Download word cloud"
+                      title="Download word cloud"
+                      onClick={() => onDownloadWordCloud(nodeKey, result.displayName)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  {view === 'list' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label="Download frequencies"
+                      title="Download frequencies"
+                      onClick={() => onDownloadFrequencyCsv(result.displayName, Array.isArray(result.filteredRows) ? result.filteredRows : result.rows)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </CardHeader>
 
             <CardContent className="space-y-2">
-              <div className="mb-4 flex w-full justify-center overflow-visible">
+              <div className={view === 'cloud' ? 'mb-4 flex w-full justify-center overflow-visible' : 'hidden'}>
                 <svg
                   ref={(element) => registerWordCloudRef(nodeKey, element)}
                   width={cloudWidth}
@@ -125,12 +222,26 @@ export const TokenFrequencySingleTokenSection = ({
                 </svg>
               </div>
 
-              <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: `${BAR_LIST_MAX_HEIGHT_REM}rem` }}>
-                {displayRows.map((row) => {
+              <div
+                ref={(element) => {
+                  listScrollRefs.current[index] = element;
+                }}
+                onScroll={handleListScroll(index)}
+                className={view === 'list' ? 'space-y-2 overflow-y-auto pr-1' : 'hidden'}
+                style={view === 'list' ? { maxHeight: `${BAR_LIST_MAX_HEIGHT_REM}rem` } : undefined}
+              >
+                {filteredListRows.map(({ row, rank }) => {
                   const frequency = Number(row.frequency) || 0;
-                  const widthPct = Math.max(3, Math.round((frequency / maxFrequency) * 100));
+                  const widthPct = Math.max(3, Math.round((frequency / listMaxFrequency) * 100));
                   return (
-                    <div key={`${result.nodeId}-${row.token}`} className="grid grid-cols-[minmax(0,1fr)_90px] items-center gap-2">
+                    <div
+                      key={`${result.nodeId}-${row.token}`}
+                      className="grid items-center gap-2"
+                      style={{ gridTemplateColumns: `${rankWidthCh}ch minmax(0,1fr) 90px` }}
+                    >
+                      <span className="text-right text-xs tabular-nums text-muted-foreground">
+                        {rank}.
+                      </span>
                       <button
                         type="button"
                         className="group relative h-8 overflow-hidden rounded border text-left"

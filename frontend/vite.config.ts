@@ -10,7 +10,7 @@ import tailwindcss from '@tailwindcss/postcss';
 const frontendRootDir = path.dirname(fileURLToPath(import.meta.url));
 
 const serverConfig = {
-  port: Number(process.env.FRONTEND_PORT ?? 3000),
+  port: Number(process.env.FRONTEND_PORT ?? 3002),
   host: '0.0.0.0',
   forwardConsole: {
     unhandledErrors: true,
@@ -23,6 +23,7 @@ export default defineConfig({
   plugins: [
     react(),
     babel({
+      include: /\.[tj]sx?$/,
       presets: [reactCompilerPreset()],
     } as Parameters<typeof babel>[0]),
   ],
@@ -45,7 +46,7 @@ export default defineConfig({
   },
   server: serverConfig,
   preview: {
-    port: Number(process.env.FRONTEND_PORT ?? 3000),
+    port: Number(process.env.FRONTEND_PORT ?? 3002),
   },
   envPrefix: 'VITE_', // Vite standard environment variable prefix
   test: {

@@ -4,6 +4,14 @@ import { isConditionComplete } from '../filter/utils/serializers';
 const DEFAULT_NAME_FALLBACK = 'dataset';
 const DEFAULT_SLICE_OFFSET = 0;
 
+const EXPRESSION_CONTEXT_SUFFIX: Record<'filter' | 'with_columns' | 'select' | 'sort' | 'group_by_agg', string> = {
+  filter: 'filtered_expr',
+  with_columns: 'with_columns',
+  select: 'selected_expr',
+  sort: 'sorted_expr',
+  group_by_agg: 'grouped_expr',
+};
+
 const sanitizeToken = (value: string): string => {
   const trimmed = value.trim();
   if (!trimmed) return 'value';
@@ -135,4 +143,15 @@ export const buildSamplingAutoNodeName = ({
       : '';
 
   return `${base}_sampled_${sampleToken}${seedToken}`;
+};
+
+export const buildExpressionAutoNodeName = ({
+  baseName,
+  context,
+}: {
+  baseName: string | null | undefined;
+  context: keyof typeof EXPRESSION_CONTEXT_SUFFIX;
+}): string => {
+  const base = (baseName || '').trim() || DEFAULT_NAME_FALLBACK;
+  return `${base}_${EXPRESSION_CONTEXT_SUFFIX[context]}`;
 };

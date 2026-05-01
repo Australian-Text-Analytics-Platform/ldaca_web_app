@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '../../../../../components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
@@ -39,6 +39,9 @@ type Props = {
   topicSearchQuery: string;
   onTopicSearchQueryChange: (query: string) => void;
   activeDomain: ZoomDomain | null;
+  nodeNames?: string[];
+  minTopicSize?: number;
+  randomSeed?: number;
   detachDialogOpen: boolean;
   setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   detachNodeOptions: Array<{ node_id: string; node_name: string; available_columns: string[]; disabled_columns?: string[] }>;
@@ -73,6 +76,9 @@ export function TopicModelingResultsPanel({
   topicSearchQuery,
   onTopicSearchQueryChange,
   activeDomain,
+  nodeNames,
+  minTopicSize,
+  randomSeed,
   detachDialogOpen,
   setDetachDialogOpen,
   detachNodeOptions,
@@ -124,7 +130,7 @@ export function TopicModelingResultsPanel({
               <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
               <Button
                 type="button"
-                variant="outline"
+                size="sm"
                 className="w-full sm:w-auto"
                 onClick={() => void openDetachDialog()}
                 disabled={isDetachLoading || isDetaching}
@@ -132,12 +138,18 @@ export function TopicModelingResultsPanel({
                 {isDetachLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading Detach…
+                    Preparing Add to Workspace…
                   </>
                 ) : selectedTopicIds.size > 0 ? (
-                  `Detach (${selectedTopicIds.size} topics)`
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {`Add to Workspace (${selectedTopicIds.size} topics)`}
+                  </>
                 ) : (
-                  'Detach (all)'
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace (all)
+                  </>
                 )}
               </Button>
             </div>
@@ -157,6 +169,9 @@ export function TopicModelingResultsPanel({
               topicSearchQuery={topicSearchQuery}
               onTopicSearchQueryChange={onTopicSearchQueryChange}
               activeDomain={activeDomain}
+              nodeNames={nodeNames}
+              minTopicSize={minTopicSize}
+              randomSeed={randomSeed}
             />
           </div>
         ) : null}

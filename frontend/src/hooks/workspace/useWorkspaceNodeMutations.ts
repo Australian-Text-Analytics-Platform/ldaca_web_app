@@ -5,8 +5,8 @@ import {
   nodesApi,
   type FilterRequest,
   type SliceRequest,
-  type ExpressionTransformRequest,
   type ReplaceRequest,
+  type PolarsExpressionRequest,
 } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
 import { type NodeSchemaResponse } from '../../types';
@@ -343,38 +343,29 @@ export const useWorkspaceNodeMutations = ({
       };
       return nodesApi.join(request, authHeaders);
     },
-    onMutate: async () => {
+    onMutate: () => {
       startOperation('joinNodes');
-      let previousNodeIds: string[] = [];
-      try {
-        if (currentWorkspaceId) {
-          const previousGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
-          previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
-        }
-      } catch {
-        // ignore snapshot errors
-      }
+      const previousGraph = currentWorkspaceId
+        ? queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId))
+        : undefined;
+      const previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
       clearSelection();
       return { previousNodeIds };
     },
     onSuccess: async (createdNode: Record<string, unknown>, _vars, context) => {
-      try {
-        let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
-        if (!newId && currentWorkspaceId) {
-          await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-          const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
-          if (freshGraph?.nodes) {
-            const prevIds: string[] = context?.previousNodeIds || [];
-            const diff = freshGraph.nodes.map((node) => node.id).filter((id: string) => !prevIds.includes(id));
-            if (diff.length === 1) newId = diff[0];
-          }
+      let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
+      if (!newId && currentWorkspaceId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
+        if (freshGraph?.nodes) {
+          const prevIds = context?.previousNodeIds || [];
+          const diff = freshGraph.nodes.map((node) => node.id).filter((id) => !prevIds.includes(id));
+          if (diff.length === 1) newId = diff[0];
         }
-        if (newId) {
-          setSelectedNodes([newId]);
-        } else {
-          clearSelection();
-        }
-      } catch {
+      }
+      if (newId) {
+        setSelectedNodes([newId]);
+      } else {
         clearSelection();
       }
       if (currentWorkspaceId) {
@@ -391,38 +382,29 @@ export const useWorkspaceNodeMutations = ({
   const concatNodesMutation = useMutation({
     mutationFn: ({ nodeIds, newNodeName }: { nodeIds: string[]; newNodeName?: string }) =>
       nodesApi.concat({ node_ids: nodeIds, new_node_name: newNodeName }, authHeaders),
-    onMutate: async () => {
+    onMutate: () => {
       startOperation('concatNodes');
-      let previousNodeIds: string[] = [];
-      try {
-        if (currentWorkspaceId) {
-          const previousGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
-          previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
-        }
-      } catch {
-        // ignore snapshot errors
-      }
+      const previousGraph = currentWorkspaceId
+        ? queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId))
+        : undefined;
+      const previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
       clearSelection();
       return { previousNodeIds };
     },
     onSuccess: async (createdNode: Record<string, unknown>, _vars, context) => {
-      try {
-        let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
-        if (!newId && currentWorkspaceId) {
-          await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-          const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
-          if (freshGraph?.nodes) {
-            const prevIds: string[] = context?.previousNodeIds || [];
-            const diff = freshGraph.nodes.map((node) => node.id).filter((id: string) => !prevIds.includes(id));
-            if (diff.length === 1) newId = diff[0];
-          }
+      let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
+      if (!newId && currentWorkspaceId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
+        if (freshGraph?.nodes) {
+          const prevIds = context?.previousNodeIds || [];
+          const diff = freshGraph.nodes.map((node) => node.id).filter((id) => !prevIds.includes(id));
+          if (diff.length === 1) newId = diff[0];
         }
-        if (newId) {
-          setSelectedNodes([newId]);
-        } else {
-          clearSelection();
-        }
-      } catch {
+      }
+      if (newId) {
+        setSelectedNodes([newId]);
+      } else {
         clearSelection();
       }
       if (currentWorkspaceId) {
@@ -451,28 +433,6 @@ export const useWorkspaceNodeMutations = ({
     onError: (error: Error) => {
       setOperationError('filterNode', error.message);
       endOperation('filterNode');
-    },
-  });
-
-  const computeColumnMutation = useMutation({
-    mutationFn: ({ nodeId, request }: { nodeId: string; request: ExpressionTransformRequest }) =>
-      nodesApi.computeColumn(nodeId, request, authHeaders),
-    onMutate: () => {
-      startOperation('computeColumn');
-    },
-    onSuccess: (_response, variables) => {
-      if (currentWorkspaceId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        if (variables?.nodeId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
-        }
-      }
-      endOperation('computeColumn');
-    },
-    onError: (error: Error) => {
-      setOperationError('computeColumn', error.message);
-      endOperation('computeColumn');
     },
   });
 
@@ -631,14 +591,14 @@ export const useWorkspaceNodeMutations = ({
       sliceNodeMutation.mutateAsync({ nodeId, request }),
     slicePreview: (nodeId: string, request: SliceRequest, page = 1, pageSize = 10) =>
       nodesApi.slicePreview(nodeId, request, page, pageSize, authHeaders),
-    computeColumn: (nodeId: string, request: ExpressionTransformRequest) =>
-      computeColumnMutation.mutateAsync({ nodeId, request }),
-    computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest, page = 1, pageSize = 10) =>
-      nodesApi.computeColumnPreview(nodeId, request, page, pageSize, authHeaders),
     replaceText: (nodeId: string, request: ReplaceRequest) =>
       replaceTextMutation.mutateAsync({ nodeId, request }),
     replaceTextPreview: (nodeId: string, request: ReplaceRequest, page = 1, pageSize = 10) =>
       nodesApi.replaceTextPreview(nodeId, request, page, pageSize, authHeaders),
+    polarsExpressionPreview: (nodeId: string, request: PolarsExpressionRequest, page = 1, pageSize = 10) =>
+      nodesApi.polarsExpressionPreview(nodeId, request, page, pageSize, authHeaders),
+    polarsExpressionApply: (nodeId: string, request: PolarsExpressionRequest) =>
+      nodesApi.polarsExpressionApply(nodeId, request, authHeaders),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
       castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
     renameColumn: (nodeId: string, column: string, newName: string) =>

@@ -28,7 +28,7 @@ const logGraphDebug = (result: { nodes?: GraphNode[]; edges?: { source: string; 
   });
 
   if (result?.nodes && result.nodes.length > 0) {
-    const sampleNode = result.nodes[0];
+    const sampleNode = result.nodes[0]!;
     console.debug('Sample node structure:', {
       id: sampleNode.id,
       name: sampleNode.name,
@@ -78,12 +78,24 @@ export const useWorkspaceQueries = ({
       currentWorkspaceId ?? '',
       selectedNodeId ?? '',
       getPaginationForNode(selectedNodeId).currentPage,
-      getPaginationForNode(selectedNodeId).pageSize
+      getPaginationForNode(selectedNodeId).pageSize,
+      getPaginationForNode(selectedNodeId).sortBy,
+      getPaginationForNode(selectedNodeId).descending,
+      getPaginationForNode(selectedNodeId).filterColumn,
+      getPaginationForNode(selectedNodeId).filterValue,
     ),
     queryFn: () => {
       if (!currentWorkspaceId || !selectedNodeId) throw new Error('Missing workspace or node ID');
-      const { currentPage, pageSize } = getPaginationForNode(selectedNodeId);
-      return nodesApi.data(selectedNodeId, currentPage, pageSize, authHeaders);
+      const { currentPage, pageSize, sortBy, descending, filterColumn, filterValue, filterOp } = getPaginationForNode(selectedNodeId);
+      return nodesApi.data(selectedNodeId, {
+        page: currentPage,
+        pageSize,
+        sortBy,
+        descending,
+        filterColumn,
+        filterValue,
+        filterOp,
+      }, authHeaders);
     },
     enabled: isAuthenticated && !!currentWorkspaceId && !!selectedNodeId,
     staleTime: 30 * 1000,

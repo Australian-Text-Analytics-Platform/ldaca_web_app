@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucide-react';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
@@ -11,8 +12,10 @@ import { ConcatSubTab } from '../../preprocessing/concat/ConcatSubTab';
 import { SliceSubTab } from '../../preprocessing/slice/SliceSubTab';
 import { AggregateSubTab } from '../../preprocessing/aggregate/AggregateSubTab';
 import { ReplaceSubTab } from '../../preprocessing/replace/ReplaceSubTab';
+import InfoIcon from '../../../components/help/InfoIcon';
+import { PolarsExpressionSubTab } from '../../preprocessing/expression/PolarsExpressionSubTab';
 
-type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate';
+type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
 
 const DataPreprocessingFeature: React.FC = () => {
   const { selectedNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
@@ -25,11 +28,11 @@ const DataPreprocessingFeature: React.FC = () => {
     concatPreview,
     sliceNode,
     slicePreview,
-    computeColumn,
-    computeColumnPreview,
     replaceText,
     replaceTextPreview,
     refreshNodeSchema,
+    polarsExpressionPreview,
+    polarsExpressionApply,
   } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
@@ -43,10 +46,17 @@ const DataPreprocessingFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-semibold leading-none tracking-tight text-foreground">Data Preprocessing</h1>
+            <InfoIcon
+              targetKey="preprocessing.overview"
+              label="About Data Preprocessing"
+              tooltip="Learn what data preprocessing is and how it can help you."
+            />
+          </div>
           <p className="text-sm text-muted-foreground">
             Prepare your dataset with filtering, sampling, join, stack, find, and create tools.
           </p>
@@ -56,18 +66,19 @@ const DataPreprocessingFeature: React.FC = () => {
       <Tabs
         value={activeSubtab}
         onValueChange={(value) => setActiveSubtab(value as DataPrepSubtab)}
-        className="space-y-6"
+        className="space-y-4"
       >
         <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
-          <TabsTrigger value="filter">Filter</TabsTrigger>
-          <TabsTrigger value="slice">Sample</TabsTrigger>
-          <TabsTrigger value="join">Join</TabsTrigger>
-          <TabsTrigger value="concat">Stack</TabsTrigger>
-          <TabsTrigger value="find">Find</TabsTrigger>
-          <TabsTrigger value="aggregate">Create</TabsTrigger>
+          <TabsTrigger value="filter"><Filter className="mr-1.5 h-4 w-4" />Filter</TabsTrigger>
+          <TabsTrigger value="slice"><Shuffle className="mr-1.5 h-4 w-4" />Sample</TabsTrigger>
+          <TabsTrigger value="join"><Merge className="mr-1.5 h-4 w-4" />Join</TabsTrigger>
+          <TabsTrigger value="concat"><Layers className="mr-1.5 h-4 w-4" />Stack</TabsTrigger>
+          <TabsTrigger value="find"><Search className="mr-1.5 h-4 w-4" />Find</TabsTrigger>
+          <TabsTrigger value="aggregate"><Calculator className="mr-1.5 h-4 w-4" />Create</TabsTrigger>
+          <TabsTrigger value="expression"><Code2 className="mr-1.5 h-4 w-4" />Polars Expression</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="filter" className="space-y-6">
+        <TabsContent value="filter" className="space-y-4">
           <FilterSubTab
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
@@ -82,7 +93,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="slice" className="space-y-6">
+        <TabsContent value="slice" className="space-y-4">
           <SliceSubTab
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
@@ -95,7 +106,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="join" className="space-y-6">
+        <TabsContent value="join" className="space-y-4">
           <JoinSubTab
             selectedNodeIds={selectedNodeIds}
             currentWorkspaceId={currentWorkspaceId}
@@ -106,7 +117,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="concat" className="space-y-6">
+        <TabsContent value="concat" className="space-y-4">
           <ConcatSubTab
             selectedNodeIds={selectedNodeIds}
             currentWorkspaceId={currentWorkspaceId}
@@ -118,7 +129,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="find" className="space-y-6">
+        <TabsContent value="find" className="space-y-4">
           <ReplaceSubTab
             selectedNodeId={selectedNodeId}
             selectedNodes={selectedNodes}
@@ -131,15 +142,28 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="aggregate" className="space-y-6">
+        <TabsContent value="aggregate" className="space-y-4">
           <AggregateSubTab
             selectedNodeId={selectedNodeId}
             selectedNodes={selectedNodes}
             workspaceNodes={workspaceNodes}
             isLoading={isLoading}
             onAlert={handleAlert}
-            computeColumnPreview={computeColumnPreview}
-            computeColumn={computeColumn}
+            polarsExpressionPreview={polarsExpressionPreview}
+            polarsExpressionApply={polarsExpressionApply}
+            refreshNodeSchema={refreshNodeSchema}
+          />
+        </TabsContent>
+
+        <TabsContent value="expression" className="space-y-4">
+          <PolarsExpressionSubTab
+            selectedNodeId={selectedNodeId}
+            selectedNodes={selectedNodes}
+            workspaceNodes={workspaceNodes}
+            isLoading={isLoading}
+            onAlert={handleAlert}
+            polarsExpressionPreview={polarsExpressionPreview}
+            polarsExpressionApply={polarsExpressionApply}
             refreshNodeSchema={refreshNodeSchema}
           />
         </TabsContent>

@@ -19,6 +19,7 @@ export interface FilterCondition {
   value: ConditionValue;
   negate?: boolean;
   regex?: boolean;
+  case_sensitive?: boolean;
 }
 
 export interface ConditionColumnOption {
@@ -41,6 +42,7 @@ export interface FilterConditionWithId {
   value: ConditionValue;
   negate?: boolean;
   regex?: boolean;
+  caseSensitive?: boolean;
   dataType?: string;
   [key: string]: ConditionValue | string | boolean | undefined;
 }

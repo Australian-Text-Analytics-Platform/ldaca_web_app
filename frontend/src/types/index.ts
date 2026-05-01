@@ -1,3 +1,13 @@
+/**
+ * Shared app-level types.
+ *
+ * Kept intentionally small; most request/response shapes live in `./api` or
+ * alongside the API client in `src/api/*.ts`. Add a type here only if it is
+ * used by at least two consumers across feature boundaries.
+ */
+
+// ---------- Auth ----------
+
 export interface User {
   id: string;
   name: string;
@@ -9,7 +19,23 @@ export interface User {
   last_login?: string;
 }
 
-// Remove GoogleUser - we only need one User interface
+export interface AuthMethod {
+  name: string;
+  display_name: string;
+  enabled: boolean;
+}
+
+/** GET /auth/ payload — hydrates useAuth, gates startup flows. */
+export interface AuthInfoResponse {
+  authenticated: boolean;
+  user: User | null;
+  available_auth_methods: AuthMethod[];
+  requires_authentication: boolean;
+  /** Only present in single-user mode. */
+  data_folder?: string;
+}
+
+// ---------- Files ----------
 
 export interface FileTreeFile {
   name: string;
@@ -27,65 +53,14 @@ export interface FileTreeDirectory {
 
 export type FileTreeNode = FileTreeFile | FileTreeDirectory;
 
-export interface FileData {
-  files: string[];
-}
-
-export interface DataFrameResponse {
-  dataframe: Record<string, unknown>[];
-  total_pages?: number;
-}
-
-export interface FilePreviewResponse {
-  data: Record<string, unknown>[];
-  columns: string[];
-  total_rows: number;
-  preview_rows: number;
-  file_info: {
-    filename: string;
-    size: number;
-    type: string;
-    modified: string;
-  };
-}
-
-export interface UserMeResponse {
-  user: User;
-  authenticated: boolean;
-  expires_at: string;
-}
-
-export interface UserStorageInfo {
-  used_space_mb: number;
-  file_count: number;
-  folders: string[];
-}
+// ---------- Workspace / Node ----------
 
 export type NodeShape = [number | null, number | null];
 
-export interface Workspace {
-  id: string;
-  name: string;
-  description?: string;
-  created_at: string;
-  updated_at: string;
-  total_nodes: number;
-}
-
-export type TabType = 'data-loader' | 'analysis' | 'export';
-
-// Workspace management types
-export interface WorkspaceInfo {
-  id: string;
-  name: string;
-  created_at: string;
-  modified_at: string;
-  description?: string;
-  total_nodes?: number;
-  dataframe_count: number;
-  is_saved: boolean;
-}
-
+/**
+ * Rich node shape used by the workspace graph/table view. The backend may
+ * attach extra per-operation fields, hence the index signature.
+ */
 export interface WorkspaceNode {
   node_id: string;
   name: string;
@@ -95,9 +70,9 @@ export interface WorkspaceNode {
   is_text_data: boolean;
   can_undo?: boolean;
   can_redo?: boolean;
-  data_type?: string; // e.g., 'polars.dataframe.frame.DataFrame', 'pandas.core.frame.DataFrame'
-  column_schema?: Record<string, string>; // Column name to data type mapping
-  dtypes?: Record<string, string>; // Alternative name for column types
+  data_type?: string;
+  column_schema?: Record<string, string>;
+  dtypes?: Record<string, string>;
   [key: string]: unknown;
 }
 
@@ -108,56 +83,4 @@ export interface NodeSchemaResponse {
   column_types: Record<string, string>;
   is_text_data: boolean;
   document_column?: string;
-}
-
-export interface NodeDataResponse {
-  data: Record<string, unknown>[];
-  total_rows: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-}
-
-export interface WorkspaceListResponse {
-  workspaces: WorkspaceInfo[];
-}
-
-export interface WorkspaceNodesResponse {
-  nodes: WorkspaceNode[];
-}
-
-export interface WorkspaceCreateRequest {
-  name: string;
-  description?: string;
-}
-
-// =============================================================================
-// UNIFIED AUTH TYPES (matching backend models)
-// =============================================================================
-
-export interface AuthMethod {
-  name: string;
-  display_name: string;
-  enabled: boolean;
-}
-
-export interface AuthInfoResponse {
-  authenticated: boolean;
-  user: User | null;
-  available_auth_methods: AuthMethod[];
-  requires_authentication: boolean;
-  data_folder?: string; // Only present in single-user mode
-}
-
-export interface GoogleAuthRequest {
-  id_token: string;
-}
-
-export interface GoogleAuthResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  scope: string;
-  token_type: string;
-  user: User;
 }

@@ -100,6 +100,20 @@ const persistToken = (token: string | null) => {
   }
 };
 
+// Pick up auth_token from URL (Google redirect callback flow) and persist it
+// before the first auth fetch so the bootstrap request includes it.
+if (typeof window !== 'undefined') {
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get('auth_token');
+  if (urlToken) {
+    persistToken(urlToken);
+    params.delete('auth_token');
+    const clean = params.toString();
+    const newUrl = `${window.location.pathname}${clean ? `?${clean}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', newUrl);
+  }
+}
+
 const buildAuthHeaders = (): Record<string, string> => {
   const token = readStoredToken();
   return token ? { Authorization: `Bearer ${token}` } : {};

@@ -77,7 +77,6 @@ export const useNodeColumnInfos = (
               workspaceId,
               nodeId,
               getAuthHeaders,
-              force: true,
             });
             if (cancelled) return;
             const infos = mapColumnsToInfo(info);

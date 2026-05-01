@@ -5,6 +5,21 @@ import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
 import { DEFAULT_VISIBLE_VIEWS, useUIStore } from '../../../stores/uiStore';
+import { useHintsStore } from '../../../stores/hintsStore';
+
+const toastMock = vi.fn();
+
+vi.mock('sonner', () => ({
+  toast: (...args: unknown[]) => toastMock(...args),
+}));
+
+const authState = {
+  getAuthHeaders: () => ({}),
+  user: { name: 'Test User' },
+  logout: vi.fn(),
+  dataFolder: '/tmp/workdir',
+  isMultiUserMode: false,
+};
 
 vi.mock('@/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
@@ -34,13 +49,7 @@ vi.mock('@/hooks/useWorkspaceTaskStream', () => ({
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({
-    getAuthHeaders: () => ({}),
-    user: { name: 'Test User' },
-    logout: vi.fn(),
-    dataFolder: '/tmp/workdir',
-    isMultiUserMode: false,
-  }),
+  useAuth: () => authState,
 }));
 
 vi.mock('@/stores/analysisStore', () => ({
@@ -66,6 +75,10 @@ const renderSidebar = () =>
 
 describe('Sidebar view visibility menu', () => {
   beforeEach(() => {
+    authState.isMultiUserMode = false;
+    authState.dataFolder = '/tmp/workdir';
+    authState.logout = vi.fn();
+
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -85,22 +98,18 @@ describe('Sidebar view visibility menu', () => {
       ...state,
       currentView: 'data-loader',
       sidebarCollapsed: false,
-      isGlobalLoading: false,
       loadingOperations: new Set(),
-      globalError: null,
       operationErrors: new Map(),
       modals: {
-        joinModal: false,
-        filterModal: false,
-        documentColumnModal: false,
-        renameModal: false,
-        deleteConfirmModal: false,
         feedbackModal: false,
         tutorialModal: false,
       },
       tutorialTarget: null,
       visibleViews: [...DEFAULT_VISIBLE_VIEWS],
+      sessionDismissedHints: new Set(),
     }));
+    useHintsStore.setState({ dismissedHints: [], hintsEnabled: true });
+    toastMock.mockReset();
   });
 
   it('hides AI Annotator by default and allows showing it from the views editor', async () => {
@@ -111,7 +120,7 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.queryByRole('button', { name: 'AI Annotator' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Data Loader' })).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]);
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
 
     const aiAnnotatorToggle = screen.getByRole('menuitemcheckbox', { name: 'AI Annotator' });
     expect(aiAnnotatorToggle).not.toBeChecked();
@@ -129,11 +138,46 @@ describe('Sidebar view visibility menu', () => {
 
     renderSidebar();
 
-    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]);
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
 
     expect(screen.queryByRole('menuitemcheckbox', { name: 'Data Loader' })).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitemcheckbox', { name: 'Data Preprocessing' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Preprocessing' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.getAllByRole('button', { name: 'Data Loader' }).length).toBeGreaterThan(0);
+  });
+
+  it('resets dismissed hints from the views editor', async () => {
+    const user = userEvent.setup();
+
+    useHintsStore.setState({ dismissedHints: ['preprocessing.filter.select-node'], hintsEnabled: true });
+    useUIStore.setState((state) => ({
+      ...state,
+      sessionDismissedHints: new Set(['preprocessing.filter.select-column']),
+    }));
+
+    renderSidebar();
+
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
+    await user.click(screen.getByRole('menuitem', { name: 'Reset all hints' }));
+
+    expect(useHintsStore.getState().dismissedHints).toEqual([]);
+    expect(Array.from(useUIStore.getState().sessionDismissedHints)).toEqual([]);
+    expect(toastMock).toHaveBeenCalledWith('All hints have been reset. Dismissed hints can appear again.');
+  });
+
+  it('hides the working directory card in multi-user mode', () => {
+    authState.isMultiUserMode = true;
+
+    renderSidebar();
+
+    expect(screen.queryByTestId('sidebar-data-directory')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Change working directory')).not.toBeInTheDocument();
+  });
+
+  it('shows the working directory card in single-user mode', () => {
+    renderSidebar();
+
+    expect(screen.getByTestId('sidebar-data-directory')).toBeInTheDocument();
+    expect(screen.getByText('/tmp/workdir')).toBeInTheDocument();
   });
 });

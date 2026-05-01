@@ -61,10 +61,10 @@ export const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: n
 
 export const STATS_SORT_ACCESSORS: Record<string, (stat: TokenFrequencyStatisticsEntry) => unknown> = {
   token: (stat) => stat.token,
-  freq_corpus_0: (stat) => stat.freq_corpus_0,
-  percent_corpus_0: (stat) => stat.percent_corpus_0,
-  freq_corpus_1: (stat) => stat.freq_corpus_1,
-  percent_corpus_1: (stat) => stat.percent_corpus_1,
+  freq_reference: (stat) => stat.freq_reference,
+  percent_reference: (stat) => stat.percent_reference,
+  freq_study: (stat) => stat.freq_study,
+  percent_study: (stat) => stat.percent_study,
   log_likelihood_llv: (stat) => stat.log_likelihood_llv,
   percent_diff: (stat) => stat.percent_diff,
   bayes_factor_bic: (stat) => stat.bayes_factor_bic,
@@ -278,7 +278,7 @@ export const sortStatistics = (
   const columnKey = statsSortColumn || 'log_likelihood_llv';
   const direction = statsSortDirection === 'asc' ? 1 : -1;
 
-  return [...filteredStatistics].sort((a, b) => {
+  return filteredStatistics.toSorted((a, b) => {
     if (columnKey === 'significance') {
       const rank = (stat: TokenFrequencyStatisticsEntry) => (stat.significance || '').length;
       const va = rank(a);

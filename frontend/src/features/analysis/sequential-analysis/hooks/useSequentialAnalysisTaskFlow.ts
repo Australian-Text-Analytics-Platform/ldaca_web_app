@@ -1,12 +1,14 @@
 import { toast } from 'sonner';
 import {
   type SequentialAnalysisRequest,
+  type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
 } from '../../../../api/text';
 import type { ChartConfig } from '../../../../components/ui/chart';
 import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
 
+// Callers may rely on period_start and period_end being present on chart rows.
 export type SequentialAnalysisDatum = Record<string, unknown>;
 
 export type ChartTypeOption = 'line' | 'bar' | 'area';
@@ -23,6 +25,26 @@ export const SEQUENTIAL_ANALYSIS_PALETTE = [
 
 export const getPaletteColor = (index: number) =>
   SEQUENTIAL_ANALYSIS_PALETTE[index % SEQUENTIAL_ANALYSIS_PALETTE.length];
+
+const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_end']);
+
+const comparePeriodBounds = (left: unknown, right: unknown): number => {
+  if (left === right) return 0;
+  if (left === undefined || left === null) return 1;
+  if (right === undefined || right === null) return -1;
+
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left - right;
+  }
+
+  const leftTime = new Date(String(left)).getTime();
+  const rightTime = new Date(String(right)).getTime();
+  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime)) {
+    return leftTime - rightTime;
+  }
+
+  return String(left).localeCompare(String(right));
+};
 
 export const formatTimeLabel = (value?: string | number) => {
   if (!value) return '—';
@@ -50,6 +72,9 @@ interface SequentialAnalysisState {
   numericOriginValue: number | null;
   numericIntervalValue: number | null;
   numericOriginInput: string;
+  customIntervalValue: number | null;
+  customIntervalUnit: SequentialCustomIntervalUnit | null;
+  caseSensitive: boolean;
   results: Record<string, unknown> | null;
 }
 
@@ -89,6 +114,9 @@ export function useSequentialAnalysisTaskFlow({
     numericOriginValue,
     numericIntervalValue,
     numericOriginInput,
+    customIntervalValue,
+    customIntervalUnit,
+    caseSensitive,
     results,
   },
   actions: {
@@ -138,6 +166,22 @@ export function useSequentialAnalysisTaskFlow({
       }
     }
 
+    const isCustomDatetime = derivedColumnType === 'datetime' && frequency === 'custom';
+    if (isCustomDatetime) {
+      if (
+        customIntervalValue === null ||
+        !Number.isInteger(customIntervalValue) ||
+        customIntervalValue <= 0
+      ) {
+        toast.error('Please enter a positive whole number for the custom interval.');
+        return;
+      }
+      if (customIntervalUnit === null) {
+        toast.error('Please select a unit for the custom interval.');
+        return;
+      }
+    }
+
     const request: SequentialAnalysisRequest = {
       time_column: picked,
       group_by_columns: validGroupByColumns.length > 0 ? validGroupByColumns : null,
@@ -146,6 +190,9 @@ export function useSequentialAnalysisTaskFlow({
       column_type: derivedColumnType,
       numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : undefined,
       numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : undefined,
+      custom_interval_value: isCustomDatetime ? customIntervalValue : undefined,
+      custom_interval_unit: isCustomDatetime ? customIntervalUnit : undefined,
+      case_sensitive: caseSensitive,
     };
 
     try {
@@ -167,6 +214,9 @@ export function useSequentialAnalysisTaskFlow({
           column_type: derivedColumnType,
           numeric_origin: numericOriginValue,
           numeric_interval: numericIntervalValue,
+          custom_interval_value: isCustomDatetime ? customIntervalValue : null,
+          custom_interval_unit: isCustomDatetime ? customIntervalUnit : null,
+          case_sensitive: caseSensitive,
         },
       };
       const resolvedChartType = isChartTypeOption((enrichedResult as Record<string, unknown>)?.chart_type)
@@ -251,10 +301,20 @@ export function useSequentialAnalysisTaskFlow({
         .map((col: string) => String(item[col] ?? ''))
         .join(' - ');
       if (!timeMap.has(timePeriod)) {
-        timeMap.set(timePeriod, { time_period: timePeriod });
+        timeMap.set(timePeriod, {
+          time_period: timePeriod,
+          period_start: item.period_start,
+          period_end: item.period_end,
+        });
       }
       const timeEntry = timeMap.get(timePeriod);
       if (timeEntry) {
+        if (comparePeriodBounds(item.period_start, timeEntry.period_start) < 0) {
+          timeEntry.period_start = item.period_start;
+        }
+        if (comparePeriodBounds(item.period_end, timeEntry.period_end) > 0) {
+          timeEntry.period_end = item.period_end;
+        }
         timeEntry[groupKey] = item.sequential_count;
       }
     });
@@ -279,7 +339,7 @@ export function useSequentialAnalysisTaskFlow({
     const keys = new Set<string>();
     chartData.forEach((item: Record<string, unknown>) => {
       Object.keys(item).forEach((key) => {
-        if (key !== 'time_period') keys.add(key);
+        if (!NON_SERIES_CHART_KEYS.has(key)) keys.add(key);
       });
     });
     return Array.from(keys);

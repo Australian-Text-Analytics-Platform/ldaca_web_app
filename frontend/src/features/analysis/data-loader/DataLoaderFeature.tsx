@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon, MoreHorizontal } from 'lucide-react';
+import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon, MoreHorizontal, Star } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,10 @@ import { useFiles } from '../../../hooks/useFiles';
 import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
 import { workspacesApi } from '../../../api/workspaces';
+import { saveBlob } from '../../../lib/download';
 import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
+import { usePreferencesStore } from '../../../stores/preferencesStore';
+import { useUIStore } from '../../../stores/uiStore';
 import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -48,6 +51,7 @@ import {
   DropdownMenuTrigger,
 } from '../../../components/ui/dropdown-menu';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 
 const README_FILENAME = 'README.md';
 const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
@@ -167,9 +171,60 @@ export const DataLoaderFeature: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const workspaceZipInputRef = useRef<HTMLInputElement | null>(null);
-  const activeCardRef = useRef<HTMLDivElement | null>(null);
-  const [activeCardHeight, setActiveCardHeight] = useState<number | null>(null);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const splitDraggingRef = useRef(false);
+  const [topRatio, setTopRatio] = useState(0.4);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
+
+  const clampRatio = (value: number) => Math.min(0.85, Math.max(0.15, value));
+
+  const handleSplitterPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    splitDraggingRef.current = true;
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // ignore pointer capture errors
+    }
+  };
+
+  const handleSplitterPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!splitDraggingRef.current) return;
+    const container = splitContainerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    if (rect.height <= 0) return;
+    const offset = event.clientY - rect.top;
+    setTopRatio(clampRatio(offset / rect.height));
+  };
+
+  const handleSplitterPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    splitDraggingRef.current = false;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore pointer capture errors
+    }
+  };
+
+  const handleSplitterKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setTopRatio((prev) => clampRatio(prev - 0.05));
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setTopRatio((prev) => clampRatio(prev + 0.05));
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setTopRatio(0.15);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      setTopRatio(0.85);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setTopRatio(0.5);
+    }
+  };
 
   const notify = (type: 'success' | 'error' | 'info', message: string) => {
     const duration = type === 'error' ? 6000 : 3500;
@@ -192,22 +247,14 @@ export const DataLoaderFeature: React.FC = () => {
     setDescriptionValue(active?.description || '');
   }, [currentWorkspaceId, workspaces]);
 
-  useEffect(() => {
-    const element = activeCardRef.current;
-    if (!element || typeof ResizeObserver === 'undefined') {
-      return;
-    }
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const nextHeight = Math.round(entry.contentRect.height);
-      setActiveCardHeight((prev) => (prev === nextHeight ? prev : nextHeight));
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+  const { favoriteWorkspaces, toggleFavorite, isFavorite } = usePreferencesStore();
 
-  const sortedWorkspaces = [...workspaces].sort((a, b) => {
+  const sortedWorkspaces = workspaces.toSorted((a, b) => {
+    const aId = getWorkspaceId(a) ?? '';
+    const bId = getWorkspaceId(b) ?? '';
+    const aFav = favoriteWorkspaces.includes(aId) ? 1 : 0;
+    const bFav = favoriteWorkspaces.includes(bId) ? 1 : 0;
+    if (aFav !== bFav) return bFav - aFav;
     const aTime = Date.parse(String(a?.modified_at || a?.updated_at || a?.created_at || ''));
     const bTime = Date.parse(String(b?.modified_at || b?.updated_at || b?.created_at || ''));
     return (bTime || 0) - (aTime || 0);
@@ -264,6 +311,14 @@ export const DataLoaderFeature: React.FC = () => {
       notify('success', 'Workspace saved.');
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to save workspace.');
+    }
+  };
+
+  const handleSetCurrentWorkspace = async (workspaceId: string | null) => {
+    try {
+      await workspaceActions.setCurrentWorkspace(workspaceId);
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to update active workspace.');
     }
   };
 
@@ -384,14 +439,8 @@ export const DataLoaderFeature: React.FC = () => {
         (async () => {
           try {
             const blob = await workspacesApi.downloadTaskArtifact(taskId, authHeaders);
-            const objectUrl = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = objectUrl;
-            anchor.download = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
-            document.body.appendChild(anchor);
-            anchor.click();
-            document.body.removeChild(anchor);
-            URL.revokeObjectURL(objectUrl);
+            const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
+            await saveBlob(blob, filename);
             notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
           } catch (err) {
             notify('error', (err as Error).message || 'Failed to download workspace ZIP.');
@@ -591,6 +640,8 @@ export const DataLoaderFeature: React.FC = () => {
     setUploadingFiles(true);
     let uploadedCount = 0;
     const failedFiles: string[] = [];
+    const setLastUploadedFilePath = useUIStore.getState().setLastUploadedFilePath;
+    let lastSuccess: string | null = null;
 
     try {
       for (const file of selectedFiles) {
@@ -598,12 +649,20 @@ export const DataLoaderFeature: React.FC = () => {
           const success = await handleUploadFile(file);
           if (success) {
             uploadedCount += 1;
+            lastSuccess = file.name;
           } else {
             failedFiles.push(file.name);
           }
         } catch {
           failedFiles.push(file.name);
         }
+      }
+
+      if (lastSuccess) {
+        // Server stores uploads at the data-folder root, so the visible path
+        // matches the file's basename. Used by the contextual hints system
+        // to highlight the matching file row's "Add" button.
+        setLastUploadedFilePath(lastSuccess);
       }
 
       if (failedFiles.length === 0) {
@@ -678,6 +737,12 @@ export const DataLoaderFeature: React.FC = () => {
     try {
       await workspaceActions.createNodeFromFile(addFileName, selectedSheet ?? undefined);
       notify('success', `${addFileName} added to workspace.`);
+      // The file has been added — clear the "new upload" hint state so the
+      // contextual hint stops pointing at this row.
+      const lastUploaded = useUIStore.getState().lastUploadedFilePath;
+      if (lastUploaded && (lastUploaded === addFileName || addFileName.endsWith(`/${lastUploaded}`))) {
+        useUIStore.getState().setLastUploadedFilePath(null);
+      }
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to add file to workspace.');
     } finally {
@@ -730,6 +795,7 @@ export const DataLoaderFeature: React.FC = () => {
             variant="ghost"
             className="h-7 px-2"
             disabled={!hasWorkspaceSelected}
+            data-hint-id="data-loader.file-row.add"
             onClick={() => {
               if (!hasWorkspaceSelected) {
                 setWorkspaceAlertOpen(true);
@@ -834,10 +900,15 @@ export const DataLoaderFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-[calc(100vh-9rem)] min-h-[640px] flex-col gap-4">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold text-foreground">Data Loader</h1>
+          <h1 className="font-semibold leading-none tracking-tight text-foreground">Data Loader</h1>
+          <InfoIcon
+            targetKey="data-loader.overview"
+            label="About the Data Loader"
+            tooltip="Learn what the Data Loader is and how it helps you get started."
+          />
           <HelpIcon
             targetKey="data-loader.tab"
             label="Data loader overview"
@@ -846,27 +917,37 @@ export const DataLoaderFeature: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card ref={activeCardRef} data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {currentWorkspace ? 'Active workspace' : 'Create workspace'}
-              {currentWorkspace ? (
-                <HelpIcon
-                  targetKey="data-loader.active-workspace.section"
-                  label="Active workspace overview"
-                  tooltip="Choose or rename the workspace where new data blocks will be added. Save regularly to persist your progress."
-                />
-              ) : (
-                <HelpIcon
-                  targetKey="data-loader.create-workspace.name"
-                  label="Create workspace overview"
-                  tooltip="Create a new workspace before uploading files or adding data blocks. Add an optional description if you want to capture its purpose."
-                />
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <div ref={splitContainerRef} className="flex min-h-0 flex-1 flex-col">
+        <div
+          className="min-h-0 overflow-hidden"
+          style={{ flexBasis: `${topRatio * 100}%` }}
+        >
+          <div className="grid h-full min-h-0 gap-4 lg:grid-cols-2">
+            <Card
+              data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}
+              data-hint-id="workspace.create-or-load"
+              className="flex h-full flex-col overflow-hidden"
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {currentWorkspace ? 'Active workspace' : 'Create workspace'}
+                  {currentWorkspace ? (
+                    <HelpIcon
+                      targetKey="data-loader.active-workspace.section"
+                      label="Active workspace overview"
+                      tooltip="Choose or rename the workspace where new data blocks will be added. Save regularly to persist your progress."
+                    />
+                  ) : (
+                    <HelpIcon
+                      targetKey="data-loader.create-workspace.name"
+                      label="Create workspace overview"
+                      tooltip="Create a new workspace before uploading files or adding data blocks. Add an optional description if you want to capture its purpose."
+                    />
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4">
+
             {currentWorkspace ? (
               <>
                 <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
@@ -927,7 +1008,9 @@ export const DataLoaderFeature: React.FC = () => {
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
-                      onClick={() => workspaceActions.setCurrentWorkspace(null)}
+                      onClick={() => {
+                        void handleSetCurrentWorkspace(null);
+                      }}
                       disabled={!hasWorkspaceSelected || workspaceBusy}
                     >
                       <LogOut className="mr-2 h-4 w-4" /> Unload
@@ -961,8 +1044,7 @@ export const DataLoaderFeature: React.FC = () => {
         </Card>
 
         <Card
-          className="flex flex-col overflow-hidden"
-          style={activeCardHeight ? { height: activeCardHeight } : undefined}
+          className="flex h-full flex-col overflow-hidden"
         >
           <CardHeader>
             <div className="flex items-center justify-between gap-2">
@@ -1029,6 +1111,17 @@ export const DataLoaderFeature: React.FC = () => {
                     >
                       <div>
                         <div className="flex items-center gap-1 font-medium text-foreground">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 shrink-0"
+                            aria-label={isFavorite(workspaceId) ? 'Remove from favorites' : 'Add to favorites'}
+                            onClick={() => toggleFavorite(workspaceId)}
+                          >
+                            <Star
+                              className={`h-4 w-4 ${isFavorite(workspaceId) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
+                            />
+                          </Button>
                           <span>{workspace.name || workspaceId}</span>
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
@@ -1057,7 +1150,9 @@ export const DataLoaderFeature: React.FC = () => {
                         <Button
                           size="sm"
                           variant={isActive ? 'outline' : 'secondary'}
-                          onClick={() => workspaceActions.setCurrentWorkspace(isActive ? null : workspaceId)}
+                          onClick={() => {
+                            void handleSetCurrentWorkspace(isActive ? null : workspaceId);
+                          }}
                         >
                           {isActive ? 'Unload' : 'Load'}
                         </Button>
@@ -1085,9 +1180,34 @@ export const DataLoaderFeature: React.FC = () => {
             )}
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </div>
 
-      <Card>
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize data loader sections"
+          aria-valuenow={Math.round(topRatio * 100)}
+          aria-valuemin={15}
+          aria-valuemax={85}
+          tabIndex={0}
+          onPointerDown={handleSplitterPointerDown}
+          onPointerMove={handleSplitterPointerMove}
+          onPointerUp={handleSplitterPointerUp}
+          onPointerCancel={handleSplitterPointerUp}
+          onKeyDown={handleSplitterKeyDown}
+          onDoubleClick={() => setTopRatio(0.5)}
+          className="my-1 flex h-2 shrink-0 cursor-row-resize items-center justify-center rounded-full bg-border transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="Drag to resize. Double-click to reset."
+        >
+          <div className="h-1 w-12 rounded-full bg-muted-foreground/40" />
+        </div>
+
+        <div
+          className="flex min-h-0 flex-col overflow-hidden"
+          style={{ flexBasis: `${(1 - topRatio) * 100}%` }}
+        >
+          <Card className="flex h-full flex-col overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2">
@@ -1110,7 +1230,7 @@ export const DataLoaderFeature: React.FC = () => {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
               <Button onClick={openFilePicker} disabled={uploading || uploadingFiles}>
@@ -1210,6 +1330,8 @@ export const DataLoaderFeature: React.FC = () => {
           <div>Total files: {totalFileCount}</div>
         </div>
       </Card>
+        </div>
+      </div>
 
       <FilePreviewPanel filename={previewFile} open={Boolean(previewFile)} onClose={() => setPreviewFile(null)} />
       <AddFilePanel

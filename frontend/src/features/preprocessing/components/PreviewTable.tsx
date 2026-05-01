@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { flexRender, type ColumnDef } from '@tanstack/react-table';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { Button } from '../../../components/ui/button';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { RowDetailPanel } from '../../analysis/common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../../analysis/common/components/useRowDetailDialog';
+import { useServerTable } from '../../../hooks/useServerTable';
 import { formatPreviewValue } from '../utils/typeUtils';
 import { type PreviewRow, type PreviewPagination, PREVIEW_PAGE_SIZE_OPTIONS } from '../types';
 
@@ -23,14 +25,24 @@ interface PreviewTableProps {
   page: number;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  /** Set the current page (1-indexed). Replaces onPreviousPage / onNextPage. */
+  onPageChange: (page: number) => void;
   loadingBadge?: React.ReactNode;
   documentColumn?: string;
 }
 
+function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow, unknown>[] {
+  return columnsToRender.map((col) => ({
+    accessorKey: col,
+    header: col,
+    cell: ({ getValue }) => formatPreviewValue(getValue()),
+  }));
+}
+
 /**
- * Shared preview table component used across data preprocessing sub-tabs
+ * Shared preview table component used across data preprocessing sub-tabs.
+ * Internally backed by a server-side TanStack Table (useServerTable) for
+ * consistent rendering and pagination handling.
  */
 export const PreviewTable: React.FC<PreviewTableProps> = ({
   title,
@@ -45,8 +57,7 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
   page,
   pageSize,
   onPageSizeChange,
-  onPreviousPage,
-  onNextPage,
+  onPageChange,
   loadingBadge,
   documentColumn,
 }) => {
@@ -60,6 +71,25 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
   const tableColSpan = Math.max(columnsToRender.length, 1);
   const currentPage = pagination?.page ?? page;
   const displayTotalPages = pagination?.total_pages ?? Math.max(1, currentPage);
+
+  const columnDefs = buildColumnDefs(columnsToRender);
+
+  const table = useServerTable<PreviewRow>({
+    data,
+    columns: columnDefs,
+    rowCount: pagination?.total_rows ?? data.length,
+    pageIndex: currentPage - 1,
+    pageSize,
+    onPaginationChange: (next) => {
+      if (next.pageSize !== pageSize) {
+        onPageSizeChange(next.pageSize);
+      }
+      const newPage = next.pageIndex + 1;
+      if (newPage !== currentPage) {
+        onPageChange(newPage);
+      }
+    },
+  });
 
   return (
     <Card>
@@ -108,22 +138,28 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
           <ScrollArea type="always" scrollbars="horizontal" className="rounded-lg border border-border">
               <Table disableContainer>
                 <TableHeader className="bg-muted/40">
-                  <TableRow>
-                    {columnsToRender.length > 0 ? (
-                      columnsToRender.map((col) => (
-                        <TableHead
-                          key={col}
-                          className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground"
-                        >
-                          {col}
-                        </TableHead>
-                      ))
-                    ) : (
+                  {columnsToRender.length > 0 ? (
+                    table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead
+                            key={header.id}
+                            className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground"
+                          >
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(header.column.columnDef.header, header.getContext())}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
                       <TableHead className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground">
                         No columns
                       </TableHead>
-                    )}
-                  </TableRow>
+                    </TableRow>
+                  )}
                 </TableHeader>
                 <TableBody>
                   {loading && data.length === 0 ? (
@@ -142,31 +178,32 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data.map((row, rowIndex) => (
+                    table.getRowModel().rows.map((row) => (
                       <TableRow
-                        key={rowIndex}
+                        key={row.id}
                         className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
                         onClick={() => {
+                          const original = row.original;
                           const detailTextColumn =
-                            documentColumn && Object.prototype.hasOwnProperty.call(row, documentColumn)
+                            documentColumn && Object.prototype.hasOwnProperty.call(original, documentColumn)
                               ? documentColumn
                               : undefined;
 
                           openRowDetail({
-                            record: { ...row },
+                            record: Object.assign({}, original),
                             textColumn: detailTextColumn,
                           });
                         }}
                       >
-                        {columnsToRender.map((col) => {
-                          const cellValue = formatPreviewValue(row[col]);
+                        {row.getVisibleCells().map((cell) => {
+                          const cellValue = cell.getValue();
                           return (
                             <TableCell
-                              key={`${rowIndex}-${col}`}
+                              key={cell.id}
                               className="max-w-xs truncate px-3 py-2 font-mono text-xs text-foreground"
                               title={String(cellValue ?? '')}
                             >
-                              {cellValue}
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </TableCell>
                           );
                         })}
@@ -188,8 +225,8 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              onClick={onPreviousPage}
-              disabled={!pagination?.has_prev || loading}
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage() || loading}
               variant="outline"
               size="sm"
             >
@@ -198,8 +235,8 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
             <span className="text-sm text-muted-foreground">Page {currentPage}</span>
             <Button
               type="button"
-              onClick={onNextPage}
-              disabled={!pagination?.has_next || loading}
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage() || loading}
               variant="outline"
               size="sm"
             >

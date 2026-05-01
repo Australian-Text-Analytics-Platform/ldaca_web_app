@@ -8,6 +8,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: ({ label }: { label?: string }) => <button type="button">{label ?? 'Help'}</button>,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => null,
+}));
+
 vi.mock('@/features/analysis/common/components/AnalysisCardLayout', () => ({
   AnalysisCardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -36,9 +40,11 @@ describe('TokenFrequencyResultsPanel', () => {
         onStopWordsApply={vi.fn()}
         isLoadingStopWords={false}
         onFillDefaultStopWords={vi.fn()}
+        onSortStopWords={vi.fn()}
         tokenLimitInput="25"
         onTokenLimitInputChange={vi.fn()}
         onTokenLimitBlur={vi.fn()}
+        applyCloudTokenLimit={vi.fn()}
         tokenLimitError={null}
         isApplyingTokenLimit={false}
         appliedStopCount={0}
@@ -57,24 +63,15 @@ describe('TokenFrequencyResultsPanel', () => {
         unifiedCloudHeight={400}
         unifiedCloudContainerRef={{ current: null }}
         registerWordCloudRef={vi.fn()}
-        statsSortColumn="token"
-        statsSortDirection="asc"
-        onToggleStatsSort={vi.fn()}
-        sortedStatistics={[]}
-        statsRowsPerPage={10}
-        statsPage={1}
-        onStatsPageChange={vi.fn()}
-        onStatsRowsPerPageChange={vi.fn()}
         onDownloadFrequencyCsv={vi.fn()}
-        statsTokenFilter=""
-        onStatsTokenFilterChange={vi.fn()}
       />
     );
 
     expect(screen.getByRole('button', { name: 'Apply Stop Words' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fill Default' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About default stop words' })).toBeInTheDocument();
-    expect(screen.getByText('Currently displaying top 25 tokens per table (default: 25).')).toBeInTheDocument();
+    expect(screen.getByText('Cloud display limit (10–100)')).toBeInTheDocument();
     expect(screen.queryByText('Bundled default stop words')).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Fill Default loads the bundled English stop-word list shipped with the app/i)

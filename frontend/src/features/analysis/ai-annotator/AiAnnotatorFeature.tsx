@@ -366,7 +366,7 @@ const AiAnnotatorFeature: React.FC = () => {
       setAvailableModels(models);
       const modelIds = models.map((m) => m.id);
       if (models.length > 0 && (!model.trim() || !modelIds.includes(model))) {
-        setModel(models[0].id);
+        setModel(models[0]!.id);
       }
       setStatusMessage(response?.message ?? 'Model catalog loaded.');
     } catch (error) {
@@ -609,7 +609,7 @@ const AiAnnotatorFeature: React.FC = () => {
   const loadReviewPage = async (nodeId: string, textCol: string, annotationCol: string, pg: number, pgSize: number) => {
     setIsReviewPaging(true);
     try {
-      const response = await nodesApi.data(nodeId, pg, pgSize, getAuthHeaders());
+      const response = await nodesApi.data(nodeId, { page: pg, pageSize: pgSize }, getAuthHeaders());
       const rows = (response as { data?: Array<Record<string, unknown>> })?.data ?? [];
       const columns = (response as { columns?: string[] })?.columns ?? [];
       const pagination = (response as { pagination?: AiAnnotationNodeResult['pagination'] })?.pagination;
@@ -861,7 +861,7 @@ const AiAnnotatorFeature: React.FC = () => {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {aiAnnotationWaitingBanner ? (
         <AnalysisTaskBanner
           analysisName="AI Annotation"
@@ -874,6 +874,11 @@ const AiAnnotatorFeature: React.FC = () => {
 
       <AnalysisCardLayout
         title="AI Annotation and Review"
+        info={{
+          targetKey: 'ai-annotator.overview',
+          label: 'About AI Annotation and Review',
+          tooltip: 'Learn what AI annotation is and how it can help you.',
+        }}
         actions={panelTab === 'ai-annotation' ? {
           onRun: handleRun,
           onClear: handleClear,
@@ -920,6 +925,11 @@ const AiAnnotatorFeature: React.FC = () => {
           runLabel: isReviewLoading ? 'Reviewing' : 'Review',
         }}
       >
+        <p className="mb-4 text-sm font-medium text-red-600 dark:text-red-400">
+          This tool is under development and not ready to be used. In order to use GenAI assisted coding,
+          you will need to have a valid API key from a commercial provider, or deploy a local GenAI model
+          and setup the endpoint correctly.
+        </p>
         <Tabs value={panelTab} onValueChange={(value) => setPanelTab(value as 'ai-annotation' | 'review')}>
           <TabsList className="mb-4">
             <TabsTrigger value="ai-annotation">AI Annotation</TabsTrigger>
@@ -927,7 +937,7 @@ const AiAnnotatorFeature: React.FC = () => {
           </TabsList>
 
           <TabsContent value="ai-annotation" className="mt-0">
-            <div className="space-y-6">
+            <div className="space-y-4">
               <section className="space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Commonly Used Parameters</h3>
@@ -1217,17 +1227,20 @@ const AiAnnotatorFeature: React.FC = () => {
               </div>
               <Button
                 type="button"
-                variant="outline"
+                size="sm"
                 onClick={handleDetach}
                 disabled={isDetaching || isRunning || !selectedNodeId || !selectedColumn || parsedClasses.length === 0}
               >
                 {isDetaching ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Detaching...
+                    Adding to Workspace...
                   </>
                 ) : (
-                  'Detach'
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace
+                  </>
                 )}
               </Button>
             </div>

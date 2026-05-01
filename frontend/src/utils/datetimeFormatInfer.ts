@@ -7,25 +7,43 @@ export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boo
   if (!nonEmpty.length) return null;
 
   // Choose the sample with the most content (likely has time / tz info)
-  const candidate = [...nonEmpty].sort((a, b) => b.length - a.length)[0].trim();
+  const candidate = nonEmpty.toSorted((a, b) => b.length - a.length)[0]!.trim();
 
   let format = candidate;
 
   // Year (4-digit)
   format = format.replace(/\b\d{4}\b/, '%Y');
+
+  // Full month names (January, February, ...) → %B
+  format = format.replace(
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/i,
+    '%B',
+  );
+  // Abbreviated month names (Jan, Feb, ...) → %b
+  if (!format.includes('%B')) {
+    format = format.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i, '%b');
+  }
+
+  const hasMonthToken = () => format.includes('%m') || format.includes('%b') || format.includes('%B');
+  const escapeSep = (s: string) => (s === '.' ? '\\.' : s);
+
   // Month and day: attempt to respect separators - replace first 2-digit group after %Y separator with %m then next with %d
   const dateSepMatch = format.match(/%Y([-/.])/);
   if (dateSepMatch) {
-    const sep = dateSepMatch[1];
-    const afterYearRegex = new RegExp(`%Y${sep}(\\d{2})`);
-    format = format.replace(afterYearRegex, `%Y${sep}%m`);
-    const afterMonthRegex = new RegExp(`%m${sep}(\\d{2})`);
-    format = format.replace(afterMonthRegex, `%m${sep}%d`);
-  } else {
-    // Fallback: replace first 2-digit with %m second with %d if not already present
-    if (!format.includes('%m')) format = format.replace(/\b\d{2}\b/, '%m');
-    if (!format.includes('%d')) format = format.replace(/\b\d{2}\b/, '%d');
+    const sep = dateSepMatch[1]!;
+    const esc = escapeSep(sep);
+    if (!hasMonthToken()) {
+      format = format.replace(new RegExp(`%Y${esc}(\\d{2})`), `%Y${sep}%m`);
+    }
+    if (!format.includes('%d')) {
+      format = format.replace(new RegExp(`(?:%m|%b|%B)${esc}(\\d{2})`), (match) =>
+        match.replace(/\d{2}/, '%d'),
+      );
+    }
   }
+  // General fallback for remaining date components
+  if (!hasMonthToken()) format = format.replace(/\b\d{2}\b/, '%m');
+  if (!format.includes('%d')) format = format.replace(/\b\d{2}\b/, '%d');
 
   // Timezone offset MUST be detected BEFORE time patterns to avoid
   // +00:00 being misinterpreted as a second %H:%M.
@@ -36,17 +54,20 @@ export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boo
   // Trailing Z for UTC
   format = format.replace(/Z$/, 'Z');
 
-  // Time HH:MM:SS
-  format = format.replace(/\b([01]\d|2[0-3]):[0-5]\d:[0-5]\d/, '%H:%M:%S');
-  // Time HH:MM (only if full not already replaced)
-  format = format.replace(/\b([01]\d|2[0-3]):[0-5]\d\b/, '%H:%M');
+  // Time HH:MM:SS — also match after 'T' for ISO 8601
+  format = format.replace(/(?:\b|(?<=T))([01]\d|2[0-3]):[0-5]\d:[0-5]\d/, '%H:%M:%S');
+  // Time HH:MM (only if full not already replaced) — use negative lookahead instead of \b to handle trailing Z
+  format = format.replace(/(?:\b|(?<=T))([01]\d|2[0-3]):[0-5]\d(?![:\d])/, '%H:%M');
+
+  // 12-hour AM/PM → convert %H to %I and add %p
+  format = format.replace(/%H(:%M(?::%S)?)\s*(?:AM|PM)/i, '%I$1 %p');
 
   // Fractional seconds .123 or .123456 -> replace any dot + 3-6 digits with %.f (Chrono-style subseconds placeholder)
   format = format.replace(/\.\d{3,6}/, '%.f');
 
   // Basic validation
   if (!format.includes('%Y')) return null;
-  if (opts.requireTime && !format.includes('%H')) return null;
+  if (opts.requireTime && !format.includes('%H') && !format.includes('%I')) return null;
 
   return format;
 }

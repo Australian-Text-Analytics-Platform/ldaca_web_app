@@ -3,6 +3,11 @@ export type PaginationState = {
   totalPages: number;
   pageSize: number;
   totalItems: number;
+  sortBy?: string;
+  descending?: boolean;
+  filterColumn?: string;
+  filterValue?: string;
+  filterOp?: string;
 };
 
 export type PaginationMap = Record<string, PaginationState>;

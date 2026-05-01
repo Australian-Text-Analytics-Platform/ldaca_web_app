@@ -28,12 +28,8 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
     setPageSize,
   } = useFilePreview(filename, open);
 
-  const rows = previewData as ReadonlyArray<Record<string, unknown>>;
-  const columnNames = columns as ReadonlyArray<string>;
-  const availableSheets = sheetNames as ReadonlyArray<string> | null | undefined;
-
   const canPrev = page > 0;
-  const canNext = totalRows ? (page + 1) * pageSize < totalRows : rows.length > 0;
+  const canNext = totalRows ? (page + 1) * pageSize < totalRows : previewData.length > 0;
 
   const handlePrev = () => {
     if (!filename || !canPrev) return;
@@ -67,7 +63,7 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
 
           <CardContent className="flex-1 min-w-0 overflow-hidden px-0 py-0">
             <div className="h-full w-full min-w-0 overflow-y-auto px-6 py-4">
-              {fileType === 'excel' && availableSheets && availableSheets.length > 0 && (
+              {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
                 <div className="mb-4">
                   <label className="mb-2 block text-sm font-medium text-foreground">Sheet</label>
                   <Select
@@ -82,7 +78,7 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
                       <SelectValue placeholder="Select a sheet" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableSheets.map((name) => (
+                      {sheetNames.map((name) => (
                         <SelectItem key={name} value={name}>
                           {name}
                         </SelectItem>
@@ -97,14 +93,14 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
                 <div className="py-12 text-center text-muted-foreground">Loading…</div>
               ) : error ? (
                 <div className="py-12 text-center text-destructive">{error}</div>
-              ) : rows.length === 0 ? (
+              ) : previewData.length === 0 ? (
                 <div className="py-12 text-center text-muted-foreground">No preview data</div>
               ) : (
                 <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-md border border-border/50">
                   <table className="min-w-max max-w-full text-sm">
                     <thead>
                       <tr className="bg-muted">
-                        {columnNames.map((column) => (
+                        {columns.map((column) => (
                           <th key={column} className="whitespace-nowrap px-3 py-2 text-left font-medium">
                             {column}
                           </th>
@@ -112,9 +108,9 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((row, rowIndex) => (
+                      {previewData.map((row, rowIndex) => (
                         <tr key={rowIndex} className={rowIndex % 2 ? 'bg-muted/40' : 'bg-background'}>
-                          {columnNames.map((column) => {
+                          {columns.map((column) => {
                             const cellValue = String(row[column] ?? '');
                             return (
                               <td key={`${column}-${rowIndex}`} className="max-w-xs truncate px-3 py-2" title={cellValue}>

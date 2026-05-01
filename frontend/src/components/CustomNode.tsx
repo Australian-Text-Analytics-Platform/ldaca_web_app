@@ -13,8 +13,6 @@ import {
 } from './ui/alert-dialog';
 import { type WorkspaceNode } from '../types';
 
-type DebugWindow = Window & { __LDACA_DEBUG_GRAPH?: boolean };
-
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
   isMultiSelected?: boolean;
@@ -25,6 +23,10 @@ interface CustomNodeData extends Record<string, unknown> {
   onRedo?: (nodeId: string) => void;
 }
 
+const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
+
+/** React Flow node renderer for a workspace node. Shows a compact card when zoomed
+ *  out, and a full card with metadata + action menu when zoomed in. */
 function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
   const { node, isMultiSelected = false, onDelete, onRename, onCopy, onUndo, onRedo } = data;
   const [showMenu, setShowMenu] = useState(false);
@@ -36,22 +38,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const zoom = useStore((s) => s.transform[2]);
-  const isZoomedOut = zoom < 0.7;
-
-  const debugWindow: DebugWindow | null = typeof window !== 'undefined' ? (window as DebugWindow) : null;
-  const DEBUG_GRAPH = Boolean(debugWindow?.__LDACA_DEBUG_GRAPH) || (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
-  const dlog = (...args: unknown[]) => {
-    if (DEBUG_GRAPH) console.debug(...args);
-  };
-
-  useEffect(() => {
-    if (DEBUG_GRAPH) console.debug('CustomNode: node updated', {
-      nodeId: node?.node_id,
-      dataType: node?.data_type,
-      nodeName: node?.name,
-      isRendering: true
-    });
-  }, [node, DEBUG_GRAPH]);
+  const isZoomedOut = zoom < COMPACT_NODE_ZOOM_THRESHOLD;
 
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;
@@ -223,15 +210,24 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     </div>
   );
 
-  dlog('CustomNode rendering:', {
-    nodeId: node?.node_id,
-    nodeName,
-    selected,
-    isMultiSelected,
-    shape: nodeShape,
-    shapeFirstElement: nodeShape ? nodeShape[0] : 'no shape',
-    isFirstElementNull: nodeShape ? nodeShape[0] === null : 'no shape'
-  });
+  const deleteDialog = (
+    <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete this node and its data. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-white hover:bg-destructive/90">
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
@@ -261,23 +257,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         </div>
         <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
-
-        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete this node and its data. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-white hover:bg-destructive/90">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {deleteDialog}
       </div>
     );
   }
@@ -307,7 +287,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="nodrag nopan relative z-50 w-full rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="nodrag nopan relative z-50 w-full rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-bold focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 style={{ 
                   fontSize: '14px',
                   lineHeight: '1.2'
@@ -355,23 +335,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       {/* Passive handles so backend edges can attach; UI connections remain disabled by parent ReactFlow props */}
       <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
-
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this node and its data. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-white hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {deleteDialog}
     </div>
   );
 };

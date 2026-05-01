@@ -168,7 +168,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     queryKey: (nodeId && workspaceId) ? queryKeys.nodeSchema(workspaceId, nodeId) : ['_no_schema_'],
     queryFn: async () => {
       if (!workspaceId || !nodeId) return {};
-      const info = await getNodeInfo({ workspaceId, nodeId, getAuthHeaders, force: true });
+      const info = await getNodeInfo({ workspaceId, nodeId, getAuthHeaders });
       return normalizeSchemaFromInfo(info);
     },
     enabled: !!nodeId && !isLocked && !!workspaceId,

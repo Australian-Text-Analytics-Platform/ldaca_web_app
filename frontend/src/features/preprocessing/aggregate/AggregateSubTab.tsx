@@ -1,16 +1,17 @@
 import React from 'react';
-import { Calculator, Loader2 } from 'lucide-react';
+import { Calculator, Loader2, X } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Separator } from '../../../components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import { Tag } from '../../../components/ui/tag';
 import { cn } from '../../../lib/utils';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
+import { OperationPopover } from './components/OperationPopover';
 import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
 export type { AggregateSubTabProps } from './hooks/useAggregateSubTab';
@@ -23,25 +24,34 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
     basicBuilder,
     preview,
     apply,
-    manualExpressionActive,
     dropZoneRef,
   } = useAggregateSubTab(props);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
-        <CardHeader className="space-y-1">
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Computed Column Builder
-            <HelpIcon
-              targetKey="preprocessing.aggregate.tab"
-              label="Aggregate sub-tab overview"
-              tooltip="Combine existing columns with Polars-style expressions. The result is added to the selected data block using with_columns."
-            />
-          </CardTitle>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Computed Column Builder
+                <HelpIcon
+                  targetKey="preprocessing.aggregate.tab"
+                  label="Aggregate sub-tab overview"
+                  tooltip="Combine existing columns with Polars-style expressions. The result is added to the selected data block using with_columns."
+                />
+              </CardTitle>
+            </div>
+            {apply.loading && (
+              <Tag tone="muted">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Adding…
+              </Tag>
+            )}
+          </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <NodeSelectionPanel
             selectedNodes={nodeSelection.effectiveNodes}
             nodeColumnSelections={nodeSelection.nodeColumnSelections}
@@ -53,6 +63,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             className="rounded-lg border border-border/60 bg-muted/40 pt-0"
             showColorPicker={false}
             showColumnPicker={false}
+            showHeaderLabel
             originalCount={nodeSelection.originalCount}
             disabled={isLoading.operations}
             showShape
@@ -67,25 +78,19 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
 
           <Separator />
 
-          <Tabs value={expression.mode} onValueChange={(val) => expression.setMode(val as 'basic' | 'advanced')} className="space-y-4">
-            <TabsList className="flex max-w-md gap-2">
-              <TabsTrigger value="basic">Basic</TabsTrigger>
-              <TabsTrigger value="advanced">Advanced</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="basic" className="space-y-4">
+          <div className="space-y-4">
               <div className="space-y-2">
-                <span className="text-sm font-medium text-foreground">Available tokens</span>
+                <span className="text-sm font-medium text-foreground">Available columns</span>
                 {basicBuilder.availableColumns.length > 0 ? (
                   <div className={cn('flex flex-wrap gap-2', basicBuilder.disabled && 'pointer-events-none opacity-60')}>
-                    {basicBuilder.availableColumns.map((column) => (
+                    {basicBuilder.availableColumns.map((col) => (
                       <button
-                        key={column}
+                        key={col.name}
                         type="button"
                         draggable={!basicBuilder.disabled}
-                        onDragStart={(event) => basicBuilder.handlers.columnDragStart(event, column)}
+                        onDragStart={(event) => basicBuilder.handlers.columnDragStart(event, col.name, col.dataType)}
                         onDragEnd={basicBuilder.handlers.paletteDragEnd}
-                        onClick={() => basicBuilder.addColumnToken(column)}
+                        onClick={() => basicBuilder.addColumnToken(col.name, col.dataType)}
                         className={cn(
                           'select-none rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
                           basicBuilder.disabled
@@ -93,7 +98,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                             : 'cursor-grab active:cursor-grabbing',
                         )}
                       >
-                        {column}
+                        {col.name}
                       </button>
                     ))}
                     <button
@@ -136,16 +141,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                 >
                   {basicBuilder.tokens.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      {manualExpressionActive ? (
-                        <>
-                          Expression currently defined via Advanced editor:&nbsp;
-                          <code className="rounded bg-background px-2 py-1 font-mono text-xs text-foreground">
-                            {expression.expression.trim()}
-                          </code>
-                        </>
-                      ) : (
-                        'Drag columns or custom text here to build an expression. Tokens snap into place as you drop them.'
-                      )}
+                      Drag columns or custom text here to build an expression. Tokens snap into place as you drop them.
                     </p>
                   ) : (
                     <div className="flex flex-wrap items-center gap-3">
@@ -162,7 +158,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                           <div key={token.id} className="flex items-center gap-1">
                             {showBefore && <span className="h-8 w-0.5 rounded bg-primary" aria-hidden="true" />}
                             <div
-                              className={cn('group relative flex items-center', basicBuilder.disabled && 'opacity-70')}
+                              className={cn('group', basicBuilder.disabled && 'opacity-70')}
                               draggable={!basicBuilder.disabled && !isEditing}
                               onDragStart={(event) => basicBuilder.handlers.existingTokenDragStart(event, token.id)}
                               onDragEnd={basicBuilder.handlers.existingTokenDragEnd}
@@ -170,7 +166,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                             >
                               <div
                                 className={cn(
-                                  'flex min-h-8.5 items-center gap-2 rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
+                                  'flex min-h-8.5 items-center gap-1 rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
                                   !basicBuilder.disabled && !isEditing && 'cursor-grab active:cursor-grabbing',
                                 )}
                               >
@@ -198,19 +194,43 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                                     </button>
                                   )
                                 ) : (
-                                  <span className="font-medium">{token.column}</span>
+                                  <OperationPopover
+                                    nodeId={nodeSelection.effectiveNodes[0]?.id ?? nodeSelection.effectiveNodes[0]?.node_id ?? ''}
+                                    column={token.column}
+                                    dtype={token.dtype}
+                                    onSelect={(op) => basicBuilder.addOperation(token.id, op)}
+                                    disabled={basicBuilder.disabled}
+                                  >
+                                    <button type="button" className="font-medium hover:text-background/80 transition">
+                                      {token.column}
+                                    </button>
+                                  </OperationPopover>
                                 )}
+                                {!isCustom && token.operations.map((op, idx) => (
+                                  <span key={`${op}-${idx}`} className="flex items-center gap-0.5 border-l border-background/30 pl-1">
+                                    <span className="font-mono text-xs text-background/70">.{op}()</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => basicBuilder.removeOperation(token.id, idx)}
+                                      className="inline-flex size-3.5 items-center justify-center rounded-full hover:bg-background/20 focus-visible:outline-hidden"
+                                      aria-label={`Remove ${op}`}
+                                      disabled={basicBuilder.disabled}
+                                    >
+                                      <X className="size-2.5" />
+                                    </button>
+                                  </span>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => basicBuilder.removeToken(token.id)}
+                                  className="ml-1 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-background/30 text-background/60 transition hover:border-background/60 hover:text-background focus-visible:outline-hidden group-hover:border-background/60 group-hover:text-background"
+                                  aria-label="Remove token"
+                                  disabled={basicBuilder.disabled}
+                                  onMouseDown={(event) => event.stopPropagation()}
+                                >
+                                  <X className="size-2.5" />
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => basicBuilder.removeToken(token.id)}
-                                className="absolute -top-1.5 -right-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-[10px] font-semibold text-muted-foreground opacity-0 transition hover:border-destructive hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
-                                aria-label="Remove token"
-                                disabled={basicBuilder.disabled}
-                                onMouseDown={(event) => event.stopPropagation()}
-                              >
-                                <span aria-hidden="true">x</span>
-                              </button>
                             </div>
                             {showAfter && <span className="h-8 w-0.5 rounded bg-primary" aria-hidden="true" />}
                           </div>
@@ -223,7 +243,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
 
               <div className="space-y-2">
                 <span className="text-sm font-medium text-foreground">Expression preview</span>
-                <div className="rounded-md border border-muted-foreground/50 bg-muted/30 px-3 py-2 font-mono text-sm text-muted-foreground">
+                <div className="rounded-md border border-muted-foreground/50 bg-muted/30 px-3 py-2 font-mono text-sm text-muted-foreground break-all">
                   {basicBuilder.expressionPreview.length > 0 ? basicBuilder.expressionPreview : '—'}
                 </div>
               </div>
@@ -242,88 +262,48 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                   Clear Builder
                 </Button>
               </div>
-            </TabsContent>
-
-            <TabsContent value="advanced" className="space-y-4">
-              <label className="flex flex-col gap-2">
-                <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  Expression
-                  <HelpIcon targetKey="preprocessing.aggregate.expression" label="Advanced expression" />
-                </span>
-                <textarea
-                  value={expression.expression}
-                  onChange={expression.onChange.expression}
-                  onBlur={expression.onExpressionBlur}
-                  onFocus={expression.onExpressionFocus}
-                  spellCheck={false}
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  rows={3}
-                  placeholder="Examples: A + B, when(A > 0, A, 0), A / lit(100)"
-                  className={cn(
-                    'w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm shadow-sm',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  )}
-                  disabled={!nodeSelection.effectiveNodes.length || isLoading.operations}
-                />
-              </label>
-            </TabsContent>
-          </Tabs>
-
-          <div className="space-y-4">
-            <label className="flex flex-col gap-2">
-              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                New column name (optional)
-                <HelpIcon targetKey="preprocessing.aggregate.column-name" label="Computed column name" />
-              </span>
-              <Input
-                value={expression.columnName}
-                onChange={expression.onChange.columnName}
-                onBlur={expression.onColumnNameBlur}
-                onFocus={expression.onColumnNameFocus}
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="none"
-                autoComplete="off"
-                placeholder="Defaults to the expression string"
-                disabled={!nodeSelection.effectiveNodes.length || isLoading.operations}
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button type="button" onClick={apply.handleApply} disabled={!apply.canApply}>
-                {apply.loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding…
-                  </>
-                ) : (
-                  'Add to Data Block'
-                )}
-              </Button>
-              <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
-            </div>
-            {(preview.loading ||
-              expression.focused.expression ||
-              expression.focused.columnName ||
-              basicBuilder.editingTokenId !== null ||
-              basicBuilder.dragActive) && (
-              <span className="text-sm text-muted-foreground">
-                Preview updates after you finish editing tokens or exit the fields.
-              </span>
-            )}
-            {apply.currentMatchesApplied && !preview.loading && !preview.error && (
-              <span className="text-sm text-muted-foreground">Latest expression already applied.</span>
-            )}
           </div>
         </CardContent>
+
+        <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
+          <div className="flex flex-1 items-center gap-2">
+            <span className="shrink-0 text-sm font-medium text-foreground">New column name</span>
+            <HelpIcon targetKey="preprocessing.aggregate.column-name" label="Computed column name" />
+            <Input
+              value={expression.columnName}
+              onChange={expression.onChange.columnName}
+              onBlur={expression.onColumnNameBlur}
+              onFocus={expression.onColumnNameFocus}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="none"
+              autoComplete="off"
+              placeholder="Defaults to the expression string"
+              disabled={!nodeSelection.effectiveNodes.length || isLoading.operations}
+              className="min-w-0 flex-1"
+            />
+          </div>
+          <Button type="button" size="sm" onClick={apply.handleApply} disabled={!apply.canApply} className="shrink-0">
+            {apply.loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding…
+              </>
+            ) : (
+              'Add to Data Block'
+            )}
+          </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+        </CardFooter>
       </Card>
 
       <PreviewTable
-        title="Preview"
+        title={
+          <span className="flex items-center gap-2">
+            Preview
+            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+          </span>
+        }
         description="Shows the computed column appended. Preview refreshes after each apply."
         columns={preview.columns}
         data={preview.data}
@@ -336,8 +316,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
         pageSize={preview.pageSize}
         documentColumn={getNodeDocumentColumn(nodeSelection.effectiveNodes[0])}
         onPageSizeChange={preview.setPageSize}
-        onPreviousPage={preview.onPreviousPage}
-        onNextPage={preview.onNextPage}
+        onPageChange={preview.onPageChange}
       />
     </div>
   );

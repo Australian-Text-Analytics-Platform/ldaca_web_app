@@ -11,8 +11,8 @@ const mockSliceNode = vi.fn();
 const mockSlicePreview = vi.fn();
 const mockFilterNode = vi.fn();
 const mockFilterPreview = vi.fn();
-const mockComputeColumnPreview = vi.fn();
-const mockComputeColumn = vi.fn();
+const mockPolarsExpressionPreview = vi.fn();
+const mockPolarsExpressionApply = vi.fn();
 const mockReplacePreview = vi.fn();
 const mockReplaceText = vi.fn();
 const mockRefreshNodeSchema = vi.fn();
@@ -60,11 +60,11 @@ vi.mock('@/hooks/useWorkspaceActions', () => ({
     concatPreview: vi.fn(),
     sliceNode: mockSliceNode,
     slicePreview: mockSlicePreview,
-    computeColumn: mockComputeColumn,
-    computeColumnPreview: mockComputeColumnPreview,
     replaceText: mockReplaceText,
     replaceTextPreview: mockReplacePreview,
     refreshNodeSchema: mockRefreshNodeSchema,
+    polarsExpressionPreview: mockPolarsExpressionPreview,
+    polarsExpressionApply: mockPolarsExpressionApply,
   }),
 }));
 
@@ -79,6 +79,10 @@ vi.mock('@/hooks/useWorkspaceStatus', () => ({
 }));
 
 vi.mock('@/components/help/HelpIcon', () => ({
+  default: () => null,
+}));
+
+vi.mock('@/components/help/InfoIcon', () => ({
   default: () => null,
 }));
 
@@ -192,11 +196,10 @@ describe('DataPreprocessingFeature replace tab', () => {
       expect(screen.getByRole('tab', { name: 'Sample' })).toHaveAttribute('aria-selected', 'true');
     });
 
-    expect(screen.getByText('Sample rows')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Slice' })).toBeInTheDocument();
     expect(screen.getByLabelText('Offset')).toBeInTheDocument();
 
-    screen.getByRole('combobox', { name: 'Sampling method' }).focus();
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    await user.click(screen.getByRole('tab', { name: 'Random Sample' }));
 
     expect(screen.queryByLabelText('Offset')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fraction / Count')).toBeInTheDocument();
@@ -230,7 +233,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     render(<DataPreprocessingFeature />);
 
     const [filterTab] = screen.getAllByRole('tab', { name: 'Filter' });
-    filterTab.focus();
+    filterTab!.focus();
     await user.keyboard('{ArrowRight}');
 
     await waitFor(() => {
@@ -239,9 +242,7 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     const samplePanel = screen.getByRole('tabpanel', { name: 'Sample' });
 
-    const [samplingMethodSelect] = within(samplePanel).getAllByRole('combobox');
-    samplingMethodSelect.focus();
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    await user.click(within(samplePanel).getByRole('tab', { name: 'Random Sample' }));
 
     fireEvent.change(within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'), { target: { value: '0.4' } });
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
@@ -258,6 +259,44 @@ describe('DataPreprocessingFeature replace tab', () => {
     expect(sampleNameInput).toHaveValue('Corpus_sampled_fr_0_4_rs_7');
   });
 
+  it('keeps focus on the name input after the first tab fill, then tabs to the next control on the second press', async () => {
+    const user = userEvent.setup();
+
+    render(<DataPreprocessingFeature />);
+
+    const [filterTab] = screen.getAllByRole('tab', { name: 'Filter' });
+    filterTab!.focus();
+    await user.keyboard('{ArrowRight}');
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Sample' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    const samplePanel = screen.getByRole('tabpanel', { name: 'Sample' });
+
+    await user.click(within(samplePanel).getByRole('tab', { name: 'Random Sample' }));
+
+    fireEvent.change(within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
+
+    const sampleNameInput = await screen.findByPlaceholderText('Corpus_sampled_fr_0_4_rs_7') as HTMLInputElement;
+    const addButton = within(samplePanel).getByRole('button', { name: 'Add to Workspace' });
+
+    sampleNameInput.focus();
+    expect(sampleNameInput).toHaveFocus();
+
+    await user.tab();
+
+    expect(sampleNameInput).toHaveValue('Corpus_sampled_fr_0_4_rs_7');
+    expect(sampleNameInput).toHaveFocus();
+    expect(sampleNameInput.selectionStart).toBe('Corpus_sampled_fr_0_4_rs_7'.length);
+    expect(sampleNameInput.selectionEnd).toBe('Corpus_sampled_fr_0_4_rs_7'.length);
+
+    await user.tab();
+
+    expect(addButton).toHaveFocus();
+  });
+
   it('uses a smart filter placeholder name and preserves typed overrides', async () => {
     const user = userEvent.setup();
 
@@ -265,7 +304,7 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
     const [columnSelect] = within(filterPanel).getAllByRole('combobox');
-    columnSelect.focus();
+    columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
 
     const valueInput = await screen.findByPlaceholderText('Enter value');
@@ -273,14 +312,20 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     const nameInput = within(filterPanel).getByLabelText('New data block name');
     expect(nameInput).toHaveValue('');
-    expect(nameInput).toHaveAttribute('placeholder', 'Corpus_filtered_by_Body_eq_candidate');
+    expect(nameInput).toHaveAttribute('placeholder', 'Corpus_filtered_by_Body_contains_candidate');
 
     fireEvent.change(nameInput, { target: { value: 'custom_filter_name' } });
     fireEvent.change(valueInput, { target: { value: 'election' } });
 
     expect(nameInput).toHaveValue('custom_filter_name');
 
-    fireEvent.click(within(filterPanel).getByRole('button', { name: 'Add to Workspace' }));
+    const addButton = within(filterPanel).getByRole('button', { name: 'Add to Workspace' });
+
+    await waitFor(() => {
+      expect(addButton).toBeEnabled();
+    });
+
+    fireEvent.click(addButton);
 
     await waitFor(() => {
       const [nodeId, payload] = mockFilterNode.mock.calls[0] ?? [];
@@ -292,10 +337,64 @@ describe('DataPreprocessingFeature replace tab', () => {
       expect(payload.conditions).toMatchObject([
         {
           column: 'Body',
-          operator: 'eq',
+          operator: 'contains',
           value: 'election',
         },
       ]);
+    });
+  });
+
+  it('keeps filter Add to Workspace disabled until conditions are valid and preview rows exist', async () => {
+    const user = userEvent.setup();
+
+    mockFilterPreview.mockResolvedValueOnce({
+      columns: ['Body', 'Count'],
+      data: [],
+      pagination: {
+        page: 1,
+        page_size: 10,
+        total_rows: 0,
+        total_pages: 1,
+      },
+    });
+
+    render(<DataPreprocessingFeature />);
+
+    const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
+    const addButton = within(filterPanel).getByRole('button', { name: 'Add to Workspace' });
+
+    expect(addButton).toBeDisabled();
+
+    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    columnSelect!.focus();
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    const valueInput = await screen.findByPlaceholderText('Enter value');
+    fireEvent.change(valueInput, { target: { value: 'candidate' } });
+
+    await waitFor(() => {
+      expect(mockFilterPreview).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(addButton).toBeDisabled();
+    });
+
+    mockFilterPreview.mockResolvedValueOnce({
+      columns: ['Body', 'Count'],
+      data: [{ Body: 'candidate tweet', Count: 1 }],
+      pagination: {
+        page: 1,
+        page_size: 10,
+        total_rows: 1,
+        total_pages: 1,
+      },
+    });
+
+    fireEvent.change(valueInput, { target: { value: 'election' } });
+
+    await waitFor(() => {
+      expect(addButton).toBeEnabled();
     });
   });
 });

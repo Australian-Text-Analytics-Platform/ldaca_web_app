@@ -1,15 +1,17 @@
 import React from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
+import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
 export type { ReplaceSubTabProps } from './hooks/useReplaceSubTab';
@@ -24,7 +26,6 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
     setSelectedColumn,
     mode,
     setMode,
-    count,
     n,
     setN,
     pattern,
@@ -35,7 +36,6 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
     setConnector,
     outputColumnName,
     setOutputColumnName,
-    resolvedOutputColumnName,
     controlsDisabled,
     canApply,
     applyLoading,
@@ -47,25 +47,30 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
   } = useReplaceSubTab(props);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Find &amp; transform with regex</CardTitle>
-              <CardDescription>
-                Find regex matches in a text column and replace or extract them. Leave the output column blank to overwrite the source column.
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                Find &amp; Transform with Regex
+                <HelpIcon
+                  targetKey="preprocessing.find.tab"
+                  label="Find sub-tab overview"
+                  tooltip="Find regex matches in a text column and replace or extract them."
+                />
+              </CardTitle>
             </div>
-            {preview.loading && (
+            {applyLoading && (
               <Tag tone="muted">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Refreshing preview…
+                Applying…
               </Tag>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 pt-0">
+        <CardContent className="space-y-4 pt-0">
           <NodeSelectionPanel
             selectedNodes={effectiveNodes}
             nodeColumnSelections={activeNodeId ? [{ nodeId: activeNodeId, column: selectedColumn }] : []}
@@ -91,6 +96,13 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
               hasSelection && stringColumns.length === 0
                 ? 'The selected data block has no string columns available for regex operations.'
                 : undefined
+            }
+            headerAddon={
+              <HelpIcon
+                targetKey="preprocessing.common.node-selection"
+                label="Selected data blocks"
+                className="h-4 w-4 text-muted-foreground"
+              />
             }
           />
 
@@ -162,50 +174,34 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
               </>
             )}
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            {mode === 'replace'
-              ? count === 'all'
-                ? 'Uses Polars Expr.str.replace_all — replaces every regex match in each value.'
-                : `Uses Polars Expr.str.replace(n=${n ?? 1}) — replaces the first ${n ?? 1} regex match(es) in each value.`
-              : count === 'all'
-                ? `Extracts all regex matches and joins them with the connector.`
-                : `Extracts the first ${n ?? 1} regex match(es) and joins them with the connector.`}
-          </p>
-
-          <div className="space-y-2">
-            <Label htmlFor="replace-output-column">Output column name</Label>
+        </CardContent>
+        <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
+          <div className="flex flex-1 items-center gap-2">
+            <Label htmlFor="replace-output-column" className="shrink-0">Output column name</Label>
             <Input
               id="replace-output-column"
               value={outputColumnName}
               onChange={(event) => setOutputColumnName(event.target.value)}
+              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: outputColumnName, setValue: setOutputColumnName })}
               placeholder={selectedColumn || 'Leave blank to overwrite the selected column'}
               disabled={controlsDisabled || !selectedColumn}
+              className="min-w-0 flex-1"
             />
-            <p className="text-xs text-muted-foreground">When blank, the result is written back to <span className="font-medium text-foreground">{selectedColumn || 'the selected column'}</span>.</p>
           </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-3 border-t border-border bg-muted/20 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-muted-foreground">
-            <p>Source column: {selectedColumn || 'Select a string column'}</p>
-            <p>Output column: {resolvedOutputColumnName || 'Select a string column'}</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {preview.error && (
-              <div className="flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <span>{preview.error}</span>
-              </div>
-            )}
-            <Button type="button" onClick={() => void handleApply()} disabled={!canApply}>
-              {applyLoading ? 'Applying…' : 'Add to Data Block'}
-            </Button>
-          </div>
+          <Button type="button" size="sm" onClick={() => void handleApply()} disabled={!canApply} className="shrink-0">
+            {applyLoading ? 'Applying…' : 'Add to Data Block'}
+          </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
 
       <PreviewTable
-        title="Preview results"
+        title={
+          <span className="flex items-center gap-2">
+            Preview results
+            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+          </span>
+        }
         description="Review the updated rows before applying to the selected data block."
         columns={preview.columns}
         data={preview.data}
@@ -218,8 +214,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
         pageSize={preview.pageSize}
         documentColumn={getNodeDocumentColumn(effectiveNodes[0])}
         onPageSizeChange={preview.setPageSize}
-        onPreviousPage={preview.onPreviousPage}
-        onNextPage={preview.onNextPage}
+        onPageChange={preview.onPageChange}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { nodesApi } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
 import { Checkbox } from '../../../../components/ui/checkbox';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
@@ -85,8 +86,7 @@ interface FilterPreviewConfig {
   readyMessage: string;
   page: number;
   pageSize: number;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
 
@@ -158,13 +158,15 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     isLoading,
     onAlert,
   } = props;
+  const { getAuthHeaders } = useAuth();
   const [conditions, setConditions] = useState<FilterConditionWithId[]>([{
     id: '1',
     column: '',
     operator: 'eq',
     value: '',
     negate: false,
-    regex: true,
+    regex: false,
+    caseSensitive: false,
   }]);
   const [logic, setLogic] = useState<'and' | 'or'>('and');
   const [newNodeName, setNewNodeName] = useState('');
@@ -255,7 +257,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       });
 
       try {
-        const response = await nodesApi.uniqueValues(selectedNodeId, column);
+        const response = await nodesApi.uniqueValues(selectedNodeId, column, getAuthHeaders());
         const rawValues: unknown[] = Array.isArray(response?.unique_values) ? response.unique_values : [];
         const includeNullOption = dataType === 'categorical';
         const hasNullFromResponse = includeNullOption && Boolean(response?.has_null);
@@ -308,7 +310,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           },
         }));
       }
-    }, [getCategoricalKey, currentWorkspaceId, selectedNodeId]);
+    }, [getCategoricalKey, currentWorkspaceId, selectedNodeId, getAuthHeaders]);
 
   const filterDefaultPalette = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'];
 
@@ -401,7 +403,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         pagination: response?.pagination ?? null,
       };
     }
-    const response = await nodesApi.data(request.nodeId, page, pageSize);
+    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -434,20 +436,6 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   })();
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
-  const previewHasPrev = Boolean(previewPagination?.has_prev);
-  const previewHasNext = Boolean(previewPagination?.has_next);
-
-  const handlePreviewPrev = () => {
-    if (previewHasPrev && !previewLoading) {
-      setPreviewPage(Math.max(1, currentPreviewPage - 1));
-    }
-  };
-
-  const handlePreviewNext = () => {
-    if (previewHasNext && !previewLoading) {
-      setPreviewPage(currentPreviewPage + 1);
-    }
-  };
 
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
@@ -460,7 +448,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       value: defaultValue,
       dataType: firstColumn ? firstColumn.dataType : 'string',
       negate: false,
-      regex: defaultOperator === 'contains',
+      regex: false,
+      caseSensitive: false,
     };
     setConditions([...conditions, newCondition]);
   };
@@ -494,7 +483,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           const nextOperator = getDefaultOperatorForType(columnInfo.dataType);
           updated.operator = nextOperator;
           updated.value = nextOperator === 'in' ? [] : '';
-          updated.regex = nextOperator === 'contains';
+          updated.regex = false;
+          updated.caseSensitive = false;
 
           if (columnInfo.dataType === 'categorical' || columnInfo.dataType === 'list_string') {
             nextCategoricalColumnToLoad = columnInfo.name;
@@ -587,15 +577,31 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       </label>
 
       {condition.dataType === 'string' && condition.operator === 'contains' && (
-        <label className="flex items-center gap-1.5">
-          <Checkbox
-            id={`regex-${condition.id}`}
-            checked={Boolean(condition.regex ?? true)}
-            onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
-            disabled={rowDisabled}
-          />
-          <span>regex</span>
-        </label>
+        <>
+          <label className="flex items-center gap-1.5">
+            <Checkbox
+              id={`regex-${condition.id}`}
+              checked={Boolean(condition.regex)}
+              onCheckedChange={(checked) => {
+                const nextRegex = checked === true;
+                setConditions((prev) => prev.map((c) =>
+                  c.id !== condition.id ? c : { ...c, regex: nextRegex, caseSensitive: nextRegex ? false : c.caseSensitive }
+                ));
+              }}
+              disabled={rowDisabled}
+            />
+            <span>regex</span>
+          </label>
+          <label className="flex items-center gap-1.5">
+            <Checkbox
+              id={`case-sensitive-${condition.id}`}
+              checked={Boolean(condition.caseSensitive)}
+              onCheckedChange={(checked) => handleConditionChange(condition.id, 'caseSensitive', checked === true)}
+              disabled={rowDisabled || Boolean(condition.regex)}
+            />
+            <span>case sensitive</span>
+          </label>
+        </>
       )}
     </div>
   );
@@ -616,7 +622,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (!selectedNodeId || !currentWorkspaceId) return;
     
     try {
-      const describeData = await nodesApi.describeColumn(selectedNodeId, column);
+      const describeData = await nodesApi.describeColumn(selectedNodeId, column, getAuthHeaders());
       
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;
@@ -658,7 +664,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (!selectedNodeId || !currentWorkspaceId) return;
 
     try {
-      const describeData = await nodesApi.describeColumn(selectedNodeId, column);
+      const describeData = await nodesApi.describeColumn(selectedNodeId, column, getAuthHeaders());
 
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;
@@ -918,7 +924,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     ? 'Define at least one condition to enable preview and filtering.'
     : `${conditions.length} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`;
 
-  const applyButtonDisabled = isConfigDisabled || isFiltering || isLoading.operations;
+  const hasApplicablePreviewRows = conditionsComplete && !previewLoading && !previewError && previewData.length > 0;
+
+  const applyButtonDisabled =
+    isConfigDisabled ||
+    isFiltering ||
+    isLoading.operations ||
+    !hasApplicablePreviewRows;
 
   return {
     selectionPanel: {
@@ -969,8 +981,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       readyMessage: previewReadyMessage,
       page: currentPreviewPage,
       pageSize: previewPageSize,
-      onPreviousPage: handlePreviewPrev,
-      onNextPage: handlePreviewNext,
+      onPageChange: setPreviewPage,
       onPageSizeChange: setPreviewPageSize,
     },
     selectedNodesOriginalCount: selectedNodes.length,

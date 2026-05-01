@@ -19,10 +19,7 @@ import {
   buildResponseDisplayNameHints,
   computeAnalysisNodeIds,
   deriveNodeDisplayResults,
-  filterStatisticsByStopWords,
-  filterStatisticsByTokenPattern,
   normalizeNodeResults,
-  sortStatistics,
 } from './tokenFrequencyAdapters';
 import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLimit, type NodeNameEntry } from './tokenFrequencyUtils';
 import {
@@ -87,15 +84,23 @@ const TokenFrequencyFeature = () => {
 
   const [results, resultRef, setResultSafely, setResults] = useSafeResult<TokenFrequencyResponse>();
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
-  const [statsSortColumn, setStatsSortColumn] = useState<string>('log_likelihood_llv');
-  const [statsSortDirection, setStatsSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [statsPage, setStatsPage] = useState<number>(1);
-  const [statsRowsPerPage, setStatsRowsPerPage] = useState<number>(50);
-  const [statsTokenFilter, setStatsTokenFilter] = useState<string>('');
+  const [referenceNodeId, setReferenceNodeId] = useState<string | null>(null);
 
   const panelNodeIds = takeMostRecent(panelSelectedNodes, 2)
     .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
     .filter((id): id is string => Boolean(id));
+
+  const effectiveReferenceNodeId = referenceNodeId && panelNodeIds.includes(referenceNodeId)
+    ? referenceNodeId
+    : panelNodeIds[0] ?? null;
+
+  const orderedPanelNodeIds = (() => {
+    if (!effectiveReferenceNodeId) return panelNodeIds;
+    return [
+      effectiveReferenceNodeId,
+      ...panelNodeIds.filter((nodeId) => nodeId !== effectiveReferenceNodeId),
+    ];
+  })();
 
   const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
     activeNodeIds: takeMostRecent(panelNodeIds, 2),
@@ -136,6 +141,7 @@ const TokenFrequencyFeature = () => {
       const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
       setNodeColumnSelections(selections, { replace: true });
       setLastCompareNodeIds(nodeIds);
+      setReferenceNodeId(nodeIds[0] ?? null);
       applyTokenLimitState(
         typeof requestData?.token_limit === 'number' ? requestData.token_limit : null,
       );
@@ -157,6 +163,7 @@ const TokenFrequencyFeature = () => {
       const node_columns: Record<string, string> = (reqObj.node_columns as Record<string, string>) || {};
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
+      setReferenceNodeId(nodeIds[0] ?? null);
       if (nodeIds.length && currentWorkspaceId) {
         try {
           await restoreAnalysisLockFromRequest({
@@ -173,6 +180,7 @@ const TokenFrequencyFeature = () => {
       setResultSafely(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
       setLastCompareNodeIds([]);
+      setReferenceNodeId(null);
       resetPreferenceUiState();
     },
     pruneGlobalTasks: (taskIds) =>
@@ -184,7 +192,7 @@ const TokenFrequencyFeature = () => {
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
   const getColorForNode = (nodeId: string, index = 0) => {
-    return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length];
+    return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length] ?? '#000000';
   };
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
@@ -202,8 +210,10 @@ const TokenFrequencyFeature = () => {
     effectiveTokenLimit,
     applyTokenLimitState,
     applyStopSetFromText,
+    sortStopWords,
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
+    applyTokenLimit,
     handleFillDefaultStopWords,
     resetPreferenceUiState,
   } = useTokenFrequencyPreferences({
@@ -232,7 +242,7 @@ const TokenFrequencyFeature = () => {
   const { handleAnalyze, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
     state: {
       currentWorkspaceId,
-      panelNodeIds,
+      panelNodeIds: orderedPanelNodeIds,
       panelSelectedNodes,
       effectiveNodeColumnSelections,
       stopWords,
@@ -285,11 +295,6 @@ const TokenFrequencyFeature = () => {
 
   const normalizedNodeResults = normalizeNodeResults(results?.data, analysisNodeIds, computeDisplayName);
   const nodeDisplayResults = deriveNodeDisplayResults(normalizedNodeResults, appliedStopSet, effectiveTokenLimit);
-  const filteredStatistics = filterStatisticsByTokenPattern(
-    filterStatisticsByStopWords(results?.statistics, appliedStopSet),
-    statsTokenFilter,
-  );
-  const sortedStatistics = sortStatistics(filteredStatistics, statsSortColumn, statsSortDirection);
 
   const registerWordCloudRef = (nodeKey: string, element: SVGSVGElement | null) => {
     if (!element) {
@@ -315,8 +320,36 @@ const TokenFrequencyFeature = () => {
     setDownloadDialogOpen(true);
   };
 
+  const renameStatisticsKeysForExport = (rows: unknown[]): unknown[] => {
+    if (analysisNodeIds.length !== 2) return rows;
+    const referenceName = computeDisplayName(analysisNodeIds[0]!, 'reference');
+    const studyName = computeDisplayName(analysisNodeIds[1]!, 'study');
+    const keyMap: Record<string, string> = {
+      freq_reference: `OR_${referenceName}`,
+      freq_study: `OS_${studyName}`,
+      percent_reference: `%R_${referenceName}`,
+      percent_study: `%S_${studyName}`,
+      expected_reference: `E_${referenceName}`,
+      expected_study: `E_${studyName}`,
+      reference_total: `Total_${referenceName}`,
+      study_total: `Total_${studyName}`,
+      overuse: 'Overuse',
+      signed_ll: 'Signed_LL',
+    };
+    return rows.map((row) => {
+      if (!row || typeof row !== 'object') return row;
+      const source = row as Record<string, unknown>;
+      const renamed: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(source)) {
+        renamed[keyMap[key] ?? key] = value;
+      }
+      return renamed;
+    });
+  };
+
   const handleDownloadFrequencyCsv = (label: string, rows: unknown[]) => {
-    pendingDownloadRef.current = { mode: 'frequencies', label, rows };
+    const exportRows = label === 'token-keyness' ? renameStatisticsKeysForExport(rows) : rows;
+    pendingDownloadRef.current = { mode: 'frequencies', label, rows: exportRows };
     setDownloadDialogMode('frequencies');
     setDownloadDialogOpen(true);
   };
@@ -389,21 +422,6 @@ const TokenFrequencyFeature = () => {
     applyStopSetFromText(stopWords);
   };
 
-  const handleToggleStatsSort = (column: string) => {
-    if (statsSortColumn === column) {
-      setStatsSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setStatsSortColumn(column);
-      setStatsSortDirection(column === 'token' ? 'asc' : 'desc');
-    }
-    setStatsPage(1);
-  };
-
-  const handleStatsTokenFilterChange = (value: string) => {
-    setStatsTokenFilter(value);
-    setStatsPage(1);
-  };
-
   const hasIncompleteSelections = effectiveNodeColumnSelections.some((selection) => !selection.column);
   const displayNodeCount = panelSelectedNodes.length;
 
@@ -429,7 +447,7 @@ const TokenFrequencyFeature = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <TokenFrequencyParameterPanel
         panelSelectedNodes={panelSelectedNodes}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}
@@ -448,6 +466,10 @@ const TokenFrequencyFeature = () => {
         appliedStopCount={appliedStopSet.size}
         hasResults={Boolean(results)}
         runLabel={actionState.runLabel}
+        referenceNodeId={effectiveReferenceNodeId}
+        onReferenceNodeChange={setReferenceNodeId}
+        getColorForNode={getColorForNode}
+        computeDisplayName={computeDisplayName}
       />
 
       <TokenFrequencyResultsPanel
@@ -459,9 +481,11 @@ const TokenFrequencyFeature = () => {
         onStopWordsApply={handleApplyStopWords}
         isLoadingStopWords={isLoadingStopWords}
         onFillDefaultStopWords={handleFillDefaultStopWords}
+        onSortStopWords={sortStopWords}
         tokenLimitInput={tokenLimitInput}
         onTokenLimitInputChange={handleTokenLimitInputChange}
         onTokenLimitBlur={handleTokenLimitBlur}
+        applyCloudTokenLimit={applyTokenLimit}
         tokenLimitError={tokenLimitError}
         isApplyingTokenLimit={isApplyingTokenLimit}
         appliedStopCount={appliedStopSet.size}
@@ -481,16 +505,6 @@ const TokenFrequencyFeature = () => {
         unifiedCloudContainerRef={unifiedCloudContainerRef}
         registerWordCloudRef={registerWordCloudRef}
         onDownloadFrequencyCsv={handleDownloadFrequencyCsv}
-        sortedStatistics={sortedStatistics}
-        statsSortColumn={statsSortColumn}
-        statsSortDirection={statsSortDirection}
-        onToggleStatsSort={handleToggleStatsSort}
-        statsPage={statsPage}
-        onStatsPageChange={setStatsPage}
-        statsRowsPerPage={statsRowsPerPage}
-        onStatsRowsPerPageChange={setStatsRowsPerPage}
-        statsTokenFilter={statsTokenFilter}
-        onStatsTokenFilterChange={handleStatsTokenFilterChange}
       />
 
       <TokenFrequencyDownloadDialog

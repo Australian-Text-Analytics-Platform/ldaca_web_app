@@ -12,7 +12,8 @@ export type ConcordanceHitRow = Record<string, unknown>;
 export type ConcordanceGroupedRow = ConcordanceHitRow[];
 
 export interface ConcordanceRequest { column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; whole_word?: boolean; case_sensitive?: boolean; sort_by?: string; }
-export interface ConcordanceDetachRequest { node_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; whole_word?: boolean; case_sensitive?: boolean; new_node_name?: string; selected_columns?: string[]; }
+export interface ConcordanceDetachRequest { node_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; whole_word?: boolean; case_sensitive?: boolean; new_node_name?: string; selected_columns?: string[]; materialized_path?: string | null; }
+export interface ConcordanceMaterializeRequest { parent_task_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; whole_word?: boolean; case_sensitive?: boolean; }
 export interface ConcordanceDetachNodeOption {
   node_id: string;
   node_name: string;
@@ -43,6 +44,7 @@ export interface ConcordanceResultEntry {
   metadata: ConcordanceMetadata;
   pagination: ConcordancePagination;
   sorting: { sort_by?: string; descending: boolean; };
+  materialized?: boolean;
 }
 export interface ConcordanceAnalysisResponse {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
@@ -81,7 +83,8 @@ export interface QuotationAnalysisResponse {
   task_id?: string;
 }
 export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; descending?: boolean; engine?: QuotationEngineConfig; }
-export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; engine?: QuotationEngineConfig; selected_columns?: string[]; }
+export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; engine?: QuotationEngineConfig; selected_columns?: string[]; materialized_path?: string | null; }
+export interface QuotationMaterializeRequest { parent_task_id: string; column: string; engine?: QuotationEngineConfig; }
 export interface QuotationDetachNodeOption {
   node_id: string;
   node_name: string;
@@ -103,7 +106,8 @@ export interface QuotationResultQuery {
   context_length?: number;
   update_only?: boolean;
 }
-export type SequentialFrequency = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type SequentialFrequency = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
+export type SequentialCustomIntervalUnit = 'seconds' | 'minutes' | 'hours' | 'days' | 'weeks';
 export interface SequentialAnalysisRequest {
   time_column: string;
   group_by_columns?: string[] | null;
@@ -112,6 +116,20 @@ export interface SequentialAnalysisRequest {
   column_type?: 'datetime' | 'numeric';
   numeric_origin?: number | null;
   numeric_interval?: number | null;
+  custom_interval_value?: number | null;
+  custom_interval_unit?: SequentialCustomIntervalUnit | null;
+  case_sensitive?: boolean;
+}
+
+export interface SequentialAnalysisDetachRequest {
+  selected_periods: Array<{ period_start: unknown; period_end: unknown }>;
+  visible_groups?: Array<{ values: Record<string, unknown> }>;
+  new_node_name: string;
+}
+
+export interface SequentialAnalysisDetachResponse {
+  new_node_id: string;
+  new_node_name: string;
 }
 
 export interface TokenFrequencyRequest {
@@ -138,10 +156,10 @@ export interface TokenFrequencyResponse {
   stop_words?: string[] | null;
   statistics?: Array<{
     token: string;
-    freq_corpus_0: number;
-    percent_corpus_0: StatisticsNumericValue;
-    freq_corpus_1: number;
-    percent_corpus_1: StatisticsNumericValue;
+    freq_reference: number;
+    percent_reference: StatisticsNumericValue;
+    freq_study: number;
+    percent_study: StatisticsNumericValue;
     log_likelihood_llv: StatisticsNumericValue;
     percent_diff: StatisticsNumericValue;
     bayes_factor_bic?: StatisticsNumericValue;
@@ -326,6 +344,8 @@ export interface AiAnnotationCategoriesResponse {
 export const textApi = {
   concordance: (req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance`, req, headers),
   concordanceDetach: async (node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}): Promise<void> => { await post(`/workspaces/nodes/${node}/concordance/detach`, req, headers); },
+  concordanceMaterialize: (node: string, req: ConcordanceMaterializeRequest, headers: Record<string,string> = {}) =>
+    post<{ state: string; message: string; data: null; metadata?: { task_id?: string } }>(`/workspaces/nodes/${node}/concordance/materialize`, req, headers),
   getConcordanceDetachOptions: (node: string, column: string, headers: Record<string,string> = {}) =>
     httpRequest<ConcordanceDetachOptionsResponse>(`/workspaces/nodes/${node}/concordance/detach-options`, { method: 'GET', headers, params: { column } }),
   getConcordanceTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/concordance/tasks/${taskId}/request`, { method: 'GET', headers }),
@@ -337,6 +357,8 @@ export const textApi = {
   getQuotationDetachOptions: (node: string, column: string, headers: Record<string,string> = {}) =>
     httpRequest<QuotationDetachOptionsResponse>(`/workspaces/nodes/${node}/quotation/detach-options`, { method: 'GET', headers, params: { column } }),
   quotationDetach: async (node: string, req: QuotationDetachRequest, headers: Record<string,string> = {}): Promise<void> => { await post(`/workspaces/nodes/${node}/quotation/detach`, req, headers); },
+  quotationMaterialize: (node: string, req: QuotationMaterializeRequest, headers: Record<string,string> = {}) =>
+    post<{ state: string; message: string; data: null; metadata?: { task_id?: string } }>(`/workspaces/nodes/${node}/quotation/materialize`, req, headers),
   getQuotationTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/quotation/tasks/${taskId}/request`, { method: 'GET', headers }),
   getQuotationTaskResult: (taskId: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest<QuotationAnalysisResponse>(`/workspaces/quotation/tasks/${taskId}/result`, { method: 'GET', headers, params: params as Record<string, unknown> }),
   postQuotationTaskResult: (taskId: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post<QuotationAnalysisResponse>(`/workspaces/quotation/tasks/${taskId}/result`, body, headers),
@@ -346,6 +368,12 @@ export const textApi = {
   getSequentialAnalysisTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/sequential-analysis/tasks/${taskId}/request`, { method: 'GET', headers }),
   getSequentialAnalysisTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/sequential-analysis/tasks/${taskId}/result`, { method: 'GET', headers }),
   postSequentialAnalysisTaskResult: (taskId: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/sequential-analysis/tasks/${taskId}/result`, body, headers),
+  sequentialAnalysisDetach: async (
+    taskId: string,
+    req: SequentialAnalysisDetachRequest,
+    headers: Record<string, string> = {},
+  ): Promise<SequentialAnalysisDetachResponse> =>
+    post(`/workspaces/sequential-analysis/tasks/${taskId}/detach`, req, headers),
 
   // Token Frequency
   tokenFrequencies: (req: TokenFrequencyRequest, headers: Record<string,string> = {}) => post<TokenFrequencyResponse>(`/workspaces/token-frequencies`, req, headers),

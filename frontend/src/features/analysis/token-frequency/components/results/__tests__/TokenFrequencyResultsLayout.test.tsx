@@ -9,6 +9,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: () => <span data-testid="help-icon" />,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => <span data-testid="info-icon" />,
+}));
+
 vi.mock('@visx/wordcloud', () => ({
   Wordcloud: ({ children, words }: { children: (cloudWords: Array<Record<string, unknown>>) => React.ReactNode; words: Array<Record<string, unknown>> }) => (
     <g data-testid="mock-wordcloud">
@@ -53,10 +57,10 @@ const baseSingleSectionProps = {
 
 const buildStatistic = (overrides: Partial<TokenFrequencyStatisticsEntry> = {}): TokenFrequencyStatisticsEntry => ({
   token: overrides.token ?? 'alpha',
-  freq_corpus_0: overrides.freq_corpus_0 ?? 18,
-  percent_corpus_0: overrides.percent_corpus_0 ?? 0.6,
-  freq_corpus_1: overrides.freq_corpus_1 ?? 12,
-  percent_corpus_1: overrides.percent_corpus_1 ?? 0.4,
+  freq_reference: overrides.freq_reference ?? 18,
+  percent_reference: overrides.percent_reference ?? 0.6,
+  freq_study: overrides.freq_study ?? 12,
+  percent_study: overrides.percent_study ?? 0.4,
   log_likelihood_llv: overrides.log_likelihood_llv ?? 3.1,
   percent_diff: overrides.percent_diff ?? 0.2,
   bayes_factor_bic: overrides.bayes_factor_bic ?? 1.4,
@@ -84,17 +88,7 @@ const baseUnifiedSectionProps = {
   unifiedCloudHeight: 340,
   unifiedCloudContainerRef: { current: null },
   registerWordCloudRef: vi.fn(),
-  sortedStatistics: [] as TokenFrequencyStatisticsEntry[],
-  statsSortColumn: 'log_likelihood_llv',
-  statsSortDirection: 'desc' as const,
-  onToggleStatsSort: vi.fn(),
-  statsPage: 1,
-  onStatsPageChange: vi.fn(),
-  statsRowsPerPage: 25,
-  onStatsRowsPerPageChange: vi.fn(),
   onDownloadFrequencyCsv: vi.fn(),
-  statsTokenFilter: '',
-  onStatsTokenFilterChange: vi.fn(),
 };
 
 describe('Token frequency result layouts', () => {
@@ -144,7 +138,7 @@ describe('Token frequency result layouts', () => {
   it('shows the unified card only when two node results are available', () => {
     const { rerender } = render(<TokenFrequencyUnifiedTokenSection {...baseUnifiedSectionProps} />);
 
-    expect(screen.queryByText('Unified Word Cloud')).not.toBeInTheDocument();
+    expect(screen.queryByText('Juxtorpus')).not.toBeInTheDocument();
 
     const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Node A' });
     const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Node B' });
@@ -157,10 +151,9 @@ describe('Token frequency result layouts', () => {
         nodeDisplayResults={[nodeA, nodeB]}
         lastCompareNodeIds={['node-a', 'node-b']}
         statistics={statistics}
-        sortedStatistics={statistics}
       />
     );
 
-    expect(screen.getByText('Unified Word Cloud')).toBeInTheDocument();
+    expect(screen.getByText('Juxtorpus')).toBeInTheDocument();
   });
 });

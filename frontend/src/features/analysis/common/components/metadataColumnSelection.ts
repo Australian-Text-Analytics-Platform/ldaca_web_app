@@ -39,7 +39,7 @@ export const getDefaultMetadataColumnSelection = (
     return [resolvedPreferredColumn];
   }
 
-  return [normalizedColumns[0]];
+  return [normalizedColumns[0]!];
 };
 
 export const reconcileMetadataColumnSelection = (

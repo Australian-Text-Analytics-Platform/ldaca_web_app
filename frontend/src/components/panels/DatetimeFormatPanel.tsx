@@ -102,7 +102,7 @@ export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
                 placeholder="e.g., %Y-%m-%d %H:%M:%S"
                 value={customFormat}
                 onChange={(event) => setCustomFormat(event.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
               />
               <div className="mt-1 text-xs text-muted-foreground">
                 Use Python strftime codes.

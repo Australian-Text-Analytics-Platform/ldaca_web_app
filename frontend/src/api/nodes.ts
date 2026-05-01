@@ -31,6 +31,7 @@ export interface FilterCondition {
   value: unknown;
   negate?: boolean;
   regex?: boolean;
+  case_sensitive?: boolean;
 }
 export interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
 export interface SliceRequest {
@@ -61,11 +62,7 @@ export interface FilterPreviewResponse {
 }
 export type JoinPreviewResponse = FilterPreviewResponse;
 
-export interface ExpressionTransformRequest {
-  expression: string;
-  new_column_name?: string | null;
-  preview_limit?: number;
-}
+
 
 export interface ReplaceRequest {
   source_column: string;
@@ -79,14 +76,7 @@ export interface ReplaceRequest {
   connector?: string;
 }
 
-export interface ExpressionApplyResponse {
-  state: 'successful';
-  node_id: string;
-  column_name: string;
-  expression: string;
-  dtype?: string | null;
-  message: string;
-}
+
 
 export interface ReplaceApplyResponse {
   state: 'successful';
@@ -94,6 +84,49 @@ export interface ReplaceApplyResponse {
   column_name: string;
   dtype?: string | null;
   message: string;
+}
+
+// ---------------------------------------------------------------------------
+// Column operations registry
+// ---------------------------------------------------------------------------
+
+export interface OperationInfo {
+  method: string;
+  label: string;
+}
+
+export type ColumnOperationsResponse = {
+  operations: Record<string, OperationInfo[]>;
+};
+
+// ---------------------------------------------------------------------------
+// Polars Expression (unified endpoint) types
+// ---------------------------------------------------------------------------
+
+export type PolarsExpressionContext =
+  | 'filter'
+  | 'with_columns'
+  | 'select'
+  | 'sort'
+  | 'group_by_agg';
+
+export interface PolarsExpressionItem {
+  /** Python expression string, e.g. "pl.col('text').str.starts_with('RT')" */
+  code: string;
+  /** Only used in sort context */
+  descending?: boolean;
+}
+
+export interface PolarsExpressionRequest {
+  context: PolarsExpressionContext;
+  expressions: PolarsExpressionItem[];
+  group_by_keys?: PolarsExpressionItem[];
+  new_node_name?: string;
+}
+
+export interface PolarsExpressionApplyResponse {
+  node_id: string;
+  node_name: string;
 }
 
 export interface NodeInfoResponse {
@@ -110,9 +143,34 @@ export interface NodeInfoResponse {
   can_redo?: boolean;
 }
 
+export interface NodeDataParams {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string | null;
+  descending?: boolean;
+  filterColumn?: string | null;
+  filterValue?: string | null;
+  filterOp?: string;
+}
+
 export const nodesApi = {
   info: (node: string, headers: Record<string,string> = {}) => get<NodeInfoResponse>(`/workspaces/nodes/${node}`, headers),
-  data: (node: string, page = 0, pageSize = 20, headers: Record<string,string> = {}) => httpRequest<NodeDataResponse>(`/workspaces/nodes/${node}/data`, { method: 'GET', headers, params: { page, page_size: pageSize } }),
+  data: (node: string, params: NodeDataParams = {}, headers: Record<string,string> = {}) => {
+    const query: Record<string, unknown> = {
+      page: params.page ?? 1,
+      page_size: params.pageSize ?? 20,
+    };
+    if (params.sortBy) {
+      query.sort_by = params.sortBy;
+      query.descending = params.descending ?? false;
+    }
+    if (params.filterColumn && params.filterValue != null) {
+      query.filter_column = params.filterColumn;
+      query.filter_value = params.filterValue;
+      query.filter_op = params.filterOp ?? 'contains';
+    }
+    return httpRequest<NodeDataResponse>(`/workspaces/nodes/${node}/data`, { method: 'GET', headers, params: query });
+  },
   shape: (node: string, headers: Record<string,string> = {}) => get<Record<string, unknown>>(`/workspaces/nodes/${node}/shape`, headers),
   uniqueValues: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnUniqueValuesResponse>(`/workspaces/nodes/${node}/columns/${col}/unique`, headers),
   describeColumn: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnDescribeResponse>(`/workspaces/nodes/${node}/columns/${col}/describe`, headers),
@@ -189,23 +247,13 @@ export const nodesApi = {
     { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
   slice: (node: string, req: SliceRequest, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/nodes/${node}/slice`, req, headers),
-  computeColumnPreview: (
+  columnOperations: (
     node: string,
-    req: ExpressionTransformRequest,
-    page = 1,
-    pageSize = 10,
+    column: string,
     headers: Record<string, string> = {}
-  ) => httpRequest<FilterPreviewResponse>(
-    `/workspaces/nodes/${node}/compute-column/preview`,
-    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
-  ),
-  computeColumn: (
-    node: string,
-    req: ExpressionTransformRequest,
-    headers: Record<string, string> = {}
-  ) => httpRequest<ExpressionApplyResponse>(
-    `/workspaces/nodes/${node}/compute-column`,
-    { method: 'POST', headers, body: req }
+  ) => get<ColumnOperationsResponse>(
+    `/workspaces/nodes/${node}/columns/${encodeURIComponent(column)}/operations`,
+    headers
   ),
   replaceTextPreview: (
     node: string,
@@ -223,6 +271,24 @@ export const nodesApi = {
     headers: Record<string, string> = {}
   ) => httpRequest<ReplaceApplyResponse>(
     `/workspaces/nodes/${node}/replace`,
+    { method: 'POST', headers, body: req }
+  ),
+  polarsExpressionPreview: (
+    node: string,
+    req: PolarsExpressionRequest,
+    page = 1,
+    pageSize = 10,
+    headers: Record<string, string> = {}
+  ) => httpRequest<FilterPreviewResponse>(
+    `/workspaces/nodes/${node}/expression/preview`,
+    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
+  ),
+  polarsExpressionApply: (
+    node: string,
+    req: PolarsExpressionRequest,
+    headers: Record<string, string> = {}
+  ) => httpRequest<PolarsExpressionApplyResponse>(
+    `/workspaces/nodes/${node}/expression/apply`,
     { method: 'POST', headers, body: req }
   ),
 };

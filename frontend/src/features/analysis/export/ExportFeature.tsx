@@ -17,7 +17,9 @@ import {
   SelectValue,
 } from '../../../components/ui/select';
 import { toast } from 'sonner';
+import { saveBlob } from '../../../lib/download';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -90,17 +92,8 @@ const ExportFeature: React.FC = () => {
       const ext = multiple ? 'zip' : getDownloadExtension(format);
       const filename = multiple
         ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
-        : `${toDisplay(selectedNodes[0]).name || nodeIds[0]}.${ext}`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        a.remove();
-      }, 0);
+        : `${toDisplay(selectedNodes[0]!).name || nodeIds[0]}.${ext}`;
+      await saveBlob(blob, filename);
     } catch (e) {
       console.error(e);
       toast.error('Failed to export data blocks');
@@ -125,16 +118,7 @@ const ExportFeature: React.FC = () => {
       const blob = await resp.blob();
       const ext = getDownloadExtension(format);
       const filename = `${name || id}.${ext}`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        a.remove();
-      }, 0);
+      await saveBlob(blob, filename);
     } catch (e) {
       console.error(e);
       toast.error('Failed to download data block');
@@ -144,11 +128,16 @@ const ExportFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-1">
           <CardTitle className="flex items-center gap-2">
             Export Data Blocks
+            <InfoIcon
+              targetKey="export.overview"
+              label="About Exporting Data"
+              tooltip="Learn what exporting does and how it can help you."
+            />
             <HelpIcon
               targetKey="analysis.export.parameters"
               label="Export parameters"
@@ -156,7 +145,7 @@ const ExportFeature: React.FC = () => {
             />
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <div className="border-border/50 bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
             <div className="text-muted-foreground text-sm">
               Workspace ID:{' '}

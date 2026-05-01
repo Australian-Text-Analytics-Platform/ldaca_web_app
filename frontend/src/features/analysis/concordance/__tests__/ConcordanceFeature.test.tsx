@@ -25,6 +25,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: () => <span data-testid="help-icon" />,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => <span data-testid="info-icon" />,
+}));
+
 vi.mock('@/components/tabs/AnalysisTaskBanner', () => ({
   default: () => null,
 }));
@@ -95,6 +99,7 @@ vi.mock('@/hooks/useWorkspaceData', () => ({
 vi.mock('@/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     detachConcordance: vi.fn(),
+    materializeConcordance: vi.fn(),
     selectNodes: vi.fn(),
   }),
 }));
@@ -129,6 +134,9 @@ vi.mock('@/api/text', () => ({
 
 vi.mock('@/hooks/analysisTaskUtils', () => ({
   pruneTasksById: vi.fn((tasks) => tasks),
+  getTaskTypeCandidates: (taskType: string) => [taskType],
+  normalizeTaskDedupeKey: (taskId: string | null, state: string | null) =>
+    taskId && state ? `${taskId}:${state}` : null,
 }));
 
 vi.mock('../components/ConcordanceDetachDialog', () => ({
@@ -157,6 +165,7 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
     handlePageChange: vi.fn(),
     persistResultPreferences: vi.fn(),
     handleDetach: vi.fn(),
+    handleMaterialize: vi.fn(),
   };
   },
 }));
@@ -256,11 +265,11 @@ describe('ConcordanceFeature', () => {
   it('clears previous results before rerunning when clicking Update', () => {
     const { unmount } = render(<ConcordanceFeature />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0], {
+    fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]!);
 
     return waitFor(() => {
       expect(clearResultsMock).toHaveBeenCalledTimes(1);
@@ -271,11 +280,11 @@ describe('ConcordanceFeature', () => {
   it('passes the locked-update flag when clicking Update', () => {
     const { unmount } = render(<ConcordanceFeature />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0], {
+    fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]!);
 
     return waitFor(() => {
       expect(handleSearchMock).toHaveBeenCalledWith(true, undefined, undefined, undefined, undefined, true);
@@ -591,8 +600,8 @@ describe('ConcordanceFeature', () => {
 
     render(<ConcordanceFeature />);
 
-    expect(screen.getAllByText('Documents per page').length).toBeGreaterThan(0);
-    expect(screen.getByText('(Found 2 instances in 1 document).')).toBeInTheDocument();
+    expect(screen.getAllByText('Documents per batch').length).toBeGreaterThan(0);
+    expect(screen.getByText('(Found 2 instances in 1 document after processing 20 documents).')).toBeInTheDocument();
   });
 
   it('hides the proportional-width control until Dispersion View is enabled', () => {
