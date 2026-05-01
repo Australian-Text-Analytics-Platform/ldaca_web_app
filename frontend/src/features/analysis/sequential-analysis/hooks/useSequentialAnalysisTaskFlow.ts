@@ -8,6 +8,7 @@ import {
 import type { ChartConfig } from '../../../../components/ui/chart';
 import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
 
+// Callers may rely on period_start and period_end being present on chart rows.
 export type SequentialAnalysisDatum = Record<string, unknown>;
 
 export type ChartTypeOption = 'line' | 'bar' | 'area';
@@ -280,7 +281,11 @@ export function useSequentialAnalysisTaskFlow({
         .map((col: string) => String(item[col] ?? ''))
         .join(' - ');
       if (!timeMap.has(timePeriod)) {
-        timeMap.set(timePeriod, { time_period: timePeriod });
+        timeMap.set(timePeriod, {
+          time_period: timePeriod,
+          period_start: item.period_start,
+          period_end: item.period_end,
+        });
       }
       const timeEntry = timeMap.get(timePeriod);
       if (timeEntry) {

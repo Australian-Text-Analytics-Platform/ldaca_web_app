@@ -10,6 +10,7 @@ import {
   Bar,
   AreaChart,
   Area,
+  Cell,
 } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../../../../components/ui/chart';
 import type { ChartConfig } from '../../../../components/ui/chart';
@@ -23,8 +24,16 @@ interface SequentialChartProps {
   groupKeys: string[];
   groupPointCounts: Record<string, number>;
   hiddenKeys: Set<string>;
+  selectedPeriodIndices: Set<number>;
   onToggleKey: (key: string) => void;
+  onPeriodClick: (index: number, shiftHeld: boolean) => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
+}
+
+interface SequentialDotProps {
+  cx?: number;
+  cy?: number;
+  index?: number;
 }
 
 export const SequentialChart: React.FC<SequentialChartProps> = ({
@@ -34,12 +43,46 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
   groupKeys,
   groupPointCounts,
   hiddenKeys,
+  selectedPeriodIndices,
   onToggleKey,
+  onPeriodClick,
   containerRef,
 }) => {
   const toggleKey = onToggleKey;
 
   const visibleKeys = groupKeys.filter((key) => !hiddenKeys.has(key));
+  const hasSelection = selectedPeriodIndices.size > 0;
+
+  const handleChartClick = (activeTooltipIndex: unknown, shiftHeld: boolean) => {
+    if (typeof activeTooltipIndex === 'number') {
+      onPeriodClick(activeTooltipIndex, shiftHeld);
+      return;
+    }
+
+    if (typeof activeTooltipIndex === 'string') {
+      const parsedIndex = Number(activeTooltipIndex);
+      if (Number.isInteger(parsedIndex)) {
+        onPeriodClick(parsedIndex, shiftHeld);
+      }
+    }
+  };
+
+  const renderDot = (color: string, shouldShowDot: boolean) => (props: SequentialDotProps) => {
+    const { cx, cy, index } = props;
+    if (typeof cx !== 'number' || typeof cy !== 'number' || typeof index !== 'number') {
+      return null;
+    }
+
+    if (!hasSelection) {
+      return shouldShowDot ? <circle cx={cx} cy={cy} r={4} fill={color} /> : null;
+    }
+
+    if (selectedPeriodIndices.has(index)) {
+      return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
+    }
+
+    return <circle cx={cx} cy={cy} r={3} fill={color} fillOpacity={0.25} />;
+  };
 
   if (!chartData.length) {
     return (
@@ -59,11 +102,17 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
 
   return (
     <div ref={containerRef}>
-    <ChartContainer config={chartConfig} className="w-full">
-      <div className="aspect-auto h-100 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          {chartType === 'bar' ? (
-            <BarChart data={chartData} margin={margin}>
+      <ChartContainer config={chartConfig} className={chartData.length ? 'w-full cursor-pointer' : 'w-full'}>
+        <div className="aspect-auto h-100 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            {chartType === 'bar' ? (
+              <BarChart
+                data={chartData}
+                margin={margin}
+                onClick={(nextState, event) => {
+                  handleChartClick(nextState?.activeTooltipIndex, event.shiftKey);
+                }}
+              >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time_period" {...axisTickProps} />
               <YAxis />
@@ -71,12 +120,29 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 content={<ChartTooltipContent className="min-w-50" labelFormatter={formatTimeLabel} />}
               />
               {visibleKeys.map((key, idx) => {
-                const color = chartConfig[key]?.color ?? getPaletteColor(idx);
-                return <Bar key={key} dataKey={key} fill={color} radius={[6, 6, 0, 0]} name={key} />;
+                const color = String(chartConfig[key]?.color ?? getPaletteColor(idx));
+                return (
+                  <Bar key={key} dataKey={key} fill={color} radius={[6, 6, 0, 0]} name={key}>
+                    {chartData.map((_, pointIdx) => (
+                      <Cell
+                        key={`${key}-${pointIdx}`}
+                        fillOpacity={
+                          !hasSelection || selectedPeriodIndices.has(pointIdx) ? 1 : 0.25
+                        }
+                      />
+                    ))}
+                  </Bar>
+                );
               })}
-            </BarChart>
-          ) : chartType === 'area' ? (
-            <AreaChart data={chartData} margin={margin}>
+              </BarChart>
+            ) : chartType === 'area' ? (
+              <AreaChart
+                data={chartData}
+                margin={margin}
+                onClick={(nextState, event) => {
+                  handleChartClick(nextState?.activeTooltipIndex, event.shiftKey);
+                }}
+              >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time_period" {...axisTickProps} />
               <YAxis />
@@ -84,7 +150,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 content={<ChartTooltipContent className="min-w-50" labelFormatter={formatTimeLabel} />}
               />
               {visibleKeys.map((key, idx) => {
-                const color = chartConfig[key]?.color ?? getPaletteColor(idx);
+                const color = String(chartConfig[key]?.color ?? getPaletteColor(idx));
                 return (
                   <Area
                     key={key}
@@ -93,14 +159,22 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                     stackId="1"
                     stroke={color}
                     fill={color}
-                    fillOpacity={0.35}
+                    fillOpacity={hasSelection ? 0.2 : 0.35}
+                    dot={renderDot(color, (groupPointCounts[key] ?? chartData.length) <= 1)}
+                    activeDot={{ r: 5 }}
                     name={key}
                   />
                 );
               })}
-            </AreaChart>
-          ) : (
-            <LineChart data={chartData} margin={margin}>
+              </AreaChart>
+            ) : (
+              <LineChart
+                data={chartData}
+                margin={margin}
+                onClick={(nextState, event) => {
+                  handleChartClick(nextState?.activeTooltipIndex, event.shiftKey);
+                }}
+              >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time_period" {...axisTickProps} />
               <YAxis />
@@ -110,7 +184,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 }
               />
               {visibleKeys.map((key, idx) => {
-                const color = chartConfig[key]?.color ?? getPaletteColor(idx);
+                const color = String(chartConfig[key]?.color ?? getPaletteColor(idx));
                 const shouldShowDot = (groupPointCounts[key] ?? chartData.length) <= 1;
                 return (
                   <Line
@@ -119,51 +193,51 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                     dataKey={key}
                     stroke={color}
                     strokeWidth={2}
-                    dot={shouldShowDot ? { r: 4, strokeWidth: 0 } : false}
+                    dot={renderDot(color, shouldShowDot)}
                     activeDot={{ r: 5 }}
                     name={key}
                   />
                 );
               })}
-            </LineChart>
-          )}
-        </ResponsiveContainer>
-      </div>
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4">
-        {groupKeys.map((key) => {
-          const color = chartConfig[key]?.color;
-          const label = chartConfig[key]?.label || key;
-          const isHidden = hiddenKeys.has(key);
-          return (
-            <button
-              key={key}
-              type="button"
-              className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 transition-opacity hover:bg-muted/60"
-              style={{ opacity: isHidden ? 0.4 : 1 }}
-              onClick={() => toggleKey(key)}
-              aria-pressed={!isHidden}
-              aria-label={isHidden ? `Show ${label}` : `Hide ${label}`}
-            >
-              {chartType === 'line' ? (
-                <div className="flex items-center">
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                  <div className="h-0.5 w-3" style={{ backgroundColor: color }} />
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                </div>
-              ) : (
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
-              )}
-              <span
-                className="text-sm font-medium text-muted-foreground"
-                style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
+              </LineChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4">
+          {groupKeys.map((key) => {
+            const color = String(chartConfig[key]?.color ?? '#8884d8');
+            const label = chartConfig[key]?.label || key;
+            const isHidden = hiddenKeys.has(key);
+            return (
+              <button
+                key={key}
+                type="button"
+                className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 transition-opacity hover:bg-muted/60"
+                style={{ opacity: isHidden ? 0.4 : 1 }}
+                onClick={() => toggleKey(key)}
+                aria-pressed={!isHidden}
+                aria-label={isHidden ? `Show ${label}` : `Hide ${label}`}
               >
-                {label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </ChartContainer>
+                {chartType === 'line' ? (
+                  <div className="flex items-center">
+                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                    <div className="h-0.5 w-3" style={{ backgroundColor: color }} />
+                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                  </div>
+                ) : (
+                  <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
+                )}
+                <span
+                  className="text-sm font-medium text-muted-foreground"
+                  style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
+                >
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </ChartContainer>
     </div>
   );
 };

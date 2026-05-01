@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
@@ -50,6 +51,7 @@ import {
   getPaletteColor,
   type ChartTypeOption,
 } from './hooks/useSequentialAnalysisTaskFlow';
+import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
 import { UniqueValueCount } from './components/UniqueValueCount';
 import { SequentialChart } from './components/SequentialChart';
 import { ChartImageDownloadDialog } from '../../../components/ui/ChartImageDownloadDialog';
@@ -108,6 +110,7 @@ const parsePositiveIntegerInput = (value: string): number | null => {
 };
 
 const SequentialAnalysisFeature = () => {
+  const queryClient = useQueryClient();
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
@@ -147,7 +150,9 @@ const SequentialAnalysisFeature = () => {
     useState<SequentialCustomIntervalUnit>('minutes');
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [selectedPeriodIndices, setSelectedPeriodIndices] = useState<Set<number>>(new Set());
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastClickedIndexRef = useRef<number | null>(null);
 
   // Use schema management hook
   const {
@@ -199,6 +204,8 @@ const SequentialAnalysisFeature = () => {
       textApi.getSequentialAnalysisTaskRequest(taskId, headers),
     onResultFetched: (resultData) => {
       if (!resultData) return;
+      setSelectedPeriodIndices(new Set());
+      lastClickedIndexRef.current = null;
       const resolvedChartType = isChartTypeOption((resultData as Record<string, unknown>)?.chart_type)
         ? (resultData as Record<string, unknown>).chart_type as ChartTypeOption
         : chartType;
@@ -214,6 +221,8 @@ const SequentialAnalysisFeature = () => {
     },
     onHydratedResult: (resultPayload) => {
       if (!resultPayload) return;
+      setSelectedPeriodIndices(new Set());
+      lastClickedIndexRef.current = null;
       const hydratedParams = hydratedParamsRef.current;
       const enriched = {
         ...(resultPayload as Record<string, unknown>),
@@ -331,6 +340,8 @@ const SequentialAnalysisFeature = () => {
     onCleared: (_, options) => {
       setResultSafely(null);
       setHiddenKeys(new Set());
+      setSelectedPeriodIndices(new Set());
+      lastClickedIndexRef.current = null;
       if (options?.preserveLocalState) {
         return;
       }
@@ -541,6 +552,45 @@ const SequentialAnalysisFeature = () => {
       clearResults,
     },
     lock: { getAuthHeaders },
+  });
+
+  const handlePeriodClick = (index: number, shiftHeld: boolean) => {
+    if (index < 0 || index >= chartData.length) return;
+
+    setSelectedPeriodIndices((prev) => {
+      const next = new Set(prev);
+
+      if (shiftHeld && lastClickedIndexRef.current !== null) {
+        const lower = Math.min(lastClickedIndexRef.current, index);
+        const upper = Math.max(lastClickedIndexRef.current, index);
+        for (let cursor = lower; cursor <= upper; cursor += 1) {
+          next.add(cursor);
+        }
+      } else {
+        if (next.has(index)) {
+          next.delete(index);
+        } else {
+          next.add(index);
+        }
+        lastClickedIndexRef.current = index;
+      }
+
+      return next;
+    });
+  };
+
+  const canDetach = selectedPeriodIndices.size > 0 && selectedPeriodIndices.size < chartData.length;
+
+  const { handleDetach, isDetaching } = useSequentialAnalysisDetach({
+    currentWorkspaceId,
+    resolveTaskId,
+    getAuthHeaders,
+    panelSelectedNodes,
+    chartData,
+    results,
+    hiddenKeys,
+    selectedPeriodIndices,
+    queryClient,
   });
 
   const handleRunOrUpdate = async () => {
@@ -929,6 +979,25 @@ const SequentialAnalysisFeature = () => {
               </Select>
               <Button
                 variant="outline"
+                disabled={!canDetach || isDetaching}
+                onClick={() => {
+                  void handleDetach();
+                }}
+              >
+                {isDetaching ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace ({selectedPeriodIndices.size})
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
                 size="icon"
                 aria-label="Download chart"
                 onClick={() => setDownloadDialogOpen(true)}
@@ -984,7 +1053,9 @@ const SequentialAnalysisFeature = () => {
               groupKeys={groupKeys}
               groupPointCounts={groupPointCounts}
               hiddenKeys={hiddenKeys}
+              selectedPeriodIndices={selectedPeriodIndices}
               onToggleKey={handleToggleKey}
+              onPeriodClick={handlePeriodClick}
               containerRef={chartContainerRef}
             />
           </CardContent>
