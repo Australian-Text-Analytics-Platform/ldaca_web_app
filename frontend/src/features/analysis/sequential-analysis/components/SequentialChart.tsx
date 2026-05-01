@@ -70,6 +70,56 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
   const visibleKeys = groupKeys.filter((key) => !hiddenKeys.has(key));
   const hasSelection = selectedPeriodIndices.size > 0;
 
+  if (!groupKeys.length) {
+    return (
+      <div ref={containerRef}>
+        <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
+          No groups meet the current minimum group size.
+        </div>
+        <div className="mt-4 flex flex-col gap-3 px-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={!hasSelection || isDetaching}
+            onClick={onClearSelection}
+          >
+            Clear Selection
+          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[22rem] sm:flex-row sm:items-center sm:justify-end">
+            <div className="flex w-full items-center gap-2 sm:max-w-md">
+              <label
+                className="shrink-0 text-sm font-medium text-muted-foreground"
+                htmlFor="sequential-new-node-name"
+              >
+                New data block name
+              </label>
+              <Input
+                id="sequential-new-node-name"
+                value={detachNodeName}
+                onChange={(event) => onDetachNodeNameChange(event.target.value)}
+                placeholder={detachNodeNamePlaceholder}
+                disabled={isDetaching}
+                aria-label="New data block name"
+                className="min-w-0 flex-1"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              disabled
+              onClick={onDetach}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add to Workspace ({selectedPeriodIndices.size})
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const handleChartClick = (activeTooltipIndex: unknown, shiftHeld: boolean) => {
     if (typeof activeTooltipIndex === 'number') {
       onPeriodClick(activeTooltipIndex, shiftHeld);

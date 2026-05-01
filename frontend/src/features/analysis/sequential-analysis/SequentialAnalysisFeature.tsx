@@ -109,6 +109,13 @@ const parsePositiveIntegerInput = (value: string): number | null => {
   return parsed;
 };
 
+const parseNonNegativeIntegerInput = (value: string): number | null => {
+  const parsed = parseNumericInput(value);
+  if (parsed === null) return null;
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
+};
+
 const SequentialAnalysisFeature = () => {
   const queryClient = useQueryClient();
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
@@ -148,6 +155,7 @@ const SequentialAnalysisFeature = () => {
   const [customIntervalValueInput, setCustomIntervalValueInput] = useState<string>('1');
   const [customIntervalUnit, setCustomIntervalUnit] =
     useState<SequentialCustomIntervalUnit>('minutes');
+  const [minGroupSizeInput, setMinGroupSizeInput] = useState('10');
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [selectedPeriodIndices, setSelectedPeriodIndices] = useState<Set<number>>(new Set());
@@ -588,21 +596,6 @@ const SequentialAnalysisFeature = () => {
     lastClickedIndexRef.current = null;
   };
 
-  const canDetach = selectedPeriodIndices.size > 0 && selectedPeriodIndices.size < chartData.length;
-
-  const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
-    currentWorkspaceId,
-    resolveTaskId,
-    getAuthHeaders,
-    panelSelectedNodes,
-    chartData,
-    results,
-    hiddenKeys,
-    selectedPeriodIndices,
-    requestedNodeName: detachNodeName,
-    queryClient,
-  });
-
   const handleRunOrUpdate = async () => {
     await executeAnalysisRunOrUpdate({
       hasLockedParameterChanges: hasParamsChanged,
@@ -641,6 +634,7 @@ const SequentialAnalysisFeature = () => {
         ? `Every ${summaryCustomIntervalValue} ${summaryCustomIntervalUnit}`
         : 'Custom interval'
       : rawSummaryFrequency;
+  const minGroupSize = parseNonNegativeIntegerInput(minGroupSizeInput) ?? 0;
 
   const rawResultRows = Array.isArray(results?.data)
     ? (results.data as Array<Record<string, unknown>>)
@@ -650,9 +644,44 @@ const SequentialAnalysisFeature = () => {
     .map((column) => String(row[column] ?? ''))
     .join(' - ');
 
+  const groupSizeByKey = (() => {
+    if (!summaryGroupBy.length) return {} as Record<string, number>;
+
+    const sizes: Record<string, number> = {};
+    rawResultRows.forEach((row) => {
+      const groupKey = getGroupKey(row);
+      const count = row.sequential_count;
+      const numericCount = typeof count === 'number' ? count : Number(count ?? 0);
+      sizes[groupKey] = (sizes[groupKey] ?? 0) + numericCount;
+    });
+    return sizes;
+  })();
+
+  const passesMinGroupSize = (key: string) => !summaryGroupBy.length || (groupSizeByKey[key] ?? 0) >= minGroupSize;
+  const filteredGroupKeys = groupKeys.filter((key) => passesMinGroupSize(key));
+  const filteredOutGroupKeys = new Set(groupKeys.filter((key) => !passesMinGroupSize(key)));
+  const invisibleGroupKeys = new Set([...hiddenKeys, ...filteredOutGroupKeys]);
+
+  const canDetach = selectedPeriodIndices.size > 0
+    && selectedPeriodIndices.size < chartData.length
+    && filteredGroupKeys.length > 0;
+
+  const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
+    currentWorkspaceId,
+    resolveTaskId,
+    getAuthHeaders,
+    panelSelectedNodes,
+    chartData,
+    results,
+    excludedGroupKeys: invisibleGroupKeys,
+    selectedPeriodIndices,
+    requestedNodeName: detachNodeName,
+    queryClient,
+  });
+
   const isRowVisible = (row: Record<string, unknown>) => {
     if (!summaryGroupBy.length) return true;
-    return !hiddenKeys.has(getGroupKey(row));
+    return !invisibleGroupKeys.has(getGroupKey(row));
   };
 
   const getTimeBucketKey = (row: Record<string, unknown>) => String(
@@ -712,7 +741,7 @@ const SequentialAnalysisFeature = () => {
       { label: 'Chosen', value: `${chosenPointCount}/${chosenDocumentCount}` },
       { label: 'Groups', value: summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None' },
     ];
-    const legend: ChartExportLegendItem[] = groupKeys.map((key, idx) => ({
+    const legend: ChartExportLegendItem[] = filteredGroupKeys.map((key, idx) => ({
       label: (chartConfig[key]?.label as string | undefined) ?? key,
       color: chartConfig[key]?.color ?? getPaletteColor(idx) ?? '#888888',
       type: chartType === 'line' ? 'line' : chartType === 'bar' ? 'bar' : 'area',
@@ -1019,7 +1048,17 @@ const SequentialAnalysisFeature = () => {
                 />
               </CardTitle>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Min Group Size</span>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={minGroupSizeInput}
+                onChange={(event) => setMinGroupSizeInput(event.target.value)}
+                className="w-24 text-sm"
+                aria-label="Min Group Size"
+              />
               <span className="text-sm text-muted-foreground">Chart Type</span>
               <Select
                 value={chartType}
@@ -1104,7 +1143,7 @@ const SequentialAnalysisFeature = () => {
               chartType={chartType}
               chartData={chartData}
               chartConfig={chartConfig}
-              groupKeys={groupKeys}
+              groupKeys={filteredGroupKeys}
               groupPointCounts={groupPointCounts}
               hiddenKeys={hiddenKeys}
               selectedPeriodIndices={selectedPeriodIndices}

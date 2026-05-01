@@ -16,7 +16,7 @@ interface SequentialAnalysisDetachParams {
   panelSelectedNodes: SequentialAnalysisDetachNode[];
   chartData: SequentialAnalysisDatum[];
   results: Record<string, unknown> | null;
-  hiddenKeys: Set<string>;
+  excludedGroupKeys: Set<string>;
   selectedPeriodIndices: Set<number>;
   requestedNodeName: string;
   queryClient: {
@@ -31,7 +31,7 @@ export function useSequentialAnalysisDetach({
   panelSelectedNodes,
   chartData,
   results,
-  hiddenKeys,
+  excludedGroupKeys,
   selectedPeriodIndices,
   requestedNodeName,
   queryClient,
@@ -46,12 +46,12 @@ export function useSequentialAnalysisDetach({
     : [];
 
   const visibleGroups = (() => {
-    if (!groupByColumns.length || hiddenKeys.size === 0) return undefined;
+    if (!groupByColumns.length || excludedGroupKeys.size === 0) return undefined;
 
     const dedupedVisibleGroups = new Map<string, Record<string, unknown>>();
     rawRows.forEach((row) => {
       const groupKey = groupByColumns.map((column) => String(row[column] ?? '')).join(' - ');
-      if (hiddenKeys.has(groupKey)) {
+      if (excludedGroupKeys.has(groupKey)) {
         return;
       }
 

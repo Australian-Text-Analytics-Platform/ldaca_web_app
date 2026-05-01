@@ -28,6 +28,24 @@ export const getPaletteColor = (index: number) =>
 
 const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_end']);
 
+const comparePeriodBounds = (left: unknown, right: unknown): number => {
+  if (left === right) return 0;
+  if (left === undefined || left === null) return 1;
+  if (right === undefined || right === null) return -1;
+
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left - right;
+  }
+
+  const leftTime = new Date(String(left)).getTime();
+  const rightTime = new Date(String(right)).getTime();
+  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime)) {
+    return leftTime - rightTime;
+  }
+
+  return String(left).localeCompare(String(right));
+};
+
 export const formatTimeLabel = (value?: string | number) => {
   if (!value) return '—';
   const str = String(value);
@@ -291,6 +309,12 @@ export function useSequentialAnalysisTaskFlow({
       }
       const timeEntry = timeMap.get(timePeriod);
       if (timeEntry) {
+        if (comparePeriodBounds(item.period_start, timeEntry.period_start) < 0) {
+          timeEntry.period_start = item.period_start;
+        }
+        if (comparePeriodBounds(item.period_end, timeEntry.period_end) > 0) {
+          timeEntry.period_end = item.period_end;
+        }
         timeEntry[groupKey] = item.sequential_count;
       }
     });
