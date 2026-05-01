@@ -334,10 +334,14 @@ const buildCompositeSvg = (
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-export const downloadChartAs = async (
+/**
+ * Build a chart image blob + its intended filename without saving it.
+ * Use this when you need to bundle the chart with other files (e.g. a ZIP).
+ */
+export const buildChartBlob = async (
   svg: SVGSVGElement,
   options: DownloadChartOptions,
-): Promise<void> => {
+): Promise<{ blob: Blob; filename: string }> => {
   const { svgString, width, height } = serializeChartSvg(svg);
   const filename = toChartFilename(
     options.nodeName ?? '',
@@ -349,11 +353,10 @@ export const downloadChartAs = async (
 
   if (options.format === 'svg') {
     const compositeSvg = buildCompositeSvg(svgString, width, height, header, legend);
-    await saveBlob(
-      new Blob([compositeSvg], { type: 'image/svg+xml;charset=utf-8' }),
+    return {
+      blob: new Blob([compositeSvg], { type: 'image/svg+xml;charset=utf-8' }),
       filename,
-    );
-    return;
+    };
   }
 
   const blob = await renderCompositeBitmap(svgString, width, height, {
@@ -362,6 +365,15 @@ export const downloadChartAs = async (
     header,
     legend,
   });
+  return { blob, filename };
+};
+
+/** Build and immediately save a chart image, with browser/Tauri toast handling. */
+export const downloadChartAs = async (
+  svg: SVGSVGElement,
+  options: DownloadChartOptions,
+): Promise<void> => {
+  const { blob, filename } = await buildChartBlob(svg, options);
   await saveBlob(blob, filename);
 };
 
