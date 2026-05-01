@@ -579,6 +579,11 @@ const SequentialAnalysisFeature = () => {
     });
   };
 
+  const clearPeriodSelection = () => {
+    setSelectedPeriodIndices(new Set());
+    lastClickedIndexRef.current = null;
+  };
+
   const canDetach = selectedPeriodIndices.size > 0 && selectedPeriodIndices.size < chartData.length;
 
   const { handleDetach, isDetaching } = useSequentialAnalysisDetach({
@@ -631,6 +636,51 @@ const SequentialAnalysisFeature = () => {
         ? `Every ${summaryCustomIntervalValue} ${summaryCustomIntervalUnit}`
         : 'Custom interval'
       : rawSummaryFrequency;
+
+  const rawResultRows = Array.isArray(results?.data)
+    ? (results.data as Array<Record<string, unknown>>)
+    : [];
+
+  const getGroupKey = (row: Record<string, unknown>) => summaryGroupBy
+    .map((column) => String(row[column] ?? ''))
+    .join(' - ');
+
+  const isRowVisible = (row: Record<string, unknown>) => {
+    if (!summaryGroupBy.length) return true;
+    return !hiddenKeys.has(getGroupKey(row));
+  };
+
+  const getTimeBucketKey = (row: Record<string, unknown>) => String(
+    (row.time_period_formatted as string | number | undefined)
+      ?? (row.time_period as string | number | undefined)
+      ?? '',
+  );
+
+  const selectedTimeBucketKeys = new Set(
+    Array.from(selectedPeriodIndices)
+      .map((index) => String(chartData[index]?.time_period ?? ''))
+      .filter((value) => value.length > 0),
+  );
+
+  const sumSequentialDocs = (rows: Array<Record<string, unknown>>) => rows.reduce((total, row) => {
+    const count = row.sequential_count;
+    return total + (typeof count === 'number' ? count : Number(count ?? 0));
+  }, 0);
+
+  const shownRows = rawResultRows.filter(isRowVisible);
+  const chosenRows = shownRows.filter((row) => selectedTimeBucketKeys.has(getTimeBucketKey(row)));
+
+  const totalPointCount = typeof results?.total_records === 'number'
+    ? results.total_records
+    : rawResultRows.length;
+  const totalDocumentCount = typeof panelSelectedNodes[0]?.shape?.[0] === 'number'
+    ? panelSelectedNodes[0].shape[0]
+    : sumSequentialDocs(rawResultRows);
+  const shownPointCount = shownRows.length;
+  const shownDocumentCount = sumSequentialDocs(shownRows);
+  const chosenPointCount = selectedPeriodIndices.size > 0 ? chosenRows.length : 0;
+  const chosenDocumentCount = selectedPeriodIndices.size > 0 ? sumSequentialDocs(chosenRows) : 0;
+
   const resultsSummary = summaryTimeColumn
     ? (summaryColumnType === 'numeric'
         ? `Numeric bin counts for ${summaryTimeColumn}`
@@ -652,7 +702,9 @@ const SequentialAnalysisFeature = () => {
       { label: 'Data Block', value: nodeName },
       { label: 'Time Column', value: summaryTimeColumn || '—' },
       { label: 'Frequency', value: summaryFrequency ?? '—' },
-      { label: 'Total Records', value: String(results?.total_records ?? '—') },
+      { label: 'Total', value: `${totalPointCount}/${totalDocumentCount}` },
+      { label: 'Shown', value: `${shownPointCount}/${shownDocumentCount}` },
+      { label: 'Chosen', value: `${chosenPointCount}/${chosenDocumentCount}` },
       { label: 'Groups', value: summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None' },
     ];
     const legend: ChartExportLegendItem[] = groupKeys.map((key, idx) => ({
@@ -979,25 +1031,6 @@ const SequentialAnalysisFeature = () => {
               </Select>
               <Button
                 variant="outline"
-                disabled={!canDetach || isDetaching}
-                onClick={() => {
-                  void handleDetach();
-                }}
-              >
-                {isDetaching ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add to Workspace ({selectedPeriodIndices.size})
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
                 size="icon"
                 aria-label="Download chart"
                 onClick={() => setDownloadDialogOpen(true)}
@@ -1007,7 +1040,7 @@ const SequentialAnalysisFeature = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 xl:grid-cols-6">
               <div className="rounded-md border border-border/60 p-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Time Column
@@ -1030,10 +1063,26 @@ const SequentialAnalysisFeature = () => {
               </div>
               <div className="rounded-md border border-border/60 p-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total Records
+                  Total
                 </span>
                 <div className="mt-1 text-base font-semibold text-foreground">
-                  {String(results?.total_records ?? '—')}
+                  {`${totalPointCount}/${totalDocumentCount}`}
+                </div>
+              </div>
+              <div className="rounded-md border border-border/60 p-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Shown
+                </span>
+                <div className="mt-1 text-base font-semibold text-foreground">
+                  {`${shownPointCount}/${shownDocumentCount}`}
+                </div>
+              </div>
+              <div className="rounded-md border border-border/60 p-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Chosen
+                </span>
+                <div className="mt-1 text-base font-semibold text-foreground">
+                  {`${chosenPointCount}/${chosenDocumentCount}`}
                 </div>
               </div>
               <div className="rounded-md border border-border/60 p-3">
@@ -1054,8 +1103,14 @@ const SequentialAnalysisFeature = () => {
               groupPointCounts={groupPointCounts}
               hiddenKeys={hiddenKeys}
               selectedPeriodIndices={selectedPeriodIndices}
+              canDetach={canDetach}
+              isDetaching={isDetaching}
               onToggleKey={handleToggleKey}
               onPeriodClick={handlePeriodClick}
+              onClearSelection={clearPeriodSelection}
+              onDetach={() => {
+                void handleDetach();
+              }}
               containerRef={chartContainerRef}
             />
           </CardContent>

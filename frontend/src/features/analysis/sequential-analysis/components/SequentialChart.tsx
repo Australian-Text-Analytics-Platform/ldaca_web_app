@@ -12,7 +12,9 @@ import {
   Area,
   Cell,
 } from 'recharts';
+import { Loader2, Plus } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../../../../components/ui/chart';
+import { Button } from '../../../../components/ui/button';
 import type { ChartConfig } from '../../../../components/ui/chart';
 import type { SequentialAnalysisDatum, ChartTypeOption } from '../hooks/useSequentialAnalysisTaskFlow';
 import { getPaletteColor, formatTimeLabel } from '../hooks/useSequentialAnalysisTaskFlow';
@@ -25,8 +27,12 @@ interface SequentialChartProps {
   groupPointCounts: Record<string, number>;
   hiddenKeys: Set<string>;
   selectedPeriodIndices: Set<number>;
+  canDetach: boolean;
+  isDetaching: boolean;
   onToggleKey: (key: string) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
+  onClearSelection: () => void;
+  onDetach: () => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -44,8 +50,12 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
   groupPointCounts,
   hiddenKeys,
   selectedPeriodIndices,
+  canDetach,
+  isDetaching,
   onToggleKey,
   onPeriodClick,
+  onClearSelection,
+  onDetach,
   containerRef,
 }) => {
   const toggleKey = onToggleKey;
@@ -236,6 +246,36 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
               </button>
             );
           })}
+        </div>
+        <div className="mt-4 flex flex-wrap justify-end gap-2 px-4 pb-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={!hasSelection || isDetaching}
+            onClick={onClearSelection}
+          >
+            Clear Selection
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={!canDetach || isDetaching}
+            onClick={onDetach}
+          >
+            {isDetaching ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Workspace ({selectedPeriodIndices.size})
+              </>
+            )}
+          </Button>
         </div>
       </ChartContainer>
     </div>
