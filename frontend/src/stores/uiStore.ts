@@ -45,12 +45,6 @@ export const DEFAULT_VISIBLE_VIEWS: ViewType[] = ALL_VIEWS.filter(
   (view) => view !== 'ai-annotator',
 );
 
-interface TutorialTarget {
-  file: string;
-  anchor: string;
-  label?: string;
-}
-
 interface UIState {
   currentView: ViewType;
   visibleViews: ViewType[];
@@ -130,7 +124,7 @@ type UIStore = UIState & UIActions;
 export const useUIStore = create<UIStore>()(
   devtools(
     persist(
-      immer((set, get) => ({
+      immer((set) => ({
       // Initial state
       currentView: 'data-loader',
       visibleViews: [...DEFAULT_VISIBLE_VIEWS],
