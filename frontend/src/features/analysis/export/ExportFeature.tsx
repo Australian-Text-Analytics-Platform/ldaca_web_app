@@ -26,6 +26,7 @@ type DownloadStatus = 'idle' | 'downloading';
 // Supported formats aligned with backend / Polars write_* methods
 const FORMATS = [
   { value: 'csv', label: 'CSV (.csv)' },
+  { value: 'xlsx', label: 'Excel (.xlsx)' },
   { value: 'json', label: 'JSON (.json)' },
   { value: 'ndjson', label: 'NDJSON (.ndjson)' },
   { value: 'parquet', label: 'Parquet (.parquet)' },
