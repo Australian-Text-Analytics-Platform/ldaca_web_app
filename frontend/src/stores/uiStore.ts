@@ -134,6 +134,7 @@ interface UIActions {
   // Hints
   setLastUploadedFilePath: (path: string | null) => void;
   sessionDismissHint: (id: string) => void;
+  resetSessionDismissedHints: () => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -297,6 +298,10 @@ export const useUIStore = create<UIStore>()(
 
       sessionDismissHint: (id) => set((state) => {
         state.sessionDismissedHints.add(id);
+      }),
+
+      resetSessionDismissedHints: () => set((state) => {
+        state.sessionDismissedHints = new Set<string>();
       }),
     })),
       {

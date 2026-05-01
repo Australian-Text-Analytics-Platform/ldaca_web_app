@@ -125,7 +125,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     } finally {
       setIsApplying(false);
     }
-  }, [nodeId, serializedRequest, newNodeName, polarsExpressionApply, refreshNodeSchema, onAlert]);
+  }, [nodeId, serializedRequest, newNodeName, newNodeNamePlaceholder, polarsExpressionApply, refreshNodeSchema, onAlert]);
 
   return {
     effectiveNode,

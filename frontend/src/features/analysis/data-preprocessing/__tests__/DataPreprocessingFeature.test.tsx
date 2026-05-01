@@ -319,7 +319,13 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     expect(nameInput).toHaveValue('custom_filter_name');
 
-    fireEvent.click(within(filterPanel).getByRole('button', { name: 'Add to Workspace' }));
+    const addButton = within(filterPanel).getByRole('button', { name: 'Add to Workspace' });
+
+    await waitFor(() => {
+      expect(addButton).toBeEnabled();
+    });
+
+    fireEvent.click(addButton);
 
     await waitFor(() => {
       const [nodeId, payload] = mockFilterNode.mock.calls[0] ?? [];

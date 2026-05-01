@@ -53,29 +53,31 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
         </CardHeader>
 
         <CardContent className="space-y-4 pt-0">
-          <NodeSelectionPanel
-            selectedNodes={selectionPanel.selectedNodes}
-            nodeColumnSelections={selectionPanel.nodeColumnSelections}
-            onColumnChange={selectionPanel.onColumnChange}
-            nodeColors={selectionPanel.nodeColors}
-            onColorChange={selectionPanel.onColorChange}
-            defaultPalette={selectionPanel.defaultPalette}
-            maxCompare={1}
-            className="rounded-lg border border-border/60 bg-muted/40"
-            showColorPicker={false}
-            showColumnPicker={false}
-            showHeaderLabel
-            showShape
-            disabled={selectionPanel.disabled}
-            originalCount={selectedNodesOriginalCount}
-            headerAddon={
-              <HelpIcon
-                targetKey="preprocessing.common.node-selection"
-                label="Selected data blocks"
-                className="h-4 w-4 text-muted-foreground"
-              />
-            }
-          />
+          <div data-hint-id="preprocessing.filter.node-selection">
+            <NodeSelectionPanel
+              selectedNodes={selectionPanel.selectedNodes}
+              nodeColumnSelections={selectionPanel.nodeColumnSelections}
+              onColumnChange={selectionPanel.onColumnChange}
+              nodeColors={selectionPanel.nodeColors}
+              onColorChange={selectionPanel.onColorChange}
+              defaultPalette={selectionPanel.defaultPalette}
+              maxCompare={1}
+              className="rounded-lg border border-border/60 bg-muted/40"
+              showColorPicker={false}
+              showColumnPicker={false}
+              showHeaderLabel
+              showShape
+              disabled={selectionPanel.disabled}
+              originalCount={selectedNodesOriginalCount}
+              headerAddon={
+                <HelpIcon
+                  targetKey="preprocessing.common.node-selection"
+                  label="Selected data blocks"
+                  className="h-4 w-4 text-muted-foreground"
+                />
+              }
+            />
+          </div>
 
           {hasSelection && isSchemaLoading && (
             <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
@@ -114,6 +116,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
             renderConditionMetadata={conditionBuilder.renderConditionMetadata}
             shouldHideOperatorSelect={conditionBuilder.shouldHideOperatorSelect}
             getOperatorOptions={conditionBuilder.getOperatorOptions}
+            getColumnHintId={(_condition, index) => (index === 0 ? 'preprocessing.filter.condition-column' : undefined)}
           />
         </CardContent>
 

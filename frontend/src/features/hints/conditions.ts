@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '@/stores/uiStore';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import type { HintConditionMap, HintResolverContext } from './types';
 
 /**
@@ -16,8 +17,10 @@ export function useHintConditions(): {
   context: HintResolverContext;
 } {
   const { currentWorkspaceId, workspaceGraph } = useWorkspaceData();
-  const { lastUploadedFilePath, hasAnyModalOpen } = useUIStore(
+  const { selectedNodeId } = useWorkspaceSelection();
+  const { currentView, lastUploadedFilePath, hasAnyModalOpen } = useUIStore(
     useShallow((s) => ({
+      currentView: s.currentView,
       lastUploadedFilePath: s.lastUploadedFilePath,
       hasAnyModalOpen: Object.values(s.modals).some(Boolean),
     })),
@@ -26,6 +29,8 @@ export function useHintConditions(): {
   const noActiveWorkspace = !currentWorkspaceId;
   const workspaceHasNoNodes =
     !!currentWorkspaceId && (workspaceGraph?.nodes?.length ?? 0) === 0;
+  const workspaceHasNodes =
+    !!currentWorkspaceId && (workspaceGraph?.nodes?.length ?? 0) > 0;
 
   // "File uploaded without an active workspace": user uploaded something but
   // hasn't created/loaded a workspace yet. This is a separate hint id from
@@ -59,6 +64,11 @@ export function useHintConditions(): {
 
   // Suppress all hints while a modal/dialog is open to avoid stacking UI.
   const enabled = !hasAnyModalOpen;
+  const isFilterView = currentView === 'filter';
+  const filterNoNodeSelected =
+    isFilterView && workspaceHasNodes && !selectedNodeId;
+  const filterAwaitingColumnSelection =
+    isFilterView && !!selectedNodeId;
 
   return {
     conditions: {
@@ -66,6 +76,8 @@ export function useHintConditions(): {
       'workspace-has-no-nodes': enabled && workspaceHasNoNodes,
       'file-uploaded-not-added': enabled && fileUploadedNotAdded,
       'file-uploaded-no-workspace': enabled && fileUploadedNoWorkspace,
+      'filter-no-node-selected': enabled && filterNoNodeSelected,
+      'filter-awaiting-column-selection': enabled && filterAwaitingColumnSelection,
     },
     context: {
       lastUploadedFilePath,

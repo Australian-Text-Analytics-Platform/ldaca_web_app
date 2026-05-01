@@ -16,7 +16,9 @@ export type HintConditionId =
   | 'no-active-workspace'
   | 'workspace-has-no-nodes'
   | 'file-uploaded-not-added'
-  | 'file-uploaded-no-workspace';
+  | 'file-uploaded-no-workspace'
+  | 'filter-no-node-selected'
+  | 'filter-awaiting-column-selection';
 
 export type HintConditionMap = Record<HintConditionId, boolean>;
 

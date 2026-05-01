@@ -23,6 +23,9 @@ const formatShapeLabel = (node: SidebarWorkspaceNode): string => {
 const getNodeDisplayName = (node: SidebarWorkspaceNode): string =>
   node?.data?.nodeName || node?.data?.label || node?.label || node?.name || node.id;
 
+const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
+  event.key === 'Enter' || event.key === ' ';
+
 const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
   nodes,
   selectedNodeIds,
@@ -65,11 +68,19 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
             const tooltip = `${displayName}\nShape: ${shape}`;
 
             return (
-              <button
+              <div
                 key={node.id}
-                type="button"
                 onClick={() => onToggleNodeSelection(node.id)}
+                onKeyDown={(event) => {
+                  if (!isActivationKey(event)) {
+                    return;
+                  }
+                  event.preventDefault();
+                  onToggleNodeSelection(node.id);
+                }}
                 title={tooltip}
+                role="button"
+                tabIndex={0}
                 aria-pressed={checked}
                 aria-label={`${checked ? 'Deselect' : 'Select'} ${displayName}`}
                 className={cn(
@@ -88,7 +99,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                 <span className="flex-1 min-w-0 truncate text-sm font-medium text-foreground">
                   {displayName}
                 </span>
-              </button>
+              </div>
             );
           })
         ) : (

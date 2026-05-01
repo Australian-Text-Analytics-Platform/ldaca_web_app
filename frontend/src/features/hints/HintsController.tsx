@@ -48,6 +48,15 @@ function pickActiveHint(
   return null;
 }
 
+function sameActiveHint(
+  left: { hint: HintDefinition; target: Element } | null,
+  right: { hint: HintDefinition; target: Element } | null,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.hint.id === right.hint.id && left.target === right.target;
+}
+
 /**
  * Side-effect component: scrolls the target into view exactly when the active
  * hint identity (or its target element) changes \u2014 not on every poll tick.
@@ -94,11 +103,28 @@ export const HintsController: React.FC = () => {
   // up DOM changes (route swaps, late-mounted rows in virtualized lists,
   // etc.) without wiring a MutationObserver across the entire document.
   const [tick, setTick] = useState(0);
+  const [active, setActive] = useState<{ hint: HintDefinition; target: Element } | null>(null);
+
   useEffect(() => {
     if (!hintsEnabled) return;
-    const id = window.setInterval(() => setTick((t) => t + 1), POLL_INTERVAL_MS);
+
+    const syncActiveHint = () => {
+      const persistent = new Set(dismissedHints);
+      const next = pickActiveHint(conditions, context, persistent, sessionDismissedHints);
+      setActive((previous) => (sameActiveHint(previous, next) ? previous : next));
+      setTick((t) => t + 1);
+    };
+
+    syncActiveHint();
+    const id = window.setInterval(syncActiveHint, POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [hintsEnabled]);
+  }, [
+    hintsEnabled,
+    dismissedHints,
+    sessionDismissedHints,
+    conditions,
+    context,
+  ]);
 
   // Expose a small debug helper so authors can introspect from DevTools:
   //   window.__ldacaHints.debug()
@@ -115,6 +141,8 @@ export const HintsController: React.FC = () => {
           dismissedHints: useHintsStore.getState().dismissedHints,
           sessionDismissed: Array.from(session),
           lastUploadedFilePath: useUIStore.getState().lastUploadedFilePath,
+          renderPickedHintId: active?.hint.id ?? null,
+          tick,
           currentConditions: conditions,
           pickedHintId: picked?.hint.id ?? null,
           registryEvaluation: hintRegistry.map((h) => ({
@@ -140,17 +168,9 @@ export const HintsController: React.FC = () => {
     return () => {
       delete (w as { __ldacaHints?: unknown }).__ldacaHints;
     };
-  }, [conditions, context]);
+  }, [active, conditions, context, tick]);
 
   if (!hintsEnabled) return null;
-
-  const persistentSet = new Set(dismissedHints);
-  const active = pickActiveHint(
-    conditions,
-    context,
-    persistentSet,
-    sessionDismissedHints,
-  );
   if (!active) return null;
 
   const { hint, target } = active;

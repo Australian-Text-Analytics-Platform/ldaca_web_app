@@ -341,6 +341,9 @@ const WorkspaceShell: React.FC = () => {
                 )}
               </div>
             )}
+            <Suspense fallback={null}>
+              <HintsController />
+            </Suspense>
             <div className="flex h-dvh w-full overflow-hidden">
               <ErrorBoundary>
                 <Sidebar />
@@ -363,10 +366,6 @@ const WorkspaceShell: React.FC = () => {
               <SidebarInset className="flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
                 <Suspense fallback={null}>
                   <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
-                </Suspense>
-
-                <Suspense fallback={null}>
-                  <HintsController />
                 </Suspense>
 
                 <header className="border-b border-border/40 bg-white px-4 py-3 md:hidden">

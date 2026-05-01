@@ -17,6 +17,8 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -29,9 +31,11 @@ import { filesApi } from '@/api/files';
 import { workspacesApi } from '@/api/workspaces';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
+import { useHintsStore } from '@/stores/hintsStore';
 import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
@@ -59,6 +63,7 @@ import {
   Upload,
   ChevronDown,
   Pencil,
+  RotateCcw,
 } from 'lucide-react';
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
@@ -97,9 +102,34 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const Sidebar: React.FC = () => {
-  const { currentView, visibleViews, setCurrentView, setViewVisibility, openFeedbackModal, openTutorialTarget } = useUIStore(
-    useShallow(({ currentView, visibleViews, setCurrentView, setViewVisibility, openFeedbackModal, openTutorialTarget }) => ({ currentView, visibleViews, setCurrentView, setViewVisibility, openFeedbackModal, openTutorialTarget }))
+  const {
+    currentView,
+    visibleViews,
+    setCurrentView,
+    setViewVisibility,
+    openFeedbackModal,
+    openTutorialTarget,
+    resetSessionDismissedHints,
+  } = useUIStore(
+    useShallow(({
+      currentView,
+      visibleViews,
+      setCurrentView,
+      setViewVisibility,
+      openFeedbackModal,
+      openTutorialTarget,
+      resetSessionDismissedHints,
+    }) => ({
+      currentView,
+      visibleViews,
+      setCurrentView,
+      setViewVisibility,
+      openFeedbackModal,
+      openTutorialTarget,
+      resetSessionDismissedHints,
+    }))
   );
+  const resetHints = useHintsStore((state) => state.resetHints);
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNodeSelection } = useWorkspaceActions();
@@ -125,6 +155,12 @@ const Sidebar: React.FC = () => {
   const openQuotationEngineDialog = () => {
     setCurrentView('quotation');
     openEngineDialog();
+  };
+
+  const handleResetHints = () => {
+    resetHints();
+    resetSessionDismissedHints();
+    toast('All hints have been reset. Dismissed hints can appear again.');
   };
 
   const [isDataFolderDialogOpen, setIsDataFolderDialogOpen] = React.useState(false);
@@ -487,6 +523,14 @@ const Sidebar: React.FC = () => {
                               </DropdownMenuCheckboxItem>
                             );
                           })}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={handleResetHints}
+                            className="text-xs text-muted-foreground focus:text-foreground"
+                          >
+                            <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                            Reset all hints
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                       </div>

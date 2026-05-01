@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
 interface HighlightRingProps {
@@ -60,13 +59,13 @@ export const HighlightRing: React.FC<HighlightRingProps> = ({
       '0 0 0 3px rgb(59 130 246 / 0.9), 0 0 0 6px rgb(255 255 255 / 0.9), 0 0 0 9999px rgb(15 23 42 / 0.35)',
   };
 
-  return createPortal(
+  return (
     <div
       aria-hidden="true"
+      data-testid="hint-highlight-ring"
       style={style}
       className={cn('motion-safe:animate-pulse', className)}
-    />,
-    document.body,
+    />
   );
 };
 
