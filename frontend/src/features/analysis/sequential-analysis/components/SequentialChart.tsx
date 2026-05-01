@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   LineChart,
   Line,
@@ -22,6 +22,9 @@ interface SequentialChartProps {
   chartConfig: ChartConfig;
   groupKeys: string[];
   groupPointCounts: Record<string, number>;
+  hiddenKeys: Set<string>;
+  onToggleKey: (key: string) => void;
+  containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export const SequentialChart: React.FC<SequentialChartProps> = ({
@@ -30,20 +33,11 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
   chartConfig,
   groupKeys,
   groupPointCounts,
+  hiddenKeys,
+  onToggleKey,
+  containerRef,
 }) => {
-  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
-
-  const toggleKey = (key: string) => {
-    setHiddenKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
+  const toggleKey = onToggleKey;
 
   const visibleKeys = groupKeys.filter((key) => !hiddenKeys.has(key));
 
@@ -64,6 +58,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
   };
 
   return (
+    <div ref={containerRef}>
     <ChartContainer config={chartConfig} className="w-full">
       <div className="aspect-auto h-100 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -169,5 +164,6 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
         })}
       </div>
     </ChartContainer>
+    </div>
   );
 };

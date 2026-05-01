@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
@@ -29,7 +30,7 @@ import {
   SelectValue,
 } from '../../../components/ui/select';
 import { Checkbox } from '../../../components/ui/checkbox';
-import { Loader2, Play, Plus, Trash2 } from 'lucide-react';
+import { Download, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { normalizeTypeName } from '../../../utils/columnTypes';
 import {
   hasLockedParameterDiff,
@@ -46,10 +47,19 @@ import {
 import {
   useSequentialAnalysisTaskFlow,
   isChartTypeOption,
+  getPaletteColor,
   type ChartTypeOption,
 } from './hooks/useSequentialAnalysisTaskFlow';
 import { UniqueValueCount } from './components/UniqueValueCount';
 import { SequentialChart } from './components/SequentialChart';
+import { ChartImageDownloadDialog } from '../../../components/ui/ChartImageDownloadDialog';
+import {
+  downloadChartAs,
+  findSvgInContainer,
+  type ChartImageFormat,
+  type ChartExportHeaderItem,
+  type ChartExportLegendItem,
+} from '../../../lib/chartExport';
 
 const FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
   { value: 'hourly', label: 'Hourly' },
@@ -135,7 +145,10 @@ const SequentialAnalysisFeature = () => {
   const [customIntervalValueInput, setCustomIntervalValueInput] = useState<string>('1');
   const [customIntervalUnit, setCustomIntervalUnit] =
     useState<SequentialCustomIntervalUnit>('minutes');
-  
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const chartContainerRef = useRef<HTMLDivElement | null>(null);
+
   // Use schema management hook
   const {
     setLockedSchema,
@@ -317,6 +330,7 @@ const SequentialAnalysisFeature = () => {
     },
     onCleared: (_, options) => {
       setResultSafely(null);
+      setHiddenKeys(new Set());
       if (options?.preserveLocalState) {
         return;
       }
@@ -476,6 +490,18 @@ const SequentialAnalysisFeature = () => {
     setGroupByColumns(newColumns);
   };
 
+  const handleToggleKey = (key: string) => {
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const {
     handleAnalyze,
     handleClearResults,
@@ -560,6 +586,44 @@ const SequentialAnalysisFeature = () => {
         ? `Numeric bin counts for ${summaryTimeColumn}`
         : `Frequency of records grouped by ${summaryTimeColumn}`)
     : 'Aggregated frequency over time';
+
+  const handleDownloadChart = async (format: ChartImageFormat) => {
+    if (!chartContainerRef.current) {
+      toast.error('Chart not available for export.');
+      return;
+    }
+    const svg = findSvgInContainer(chartContainerRef.current);
+    if (!svg) {
+      toast.error('Chart SVG not found.');
+      return;
+    }
+    const nodeName = panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data';
+    const header: ChartExportHeaderItem[] = [
+      { label: 'Data Block', value: nodeName },
+      { label: 'Time Column', value: summaryTimeColumn || '—' },
+      { label: 'Frequency', value: summaryFrequency ?? '—' },
+      { label: 'Total Records', value: String(results?.total_records ?? '—') },
+      { label: 'Groups', value: summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None' },
+    ];
+    const legend: ChartExportLegendItem[] = groupKeys.map((key, idx) => ({
+      label: (chartConfig[key]?.label as string | undefined) ?? key,
+      color: chartConfig[key]?.color ?? getPaletteColor(idx) ?? '#888888',
+      type: chartType === 'line' ? 'line' : chartType === 'bar' ? 'bar' : 'area',
+      hidden: hiddenKeys.has(key),
+    }));
+    try {
+      await downloadChartAs(svg, {
+        nodeName,
+        toolSuffix: 'trends',
+        format,
+        header,
+        legend,
+      });
+    } catch (err) {
+      toast.error('Failed to export chart.');
+      console.error(err);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -863,6 +927,14 @@ const SequentialAnalysisFeature = () => {
                   <SelectItem value="area">Area Chart</SelectItem>
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Download chart"
+                onClick={() => setDownloadDialogOpen(true)}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -911,10 +983,19 @@ const SequentialAnalysisFeature = () => {
               chartConfig={chartConfig}
               groupKeys={groupKeys}
               groupPointCounts={groupPointCounts}
+              hiddenKeys={hiddenKeys}
+              onToggleKey={handleToggleKey}
+              containerRef={chartContainerRef}
             />
           </CardContent>
         </Card>
       )}
+      <ChartImageDownloadDialog
+        open={downloadDialogOpen}
+        onOpenChange={setDownloadDialogOpen}
+        title="Download Trends Chart"
+        onConfirm={(format) => { void handleDownloadChart(format); }}
+      />
     </div>
   );
 };

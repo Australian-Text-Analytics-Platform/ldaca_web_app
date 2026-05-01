@@ -39,6 +39,9 @@ type Props = {
   topicSearchQuery: string;
   onTopicSearchQueryChange: (query: string) => void;
   activeDomain: ZoomDomain | null;
+  nodeNames?: string[];
+  minTopicSize?: number;
+  randomSeed?: number;
   detachDialogOpen: boolean;
   setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   detachNodeOptions: Array<{ node_id: string; node_name: string; available_columns: string[]; disabled_columns?: string[] }>;
@@ -73,6 +76,9 @@ export function TopicModelingResultsPanel({
   topicSearchQuery,
   onTopicSearchQueryChange,
   activeDomain,
+  nodeNames,
+  minTopicSize,
+  randomSeed,
   detachDialogOpen,
   setDetachDialogOpen,
   detachNodeOptions,
@@ -163,6 +169,9 @@ export function TopicModelingResultsPanel({
               topicSearchQuery={topicSearchQuery}
               onTopicSearchQueryChange={onTopicSearchQueryChange}
               activeDomain={activeDomain}
+              nodeNames={nodeNames}
+              minTopicSize={minTopicSize}
+              randomSeed={randomSeed}
             />
           </div>
         ) : null}
