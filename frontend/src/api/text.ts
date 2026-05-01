@@ -106,7 +106,8 @@ export interface QuotationResultQuery {
   context_length?: number;
   update_only?: boolean;
 }
-export type SequentialFrequency = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type SequentialFrequency = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
+export type SequentialCustomIntervalUnit = 'seconds' | 'minutes' | 'hours' | 'days' | 'weeks';
 export interface SequentialAnalysisRequest {
   time_column: string;
   group_by_columns?: string[] | null;
@@ -115,6 +116,8 @@ export interface SequentialAnalysisRequest {
   column_type?: 'datetime' | 'numeric';
   numeric_origin?: number | null;
   numeric_interval?: number | null;
+  custom_interval_value?: number | null;
+  custom_interval_unit?: SequentialCustomIntervalUnit | null;
   case_sensitive?: boolean;
 }
 

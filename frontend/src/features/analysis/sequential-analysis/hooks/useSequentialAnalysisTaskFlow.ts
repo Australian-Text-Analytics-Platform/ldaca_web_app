@@ -1,6 +1,7 @@
 import { toast } from 'sonner';
 import {
   type SequentialAnalysisRequest,
+  type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
 } from '../../../../api/text';
@@ -50,6 +51,8 @@ interface SequentialAnalysisState {
   numericOriginValue: number | null;
   numericIntervalValue: number | null;
   numericOriginInput: string;
+  customIntervalValue: number | null;
+  customIntervalUnit: SequentialCustomIntervalUnit | null;
   caseSensitive: boolean;
   results: Record<string, unknown> | null;
 }
@@ -90,6 +93,8 @@ export function useSequentialAnalysisTaskFlow({
     numericOriginValue,
     numericIntervalValue,
     numericOriginInput,
+    customIntervalValue,
+    customIntervalUnit,
     caseSensitive,
     results,
   },
@@ -140,6 +145,22 @@ export function useSequentialAnalysisTaskFlow({
       }
     }
 
+    const isCustomDatetime = derivedColumnType === 'datetime' && frequency === 'custom';
+    if (isCustomDatetime) {
+      if (
+        customIntervalValue === null ||
+        !Number.isInteger(customIntervalValue) ||
+        customIntervalValue <= 0
+      ) {
+        toast.error('Please enter a positive whole number for the custom interval.');
+        return;
+      }
+      if (customIntervalUnit === null) {
+        toast.error('Please select a unit for the custom interval.');
+        return;
+      }
+    }
+
     const request: SequentialAnalysisRequest = {
       time_column: picked,
       group_by_columns: validGroupByColumns.length > 0 ? validGroupByColumns : null,
@@ -148,6 +169,8 @@ export function useSequentialAnalysisTaskFlow({
       column_type: derivedColumnType,
       numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : undefined,
       numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : undefined,
+      custom_interval_value: isCustomDatetime ? customIntervalValue : undefined,
+      custom_interval_unit: isCustomDatetime ? customIntervalUnit : undefined,
       case_sensitive: caseSensitive,
     };
 
@@ -170,6 +193,8 @@ export function useSequentialAnalysisTaskFlow({
           column_type: derivedColumnType,
           numeric_origin: numericOriginValue,
           numeric_interval: numericIntervalValue,
+          custom_interval_value: isCustomDatetime ? customIntervalValue : null,
+          custom_interval_unit: isCustomDatetime ? customIntervalUnit : null,
           case_sensitive: caseSensitive,
         },
       };

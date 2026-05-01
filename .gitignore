@@ -231,3 +231,4 @@ target
 
 **/backend-src/
 **/uv-bin/
+/.claude

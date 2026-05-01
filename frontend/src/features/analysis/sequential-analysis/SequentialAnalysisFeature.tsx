@@ -5,7 +5,11 @@ import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../../hooks/useAuth';
 import { useUIStore } from '../../../stores/uiStore';
 import { useSchemaManagement } from '../../../hooks/useSchemaManagement';
-import { type SequentialFrequency, textApi } from '../../../api/text';
+import {
+  type SequentialCustomIntervalUnit,
+  type SequentialFrequency,
+  textApi,
+} from '../../../api/text';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
@@ -54,7 +58,26 @@ const FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = 
   { value: 'monthly', label: 'Monthly' },
   { value: 'quarterly', label: 'Quarterly' },
   { value: 'yearly', label: 'Yearly' },
+  { value: 'custom', label: 'Customised' },
 ];
+
+const CUSTOM_INTERVAL_UNIT_OPTIONS: Array<{
+  value: SequentialCustomIntervalUnit;
+  label: string;
+}> = [
+  { value: 'seconds', label: 'seconds' },
+  { value: 'minutes', label: 'minutes' },
+  { value: 'hours', label: 'hours' },
+  { value: 'days', label: 'days' },
+  { value: 'weeks', label: 'weeks' },
+];
+
+const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] =
+  CUSTOM_INTERVAL_UNIT_OPTIONS.map((opt) => opt.value);
+
+const isCustomIntervalUnit = (value: unknown): value is SequentialCustomIntervalUnit =>
+  typeof value === 'string' &&
+  VALID_CUSTOM_INTERVAL_UNITS.includes(value as SequentialCustomIntervalUnit);
 
 const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
 const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
@@ -65,6 +88,13 @@ const parseNumericInput = (value: string): number | null => {
   if (!trimmed.length) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parsePositiveIntegerInput = (value: string): number | null => {
+  const parsed = parseNumericInput(value);
+  if (parsed === null) return null;
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
 };
 
 const SequentialAnalysisFeature = () => {
@@ -102,6 +132,9 @@ const SequentialAnalysisFeature = () => {
   const [caseSensitive, setCaseSensitive] = useState(true);
   const [numericOriginInput, setNumericOriginInput] = useState<string>('');
   const [numericIntervalInput, setNumericIntervalInput] = useState<string>('1');
+  const [customIntervalValueInput, setCustomIntervalValueInput] = useState<string>('1');
+  const [customIntervalUnit, setCustomIntervalUnit] =
+    useState<SequentialCustomIntervalUnit>('minutes');
   
   // Use schema management hook
   const {
@@ -127,6 +160,8 @@ const SequentialAnalysisFeature = () => {
     columnType: 'datetime' | 'numeric';
     numericOrigin: number | null;
     numericInterval: number | null;
+    customIntervalValue: number | null;
+    customIntervalUnit: SequentialCustomIntervalUnit | null;
     caseSensitive: boolean;
   } | null>(null);
 
@@ -178,7 +213,11 @@ const SequentialAnalysisFeature = () => {
                 frequency: hydratedParams.frequency,
                 column_type: hydratedParams.columnType,
                 numeric_origin: hydratedParams.numericOrigin,
-                numeric_interval: hydratedParams.numericInterval,                case_sensitive: hydratedParams.caseSensitive,              }
+                numeric_interval: hydratedParams.numericInterval,
+                custom_interval_value: hydratedParams.customIntervalValue,
+                custom_interval_unit: hydratedParams.customIntervalUnit,
+                case_sensitive: hydratedParams.caseSensitive,
+              }
             : {}),
         },
       };
@@ -214,10 +253,33 @@ const SequentialAnalysisFeature = () => {
         ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
         : [];
       setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
-      const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+      const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'];
       const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as SequentialFrequency) : undefined;
       const lockedFrequency = reqFrequency && validFrequencies.includes(reqFrequency) ? reqFrequency : frequency;
       setFrequency(lockedFrequency);
+      const lockedCustomIntervalValue =
+        reqColumnType === 'datetime' &&
+        lockedFrequency === 'custom' &&
+        typeof req.custom_interval_value === 'number' &&
+        Number.isInteger(req.custom_interval_value) &&
+        req.custom_interval_value > 0
+          ? (req.custom_interval_value as number)
+          : null;
+      const lockedCustomIntervalUnit =
+        reqColumnType === 'datetime' &&
+        lockedFrequency === 'custom' &&
+        isCustomIntervalUnit(req.custom_interval_unit)
+          ? (req.custom_interval_unit as SequentialCustomIntervalUnit)
+          : null;
+      if (lockedFrequency === 'custom' && reqColumnType === 'datetime') {
+        setCustomIntervalValueInput(
+          lockedCustomIntervalValue != null ? String(lockedCustomIntervalValue) : '1',
+        );
+        setCustomIntervalUnit(lockedCustomIntervalUnit ?? 'minutes');
+      } else {
+        setCustomIntervalValueInput('1');
+        setCustomIntervalUnit('minutes');
+      }
       const reqCaseSensitive = typeof req.case_sensitive === 'boolean' ? req.case_sensitive : true;
       setCaseSensitive(reqCaseSensitive);
       hydratedParamsRef.current = {
@@ -227,6 +289,8 @@ const SequentialAnalysisFeature = () => {
         columnType: reqColumnType,
         numericOrigin: lockedNumericOrigin,
         numericInterval: lockedNumericInterval,
+        customIntervalValue: lockedCustomIntervalValue,
+        customIntervalUnit: lockedCustomIntervalUnit,
         caseSensitive: reqCaseSensitive,
       };
       if (nodeIdStr && currentWorkspaceId) {
@@ -262,6 +326,8 @@ const SequentialAnalysisFeature = () => {
       setCaseSensitive(true);
       setNumericOriginInput('');
       setNumericIntervalInput('1');
+      setCustomIntervalValueInput('1');
+      setCustomIntervalUnit('minutes');
     },
     getExtraTaskIdCandidates: () => [(resultRef.current as Record<string, unknown> | null)?.metadata as Record<string, unknown> | undefined].map(m => m?.task_id as string | undefined),
     getClearTaskIdSources: () => [(resultRef.current as Record<string, unknown> | null)?.metadata as Record<string, unknown> | undefined].map(m => m?.task_id as string | undefined),
@@ -295,6 +361,13 @@ const SequentialAnalysisFeature = () => {
   const derivedColumnType: 'datetime' | 'numeric' = NUMERIC_TYPE_SET.has(activeColumnType) ? 'numeric' : 'datetime';
   const numericOriginValue = derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null;
   const numericIntervalValue = derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null;
+  const isCustomDatetime = derivedColumnType === 'datetime' && frequency === 'custom';
+  const customIntervalValue = isCustomDatetime
+    ? parsePositiveIntegerInput(customIntervalValueInput)
+    : null;
+  const customIntervalUnitValue: SequentialCustomIntervalUnit | null = isCustomDatetime
+    ? customIntervalUnit
+    : null;
 
   const hasParamsChanged = hasLockedParameterDiff({
     isLocked,
@@ -305,6 +378,8 @@ const SequentialAnalysisFeature = () => {
       column_type: derivedColumnType,
       numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : null,
       numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
+      custom_interval_value: isCustomDatetime ? customIntervalValue : null,
+      custom_interval_unit: isCustomDatetime ? customIntervalUnitValue : null,
       case_sensitive: caseSensitive,
     },
     getServerParams: (request) => {
@@ -312,6 +387,16 @@ const SequentialAnalysisFeature = () => {
       const serverFrequency = typeof request.frequency === 'string' ? request.frequency : 'year';
       const serverNumericOrigin = request.numeric_origin == null ? null : Number(request.numeric_origin);
       const serverNumericInterval = request.numeric_interval == null ? null : Number(request.numeric_interval);
+      const serverIsCustomDatetime =
+        serverColumnType === 'datetime' && serverFrequency === 'custom';
+      const serverCustomIntervalValue =
+        serverIsCustomDatetime && typeof request.custom_interval_value === 'number'
+          ? Number(request.custom_interval_value)
+          : null;
+      const serverCustomIntervalUnit =
+        serverIsCustomDatetime && isCustomIntervalUnit(request.custom_interval_unit)
+          ? (request.custom_interval_unit as SequentialCustomIntervalUnit)
+          : null;
 
       const serverCaseSensitive = typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true;
       return {
@@ -320,6 +405,8 @@ const SequentialAnalysisFeature = () => {
         column_type: serverColumnType,
         numeric_origin: serverColumnType === 'numeric' ? serverNumericOrigin : null,
         numeric_interval: serverColumnType === 'numeric' ? serverNumericInterval : null,
+        custom_interval_value: serverIsCustomDatetime ? serverCustomIntervalValue : null,
+        custom_interval_unit: serverIsCustomDatetime ? serverCustomIntervalUnit : null,
         case_sensitive: serverCaseSensitive,
       };
     },
@@ -410,6 +497,8 @@ const SequentialAnalysisFeature = () => {
       numericOriginValue,
       numericIntervalValue,
       numericOriginInput,
+      customIntervalValue,
+      customIntervalUnit: customIntervalUnitValue,
       caseSensitive,
       results,
     },
@@ -446,9 +535,26 @@ const SequentialAnalysisFeature = () => {
   const summaryNumericInterval = summaryColumnType === 'numeric'
     ? ((results?.analysis_params as Record<string, unknown> | undefined)?.numeric_interval as number | null | undefined) ?? numericIntervalValue ?? null
     : null;
+  const rawSummaryFrequency =
+    ((results?.analysis_params as Record<string, unknown> | undefined)?.frequency as SequentialFrequency | undefined) ?? frequency;
+  const summaryCustomIntervalValue =
+    ((results?.analysis_params as Record<string, unknown> | undefined)?.custom_interval_value as number | null | undefined) ??
+    customIntervalValue;
+  const rawSummaryCustomIntervalUnit =
+    ((results?.analysis_params as Record<string, unknown> | undefined)?.custom_interval_unit as unknown) ??
+    customIntervalUnitValue;
+  const summaryCustomIntervalUnit: SequentialCustomIntervalUnit | null = isCustomIntervalUnit(
+    rawSummaryCustomIntervalUnit,
+  )
+    ? rawSummaryCustomIntervalUnit
+    : null;
   const summaryFrequency = summaryColumnType === 'numeric'
     ? 'Numeric bins'
-    : (((results?.analysis_params as Record<string, unknown> | undefined)?.frequency as SequentialFrequency | undefined) ?? frequency);
+    : rawSummaryFrequency === 'custom'
+      ? summaryCustomIntervalValue && summaryCustomIntervalUnit
+        ? `Every ${summaryCustomIntervalValue} ${summaryCustomIntervalUnit}`
+        : 'Custom interval'
+      : rawSummaryFrequency;
   const resultsSummary = summaryTimeColumn
     ? (summaryColumnType === 'numeric'
         ? `Numeric bin counts for ${summaryTimeColumn}`
@@ -511,29 +617,69 @@ const SequentialAnalysisFeature = () => {
           <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {derivedColumnType === 'datetime' ? (
-              <div className="md:col-span-1">
+              <div className={frequency === 'custom' ? 'md:col-span-2' : 'md:col-span-1'}>
                 <div className="mb-1 flex items-center gap-2">
                   <label className="block text-sm font-medium text-gray-700">
                     Frequency
                   </label>
                   <HelpIcon targetKey="analysis.sequential-analysis.frequency" label="Frequency selector" />
                 </div>
-                <Select
-                  value={frequency}
-                  onValueChange={(value) => setFrequency(value as SequentialFrequency)}
-                  disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select frequency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FREQUENCY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select
+                    value={frequency}
+                    onValueChange={(value) => setFrequency(value as SequentialFrequency)}
+                    disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
+                  >
+                    <SelectTrigger className={frequency === 'custom' ? 'w-full sm:w-44' : 'w-full'}>
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FREQUENCY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {frequency === 'custom' && (
+                    <div className="flex flex-1 items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Every</span>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={customIntervalValueInput}
+                        onChange={(event) => setCustomIntervalValueInput(event.target.value)}
+                        placeholder="e.g. 30"
+                        className="w-24"
+                        disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
+                      />
+                      <Select
+                        value={customIntervalUnit}
+                        onValueChange={(value) => {
+                          if (isCustomIntervalUnit(value)) setCustomIntervalUnit(value);
+                        }}
+                        disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CUSTOM_INTERVAL_UNIT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+                {frequency === 'custom' && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Bucket records by a fixed interval. Enter a positive whole number.
+                  </p>
+                )}
               </div>
             ) : (
               <>
