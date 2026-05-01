@@ -232,3 +232,4 @@ target
 **/backend-src/
 **/uv-bin/
 /.claude
+.vscode/settings.json
