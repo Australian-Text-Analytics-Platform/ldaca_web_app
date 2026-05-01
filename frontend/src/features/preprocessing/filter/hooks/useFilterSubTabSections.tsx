@@ -924,7 +924,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     ? 'Define at least one condition to enable preview and filtering.'
     : `${conditions.length} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`;
 
-  const applyButtonDisabled = isConfigDisabled || isFiltering || isLoading.operations;
+  const hasApplicablePreviewRows = conditionsComplete && !previewLoading && !previewError && previewData.length > 0;
+
+  const applyButtonDisabled =
+    isConfigDisabled ||
+    isFiltering ||
+    isLoading.operations ||
+    !hasApplicablePreviewRows;
 
   return {
     selectionPanel: {

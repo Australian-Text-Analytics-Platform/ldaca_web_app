@@ -337,4 +337,58 @@ describe('DataPreprocessingFeature replace tab', () => {
       ]);
     });
   });
+
+  it('keeps filter Add to Workspace disabled until conditions are valid and preview rows exist', async () => {
+    const user = userEvent.setup();
+
+    mockFilterPreview.mockResolvedValueOnce({
+      columns: ['Body', 'Count'],
+      data: [],
+      pagination: {
+        page: 1,
+        page_size: 10,
+        total_rows: 0,
+        total_pages: 1,
+      },
+    });
+
+    render(<DataPreprocessingFeature />);
+
+    const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
+    const addButton = within(filterPanel).getByRole('button', { name: 'Add to Workspace' });
+
+    expect(addButton).toBeDisabled();
+
+    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    columnSelect!.focus();
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    const valueInput = await screen.findByPlaceholderText('Enter value');
+    fireEvent.change(valueInput, { target: { value: 'candidate' } });
+
+    await waitFor(() => {
+      expect(mockFilterPreview).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(addButton).toBeDisabled();
+    });
+
+    mockFilterPreview.mockResolvedValueOnce({
+      columns: ['Body', 'Count'],
+      data: [{ Body: 'candidate tweet', Count: 1 }],
+      pagination: {
+        page: 1,
+        page_size: 10,
+        total_rows: 1,
+        total_pages: 1,
+      },
+    });
+
+    fireEvent.change(valueInput, { target: { value: 'election' } });
+
+    await waitFor(() => {
+      expect(addButton).toBeEnabled();
+    });
+  });
 });
