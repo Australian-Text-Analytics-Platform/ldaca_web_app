@@ -33,6 +33,8 @@ Internet → Nginx (80/443) → FastAPI app (localhost:8001)
 ```bash
 cd /home/ubuntu/src/ldaca_web_app
 git pull
+git submodule sync --recursive
+git submodule update --init --recursive --checkout --force
 ```
 
 ### 2. Configure Nginx
@@ -101,8 +103,10 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/src/ldaca_web_app
+WorkingDirectory=/home/ubuntu/src/ldaca_web_app/backend
 Environment="GOOGLE_CLIENT_ID=460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com"
+ExecStartPre=/bin/rm -rf /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend/build
+ExecStartPre=/bin/tar -xzf /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend/build.tar.gz -C /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend
 ExecStart=/home/ubuntu/.local/bin/uv run ldaca-web-app --multi-user --port 8001
 Restart=on-failure
 RestartSec=5
@@ -174,13 +178,163 @@ sudo certbot renew --dry-run
 
 ---
 
+## Release Checklist
+
+This project has two release surfaces that must stay aligned:
+
+- The `backend/` submodule repo publishes the Python package consumed by `uvx`.
+- The root repo pins that backend release and is what the Nectar VM deploys from source.
+
+Release from `dev`, then promote to `main`.
+
+### 1. Build the frontend from the root repo
+
+```bash
+cd /path/to/ldaca_web_app
+npm run build -w frontend
+```
+
+### 2. Sync the built frontend into the backend package bundle
+
+```bash
+cd /path/to/ldaca_web_app
+node scripts/deploy-frontend-to-backend.mjs
+```
+
+This refreshes:
+
+- `backend/src/ldaca_web_app/resources/frontend/build.tar.gz`
+- `backend/src/ldaca_web_app/resources/frontend/build/`
+
+### 3. Bump the backend package version
+
+Update the backend package version in:
+
+- `backend/pyproject.toml`
+- `backend/uv.lock`
+
+Then refresh the lockfile:
+
+```bash
+cd /path/to/ldaca_web_app/backend
+uv lock
+```
+
+### 4. Validate the backend release artifact
+
+```bash
+cd /path/to/ldaca_web_app/backend
+uv build
+uv run pytest -q
+uvx ty check
+uvx --from dist/ldaca_web_app-<VERSION>-py3-none-any.whl ldaca-web-app --help
+```
+
+If `uvx ty check` is already failing on unrelated, pre-existing issues, record that explicitly before releasing.
+
+### 5. Publish the backend package repo
+
+From the `backend/` repo:
+
+```bash
+cd /path/to/ldaca_web_app/backend
+git add pyproject.toml uv.lock src/ldaca_web_app/resources/frontend/build.tar.gz
+git commit -m "Release v<VERSION>"
+git push origin main
+git tag v<VERSION>
+git push origin v<VERSION>
+```
+
+This triggers the backend repo's PyPI publish workflow.
+
+### 6. Update the root repo to the new backend submodule pointer
+
+From the root repo:
+
+```bash
+cd /path/to/ldaca_web_app
+git add backend
+git commit -m "Sync backend release v<VERSION>"
+git push origin dev
+```
+
+If the visible app version text is shown in docs/UI, update that in the root repo in the same commit.
+
+### 7. Verify the published `uvx` package
+
+After the backend release workflow finishes:
+
+```bash
+uvx --refresh ldaca-web-app@<VERSION> --help
+uvx --from ldaca-web-app==<VERSION> ldaca-web-app --help
+```
+
+For a full smoke test:
+
+```bash
+uvx --from ldaca-web-app==<VERSION> ldaca-web-app --host 127.0.0.1 --port 8016
+```
+
+### 8. Merge `dev` into `main` in the root repo
+
+```bash
+cd /path/to/ldaca_web_app
+git checkout main
+git pull --ff-only origin main
+git merge --no-ff dev -m "Merge dev into main"
+git push origin main
+git tag v<VERSION>
+git push origin v<VERSION>
+```
+
+### 9. Deploy Nectar from the root repo checkout
+
+```bash
+cd /home/ubuntu/src/ldaca_web_app
+git pull
+git submodule sync --recursive
+git submodule update --init --recursive --checkout --force
+sudo systemctl restart ldaca-web-app
+```
+
+### 10. Verify the Nectar deployment
+
+Check git state:
+
+```bash
+cd /home/ubuntu/src/ldaca_web_app && \
+echo "root branch: $(git branch --show-current)" && \
+echo "root commit: $(git rev-parse --short HEAD)" && \
+echo "backend submodule: $(git submodule status backend)" && \
+echo "backend commit: $(git -C backend rev-parse --short HEAD)"
+```
+
+Check served assets:
+
+```bash
+curl -s http://127.0.0.1:8001/ | grep -Eo 'assets/[A-Za-z0-9._-]+' | head -20
+```
+
+For UI regressions, also verify the bundled build contains the expected strings:
+
+```bash
+cd /home/ubuntu/src/ldaca_web_app/backend
+rg -n "Reset all hints|Topic Modelling - BERTopic|All hints have been reset" src/ldaca_web_app/resources/frontend/build
+```
+
+---
+
 ## Updating the App
 
 ```bash
 cd /home/ubuntu/src/ldaca_web_app
 git pull
+git submodule sync --recursive
+git submodule update --init --recursive --checkout --force
 sudo systemctl restart ldaca-web-app
 ```
+
+If the service still serves stale frontend assets after a restart, confirm the backend submodule matches the root repo's recorded commit. A leading `+` in `git submodule status backend` means the deployed backend checkout does not match the root repo pointer.
 
 ---
 
