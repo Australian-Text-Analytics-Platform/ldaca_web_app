@@ -106,7 +106,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
             </div>
             <Button
               type="button"
-              variant="outline"
+              size="sm"
               className="w-full sm:w-auto"
               disabled
               onClick={onDetach}
@@ -334,7 +334,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
             </div>
             <Button
               type="button"
-              variant="outline"
+              size="sm"
               className="w-full sm:w-auto"
               disabled={!canDetach || isDetaching}
               onClick={onDetach}

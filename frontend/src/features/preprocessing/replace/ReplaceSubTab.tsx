@@ -186,7 +186,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
               className="min-w-0 flex-1"
             />
           </div>
-          <Button type="button" onClick={() => void handleApply()} disabled={!canApply} className="shrink-0">
+          <Button type="button" size="sm" onClick={() => void handleApply()} disabled={!canApply} className="shrink-0">
             {applyLoading ? 'Applying…' : 'Add to Data Block'}
           </Button>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />

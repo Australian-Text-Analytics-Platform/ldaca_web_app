@@ -130,7 +130,7 @@ export function TopicModelingResultsPanel({
               <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
               <Button
                 type="button"
-                variant="outline"
+                size="sm"
                 className="w-full sm:w-auto"
                 onClick={() => void openDetachDialog()}
                 disabled={isDetachLoading || isDetaching}

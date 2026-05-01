@@ -1504,7 +1504,7 @@ const QuotationFeature: React.FC = () => {
                       </Button>
                       <Button
                         type="button"
-                        variant="outline"
+                        size="sm"
                         onClick={() => void openDetachDialog(nodeId)}
                         disabled={Boolean(nodeDetaching[nodeId])}
                         className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"

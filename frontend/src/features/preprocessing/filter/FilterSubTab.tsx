@@ -134,7 +134,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
               className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <Button variant="outline" onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
+          <Button size="sm" onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
             {isFiltering ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

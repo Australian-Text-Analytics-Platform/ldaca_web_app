@@ -1478,7 +1478,7 @@ const ConcordanceFeature: React.FC = () => {
               }
             }}
             disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
-            variant="outline"
+            size="sm"
             className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
             title="Create a new data block with concordance results joined to the original table"
           >

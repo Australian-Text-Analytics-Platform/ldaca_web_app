@@ -114,7 +114,7 @@ export function DetachColumnsDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDetaching}>Cancel</AlertDialogCancel>
-          <Button asChild variant="outline" disabled={isDetaching}>
+          <Button asChild size="sm" disabled={isDetaching}>
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault();

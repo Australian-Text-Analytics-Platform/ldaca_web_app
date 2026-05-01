@@ -124,7 +124,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
               className="min-w-0 flex-1"
             />
           </div>
-          <Button type="button" variant="outline" onClick={() => void apply.run()} disabled={apply.disabled} className="shrink-0">
+          <Button type="button" size="sm" onClick={() => void apply.run()} disabled={apply.disabled} className="shrink-0">
             {apply.isBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

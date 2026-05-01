@@ -192,7 +192,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               <span>{inlineError}</span>
             </div>
           )}
-          <Button variant="outline" onClick={applySlice} disabled={applyDisabled} className="shrink-0">
+          <Button size="sm" onClick={applySlice} disabled={applyDisabled} className="shrink-0">
             {isBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

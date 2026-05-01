@@ -380,7 +380,7 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
             />
           </div>
           <Button
-            variant="outline"
+            size="sm"
             onClick={applyExpression}
             disabled={!canApply || isLoading.operations}
             className="shrink-0"

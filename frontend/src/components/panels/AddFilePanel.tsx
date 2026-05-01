@@ -141,7 +141,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
               <Button variant="outline" onClick={handleClose} type="button">
                 Cancel
               </Button>
-              <Button variant="outline" onClick={handleConfirm} disabled={submitting}>
+              <Button size="sm" onClick={handleConfirm} disabled={submitting}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
