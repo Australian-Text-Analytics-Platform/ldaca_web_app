@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
+import JSZip from 'jszip';
 import { Download, Scan } from 'lucide-react';
 import { toast } from 'sonner';
 import { TopicSelectionPanel } from './TopicSelectionPanel';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 import { ChartImageDownloadDialog } from '../../../../../components/ui/ChartImageDownloadDialog';
 import {
-  downloadChartAs,
+  buildChartBlob,
   findSvgInContainer,
   type ChartImageFormat,
   type ChartExportHeaderItem,
 } from '../../../../../lib/chartExport';
+import { saveBlob } from '../../../../../lib/download';
 
 type TopicLike = {
   id: number;
   label: string;
+  representative_words?: string[];
   size?: number[];
   total_size?: number | null;
   x?: number;
@@ -44,6 +47,32 @@ type Props = {
 const OVERLAY_BTN =
   'flex items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
 
+const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+
+const buildTopicsCSV = (topics: TopicLike[], selectedTopicIds: Set<number>): string => {
+  const sorted = [...topics].sort((a, b) => {
+    const aSelected = selectedTopicIds.has(a.id) ? 0 : 1;
+    const bSelected = selectedTopicIds.has(b.id) ? 0 : 1;
+    if (aSelected !== bSelected) return aSelected - bSelected;
+    return a.id - b.id;
+  });
+  const header = ['Selected', 'Topic No', 'Representative Words'].map(escapeCsv).join(',');
+  const rows = sorted.map((t) =>
+    [
+      escapeCsv(selectedTopicIds.has(t.id) ? 'Yes' : 'No'),
+      escapeCsv(String(t.id)),
+      escapeCsv((t.representative_words ?? []).join(', ')),
+    ].join(','),
+  );
+  return [header, ...rows].join('\r\n');
+};
+
+const TM_CSV_OPTION = {
+  id: 'includeCSV',
+  label: 'Include representative words (CSV)',
+  defaultChecked: true,
+} as const;
+
 export function TopicModelingBubbleChartSection({
   topics,
   chartRef,
@@ -66,7 +95,7 @@ export function TopicModelingBubbleChartSection({
 }: Props) {
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
 
-  const handleDownloadChart = async (format: ChartImageFormat) => {
+  const handleDownloadChart = async (format: ChartImageFormat, extras: Record<string, boolean>) => {
     if (!chartRef.current) {
       toast.error('Chart not available for export.');
       return;
@@ -76,22 +105,50 @@ export function TopicModelingBubbleChartSection({
       toast.error('Chart SVG not found.');
       return;
     }
+
     const nodeName = nodeNames?.[0] ?? 'data';
     // Row 1 = centred node name; Row 2 = Min Topic Size | Random Seed | Topics
     const header: ChartExportHeaderItem[] = [
-      { label: 'Data Block', value: nodeNames?.join(', ') ?? 'data' },
+      { label: 'Data Block',    value: nodeNames?.join(', ') ?? 'data' },
       { label: 'Min Topic Size', value: minTopicSize != null ? String(minTopicSize) : '—' },
-      { label: 'Random Seed',    value: randomSeed    != null ? String(randomSeed)    : '—' },
-      { label: 'Topics',         value: String(topics.length) },
+      { label: 'Random Seed',   value: randomSeed    != null ? String(randomSeed)    : '—' },
+      { label: 'Topics',        value: String(topics.length) },
     ];
+
+    const includeCSV = extras['includeCSV'] ?? false;
+
     try {
-      await downloadChartAs(svg, {
-        nodeName,
-        toolSuffix: 'tm',
-        format,
-        header,
-        legend: [],
-      });
+      if (includeCSV) {
+        // Build image blob + CSV blob, then zip together
+        const { blob: imageBlob, filename: imageFilename } = await buildChartBlob(svg, {
+          nodeName,
+          toolSuffix: 'tm',
+          format,
+          header,
+          legend: [],
+        });
+
+        const csvContent = buildTopicsCSV(topics, selectedTopicIds);
+        const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const csvFilename = `${nodeName.replace(/[<>:"\\|?*/\s]+/g, '_').slice(0, 60) || 'data'}_tm_topics.csv`;
+
+        const zip = new JSZip();
+        zip.file(imageFilename, imageBlob);
+        zip.file(csvFilename, csvBlob);
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zipFilename = `${nodeName.replace(/[<>:"\\|?*/\s]+/g, '_').slice(0, 60) || 'data'}_tm.zip`;
+        await saveBlob(zipBlob, zipFilename);
+      } else {
+        // Image only — use the same path as Trends
+        await buildChartBlob(svg, {
+          nodeName,
+          toolSuffix: 'tm',
+          format,
+          header,
+          legend: [],
+        }).then(({ blob, filename }) => saveBlob(blob, filename));
+      }
     } catch (err) {
       toast.error('Failed to export chart.');
       console.error(err);
@@ -161,7 +218,8 @@ export function TopicModelingBubbleChartSection({
         open={downloadDialogOpen}
         onOpenChange={setDownloadDialogOpen}
         title="Download Topic Model Chart"
-        onConfirm={(format) => { void handleDownloadChart(format); }}
+        extraOptions={[TM_CSV_OPTION]}
+        onConfirm={(format, extras) => { void handleDownloadChart(format, extras); }}
       />
     </>
   );
