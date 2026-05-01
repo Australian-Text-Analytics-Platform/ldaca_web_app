@@ -76,6 +76,26 @@ const ExportFeature: React.FC = () => {
     return { id, name, shape };
   };
 
+  // Pull a human-readable error description out of a non-OK Response. FastAPI
+  // returns {"detail": "..."}; fall back to plain text or HTTP status. Used to
+  // surface real backend errors (e.g. Polars sink failure on Windows) in the
+  // download/export failure toasts instead of a generic "Failed to ...".
+  const describeResponseError = async (resp: Response): Promise<string> => {
+    try {
+      const text = await resp.text();
+      if (!text) return `HTTP ${resp.status}`;
+      try {
+        const parsed = JSON.parse(text) as { detail?: unknown };
+        if (typeof parsed.detail === 'string' && parsed.detail.trim()) return parsed.detail;
+      } catch {
+        // not JSON
+      }
+      return text.length > 500 ? `${text.slice(0, 500)}\u2026` : text;
+    } catch {
+      return `HTTP ${resp.status}`;
+    }
+  };
+
   // Export all selected nodes in the requested format (zip when multiple)
   const handleExportAll = async () => {
     if (!currentWorkspaceId || nodeIds.length === 0) return;
@@ -86,7 +106,11 @@ const ExportFeature: React.FC = () => {
       const resp = await fetch(`${apiBase}/workspaces/export?` + params.toString(), {
         headers: getAuthHeaders(),
       });
-      if (!resp.ok) throw new Error('Export failed');
+      if (!resp.ok) {
+        const description = await describeResponseError(resp);
+        toast.error('Failed to export data blocks', { description });
+        return;
+      }
       const blob = await resp.blob();
       const multiple = nodeIds.length > 1;
       const ext = multiple ? 'zip' : getDownloadExtension(format);
@@ -96,7 +120,8 @@ const ExportFeature: React.FC = () => {
       await saveBlob(blob, filename);
     } catch (e) {
       console.error(e);
-      toast.error('Failed to export data blocks');
+      const description = e instanceof Error ? e.message : String(e);
+      toast.error('Failed to export data blocks', { description });
     } finally {
       setExporting(false);
     }
@@ -114,14 +139,19 @@ const ExportFeature: React.FC = () => {
       const resp = await fetch(`${apiBase}/workspaces/export?` + params.toString(), {
         headers: getAuthHeaders(),
       });
-      if (!resp.ok) throw new Error('Download failed');
+      if (!resp.ok) {
+        const description = await describeResponseError(resp);
+        toast.error('Failed to download data block', { description });
+        return;
+      }
       const blob = await resp.blob();
       const ext = getDownloadExtension(format);
       const filename = `${name || id}.${ext}`;
       await saveBlob(blob, filename);
     } catch (e) {
       console.error(e);
-      toast.error('Failed to download data block');
+      const description = e instanceof Error ? e.message : String(e);
+      toast.error('Failed to download data block', { description });
     } finally {
       setDownloadingIds((s) => ({ ...s, [id]: 'idle' }));
     }
