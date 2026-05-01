@@ -128,7 +128,8 @@ export function TopicModelingBubbleChartSection({
       return;
     }
 
-    const nodeName = nodeNames?.[0] ?? 'data';
+    // Join all node names with '_' so the filename reflects both data blocks
+    const nodeName = (nodeNames ?? []).filter(Boolean).join('_') || 'data';
     // Row 1 = centred node name; Row 2 = Min Topic Size | Random Seed | Topics
     const header: ChartExportHeaderItem[] = [
       { label: 'Data Block',    value: nodeNames?.join(', ') ?? 'data' },
