@@ -4,6 +4,8 @@ import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPane
 import { type FilterPreviewResponse, type PolarsExpressionRequest, type PolarsExpressionApplyResponse, type PolarsExpressionContext } from '../../../../api/nodes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { takeMostRecent } from '../../../../utils/selectionUtils';
+import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
+import { deriveNodeLabel } from '../../utils/nodeMetadata';
 
 export type ExpressionContextTab = PolarsExpressionContext;
 
@@ -47,6 +49,11 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const [activeContext, setActiveContext] = useState<ExpressionContextTab>('filter');
   const [newNodeName, setNewNodeName] = useState('');
   const [isApplying, setIsApplying] = useState(false);
+
+  const newNodeNamePlaceholder = buildExpressionAutoNodeName({
+    baseName: deriveNodeLabel(effectiveNode),
+    context: activeContext,
+  });
 
   // Per-context state
   const [filterCode, setFilterCode] = useState('');
@@ -109,7 +116,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     try {
       const req: PolarsExpressionRequest = {
         ...serializedRequest,
-        new_node_name: newNodeName.trim() || undefined,
+        new_node_name: newNodeName.trim() || newNodeNamePlaceholder,
       };
       await polarsExpressionApply(nodeId, req);
       await refreshNodeSchema(nodeId);
@@ -127,6 +134,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     activeContext,
     setActiveContext,
     newNodeName,
+    newNodeNamePlaceholder,
     setNewNodeName,
     isApplying,
     evalError,

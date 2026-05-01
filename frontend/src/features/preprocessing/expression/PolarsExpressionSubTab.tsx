@@ -12,6 +12,7 @@ import { Label } from '../../../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
+import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { usePolarsExpressionSubTab, type PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';
 
 export type { PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';
@@ -51,6 +52,7 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
     activeContext,
     setActiveContext,
     newNodeName,
+    newNodeNamePlaceholder,
     setNewNodeName,
     isApplying,
     evalError,
@@ -373,9 +375,10 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
             <Input
               id="polars-new-node-name"
               className="min-w-0 flex-1"
-              placeholder="New block name (optional)"
+              placeholder={newNodeNamePlaceholder}
               value={newNodeName}
               onChange={(e) => setNewNodeName(e.target.value)}
+              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: newNodeName, setValue: setNewNodeName })}
               disabled={!canApply}
             />
           </div>

@@ -17,6 +17,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../../../../c
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
 import type { ChartConfig } from '../../../../components/ui/chart';
+import { acceptPlaceholderOnTab } from '../../../preprocessing/utils/placeholderTabFill';
 import type { SequentialAnalysisDatum, ChartTypeOption } from '../hooks/useSequentialAnalysisTaskFlow';
 import { getPaletteColor, formatTimeLabel } from '../hooks/useSequentialAnalysisTaskFlow';
 
@@ -98,6 +99,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 id="sequential-new-node-name"
                 value={detachNodeName}
                 onChange={(event) => onDetachNodeNameChange(event.target.value)}
+                onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: detachNodeName, setValue: onDetachNodeNameChange })}
                 placeholder={detachNodeNamePlaceholder}
                 disabled={isDetaching}
                 aria-label="New data block name"
@@ -326,6 +328,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 id="sequential-new-node-name"
                 value={detachNodeName}
                 onChange={(event) => onDetachNodeNameChange(event.target.value)}
+                onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: detachNodeName, setValue: onDetachNodeNameChange })}
                 placeholder={detachNodeNamePlaceholder}
                 disabled={isDetaching}
                 aria-label="New data block name"

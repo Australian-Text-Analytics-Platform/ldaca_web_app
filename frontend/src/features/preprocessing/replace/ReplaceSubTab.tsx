@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
+import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
 export type { ReplaceSubTabProps } from './hooks/useReplaceSubTab';
@@ -181,6 +182,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
               id="replace-output-column"
               value={outputColumnName}
               onChange={(event) => setOutputColumnName(event.target.value)}
+              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: outputColumnName, setValue: setOutputColumnName })}
               placeholder={selectedColumn || 'Leave blank to overwrite the selected column'}
               disabled={controlsDisabled || !selectedColumn}
               className="min-w-0 flex-1"

@@ -259,6 +259,44 @@ describe('DataPreprocessingFeature replace tab', () => {
     expect(sampleNameInput).toHaveValue('Corpus_sampled_fr_0_4_rs_7');
   });
 
+  it('keeps focus on the name input after the first tab fill, then tabs to the next control on the second press', async () => {
+    const user = userEvent.setup();
+
+    render(<DataPreprocessingFeature />);
+
+    const [filterTab] = screen.getAllByRole('tab', { name: 'Filter' });
+    filterTab!.focus();
+    await user.keyboard('{ArrowRight}');
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Sample' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    const samplePanel = screen.getByRole('tabpanel', { name: 'Sample' });
+
+    await user.click(within(samplePanel).getByRole('tab', { name: 'Random Sample' }));
+
+    fireEvent.change(within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
+
+    const sampleNameInput = await screen.findByPlaceholderText('Corpus_sampled_fr_0_4_rs_7') as HTMLInputElement;
+    const addButton = within(samplePanel).getByRole('button', { name: 'Add to Workspace' });
+
+    sampleNameInput.focus();
+    expect(sampleNameInput).toHaveFocus();
+
+    await user.tab();
+
+    expect(sampleNameInput).toHaveValue('Corpus_sampled_fr_0_4_rs_7');
+    expect(sampleNameInput).toHaveFocus();
+    expect(sampleNameInput.selectionStart).toBe('Corpus_sampled_fr_0_4_rs_7'.length);
+    expect(sampleNameInput.selectionEnd).toBe('Corpus_sampled_fr_0_4_rs_7'.length);
+
+    await user.tab();
+
+    expect(addButton).toHaveFocus();
+  });
+
   it('uses a smart filter placeholder name and preserves typed overrides', async () => {
     const user = userEvent.setup();
 
