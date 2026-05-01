@@ -6,7 +6,7 @@
 
 ![Concordance screenshot](tutorials/assets/concordance.png)
 
-The Concordance tool searches for a word or phrase in the text collection and displays how each match is used in context.
+The Concordance tool searches for a word or phrase in the text collection and displays how each match is used in context. 
 
 > **Placeholder (image):** Screenshot of concordance results with highlighted term.
 
@@ -25,11 +25,13 @@ Regex mode lets you use patterns for advanced matching (e.g., word variants).
 - Use it when you need flexible matching.
 - Turn it off for exact, literal searches.
 
+For example, if you tick the regular expressions box and input _“child\w*”_ (without the quotation marks), it will retrieve any word starting with the string child (followed by zero or more characters) – such as child, children, childhood. If you want to retrieve all the hashtags in your data, you can use the regular expression _“#\w+”_ (without the quotation marks). This will retrieve anything starting with a hashtag followed by one or more characters. Another example is _“tax|budget|walfare”_ can be used search three words at one time. 
+
 **Q: Can I search for multiple words at once?**
 
 The concordance tool accepts a single search term. However, if you use a [regular expression (RegEx)](https://en.wikipedia.org/wiki/Regular_expression) as your search term, you can write a pattern that matches multiple words. You are responsible for [designing the RegEx pattern](https://regexr.com/); a few simple examples are shown below. Alternatively, you can run several concordance searches with different terms, detach the results, and use the pre-processing Stack tool to combine them.
 
-**Example RegEx patterns**
+**Other Example RegEx Patterns**
 
 *child(ren)?* or *child|children*: Matches *child* or *children*.
 *\w{2}-\d{4,6}*: Matches a pattern starting with two letters (`\w`), followed by a dash, then 4 to 6 digits (`\d`) — e.g. *id-4589* or *SA-398871*.

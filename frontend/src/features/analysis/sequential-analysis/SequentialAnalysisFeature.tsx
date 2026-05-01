@@ -768,7 +768,7 @@ const SequentialAnalysisFeature = () => {
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Sequential Analysis
+                Trends and Sequence
                 <InfoIcon
                   targetKey="sequential-analysis.overview"
                   label="About Sequential Analysis"
@@ -1026,7 +1026,7 @@ const SequentialAnalysisFeature = () => {
 
       {sequentialWaitingBanner && (
         <AnalysisTaskBanner
-          analysisName="Sequential Analysis"
+          analysisName="Trends and Sequence"
           status={sequentialWaitingBanner.status}
           taskId={sequentialWaitingBanner.taskId}
           message={sequentialWaitingBanner.message}
@@ -1040,7 +1040,7 @@ const SequentialAnalysisFeature = () => {
           <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Sequential Analysis Results
+                Trends and Sequence Results
                 <HelpIcon
                   targetKey="analysis.sequential-analysis.results"
                   label="Sequential analysis results"

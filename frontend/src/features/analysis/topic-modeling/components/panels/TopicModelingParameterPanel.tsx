@@ -75,7 +75,7 @@ export function TopicModelingParameterPanel({
 
   return (
     <AnalysisCardLayout
-      title="Topic Modeling"
+      title="Topic Modelling - BERTopic"
       info={{
         targetKey: 'topic-modeling.overview',
         label: 'About Topic Modeling',
