@@ -1227,7 +1227,7 @@ const AiAnnotatorFeature: React.FC = () => {
               </div>
               <Button
                 type="button"
-                variant="outline"
+                size="sm"
                 onClick={handleDetach}
                 disabled={isDetaching || isRunning || !selectedNodeId || !selectedColumn || parsedClasses.length === 0}
               >

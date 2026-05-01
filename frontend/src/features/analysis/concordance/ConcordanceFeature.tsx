@@ -1479,13 +1479,13 @@ const ConcordanceFeature: React.FC = () => {
             }}
             disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
             size="sm"
-            className="h-auto max-w-full whitespace-normal wrap-break-word bg-green-600 py-1.5 text-left hover:bg-green-700"
+            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
             title="Create a new data block with concordance results joined to the original table"
           >
             {isDetaching ? (
-              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Adding to Workspace...</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
             ) : (
-              <><Plus className="mr-2 h-3 w-3" />Add to Workspace</>
+              <><Plus className="mr-2 h-4 w-4" />Add to Workspace</>
             )}
           </Button>
         </AnalysisPagination>

@@ -45,12 +45,6 @@ export const DEFAULT_VISIBLE_VIEWS: ViewType[] = ALL_VIEWS.filter(
   (view) => view !== 'ai-annotator',
 );
 
-interface TutorialTarget {
-  file: string;
-  anchor: string;
-  label?: string;
-}
-
 interface UIState {
   currentView: ViewType;
   visibleViews: ViewType[];
@@ -140,6 +134,7 @@ interface UIActions {
   // Hints
   setLastUploadedFilePath: (path: string | null) => void;
   sessionDismissHint: (id: string) => void;
+  resetSessionDismissedHints: () => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -147,7 +142,7 @@ type UIStore = UIState & UIActions;
 export const useUIStore = create<UIStore>()(
   devtools(
     persist(
-      immer((set, get) => ({
+      immer((set) => ({
       // Initial state
       currentView: 'data-loader',
       visibleViews: [...DEFAULT_VISIBLE_VIEWS],
@@ -303,6 +298,10 @@ export const useUIStore = create<UIStore>()(
 
       sessionDismissHint: (id) => set((state) => {
         state.sessionDismissedHints.add(id);
+      }),
+
+      resetSessionDismissedHints: () => set((state) => {
+        state.sessionDismissedHints = new Set<string>();
       }),
     })),
       {

@@ -5,6 +5,13 @@ import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
 import { DEFAULT_VISIBLE_VIEWS, useUIStore } from '../../../stores/uiStore';
+import { useHintsStore } from '../../../stores/hintsStore';
+
+const toastMock = vi.fn();
+
+vi.mock('sonner', () => ({
+  toast: (...args: unknown[]) => toastMock(...args),
+}));
 
 const authState = {
   getAuthHeaders: () => ({}),
@@ -99,7 +106,10 @@ describe('Sidebar view visibility menu', () => {
       },
       tutorialTarget: null,
       visibleViews: [...DEFAULT_VISIBLE_VIEWS],
+      sessionDismissedHints: new Set(),
     }));
+    useHintsStore.setState({ dismissedHints: [], hintsEnabled: true });
+    toastMock.mockReset();
   });
 
   it('hides AI Annotator by default and allows showing it from the views editor', async () => {
@@ -134,6 +144,25 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.getByRole('menuitemcheckbox', { name: 'Preprocessing' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.getAllByRole('button', { name: 'Data Loader' }).length).toBeGreaterThan(0);
+  });
+
+  it('resets dismissed hints from the views editor', async () => {
+    const user = userEvent.setup();
+
+    useHintsStore.setState({ dismissedHints: ['preprocessing.filter.select-node'], hintsEnabled: true });
+    useUIStore.setState((state) => ({
+      ...state,
+      sessionDismissedHints: new Set(['preprocessing.filter.select-column']),
+    }));
+
+    renderSidebar();
+
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
+    await user.click(screen.getByRole('menuitem', { name: 'Reset all hints' }));
+
+    expect(useHintsStore.getState().dismissedHints).toEqual([]);
+    expect(Array.from(useUIStore.getState().sessionDismissedHints)).toEqual([]);
+    expect(toastMock).toHaveBeenCalledWith('All hints have been reset. Dismissed hints can appear again.');
   });
 
   it('hides the working directory card in multi-user mode', () => {

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { HintDefinition } from './types';
@@ -143,15 +142,16 @@ export const HintBubble: React.FC<HintBubbleProps> = ({
         opacity: 0,
       };
 
-  return createPortal(
+  return (
     <div
       ref={bubbleRef}
       role="dialog"
+      data-hint-bubble="true"
       aria-live="polite"
       aria-labelledby={`hint-title-${hint.id}`}
       style={style}
       className={cn(
-        'w-80 max-w-[calc(100vw-1.5rem)] rounded-lg border border-blue-300 bg-white p-4 text-foreground shadow-xl',
+        'pointer-events-auto w-80 max-w-[calc(100vw-1.5rem)] rounded-lg border border-blue-300 bg-white p-4 text-foreground shadow-xl',
         'dark:bg-slate-900 dark:border-blue-700 dark:text-slate-100',
       )}
     >
@@ -176,9 +176,6 @@ export const HintBubble: React.FC<HintBubbleProps> = ({
           </Button>
         )}
         {hint.oneShot === false ? (
-          // Recurring hint: primary button only hides for this session so the
-          // hint re-appears next time the condition is true. Secondary button
-          // mutes the hint permanently.
           <>
             <Button
               variant="ghost"
@@ -219,8 +216,7 @@ export const HintBubble: React.FC<HintBubbleProps> = ({
           </>
         )}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 };
 

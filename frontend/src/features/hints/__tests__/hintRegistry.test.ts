@@ -20,10 +20,33 @@ describe('hintRegistry', () => {
       'workspace-has-no-nodes',
       'file-uploaded-not-added',
       'file-uploaded-no-workspace',
+      'filter-no-node-selected',
+      'filter-awaiting-column-selection',
     ];
     for (const hint of hintRegistry) {
       expect(known).toContain(hint.condition);
     }
+  });
+
+  it('resolves the filter column hint only when the column selector is still empty', () => {
+    const hint = hintRegistry.find((entry) => entry.id === 'preprocessing.filter.select-column');
+
+    expect(hint?.resolveAnchor).toBeTypeOf('function');
+
+    const emptyTrigger = document.createElement('button');
+    emptyTrigger.setAttribute('data-hint-id', 'preprocessing.filter.condition-column');
+    emptyTrigger.setAttribute('data-filter-column-empty', 'true');
+    document.body.appendChild(emptyTrigger);
+
+    const filledTrigger = document.createElement('button');
+    filledTrigger.setAttribute('data-hint-id', 'preprocessing.filter.condition-column');
+    filledTrigger.setAttribute('data-filter-column-empty', 'false');
+    document.body.appendChild(filledTrigger);
+
+    expect(hint?.resolveAnchor?.({ lastUploadedFilePath: null })).toBe(emptyTrigger);
+
+    emptyTrigger.remove();
+    filledTrigger.remove();
   });
 
   it('every entry has either an anchorHintId or a resolveAnchor', () => {

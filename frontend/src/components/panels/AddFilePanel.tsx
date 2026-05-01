@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Loader2, Plus } from 'lucide-react';
 import { useFilePreview } from '../../hooks/useFilePreview';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
@@ -140,8 +141,18 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
               <Button variant="outline" onClick={handleClose} type="button">
                 Cancel
               </Button>
-              <Button onClick={handleConfirm} disabled={submitting}>
-                {submitting ? 'Adding…' : 'Add to Workspace'}
+              <Button size="sm" onClick={handleConfirm} disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding…
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace
+                  </>
+                )}
               </Button>
             </div>
           </CardFooter>

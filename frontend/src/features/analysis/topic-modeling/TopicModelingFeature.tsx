@@ -72,7 +72,7 @@ const TopicModelingFeature: React.FC = () => {
   
   const [minTopicSize, setMinTopicSize] = useState(10);
   const [randomSeed, setRandomSeed] = useState(42);
-  const [representativeWordsCount, setRepresentativeWordsCount] = useState(5);
+  const [representativeWordsCount, setRepresentativeWordsCount] = useState(15);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
@@ -130,7 +130,7 @@ const TopicModelingFeature: React.FC = () => {
       setNodeColumnSelections(sels, { replace: true });
       setMinTopicSize(Number(req.min_topic_size ?? 10));
       setRandomSeed(Number(req.random_seed ?? 42));
-      setRepresentativeWordsCount(Number(req.representative_words_count ?? 5));
+      setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
       if (nodeIds.length && currentWorkspaceId) {
         try {
           await restoreAnalysisLockFromRequest({
@@ -406,6 +406,11 @@ const TopicModelingFeature: React.FC = () => {
           topicSearchQuery={topicSearchQuery}
           onTopicSearchQueryChange={setTopicSearchQuery}
           activeDomain={activeDomain}
+          nodeNames={panelSelectedNodes
+            .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
+            .filter(Boolean) as string[]}
+          minTopicSize={minTopicSize}
+          randomSeed={randomSeed}
           detachDialogOpen={detachDialogOpen}
           setDetachDialogOpen={setDetachDialogOpen}
           detachNodeOptions={detachNodeOptions}

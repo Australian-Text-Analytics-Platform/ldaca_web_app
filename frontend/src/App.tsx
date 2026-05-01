@@ -341,6 +341,9 @@ const WorkspaceShell: React.FC = () => {
                 )}
               </div>
             )}
+            <Suspense fallback={null}>
+              <HintsController />
+            </Suspense>
             <div className="flex h-dvh w-full overflow-hidden">
               <ErrorBoundary>
                 <Sidebar />

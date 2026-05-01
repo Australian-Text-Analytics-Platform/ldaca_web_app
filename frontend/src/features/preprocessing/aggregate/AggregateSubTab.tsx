@@ -283,7 +283,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
               className="min-w-0 flex-1"
             />
           </div>
-          <Button type="button" onClick={apply.handleApply} disabled={!apply.canApply} className="shrink-0">
+          <Button type="button" size="sm" onClick={apply.handleApply} disabled={!apply.canApply} className="shrink-0">
             {apply.loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

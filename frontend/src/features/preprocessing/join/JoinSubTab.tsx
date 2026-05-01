@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Merge } from 'lucide-react';
+import { Loader2, Merge, Plus } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -125,14 +125,17 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
               className="min-w-0 flex-1"
             />
           </div>
-          <Button type="button" onClick={apply.run} disabled={apply.disabled} className="shrink-0">
+          <Button type="button" size="sm" onClick={apply.run} disabled={apply.disabled} className="shrink-0">
             {apply.isBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Joining…
               </>
             ) : (
-              'Add to Workspace'
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Workspace
+              </>
             )}
           </Button>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />

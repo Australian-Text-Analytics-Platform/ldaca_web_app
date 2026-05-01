@@ -69,4 +69,31 @@ export const hintRegistry: HintDefinition[] = [
     oneShot: false,
     placement: 'right',
   },
+  {
+    id: 'preprocessing.filter.select-node',
+    title: 'Select one data block to filter',
+    body:
+      'Choose a single data block from the workspace first. The Filter tool needs one selected source before you can configure conditions.',
+    condition: 'filter-no-node-selected',
+    anchorHintId: 'preprocessing.filter.node-selection',
+    priority: 35,
+    oneShot: false,
+    placement: 'bottom',
+  },
+  {
+    id: 'preprocessing.filter.select-column',
+    title: 'Pick a column for this condition',
+    body:
+      'Start each filter condition by choosing the column you want to inspect. Once a column is selected, the operator and value inputs will unlock.',
+    condition: 'filter-awaiting-column-selection',
+    priority: 36,
+    oneShot: false,
+    placement: 'bottom',
+    resolveAnchor: () => {
+      const anchor = document.querySelector(
+        '[data-hint-id="preprocessing.filter.condition-column"][data-filter-column-empty="true"]',
+      );
+      return anchor;
+    },
+  },
 ];
