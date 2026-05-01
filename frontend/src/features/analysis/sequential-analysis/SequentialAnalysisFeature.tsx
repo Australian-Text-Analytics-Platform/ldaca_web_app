@@ -151,6 +151,7 @@ const SequentialAnalysisFeature = () => {
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [selectedPeriodIndices, setSelectedPeriodIndices] = useState<Set<number>>(new Set());
+  const [detachNodeName, setDetachNodeName] = useState('');
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const lastClickedIndexRef = useRef<number | null>(null);
 
@@ -204,6 +205,7 @@ const SequentialAnalysisFeature = () => {
       textApi.getSequentialAnalysisTaskRequest(taskId, headers),
     onResultFetched: (resultData) => {
       if (!resultData) return;
+      setDetachNodeName('');
       setSelectedPeriodIndices(new Set());
       lastClickedIndexRef.current = null;
       const resolvedChartType = isChartTypeOption((resultData as Record<string, unknown>)?.chart_type)
@@ -221,6 +223,7 @@ const SequentialAnalysisFeature = () => {
     },
     onHydratedResult: (resultPayload) => {
       if (!resultPayload) return;
+      setDetachNodeName('');
       setSelectedPeriodIndices(new Set());
       lastClickedIndexRef.current = null;
       const hydratedParams = hydratedParamsRef.current;
@@ -340,6 +343,7 @@ const SequentialAnalysisFeature = () => {
     onCleared: (_, options) => {
       setResultSafely(null);
       setHiddenKeys(new Set());
+      setDetachNodeName('');
       setSelectedPeriodIndices(new Set());
       lastClickedIndexRef.current = null;
       if (options?.preserveLocalState) {
@@ -586,7 +590,7 @@ const SequentialAnalysisFeature = () => {
 
   const canDetach = selectedPeriodIndices.size > 0 && selectedPeriodIndices.size < chartData.length;
 
-  const { handleDetach, isDetaching } = useSequentialAnalysisDetach({
+  const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
     currentWorkspaceId,
     resolveTaskId,
     getAuthHeaders,
@@ -595,6 +599,7 @@ const SequentialAnalysisFeature = () => {
     results,
     hiddenKeys,
     selectedPeriodIndices,
+    requestedNodeName: detachNodeName,
     queryClient,
   });
 
@@ -1108,6 +1113,9 @@ const SequentialAnalysisFeature = () => {
               onToggleKey={handleToggleKey}
               onPeriodClick={handlePeriodClick}
               onClearSelection={clearPeriodSelection}
+              detachNodeName={detachNodeName}
+              detachNodeNamePlaceholder={defaultNodeName}
+              onDetachNodeNameChange={setDetachNodeName}
               onDetach={() => {
                 void handleDetach();
               }}

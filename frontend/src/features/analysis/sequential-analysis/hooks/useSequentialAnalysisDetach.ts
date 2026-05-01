@@ -18,6 +18,7 @@ interface SequentialAnalysisDetachParams {
   results: Record<string, unknown> | null;
   hiddenKeys: Set<string>;
   selectedPeriodIndices: Set<number>;
+  requestedNodeName: string;
   queryClient: {
     invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown>;
   };
@@ -32,6 +33,7 @@ export function useSequentialAnalysisDetach({
   results,
   hiddenKeys,
   selectedPeriodIndices,
+  requestedNodeName,
   queryClient,
 }: SequentialAnalysisDetachParams) {
   const [isDetaching, setIsDetaching] = useState(false);
@@ -60,6 +62,9 @@ export function useSequentialAnalysisDetach({
 
     return Array.from(dedupedVisibleGroups.values()).map((values) => ({ values }));
   })();
+
+  const sourceName = String(panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data');
+  const defaultNodeName = `${sourceName}_trend`;
 
   const handleDetach = async () => {
     if (!currentWorkspaceId) return;
@@ -91,8 +96,8 @@ export function useSequentialAnalysisDetach({
       return;
     }
 
-    const sourceName = String(panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data');
-    const newNodeName = `${sourceName}_trend`;
+    const trimmedRequestedName = requestedNodeName.trim();
+    const newNodeName = trimmedRequestedName.length > 0 ? trimmedRequestedName : defaultNodeName;
 
     setIsDetaching(true);
     try {
@@ -120,5 +125,5 @@ export function useSequentialAnalysisDetach({
     }
   };
 
-  return { handleDetach, isDetaching };
+  return { handleDetach, isDetaching, defaultNodeName };
 }

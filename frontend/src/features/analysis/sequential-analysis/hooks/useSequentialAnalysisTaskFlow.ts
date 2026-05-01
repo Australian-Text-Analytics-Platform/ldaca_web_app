@@ -26,6 +26,8 @@ export const SEQUENTIAL_ANALYSIS_PALETTE = [
 export const getPaletteColor = (index: number) =>
   SEQUENTIAL_ANALYSIS_PALETTE[index % SEQUENTIAL_ANALYSIS_PALETTE.length];
 
+const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_end']);
+
 export const formatTimeLabel = (value?: string | number) => {
   if (!value) return '—';
   const str = String(value);
@@ -313,7 +315,7 @@ export function useSequentialAnalysisTaskFlow({
     const keys = new Set<string>();
     chartData.forEach((item: Record<string, unknown>) => {
       Object.keys(item).forEach((key) => {
-        if (key !== 'time_period') keys.add(key);
+        if (!NON_SERIES_CHART_KEYS.has(key)) keys.add(key);
       });
     });
     return Array.from(keys);
