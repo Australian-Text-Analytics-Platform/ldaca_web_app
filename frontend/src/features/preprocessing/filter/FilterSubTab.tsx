@@ -1,5 +1,5 @@
 import React from 'react';
-import { Filter, Loader2 } from 'lucide-react';
+import { Filter, Loader2, Plus } from 'lucide-react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Tag } from '../../../components/ui/tag';
@@ -134,8 +134,18 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
               className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <Button onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
-            {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
+          <Button variant="outline" onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
+            {isFiltering ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding to workspace…
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Workspace
+              </>
+            )}
           </Button>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>

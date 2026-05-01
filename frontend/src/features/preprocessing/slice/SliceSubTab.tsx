@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Loader2, Shuffle } from 'lucide-react';
+import { AlertCircle, Loader2, Plus, Shuffle } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -192,8 +192,18 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               <span>{inlineError}</span>
             </div>
           )}
-          <Button onClick={applySlice} disabled={applyDisabled} className="shrink-0">
-            {isBusy ? 'Adding to workspace…' : 'Add to Workspace'}
+          <Button variant="outline" onClick={applySlice} disabled={applyDisabled} className="shrink-0">
+            {isBusy ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding to workspace…
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Workspace
+              </>
+            )}
           </Button>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>

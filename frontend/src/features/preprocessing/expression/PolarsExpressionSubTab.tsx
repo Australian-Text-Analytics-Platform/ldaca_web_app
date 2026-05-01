@@ -380,12 +380,22 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
             />
           </div>
           <Button
+            variant="outline"
             onClick={applyExpression}
             disabled={!canApply || isLoading.operations}
             className="shrink-0"
           >
-            {isApplying && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-            Add to Workspace
+            {isApplying ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding to Workspace…
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Workspace
+              </>
+            )}
           </Button>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
