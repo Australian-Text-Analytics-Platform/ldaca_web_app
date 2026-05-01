@@ -49,21 +49,43 @@ const OVERLAY_BTN =
 
 const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
 
-const buildTopicsCSV = (topics: TopicLike[], selectedTopicIds: Set<number>): string => {
+const buildTopicsCSV = (
+  topics: TopicLike[],
+  selectedTopicIds: Set<number>,
+  nodeNames: string[],
+): string => {
   const sorted = [...topics].sort((a, b) => {
     const aSelected = selectedTopicIds.has(a.id) ? 0 : 1;
     const bSelected = selectedTopicIds.has(b.id) ? 0 : 1;
     if (aSelected !== bSelected) return aSelected - bSelected;
     return a.id - b.id;
   });
-  const header = ['Selected', 'Topic No', 'Representative Words'].map(escapeCsv).join(',');
-  const rows = sorted.map((t) =>
-    [
+
+  // Column layout mirrors the All Topics pane:
+  //   Selected | Topic No | Representative Words | [NodeName...] | Total (multi-corpus only)
+  const hasMultiCorpora = nodeNames.length >= 2;
+  const headerCols = ['Selected', 'Topic No', 'Representative Words', ...nodeNames];
+  if (hasMultiCorpora) headerCols.push('Total');
+
+  const header = headerCols.map(escapeCsv).join(',');
+
+  const rows = sorted.map((t) => {
+    const cols = [
       escapeCsv(selectedTopicIds.has(t.id) ? 'Yes' : 'No'),
       escapeCsv(String(t.id)),
       escapeCsv((t.representative_words ?? []).join(', ')),
-    ].join(','),
-  );
+    ];
+    // Per-node document counts
+    for (let i = 0; i < nodeNames.length; i++) {
+      cols.push(escapeCsv(String(t.size?.[i] ?? 0)));
+    }
+    // Total only when there are multiple corpora (otherwise it equals the single count)
+    if (hasMultiCorpora) {
+      cols.push(escapeCsv(String(t.total_size ?? 0)));
+    }
+    return cols.join(',');
+  });
+
   return [header, ...rows].join('\r\n');
 };
 
@@ -128,7 +150,7 @@ export function TopicModelingBubbleChartSection({
           legend: [],
         });
 
-        const csvContent = buildTopicsCSV(topics, selectedTopicIds);
+        const csvContent = buildTopicsCSV(topics, selectedTopicIds, nodeNames ?? []);
         const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const csvFilename = `${nodeName.replace(/[<>:"\\|?*/\s]+/g, '_').slice(0, 60) || 'data'}_tm_topics.csv`;
 
