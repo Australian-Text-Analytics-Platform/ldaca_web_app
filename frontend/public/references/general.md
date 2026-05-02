@@ -54,4 +54,4 @@ These contributions have been essential in ensuring that the LDaCA webApp meets 
 
 © Language Data Commons of Australia (LDaCA)
 
-Version 0.2.2-dev4 (Windows export: download via Rust reqwest direct-to-disk) - built on 02/May/2026.
+Version 0.2.2-dev5 (prefetch topic-modelling embedder at startup) - built on 03/May/2026.
