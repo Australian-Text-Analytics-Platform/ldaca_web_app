@@ -81,6 +81,39 @@ impl BackendProcessHandle {
                 }
             }
 
+            #[cfg(target_os = "windows")]
+            {
+                // /F = force, /T = terminate child + entire descendant tree.
+                // child.kill() alone only sends TerminateProcess to the
+                // immediate python.exe and leaves any subprocesses running
+                // (uvicorn/multiprocessing workers, spaCy download helpers,
+                // etc.), which is how the port stays held after the window
+                // closes.
+                let status = std::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &self.pid.to_string()])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .status();
+                match status {
+                    Ok(s) if s.success() => {
+                        let _ = child.wait();
+                        println!("Backend {} terminated via taskkill /T", self.pid);
+                        return;
+                    }
+                    Ok(s) => {
+                        eprintln!(
+                            "taskkill exited {} for backend {}; falling back to TerminateProcess",
+                            s, self.pid
+                        );
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "Failed to invoke taskkill for backend {}: {}; falling back to TerminateProcess",
+                            self.pid, err
+                        );
+                    }
+                }
+            }
+
             if let Err(err) = child.kill() {
                 eprintln!("Failed to stop backend {} cleanly: {}", self.pid, err);
             } else {
@@ -567,6 +600,10 @@ fn spawn_backend_process(
     command.env("LDACA_BACKEND_PORT", backend_port.to_string());
     command.env("LDACA_BACKEND_RUNTIME", runtime_root.as_os_str());
     command.env("LDACA_BACKEND_PYTHON", runtime_python.as_os_str());
+    // The backend's parent_watchdog reads this and self-destructs if our
+    // PID disappears, so a force-quit / crash / SIGKILL of Tauri doesn't
+    // leave an orphan Python holding port 8001.
+    command.env("LDACA_PARENT_PID", std::process::id().to_string());
 
     // Ensure packaged Python runtime is relocatable across machines.
     // `pyvenv.cfg` may contain build-machine absolute paths; use managed-python
