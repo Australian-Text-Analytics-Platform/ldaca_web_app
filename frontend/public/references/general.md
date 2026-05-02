@@ -54,4 +54,4 @@ These contributions have been essential in ensuring that the LDaCA webApp meets 
 
 © Language Data Commons of Australia (LDaCA)
 
-Version 0.2.2-dev2 (Windows export: CSP allows IPC custom protocol) - built on 02/May/2026.
+Version 0.2.2-dev3 (parent watchdog: tolerate transient OpenProcess failures) - built on 02/May/2026.
