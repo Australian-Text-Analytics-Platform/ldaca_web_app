@@ -33,7 +33,16 @@ Internet → Nginx (80/443) → FastAPI app (localhost:8001)
 ```bash
 cd /home/ubuntu/src/ldaca_web_app
 git pull
+git submodule update --init --recursive
 ```
+
+> The `git submodule update --init --recursive` step is mandatory: this
+> repo embeds the `ldaca_web_app_backend` package (along with
+> `docworkspace` and `polars-text`) as git submodules, and a plain
+> `git pull` only advances the *submodule pointer* in the parent tree
+> without checking out the new submodule content. Skipping this leaves
+> the systemd service running stale backend code while `git status`
+> looks clean.
 
 ### 2. Configure Nginx
 
@@ -179,8 +188,14 @@ sudo certbot renew --dry-run
 ```bash
 cd /home/ubuntu/src/ldaca_web_app
 git pull
+git submodule update --init --recursive
 sudo systemctl restart ldaca-web-app
 ```
+
+> The `git submodule update` step is **required** on every update —
+> without it the new submodule pointer in the parent tree is recorded
+> but the actual `backend/` working tree stays at the old commit, and
+> the systemd service keeps running the previous release.
 
 ---
 
