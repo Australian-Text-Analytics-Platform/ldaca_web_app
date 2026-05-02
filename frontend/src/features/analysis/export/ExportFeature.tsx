@@ -77,6 +77,24 @@ const ExportFeature: React.FC = () => {
     return { id, name, shape };
   };
 
+  // Inside Tauri (especially WebView2 on Windows) the native fetch API drops
+  // large cross-origin downloads — the body fully arrives but resp.blob() then
+  // throws "Failed to fetch". Routing through the Tauri http plugin uses
+  // Rust's reqwest under the hood and bypasses WebView2 networking, so large
+  // exports work reliably. The web build keeps native fetch.
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+  const downloadFetch = async (
+    url: string,
+    init?: { headers?: Record<string, string> },
+  ): Promise<Response> => {
+    if (isTauri) {
+      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+      return tauriFetch(url, init);
+    }
+    return window.fetch(url, init);
+  };
+
   // Pull a human-readable error description out of a non-OK Response. FastAPI
   // returns {"detail": "..."}; fall back to plain text or HTTP status. Used to
   // surface real backend errors (e.g. Polars sink failure on Windows) in the
@@ -104,7 +122,7 @@ const ExportFeature: React.FC = () => {
     try {
       const params = new URLSearchParams({ node_ids: nodeIds.join(','), format });
       const apiBase = getApiBase();
-      const resp = await fetch(`${apiBase}/workspaces/export?` + params.toString(), {
+      const resp = await downloadFetch(`${apiBase}/workspaces/export?` + params.toString(), {
         headers: getAuthHeaders(),
       });
       if (!resp.ok) {
@@ -137,7 +155,7 @@ const ExportFeature: React.FC = () => {
     try {
       const params = new URLSearchParams({ node_ids: id, format });
       const apiBase = getApiBase();
-      const resp = await fetch(`${apiBase}/workspaces/export?` + params.toString(), {
+      const resp = await downloadFetch(`${apiBase}/workspaces/export?` + params.toString(), {
         headers: getAuthHeaders(),
       });
       if (!resp.ok) {
