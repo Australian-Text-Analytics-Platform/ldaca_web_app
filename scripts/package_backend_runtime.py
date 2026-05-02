@@ -16,6 +16,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
+BACKEND_PROJECT_ROOT = PROJECT_ROOT / "backend"
 
 
 def parse_args() -> argparse.Namespace:
@@ -222,7 +223,7 @@ def ensure_venv_libpython(
 def sync_runtime_environment(
     *, runtime_python_dir: Path, uv_packaging_env: dict[str, str]
 ) -> None:
-    print("[INFO] Syncing backend runtime environment from uv.lock")
+    print("[INFO] Syncing backend runtime environment from backend/uv.lock")
     sync_env = dict(uv_packaging_env)
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_python_dir)
     sync_env["VIRTUAL_ENV"] = str(runtime_python_dir)
@@ -234,7 +235,7 @@ def sync_runtime_environment(
             "--no-dev",
             "--no-editable",
         ],
-        cwd=PROJECT_ROOT,
+        cwd=BACKEND_PROJECT_ROOT,
         extra_env=sync_env,
     )
 
