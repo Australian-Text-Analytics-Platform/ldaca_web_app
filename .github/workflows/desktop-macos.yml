@@ -1,10 +1,25 @@
 name: Desktop macOS Build (Apple Silicon)
 
 on:
+  workflow_call:
+    inputs:
+      build-notes:
+        description: "Optional note about this build"
+        required: false
+        type: string
+      ref:
+        description: "Git ref to build"
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       build-notes:
         description: "Optional note about this build"
+        required: false
+        type: string
+      ref:
+        description: "Optional Git ref to build (branch, tag, or SHA)"
         required: false
         type: string
 
@@ -21,6 +36,7 @@ jobs:
       - name: Checkout repository with submodules
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
           submodules: recursive
 
       - name: Set up Node.js

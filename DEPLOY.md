@@ -295,6 +295,10 @@ git tag v<VERSION>
 git push origin v<VERSION>
 ```
 
+Pushing the root `v<VERSION>` tag now triggers the root desktop release workflow,
+which builds the Windows MSI and Apple Silicon DMG and attaches both artifacts to
+the GitHub release page for that tag.
+
 ### 9. Deploy Nectar from the root repo checkout
 
 ```bash
