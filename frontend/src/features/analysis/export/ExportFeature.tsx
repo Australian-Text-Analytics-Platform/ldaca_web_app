@@ -77,22 +77,23 @@ const ExportFeature: React.FC = () => {
     return { id, name, shape };
   };
 
-  // Inside Tauri (especially WebView2 on Windows) the native fetch API drops
-  // large cross-origin downloads — the body fully arrives but resp.blob() then
-  // throws "Failed to fetch". Routing through the Tauri http plugin uses
-  // Rust's reqwest under the hood and bypasses WebView2 networking, so large
-  // exports work reliably. The web build keeps native fetch.
+  // On Windows, both WebView2's native fetch and tauri-plugin-http drop
+  // large cross-origin response bodies — backend returns 200, but the body
+  // never fully reaches JS (WebView2 chokes on Range/large responses;
+  // plugin-http's IPC channel resets mid-transfer for >10MB blobs). To
+  // bypass both paths we expose a Rust Tauri command (`download_to_downloads`)
+  // that uses reqwest to stream the URL straight to the user's Downloads
+  // folder. The body never crosses the WebView2 / IPC boundary.
+  // The web build keeps the original fetch + blob + saveBlob path.
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-  const downloadFetch = async (
+  const tauriDownloadToDisk = async (
     url: string,
-    init?: { headers?: Record<string, string> },
-  ): Promise<Response> => {
-    if (isTauri) {
-      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-      return tauriFetch(url, init);
-    }
-    return window.fetch(url, init);
+    headers: Record<string, string>,
+    filename: string,
+  ): Promise<string> => {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke<string>('download_to_downloads', { url, headers, filename });
   };
 
   // Pull a human-readable error description out of a non-OK Response. FastAPI
@@ -122,20 +123,27 @@ const ExportFeature: React.FC = () => {
     try {
       const params = new URLSearchParams({ node_ids: nodeIds.join(','), format });
       const apiBase = getApiBase();
-      const resp = await downloadFetch(`${apiBase}/workspaces/export?` + params.toString(), {
-        headers: getAuthHeaders(),
-      });
+      const url = `${apiBase}/workspaces/export?` + params.toString();
+      const headers = getAuthHeaders();
+      const multiple = nodeIds.length > 1;
+      const ext = multiple ? 'zip' : getDownloadExtension(format);
+      const filename = multiple
+        ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
+        : `${toDisplay(selectedNodes[0]!).name || nodeIds[0]}.${ext}`;
+
+      if (isTauri) {
+        const fullPath = await tauriDownloadToDisk(url, headers, filename);
+        toast.success(`Saved ${filename} to Downloads`, { description: fullPath });
+        return;
+      }
+
+      const resp = await fetch(url, { headers });
       if (!resp.ok) {
         const description = await describeResponseError(resp);
         toast.error('Failed to export data blocks', { description });
         return;
       }
       const blob = await resp.blob();
-      const multiple = nodeIds.length > 1;
-      const ext = multiple ? 'zip' : getDownloadExtension(format);
-      const filename = multiple
-        ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
-        : `${toDisplay(selectedNodes[0]!).name || nodeIds[0]}.${ext}`;
       await saveBlob(blob, filename);
     } catch (e) {
       console.error(e);
@@ -155,17 +163,24 @@ const ExportFeature: React.FC = () => {
     try {
       const params = new URLSearchParams({ node_ids: id, format });
       const apiBase = getApiBase();
-      const resp = await downloadFetch(`${apiBase}/workspaces/export?` + params.toString(), {
-        headers: getAuthHeaders(),
-      });
+      const url = `${apiBase}/workspaces/export?` + params.toString();
+      const headers = getAuthHeaders();
+      const ext = getDownloadExtension(format);
+      const filename = `${name || id}.${ext}`;
+
+      if (isTauri) {
+        const fullPath = await tauriDownloadToDisk(url, headers, filename);
+        toast.success(`Saved ${filename} to Downloads`, { description: fullPath });
+        return;
+      }
+
+      const resp = await fetch(url, { headers });
       if (!resp.ok) {
         const description = await describeResponseError(resp);
         toast.error('Failed to download data block', { description });
         return;
       }
       const blob = await resp.blob();
-      const ext = getDownloadExtension(format);
-      const filename = `${name || id}.${ext}`;
       await saveBlob(blob, filename);
     } catch (e) {
       console.error(e);

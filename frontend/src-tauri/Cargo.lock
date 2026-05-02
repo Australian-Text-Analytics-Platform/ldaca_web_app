@@ -1910,7 +1910,9 @@ name = "ldaca-web-app"
 version = "0.2.0"
 dependencies = [
  "dotenvy",
+ "futures-util",
  "libc",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",
@@ -1919,6 +1921,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-http",
  "tauri-plugin-opener",
+ "tokio",
 ]
 
 [[package]]
@@ -3094,6 +3097,7 @@ dependencies = [
  "cookie_store",
  "encoding_rs",
  "futures-core",
+ "futures-util",
  "h2",
  "http",
  "http-body",
@@ -3115,12 +3119,14 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "webpki-roots",
 ]
