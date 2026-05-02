@@ -37,6 +37,14 @@ git submodule sync --recursive
 git submodule update --init --recursive --checkout --force
 ```
 
+> The `git submodule update --init --recursive` step is mandatory: this
+> repo embeds the `ldaca_web_app_backend` package (along with
+> `docworkspace` and `polars-text`) as git submodules, and a plain
+> `git pull` only advances the *submodule pointer* in the parent tree
+> without checking out the new submodule content. Skipping this leaves
+> the systemd service running stale backend code while `git status`
+> looks clean.
+
 ### 2. Configure Nginx
 
 Create `/etc/nginx/sites-available/analytics.ldaca.edu.au`:

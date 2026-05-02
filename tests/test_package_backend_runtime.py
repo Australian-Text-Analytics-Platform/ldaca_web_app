@@ -50,7 +50,7 @@ def test_sync_runtime_environment_uses_frozen_non_editable_sync(
                 "--no-dev",
                 "--no-editable",
             ],
-            module.PROJECT_ROOT,
+            module.BACKEND_PROJECT_ROOT,
             {
                 "UV_LINK_MODE": "copy",
                 "UV_PROJECT_ENVIRONMENT": str(runtime_python_dir),

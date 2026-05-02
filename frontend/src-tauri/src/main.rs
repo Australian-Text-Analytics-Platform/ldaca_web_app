@@ -7,6 +7,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 use tauri::{path::BaseDirectory, AppHandle, Manager, State};
 
@@ -76,6 +77,39 @@ impl BackendProcessHandle {
                     }
                     Err(err) => {
                         eprintln!("Failed to send SIGTERM to backend {}: {}", self.pid, err);
+                    }
+                }
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                // /F = force, /T = terminate child + entire descendant tree.
+                // child.kill() alone only sends TerminateProcess to the
+                // immediate python.exe and leaves any subprocesses running
+                // (uvicorn/multiprocessing workers, spaCy download helpers,
+                // etc.), which is how the port stays held after the window
+                // closes.
+                let status = std::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &self.pid.to_string()])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .status();
+                match status {
+                    Ok(s) if s.success() => {
+                        let _ = child.wait();
+                        println!("Backend {} terminated via taskkill /T", self.pid);
+                        return;
+                    }
+                    Ok(s) => {
+                        eprintln!(
+                            "taskkill exited {} for backend {}; falling back to TerminateProcess",
+                            s, self.pid
+                        );
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "Failed to invoke taskkill for backend {}: {}; falling back to TerminateProcess",
+                            self.pid, err
+                        );
                     }
                 }
             }
@@ -566,6 +600,10 @@ fn spawn_backend_process(
     command.env("LDACA_BACKEND_PORT", backend_port.to_string());
     command.env("LDACA_BACKEND_RUNTIME", runtime_root.as_os_str());
     command.env("LDACA_BACKEND_PYTHON", runtime_python.as_os_str());
+    // The backend's parent_watchdog reads this and self-destructs if our
+    // PID disappears, so a force-quit / crash / SIGKILL of Tauri doesn't
+    // leave an orphan Python holding port 8001.
+    command.env("LDACA_PARENT_PID", std::process::id().to_string());
 
     // Ensure packaged Python runtime is relocatable across machines.
     // `pyvenv.cfg` may contain build-machine absolute paths; use managed-python
@@ -683,6 +721,130 @@ fn find_available_port(start: u16, end: u16) -> Option<u16> {
 #[tauri::command]
 fn get_backend_url(state: State<BackendState>) -> String {
     state.url.clone()
+}
+
+/// Replace path-unsafe characters in a download filename so we can write it
+/// to disk without surprises (Windows forbids `<>:"/\\|?*` and control chars).
+fn sanitize_download_filename(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_matches('.').to_string();
+    if trimmed.is_empty() {
+        "download".to_string()
+    } else {
+        trimmed
+    }
+}
+
+/// Pick a path under `dir` that doesn't already exist, appending ` (1)`,
+/// ` (2)`, etc. before the extension if needed (matches the JS saveBlob
+/// behaviour). Falls back to a timestamp suffix if 1000 collisions happen.
+fn pick_unique_download_path(dir: &Path, filename: &str) -> PathBuf {
+    let candidate = dir.join(filename);
+    if !candidate.exists() {
+        return candidate;
+    }
+    let path = Path::new(filename);
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename);
+    let ext_with_dot = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|e| format!(".{}", e))
+        .unwrap_or_default();
+
+    for i in 1..1000 {
+        let next = format!("{} ({}){}", stem, i, ext_with_dot);
+        let candidate = dir.join(&next);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    dir.join(format!("{}-{}{}", stem, ts, ext_with_dot))
+}
+
+/// Stream a URL into the user's Downloads folder via the Rust HTTP client.
+///
+/// JS calls this instead of `fetch + resp.blob() + writeFile` so the
+/// response body never crosses the WebView2 / Tauri IPC boundary — that
+/// path drops large cross-origin responses on Windows even with
+/// tauri-plugin-http (the body round-trips through IPC and gets reset
+/// mid-transfer for >10MB downloads).
+///
+/// Returns the absolute path that was written.
+#[tauri::command]
+async fn download_to_downloads(
+    app: tauri::AppHandle,
+    url: String,
+    headers: HashMap<String, String>,
+    filename: String,
+) -> Result<String, String> {
+    use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
+    let downloads_dir = app
+        .path()
+        .download_dir()
+        .map_err(|e| format!("Cannot resolve Downloads directory: {}", e))?;
+
+    let safe_name = sanitize_download_filename(&filename);
+    let target_path = pick_unique_download_path(&downloads_dir, &safe_name);
+
+    let client = reqwest::Client::builder()
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    let mut request = client.get(&url);
+    for (k, v) in &headers {
+        request = request.header(k.as_str(), v.as_str());
+    }
+
+    let response = request
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("HTTP {}: {}", status, body));
+    }
+
+    let mut file = tokio::fs::File::create(&target_path)
+        .await
+        .map_err(|e| {
+            format!(
+                "Failed to create file {}: {}",
+                target_path.display(),
+                e
+            )
+        })?;
+
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Failed to read response chunk: {}", e))?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("Failed to write chunk: {}", e))?;
+    }
+    file.flush()
+        .await
+        .map_err(|e| format!("Failed to flush file: {}", e))?;
+
+    Ok(target_path.to_string_lossy().to_string())
 }
 
 /// Send SIGTERM to a process group (Unix). The child was spawned with
@@ -887,8 +1049,12 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
         .manage(backend_state)
-        .invoke_handler(tauri::generate_handler![get_backend_url])
+        .invoke_handler(tauri::generate_handler![
+            get_backend_url,
+            download_to_downloads
+        ])
         .setup(move |app| {
             let window = app
                 .get_webview_window("main")

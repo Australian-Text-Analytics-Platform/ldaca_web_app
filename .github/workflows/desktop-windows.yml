@@ -7,6 +7,11 @@ on:
         description: "Optional note about this build"
         required: false
         type: string
+      debug:
+        description: "Build with --debug (keeps Windows console + WebView2 devtools)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,6 +23,12 @@ jobs:
       CI: "true"
       PYTHONUTF8: "1"
       PYTHONIOENCODING: "utf-8"
+      # Debug builds (a) keep the Windows console subsystem so backend stdout/
+      # stderr print to cmd.exe, and (b) leave WebView2 devtools enabled so
+      # Ctrl+Shift+I works. Used to diagnose runtime issues that don't surface
+      # in release MSIs (e.g. cross-origin fetch failures).
+      TAURI_PROFILE: ${{ inputs.debug && 'debug' || 'release' }}
+      TAURI_BUILD_FLAGS: ${{ inputs.debug && '--debug' || '' }}
 
     steps:
       - name: Enable Windows long paths
@@ -94,13 +105,18 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          npx tauri build
+          if ($env:TAURI_BUILD_FLAGS) {
+            Write-Host "Building with flags: $env:TAURI_BUILD_FLAGS"
+            npx tauri build $env:TAURI_BUILD_FLAGS
+          } else {
+            npx tauri build
+          }
 
       - name: Validate bundled backend runtime
         shell: pwsh
         run: |
           Set-StrictMode -Version Latest
-          $runtimeDir = "frontend\src-tauri\target\release\backend-runtime"
+          $runtimeDir = "frontend\src-tauri\target\$env:TAURI_PROFILE\backend-runtime"
           $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
 
           if (-not (Test-Path (Join-Path $runtimeDir "runtime-manifest.json"))) {
@@ -113,7 +129,7 @@ jobs:
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ldaca-desktop-windows-msi
-          path: frontend/src-tauri/target/release/bundle/msi/*.msi
+          name: ldaca-desktop-windows-msi${{ inputs.debug && '-debug' || '' }}
+          path: frontend/src-tauri/target/${{ inputs.debug && 'debug' || 'release' }}/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 14
