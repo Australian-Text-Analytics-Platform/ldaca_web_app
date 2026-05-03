@@ -1,6 +1,6 @@
 {
   "name": "ldaca_web_app_frontend",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "LDaCA Web App Frontend - React application for text analytics and corpus analysis",
   "type": "module",
   "private": true,
