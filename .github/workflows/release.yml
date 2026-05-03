@@ -6,13 +6,23 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Tag to build and publish, e.g. v0.2.2"
-        required: true
+      ref:
+        description: "Git ref to build manually, e.g. dev"
+        required: false
+        type: string
+        default: "dev"
+      publish_release:
+        description: "Publish artifacts to a GitHub release"
+        required: false
+        type: boolean
+        default: false
+      release_tag:
+        description: "Release tag to publish when publish_release is enabled"
+        required: false
         type: string
 
 concurrency:
-  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -23,19 +33,20 @@ jobs:
     name: Build Windows MSI
     uses: ./.github/workflows/desktop-windows.yml
     with:
-      build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop release build for {0}', inputs.tag) || format('Automated desktop release build for {0}', github.ref_name) }}
+      build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop build for {0}', inputs.ref) || format('Automated desktop release build for {0}', github.ref_name) }}
       debug: false
-      ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
   build-macos:
     name: Build macOS DMG
     uses: ./.github/workflows/desktop-macos.yml
     with:
-      build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop release build for {0}', inputs.tag) || format('Automated desktop release build for {0}', github.ref_name) }}
-      ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+      build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop build for {0}', inputs.ref) || format('Automated desktop release build for {0}', github.ref_name) }}
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
   publish-release:
     name: Publish Desktop Assets
+    if: ${{ github.event_name == 'push' || inputs.publish_release }}
     needs:
       - build-windows
       - build-macos
@@ -59,7 +70,12 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          release_tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          release_tag="${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}"
+
+          if [ -z "$release_tag" ]; then
+            echo "release_tag input is required when publish_release is true" >&2
+            exit 1
+          fi
 
           if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$release_tag" \
