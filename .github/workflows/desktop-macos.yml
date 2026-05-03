@@ -145,7 +145,7 @@ jobs:
             exit 1
           fi
           primary_dmg="${dmg_files[0]}"
-          app_version="$(node -p \"require('./src-tauri/tauri.conf.json').version\")"
+          app_version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
           labeled_dmg="$repo_root/frontend/src-tauri/target/release/bundle/dmg/ldaca-desktop-apple-silicon-${app_version}.dmg"
           cp "$primary_dmg" "$labeled_dmg"
           echo "path=$labeled_dmg" >> "$GITHUB_OUTPUT"
