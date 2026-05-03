@@ -490,16 +490,31 @@ const WorkspaceShell: React.FC = () => {
  */
 const App: React.FC = () => {
   const { ready: backendReady, error: backendError } = useBackendHealth();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   let content: ReactNode;
 
   if (!backendReady) {
     content = (
-      <BlockingScreen
-        title="Starting backend services"
-        description="Hang tight while we verify the backend is up and happy."
-        status="Checking /health…"
-        hint={backendError ? `Last error: ${backendError}` : 'If this takes more than ~30s, check the backend logs.'}
-      />
+      <>
+        <BlockingScreen
+          title="Starting backend services"
+          description="Hang tight while we verify the backend is up and happy."
+          status="Checking /health…"
+          hint={backendError ? `Last error: ${backendError}` : 'If this takes more than ~30s, check the backend logs.'}
+          actions={(
+            <button
+              type="button"
+              onClick={() => setFeedbackOpen(true)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 font-medium shadow-sm hover:bg-gray-50 focus-visible:outline-offset-2 focus-visible:outline-blue-500 focus-visible:outline-2"
+            >
+              Send feedback
+            </button>
+          )}
+        />
+        <Suspense fallback={null}>
+          <FeedbackPanel open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+        </Suspense>
+      </>
     );
   } else {
     content = <WorkspaceShell />;
