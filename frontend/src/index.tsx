@@ -16,6 +16,12 @@ const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   '460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com';
 
+// CILogon uses server-side OIDC; __CILOGON_CLIENT_ID__ is injected for
+// informational use only — the actual auth flow starts at /api/auth/cilogon/login.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _CILOGON_CLIENT_ID =
+  typeof window !== 'undefined' ? window.__CILOGON_CLIENT_ID__ : undefined;
+
 const container = document.getElementById('root');
 if (!container) {
   throw new Error('Root container #root not found');
