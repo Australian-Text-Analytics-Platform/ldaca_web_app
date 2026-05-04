@@ -37,11 +37,14 @@ type Props = {
   topicSizeMode: 'target' | 'min' | 'exact';
   onTopicSizeModeChange: (mode: 'target' | 'min' | 'exact') => void;
   topicSizeValue: number;
+  topicSizeUserSet: boolean;
   onTopicSizeValueChange: (value: number) => void;
   showSamplingWarning: boolean;
   randomSeed: number;
+  randomSeedUserSet: boolean;
   onRandomSeedChange: (value: number) => void;
   representativeWordsCount: number;
+  representativeWordsCountUserSet: boolean;
   onRepresentativeWordsCountChange: (value: number) => void;
   isRunning: boolean;
   isClearing: boolean;
@@ -67,11 +70,14 @@ export function TopicModelingParameterPanel({
   topicSizeMode,
   onTopicSizeModeChange,
   topicSizeValue,
+  topicSizeUserSet,
   onTopicSizeValueChange,
   showSamplingWarning,
   randomSeed,
+  randomSeedUserSet,
   onRandomSeedChange,
   representativeWordsCount,
+  representativeWordsCountUserSet,
   onRepresentativeWordsCountChange,
   isRunning,
   isClearing,
@@ -90,7 +96,7 @@ export function TopicModelingParameterPanel({
     const raw = Number(event.currentTarget.value);
     const next = Math.max(2, isNaN(raw) ? 2 : Math.round(raw));
     setTopicSizeValueDraft(String(next));
-    if (next !== topicSizeValue) onTopicSizeValueChange(next);
+    onTopicSizeValueChange(next); // always call — even unchanged — to solidify grey placeholder
   };
 
   return (
@@ -262,7 +268,7 @@ export function TopicModelingParameterPanel({
               step={1}
               value={topicSizeValueDraft}
               disabled={isLocked}
-              className="h-8 w-24 flex-shrink-0 px-2 text-right text-sm"
+              className={`h-8 w-24 flex-shrink-0 px-2 text-right text-sm${!topicSizeUserSet ? ' text-muted-foreground' : ''}`}
               onChange={(e) => setTopicSizeValueDraft(e.target.value)}
               onBlur={handleTopicSizeValueBlur}
             />
@@ -279,7 +285,7 @@ export function TopicModelingParameterPanel({
               min={0}
               step={1}
               value={randomSeed}
-              className="h-8 w-24 text-right text-sm"
+              className={`h-8 w-24 text-right text-sm${!randomSeedUserSet ? ' text-muted-foreground' : ''}`}
               onChange={(e) => onRandomSeedChange(Math.max(0, Number(e.target.value) || 0))}
             />
           </div>
@@ -296,7 +302,7 @@ export function TopicModelingParameterPanel({
               max={50}
               step={1}
               value={representativeWordsCount}
-              className="h-8 w-24 text-right text-sm"
+              className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
               onChange={(e) =>
                 onRepresentativeWordsCountChange(Math.max(1, Number(e.target.value) || 0))
               }

@@ -10,16 +10,19 @@ type AnalysisRunningStateCardProps = {
   startedAt?: string | number | null;
 };
 
+// Backend sends started_at as time.time() (Unix seconds). Convert to ms when needed.
+const toMs = (v: number) => (v < 1e12 ? v * 1000 : v);
+
 function useElapsedSeconds(startedAt: string | number | null | undefined): number {
   const [elapsed, setElapsed] = useState<number>(() => {
     if (!startedAt) return 0;
-    const start = typeof startedAt === 'number' ? startedAt : Date.parse(startedAt);
+    const start = typeof startedAt === 'number' ? toMs(startedAt) : Date.parse(startedAt);
     return isNaN(start) ? 0 : Math.max(0, Math.floor((Date.now() - start) / 1000));
   });
 
   useEffect(() => {
     if (!startedAt) return;
-    const start = typeof startedAt === 'number' ? startedAt : Date.parse(startedAt);
+    const start = typeof startedAt === 'number' ? toMs(startedAt) : Date.parse(startedAt);
     if (isNaN(start)) return;
     const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
     tick();

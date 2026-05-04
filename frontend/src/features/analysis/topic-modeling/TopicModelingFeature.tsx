@@ -75,8 +75,12 @@ const TopicModelingFeature: React.FC = () => {
   const [corpusSamples, setCorpusSamples] = useState<CorpusSample[]>([]);
   const [topicSizeMode, setTopicSizeMode] = useState<'target' | 'min' | 'exact'>('target');
   const [topicSizeValue, setTopicSizeValue] = useState(50);
+  const [topicSizeUserSet, setTopicSizeUserSet] = useState(false);
+  const [referenceTopicNo, setReferenceTopicNo] = useState(50);
   const [randomSeed, setRandomSeed] = useState(42);
+  const [randomSeedUserSet, setRandomSeedUserSet] = useState(false);
   const [representativeWordsCount, setRepresentativeWordsCount] = useState(15);
+  const [representativeWordsCountUserSet, setRepresentativeWordsCountUserSet] = useState(false);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
@@ -133,9 +137,14 @@ const TopicModelingFeature: React.FC = () => {
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
       setRandomSeed(Number(req.random_seed ?? 42));
+      setRandomSeedUserSet(true);
       setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
+      setRepresentativeWordsCountUserSet(true);
       setTopicSizeMode((req.topic_size_mode as 'target' | 'min' | 'exact') || 'target');
-      setTopicSizeValue(Number(req.topic_size_value ?? 50));
+      const hydratedTopicSizeValue = Number(req.topic_size_value ?? 50);
+      setTopicSizeValue(hydratedTopicSizeValue);
+      setReferenceTopicNo(hydratedTopicSizeValue);
+      setTopicSizeUserSet(true);
       if (nodeIds.length && currentWorkspaceId) {
         try {
           await restoreAnalysisLockFromRequest({
@@ -168,7 +177,27 @@ const TopicModelingFeature: React.FC = () => {
     setCorpusSamples([]);
     setTopicSizeMode('target');
     setTopicSizeValue(50);
+    setTopicSizeUserSet(false);
+    setReferenceTopicNo(50);
+    setRandomSeedUserSet(false);
+    setRepresentativeWordsCountUserSet(false);
     setIsClearing(false);
+  };
+
+  const handleTopicSizeModeChange = (mode: 'target' | 'min' | 'exact') => {
+    setTopicSizeMode(mode);
+    setTopicSizeUserSet(false);
+    if (mode !== 'min') {
+      setTopicSizeValue(referenceTopicNo);
+    }
+  };
+
+  const handleTopicSizeValueChange = (value: number) => {
+    setTopicSizeValue(value);
+    setTopicSizeUserSet(true);
+    if (topicSizeMode !== 'min') {
+      setReferenceTopicNo(value);
+    }
   };
 
   const handleToggleTopicSelection = (id: number) => {
@@ -297,6 +326,14 @@ const TopicModelingFeature: React.FC = () => {
   );
 
   const combinedEffective = effectiveDocCounts.reduce((a, b) => a + b, 0);
+
+  // Auto-recalculate min topic size when in 'min' mode and not overridden by user
+  useEffect(() => {
+    if (topicSizeMode !== 'min' || topicSizeUserSet || combinedEffective <= 0) return;
+    const autoMin = Math.max(2, Math.floor(combinedEffective / (10 * referenceTopicNo)));
+    setTopicSizeValue(autoMin);
+  }, [topicSizeMode, topicSizeUserSet, combinedEffective, referenceTopicNo]);
+
   const showSamplingWarning =
     combinedEffective > 0 && combinedEffective < 5 * (topicSizeValue ?? 50);
 
@@ -437,14 +474,17 @@ const TopicModelingFeature: React.FC = () => {
           })
         }
         topicSizeMode={topicSizeMode}
-        onTopicSizeModeChange={setTopicSizeMode}
+        onTopicSizeModeChange={handleTopicSizeModeChange}
         topicSizeValue={topicSizeValue}
-        onTopicSizeValueChange={setTopicSizeValue}
+        topicSizeUserSet={topicSizeUserSet}
+        onTopicSizeValueChange={handleTopicSizeValueChange}
         showSamplingWarning={showSamplingWarning}
         randomSeed={randomSeed}
-        onRandomSeedChange={setRandomSeed}
+        randomSeedUserSet={randomSeedUserSet}
+        onRandomSeedChange={(v) => { setRandomSeed(v); setRandomSeedUserSet(true); }}
         representativeWordsCount={representativeWordsCount}
-        onRepresentativeWordsCountChange={setRepresentativeWordsCount}
+        representativeWordsCountUserSet={representativeWordsCountUserSet}
+        onRepresentativeWordsCountChange={(v) => { setRepresentativeWordsCount(v); setRepresentativeWordsCountUserSet(true); }}
         isRunning={isRunning}
         isClearing={isClearing}
         onRun={handleRunOrUpdate}
