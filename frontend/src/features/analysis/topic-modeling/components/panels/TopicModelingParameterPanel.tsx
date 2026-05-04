@@ -38,6 +38,7 @@ type Props = {
   onTopicSizeModeChange: (mode: 'target' | 'min' | 'exact') => void;
   topicSizeValue: number;
   topicSizeUserSet: boolean;
+  topicSizeWarning: 'orange' | 'red' | null;
   onTopicSizeValueChange: (value: number) => void;
   showSamplingWarning: boolean;
   randomSeed: number;
@@ -71,6 +72,7 @@ export function TopicModelingParameterPanel({
   onTopicSizeModeChange,
   topicSizeValue,
   topicSizeUserSet,
+  topicSizeWarning,
   onTopicSizeValueChange,
   showSamplingWarning,
   randomSeed,
@@ -268,7 +270,22 @@ export function TopicModelingParameterPanel({
               step={1}
               value={topicSizeValueDraft}
               disabled={isLocked}
-              className={`h-8 w-24 flex-shrink-0 px-2 text-right text-sm${!topicSizeUserSet ? ' text-muted-foreground' : ''}`}
+              title={
+                topicSizeWarning === 'red'
+                  ? 'Fewer than 3 documents per topic — results will likely be unusable'
+                  : topicSizeWarning === 'orange'
+                  ? 'Fewer than 10 documents per topic — topics may be noisy or unstable'
+                  : undefined
+              }
+              className={`h-8 w-24 flex-shrink-0 px-2 text-right text-sm${
+                topicSizeWarning === 'red'
+                  ? ' text-red-500'
+                  : topicSizeWarning === 'orange'
+                  ? ' text-orange-500'
+                  : !topicSizeUserSet
+                  ? ' text-muted-foreground'
+                  : ''
+              }`}
               onChange={(e) => setTopicSizeValueDraft(e.target.value)}
               onBlur={handleTopicSizeValueBlur}
             />

@@ -38,6 +38,7 @@ const baseProps = {
   onTopicSizeModeChange: vi.fn(),
   topicSizeValue: 50,
   topicSizeUserSet: false,
+  topicSizeWarning: null as 'orange' | 'red' | null,
   onTopicSizeValueChange: vi.fn(),
   showSamplingWarning: false,
   randomSeed: 42,

@@ -327,6 +327,17 @@ const TopicModelingFeature: React.FC = () => {
 
   const combinedEffective = effectiveDocCounts.reduce((a, b) => a + b, 0);
 
+  // Docs-per-estimated-topic: for target/exact this is combinedEffective/value;
+  // for min mode the value itself is the minimum cluster size (= docs per topic floor).
+  const topicSizeWarning: 'orange' | 'red' | null = useMemo(() => {
+    if (combinedEffective <= 0 || topicSizeValue <= 0) return null;
+    const docsPerTopic =
+      topicSizeMode === 'min' ? topicSizeValue : combinedEffective / topicSizeValue;
+    if (docsPerTopic < 3) return 'red';
+    if (docsPerTopic < 10) return 'orange';
+    return null;
+  }, [topicSizeMode, topicSizeValue, combinedEffective]);
+
   // Auto-recalculate min topic size when in 'min' mode and not overridden by user
   useEffect(() => {
     if (topicSizeMode !== 'min' || topicSizeUserSet || combinedEffective <= 0) return;
@@ -477,6 +488,7 @@ const TopicModelingFeature: React.FC = () => {
         onTopicSizeModeChange={handleTopicSizeModeChange}
         topicSizeValue={topicSizeValue}
         topicSizeUserSet={topicSizeUserSet}
+        topicSizeWarning={topicSizeWarning}
         onTopicSizeValueChange={handleTopicSizeValueChange}
         showSamplingWarning={showSamplingWarning}
         randomSeed={randomSeed}
