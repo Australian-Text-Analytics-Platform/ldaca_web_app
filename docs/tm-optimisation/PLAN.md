@@ -97,7 +97,13 @@ Each phase has its own exit criteria. Phases are independently shippable: phase 
 - Cache can be cleared via API (and via a UI button — frontend phase)
 - Cache is per-user, never shared across users
 
-**Status:** not started
+**Status:** complete — backend commit `9239c39`
+
+Notes from implementation:
+- Stored as float16 (≈1e-2 atol round-trip error; well within cosine-sim tolerance)
+- `embedding_cache_dir` defaults to `None` (bypasses cache) so tests that don't set it still pass
+- Cache is per-(model_id, provider_id) file; different providers can't share (float differences break UMAP reproducibility)
+- LRU eviction deferred — warns at 500 MB, refuses writes above 2 GB
 
 ---
 
