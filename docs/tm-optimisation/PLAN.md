@@ -170,7 +170,17 @@ Notes from implementation:
 - Each pipeline stage emits at least one progress event per 10s of wall time during long runs
 - Cancel kills the worker process within 5 s
 
-**Status:** not started
+**Status:** partially complete — backend commit `f315b11`; frontend commit pending
+
+What's done:
+- `worker.py`: `_pid_reporting_wrapper` is a top-level wrapper executed inside the worker process; it sends `{"type": "pid", "pid": os.getpid()}` through the progress queue before delegating to the real task function, making the PID available on the main-process side
+- `worker_task_manager.py`: `TaskInfo.worker_pid` field; `_consume_worker_progress` captures the PID from the queue; new `stop_task()` method sets status to `CANCELLED`, sends `SIGTERM` to the worker PID, calls `future.cancel()` as belt-and-braces for queued tasks, emits SSE update — **task record is kept** (not removed) for user dismissal; `_monitor_task_completion` no longer overrides `CANCELLED` status with a failure on `BrokenProcessPool`
+- `api/tasks.py`: new `POST /tasks/cancel?task_id=...` endpoint calls `stop_task()`
+- `frontend/src/api/workspaces.ts`: `cancelTask()` pointing to `/tasks/cancel`
+- `frontend/src/components/layout/Sidebar.tsx`: Stop button calls `cancelTask` (no local state removal — SSE pushes the cancelled state update); Clear button on terminal states works as before
+
+What's **not** done yet (remaining exit criterion):
+- Per-chunk progress callbacks during embedding (`_encode_embeddings_in_chunks` inner loop is silent for ~3 min currently). The progress bar shows 0% for the entire embedding phase.
 
 ---
 
