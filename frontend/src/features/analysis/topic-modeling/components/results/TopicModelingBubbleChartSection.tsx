@@ -40,7 +40,8 @@ type Props = {
   onTopicSearchQueryChange: (query: string) => void;
   activeDomain: ZoomDomain | null;
   nodeNames?: string[];
-  minTopicSize?: number;
+  topicSizeMode?: string;
+  topicSizeValue?: number;
   randomSeed?: number;
 };
 
@@ -112,7 +113,8 @@ export function TopicModelingBubbleChartSection({
   onTopicSearchQueryChange,
   activeDomain,
   nodeNames,
-  minTopicSize,
+  topicSizeMode,
+  topicSizeValue,
   randomSeed,
 }: Props) {
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
@@ -130,12 +132,15 @@ export function TopicModelingBubbleChartSection({
 
     // Join all node names with '_' so the filename reflects both data blocks
     const nodeName = (nodeNames ?? []).filter(Boolean).join('_') || 'data';
-    // Row 1 = centred node name; Row 2 = Min Topic Size | Random Seed | Topics
+    const topicSizeLabel =
+      topicSizeMode === 'min' ? 'Min Topic Size' :
+      topicSizeMode === 'exact' ? 'Exact Topics' :
+      'Target Topics';
     const header: ChartExportHeaderItem[] = [
-      { label: 'Data Block',    value: nodeNames?.join(', ') ?? 'data' },
-      { label: 'Min Topic Size', value: minTopicSize != null ? String(minTopicSize) : '—' },
-      { label: 'Random Seed',   value: randomSeed    != null ? String(randomSeed)    : '—' },
-      { label: 'Topics',        value: String(topics.length) },
+      { label: 'Data Block',   value: nodeNames?.join(', ') ?? 'data' },
+      { label: topicSizeLabel, value: topicSizeValue != null ? String(topicSizeValue) : '—' },
+      { label: 'Random Seed',  value: randomSeed    != null ? String(randomSeed)    : '—' },
+      { label: 'Topics',       value: String(topics.length) },
     ];
 
     const includeCSV = extras['includeCSV'] ?? false;
