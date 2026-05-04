@@ -47,8 +47,9 @@ export function AnalysisRunningStateCard({
   progress,
   startedAt,
 }: AnalysisRunningStateCardProps) {
+  // Backend sends progress as 0.0–1.0; convert to 0–100 for display
   const normalizedProgress =
-    typeof progress === 'number' ? Math.max(0, Math.min(100, progress)) : null;
+    typeof progress === 'number' ? Math.max(0, Math.min(100, progress * 100)) : null;
   const elapsed = useElapsedSeconds(startedAt);
 
   return (
