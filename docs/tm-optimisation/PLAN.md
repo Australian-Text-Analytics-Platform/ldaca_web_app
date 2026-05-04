@@ -204,7 +204,7 @@ MPS maps the full BERT graph to Apple Silicon GPU/Neural Engine without partitio
 - Linux path unchanged (ONNX + CPU quantized)
 - Bundle size increase ≤ 50 MB
 
-**Status:** not started
+**Status:** complete
 
 ---
 
@@ -220,6 +220,7 @@ MPS maps the full BERT graph to Apple Silicon GPU/Neural Engine without partitio
 | 2026-05-04 | No `model_quantized.onnx` in the HF repo — use arch-specific variants instead                 | Actual repo has arm64/avx2 quantized + fp32; discovered via `list_repo_files` |
 | 2026-05-04 | CoreML/DirectML providers use fp32 model; CPU provider uses quantized                         | Hardware-accelerated providers apply their own compilation on fp32; pre-quantized models can cause op compatibility issues |
 | 2026-05-04 | **Drop `CoreMLExecutionProvider` from provider selection on Mac**                              | all-MiniLM-L6-v2 ONNX graph has only 68% CoreML node coverage (285/418), producing 55 partitions with ~45k CoreML↔CPU syncs per run. Embedding 26k docs took 21 min with CoreML vs 3.3 min with ARM64 CPU ONNX. `model_qint8_arm64.onnx` on `CPUExecutionProvider` is dramatically faster. DirectML on Windows covers the full graph and remains preferred. |
+| 2026-05-04 | **Phase 5: use `SentenceTransformer(device="mps")` on Apple Silicon, not ONNX CoreML**        | MPS maps the full BERT graph to Metal/Neural Engine as a single unit — no partition overhead. Expected ~64s cold vs ~201s for ONNX ARM64 CPU. torch/sentence-transformers already a transitive dep via bertopic; no new heavyweight dependency. ONNX path retained for Windows (DirectML) and Linux (CPU quantized). |
 
 ## Open questions
 
