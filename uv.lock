@@ -646,6 +646,14 @@ wheels = [
 ]
 
 [[package]]
+name = "flatbuffers"
+version = "25.12.19"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl", hash = "sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4", size = 26661, upload-time = "2025-12-19T23:16:13.622Z" },
+]
+
+[[package]]
 name = "fsspec"
 version = "2026.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -893,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "ldaca-web-app"
-version = "0.2.1"
+version = "0.2.7"
 source = { directory = "backend" }
 dependencies = [
     { name = "aiosqlite" },
@@ -904,14 +912,17 @@ dependencies = [
     { name = "fastexcel" },
     { name = "google-auth-oauthlib" },
     { name = "httpx" },
+    { name = "onnxruntime" },
     { name = "openai" },
     { name = "polars", extra = ["rtcompat"] },
     { name = "polars-text" },
     { name = "psutil" },
     { name = "pyarrow" },
     { name = "pydantic-settings" },
+    { name = "sentence-transformers" },
     { name = "spacy" },
     { name = "tbb", marker = "sys_platform != 'darwin'" },
+    { name = "tokenizers" },
     { name = "xlsxwriter" },
 ]
 
@@ -928,14 +939,17 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'deploy'", specifier = ">=9.5.0" },
     { name = "jupyter-server-proxy", marker = "extra == 'deploy'", specifier = ">=4.4.0" },
     { name = "ldaca-loader", marker = "extra == 'ldaca'", git = "https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator?branch=ldaca_web_app_integration" },
+    { name = "onnxruntime", specifier = ">=1.18.0" },
     { name = "openai", specifier = ">=2.26.0" },
     { name = "polars", extras = ["rtcompat"], specifier = ">=1.40.0" },
-    { name = "polars-text", specifier = ">=0.1.6" },
+    { name = "polars-text", specifier = ">=0.1.7" },
     { name = "psutil", specifier = ">=6.1.0" },
     { name = "pyarrow", specifier = ">=16.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "sentence-transformers", specifier = ">=3.0.0" },
     { name = "spacy", specifier = ">=3.7.0" },
     { name = "tbb", marker = "sys_platform != 'darwin'", specifier = ">=2022.3.1" },
+    { name = "tokenizers", specifier = ">=0.21.0" },
     { name = "xlsxwriter", specifier = ">=3.2.0" },
 ]
 provides-extras = ["ldaca", "deploy"]
@@ -1281,6 +1295,26 @@ wheels = [
 ]
 
 [[package]]
+name = "onnxruntime"
+version = "1.25.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flatbuffers" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "protobuf" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/aa/04530bd38e31e26970fa1212346d76cf81705dc16a8ee5e6f4fb24634c11/onnxruntime-1.25.1-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:395eb662c437fa2407f44266e4778b75bff261b17c2a6fef042421f9069f871d", size = 17773721, upload-time = "2026-04-27T21:59:59.24Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/7f/ec79ab5cece6a688c944a7fa214a8511d548b9d5142a15d1a3d730b705f1/onnxruntime-1.25.1-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9ae85395f41b291ae3e61780ec5092640181d369ef6c268aa8141c478b509e69", size = 15875954, upload-time = "2026-04-27T21:59:49.394Z" },
+    { url = "https://files.pythonhosted.org/packages/67/fe/20428215d822099ea2c1e3cf35c295cf1a58f467bf18b6c607597a39c18a/onnxruntime-1.25.1-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:828e1b12710fbedb6dfab5e7bae6f11563617cddf3c2e7e8d84c64de566a4a3a", size = 18038703, upload-time = "2026-04-27T22:00:16.199Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/b1/b15db965e6a68bc47ca7eb584de4e6b3d2d2f484d46cc57f715b596f6528/onnxruntime-1.25.1-cp314-cp314-win_amd64.whl", hash = "sha256:2affc9d2fd9ab013b9c9637464e649a0cca870d57ae18bfef74180eee65c3369", size = 13218513, upload-time = "2026-04-27T22:00:42.506Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/f9/25cd2d1b29cdc8140eee4afbb6fb930b69125526632b1d579bc747975306/onnxruntime-1.25.1-cp314-cp314-win_arm64.whl", hash = "sha256:3387d75d1a815b4b2495b4e47a05ef1b3bcb64a817ddc68587e0bfcb9702bcf6", size = 12969835, upload-time = "2026-04-27T22:00:31.504Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/0e/6c507d1e65b2421fb44e241cbba577c7276792279485024fb1752b43f5c5/onnxruntime-1.25.1-cp314-cp314t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:06280b06604660595037f783c6d24bc70cbe5c6093975f194cd1482e77d450de", size = 15883298, upload-time = "2026-04-27T21:59:51.991Z" },
+    { url = "https://files.pythonhosted.org/packages/df/4e/1c9df57496409dc86b320bd38f29ad7a34b7115e4f35b8fca44a827568a7/onnxruntime-1.25.1-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:7e79fd5ce7db10ebcc24e020e2ed0159476e69e2326b9b7828e5aadcf6184212", size = 18021249, upload-time = "2026-04-27T22:00:18.954Z" },
+]
+
+[[package]]
 name = "openai"
 version = "2.33.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1419,16 +1453,16 @@ wheels = [
 
 [[package]]
 name = "polars-text"
-version = "0.1.6"
+version = "0.1.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/ee/84f522aeeef7af6ca8184b8e965808c94204a972b6f20a8cda65e8e854cf/polars_text-0.1.6.tar.gz", hash = "sha256:137c8cf9ef28e481b732be975a0c1e5093a6c21e695bea2b650a972076fe791e", size = 5359049, upload-time = "2026-04-29T15:03:04.067Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/71/ec/854ca9bf9ed5f892bab1bc7402b502e023ecd04a72391868e43f56997d5e/polars_text-0.1.7.tar.gz", hash = "sha256:90b86af2e6abcaa80e4c71b4217637f6e9f4fd089c5ab9c43e995f40f8c6db32", size = 5360867, upload-time = "2026-05-03T10:29:07.833Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/af/17ce6b849702924916b45463c2ab9150235bab4e2608edcab64a686039dd/polars_text-0.1.6-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:55fcf62a24d1bb2a3047d9ffc9cfc5155ec50b8ce8bf895f24c80ba4c09eeabe", size = 18939218, upload-time = "2026-04-29T15:02:56.178Z" },
-    { url = "https://files.pythonhosted.org/packages/47/bf/e651469ae9195eabb1a476913538c3eeabf841b5033e56455cb0e9b229e8/polars_text-0.1.6-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:84a8276d9bcfebeae4c5fdfff8d2890c89464810244607277341d81793f4879a", size = 24016162, upload-time = "2026-04-29T15:02:59.128Z" },
-    { url = "https://files.pythonhosted.org/packages/fd/03/ec228c4ce2f422a8c1e87b56ab2b6256f88ae87000ae84417313d597a501/polars_text-0.1.6-cp314-cp314-win_amd64.whl", hash = "sha256:244f29f4b0311c3cdf025bb677cfd9091845e22d8f8a8172fae8f5d0b5cfb7fd", size = 19269690, upload-time = "2026-04-29T15:03:01.789Z" },
+    { url = "https://files.pythonhosted.org/packages/49/4b/d44f995cdf15947c8a3705cddd8512da5d8d41e150230d6395b85651991d/polars_text-0.1.7-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:dd3b68332d1d44b65c30de7844966d2fb65d94843d06164c8adf7e67e564b200", size = 19141376, upload-time = "2026-05-03T10:29:00.649Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/ef/e77aefaebfa84f0bbd820282acb5447070eed9c217f96d251089ed120f01/polars_text-0.1.7-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:33cdc3eb27f7f4586dd344136245c636267cdf45c5e2e2e0ce1df76e9422adb5", size = 24234081, upload-time = "2026-05-03T10:29:03.478Z" },
+    { url = "https://files.pythonhosted.org/packages/89/39/f0ed84e9bbeba1a5e7228b55512a04f20909a68e9b74b48e813ee8c635e5/polars_text-0.1.7-cp314-cp314-win_amd64.whl", hash = "sha256:c41141f21d1045a439d0bcca88f6ffc20394dac5d18bc09d3b34cdb5ff0c9251", size = 19484781, upload-time = "2026-05-03T10:29:05.71Z" },
 ]
 
 [[package]]
@@ -1457,6 +1491,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/37/aa/51e5b4109a4cdfae28c3613eeeb10764a3794ebef8de93ffbb109465bea3/preshed-3.0.13-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:670db59a52e1823b5f088c764df474e65b686592d4093adbeef14581c95ee2cb", size = 1959473, upload-time = "2026-03-23T08:57:15.706Z" },
     { url = "https://files.pythonhosted.org/packages/0e/6a/1d966f367a14c703dde629d150d996c1b727d442f620300b21c9ec1a24d1/preshed-3.0.13-cp314-cp314t-win_amd64.whl", hash = "sha256:b03e21b0bf95eb56e23973f32cabb930e94f352228652f81c0955dbd6967d904", size = 146229, upload-time = "2026-03-23T08:57:17.457Z" },
     { url = "https://files.pythonhosted.org/packages/22/80/368139067603e590a000122355f9c8576c8ebed4fb0b8849feaa2698489d/preshed-3.0.13-cp314-cp314t-win_arm64.whl", hash = "sha256:b980f3ea9bb74b7f94464bc3d6eb3c9162b6b79b531febd14c6465c24344d2cc", size = 119339, upload-time = "2026-03-23T08:57:18.882Z" },
+]
+
+[[package]]
+name = "protobuf"
+version = "7.34.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/6b/a0e95cad1ad7cc3f2c6821fcab91671bd5b78bd42afb357bb4765f29bc41/protobuf-7.34.1.tar.gz", hash = "sha256:9ce42245e704cc5027be797c1db1eb93184d44d1cdd71811fb2d9b25ad541280", size = 454708, upload-time = "2026-03-20T17:34:47.036Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ec/11/3325d41e6ee15bf1125654301211247b042563bcc898784351252549a8ad/protobuf-7.34.1-cp310-abi3-macosx_10_9_universal2.whl", hash = "sha256:d8b2cc79c4d8f62b293ad9b11ec3aebce9af481fa73e64556969f7345ebf9fc7", size = 429247, upload-time = "2026-03-20T17:34:37.024Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/9d/aa69df2724ff63efa6f72307b483ce0827f4347cc6d6df24b59e26659fef/protobuf-7.34.1-cp310-abi3-manylinux2014_aarch64.whl", hash = "sha256:5185e0e948d07abe94bb76ec9b8416b604cfe5da6f871d67aad30cbf24c3110b", size = 325753, upload-time = "2026-03-20T17:34:38.751Z" },
+    { url = "https://files.pythonhosted.org/packages/92/e8/d174c91fd48e50101943f042b09af9029064810b734e4160bbe282fa1caa/protobuf-7.34.1-cp310-abi3-manylinux2014_s390x.whl", hash = "sha256:403b093a6e28a960372b44e5eb081775c9b056e816a8029c61231743d63f881a", size = 340198, upload-time = "2026-03-20T17:34:39.871Z" },
+    { url = "https://files.pythonhosted.org/packages/53/1b/3b431694a4dc6d37b9f653f0c64b0a0d9ec074ee810710c0c3da21d67ba7/protobuf-7.34.1-cp310-abi3-manylinux2014_x86_64.whl", hash = "sha256:8ff40ce8cd688f7265326b38d5a1bed9bfdf5e6723d49961432f83e21d5713e4", size = 324267, upload-time = "2026-03-20T17:34:41.1Z" },
+    { url = "https://files.pythonhosted.org/packages/85/29/64de04a0ac142fb685fd09999bc3d337943fb386f3a0ec57f92fd8203f97/protobuf-7.34.1-cp310-abi3-win32.whl", hash = "sha256:34b84ce27680df7cca9f231043ada0daa55d0c44a2ddfaa58ec1d0d89d8bf60a", size = 426628, upload-time = "2026-03-20T17:34:42.536Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/87/cb5e585192a22b8bd457df5a2c16a75ea0db9674c3a0a39fc9347d84e075/protobuf-7.34.1-cp310-abi3-win_amd64.whl", hash = "sha256:e97b55646e6ce5cbb0954a8c28cd39a5869b59090dfaa7df4598a7fba869468c", size = 437901, upload-time = "2026-03-20T17:34:44.112Z" },
+    { url = "https://files.pythonhosted.org/packages/88/95/608f665226bca68b736b79e457fded9a2a38c4f4379a4a7614303d9db3bc/protobuf-7.34.1-py3-none-any.whl", hash = "sha256:bb3812cd53aefea2b028ef42bd780f5b96407247f20c6ef7c679807e9d188f11", size = 170715, upload-time = "2026-03-20T17:34:45.384Z" },
 ]
 
 [[package]]
