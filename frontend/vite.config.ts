@@ -1,5 +1,7 @@
 /// <reference types="vitest/config" />
 
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type ServerOptions } from 'vite';
@@ -8,6 +10,27 @@ import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/postcss';
 
 const frontendRootDir = path.dirname(fileURLToPath(import.meta.url));
+
+const packageVersion = (() => {
+  try {
+    return JSON.parse(readFileSync(path.join(frontendRootDir, 'package.json'), 'utf-8')).version ?? '';
+  } catch {
+    return '';
+  }
+})();
+
+const gitShortSha = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: frontendRootDir, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch {
+    return '';
+  }
+})();
+
+process.env.VITE_APP_VERSION ??= packageVersion;
+process.env.VITE_APP_BUILD ??= gitShortSha;
 
 const serverConfig = {
   port: Number(process.env.FRONTEND_PORT ?? 3002),

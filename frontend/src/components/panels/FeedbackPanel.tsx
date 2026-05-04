@@ -1,14 +1,23 @@
-import type React from 'react';
+import { type FC } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
+import { useAuth } from '../../hooks/useAuth';
+import { SURVEY_BASE_URL, buildSurveyUrl, captureFeedbackContext } from './feedbackContext';
 
 interface FeedbackPanelProps {
   open: boolean;
   onClose: () => void;
 }
 
-const SURVEY_URL = 'https://sydney.au1.qualtrics.com/jfe/form/SV_dcZ4HVzI2vsEysC';
+export const FeedbackPanel: FC<FeedbackPanelProps> = ({ open, onClose }) => {
+  const { isAuthenticated } = useAuth();
 
-export const FeedbackPanel: React.FC<FeedbackPanelProps> = ({ open, onClose }) => {
+  const surveyUrl = open
+    ? buildSurveyUrl(
+        SURVEY_BASE_URL,
+        captureFeedbackContext({ user_role: isAuthenticated ? 'authenticated' : 'anonymous' }),
+      )
+    : '';
+
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
       <DialogContent className="w-full max-w-3xl p-0 overflow-hidden">
@@ -16,11 +25,15 @@ export const FeedbackPanel: React.FC<FeedbackPanelProps> = ({ open, onClose }) =
           <DialogTitle>Send feedback</DialogTitle>
           <DialogDescription>Share ideas, report issues, or suggest improvements.</DialogDescription>
         </DialogHeader>
-        <iframe
-          src={SURVEY_URL}
-          title="Feedback survey"
-          className="h-[80vh] w-full border-0"
-        />
+        {surveyUrl ? (
+          <iframe
+            src={surveyUrl}
+            title="Feedback survey"
+            className="h-[80vh] w-full border-0"
+          />
+        ) : (
+          <div className="h-[80vh] w-full" />
+        )}
       </DialogContent>
     </Dialog>
   );
