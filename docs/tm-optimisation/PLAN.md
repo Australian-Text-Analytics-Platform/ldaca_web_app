@@ -152,6 +152,20 @@ Notes from implementation:
 - `OnlineCountVectorizer` import is guarded; missing import falls back to BERTopic default vectorizer
 - Outlier topic -1 is absent in online mode (expected; documented in plan tradeoff)
 
+**Hansard benchmark (1,956,223 docs, 1.97 GB text, M1 Max, 2026-05-04 — cold run, MPS embedder):**
+
+| Stage | Time |
+|-------|------|
+| Embedding (MPS, 1.96M docs) | 36.5 min |
+| Online pipeline (IncrementalPCA + MiniBatchKMeans, k=200) | 3.1 min |
+| Writing artifacts | ~0 min |
+| **Total** | **39.8 min** |
+
+- Both thresholds exceeded ~20×; Phase 3 auto-engaged with `pipeline_mode=online`, `n_clusters=200`
+- MPS embedding throughput: ~893 docs/s (vs 484 docs/s estimate from 26k benchmark — MPS batching scales better at high volume)
+- Old UMAP+HDBSCAN pipeline: never completed on this corpus (O(n²) memory and time)
+- Results in `scripts/bench_results_hansard.json`
+
 ---
 
 ### Phase 4 — Honest progress + cancellability
