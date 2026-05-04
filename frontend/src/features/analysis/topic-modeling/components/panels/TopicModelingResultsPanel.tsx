@@ -17,6 +17,7 @@ type Props = {
     state?: string;
     message?: string;
     progress?: number;
+    started_at?: string | null;
   } | null;
   result: TopicModelingResult;
   error?: string | null;
@@ -113,7 +114,12 @@ export function TopicModelingResultsPanel({
         help={helperConfig}
       >
         {isRunningState ? (
-          <AnalysisRunningStateCard message={runningMessage} taskId={runningTaskId} progress={runningProgress} />
+          <AnalysisRunningStateCard
+            message={runningMessage}
+            taskId={runningTaskId}
+            progress={runningProgress}
+            startedAt={runningTask?.started_at}
+          />
         ) : null}
 
         {isFailedState ? (
