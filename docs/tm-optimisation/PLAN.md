@@ -186,23 +186,34 @@ What's **not** done yet (remaining exit criterion):
 
 ### Phase 5 — Apple Silicon MPS for cold-run performance
 
-**Scope:** On Apple Silicon, use `SentenceTransformer` with `device="mps"` (PyTorch MPS backend) instead of ONNX Runtime for the embedding step. Benchmark (2026-05-04) shows:
-- ONNX ARM64 CPU cold embedding: ~201s
-- SentenceTransformer + PyTorch MPS cold embedding: ~64s (estimated from old cold = 102s with UMAP+HDBSCAN included)
+**Scope:** On Apple Silicon, use `SentenceTransformer` with `device="mps"` (PyTorch MPS backend) instead of ONNX Runtime for the embedding step. MPS maps the full BERT graph to Apple Silicon GPU/Neural Engine without partitioning.
 
-MPS maps the full BERT graph to Apple Silicon GPU/Neural Engine without partitioning. The Phase 2 cache makes cold runs rare, but MPS is needed for the first run on a new corpus to be acceptable.
+**Benchmark results (26,163-doc corpus, M1 Max, 2026-05-04 — measured on Phase 5 code):**
 
-**Constraint:** This requires `torch` in the bundle — review size impact. May be acceptable since `sentence-transformers` is already a dependency and torch on ARM64 is smaller than the x86 CUDA variant. Alternatively, investigate `mlx` (Apple MLX framework, ~20 MB) as a pure-Apple-Silicon backend without full torch.
+| Run | Embedding | UMAP+HDBSCAN | Total | vs OLD |
+|-----|-----------|--------------|-------|--------|
+| OLD cold (SentenceTransformer + MPS, pre-Phase-1) | ~64s* | ~30s* | **101.6s** | baseline |
+| Phase 1–3 cold (ONNX ARM64 CPU) | 200.7s | 41.6s | **251.1s** | 2.5× slower |
+| Phase 5 cold (MPS) | **54s** | 40s | **107.3s** | essentially same as old |
+| Phase 5 warm (cache hit) | 0.7s | 29s | **29.5s** | 3.4× faster than old cold |
+
+*\*Old code had a single progress callback; split estimated from warm UMAP time.*
+
+MPS embedding is **54s** — 3.7× faster than ONNX ARM64 CPU (201s) and better than the estimated 64s. Total cold run 107s is within ~5% of the pre-Phase-1 baseline. The Phase 2 cache makes cold runs rare in practice; warm runs remain 29s.
+
+**Constraint:** `torch` and `sentence-transformers` are already transitive deps via `bertopic` — no new packages added; bundle size unchanged.
 
 **Files (backend):**
-- `onnx_embedder.py` or new `mps_embedder.py` — detect Apple Silicon + MPS availability; prefer MPS over ONNX on Mac
-- `worker_tasks_topic.py` — `_get_embedder` returns MPS-backed embedder on Mac when available
+- New `mps_embedder.py` — `is_mps_available()`, `get_active_provider_id()`, `MpsEmbedder`
+- `worker_tasks_topic.py` — `_get_embedder` prefers MPS when available; `embedding_backend` meta field reflects actual path (`"mps"` or `"onnx"`)
+- `model_prefetch.py` — dispatches to MPS or ONNX prefetch based on platform
+- `topic_modeling.py` cache-clear endpoint — uses `get_active_provider_id()`
 
 **Exit criteria:**
-- Cold embedding on 26k-doc corpus on M1 Mac ≤ 90s (matching or beating old baseline)
-- Windows path unchanged (ONNX + DirectML still used)
-- Linux path unchanged (ONNX + CPU quantized)
-- Bundle size increase ≤ 50 MB
+- ✅ Cold embedding on 26k-doc corpus on M1 Mac ≤ 90s — actual: 54s
+- ✅ Windows path unchanged (ONNX + DirectML still used)
+- ✅ Linux path unchanged (ONNX + CPU quantized)
+- ✅ Bundle size increase ≤ 50 MB — no new packages
 
 **Status:** complete
 
@@ -220,7 +231,7 @@ MPS maps the full BERT graph to Apple Silicon GPU/Neural Engine without partitio
 | 2026-05-04 | No `model_quantized.onnx` in the HF repo — use arch-specific variants instead                 | Actual repo has arm64/avx2 quantized + fp32; discovered via `list_repo_files` |
 | 2026-05-04 | CoreML/DirectML providers use fp32 model; CPU provider uses quantized                         | Hardware-accelerated providers apply their own compilation on fp32; pre-quantized models can cause op compatibility issues |
 | 2026-05-04 | **Drop `CoreMLExecutionProvider` from provider selection on Mac**                              | all-MiniLM-L6-v2 ONNX graph has only 68% CoreML node coverage (285/418), producing 55 partitions with ~45k CoreML↔CPU syncs per run. Embedding 26k docs took 21 min with CoreML vs 3.3 min with ARM64 CPU ONNX. `model_qint8_arm64.onnx` on `CPUExecutionProvider` is dramatically faster. DirectML on Windows covers the full graph and remains preferred. |
-| 2026-05-04 | **Phase 5: use `SentenceTransformer(device="mps")` on Apple Silicon, not ONNX CoreML**        | MPS maps the full BERT graph to Metal/Neural Engine as a single unit — no partition overhead. Expected ~64s cold vs ~201s for ONNX ARM64 CPU. torch/sentence-transformers already a transitive dep via bertopic; no new heavyweight dependency. ONNX path retained for Windows (DirectML) and Linux (CPU quantized). |
+| 2026-05-04 | **Phase 5: use `SentenceTransformer(device="mps")` on Apple Silicon, not ONNX CoreML**        | MPS maps the full BERT graph to Metal/Neural Engine as a single unit — no partition overhead. Measured 54s cold embedding vs 201s ONNX ARM64 CPU (3.7×). torch/sentence-transformers already a transitive dep via bertopic; no new heavyweight dependency. ONNX path retained for Windows (DirectML) and Linux (CPU quantized). |
 
 ## Open questions
 
