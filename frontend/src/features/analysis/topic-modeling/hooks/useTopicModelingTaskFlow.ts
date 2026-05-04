@@ -21,10 +21,13 @@ interface TopicModelingState {
   panelNodeIds: string[];
   panelHasMissingColumns: boolean;
   effectiveNodeColumnSelections: NodeColumnSelection[];
-  minTopicSize: number;
+  minTopicSize?: number;
   randomSeed: number;
   representativeWordsCount: number;
   selectedTopicIds: Set<number>;
+  sampleFractions?: (number | null)[] | null;
+  topicSizeMode?: 'target' | 'min' | 'exact';
+  topicSizeValue?: number;
 }
 
 interface TopicModelingActions {
@@ -59,6 +62,9 @@ export function useTopicModelingTaskFlow({
     randomSeed,
     representativeWordsCount,
     selectedTopicIds,
+    sampleFractions,
+    topicSizeMode,
+    topicSizeValue,
   },
   actions: {
     setIsRunning,
@@ -114,9 +120,11 @@ export function useTopicModelingTaskFlow({
       const req: TopicModelingRequest = {
         node_ids: requestNodeIds,
         node_columns: nodeColumns,
-        min_topic_size: minTopicSize,
         random_seed: randomSeed,
         representative_words_count: representativeWordsCount,
+        topic_size_mode: topicSizeMode ?? 'target',
+        topic_size_value: topicSizeValue ?? 50,
+        ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
       };
 
       try {

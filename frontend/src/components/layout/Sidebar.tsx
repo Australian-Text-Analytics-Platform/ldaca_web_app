@@ -375,12 +375,21 @@ const Sidebar: React.FC = () => {
     try {
       const taskType = String(task.task_type ?? '');
       const isFileImportTask = taskType === 'ldaca_import';
-      if (isFileImportTask) {
-        await filesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
+
+      if (task.state === 'running') {
+        // Stop the running process. The task record stays; the SSE stream will
+        // push a state update to 'cancelled' so the card transitions to the
+        // clearable state without us removing it from local state here.
+        await workspacesApi.cancelTask({ task_id: task.task_id }, getAuthHeaders());
       } else {
-        await workspacesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
+        // Terminal state — remove the record entirely.
+        if (isFileImportTask) {
+          await filesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
+        } else {
+          await workspacesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
+        }
+        setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
       }
-      setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
     } catch (error) {
       console.error('Failed to clear task', error);
     }

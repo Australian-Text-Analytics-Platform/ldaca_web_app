@@ -63,6 +63,15 @@ export const workspacesApi = {
       params: options,
     }),
 
+  /** Stop a running task (sends SIGTERM to the worker process) and mark it cancelled.
+   *  The task record is kept so the user can explicitly clear it afterwards. */
+  cancelTask: (options: { task_id: string }, headers: Record<string, string> = {}) =>
+    httpRequest<Record<string, unknown>>('/tasks/cancel', {
+      method: 'POST',
+      headers,
+      params: options,
+    }),
+
   /** Current (active) workspace id accessors. */
   current: {
     get: (headers: Record<string, string> = {}) =>

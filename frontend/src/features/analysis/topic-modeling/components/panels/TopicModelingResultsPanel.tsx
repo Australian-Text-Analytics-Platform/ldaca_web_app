@@ -17,6 +17,7 @@ type Props = {
     state?: string;
     message?: string;
     progress?: number;
+    started_at?: string | null;
   } | null;
   result: TopicModelingResult;
   error?: string | null;
@@ -40,7 +41,8 @@ type Props = {
   onTopicSearchQueryChange: (query: string) => void;
   activeDomain: ZoomDomain | null;
   nodeNames?: string[];
-  minTopicSize?: number;
+  topicSizeMode?: string;
+  topicSizeValue?: number;
   randomSeed?: number;
   detachDialogOpen: boolean;
   setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -77,7 +79,8 @@ export function TopicModelingResultsPanel({
   onTopicSearchQueryChange,
   activeDomain,
   nodeNames,
-  minTopicSize,
+  topicSizeMode,
+  topicSizeValue,
   randomSeed,
   detachDialogOpen,
   setDetachDialogOpen,
@@ -113,7 +116,12 @@ export function TopicModelingResultsPanel({
         help={helperConfig}
       >
         {isRunningState ? (
-          <AnalysisRunningStateCard message={runningMessage} taskId={runningTaskId} progress={runningProgress} />
+          <AnalysisRunningStateCard
+            message={runningMessage}
+            taskId={runningTaskId}
+            progress={runningProgress}
+            startedAt={runningTask?.started_at}
+          />
         ) : null}
 
         {isFailedState ? (
@@ -170,7 +178,8 @@ export function TopicModelingResultsPanel({
               onTopicSearchQueryChange={onTopicSearchQueryChange}
               activeDomain={activeDomain}
               nodeNames={nodeNames}
-              minTopicSize={minTopicSize}
+              topicSizeMode={topicSizeMode}
+              topicSizeValue={topicSizeValue}
               randomSeed={randomSeed}
             />
           </div>
