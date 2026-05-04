@@ -73,7 +73,7 @@ Each phase has its own exit criteria. Phases are independently shippable: phase 
 - `du -sh dist-tauri/backend-runtime` reduced by ≥100 MB
 - `bertopic` still works in tests (UMAP+HDBSCAN unchanged)
 
-**Status:** not started
+**Status:** complete — backend commit `f5e0b2c`
 
 ---
 
@@ -162,11 +162,13 @@ Each phase has its own exit criteria. Phases are independently shippable: phase 
 | 2026-05-04 | `polars-text` branch is provisional — may end up unused if Python hashing is fast enough       | Avoid a Rust dependency unless profiling justifies it |
 | 2026-05-04 | Phase 1 (ONNX) ships first as standalone improvement                                           | Independently valuable, biggest size + speed win |
 | 2026-05-04 | Online pipeline auto-engages by threshold; user can override                                   | Most users don't know to choose; threshold gives a sensible default |
+| 2026-05-04 | No `model_quantized.onnx` in the HF repo — use arch-specific variants instead                 | Actual repo has arm64/avx2 quantized + fp32; discovered via `list_repo_files` |
+| 2026-05-04 | CoreML/DirectML providers use fp32 model; CPU provider uses quantized                         | Hardware-accelerated providers apply their own compilation on fp32; pre-quantized models can cause op compatibility issues |
 
 ## Open questions
 
-1. **ONNX model source.** Use HuggingFace `optimum`-exported ONNX of `all-MiniLM-L6-v2`, or a community-published one (e.g., `sentence-transformers/all-MiniLM-L6-v2` has an ONNX export under `onnx/`)? Latter is simpler but pinned to upstream.
-2. **Tokenizer.** Use HuggingFace `tokenizers` (Rust-backed, ~5 MB) or rebuild via ONNX Runtime Extensions? `tokenizers` is the safe answer.
+1. ~~**ONNX model source.**~~ Resolved: use upstream `sentence-transformers/all-MiniLM-L6-v2` `onnx/` files directly. The repo has `model_qint8_arm64.onnx`, `model_quint8_avx2.onnx`, and `model.onnx` (fp32). Platform-aware selection in `_select_onnx_filename()`.
+2. ~~**Tokenizer.**~~ Resolved: HuggingFace `tokenizers` library (Rust-backed), loaded from `tokenizer.json` in the same repo.
 3. **Can we drop `sentence-transformers` entirely?** The library is mostly a torch wrapper around HF transformers. If we go pure ONNX + tokenizers + numpy, we save another ~10 MB and a bunch of transitive deps. Worth investigating in phase 1.
 4. **CoreML provider behaviour on Intel Macs.** We dropped Intel Mac builds (verify), but if not, CoreML on Intel may fall back unhelpfully — test path needed.
 5. **DirectML provider on older Windows.** Min Windows version supported by DirectML EP — confirm it matches our Tauri build target.
