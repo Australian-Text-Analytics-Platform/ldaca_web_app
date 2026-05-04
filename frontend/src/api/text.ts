@@ -176,6 +176,9 @@ export interface TopicModelingRequest {
   min_topic_size?: number;
   random_seed?: number;
   representative_words_count?: number;
+  sample_fractions?: (number | null)[] | null;
+  topic_size_mode?: 'target' | 'min' | 'exact';
+  topic_size_value?: number;
 }
 export interface TopicModelingTopic {
   id: number;

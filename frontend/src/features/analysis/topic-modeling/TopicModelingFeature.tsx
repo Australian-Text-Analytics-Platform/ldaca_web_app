@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
@@ -23,7 +23,7 @@ import {
   getAnalysisActionState,
   executeAnalysisRunOrUpdate,
 } from '../common';
-import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
+import { TopicModelingParameterPanel, type CorpusSample } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
@@ -62,6 +62,8 @@ const TopicModelingFeature: React.FC = () => {
         min_topic_size?: number;
         random_seed?: number;
         representative_words_count?: number;
+        topic_size_mode?: string;
+        topic_size_value?: number;
       }
     | null;
   const currentView = useUIStore((state) => state.currentView);
@@ -70,7 +72,9 @@ const TopicModelingFeature: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [result, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
   
-  const [minTopicSize, setMinTopicSize] = useState(10);
+  const [corpusSamples, setCorpusSamples] = useState<CorpusSample[]>([]);
+  const [topicSizeMode, setTopicSizeMode] = useState<'target' | 'min' | 'exact'>('target');
+  const [topicSizeValue, setTopicSizeValue] = useState(50);
   const [randomSeed, setRandomSeed] = useState(42);
   const [representativeWordsCount, setRepresentativeWordsCount] = useState(15);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
@@ -128,9 +132,10 @@ const TopicModelingFeature: React.FC = () => {
       const node_columns = (req.node_columns || {}) as Record<string, string>;
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
-      setMinTopicSize(Number(req.min_topic_size ?? 10));
       setRandomSeed(Number(req.random_seed ?? 42));
       setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
+      setTopicSizeMode((req.topic_size_mode as 'target' | 'min' | 'exact') || 'target');
+      setTopicSizeValue(Number(req.topic_size_value ?? 50));
       if (nodeIds.length && currentWorkspaceId) {
         try {
           await restoreAnalysisLockFromRequest({
@@ -160,6 +165,9 @@ const TopicModelingFeature: React.FC = () => {
     await clearResults();
     setSelectedTopicIds(new Set());
     setTopicSearchQuery('');
+    setCorpusSamples([]);
+    setTopicSizeMode('target');
+    setTopicSizeValue(50);
     setIsClearing(false);
   };
 
@@ -219,14 +227,16 @@ const TopicModelingFeature: React.FC = () => {
     isLocked,
     serverRequest: typedServerRequest,
     currentParams: {
-      min_topic_size: Number(minTopicSize),
       random_seed: Number(randomSeed),
       representative_words_count: Number(representativeWordsCount),
+      topic_size_mode: topicSizeMode,
+      topic_size_value: Number(topicSizeValue),
     },
     getServerParams: (request) => ({
-      min_topic_size: Number(request.min_topic_size),
       random_seed: Number(request.random_seed),
       representative_words_count: Number(request.representative_words_count),
+      topic_size_mode: request.topic_size_mode ?? 'target',
+      topic_size_value: Number(request.topic_size_value ?? 50),
     }),
   });
 
@@ -248,10 +258,58 @@ const TopicModelingFeature: React.FC = () => {
     }
   }, [isLocked, panelNodeIdsKey, nodeColumnSelections.length, recomputeAutoColumns, panelNodeIds.length]);
 
+  // Auto-populate sampling fractions when selected nodes change
+  useEffect(() => {
+    setCorpusSamples(
+      panelSelectedNodes.slice(0, 2).map((node) => {
+        const nDocs = (node as { shape?: number[] }).shape?.[0] ?? 0;
+        const autoPercent =
+          nDocs > 0 ? Math.min(100, Math.ceil((4000 / nDocs) * 100 / 10) * 10) : 100;
+        return { percent: String(autoPercent), enabled: autoPercent < 100 };
+      })
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelNodeIdsKey]);
+
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
   };
+
+  const nodeDocCounts = useMemo(
+    () =>
+      panelSelectedNodes
+        .slice(0, 2)
+        .map((n) => (n as { shape?: number[] }).shape?.[0] ?? 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [panelNodeIdsKey]
+  );
+
+  const effectiveDocCounts = useMemo(
+    () =>
+      nodeDocCounts.map((n, idx) => {
+        const s = corpusSamples[idx];
+        if (!s?.enabled) return n;
+        const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
+        return Math.max(1, Math.round((n * pct) / 100));
+      }),
+    [nodeDocCounts, corpusSamples]
+  );
+
+  const combinedEffective = effectiveDocCounts.reduce((a, b) => a + b, 0);
+  const showSamplingWarning =
+    combinedEffective > 0 && combinedEffective < 5 * (topicSizeValue ?? 50);
+
+  const sampleFractionsForRequest = useMemo(
+    () =>
+      corpusSamples.slice(0, panelNodeIds.length).map((s) => {
+        if (!s?.enabled) return null;
+        const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
+        return pct >= 100 ? null : pct / 100;
+      }),
+    [corpusSamples, panelNodeIds.length]
+  );
+  const hasAnySampling = sampleFractionsForRequest.some((f) => f !== null);
 
   const {
     handleRun,
@@ -272,10 +330,12 @@ const TopicModelingFeature: React.FC = () => {
       panelNodeIds,
       panelHasMissingColumns,
       effectiveNodeColumnSelections,
-      minTopicSize,
       randomSeed,
       representativeWordsCount,
       selectedTopicIds,
+      sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
+      topicSizeMode,
+      topicSizeValue,
     },
     actions: {
       setIsRunning,
@@ -367,8 +427,20 @@ const TopicModelingFeature: React.FC = () => {
         isLocked={!!isLocked}
         getNodeColumns={getColumnInfos}
         actionState={actionState}
-        minTopicSize={minTopicSize}
-        onMinTopicSizeChange={setMinTopicSize}
+        corpusSamples={corpusSamples}
+        nodeDocCounts={nodeDocCounts}
+        onCorpusSampleChange={(idx, update) =>
+          setCorpusSamples((prev) => {
+            const next = [...prev];
+            next[idx] = { ...(next[idx] ?? { percent: '100', enabled: false }), ...update };
+            return next;
+          })
+        }
+        topicSizeMode={topicSizeMode}
+        onTopicSizeModeChange={setTopicSizeMode}
+        topicSizeValue={topicSizeValue}
+        onTopicSizeValueChange={setTopicSizeValue}
+        showSamplingWarning={showSamplingWarning}
         randomSeed={randomSeed}
         onRandomSeedChange={setRandomSeed}
         representativeWordsCount={representativeWordsCount}
@@ -409,7 +481,8 @@ const TopicModelingFeature: React.FC = () => {
           nodeNames={panelSelectedNodes
             .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
             .filter(Boolean) as string[]}
-          minTopicSize={minTopicSize}
+          topicSizeMode={topicSizeMode}
+          topicSizeValue={topicSizeValue}
           randomSeed={randomSeed}
           detachDialogOpen={detachDialogOpen}
           setDetachDialogOpen={setDetachDialogOpen}
