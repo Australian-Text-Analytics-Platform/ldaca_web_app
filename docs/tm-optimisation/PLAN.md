@@ -125,7 +125,16 @@ Notes from implementation:
 - Threshold can be overridden by user (force-online, force-classic)
 - Result schema is identical so the frontend doesn't notice
 
-**Status:** not started
+**Status:** complete
+
+Notes from implementation:
+- `_should_use_online_pipeline()` auto-selects by `_ONLINE_THRESHOLD_DOCS` (100k) or `_ONLINE_THRESHOLD_BYTES` (250 MB); `force_mode="online"/"classic"` overrides both thresholds
+- `_build_online_pipeline()` uses `IncrementalPCA(n_components=5)` + `MiniBatchKMeans(n_clusters=k, n_init="auto")` + `OnlineCountVectorizer` (fallback to default if unavailable)
+- `k` defaults to `max(10, min(200, sqrt(n_docs/2)))` when `n_clusters` not provided
+- `meta.pipeline_mode` ("online"/"classic") and `meta.n_clusters` (online only) added to all result payloads
+- `force_mode` and `n_clusters` threaded through `TopicModelingRequest` (models + analysis), API route, `worker.py`, and `run_topic_modeling_task`
+- `OnlineCountVectorizer` import is guarded; missing import falls back to BERTopic default vectorizer
+- Outlier topic -1 is absent in online mode (expected; documented in plan tradeoff)
 
 ---
 
