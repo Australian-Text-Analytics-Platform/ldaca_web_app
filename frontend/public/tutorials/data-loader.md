@@ -2,7 +2,7 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1 id="help-data-loader-section">Data Loader</h1>
+<h1 id="help-data-loader-section">Data Loader tutorial</h1>
 
 The Data Loader is the entry point of the application and must be configured before any analysis can be performed. It comprises three main panels: the active workspace panel, the workspace manager, and the files and uploads section.
 
@@ -12,22 +12,20 @@ The Data Loader is the entry point of the application and must be configured bef
 
 ![Active workspace screenshot](tutorials/assets/data_loader/active_workspace.png)
 
-The active workspace panel displays the currently loaded project along with its associated data blocks. From this panel, you can rename or unload the active workspace. When no workspace is loaded, this panel also provides the option to create a new, empty workspace.
+The active workspace panel displays the currently loaded project along with its associated data blocks. From here you can rename or unload the active workspace. When no workspace is loaded, this panel also shows the option to create a new, empty workspace.
 
-- Verify that the correct project is loaded before proceeding with analysis.
+- Verify the correct project is loaded before starting any analysis.
 - Create, rename, or unload a workspace as needed.
 
 <h2 id="help-data-loader-create-workspace-name">Workspace name input</h2>
 
 ![Create workspace screenshot](tutorials/assets/data_loader/create_workspace.png)
 
-This panel is visible only when no workspace is currently active. Use it to specify a name for a **new** empty workspace. Choose a descriptive name that reflects the project or dataset (e.g., the project title or dataset identifier). An optional description can also be provided at this stage.
+This field is visible only when no workspace is currently active. Use it to specify a name for a new empty workspace. Choose a descriptive name that reflects the project or dataset (e.g. the project title or dataset identifier). An optional description can also be provided at this stage.
 
 > **Note:** The workspace description cannot be edited within the application after the workspace has been created.
 
-**Q: What happens if I reuse a workspace name?**
-
-Workspace names are not unique identifiers within the system — the application permits multiple workspaces to share the same name, each stored in a distinct directory on the file system. However, using identical names for different workspaces is strongly discouraged, as it can lead to confusion when managing or revisiting projects. If duplicate names are already present, it is recommended to activate each affected workspace in turn, review its contents, and rename it to a distinct and meaningful label to prevent future ambiguity.
+Workspace names are not unique identifiers — the application allows multiple workspaces to share the same name, each stored in a separate directory. Using identical names for different workspaces is strongly discouraged, as it can cause confusion when managing or revisiting projects.
 
 <h2 id="help-data-loader-create-workspace-button">Create workspace button</h2>
 
@@ -38,7 +36,7 @@ Clicking this button creates a new workspace with the specified name and optiona
 
 <h2 id="help-data-loader-rename-workspace-input">Rename workspace input</h2>
 
-Use this field to rename the **currently active** workspace. Renaming is useful when the project scope evolves or when you wish to maintain a more organised workspace list. The workspace description can also be updated from this field.
+Use this field to rename the currently active workspace. Renaming is useful when the project scope evolves or when you want a more organised workspace list. The workspace description can also be updated from this field.
 
 <h2 id="help-data-loader-unload-button">Unload workspace</h2>
 
@@ -51,41 +49,32 @@ The unload action closes the active workspace without deleting it.
 
 ![Workspace manager screenshot](tutorials/assets/data_loader/workspace_manager.png)
 
-The workspace manager lists all saved workspaces, enabling you to switch between projects and maintain an organised workspace inventory.
+The workspace manager lists all saved workspaces, enabling you to switch between projects and maintain an organised inventory.
 
 - Click **Activate** to set a workspace as the active project; the active workspace is visually highlighted.
-- Review the last modified timestamp and data block count to confirm you are loading the intended workspace.
-- Use **Delete** to permanently remove a workspace that is no longer required.
+- Review the last-modified timestamp and data-block count to confirm you are loading the intended workspace.
+- Click **Delete** to permanently remove a workspace that is no longer needed.
 
 <h2 id="help-data-loader-files-section">Files and uploads section</h2>
 
 ![Files section screenshot](tutorials/assets/data_loader/files_section.png)
 
-This panel is used to bring data into the application. It supports file uploads, sample data imports, and add-to-workspace operations. You can also create subfolder structures, reorganise files via drag-and-drop, and remove files that are no longer needed.
-
-**Q: What file formats are supported?**
-
-The application supports common text and tabular formats, including CSV and Excel. If a file fails to load, verify its character encoding and delimiter settings.
+This panel is used to bring data into the application. It supports file uploads, sample data imports, LDaCA imports, and add-to-workspace operations. You can also create subfolder structures, reorganise files via drag-and-drop, and remove files that are no longer needed.
 
 <h2 id="help-data-loader-upload-button">Upload file</h2>
 
-Click this button to upload a file from your local machine.
+Click this button to upload a file from your local machine. Supported formats:
 
-- The following file formats are supported for text and metadata:
-  - Plain text (.txt, .md, .xml)
-  - Delimited tabular text (.csv, .tsv, .xlsx)
-  - Columnar tabular format (.parquet)
-  - ZIP-archived collections of plain text files
-- Supported file types can be previewed before being added to the workspace as a data block.
+- Plain text: `.txt`, `.md`, `.xml`
+- Delimited tabular text: `.csv`, `.tsv`, `.xlsx`
+- Columnar tabular format: `.parquet`
+- ZIP-archived collections of plain text files
+
+Supported file types can be previewed before being added to the workspace as a data block.
 
 <h2 id="help-data-loader-import-sample-button">Import sample data</h2>
 
-Use this option to load curated sample datasets for exploration and testing.
-
-- A selection of sample datasets is bundled with the application.
-- These datasets are intended for first-time users to become familiar with the application's capabilities.
-- All sample data is publicly available and may be freely tested or removed.
-- If sample data is used to generate a research output, please cite <img alt="citemark" src="references/assets/mark_ref.png" style="display: inline; height: 1em; vertical-align: middle;"> the dataset appropriately.
+Use this option to load curated sample datasets bundled with the application. These are intended for first-time users to explore the app's capabilities. All sample data is publicly available and may be freely tested or removed. If sample data is used in a research output, please cite <img alt="citemark" src="references/assets/mark_ref.png" style="display: inline; height: 1em; vertical-align: middle;"> the dataset appropriately.
 
 <h2 id="help-data-loader-import-ldaca-button">Import from LDaCA</h2>
 
@@ -93,32 +82,49 @@ Use this option to import a dataset directly from the Language Data Commons of A
 
 ![Copy download link](tutorials/assets/data_loader/ldaca_loader_link.png)
 
-- Paste the full URL of an LDaCA ZIP download (e.g., as obtained from an LDaCA repository page by tight clicking the download icon, then paste the link to the url input of the pop up window).
+1. On the LDaCA repository page, right-click the download icon to copy the ZIP download URL.
+2. Paste the URL into the import dialog.
 
 ![Paste download link](tutorials/assets/data_loader/ldaca_loader_input.png)
 
-- The import process runs in the background, depending on the size of the collection and your network speed, this may take from 30 seconds to a few minutes to finish.
-- Imported collection will appear in the files list under the **LDaCA** folder as a *parquet* file after the extraction completes. If the files do not appear, click the refresh button in the top-right corner of the panel.
-- Currently, this importer supports the following fully public collections: [COOEE](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26180~23961609&_crateId=arcp%3A%2F%2Fname%2Chdl10.26180~23961609), [ICE-AUS](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.25949~24769173.v1&_crateId=arcp%3A%2F%2Fname%2Chdl10.25949~24769173.v1), and [La Trobe Australian Spoken English](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26181~23089559&_crateId=arcp%3A%2F%2Fname%2Chdl10.26181~23089559).
+The import runs in the background and may take 30 seconds to a few minutes depending on collection size and network speed. The imported collection appears in the files list under the **LDaCA** folder as a Parquet file once extraction completes. If files do not appear, click the refresh button in the top-right corner of the panel.
 
+Currently supported fully public collections: [COOEE](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26180~23961609&_crateId=arcp%3A%2F%2Fname%2Chdl10.26180~23961609), [ICE-AUS](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.25949~24769173.v1&_crateId=arcp%3A%2F%2Fname%2Chdl10.25949~24769173.v1), and [La Trobe Australian Spoken English](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26181~23089559&_crateId=arcp%3A%2F%2Fname%2Chdl10.26181~23089559).
 
-<h2 id="help-data-loader-file-operations">File operations</h2>
+<h2 id="help-data-loader-add-button">Add file to workspace</h2>
 
 ![Files operations](tutorials/assets/data_loader/file_operations.png)
 
-Once files have been uploaded, imported, or downloaded, the following actions are available:
+Once a file is uploaded, imported, or downloaded, the following actions are available:
 
-- Preview the file contents prior to adding it to the workspace;
-- Add the selected file to the active workspace as a data block;
-- Download the original file to your local machine;
-- Remove the file from the application;
-- Create subfolders and reorganise files using drag-and-drop.
+- **Preview** the file contents before adding it to the workspace.
+- **Add to Workspace** to load the file as a data block in the active workspace.
+- **Download** the original file to your local machine.
+- **Remove** the file from the application.
+- **Create subfolders** and reorganise files using drag-and-drop.
+
+<h2 id="help-data-loader-troubleshooting">Troubleshooting</h2>
+
+| Symptom | Likely cause | What to try |
+|---|---|---|
+| File fails to load | Unsupported format or encoding | Check that the file is UTF-8 encoded and uses a supported format |
+| CSV preview shows all data in one column | Wrong delimiter | Re-export with a comma delimiter, or contact the developer team |
+| LDaCA import does not appear | Import still in progress | Wait a moment and click the refresh button |
+| Workspace not visible in the manager | Working directory changed | Check the working directory setting at the bottom of the sidebar |
+| Duplicate workspace names | Created before uniqueness was enforced | Activate each, review contents, and rename to distinct labels |
+
+<h2 id="help-data-loader-defaults">Quick-reference defaults</h2>
+
+| Setting | Default | Notes |
+|---|---|---|
+| Working directory | `~/Documents/ldaca` | Changeable via the edit icon at the bottom of the sidebar |
 
 ## Practice exercise
 
-1. Create a workspace named **"Practice Corpus"**.
+1. Create a workspace named **Practice Corpus**.
 2. Upload a CSV file and preview its contents.
-3. Add the file to the workspace graph as a data block.
-4. Rename the workspace to **"Practice Corpus v1"**.
+3. Add the file to the workspace as a data block.
+4. Rename the workspace to **Practice Corpus v1**.
+5. Unload the workspace and reload it from the workspace manager.
 
 [← Back to tutorial index](./index.md)
