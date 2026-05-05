@@ -195,14 +195,36 @@ This project has two release surfaces that must stay aligned:
 
 Release from `dev`, then promote to `main`.
 
-### 1. Build the frontend from the root repo
+> **Critical ordering rule:** All version strings that appear in the UI or in metadata files
+> **must be updated before the frontend is built**. The version text in
+> `frontend/public/references/general.md` is baked into `build.tar.gz` at build time —
+> updating it after the build has no effect on what Nectar or uvx users actually see.
+
+### 1. Bump all version strings (do this first, before any build)
+
+Update the version number in every location below before touching anything else:
+
+| File | What to change |
+|---|---|
+| `frontend/public/references/general.md` | Last line: `Version X.Y.Z - released on DD/Mon/YYYY.` |
+| `frontend/package.json` | `"version": "X.Y.Z"` |
+| `backend/pyproject.toml` | `version = "X.Y.Z"` |
+
+Then refresh the backend lockfile:
+
+```bash
+cd /path/to/ldaca_web_app/backend
+uv lock
+```
+
+### 2. Build the frontend from the root repo
 
 ```bash
 cd /path/to/ldaca_web_app
 npm run build -w frontend
 ```
 
-### 2. Sync the built frontend into the backend package bundle
+### 3. Sync the built frontend into the backend package bundle
 
 ```bash
 cd /path/to/ldaca_web_app
@@ -214,19 +236,15 @@ This refreshes:
 - `backend/src/ldaca_web_app/resources/frontend/build.tar.gz`
 - `backend/src/ldaca_web_app/resources/frontend/build/`
 
-### 3. Bump the backend package version
-
-Update the backend package version in:
-
-- `backend/pyproject.toml`
-- `backend/uv.lock`
-
-Then refresh the lockfile:
+**Verify the version string was baked in correctly before proceeding:**
 
 ```bash
-cd /path/to/ldaca_web_app/backend
-uv lock
+tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+    build/references/general.md | tail -3
 ```
+
+The output must show `Version X.Y.Z`. If it still shows the previous version, the build ran
+before the version strings were updated — delete the build output and repeat steps 1–3.
 
 ### 4. Validate the backend release artifact
 
@@ -261,12 +279,10 @@ From the root repo:
 
 ```bash
 cd /path/to/ldaca_web_app
-git add backend
-git commit -m "Sync backend release v<VERSION>"
+git add backend frontend/package.json frontend/public/references/general.md
+git commit -m "Release v<VERSION>: bump versions and sync backend submodule"
 git push origin dev
 ```
-
-If the visible app version text is shown in docs/UI, update that in the root repo in the same commit.
 
 ### 7. Verify the published `uvx` package
 
