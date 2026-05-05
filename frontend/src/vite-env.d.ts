@@ -14,4 +14,5 @@ interface Window {
   __BACKEND_URL__?: string;
   __GOOGLE_CLIENT_ID__?: string;
   __MULTI_USER__?: boolean;
+  __CILOGON_CLIENT_ID__?: string;
 }
