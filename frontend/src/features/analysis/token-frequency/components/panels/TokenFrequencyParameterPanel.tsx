@@ -4,6 +4,7 @@ import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
 import type { WorkspaceNodeLike, NodeColumnSource } from '../../../common/nodeSelectionTypes';
 import { Label } from '@/components/ui/label';
+import HelpIcon from '@/components/help/HelpIcon';
 
 type TokenFrequencyParameterPanelProps = {
   panelSelectedNodes: WorkspaceNodeLike[];
@@ -88,11 +89,56 @@ export const TokenFrequencyParameterPanel = ({
         runLabel,
         runHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },
         clearHelp: { targetKey: 'analysis.token-frequency.clear-results', label: 'Clear results' },
-        extraContent: appliedStopCount > 0 ? (
-          <span className="text-xs text-muted-foreground">
-            Active filter: {appliedStopCount} word{appliedStopCount === 1 ? '' : 's'}
-          </span>
-        ) : null,
+        extraContent: (
+          <>
+            {appliedStopCount > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                Active filter: {appliedStopCount} word{appliedStopCount === 1 ? '' : 's'}
+              </span>
+            ) : null}
+            {hasMultipleNodes && nodeOptions.length > 1 ? (
+              <div className="ml-auto flex items-center gap-2">
+                <Label className="whitespace-nowrap text-base font-medium">Reference Data Block</Label>
+                <div className="inline-flex items-center gap-1">
+                  {nodeOptions.map((option) => {
+                    const isActive = (referenceNodeId ?? nodeOptions[0]?.id) === option.id;
+                    return (
+                      <label
+                        key={option.id}
+                        className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors${isLocked ? ' cursor-not-allowed opacity-60' : ''}`}
+                        title={option.label}
+                        aria-label={option.label}
+                      >
+                        <input
+                          type="radio"
+                          name="reference-node"
+                          value={option.id}
+                          checked={isActive}
+                          disabled={isLocked}
+                          onChange={() => onReferenceNodeChange(option.id)}
+                          className="sr-only"
+                        />
+                        <span
+                          className="inline-block h-5 w-5 rounded-full border-2 transition-colors"
+                          style={{
+                            borderColor: option.color,
+                            backgroundColor: isActive ? option.color : 'transparent',
+                          }}
+                          aria-hidden="true"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+                <HelpIcon
+                  targetKey="analysis.token-frequency.reference"
+                  label="Reference Data Block"
+                  tooltip="The reference block is treated as Corpus 1 (O1/%1) in the keyword statistics. Switching it flips the direction of measures like LogRatio."
+                />
+              </div>
+            ) : null}
+          </>
+        ),
       }}
     >
       <NodeSelectionPanel
@@ -113,45 +159,6 @@ export const TokenFrequencyParameterPanel = ({
         originalCount={displayNodeCount}
         lockedMessage={ANALYSIS_LOCKED_MESSAGE}
       />
-
-      {hasMultipleNodes && nodeOptions.length > 1 && (
-        <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:gap-3">
-          <Label className="text-sm font-medium whitespace-nowrap">Reference Data Block</Label>
-          <div className="inline-flex w-fit flex-wrap rounded-xl border border-border bg-muted/40 p-1">
-            {nodeOptions.map((option) => {
-              const isActive = (referenceNodeId ?? nodeOptions[0]?.id) === option.id;
-              return (
-                <label
-                  key={option.id}
-                  className={`relative inline-flex cursor-pointer items-center justify-center rounded-lg p-2 transition-colors ${
-                    isActive
-                      ? 'bg-background shadow-sm'
-                      : 'hover:bg-background/70'
-                  } ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`}
-                  title={option.label}
-                  aria-label={option.label}
-                >
-                  <input
-                    type="radio"
-                    name="reference-node"
-                    value={option.id}
-                    checked={isActive}
-                    disabled={isLocked}
-                    onChange={() => onReferenceNodeChange(option.id)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={`inline-block h-4 w-4 rounded-full border ${isActive ? 'border-foreground/70 ring-2 ring-foreground/40' : 'border-muted-foreground/50'}`}
-                    style={{ backgroundColor: option.color }}
-                    aria-hidden="true"
-                  />
-                  <span className="sr-only">{option.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </AnalysisCardLayout>
   );
 };
