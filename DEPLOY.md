@@ -112,7 +112,10 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/src/ldaca_web_app/backend
-Environment="GOOGLE_CLIENT_ID=460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com"
+Environment="CILOGON_CLIENT_ID=cilogon:/client_id/3f6c0af973d3cc270a404823d3bbf122"
+Environment="CILOGON_CLIENT_SECRET=_ooOmovo-g0vTwtVSziDNBuT0_mWjCmNTWN1SgeeukMQsdHUWvfHDxcJag2kb2cvJyGLV7l6ZjC--GUw-ftb2g"
+Environment="CILOGON_DISCOVERY_URL=https://test.cilogon.aaf.edu.au/.well-known/openid-configuration"
+Environment="CILOGON_REDIRECT_URI=https://analytics.ldaca.edu.au/api/auth/cilogon/callback"
 ExecStartPre=/bin/rm -rf /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend/build
 ExecStartPre=/bin/tar -xzf /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend/build.tar.gz -C /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend
 ExecStart=/home/ubuntu/.local/bin/uv run ldaca-web-app --multi-user --port 8001
@@ -123,18 +126,25 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### 5. Google OAuth Setup
+> **Switching to production CILogon:** When Moises switches the registration from test to
+> production, change `CILOGON_DISCOVERY_URL` to
+> `https://cilogon.aaf.edu.au/.well-known/openid-configuration`.
 
-The app uses Google OAuth for login. For each new domain, you must register it in the
-[Google Cloud Console](https://console.cloud.google.com/) under
-**APIs & Services → Credentials → OAuth 2.0 Client ID**:
+### 5. CILogon OIDC Setup
 
-| Section                       | Value to add                                              |
-| ----------------------------- | --------------------------------------------------------- |
-| Authorized JavaScript origins | `https://analytics.ldaca.edu.au`                          |
-| Authorized redirect URIs      | `https://analytics.ldaca.edu.au/api/auth/google/callback` |
+The production deployment at `analytics.ldaca.edu.au` uses CILogon (AAF-federated OIDC)
+for authentication. The OIDC client was registered by Moises (ARDC/AAF) with the following
+parameters:
 
-> Both entries are required. The redirect URI is what Google calls back to after the user authenticates.
+| Parameter      | Value                                                                      |
+| -------------- | -------------------------------------------------------------------------- |
+| Client name    | `test.analytics.ldaca.edu.au`                                              |
+| Callback URL   | `https://analytics.ldaca.edu.au/api/auth/cilogon/callback`                 |
+| Configuration  | General LDaCA Transparent Enrollment (openid, email, profile, org.cilogon.userinfo) |
+| Discovery URL  | `https://test.cilogon.aaf.edu.au/.well-known/openid-configuration` (test)  |
+
+The client credentials are stored in the systemd service file above. No frontend changes
+are needed — the login button is served dynamically based on which provider is configured.
 
 ---
 
