@@ -305,10 +305,45 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-topic-modeling-results',
     label: 'Topic modeling results',
   },
+  'analysis.topic-modeling.sampling': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-sampling',
+    label: 'Data block sampling',
+  },
+  'analysis.topic-modeling.options': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-options',
+    label: 'Topic modelling options',
+  },
+  'analysis.topic-modeling.topic-size-mode': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-topic-size-mode',
+    label: 'Topic size mode',
+  },
+  'analysis.topic-modeling.aim-topic-no': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-aim-topic-no',
+    label: 'Aim Topic No.',
+  },
   'analysis.topic-modeling.min-topic-size': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-min-topic-size',
-    label: 'Minimum topic size',
+    label: 'Min Topic Size',
+  },
+  'analysis.topic-modeling.exact-topic-no': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-exact-topic-no',
+    label: 'Exact Topic No.',
+  },
+  'analysis.topic-modeling.random-seed': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-random-seed',
+    label: 'Random seed',
+  },
+  'analysis.topic-modeling.words-per-topic': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-words-per-topic',
+    label: 'Words per topic',
   },
   'analysis.sequential-analysis.tab': {
     file: 'tutorials/sequential-analysis.md',

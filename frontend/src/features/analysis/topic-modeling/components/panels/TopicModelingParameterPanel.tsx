@@ -244,7 +244,10 @@ export function TopicModelingParameterPanel({
 
         {/* ── Right column: Topic Modelling Options ── */}
         <div className="flex flex-col gap-3">
-          <Label className="text-sm font-medium">Topic Modelling Options</Label>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-sm font-medium">Topic Modelling Options</Label>
+            <HelpIcon targetKey="analysis.topic-modeling.options" />
+          </div>
 
           {/* Row 1: mode dropdown + value input */}
           <div className="flex items-center gap-2">
