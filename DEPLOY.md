@@ -206,6 +206,14 @@ This project has two release surfaces that must stay aligned:
 
 Release from `dev`, then promote to `main`.
 
+> **Frontend bundle rule:** `build.tar.gz` inside the backend submodule is the **sole**
+> source of frontend assets for both PyPI/uvx users and the Nectar deployment. Every change
+> to `frontend/src/**` — whether part of a version bump or a feature/fix branch — is
+> **invisible to users** until steps 2–3 below are run and the updated `build.tar.gz` is
+> committed to the backend submodule. This applies equally to full releases and to
+> feature branches deployed to Nectar before a release (see
+> [Deploying a feature branch to Nectar](#deploying-a-feature-branch-to-nectar) below).
+
 > **Critical ordering rule:** All version strings that appear in the UI or in metadata files
 > **must be updated before the frontend is built**. The version text in
 > `frontend/public/references/general.md` is baked into `build.tar.gz` at build time —
@@ -258,6 +266,19 @@ tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
 
 The output must show `Version X.Y.Z`. If it still shows the previous version, the build ran
 before the version strings were updated — delete the build output and repeat steps 1–3.
+
+**Verify any new feature strings are present in the bundle:**
+
+```bash
+tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+    $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+      | grep 'assets/index.*\.js' | head -1) \
+  | grep -c "SomeNewFeatureString"
+```
+
+Replace `SomeNewFeatureString` with a distinctive identifier from the new feature (e.g. a
+button label, component name, or route). A count of `0` means the source change was not
+included in the build — do not proceed.
 
 ### 4. Validate the backend release artifact
 
@@ -366,6 +387,62 @@ rg -n "Reset all hints|Topic Modelling - BERTopic|All hints have been reset" src
 
 ---
 
+## Deploying a Feature Branch to Nectar
+
+Use this when a feature branch has frontend source changes and needs to be deployed to
+Nectar **before** a full versioned release (e.g. testing a new auth provider in
+production). These steps are required whenever `frontend/src/**` changes on a branch,
+regardless of whether versions are bumped.
+
+### 1. Rebuild the frontend bundle on the feature branch
+
+```bash
+cd /path/to/ldaca_web_app
+npm run build -w frontend
+node scripts/deploy-frontend-to-backend.mjs
+```
+
+### 2. Verify the new feature is in the bundle
+
+```bash
+tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+    $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+      | grep 'assets/index.*\.js' | head -1) \
+  | grep -c "SomeNewFeatureString"
+```
+
+A count of `0` means the build did not include your change — stop and investigate.
+
+### 3. Commit the updated bundle to the backend submodule branch
+
+```bash
+cd /path/to/ldaca_web_app/backend
+git add src/ldaca_web_app/resources/frontend/build.tar.gz
+git commit -m "build: rebuild frontend bundle with <feature name>"
+git push origin <feature-branch>
+```
+
+### 4. Update the root repo submodule pointer
+
+```bash
+cd /path/to/ldaca_web_app
+git add backend
+git commit -m "build: point backend submodule to rebuilt <feature name> bundle"
+git push origin <feature-branch>
+```
+
+### 5. Deploy to Nectar
+
+```bash
+cd /home/ubuntu/src/ldaca_web_app
+git fetch origin
+git checkout <feature-branch>
+git submodule update --init --recursive --checkout --force
+sudo systemctl restart ldaca-web-app
+```
+
+---
+
 ## Updating the App
 
 ```bash
@@ -406,4 +483,5 @@ If you need to update environment variables (e.g. `GOOGLE_CLIENT_ID`) or startup
 | 502 Bad Gateway from Nginx     | App may be down — restart with `sudo systemctl restart ldaca-web-app`              |
 | Certificate expired            | `sudo certbot renew`                                                               |
 | Port 8001 already in use       | `sudo fuser -k 8001/tcp` then start the service                                    |
-| Google OAuth redirect mismatch | Ensure redirect URI is registered in Google Cloud Console (see OAuth Setup above)  |
+| Old UI served after deploy     | Frontend source changed but `build.tar.gz` was not rebuilt — follow [Deploying a feature branch to Nectar](#deploying-a-feature-branch-to-nectar) steps 1–4, then redeploy |
+| New feature missing from UI    | Verify with `grep -c "FeatureString"` against the bundle (see release step 3) — if `0`, rebuild and recommit `build.tar.gz` |
