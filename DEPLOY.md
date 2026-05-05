@@ -208,6 +208,8 @@ Update the version number in every location below before touching anything else:
 |---|---|
 | `frontend/public/references/general.md` | Last line: `Version X.Y.Z - released on DD/Mon/YYYY.` |
 | `frontend/package.json` | `"version": "X.Y.Z"` |
+| `frontend/src-tauri/tauri.conf.json` | `"version": "X.Y.Z"` — controls desktop bundle filenames (DMG/MSI) |
+| `frontend/src-tauri/Cargo.toml` | `version = "X.Y.Z"` — Rust crate metadata |
 | `backend/pyproject.toml` | `version = "X.Y.Z"` |
 
 Then refresh the backend lockfile:
@@ -279,7 +281,8 @@ From the root repo:
 
 ```bash
 cd /path/to/ldaca_web_app
-git add backend frontend/package.json frontend/public/references/general.md
+git add backend frontend/package.json frontend/public/references/general.md \
+    frontend/src-tauri/tauri.conf.json frontend/src-tauri/Cargo.toml
 git commit -m "Release v<VERSION>: bump versions and sync backend submodule"
 git push origin dev
 ```
