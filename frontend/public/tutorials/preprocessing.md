@@ -2,265 +2,253 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Data Preprocessing tutorial</h1>
+<h1 id="help-preprocessing-section">Preprocessing tutorial</h1>
 
 ![Preprocessing screenshot](tutorials/assets/preprocessing.png)
 
-The Data Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each tab lets you transform data in a specific way, and every action creates a **new data block** so the original data blocks are not overwritten and all operations are recoverable. There are currently seven tool tabs in this section:
+The Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each sub-tab performs a specific type of transformation, and every action creates a **new data block** — the original is never overwritten and all operations are recoverable. There are currently seven sub-tabs:
 
-1. Filter - Create a subset of the selected data block based on one or more filter conditions.
-2. Sample - Create a subset of the selected data block by either randomly sampling a certain fraction or number of rows, or by slicing a contiguous chunk of rows from the data block.
-3. Join - Create a new data block by linking two selected data blocks on columns with common values.
-4. Stack - Create a new data block by vertically stacking two selected data blocks that share identical column headers.
-5. Find - Use Regular Expressions (RegEx) to match text patterns in the selected text column, then remove, replace, or extract the matched text into the same column or a new column in the data block.
-6. Create - Combine the contents of two or more columns and save the result as a new column in the data block.
-7. Polars Expression - Write Polars expressions in Python for advanced transformations including filtering, column creation, selection, sorting, and grouped aggregation.
+| Sub-tab | What it does |
+|---|---|
+| Filter | Keep only the rows that match one or more conditions |
+| Sample | Extract a contiguous slice or a random subset of rows |
+| Join | Combine two data blocks side-by-side on a shared column |
+| Stack | Vertically concatenate two data blocks that share the same columns |
+| Find | Match text patterns with Regular Expressions, then remove, replace, or extract matches |
+| Create | Build a new column by combining the contents of existing columns |
+| Polars Expression | Write Python-style Polars expressions for advanced transformations |
 
-In order to process relevant data block(s) in any tab, the user needs to:
+The general workflow for any sub-tab is:
 
-1. Select one or more data blocks from the workspace - depending on the need.
-2. Configure the transformation to be done with the selected tool.
-3. Review the preview table and make sure it shows expected outcomes.
-4. Add the result back to the workspace as a new child data block of the original selected data block(s).
+1. Select one or more data blocks from the workspace.
+2. Configure the transformation.
+3. Review the **Preview** table to check the expected output.
+4. Click **Add to Workspace** (or **Add to Data Block**) to create the new data block.
 
 <h2 id="help-preprocessing-common-section">Common controls</h2>
 
-These controls appear in multiple preprocessing tabs and behave the same way across the workflow.
+These controls appear across multiple sub-tabs and work the same way throughout.
 
-<h3 id="help-preprocessing-common-node-selection">Data block selection panel</h3>
+<h3 id="help-preprocessing-common-node-selection">Data block selection</h3>
 
-Select one or more data blocks from the workspace graph or the data block list. Each tool will only work when the required number of data blocks are selected.
-
-<h3 id="help-preprocessing-common-apply-button">Apply action</h3>
-
-Use **Add to Workspace** or **Add to Data Block** to run the transformation. A new data block is created (or the selected data block is updated) without overwriting your source data block.
+Select one or more data blocks from the workspace graph or the data block list. Each sub-tab requires a specific number of data blocks (one for Filter, Sample, Find, Create; two for Join, Stack).
 
 <h3 id="help-preprocessing-common-preview">Preview table</h3>
 
-The preview pane displays the outcomes in a paginated format with an estimated size. The user can quickly check the results of different configurations before applying the pre-processing and producing a new data block to the workspace.
+The preview pane shows the result of the current configuration in a paginated format with an estimated row count. Check the preview before applying to confirm the output looks as expected. No data block is created until you click the action button.
+
+<h3 id="help-preprocessing-common-apply-button">Add to Workspace</h3>
+
+Click **Add to Workspace** to run the transformation and create a new child data block. The original source data block is not changed.
 
 <h2 id="help-preprocessing-filter-section">Filter</h2>
 
 ![Filter screenshot](tutorials/assets/preprocessing/filter.png)
 
-The filter tool keeps only the rows that match defined conditions. Use it to remove noise, focus on a subset, or create a clean working dataset before analysis. This tool accepts only one selected data block at a time.
+The Filter sub-tab keeps only the rows that match defined conditions. Use it to remove noise, focus on a subset, or create a clean working dataset before analysis.
 
 <h3 id="help-preprocessing-filter-conditions">Filter conditions</h3>
 
 ![Filter conditions screenshot](tutorials/assets/preprocessing/filter_conditions.png)
 
-Define one or more column-based filter conditions. Each condition can be configured differently depending on the data type of the selected column. All conditions can be combined using either AND or OR logic.
+Define one or more column-based filter conditions. The behaviour of each condition depends on the data type of the selected column. All conditions are combined using either AND or OR logic (mixed logic chains are not supported).
 
-1. Use the "Add Condition" button to add additional conditions.
-2. Select the combining logic for all conditions. The app does not support mixed logic chains (e.g. a mix of AND and OR).
-3. Any individual condition can be negated by checking its "Negate" checkbox.
-4. The preview pane displays the number of rows that match the current condition set. It is possible to produce an empty data block if no rows satisfy the conditions or if the conditions conflict with one another.
+- Click **Add Condition** to add more conditions.
+- Select **AND** or **OR** to control how conditions are combined.
+- Check **Negate** on any individual condition to invert it.
+- The preview shows how many rows the current condition set would keep. An empty result is possible if no rows satisfy the conditions or if conditions conflict.
 
 <h3 id="help-preprocessing-filter-new-node-name">New data block name</h3>
 
 ![Filter new data block name screenshot](tutorials/assets/preprocessing/filter_new_node_name.png)
 
-The user can name the filtered output data block so it is easy to spot in the workspace. The new data block is a child data block of the original selected data block.
+Give the filtered output a descriptive name so it is easy to find in the workspace. The new block is a child of the selected source block.
 
-Key controls include the data block selection panel, the filter conditions builder (with AND/OR logic), the new data block name input, the status summary, the **Add to Workspace** action, and the preview table that shows matched rows.
-
-Practice exercise:
+**Practice exercise**
 
 1. Select a dataset with a clear category column.
 2. Add a condition that keeps only one category.
-3. Add the filtered result as a new data block.
+3. Add the filtered result as a new data block and confirm the row count in the preview.
 
-<h2 id="help-preprocessing-slice-section">Sample Tool</h2>
+<h2 id="help-preprocessing-slice-section">Sample</h2>
 
 ![Sample screenshot](tutorials/assets/preprocessing/sample.png)
 
-The Sample tool extracts either a contiguous range or a randomly selected set of rows from the selected data block. Extracting a small, representative subset of the data makes exploring and debugging quicker than working with the full-size dataset.
+The Sample sub-tab extracts either a contiguous range or a randomly selected set of rows. A small representative subset makes exploring and debugging quicker than working with the full dataset.
 
-<h3 id="help-preprocessing-slice-offset">Slice</h3>
+<h3 id="help-preprocessing-slice-offset">Slice — Offset and length</h3>
 
 ![Slice screenshot](tutorials/assets/preprocessing/sample_slice.png)
 
-The slice option extracts a continuous chunk of rows from the data block. The offset parameter sets the starting row of the chunk (where the first row is 0).
+The slice option extracts a contiguous chunk of rows. **Offset** sets the starting row (0-indexed) and **Length** sets how many rows to include. Leave Length blank to slice to the end of the data block. For example, to extract rows 101–200 set Offset = 100 and Length = 100.
 
 <h3 id="help-preprocessing-slice-length">Length</h3>
 
-The number of rows to include in the extraction. Leave it blank to slice until the end of the data block. To include rows 101–200, set offset = 100 and length = 100.
+The number of rows to include in the slice. Leave blank to slice from the offset to the end of the data block.
 
-<h3 id="help-preprocessing-sample-fraction">Fraction/Count</h3>
+<h3 id="help-preprocessing-sample-fraction">Random sample — Fraction or count</h3>
 
 ![Random screenshot](tutorials/assets/preprocessing/sample_random.png)
 
-The random sample option extracts a randomly selected set of rows from the data block. You can specify either a proportion (e.g. 30%) or a fixed number of rows (e.g. 500) from the selected data block.
+The random sample option extracts a randomly selected set of rows.
 
-For proportional sampling, enter a decimal number between 0 and 1. For example, enter 0.3 to extract 30% of the data block. For a fixed row count, enter a whole number, e.g. 100 to extract 100 rows. If the number entered exceeds the size of the data block, all rows will be extracted in a shuffled order.
+- **Fraction** — enter a decimal between 0 and 1 (e.g. 0.3 for 30 % of rows).
+- **Count** — enter a whole number of rows to extract (e.g. 500). If the count exceeds the data block size, all rows are returned in shuffled order.
 
-<h3 id="help-preprocessing-sample-seed">Random Seed</h3>
+<h3 id="help-preprocessing-sample-seed">Random seed</h3>
 
-The random seed controls the reproducibility of the random sampling process. Setting a fixed seed ensures the same rows/order are extracted each time from the **same data**.
+The random seed controls reproducibility. Using the same seed on the same data always produces the same rows.
 
-- Use any non-negative integer (e.g. 0, 42, 12345).
-- Remember the seed value when you want consistent, reproducible results.
-- If you would like to have a **True Random** subset of selected data block, check the _No Random See_ box after the seed control.
-  - **Warning**: This will not only generate a random sample with unknown seed (_unreproducible_) at the time of creation, but also randomly redraw the sample everytime it is accessed or analysed again. _This randomness will be passed to all derived child data blocks if you elect to sample without a seed, and the results are subject to change at each analysis._ Please only use this option for exploring the dataset.
+- Use any non-negative integer (e.g. 42).
+- Check **No Random Seed** to draw a truly random sample — note that this makes the sample irreproducible and the randomness propagates to all derived child data blocks.
 
 <h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 
-Label the sample output so it is easy to find later. The pre-populated name includes the parameters of the selected operation.
+The pre-populated name includes the sampling parameters. Edit it if you need a more descriptive label.
 
-Key controls include the data block selection panel, the sampling method dropdown, mode-specific parameter inputs, the new data block name field, the status summary, the **Add to Workspace** action, and the preview table for the output rows.
+**Practice exercise**
 
-Practice exercise:
+1. Select a dataset with at least 200 rows.
+2. Try Slice with Offset 50 and Length 25, then try Random Sample with Fraction 0.2 and a fixed seed.
+3. Add each result as a new data block and compare the row counts.
 
-1. Pick a dataset with at least 200 rows.
-2. Try Slice with offset 50 and length 25, then try Random Sample with fraction 0.2, or count 100, and a fixed seed.
-3. Add each result as a new data block and compare the row count.
-
-<h2>Join</h2>
+<h2 id="help-preprocessing-join-section">Join</h2>
 
 ![Join screenshot](tutorials/assets/preprocessing/join.png)
 
-Join combines two data blocks using matching columns. Use it when your text data lives in one data block and metadata lives in another, or when you need to enrich a data block before analysis.
-
-<h3 id="help-preprocessing-join-section">Join sub-tab overview</h3>
-
-The Join tab guides you through selecting two data blocks, choosing the columns from each data block that share common values, and then joining both data blocks side by side based on those columns.
-
-Depending on the join type and the common values between the two data blocks, the resulting data block can have more or fewer rows than either source, but it will include all columns from both data blocks, making it wider than either source.
+The Join sub-tab combines two data blocks side-by-side using matching columns. Use it when your text data is in one block and metadata is in another, or when you need to enrich a block before analysis. The result includes all columns from both blocks, making it wider than either source.
 
 <h3 id="help-preprocessing-join-column-picker">Join column picker</h3>
 
 ![Join column picker screenshot](tutorials/assets/preprocessing/join_column_picker.png)
 
-The column pickers let you choose which column to match in each data block.
+Choose which column to match in each data block. The app pre-populates the most likely shared columns, but you are responsible for selecting the correct joining columns. Use clean, consistent identifier columns for the best results.
 
-- Pick columns that represent the same identifier in both data blocks.
-- Clean, consistent IDs produce the best joins.
-- The app will _guess_ and pre-populate the columns most likely to share common values between the two data blocks, but you are responsible for selecting the correct joining columns and join type.
-
-<h3 id="help-preprocessing-join-type">Join type selector</h3>
+<h3 id="help-preprocessing-join-type">Join type</h3>
 
 Join type controls how unmatched rows are handled:
 
-- **Inner:** only matching rows from both data blocks.
-- **Left:** all rows from the left data block plus matches from the right.
-- **Right:** all rows from the right data block plus matches from the left.
-- **Full:** all rows from both data blocks; unmatched values become nulls.
-- **Semi:** rows from the left data block that have at least one match.
-- **Anti:** rows from the left data block with no matches.
-- **Cross:** Cartesian product of both data blocks (can be very large).
+| Type | Keeps |
+|---|---|
+| Inner | Only rows with a match in both blocks |
+| Left | All rows from the left block; matched rows from the right |
+| Right | All rows from the right block; matched rows from the left |
+| Full | All rows from both blocks; unmatched values become nulls |
+| Semi | Left-block rows that have at least one match in the right |
+| Anti | Left-block rows with no match in the right |
+| Cross | Cartesian product of both blocks (can be very large) |
 
 <h3 id="help-preprocessing-join-node-name">Join output name</h3>
 
-Give the new joined data block a clear name so it is easy to find later. Leave it blank to use the suggested name.
+Give the joined output a clear name. Leave it blank to use the auto-generated suggestion.
 
-<h3 id="help-preprocessing-join-apply">Apply join</h3>
+**Practice exercise**
 
-Use **Add to Workspace** to run the join and create a new data block. Review the preview table before applying to confirm the output shape.
-
-Practice exercise:
-
-1. Select two datasets that share an ID column.
-2. Choose that ID in both column pickers.
-3. Run an inner join and compare row counts.
+1. Select two datasets that share an identifier column.
+2. Pick that column in both column pickers and run an Inner join.
+3. Compare the row count in the preview against both source blocks.
 
 <h2 id="help-preprocessing-concat-section">Stack</h2>
 
 ![Stack screenshot](tutorials/assets/preprocessing/concat.png)
 
-The Stack tab combines multiple data blocks vertically. Use it when you want to merge multiple data blocks with identical headers into one longer data block.
-
-<h3 id="help-preprocessing-concat-new-node-name">New data block name</h3>
-
-Provide a label for the stacked output. Leave it blank to use the suggested name.
+The Stack sub-tab vertically concatenates two or more data blocks. Use it when you want to merge data blocks with identical column structures into one longer block.
 
 <h3 id="help-preprocessing-concat-schema-status">Schema status</h3>
 
 ![Schema status screenshot](tutorials/assets/preprocessing/concat_schema_status.png)
 
-The schema status summary tells you whether all selected data blocks share the same column structure and highlights mismatches.
+The schema status panel tells you whether all selected data blocks share the same column structure and highlights any mismatches. Resolve mismatches (e.g. by renaming or removing columns) before stacking.
 
-Key controls include multi-selecting data blocks in the workspace, reviewing schema status and mismatch details, choosing an optional output name, applying **Add to Workspace**, and checking the preview table.
+<h3 id="help-preprocessing-concat-new-node-name">New data block name</h3>
 
-Practice exercise:
+Provide a label for the stacked output. Leave it blank to use the auto-generated suggestion.
 
-1. Select two datasets with the same columns.
-2. Leave the new data block name blank.
-3. Add the stacked result and confirm the column list matches.
+**Practice exercise**
+
+1. Select two datasets with the same column structure.
+2. Review the schema status to confirm no mismatches.
+3. Add the stacked result and confirm the row count equals the sum of both sources.
 
 <h2 id="help-preprocessing-find-replace">Find</h2>
 
 ![Find screenshot](tutorials/assets/preprocessing/find.png)
-The Find tool supports versatile text column manipulation, including cleaning, extracting, replacing, and creating content, powered by Regular Expressions (RegEx). You need to know how to write RegEx patterns to match the words and phrases you need.
 
-The **Find** tool supports two operations on the matched text contents, Replace or Extract. The outcomes can overwrite the same column of text or add to the data block as a new column, if the column name is defined.
+The Find sub-tab performs text manipulation on a selected column using Regular Expressions (RegEx). It supports two operations — **Replace** and **Extract** — and the result can either overwrite the existing column or be saved to a new column.
+
+**Replace**
 
 ![Replace screenshot](tutorials/assets/preprocessing/find_replace.png)
 
-**Replace**: The above figure shows an example of replacing all urls in the post by empty string, hence deleting the urls and create a new column named url_removed.
+Match a pattern and replace each match with a fixed string. To delete matched text, replace with an empty string. For example, to remove all URLs from a column, match `https?://\S+` and replace with an empty string.
+
+**Extract**
 
 ![Extract screenshot](tutorials/assets/preprocessing/find_extract.png)
 
-**Extract**: This is the example to match and extract all twitter mentions (@username) from the tweet messages, connect with space and create a new column named mentioned to include all mentioned usernames.
+Match a pattern and extract all captured matches into a new column. For example, to extract all @-mentions from a tweet column, match `@\w+` and save to a new column named *mentioned*.
+
+**Practice exercise**
+
+1. Select a dataset with a text column that contains noise (e.g. XML tags, URLs).
+2. Write a RegEx pattern to match the noise and replace it with an empty string.
+3. Review the preview to confirm the column looks clean, then add the result to the workspace.
 
 <h2 id="help-preprocessing-aggregate-section">Create</h2>
 
 ![Create screenshot](tutorials/assets/preprocessing/create.png)
 
-The **Create** tab allows users to build new columns in a selected data block by merging the contents of multiple columns as text. This is useful when different columns need to be analysed as a whole, e.g. combining a title, abstract, and body text as the full article content.
+The Create sub-tab builds new columns by combining the contents of existing columns as text. Use it when you need to analyse multiple columns together — for example, concatenating a title and a body into a single full-text column for topic modelling.
 
-<h3 id="help-preprocessing-aggregate-builder">Expression builder</h3>
+<h3 id="help-preprocessing-aggregate-builder">Basic builder</h3>
 
-Drag column tokens and custom text to build a Polars-style expression without typing.
+Drag column tokens and custom text blocks into the builder to assemble the expression without typing.
 
-How it works:
-
-- Drag column bubbles into the builder to add them to the equation.
-- Add the Custom Text bubble for operators or literals, then click it to edit.
-- The builder concatenates tokens with `+` automatically, quoting custom text.
-- Reorder any bubble by dragging it before or after an existing one.
+- Drag column bubbles into the builder to add them to the expression.
+- Add a **Custom Text** bubble for separators or literals, then click it to edit the value.
+- Reorder bubbles by dragging them to a new position.
 
 <h3 id="help-preprocessing-aggregate-expression">Advanced expression</h3>
 
 ![Advanced expression screenshot](tutorials/assets/preprocessing/create_expression.png)
 
-Write the expression directly when you need full control, helper functions, or complex logic.
+Use the Advanced tab for full control, including helper functions and conditional logic.
 
-Expression tips:
-
-- Use column names directly (`A`) or wrap spaced names in quotes (`"Total Count"`).
-- Combine with helpers like `abs()`, `round(value, 2)`, `when(condition, then, otherwise)`, `coalesce(a, b)`.
-- Call `lit("value")` to force a literal string when it matches an existing column name.
+- Reference columns by name (`title`) or in quotes if the name contains spaces (`"Total Count"`).
+- Combine values with `+`.
+- Use helpers such as `abs()`, `round(value, 2)`, `when(condition, then, otherwise)`, `coalesce(a, b)`.
+- Use `lit("value")` to force a literal string when it would otherwise be interpreted as a column name.
 
 <h3 id="help-preprocessing-aggregate-column-name">New column name</h3>
 
-Set a clear label for the computed column so it is easy to use downstream.
+Set a clear label for the new column so it is easy to find downstream.
 
-Key controls include the data block selection panel, the Basic builder, the Advanced editor, the optional new column name, the **Add to Data Block** action, and the preview showing the computed column.
+**Practice exercise**
 
-Practice exercise:
-
-1. Select a dataset with at least two numeric columns.
-2. In the Basic tab, drag two columns into the builder.
-3. Add the computed column and confirm it appears in the preview.
+1. Select a dataset with a title column and a body or abstract column.
+2. Use the Basic builder to drag both columns into the expression with a space separator.
+3. Preview the combined column, then add it to the data block.
 
 <h2 id="help-preprocessing-expression-section">Polars Expression</h2>
 
-The **Polars Expression** tab gives advanced users direct access to the Polars expression language. Write Python-style Polars expressions that are validated and executed on the server. This is useful when you need full control over transformations that go beyond the graphical tools.
+The Polars Expression sub-tab gives advanced users direct access to the [Polars](https://docs.pola.rs/) expression language. Write Python-style expressions that are validated and executed server-side. Use it for transformations that go beyond what the graphical tools support.
 
-There are five context modes available:
+Five context modes are available:
 
-- **Filter** — supply a boolean expression to keep only matching rows.
-- **With Columns** — add or overwrite columns using one or more expressions.
-- **Select** — choose and transform specific columns.
-- **Sort** — sort the data block by one or more expressions, with optional descending order.
-- **Group By** — group by a key expression and apply aggregations.
+| Mode | What it does |
+|---|---|
+| Filter | Supply a boolean expression to keep only matching rows |
+| With Columns | Add or overwrite columns using one or more expressions |
+| Select | Choose and transform specific columns |
+| Sort | Sort by one or more expressions, with optional descending order |
+| Group By | Group by a key expression and apply aggregations |
 
-Each mode includes a syntax hint box showing the expected expression format and examples. Use the **Preview** button to validate and inspect results before applying.
+Each mode displays a syntax hint box with examples. Click **Preview** to validate and inspect results before clicking **Add to Workspace**.
 
-Practice exercise:
+**Practice exercise**
 
 1. Select a dataset and switch to the **Filter** context.
-2. Write a boolean expression such as `pl.col("age") > 18`.
-3. Click **Preview** to inspect results, then **Add to Workspace** to create a filtered data block.
+2. Write a boolean expression such as `pl.col("word_count") > 100`.
+3. Click **Preview** to inspect the filtered rows, then **Add to Workspace** to create the filtered data block.
 
 [← Back to tutorial index](./index.md)
