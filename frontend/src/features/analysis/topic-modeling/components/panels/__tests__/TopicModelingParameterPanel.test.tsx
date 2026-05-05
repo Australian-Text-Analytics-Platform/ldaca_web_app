@@ -36,7 +36,7 @@ const baseProps = {
   onCorpusSampleChange: vi.fn(),
   topicSizeMode: 'target' as const,
   onTopicSizeModeChange: vi.fn(),
-  topicSizeValue: 50,
+  topicSizeValue: 25,
   topicSizeUserSet: false,
   topicSizeWarning: null as 'orange' | 'red' | null,
   onTopicSizeValueChange: vi.fn(),
@@ -63,7 +63,7 @@ describe('TopicModelingParameterPanel', () => {
   });
 
   it('keeps the raw topic size value input while editing', () => {
-    render(<TopicModelingParameterPanel {...baseProps} topicSizeValue={50} />);
+    render(<TopicModelingParameterPanel {...baseProps} topicSizeValue={25} />);
 
     const input = screen.getByLabelText('Topic size value') as HTMLInputElement;
 
@@ -124,5 +124,19 @@ describe('TopicModelingParameterPanel', () => {
       />
     );
     expect(screen.getByText(/sampled corpus may be too small/i)).toBeInTheDocument();
+  });
+
+  it('shows an exact-mode slowdown tooltip icon when Exact Topic No. is selected', () => {
+    render(
+      <TopicModelingParameterPanel
+        {...baseProps}
+        topicSizeMode="exact"
+      />
+    );
+
+    const tooltipIcon = screen.getByLabelText('Exact mode may run slower than Aim Topic No.');
+    const input = screen.getByLabelText('Topic size value');
+    expect(tooltipIcon).toHaveAttribute('title', expect.stringMatching(/may run slower than Aim Topic No/i));
+    expect(tooltipIcon.compareDocumentPosition(input)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 });

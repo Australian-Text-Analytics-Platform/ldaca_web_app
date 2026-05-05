@@ -235,10 +235,30 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-token-frequency-clear-results',
     label: 'Clear results',
   },
+  'analysis.token-frequency.reference': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-reference',
+    label: 'Reference Data Block',
+  },
+  'analysis.token-frequency.token-limit': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-token-limit',
+    label: 'Cloud display limit',
+  },
+  'analysis.token-frequency.list-limit': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-list-limit',
+    label: 'List display limit',
+  },
+  'analysis.token-frequency.token-filter': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-token-filter',
+    label: 'Filter tokens',
+  },
   'analysis.token-frequency.unified-word-cloud': {
     file: 'tutorials/token-frequency.md',
     anchor: 'help-token-frequency-unified-word-cloud',
-    label: 'Unified word cloud',
+    label: 'Juxtorpus',
   },
   'analysis.token-frequency.statistical-measures': {
     file: 'tutorials/token-frequency.md',
@@ -248,7 +268,7 @@ const registry: Record<string, TutorialTarget> = {
   'analysis.token-frequency.stop-words': {
     file: 'tutorials/token-frequency.md',
     anchor: 'help-token-frequency-stop-words',
-    label: 'Stop words input',
+    label: 'Stop words',
   },
   'analysis.token-frequency.run': {
     file: 'tutorials/token-frequency.md',
@@ -305,10 +325,45 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-topic-modeling-results',
     label: 'Topic modeling results',
   },
+  'analysis.topic-modeling.sampling': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-sampling',
+    label: 'Data block sampling',
+  },
+  'analysis.topic-modeling.options': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-options',
+    label: 'Topic modelling options',
+  },
+  'analysis.topic-modeling.topic-size-mode': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-topic-size-mode',
+    label: 'Topic size mode',
+  },
+  'analysis.topic-modeling.aim-topic-no': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-aim-topic-no',
+    label: 'Aim Topic No.',
+  },
   'analysis.topic-modeling.min-topic-size': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-min-topic-size',
-    label: 'Minimum topic size',
+    label: 'Min Topic Size',
+  },
+  'analysis.topic-modeling.exact-topic-no': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-exact-topic-no',
+    label: 'Exact Topic No.',
+  },
+  'analysis.topic-modeling.random-seed': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-random-seed',
+    label: 'Random seed',
+  },
+  'analysis.topic-modeling.words-per-topic': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-words-per-topic',
+    label: 'Words per topic',
   },
   'analysis.sequential-analysis.tab': {
     file: 'tutorials/sequential-analysis.md',

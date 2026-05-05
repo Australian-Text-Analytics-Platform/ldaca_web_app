@@ -2,90 +2,154 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1 id="help-token-frequency-section">Token frequency tutorial</h1>
+<h1 id="help-token-frequency-section">Token Frequency tutorial</h1>
 
 ![Token frequency screenshot](tutorials/assets/token_frequency.png)
 
-Token frequency counts how often words or tokens appear in your text data. It is one of the quickest ways to spot themes and jargon. This webApp provide two most common approaches for frequency analysis, which are wordcloud and word frequency list. On top of the straight forward word counts per data block, the token frequency tool allows user to compare two data blocks using [Keyword Analysis method](https://www.lancaster.ac.uk/fss/courses/ling/corpus/blue/l03_2.htm) and visualises the most significant words in a combined word cloud.
-
-The following sections explain basic operations in this token frequency tool.
-
-> **Placeholder (GIF):** Run token frequency and scroll through the top tokens.
+Token Frequency counts how often each word appears in your text data. It is one of the quickest ways to spot themes and jargon in a corpus. The tool offers two views: **Cloud view** for a visual impression of the most frequent terms, and **List view** for a ranked frequency list with precise counts. When two data blocks are selected, the tool also produces a comparative keyword analysis — the **Juxtorpus** cloud — and a statistical measures table that highlight the terms most distinctive to each side.
 
 <h2 id="help-token-frequency-parameters">Parameter panel</h2>
 
-Use the parameter panel to choose which data blocks and text columns to be analysed. 
-The Stop-words and number of words to be displayed can be adjusted after the run in the results panel. 
+<h3 id="help-token-frequency-data-block">Step 1 — Select your data</h3>
 
-<h3 id="help-token-frequency-stop-words">Stop words input</h3>
+Use the data-block selector to choose which corpus (or corpora) to analyse. You can select up to two data blocks at once. When two are selected, the tool runs in comparison mode and produces the Juxtorpus cloud and statistical measures in addition to the per-block results.
+
+For each selected block, choose the **text column** that contains the documents you want to count. Only columns that hold plain text are available.
+
+<h3 id="help-token-frequency-reference">Step 2 — Reference Data Block (comparison mode)</h3>
+
+When two data blocks are selected, a **Reference Data Block** toggle appears below the data-block selectors. Click the coloured circle next to a block to designate it as the reference (Corpus 1).
+
+The reference block provides the baseline for the statistical keyword analysis: its frequencies appear as **O1** and **%1** in the statistics table, and the other block appears as **O2** and **%2**. Swapping the reference flips which side each statistic measures from, which can change the sign of directional measures like LogRatio.
+
+<h3 id="help-token-frequency-stop-words">Step 3 — Stop words</h3>
 
 ![Stop words screenshot](tutorials/assets/token_frequency/stop_words.png)
 
-The stopwords are words the user choose to ignore (like “the”, “and”, or domain-specific filler) from the result. User can input a list of words (separated by space, case insentive), fill the default set of stopwords by **Fill Default** clicking the button, or add specific words by right clicking the unwanted words in the wordcloud or frequency list visual.
+Stop words are terms you want to exclude from the frequency count — commonly words like *the*, *and*, or domain-specific filler that would otherwise dominate the results.
 
-The default stopwords are an arbitrary list of words, which can be found in the GitHub repo at this [link](https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app_backend/tree/main/src/ldaca_web_app/resources). The default stopwords are sorted alphabetically, and additional user added words are inserted at the start of this list, so these can be easily found and removed.
+- Type words separated by spaces into the stop words field. Matching is case-insensitive.
+- Click **Fill Default** to populate the field with a built-in list of common English stop words.
+- Click **Sort** to sort the current stop-word list alphabetically.
+- Click **Apply Stop Words** to apply the current list to the results. Removing stop words does not change the statistical measures of remaining tokens — they are excluded as a post-processing step.
+- Right-click any word in the word cloud or frequency list to add it directly to the stop-word list. Words added this way are **inserted at the start of the list** so they are easy to find and remove. The list is not re-sorted until you click **Sort**.
 
-**Q: Why remove stopwords?**
-High-frequency filler terms can hide the meaningful terms you want to study.
+<h2 id="help-token-frequency-run">Step 4 — Run the analysis</h2>
 
-**Q: Will applying stopwords affect the results of other words?**
-No, the removal of stopwords does not affect the statistical measures of other words as these are removed as a post-process.
+Click **Analyze** to run. The button changes to **Update** once results exist, letting you adjust settings and re-run without clearing first.
 
-<h3 id="help-token-frequency-run">Run token frequency</h3>
-
-This action runs the token frequency analysis on the selected data block or comparison pair.
-If the user choose a different (set of) data block(s)), the tool needs to be reset by clicking the Clear Results button.
-
+If you want to run the analysis on a different data block, click **Clear Results** first to reset the tool.
 
 <h2 id="help-token-frequency-results">Result panel</h2>
 
-Use the result panel to inspect token lists, compare two data blocks, and review the statistical summary if two data blocks are selected.
+The results panel shows controls for stop words and display limits at the top, followed by a **Cloud view / List view** tab to switch between the two output modes.
 
-- The most significant N words (by word count or statistics) are visualised.
-- Full results can be downloaded as a tabular format file. 
-- When downloading the word cloud image or frequency table file, the associated stopwords can be downloaded together in a zip file.
-- Right click any token in the visualisation to add the token to the stopwords list.
-- Left click any token in the visualisation to jump to the concordance tool for co-occurance analysis.
+<h3 id="help-token-frequency-token-limit">Cloud display limit</h3>
 
-<h3 id="help-token-frequency-unified-word-cloud">Unified word cloud</h3>
+The **Cloud display limit** (range 10–100, default 50) sets the maximum number of tokens shown in the word clouds. Changing this value also updates the List display limit to the same number (capped at 100).
 
-![Unified word cloud screenshot](tutorials/assets/token_frequency/unified_word_cloud.png)
+<h3 id="help-token-frequency-list-limit">List display limit</h3>
 
-When two data blocks are selected for frequency analyis, the unified word cloud visualises the most significantly biased words by comparing the word usages with the Keyword Analysis method.
+The **List display limit** (range 10 – vocabulary size) sets the maximum number of tokens shown in the ranked frequency lists. Values up to 100 stay in sync with the Cloud display limit; setting the list limit above 100 lets you see a longer tail in list view while the cloud remains capped at 100.
 
-- **Selection:** tokens are ranked by $\log_{10}(O_1 + O_2) \times \text{LogRatio}$ and the view includes the lowest N and highest N scores (up to twice the token limit).
-- **Size:** token size reflects $O_1 + O_2$ (combined frequency across both data blocks).
-- **Color:** color shifts toward the side where the token has a higher percentage share, so different dataset sizes do not dominate the palette.
+<h2 id="help-token-frequency-cloud-view">Cloud view</h2>
+
+![Cloud view screenshot](tutorials/assets/token_frequency/cloud_view.png)
+
+Cloud view shows a word cloud for each selected data block, followed by the Juxtorpus cloud when two blocks are selected.
+
+Word size in each per-block cloud corresponds to frequency. Interaction:
+
+- **Left-click** any word to jump to the Concordance tab and search for that term in context.
+- **Right-click** any word to add it to the stop-word list (it is inserted at the start of the list).
+
+A download button is available for each cloud (PNG, SVG, or PDF). You can optionally include the associated stop-word list in the download as a zip file.
+
+<h3 id="help-token-frequency-unified-word-cloud">Juxtorpus</h3>
+
+When two data blocks are selected, the Juxtorpus cloud appears below the per-block clouds. It highlights the words that are most distinctively used by each block, using the keyword analysis method (log-ratio comparison).
+
+- **Size** reflects combined frequency across both blocks.
+- **Colour** shifts toward the block where the word has the higher proportional share, so differences in corpus size do not dominate the palette.
+- Words are ranked by log₁₀(O₁ + O₂) × LogRatio; the cloud shows the highest and lowest N words by that score (up to twice the cloud display limit).
+
+<h2 id="help-token-frequency-list-view">List view</h2>
+
+![List view screenshot](tutorials/assets/token_frequency/list_view.png)
+
+List view shows a ranked horizontal bar chart for each selected data block, with the statistics table below when two blocks are compared.
+
+**Word ranking**
+
+Tokens are listed in descending order of frequency. The bar length for each token is proportional to its count relative to the most frequent token in that block. When two data blocks are shown side by side, the blocks are scrolled **synchronously** — scrolling one list scrolls the other to the same position, making it easy to compare the same rank across both corpora.
+
+<h3 id="help-token-frequency-token-filter">Filter tokens</h3>
+
+A **Filter tokens** input appears at the bottom of the results when List view is active. Type a pattern to narrow both frequency lists and the statistics table simultaneously. Use `*` as a wildcard:
+
+- `pre*` — all tokens starting with *pre*
+- `*ing` — all tokens ending in *ing*
+- `*ation*` — all tokens containing *ation*
+
+Click **Clear** to remove the filter. The word clouds are not affected by the token filter.
 
 <h3 id="help-token-frequency-statistical-measures">Statistical measures</h3>
 
 ![Statistical measures screenshot](tutorials/assets/token_frequency/statistical_measures.png)
 
-- The statistical table summarizes token differences between the two datasets.
-- Click on the column header to sort the table in ascending or descending order.
-For more details, please refer to the following [webpage](https://www.lancaster.ac.uk/fss/courses/ling/corpus/blue/l03_2.htm)
+The statistical table summarises token-level differences between the two data blocks. Click any column header to sort ascending or descending.
 
-- **Head/Tail Rows (N):** shows the first $N$ and last $N$ rows of the sorted table; sorting always applies to the full set before trimming.
-- **Key definitions:**
-  - **O1/O2:** observed frequencies in each dataset.
-  - **%1/%2:** percentage of total tokens in each dataset.
-  - **LL:** log-likelihood $G^2$ statistic (higher = more significant difference).
-  - **%DIFF:** percentage point difference between datasets.
-  - **Bayes:** Bayes factor (BIC).
-  - **ELL:** effect size for log likelihood.
-  - **RRisk:** relative risk ratio.
-  - **LogRatio:** log of relative frequencies.
-  - **OddsRatio:** odds ratio between datasets.
-  - **Significance:** \***_ $p < 0.0001$, _** $p < 0.001$, \*_ $p < 0.01$, _ $p < 0.05$.
+| Column | What it shows |
+|---|---|
+| O1 / O2 | Observed frequency in each data block (O1 = reference block) |
+| %1 / %2 | Percentage of total tokens in each data block |
+| LL | Log-likelihood G² statistic — higher means a more significant difference |
+| %DIFF | Percentage-point difference between the two data blocks |
+| Bayes | Bayes factor (BIC) |
+| ELL | Effect size for log-likelihood |
+| RRisk | Relative risk ratio |
+| LogRatio | Log of relative frequencies — positive values skew toward the reference block |
+| OddsRatio | Odds ratio between data blocks |
+| Significance | \*\*\*\* p < 0.0001, \*\*\* p < 0.001, \*\* p < 0.01, \* p < 0.05 |
+
+Use the **Head / Tail Rows (N)** control to show the first and last N rows of the sorted table. Sorting always applies to the full dataset before trimming.
+
+The full table can be downloaded as a CSV file. For further reading on keyword analysis methodology, see the [Lancaster corpus linguistics resource](https://www.lancaster.ac.uk/fss/courses/ling/corpus/blue/l03_2.htm).
 
 <h3 id="help-token-frequency-clear-results">Clear results</h3>
 
-Token frequency results are saved in the backend so this tab can reload and keep persistent pages of your last run. **Clear Results** removes that cached result from the backend and resets the tab. This reset is needed if the user want to run the analysis on a (set of) different data block(s).
+Token Frequency results are saved in the backend so the tab can reload and retain your last run. **Clear Results** removes the cached result and resets the tab. You must clear first before switching to a different data block.
+
+<h2 id="help-token-frequency-troubleshooting">Troubleshooting</h2>
+
+| Symptom | Likely cause | What to try |
+|---|---|---|
+| Results unchanged after removing stop words | Stop words not applied | Click **Apply Stop Words** after editing the list |
+| Word cloud dominated by common words | No stop words applied | Click **Fill Default** then **Apply Stop Words** |
+| Juxtorpus or statistics table are missing | Only one data block selected | Select a second data block to enable comparison mode |
+| Statistical table shows no significant words | Corpora are very similar or one is very small | Try a larger or more distinct pair of data blocks |
+| Right-clicked stop word is hard to find | List was already long when the word was added | New words are inserted at the top — scroll to the start, or click **Sort** to alphabetise |
+| Analyze button is disabled | No data block selected, or no text column chosen | Select a data block and pick a text column |
+
+<h2 id="help-token-frequency-defaults">Quick-reference defaults</h2>
+
+| Setting | Default | Notes |
+|---|---|---|
+| Data blocks | None | Up to 2; comparison mode activates when 2 are selected |
+| Reference Data Block | First selected block | Changes O1/O2 assignment in the statistics table |
+| Stop words | Empty | Click **Fill Default** for a built-in English list |
+| Cloud display limit | 50 | Range 10–100; mirrors to list limit |
+| List display limit | 50 | Range 10 – vocabulary size; values > 100 diverge from cloud |
 
 ## Practice exercise
 
-1. Run token frequency with default settings.
-2. Add 3 extra stop words that look like noise.
-3. Apply them and compare the top 10 tokens.
+1. Select a data block and click **Analyze** with the default settings.
+2. Click **Fill Default** to apply the built-in stop-word list, then **Apply Stop Words** and compare the top tokens.
+3. Right-click one of the remaining high-frequency words in the cloud to add it as a custom stop word. Confirm it appears at the start of the stop-word list.
+4. Select a second data block. Use the **Reference Data Block** toggle to set which block is the baseline, then re-run.
+5. Switch to **List view** and use **Filter tokens** with a wildcard pattern (e.g. `*ing`) to find all gerund-form tokens.
+6. In **List view**, scroll one frequency list and observe that the other list scrolls in sync.
+7. Sort the statistics table by **LogRatio** to find the words most distinctively associated with each data block.
+8. Left-click one of the top distinctive words to jump to Concordance and inspect it in context.
 
 [← Back to tutorial index](./index.md)

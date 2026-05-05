@@ -189,10 +189,19 @@ export interface TopicModelingTopic {
   x: number;
   y: number;
 }
+export interface TopicModelingData {
+  topics: TopicModelingTopic[];
+  corpus_sizes?: number[];
+  per_corpus_topic_counts?: Array<Record<number, number>>;
+  meta?: Record<string, unknown>;
+}
+export interface TopicModelingResultUpdate {
+  topic_size_value: number;
+}
 export interface TopicModelingResponse {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   message: string;
-  data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] };
+  data?: TopicModelingData;
   metadata?: { task_id?: string; [k: string]: unknown };
 }
 export interface TopicModelingDetachNodeOption {
@@ -389,6 +398,8 @@ export const textApi = {
   topicModeling: (req: TopicModelingRequest, headers: Record<string, string> = {}) => post<TopicModelingResponse>(`/workspaces/topic-modeling`, req, headers),
   getTopicModelingTaskRequest: (taskId: string, headers: Record<string, string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/topic-modeling/tasks/${taskId}/request`, { method: 'GET', headers }),
   getTopicModelingTaskResult: (taskId: string, headers: Record<string, string> = {}) => httpRequest<TopicModelingResponse>(`/workspaces/topic-modeling/tasks/${taskId}/result`, { method: 'GET', headers }),
+  postTopicModelingTaskResult: (taskId: string, body: TopicModelingResultUpdate, headers: Record<string, string> = {}) =>
+    post<TopicModelingResponse>(`/workspaces/topic-modeling/tasks/${taskId}/result`, body, headers),
   getTopicModelingDetachOptions: (taskId: string, headers: Record<string, string> = {}) =>
     httpRequest<TopicModelingDetachOptionsResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach-options`, { method: 'GET', headers }),
   topicModelingDetach: (taskId: string, req: TopicModelingDetachRequest, headers: Record<string, string> = {}) =>

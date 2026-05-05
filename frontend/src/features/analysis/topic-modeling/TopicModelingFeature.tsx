@@ -29,6 +29,8 @@ import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 
+const DEFAULT_TOPIC_SIZE_VALUE = 25;
+
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -74,9 +76,9 @@ const TopicModelingFeature: React.FC = () => {
   
   const [corpusSamples, setCorpusSamples] = useState<CorpusSample[]>([]);
   const [topicSizeMode, setTopicSizeMode] = useState<'target' | 'min' | 'exact'>('target');
-  const [topicSizeValue, setTopicSizeValue] = useState(50);
+  const [topicSizeValue, setTopicSizeValue] = useState(DEFAULT_TOPIC_SIZE_VALUE);
   const [topicSizeUserSet, setTopicSizeUserSet] = useState(false);
-  const [referenceTopicNo, setReferenceTopicNo] = useState(50);
+  const [referenceTopicNo, setReferenceTopicNo] = useState(DEFAULT_TOPIC_SIZE_VALUE);
   const [randomSeed, setRandomSeed] = useState(42);
   const [randomSeedUserSet, setRandomSeedUserSet] = useState(false);
   const [representativeWordsCount, setRepresentativeWordsCount] = useState(15);
@@ -88,7 +90,9 @@ const TopicModelingFeature: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(800);
+  const chartResizeFrameRef = useRef<number | null>(null);
   const [isClearing, setIsClearing] = useState(false);
+  const [isUpdatingExactTopicCount, setIsUpdatingExactTopicCount] = useState(false);
 
   const {
     resolveTaskId,
@@ -141,7 +145,7 @@ const TopicModelingFeature: React.FC = () => {
       setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
       setRepresentativeWordsCountUserSet(true);
       setTopicSizeMode((req.topic_size_mode as 'target' | 'min' | 'exact') || 'target');
-      const hydratedTopicSizeValue = Number(req.topic_size_value ?? 50);
+      const hydratedTopicSizeValue = Number(req.topic_size_value ?? DEFAULT_TOPIC_SIZE_VALUE);
       setTopicSizeValue(hydratedTopicSizeValue);
       setReferenceTopicNo(hydratedTopicSizeValue);
       setTopicSizeUserSet(true);
@@ -176,9 +180,9 @@ const TopicModelingFeature: React.FC = () => {
     setTopicSearchQuery('');
     setCorpusSamples([]);
     setTopicSizeMode('target');
-    setTopicSizeValue(50);
+    setTopicSizeValue(DEFAULT_TOPIC_SIZE_VALUE);
     setTopicSizeUserSet(false);
-    setReferenceTopicNo(50);
+    setReferenceTopicNo(DEFAULT_TOPIC_SIZE_VALUE);
     setRandomSeedUserSet(false);
     setRepresentativeWordsCountUserSet(false);
     setIsClearing(false);
@@ -223,15 +227,32 @@ const TopicModelingFeature: React.FC = () => {
   useEffect(()=>{
     const el = chartRef.current;
     if(!el) return;
+    const updateChartWidth = (width: number) => {
+      const nextWidth = Math.round(width);
+      if (!nextWidth) return;
+      setChartWidth((prevWidth) => (prevWidth === nextWidth ? prevWidth : nextWidth));
+    };
     const observer = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        if (w) setChartWidth(w);
+      const latestEntry = entries.at(-1);
+      if (!latestEntry) return;
+      if (chartResizeFrameRef.current !== null) {
+        cancelAnimationFrame(chartResizeFrameRef.current);
       }
+      const nextWidth = latestEntry.contentRect.width;
+      chartResizeFrameRef.current = requestAnimationFrame(() => {
+        chartResizeFrameRef.current = null;
+        updateChartWidth(nextWidth);
+      });
     });
     observer.observe(el);
-    setChartWidth(el.getBoundingClientRect().width);
-    return ()=> observer.disconnect();
+    updateChartWidth(el.getBoundingClientRect().width);
+    return ()=> {
+      observer.disconnect();
+      if (chartResizeFrameRef.current !== null) {
+        cancelAnimationFrame(chartResizeFrameRef.current);
+        chartResizeFrameRef.current = null;
+      }
+    };
   },[]);
 
   const defaultPalette = DEFAULT_PALETTE;
@@ -265,7 +286,7 @@ const TopicModelingFeature: React.FC = () => {
       random_seed: Number(request.random_seed),
       representative_words_count: Number(request.representative_words_count),
       topic_size_mode: request.topic_size_mode ?? 'target',
-      topic_size_value: Number(request.topic_size_value ?? 50),
+      topic_size_value: Number(request.topic_size_value ?? DEFAULT_TOPIC_SIZE_VALUE),
     }),
   });
 
@@ -346,7 +367,7 @@ const TopicModelingFeature: React.FC = () => {
   }, [topicSizeMode, topicSizeUserSet, combinedEffective, referenceTopicNo]);
 
   const showSamplingWarning =
-    combinedEffective > 0 && combinedEffective < 5 * (topicSizeValue ?? 50);
+    combinedEffective > 0 && combinedEffective < 5 * (topicSizeValue ?? DEFAULT_TOPIC_SIZE_VALUE);
 
   const sampleFractionsForRequest = useMemo(
     () =>
@@ -403,6 +424,13 @@ const TopicModelingFeature: React.FC = () => {
 
   const topics: TopicModelingTopic[] = result?.data?.topics || [];
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
+  const exactRawTopicCount = (() => {
+    const rawValue = result?.data?.meta?.raw_total_topics;
+    if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
+      return null;
+    }
+    return Math.max(0, Math.trunc(rawValue));
+  })();
   const chartPadding = 40;
   const chartHeight = Math.min(520, Math.max(320, Math.round(chartWidth * 0.55)));
 
@@ -459,6 +487,40 @@ const TopicModelingFeature: React.FC = () => {
       clearResults,
       runFreshAnalysis: handleRun,
     });
+  };
+
+  const handleUpdateExactTopicCount = async (value: number) => {
+    if (topicSizeMode !== 'exact') return;
+    const taskId = await resolveTaskId();
+    if (!taskId) {
+      setError('No completed topic modeling task available to update.');
+      return;
+    }
+
+    setIsUpdatingExactTopicCount(true);
+    setError(null);
+    try {
+      const updated = await textApi.postTopicModelingTaskResult(
+        taskId,
+        { topic_size_value: value },
+        getAuthHeaders(),
+      );
+      setResultSafely(updated);
+      setTopicSizeValue(value);
+      setReferenceTopicNo(value);
+      setTopicSizeUserSet(true);
+      setSelectedTopicIds(new Set());
+      setHoveredTopicId(null);
+      setTopicSearchQuery('');
+    } catch (updateError: unknown) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : 'Failed to update exact topic count',
+      );
+    } finally {
+      setIsUpdatingExactTopicCount(false);
+    }
   };
 
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
@@ -536,6 +598,13 @@ const TopicModelingFeature: React.FC = () => {
           topicSizeMode={topicSizeMode}
           topicSizeValue={topicSizeValue}
           randomSeed={randomSeed}
+          exactTopicCountRange={
+            topicSizeMode === 'exact' && exactRawTopicCount && exactRawTopicCount >= 2
+              ? { min: 2, max: exactRawTopicCount }
+              : null
+          }
+          isUpdatingExactTopicCount={isUpdatingExactTopicCount}
+          onUpdateExactTopicCount={handleUpdateExactTopicCount}
           detachDialogOpen={detachDialogOpen}
           setDetachDialogOpen={setDetachDialogOpen}
           detachNodeOptions={detachNodeOptions}
