@@ -9,6 +9,7 @@ import {
 } from '../../../../api/text';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
+import { buildSamplingAutoNodeName } from '../../../preprocessing/utils/autoNodeNames';
 import { takeMostRecent } from '../../../../utils/selectionUtils';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 25;
@@ -53,6 +54,25 @@ type Params = {
   lock: TopicModelingLock;
 };
 
+export const buildTopicDetachNodeName = (
+  nodeLabel: string,
+  sampleFraction?: number | null,
+  randomSeed = 42,
+) => {
+  const baseName = `${(nodeLabel || '').trim() || 'node'}_topic`;
+  if (typeof sampleFraction === 'number' && sampleFraction > 0 && sampleFraction < 1) {
+    const seed = Number.isFinite(randomSeed) ? Math.trunc(randomSeed) : 42;
+    return buildSamplingAutoNodeName({
+      baseName,
+      mode: 'random_sample',
+      sampleSize: sampleFraction,
+      randomSeed: seed,
+      noRandomSeed: false,
+    });
+  }
+  return baseName;
+};
+
 export function useTopicModelingTaskFlow({
   state: {
     currentWorkspaceId,
@@ -81,13 +101,6 @@ export function useTopicModelingTaskFlow({
     queryClient,
   },
 }: Params) {
-  const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
-    const trimmed = nodeLabel.trim();
-    const base = trimmed.length > 0 ? trimmed : 'node';
-    const normalized = base.replace(/\s+/g, '_');
-    return `${normalized}${suffix}`;
-  };
-
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
@@ -230,10 +243,13 @@ export function useTopicModelingTaskFlow({
     try {
       setIsDetaching(true);
       const newNodeNames = Object.fromEntries(
-        detachNodeOptions.map((node) => [
-          node.node_id,
-          buildDetachNodeName(String(node.node_name || node.node_id), '_topic'),
-        ])
+        detachNodeOptions.map((node, index) => {
+          const sampleFraction = sampleFractions?.[index];
+          return [
+            node.node_id,
+            buildTopicDetachNodeName(String(node.node_name || node.node_id), sampleFraction, randomSeed),
+          ];
+        })
       );
       const payload: TopicModelingDetachRequest = {
         node_ids: nodeIds,

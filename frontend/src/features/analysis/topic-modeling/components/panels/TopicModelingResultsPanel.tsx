@@ -67,61 +67,59 @@ function ExactTopicCountSlider({
   };
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <div className="flex min-h-5 items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span className="shrink-0 text-sm font-medium text-foreground">Exact Topic No.</span>
+    <div className="relative flex min-w-0 flex-1 items-center gap-3">
+      <div className="pointer-events-none absolute bottom-full right-0 mb-1 flex min-h-5 items-center justify-end gap-2 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <Loader2 className={`h-3.5 w-3.5 animate-spin ${isUpdatingExactTopicCount ? 'opacity-100' : 'opacity-0'}`} />
           <span className={isUpdatingExactTopicCount ? 'opacity-100' : 'opacity-0'}>Re-aggregating</span>
         </span>
       </div>
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {exactTopicCountRange.min}
-        </span>
-        <div className="relative flex min-w-28 flex-1 items-center">
-          {isSliderTooltipVisible ? (
-            <div
-              aria-live="polite"
-              className="pointer-events-none absolute bottom-full z-10 mb-2 rounded border border-border bg-popover px-2 py-1 text-xs font-medium tabular-nums text-popover-foreground shadow-sm"
-              style={{ left: `${sliderProgressPercent}%`, transform: 'translateX(-50%)' }}
-            >
-              {sliderValue}
-            </div>
-          ) : null}
-          <input
-            id="exact-topic-count"
-            aria-label="Exact Topic No. after modelling"
-            type="range"
-            min={exactTopicCountRange.min}
-            max={exactTopicCountRange.max}
-            step={1}
-            value={sliderValue}
-            disabled={isUpdatingExactTopicCount}
-            className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed"
-            onChange={(event) => setSliderValue(Math.round(Number(event.currentTarget.value)))}
-            onFocus={() => setIsSliderTooltipVisible(true)}
-            onBlur={(event) => {
-              setIsSliderTooltipVisible(false);
-              commitExactTopicCount(event.currentTarget.value, event.currentTarget);
-            }}
-            onMouseDown={() => setIsSliderTooltipVisible(true)}
-            onMouseUp={(event) => {
-              setIsSliderTooltipVisible(false);
-              commitExactTopicCount(event.currentTarget.value, event.currentTarget);
-            }}
-            onTouchStart={() => setIsSliderTooltipVisible(true)}
-            onTouchEnd={(event) => {
-              setIsSliderTooltipVisible(false);
-              commitExactTopicCount(event.currentTarget.value, event.currentTarget);
-            }}
-            onKeyUp={handleExactTopicCountKeyUp}
-          />
-        </div>
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {exactTopicCountRange.max}
-        </span>
+      <span className="shrink-0 text-sm font-medium text-foreground">Exact Topic No.</span>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {exactTopicCountRange.min}
+      </span>
+      <div className="relative flex min-w-28 flex-1 items-center">
+        {isSliderTooltipVisible ? (
+          <div
+            aria-live="polite"
+            className="pointer-events-none absolute bottom-full z-10 mb-2 rounded border border-border bg-popover px-2 py-1 text-xs font-medium tabular-nums text-popover-foreground shadow-sm"
+            style={{ left: `${sliderProgressPercent}%`, transform: 'translateX(-50%)' }}
+          >
+            {sliderValue}
+          </div>
+        ) : null}
+        <input
+          id="exact-topic-count"
+          aria-label="Exact Topic No. after modelling"
+          type="range"
+          min={exactTopicCountRange.min}
+          max={exactTopicCountRange.max}
+          step={1}
+          value={sliderValue}
+          disabled={isUpdatingExactTopicCount}
+          className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed"
+          onChange={(event) => setSliderValue(Math.round(Number(event.currentTarget.value)))}
+          onFocus={() => setIsSliderTooltipVisible(true)}
+          onBlur={(event) => {
+            setIsSliderTooltipVisible(false);
+            commitExactTopicCount(event.currentTarget.value, event.currentTarget);
+          }}
+          onMouseDown={() => setIsSliderTooltipVisible(true)}
+          onMouseUp={(event) => {
+            setIsSliderTooltipVisible(false);
+            commitExactTopicCount(event.currentTarget.value, event.currentTarget);
+          }}
+          onTouchStart={() => setIsSliderTooltipVisible(true)}
+          onTouchEnd={(event) => {
+            setIsSliderTooltipVisible(false);
+            commitExactTopicCount(event.currentTarget.value, event.currentTarget);
+          }}
+          onKeyUp={handleExactTopicCountKeyUp}
+        />
       </div>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {exactTopicCountRange.max}
+      </span>
     </div>
   );
 }
@@ -262,7 +260,7 @@ export function TopicModelingResultsPanel({
 
         {isSuccessfulState ? (
           <div className="space-y-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-x-6">
               <p className="shrink-0 text-sm text-muted-foreground">Topics ({topics.length})</p>
               {showExactTopicCountControl && exactTopicCountRange ? (
                 <ExactTopicCountSlider
@@ -273,7 +271,7 @@ export function TopicModelingResultsPanel({
                   onUpdateExactTopicCount={onUpdateExactTopicCount}
                 />
               ) : (
-                <div className="hidden flex-1 lg:block" />
+                <div className="hidden lg:block" />
               )}
               <Button
                 type="button"
