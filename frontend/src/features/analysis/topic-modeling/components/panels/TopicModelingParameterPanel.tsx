@@ -1,4 +1,5 @@
 import { useEffect, useState, type FocusEvent } from 'react';
+import { CircleHelp } from 'lucide-react';
 import { Input } from '../../../../../components/ui/input';
 import { Label } from '../../../../../components/ui/label';
 import {
@@ -250,21 +251,32 @@ export function TopicModelingParameterPanel({
           </div>
 
           {/* Row 1: mode dropdown + value input */}
-          <div className="flex items-center gap-2">
-            <Select
-              value={topicSizeMode}
-              onValueChange={(v) => onTopicSizeModeChange(v as 'target' | 'min' | 'exact')}
-              disabled={isLocked}
-            >
-              <SelectTrigger className="h-8 flex-1 text-sm font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="target" className="text-sm font-medium">Aim Topic No.</SelectItem>
-                <SelectItem value="min" className="text-sm font-medium">Min Topic Size</SelectItem>
-                <SelectItem value="exact" className="text-sm font-medium">Exact Topic No.</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Select
+                value={topicSizeMode}
+                onValueChange={(v) => onTopicSizeModeChange(v as 'target' | 'min' | 'exact')}
+                disabled={isLocked}
+              >
+                <SelectTrigger className="h-8 flex-1 text-sm font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="target" className="text-sm font-medium">Aim Topic No.</SelectItem>
+                  <SelectItem value="min" className="text-sm font-medium">Min Topic Size</SelectItem>
+                  <SelectItem value="exact" className="text-sm font-medium">Exact Topic No.</SelectItem>
+                </SelectContent>
+              </Select>
+              {topicSizeMode === 'exact' ? (
+                <span
+                  aria-label="Exact mode may run slower than Aim Topic No."
+                  title="Exact Topic No. may run slower than Aim Topic No. because it fits the model first and then merges topics to your chosen count."
+                  className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground"
+                >
+                  <CircleHelp className="h-4 w-4" />
+                </span>
+              ) : null}
+            </div>
             <Input
               id="topic-size-value"
               aria-label="Topic size value"

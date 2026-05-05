@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '../../../../../components/ui/button';
 import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
@@ -8,7 +8,123 @@ import { AnalysisRunningStateCard } from '../../../common/components/AnalysisRun
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
 type TopicModelingTopic = { id: number; label: string; size: number[]; total_size: number; x: number; y: number };
-type TopicModelingResult = { state?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: Record<string, unknown>; message?: string } | null;
+type TopicModelingResult = {
+  state?: string;
+  data?: {
+    topics: TopicModelingTopic[];
+    corpus_sizes?: number[];
+    meta?: Record<string, unknown>;
+  };
+  metadata?: Record<string, unknown>;
+  message?: string;
+} | null;
+
+type ExactTopicCountSliderProps = {
+  topicSizeValue?: number;
+  exactTopicCountRange: { min: number; max: number };
+  isUpdatingExactTopicCount: boolean;
+  onUpdateExactTopicCount: (value: number) => Promise<void> | void;
+};
+
+function ExactTopicCountSlider({
+  topicSizeValue,
+  exactTopicCountRange,
+  isUpdatingExactTopicCount,
+  onUpdateExactTopicCount,
+}: ExactTopicCountSliderProps) {
+  const initialValue = topicSizeValue ?? exactTopicCountRange.min;
+  const [sliderValue, setSliderValue] = useState(initialValue);
+  const lastSubmittedValueRef = useRef<number | null>(null);
+  const [isSliderTooltipVisible, setIsSliderTooltipVisible] = useState(false);
+
+  const sliderDenominator = Math.max(1, exactTopicCountRange.max - exactTopicCountRange.min);
+  const sliderProgressPercent =
+    ((sliderValue - exactTopicCountRange.min) / sliderDenominator) * 100;
+
+  const commitExactTopicCount = (rawValue: string, input?: HTMLInputElement | null) => {
+    const parsed = Number(rawValue);
+    const nextValue = Math.min(
+      exactTopicCountRange.max,
+      Math.max(
+        exactTopicCountRange.min,
+        Number.isFinite(parsed) ? Math.round(parsed) : exactTopicCountRange.min,
+      ),
+    );
+    setSliderValue(nextValue);
+    if (input) {
+      input.value = String(nextValue);
+    }
+    if (nextValue === topicSizeValue || nextValue === lastSubmittedValueRef.current) return;
+    lastSubmittedValueRef.current = nextValue;
+    void onUpdateExactTopicCount(nextValue);
+  };
+
+  const handleExactTopicCountKeyUp = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+      return;
+    }
+    commitExactTopicCount(event.currentTarget.value, event.currentTarget);
+  };
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex min-h-5 items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span className="shrink-0 text-sm font-medium text-foreground">Exact Topic No.</span>
+        <span className="inline-flex items-center gap-1">
+          <Loader2 className={`h-3.5 w-3.5 animate-spin ${isUpdatingExactTopicCount ? 'opacity-100' : 'opacity-0'}`} />
+          <span className={isUpdatingExactTopicCount ? 'opacity-100' : 'opacity-0'}>Re-aggregating</span>
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {exactTopicCountRange.min}
+        </span>
+        <div className="relative flex min-w-28 flex-1 items-center">
+          {isSliderTooltipVisible ? (
+            <div
+              aria-live="polite"
+              className="pointer-events-none absolute bottom-full z-10 mb-2 rounded border border-border bg-popover px-2 py-1 text-xs font-medium tabular-nums text-popover-foreground shadow-sm"
+              style={{ left: `${sliderProgressPercent}%`, transform: 'translateX(-50%)' }}
+            >
+              {sliderValue}
+            </div>
+          ) : null}
+          <input
+            id="exact-topic-count"
+            aria-label="Exact Topic No. after modelling"
+            type="range"
+            min={exactTopicCountRange.min}
+            max={exactTopicCountRange.max}
+            step={1}
+            value={sliderValue}
+            disabled={isUpdatingExactTopicCount}
+            className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed"
+            onChange={(event) => setSliderValue(Math.round(Number(event.currentTarget.value)))}
+            onFocus={() => setIsSliderTooltipVisible(true)}
+            onBlur={(event) => {
+              setIsSliderTooltipVisible(false);
+              commitExactTopicCount(event.currentTarget.value, event.currentTarget);
+            }}
+            onMouseDown={() => setIsSliderTooltipVisible(true)}
+            onMouseUp={(event) => {
+              setIsSliderTooltipVisible(false);
+              commitExactTopicCount(event.currentTarget.value, event.currentTarget);
+            }}
+            onTouchStart={() => setIsSliderTooltipVisible(true)}
+            onTouchEnd={(event) => {
+              setIsSliderTooltipVisible(false);
+              commitExactTopicCount(event.currentTarget.value, event.currentTarget);
+            }}
+            onKeyUp={handleExactTopicCountKeyUp}
+          />
+        </div>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {exactTopicCountRange.max}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 type Props = {
   topicWaitingBanner: { status: 'running' | 'queued'; taskId: string | null; message?: string } | null;
@@ -44,6 +160,9 @@ type Props = {
   topicSizeMode?: string;
   topicSizeValue?: number;
   randomSeed?: number;
+  exactTopicCountRange?: { min: number; max: number } | null;
+  isUpdatingExactTopicCount: boolean;
+  onUpdateExactTopicCount: (value: number) => Promise<void> | void;
   detachDialogOpen: boolean;
   setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   detachNodeOptions: Array<{ node_id: string; node_name: string; available_columns: string[]; disabled_columns?: string[] }>;
@@ -82,6 +201,9 @@ export function TopicModelingResultsPanel({
   topicSizeMode,
   topicSizeValue,
   randomSeed,
+  exactTopicCountRange,
+  isUpdatingExactTopicCount,
+  onUpdateExactTopicCount,
   detachDialogOpen,
   setDetachDialogOpen,
   detachNodeOptions,
@@ -106,6 +228,12 @@ export function TopicModelingResultsPanel({
     label: 'Topic modeling results',
     tooltip: 'Shows running progress, failures, and final topic modeling outputs.',
   };
+  const showExactTopicCountControl = Boolean(
+    isSuccessfulState &&
+    topicSizeMode === 'exact' &&
+    exactTopicCountRange &&
+    exactTopicCountRange.max >= exactTopicCountRange.min
+  );
 
   return (
     <>
@@ -134,14 +262,25 @@ export function TopicModelingResultsPanel({
 
         {isSuccessfulState ? (
           <div className="space-y-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <p className="shrink-0 text-sm text-muted-foreground">Topics ({topics.length})</p>
+              {showExactTopicCountControl && exactTopicCountRange ? (
+                <ExactTopicCountSlider
+                  key={topicSizeValue ?? exactTopicCountRange.min}
+                  topicSizeValue={topicSizeValue}
+                  exactTopicCountRange={exactTopicCountRange}
+                  isUpdatingExactTopicCount={isUpdatingExactTopicCount}
+                  onUpdateExactTopicCount={onUpdateExactTopicCount}
+                />
+              ) : (
+                <div className="hidden flex-1 lg:block" />
+              )}
               <Button
                 type="button"
                 size="sm"
-                className="w-full sm:w-auto"
+                className="w-full shrink-0 lg:w-auto"
                 onClick={() => void openDetachDialog()}
-                disabled={isDetachLoading || isDetaching}
+                disabled={isDetachLoading || isDetaching || isUpdatingExactTopicCount}
               >
                 {isDetachLoading ? (
                   <>

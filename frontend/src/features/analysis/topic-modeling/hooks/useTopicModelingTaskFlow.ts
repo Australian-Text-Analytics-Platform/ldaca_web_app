@@ -11,6 +11,8 @@ import { queryKeys } from '../../../../lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import { takeMostRecent } from '../../../../utils/selectionUtils';
 
+const DEFAULT_TOPIC_SIZE_VALUE = 25;
+
 type NodeColumnSelection = {
   nodeId: string;
   column: string;
@@ -21,7 +23,6 @@ interface TopicModelingState {
   panelNodeIds: string[];
   panelHasMissingColumns: boolean;
   effectiveNodeColumnSelections: NodeColumnSelection[];
-  minTopicSize?: number;
   randomSeed: number;
   representativeWordsCount: number;
   selectedTopicIds: Set<number>;
@@ -58,7 +59,6 @@ export function useTopicModelingTaskFlow({
     panelNodeIds,
     panelHasMissingColumns,
     effectiveNodeColumnSelections,
-    minTopicSize,
     randomSeed,
     representativeWordsCount,
     selectedTopicIds,
@@ -123,7 +123,7 @@ export function useTopicModelingTaskFlow({
         random_seed: randomSeed,
         representative_words_count: representativeWordsCount,
         topic_size_mode: topicSizeMode ?? 'target',
-        topic_size_value: topicSizeValue ?? 50,
+        topic_size_value: topicSizeValue ?? DEFAULT_TOPIC_SIZE_VALUE,
         ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
       };
 
