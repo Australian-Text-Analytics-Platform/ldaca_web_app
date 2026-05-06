@@ -132,7 +132,7 @@ const Sidebar: React.FC = () => {
   const resetHints = useHintsStore((state) => state.resetHints);
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
-  const { toggleNodeSelection } = useWorkspaceActions();
+  const { toggleNodeSelection, clearSelection } = useWorkspaceActions();
   const { getAuthHeaders, user, logout, dataFolder, isMultiUserMode } = useAuth();
   const { tasks, setTasks } = useAnalysisStore(
     useShallow((state) => ({
@@ -564,6 +564,7 @@ const Sidebar: React.FC = () => {
                             nodes={nodes}
                             selectedNodeIds={selectedNodeIds}
                             onToggleNodeSelection={toggleNodeSelection}
+                            onClearSelection={clearSelection}
                           />
                         )}
                         {key === 'tasks' && (

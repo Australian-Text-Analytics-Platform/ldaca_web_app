@@ -23,8 +23,6 @@ The active workspace panel displays the currently loaded project along with its 
 
 This field is visible only when no workspace is currently active. Use it to specify a name for a new empty workspace. Choose a descriptive name that reflects the project or dataset (e.g. the project title or dataset identifier). An optional description can also be provided at this stage.
 
-> **Note:** The workspace description cannot be edited within the application after the workspace has been created.
-
 Workspace names are not unique identifiers — the application allows multiple workspaces to share the same name, each stored in a separate directory. Using identical names for different workspaces is strongly discouraged, as it can cause confusion when managing or revisiting projects.
 
 <h2 id="help-data-loader-create-workspace-button">Create workspace button</h2>
@@ -32,7 +30,7 @@ Workspace names are not unique identifiers — the application allows multiple w
 Clicking this button creates a new workspace with the specified name and optional description.
 
 - The newly created workspace becomes the active workspace immediately.
-- An active workspace is required before files can be loaded and analysed.
+- **An active workspace is required before files can be loaded and analysed.**
 
 <h2 id="help-data-loader-rename-workspace-input">Rename workspace input</h2>
 
@@ -53,6 +51,7 @@ The workspace manager lists all saved workspaces, enabling you to switch between
 
 - Click **Activate** to set a workspace as the active project; the active workspace is visually highlighted.
 - Review the last-modified timestamp and data-block count to confirm you are loading the intended workspace.
+- Click **Download** to export the entire workspace as a ZIP archive. The archive contains all data blocks and workspace metadata. Data blocks are stored in [Parquet](https://parquet.apache.org/) format — a compressed, column-oriented binary format that preserves data types exactly and is far more compact than CSV. Because Parquet is a well-supported open standard, the downloaded files can also be opened directly in tools such as Python (pandas/polars), R, or DuckDB. The ZIP is saved to your browser's default downloads folder (or your system Downloads folder in the desktop app). You can upload the ZIP to another instance of the application to resume your work there — for example when sharing a project with a collaborator or moving between a local installation and a hosted server.
 - Click **Delete** to permanently remove a workspace that is no longer needed.
 
 <h2 id="help-data-loader-files-section">Files and uploads section</h2>
@@ -101,7 +100,34 @@ Once a file is uploaded, imported, or downloaded, the following actions are avai
 - **Add to Workspace** to load the file as a data block in the active workspace.
 - **Download** the original file to your local machine.
 - **Remove** the file from the application.
-- **Create subfolders** and reorganise files using drag-and-drop.
+
+<h2 id="help-data-loader-file-organisation">Organising files</h2>
+
+The files panel supports folder management and drag-and-drop reorganisation so you can keep uploads tidy across projects.
+
+**Creating folders**
+
+Click the <kbd>+</kbd> folder icon next to any existing folder to create a subfolder inside it, or use the equivalent button at the root level to create a top-level folder. A dialog will prompt you for a name. Folders can be nested to any depth.
+
+**Deleting files and folders**
+
+Click the trash icon next to any file to remove it permanently. There is no separate delete-folder button — a folder is removed automatically once all files inside it have been deleted.
+
+**Moving files by drag-and-drop**
+
+Drag any file row and drop it onto a target folder (or onto any file inside a target folder) to move the file there. Valid drop targets are highlighted as you drag. A file cannot be moved to the folder it already belongs to, and dropping a file into a folder that already contains a file with the same name is not allowed.
+
+<h2 id="help-data-loader-citation-notice">Citation and licensing notices</h2>
+
+Some folders — particularly those created by the LDaCA importer — display a small quote icon (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:text-bottom"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/></svg>) next to the folder name. This icon indicates that the folder contains a `README.md` file with citation, licensing, or copyright information provided by the dataset's author.
+
+**Click the icon to open the notice.** The contents are rendered as formatted text and may include:
+
+- A required citation or acknowledgement for the dataset.
+- Licence terms (e.g. Creative Commons, restricted use).
+- Copyright or access conditions.
+
+**If this icon appears on a folder you intend to use in research or publication, review the notice carefully and follow the stated requirements before sharing or publishing your results.**
 
 <h2 id="help-data-loader-troubleshooting">Troubleshooting</h2>
 

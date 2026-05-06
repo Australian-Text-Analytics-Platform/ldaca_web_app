@@ -163,7 +163,7 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
       }
 
       return (
-        <a {...props} href={href} onClick={handleClick}>
+        <a {...props} href={href} onClick={handleClick} target={target}>
           {children}
         </a>
       );

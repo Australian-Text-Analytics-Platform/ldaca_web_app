@@ -901,8 +901,8 @@ dependencies = [
 
 [[package]]
 name = "ldaca-web-app"
-version = "0.2.7"
-source = { directory = "backend" }
+version = "0.2.8"
+source = { editable = "backend" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "bertopic" },
@@ -972,7 +972,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "ldaca-loader", git = "https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator?branch=ldaca_web_app_integration" },
-    { name = "ldaca-web-app", directory = "backend" },
+    { name = "ldaca-web-app", editable = "backend" },
 ]
 
 [[package]]
