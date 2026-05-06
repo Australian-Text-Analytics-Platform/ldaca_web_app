@@ -201,7 +201,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           onRedo: handleRedo,
         },
         hidden: false,
-        draggable: true,
         selectable: true,
         selected: selectedNodeIds?.includes?.(node.id) ?? false,
         connectable: false,
