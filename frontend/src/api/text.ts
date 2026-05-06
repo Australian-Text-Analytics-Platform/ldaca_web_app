@@ -404,6 +404,17 @@ export const textApi = {
     httpRequest<TopicModelingDetachOptionsResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach-options`, { method: 'GET', headers }),
   topicModelingDetach: (taskId: string, req: TopicModelingDetachRequest, headers: Record<string, string> = {}) =>
     post<TopicModelingDetachResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach`, req, headers),
+  getTopicModelingEmbeddingCacheSize: (headers: Record<string, string> = {}) =>
+    httpRequest<{ state: string; data: { bytes: number; files: number } }>(
+      `/workspaces/topic-modeling/embedding-cache/size`,
+      { method: 'GET', headers },
+    ),
+  clearTopicModelingEmbeddingCache: (headers: Record<string, string> = {}) =>
+    httpRequest<{
+      state: string;
+      message: string;
+      data: { bytes_freed: number; files_removed: number; measured_before: { bytes: number; files: number } };
+    }>(`/workspaces/topic-modeling/embedding-cache`, { method: 'DELETE', headers }),
 
   // AI Annotation
   aiAnnotationModels: (body: AiAnnotationModelsRequest, headers: Record<string, string> = {}) =>
