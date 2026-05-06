@@ -37,9 +37,9 @@ Below the tool list, the **Data Blocks** panel shows every data block in the act
 
 The **Tasks** panel sits below data selection and tracks time-consuming background operations such as topic modelling or large data transformations.
 
-- A green indicator means all tasks have completed successfully.
-- While a task is running, a progress spinner and status message appear.
-- Click **Clear** to dismiss completed task notifications.
+- While a task is running, a progress bar and status message appear. Click **Stop** to cancel it.
+- **Successful tasks fade out automatically** after roughly 8 seconds and are removed from the list without any action needed.
+- **Failed or stopped tasks remain** on screen until you dismiss them manually — click **Clear** on the individual task card to remove it.
 - **Live updates** keeps the panel refreshed automatically so you can continue working while tasks run in the background.
 
 <h2 id="help-ui-workspace-graph-view">4. Workspace Graph View</h2>
@@ -95,7 +95,8 @@ The **Working Directory** indicator at the bottom of the left sidebar shows the 
 
 - Click the edit icon to change the directory.
 - All workspaces, uploaded files, and exported outputs are stored under this path.
-- The default location is `~/Documents/ldaca`.
+- The default location is `~/Documents/ldaca`. This applies when running the app locally — via self-hosting, the Tauri desktop app, or UVX.
+- This section is not available in multi-user mode, where storage is managed server-side.
 
 <h2 id="help-ui-help-feedback">8. Help and Feedback</h2>
 
