@@ -152,6 +152,14 @@ A quick wildcard filter can be applied using the **text input** in the right ("A
 
 Topic modelling results are saved in the backend so this tab can reload and keep persistent pages of the last run. **Clear Results** clears the cached result in the backend and resets the tab.
 
+<h3 id="help-topic-modeling-embedding-cache">Embedding cache</h3>
+
+The slowest stage of topic modelling — converting each document into an embedding vector — is cached on disk. Each time the model encodes a document, the resulting vector is stored under a hash of that exact text. The next time topic modelling encounters the same text (in this corpus or any other), the embedding is read from disk in milliseconds instead of being recomputed. The cache is per-user and shared across all your workspaces, and it builds up automatically as you run topic modelling.
+
+**Clearing the cache.** You normally do not need to do this, but if you want to reclaim disk space, click the pencil icon next to **Views** in the sidebar (the *Edit visible views* button) and choose **Clear embedding cache** at the bottom of the menu. A confirmation dialog shows exactly how many files and how much disk space will be freed before you confirm. After clearing, the cache rebuilds itself naturally on subsequent topic modelling runs — the only cost is that those runs will be slower, especially for large corpora.
+
+**Tip — pre-run for big-corpus exploration.** If you plan to explore a large dataset by running topic modelling many times with different sub-corpora, sample fractions, or topic counts, do one **full-corpus** run first with a small topic number (e.g. 5 or 10). That first run will be slow — leaving it overnight is a reasonable strategy — but it primes the cache with embeddings for every document in the corpus. Subsequent runs on derived sub-corpora pick those embeddings up from the cache, so they finish much faster. As long as you do not click *Clear embedding cache*, those primed embeddings keep paying off across all your future explorations of the same texts.
+
 <h2 id="help-topic-modeling-troubleshooting">Troubleshooting</h2>
 
 | Symptom | Likely cause | What to try |

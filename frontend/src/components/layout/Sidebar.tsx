@@ -28,6 +28,7 @@ import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceTaskStream } from '@/hooks/useWorkspaceTaskStream';
 import { useAuth } from '@/hooks/useAuth';
 import { filesApi } from '@/api/files';
+import { textApi } from '@/api/text';
 import { workspacesApi } from '@/api/workspaces';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
@@ -36,6 +37,7 @@ import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
@@ -64,6 +66,7 @@ import {
   ChevronDown,
   Pencil,
   RotateCcw,
+  Trash2,
 } from 'lucide-react';
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
@@ -132,7 +135,7 @@ const Sidebar: React.FC = () => {
   const resetHints = useHintsStore((state) => state.resetHints);
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
-  const { toggleNodeSelection } = useWorkspaceActions();
+  const { toggleNodeSelection, clearSelection } = useWorkspaceActions();
   const { getAuthHeaders, user, logout, dataFolder, isMultiUserMode } = useAuth();
   const { tasks, setTasks } = useAnalysisStore(
     useShallow((state) => ({
@@ -161,6 +164,44 @@ const Sidebar: React.FC = () => {
     resetHints();
     resetSessionDismissedHints();
     toast('All hints have been reset. Dismissed hints can appear again.');
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes <= 0) return '0 bytes';
+    const units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
+    const idx = Math.min(units.length - 1, Math.floor(Math.log10(bytes) / 3));
+    const value = bytes / Math.pow(1000, idx);
+    return `${value < 10 && idx > 0 ? value.toFixed(1) : Math.round(value)} ${units[idx]}`;
+  };
+
+  const [isClearCacheDialogOpen, setIsClearCacheDialogOpen] = React.useState(false);
+  const [embeddingCacheStats, setEmbeddingCacheStats] = React.useState<{ bytes: number; files: number } | null>(null);
+
+  const handleOpenClearCacheDialog = async () => {
+    setEmbeddingCacheStats(null);
+    setIsClearCacheDialogOpen(true);
+    try {
+      const resp = await textApi.getTopicModelingEmbeddingCacheSize(getAuthHeaders());
+      setEmbeddingCacheStats(resp.data ?? null);
+    } catch {
+      // Leave stats null; dialog will show a generic warning without sizes.
+    }
+  };
+
+  const handleConfirmClearCache = async () => {
+    setIsClearCacheDialogOpen(false);
+    try {
+      const resp = await textApi.clearTopicModelingEmbeddingCache(getAuthHeaders());
+      const freed = resp.data?.bytes_freed ?? 0;
+      const files = resp.data?.files_removed ?? 0;
+      if (files === 0) {
+        toast('Embedding cache was already empty.');
+      } else {
+        toast(`Cleared ${files} cached embedding ${files === 1 ? 'file' : 'files'} (${formatBytes(freed)} reclaimed).`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to clear embedding cache.');
+    }
   };
 
   const [isDataFolderDialogOpen, setIsDataFolderDialogOpen] = React.useState(false);
@@ -540,6 +581,16 @@ const Sidebar: React.FC = () => {
                             <RotateCcw className="mr-2 h-3.5 w-3.5" />
                             Reset all hints
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              void handleOpenClearCacheDialog();
+                            }}
+                            className="text-xs text-muted-foreground focus:text-foreground"
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" />
+                            Clear embedding cache
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                       </div>
@@ -564,6 +615,7 @@ const Sidebar: React.FC = () => {
                             nodes={nodes}
                             selectedNodeIds={selectedNodeIds}
                             onToggleNodeSelection={toggleNodeSelection}
+                            onClearSelection={clearSelection}
                           />
                         )}
                         {key === 'tasks' && (
@@ -649,6 +701,23 @@ const Sidebar: React.FC = () => {
           onOpenChange={setIsDataFolderDialogOpen}
         />
       )}
+      <ConfirmDialog
+        open={isClearCacheDialogOpen}
+        onOpenChange={setIsClearCacheDialogOpen}
+        title="Clear embedding cache?"
+        description={
+          (embeddingCacheStats === null
+            ? 'Calculating size of cached embeddings…\n\n'
+            : embeddingCacheStats.files === 0
+              ? 'The embedding cache is currently empty — nothing to clear.\n\n'
+              : `${embeddingCacheStats.files} cached embedding ${embeddingCacheStats.files === 1 ? 'file' : 'files'} will be deleted, freeing ${formatBytes(embeddingCacheStats.bytes)} of disk space.\n\n`) +
+          'Topic modelling caches per-document embeddings so re-running on the same texts is fast. Clearing this cache means future topic modelling on those texts will need to recompute every embedding from scratch and may take noticeably longer (especially for large corpora).'
+        }
+        confirmText="Clear cache"
+        cancelText="Cancel"
+        onConfirm={handleConfirmClearCache}
+        variant="destructive"
+      />
     </SidebarRoot>
   );
 };

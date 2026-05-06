@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { SidebarWorkspaceNode } from './types';
@@ -7,6 +8,7 @@ type SidebarNodesSectionProps = {
   nodes: SidebarWorkspaceNode[];
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
+  onClearSelection?: () => void;
 };
 
 const formatShapeLabel = (node: SidebarWorkspaceNode): string => {
@@ -30,6 +32,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
   nodes,
   selectedNodeIds,
   onToggleNodeSelection,
+  onClearSelection,
 }) => {
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
@@ -57,7 +60,19 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span>Total: {nodeCount}</span>
-        <span>Selected: {selectedCount}</span>
+        <div className="flex items-center gap-1">
+          <span>Selected: {selectedCount}</span>
+          {selectedCount > 0 && onClearSelection && (
+            <button
+              type="button"
+              onClick={onClearSelection}
+              title="Clear selection"
+              className="rounded p-0.5 hover:bg-accent hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="space-y-2 pr-1">
         {orderedNodes.length ? (

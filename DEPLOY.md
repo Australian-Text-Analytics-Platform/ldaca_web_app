@@ -112,10 +112,14 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/src/ldaca_web_app/backend
-Environment="GOOGLE_CLIENT_ID=460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com"
+Environment="MULTI_USER=true"
+Environment="CILOGON_CLIENT_ID=cilogon:/client_id/3f6c0af973d3cc270a404823d3bbf122"
+Environment="CILOGON_CLIENT_SECRET=_ooOmovo-g0vTwtVSziDNBuT0_mWjCmNTWN1SgeeukMQsdHUWvfHDxcJag2kb2cvJyGLV7l6ZjC--GUw-ftb2g"
+Environment="CILOGON_DISCOVERY_URL=https://test.cilogon.aaf.edu.au/.well-known/openid-configuration"
+Environment="CILOGON_REDIRECT_URI=https://analytics.ldaca.edu.au/api/auth/cilogon/callback"
 ExecStartPre=/bin/rm -rf /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend/build
 ExecStartPre=/bin/tar -xzf /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend/build.tar.gz -C /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend
-ExecStart=/home/ubuntu/.local/bin/uv run ldaca-web-app --multi-user --port 8001
+ExecStart=/home/ubuntu/.local/bin/uv run ldaca-web-app --port 8001
 Restart=on-failure
 RestartSec=5
 
@@ -123,18 +127,25 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### 5. Google OAuth Setup
+> **Switching to production CILogon:** When Moises switches the registration from test to
+> production, change `CILOGON_DISCOVERY_URL` to
+> `https://cilogon.aaf.edu.au/.well-known/openid-configuration`.
 
-The app uses Google OAuth for login. For each new domain, you must register it in the
-[Google Cloud Console](https://console.cloud.google.com/) under
-**APIs & Services → Credentials → OAuth 2.0 Client ID**:
+### 5. CILogon OIDC Setup
 
-| Section                       | Value to add                                              |
-| ----------------------------- | --------------------------------------------------------- |
-| Authorized JavaScript origins | `https://analytics.ldaca.edu.au`                          |
-| Authorized redirect URIs      | `https://analytics.ldaca.edu.au/api/auth/google/callback` |
+The production deployment at `analytics.ldaca.edu.au` uses CILogon (AAF-federated OIDC)
+for authentication. The OIDC client was registered by Moises (ARDC/AAF) with the following
+parameters:
 
-> Both entries are required. The redirect URI is what Google calls back to after the user authenticates.
+| Parameter      | Value                                                                      |
+| -------------- | -------------------------------------------------------------------------- |
+| Client name    | `test.analytics.ldaca.edu.au`                                              |
+| Callback URL   | `https://analytics.ldaca.edu.au/api/auth/cilogon/callback`                 |
+| Configuration  | General LDaCA Transparent Enrollment (openid, email, profile, org.cilogon.userinfo) |
+| Discovery URL  | `https://test.cilogon.aaf.edu.au/.well-known/openid-configuration` (test)  |
+
+The client credentials are stored in the systemd service file above. No frontend changes
+are needed — the login button is served dynamically based on which provider is configured.
 
 ---
 
@@ -195,14 +206,46 @@ This project has two release surfaces that must stay aligned:
 
 Release from `dev`, then promote to `main`.
 
-### 1. Build the frontend from the root repo
+> **Frontend bundle rule:** `build.tar.gz` inside the backend submodule is the **sole**
+> source of frontend assets for both PyPI/uvx users and the Nectar deployment. Every change
+> to `frontend/src/**` — whether part of a version bump or a feature/fix branch — is
+> **invisible to users** until steps 2–3 below are run and the updated `build.tar.gz` is
+> committed to the backend submodule. This applies equally to full releases and to
+> feature branches deployed to Nectar before a release (see
+> [Deploying a feature branch to Nectar](#deploying-a-feature-branch-to-nectar) below).
+
+> **Critical ordering rule:** All version strings that appear in the UI or in metadata files
+> **must be updated before the frontend is built**. The version text in
+> `frontend/public/references/general.md` is baked into `build.tar.gz` at build time —
+> updating it after the build has no effect on what Nectar or uvx users actually see.
+
+### 1. Bump all version strings (do this first, before any build)
+
+Update the version number in every location below before touching anything else:
+
+| File | What to change |
+|---|---|
+| `frontend/public/references/general.md` | Last line: `Version X.Y.Z - released on DD/Mon/YYYY.` |
+| `frontend/package.json` | `"version": "X.Y.Z"` |
+| `frontend/src-tauri/tauri.conf.json` | `"version": "X.Y.Z"` — controls desktop bundle filenames (DMG/MSI) |
+| `frontend/src-tauri/Cargo.toml` | `version = "X.Y.Z"` — Rust crate metadata |
+| `backend/pyproject.toml` | `version = "X.Y.Z"` |
+
+Then refresh the backend lockfile:
+
+```bash
+cd /path/to/ldaca_web_app/backend
+uv lock
+```
+
+### 2. Build the frontend from the root repo
 
 ```bash
 cd /path/to/ldaca_web_app
 npm run build -w frontend
 ```
 
-### 2. Sync the built frontend into the backend package bundle
+### 3. Sync the built frontend into the backend package bundle
 
 ```bash
 cd /path/to/ldaca_web_app
@@ -214,19 +257,28 @@ This refreshes:
 - `backend/src/ldaca_web_app/resources/frontend/build.tar.gz`
 - `backend/src/ldaca_web_app/resources/frontend/build/`
 
-### 3. Bump the backend package version
-
-Update the backend package version in:
-
-- `backend/pyproject.toml`
-- `backend/uv.lock`
-
-Then refresh the lockfile:
+**Verify the version string was baked in correctly before proceeding:**
 
 ```bash
-cd /path/to/ldaca_web_app/backend
-uv lock
+tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+    build/references/general.md | tail -3
 ```
+
+The output must show `Version X.Y.Z`. If it still shows the previous version, the build ran
+before the version strings were updated — delete the build output and repeat steps 1–3.
+
+**Verify any new feature strings are present in the bundle:**
+
+```bash
+tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+    $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+      | grep 'assets/index.*\.js' | head -1) \
+  | grep -c "SomeNewFeatureString"
+```
+
+Replace `SomeNewFeatureString` with a distinctive identifier from the new feature (e.g. a
+button label, component name, or route). A count of `0` means the source change was not
+included in the build — do not proceed.
 
 ### 4. Validate the backend release artifact
 
@@ -261,12 +313,11 @@ From the root repo:
 
 ```bash
 cd /path/to/ldaca_web_app
-git add backend
-git commit -m "Sync backend release v<VERSION>"
+git add backend frontend/package.json frontend/public/references/general.md \
+    frontend/src-tauri/tauri.conf.json frontend/src-tauri/Cargo.toml
+git commit -m "Release v<VERSION>: bump versions and sync backend submodule"
 git push origin dev
 ```
-
-If the visible app version text is shown in docs/UI, update that in the root repo in the same commit.
 
 ### 7. Verify the published `uvx` package
 
@@ -336,6 +387,62 @@ rg -n "Reset all hints|Topic Modelling - BERTopic|All hints have been reset" src
 
 ---
 
+## Deploying a Feature Branch to Nectar
+
+Use this when a feature branch has frontend source changes and needs to be deployed to
+Nectar **before** a full versioned release (e.g. testing a new auth provider in
+production). These steps are required whenever `frontend/src/**` changes on a branch,
+regardless of whether versions are bumped.
+
+### 1. Rebuild the frontend bundle on the feature branch
+
+```bash
+cd /path/to/ldaca_web_app
+npm run build -w frontend
+node scripts/deploy-frontend-to-backend.mjs
+```
+
+### 2. Verify the new feature is in the bundle
+
+```bash
+tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+    $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+      | grep 'assets/index.*\.js' | head -1) \
+  | grep -c "SomeNewFeatureString"
+```
+
+A count of `0` means the build did not include your change — stop and investigate.
+
+### 3. Commit the updated bundle to the backend submodule branch
+
+```bash
+cd /path/to/ldaca_web_app/backend
+git add src/ldaca_web_app/resources/frontend/build.tar.gz
+git commit -m "build: rebuild frontend bundle with <feature name>"
+git push origin <feature-branch>
+```
+
+### 4. Update the root repo submodule pointer
+
+```bash
+cd /path/to/ldaca_web_app
+git add backend
+git commit -m "build: point backend submodule to rebuilt <feature name> bundle"
+git push origin <feature-branch>
+```
+
+### 5. Deploy to Nectar
+
+```bash
+cd /home/ubuntu/src/ldaca_web_app
+git fetch origin
+git checkout <feature-branch>
+git submodule update --init --recursive --checkout --force
+sudo systemctl restart ldaca-web-app
+```
+
+---
+
 ## Updating the App
 
 ```bash
@@ -376,4 +483,5 @@ If you need to update environment variables (e.g. `GOOGLE_CLIENT_ID`) or startup
 | 502 Bad Gateway from Nginx     | App may be down — restart with `sudo systemctl restart ldaca-web-app`              |
 | Certificate expired            | `sudo certbot renew`                                                               |
 | Port 8001 already in use       | `sudo fuser -k 8001/tcp` then start the service                                    |
-| Google OAuth redirect mismatch | Ensure redirect URI is registered in Google Cloud Console (see OAuth Setup above)  |
+| Old UI served after deploy     | Frontend source changed but `build.tar.gz` was not rebuilt — follow [Deploying a feature branch to Nectar](#deploying-a-feature-branch-to-nectar) steps 1–4, then redeploy |
+| New feature missing from UI    | Verify with `grep -c "FeatureString"` against the bundle (see release step 3) — if `0`, rebuild and recommit `build.tar.gz` |

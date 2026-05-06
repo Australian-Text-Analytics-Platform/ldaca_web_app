@@ -1,6 +1,6 @@
 {
   "productName": "LDaCA Text Analytics",
-  "version": "0.2.6",
+  "version": "0.2.9",
   "identifier": "au.edu.ldaca.text-analytics",
   "build": {
     "beforeDevCommand": "npm run dev",
