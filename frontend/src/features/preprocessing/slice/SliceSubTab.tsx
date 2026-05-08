@@ -4,6 +4,7 @@ import { AlertCircle, Loader2, Plus, Shuffle } from 'lucide-react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Checkbox } from '../../../components/ui/checkbox';
 import { Input } from '../../../components/ui/input';
@@ -25,6 +26,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
     hasSelection,
     isBusy,
     applyDisabled,
+    applyDisabledReason,
     applySlice,
     preview,
     showActivityTag,
@@ -111,9 +113,10 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
                   <Input
                     id="slice-length"
                     type="number"
-                    min={0}
+                    min={1}
                     value={form.lengthInput}
                     onChange={(event) => form.setLengthInput(event.target.value)}
+                    onBlur={form.onLengthBlur}
                     disabled={!hasSelection}
                     placeholder="Number of rows to include"
                   />
@@ -133,6 +136,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
                     step="any"
                     value={form.sampleSizeInput}
                     onChange={(event) => form.setSampleSizeInput(event.target.value)}
+                    onBlur={form.onSampleSizeBlur}
                     disabled={!hasSelection}
                     placeholder="e.g. 0.4 for 40% or 100 for 100 rows"
                   />
@@ -192,19 +196,21 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               <span>{inlineError}</span>
             </div>
           )}
-          <Button size="sm" onClick={applySlice} disabled={applyDisabled} className="shrink-0">
-            {isBusy ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding to workspace…
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                Add to Workspace
-              </>
-            )}
-          </Button>
+          <DisabledReasonTooltip reason={applyDisabledReason}>
+            <Button size="sm" onClick={applySlice} disabled={applyDisabled} className="shrink-0">
+              {isBusy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding to workspace…
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Workspace
+                </>
+              )}
+            </Button>
+          </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>

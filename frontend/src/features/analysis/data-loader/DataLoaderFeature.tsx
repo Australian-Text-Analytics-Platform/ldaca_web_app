@@ -52,6 +52,7 @@ import {
 } from '../../../components/ui/dropdown-menu';
 import HelpIcon from '../../../components/help/HelpIcon';
 import InfoIcon from '../../../components/help/InfoIcon';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 
 const README_FILENAME = 'README.md';
 const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
@@ -1033,9 +1034,11 @@ export const DataLoaderFeature: React.FC = () => {
                   placeholder="Optional description"
                 />
                 <div className="flex items-center gap-2">
-                  <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
-                    <Plus className="mr-2 h-4 w-4" /> Create workspace
-                  </Button>
+                  <DisabledReasonTooltip reason={!newWorkspaceName.trim() ? 'Enter a workspace name first' : undefined}>
+                    <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
+                      <Plus className="mr-2 h-4 w-4" /> Create workspace
+                    </Button>
+                  </DisabledReasonTooltip>
                   <HelpIcon targetKey="data-loader.create-workspace.button" label="Create workspace" />
                 </div>
               </div>

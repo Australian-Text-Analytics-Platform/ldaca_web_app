@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '../../../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
+import { DisabledReasonTooltip } from '../../../../components/ui/disabled-reason-tooltip';
 import { type ConditionColumnOption } from '../../types';
 
 export interface ConditionBuilderItem {
@@ -87,9 +88,17 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(props: 
               </SelectContent>
             </Select>
           )}
-          <Button onClick={onAddCondition} disabled={disabled} size="sm">
-            Add condition
-          </Button>
+          <DisabledReasonTooltip
+            reason={
+              disabled
+                ? (!hasSelection ? 'Select a data block first' : 'Column information is unavailable for this data block')
+                : undefined
+            }
+          >
+            <Button onClick={onAddCondition} disabled={disabled} size="sm">
+              Add condition
+            </Button>
+          </DisabledReasonTooltip>
         </div>
       </div>
 

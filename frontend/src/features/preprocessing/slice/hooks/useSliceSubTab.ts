@@ -66,8 +66,10 @@ interface SliceFormControllers {
   setOffsetInput: (value: string) => void;
   lengthInput: string;
   setLengthInput: (value: string) => void;
+  onLengthBlur: () => void;
   sampleSizeInput: string;
   setSampleSizeInput: (value: string) => void;
+  onSampleSizeBlur: () => void;
   sampleSizeHint: string | null;
   randomSeedInput: string;
   setRandomSeedInput: (value: string) => void;
@@ -103,6 +105,7 @@ export interface UseSliceSubTabResult {
   hasSelection: boolean;
   isBusy: boolean;
   applyDisabled: boolean;
+  applyDisabledReason: string | undefined;
   applySlice: () => Promise<void>;
   preview: SlicePreviewConfig;
   showActivityTag: boolean;
@@ -118,15 +121,24 @@ const buildSlicePayload = ({
   lengthValue,
   sampleSizeValue,
   randomSeedValue,
+  isFullShuffle,
 }: {
   mode: SamplingMode;
   offset: number;
   lengthValue?: number;
   sampleSizeValue?: number;
   randomSeedValue?: number;
+  isFullShuffle?: boolean;
 }): SliceRequestPayload => {
-  const payload: SliceRequestPayload = { mode };
   if (mode === 'random_sample') {
+    if (isFullShuffle) {
+      const payload: SliceRequestPayload = { mode: 'shuffle' };
+      if (typeof randomSeedValue === 'number') {
+        payload.random_seed = randomSeedValue;
+      }
+      return payload;
+    }
+    const payload: SliceRequestPayload = { mode };
     if (typeof sampleSizeValue === 'number') {
       payload.sample_size = sampleSizeValue;
     }
@@ -135,6 +147,7 @@ const buildSlicePayload = ({
     }
     return payload;
   }
+  const payload: SliceRequestPayload = { mode };
   payload.offset = offset;
   if (typeof lengthValue === 'number') {
     payload.length = lengthValue;
@@ -177,6 +190,13 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const selectedNodeLabel = (() => {
     if (!selectedNodeId) return '';
     return deriveNodeLabel(activeNode) || selectedNodeId;
+  })();
+
+  const nodeRowCount: number | null = (() => {
+    const shape = activeNode?.shape as [number | null, number | null] | number[] | undefined;
+    if (!Array.isArray(shape)) return null;
+    const rows = shape[0];
+    return typeof rows === 'number' && Number.isFinite(rows) && rows >= 0 ? Math.round(rows) : null;
   })();
 
   useEffect(() => {
@@ -229,7 +249,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const trimmedLength = lengthInput.trim();
   const lengthNumber = trimmedLength.length > 0 ? Number(trimmedLength) : null;
   const lengthValid =
-    lengthNumber !== null && Number.isInteger(lengthNumber) && lengthNumber >= 0;
+    lengthNumber !== null && Number.isInteger(lengthNumber) && lengthNumber >= 1;
   const lengthValue = lengthNumber === null ? undefined : lengthNumber;
 
   const trimmedSampleSize = sampleSizeInput.trim();
@@ -259,6 +279,14 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const hasOperation = mode === 'slice' ? offsetValid && lengthValid : sampleSizeValid && randomSeedValid;
 
+  const isFullShuffle =
+    mode === 'random_sample' &&
+    nodeRowCount !== null &&
+    sampleSizeValid &&
+    sampleSizeNumber !== null &&
+    Number.isInteger(sampleSizeNumber) &&
+    sampleSizeNumber >= nodeRowCount;
+
   const autoNodeName = buildSamplingAutoNodeName({
     baseName: selectedNodeLabel || selectedNodeId,
     mode,
@@ -267,6 +295,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     sampleSize: sampleSizeValid ? sampleSizeValue : undefined,
     randomSeed: randomSeedValid ? randomSeedValue : undefined,
     noRandomSeed,
+    isFullShuffle,
   });
 
   const rangeSummary = (() => {
@@ -349,6 +378,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       lengthValue,
       sampleSizeValue,
       randomSeedValue,
+      isFullShuffle,
     });
     return {
       nodeId: selectedNodeId,
@@ -412,8 +442,50 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       ? 'Showing original data. Enter offset and length to preview sliced rows.'
       : 'Showing original data. Enter a fraction or row count and optional seed to preview sampled rows.';
 
+  const handleLengthBlur = () => {
+    if (trimmedLength.length === 0) return;
+    if (lengthNumber === null || !Number.isInteger(lengthNumber)) return;
+    if (lengthNumber < 1) {
+      setLengthInput('1');
+    } else if (nodeRowCount !== null && lengthNumber > nodeRowCount) {
+      setLengthInput(String(nodeRowCount));
+    }
+  };
+
+  const handleSampleSizeBlur = () => {
+    if (trimmedSampleSize.length === 0 || !sampleSizeValid) return;
+    if (
+      nodeRowCount !== null &&
+      sampleSizeNumber !== null &&
+      Number.isInteger(sampleSizeNumber) &&
+      sampleSizeNumber >= nodeRowCount
+    ) {
+      setSampleSizeInput(String(nodeRowCount));
+    }
+  };
+
   const applyDisabled =
     !hasSelection || !hasOperation || isSlicing || isLoading.operations;
+
+  const applyDisabledReason: string | undefined = (() => {
+    if (isSlicing || isLoading.operations) return undefined;
+    if (!hasSelection) return 'Select a data block first';
+    if (mode === 'slice') {
+      if (!lengthValid) {
+        return trimmedLength.length === 0
+          ? 'Enter a length (number of rows to include)'
+          : 'Length must be a whole number ≥ 1';
+      }
+    } else {
+      if (!sampleSizeValid) {
+        return trimmedSampleSize.length === 0
+          ? 'Enter a sample size'
+          : 'Enter a valid sample size — a fraction (0–1) or a whole number ≥ 1';
+      }
+      if (!randomSeedValid) return 'Enter a valid random seed (non-negative integer)';
+    }
+    return undefined;
+  })();
 
   const applySlice = async () => {
     if (!selectedNodeId) {
@@ -446,6 +518,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       lengthValue,
       sampleSizeValue,
       randomSeedValue,
+      isFullShuffle,
     });
     const requestedName = newNodeName.trim() || autoNodeName;
     if (requestedName) {
@@ -456,7 +529,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     setIsSlicing(true);
     try {
       const response = await sliceNode(selectedNodeId, payload);
-      const operationLabel = mode === 'slice' ? 'Slice' : 'Random sample';
+      const operationLabel = mode === 'slice' ? 'Slice' : isFullShuffle ? 'Shuffle' : 'Random sample';
       if (response?.success === false) {
         const message = response.message || `${operationLabel} operation failed`;
         setInlineError(message);
@@ -467,7 +540,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
         response?.node_name?.trim?.() ||
         response?.data?.node_name?.trim?.() ||
         requestedName ||
-        `${selectedNodeLabel || selectedNodeId}_${mode === 'slice' ? 'sliced' : 'sampled'}`;
+        `${selectedNodeLabel || selectedNodeId}_${mode === 'slice' ? 'sliced' : isFullShuffle ? 'shuffled' : 'sampled'}`;
       const resultNodeId = response?.node_id;
       setLastResult({
         nodeId: resultNodeId ?? undefined,
@@ -507,8 +580,10 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       setOffsetInput,
       lengthInput,
       setLengthInput,
+      onLengthBlur: handleLengthBlur,
       sampleSizeInput,
       setSampleSizeInput,
+      onSampleSizeBlur: handleSampleSizeBlur,
       sampleSizeHint,
       randomSeedInput,
       setRandomSeedInput,
@@ -526,6 +601,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     hasSelection,
     isBusy: isSlicing,
     applyDisabled,
+    applyDisabledReason,
     applySlice,
     preview: {
       columns: previewColumns,

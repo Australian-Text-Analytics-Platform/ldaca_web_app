@@ -35,7 +35,7 @@ export interface FilterCondition {
 }
 export interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
 export interface SliceRequest {
-  mode?: 'slice' | 'random_sample';
+  mode?: 'slice' | 'random_sample' | 'shuffle';
   offset?: number;
   length?: number;
   sample_size?: number;

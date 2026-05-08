@@ -104,6 +104,7 @@ export const buildSamplingAutoNodeName = ({
   sampleSize,
   randomSeed,
   noRandomSeed,
+  isFullShuffle,
 }: {
   baseName: string | null | undefined;
   mode: 'slice' | 'random_sample';
@@ -112,6 +113,7 @@ export const buildSamplingAutoNodeName = ({
   sampleSize?: number;
   randomSeed?: number;
   noRandomSeed?: boolean;
+  isFullShuffle?: boolean;
 }): string => {
   const base = (baseName || '').trim() || DEFAULT_NAME_FALLBACK;
 
@@ -130,17 +132,22 @@ export const buildSamplingAutoNodeName = ({
     return `${base}_sliced_from_${start}_to_${end}`;
   }
 
+  const seedToken = noRandomSeed
+    ? '_true_random'
+    : typeof randomSeed === 'number' && Number.isInteger(randomSeed) && randomSeed >= 0
+      ? `_rs_${randomSeed}`
+      : '';
+
+  if (isFullShuffle) {
+    return `${base}_shuffled${seedToken}`;
+  }
+
   if (typeof sampleSize !== 'number' || !Number.isFinite(sampleSize) || sampleSize <= 0) {
     return `${base}_sampled`;
   }
 
   const sizeToken = formatScalar(sampleSize);
   const sampleToken = sampleSize < 1 ? `fr_${sizeToken}` : `n_${sizeToken}`;
-  const seedToken = noRandomSeed
-    ? '_true_random'
-    : typeof randomSeed === 'number' && Number.isInteger(randomSeed) && randomSeed >= 0
-      ? `_rs_${randomSeed}`
-      : '';
 
   return `${base}_sampled_${sampleToken}${seedToken}`;
 };
