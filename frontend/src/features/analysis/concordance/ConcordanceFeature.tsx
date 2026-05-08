@@ -80,7 +80,6 @@ import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
-import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
@@ -171,7 +170,7 @@ const ConcordanceFeature: React.FC = () => {
   const [wholeWord, setWholeWord] = useState(true);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
+  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   const [concordanceView, setConcordanceView] = useState<'table' | 'dispersion'>('table');
   const showDispersion = concordanceView === 'dispersion';
   const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
@@ -370,11 +369,21 @@ const ConcordanceFeature: React.FC = () => {
     };
   }, [results]);
 
-  const { availableMetadataColumns, metadataColumnSections } = (() => {
+  // Hoisted up from below so the metadata-column section IIFE can read it
+  // (the IIFE consults each panel node's selected text column to exclude it
+  // from the metadata column list).
+  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+
+  const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } = (() => {
     const resultEntries = results?.data ?? {};
-    // Per-block columns, ordered by display name. We exclude the __COMBINED__
-    // pseudo-block since its columns are a merge of the underlying blocks and
-    // would just duplicate them in the UI.
+    // Per-block columns, preferring `results.data` per-node entries (used by
+    // Separated view; carries the same metadata_columns the per-node table
+    // displays). When only the `__COMBINED__` entry is present (typical of
+    // Combined view), fall back to each node's workspace column list via
+    // `getColumnInfos`, dropping the chosen text column and the synthetic
+    // `__source_node` tag — without this fallback the dropdown would have
+    // nothing to show in Combined view, which is what was making the
+    // checkbox/dropdown look "stuck".
     const perBlock: { nodeKey: string; columns: string[] }[] = [];
     for (const [nodeKey, entry] of Object.entries(resultEntries)) {
       if (nodeKey === '__COMBINED__') continue;
@@ -384,10 +393,29 @@ const ConcordanceFeature: React.FC = () => {
       );
       perBlock.push({ nodeKey, columns: cols });
     }
+    if (perBlock.length === 0 && panelSelectedNodes.length > 0) {
+      panelSelectedNodes.forEach((node, idx) => {
+        const rawId = (node as { id?: string }).id;
+        const rawName = (node as { name?: string }).name;
+        const nodeKey = rawName || rawId || `node-${idx}`;
+        const sel = rawId
+          ? effectiveNodeColumnSelections.find((s) => s.nodeId === rawId)
+          : undefined;
+        const textColumn = sel?.column;
+        const cols = getColumnInfos(node, idx)
+          .map((info) => info.name)
+          .filter((name): name is string =>
+            !!name && name !== textColumn && name !== '__source_node',
+          );
+        if (cols.length > 0) perBlock.push({ nodeKey, columns: cols });
+      });
+    }
     const allColumns = Array.from(
       new Set(perBlock.flatMap((b) => b.columns)),
     );
-    const sections: { columns: string[]; color?: string }[] = [];
+    const sections: { columns: string[]; color?: string; disabled?: boolean }[] = [];
+    let disabledReason: string | undefined;
+    const isCombinedView = viewMode === 'combined';
     if (perBlock.length <= 1) {
       // Single block (or no blocks): no need for sections.
       if (allColumns.length > 0) sections.push({ columns: allColumns });
@@ -395,17 +423,36 @@ const ConcordanceFeature: React.FC = () => {
       const common = perBlock[0]!.columns.filter((c) =>
         perBlock.every((b) => b.columns.includes(c)),
       );
-      // Common section uses the default text colour (no specific block).
+      // In Combined view, columns exclusive to one source can't be rendered
+      // in the merged table — they'd be NULL for the rows from the other
+      // block. So:
+      //  - If there are common columns, show them as selectable and the
+      //    per-block exclusives as visible-but-disabled (preserves discovery
+      //    of what each block has, without letting the user pick something
+      //    that won't render).
+      //  - If there are no common columns, disable Show metadata entirely
+      //    with a tooltip explaining why.
+      if (isCombinedView && common.length === 0 && perBlock.some((b) => b.columns.length > 0)) {
+        disabledReason = 'The selected data blocks share no metadata columns; nothing to display in Combined view.';
+      }
       if (common.length > 0) sections.push({ columns: common });
       for (const block of perBlock) {
         const exclusive = block.columns.filter((c) => !common.includes(c));
         if (exclusive.length === 0) continue;
         const nodeId = resolveNodeIdForKey(block.nodeKey);
         const color = nodeId ? nodeColors?.[nodeId] : undefined;
-        sections.push({ columns: exclusive, color });
+        sections.push({
+          columns: exclusive,
+          color,
+          disabled: isCombinedView,
+        });
       }
     }
-    return { availableMetadataColumns: allColumns, metadataColumnSections: sections };
+    return {
+      availableMetadataColumns: allColumns,
+      metadataColumnSections: sections,
+      metadataDisabledReason: disabledReason,
+    };
   })();
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
@@ -581,28 +628,20 @@ const ConcordanceFeature: React.FC = () => {
     isResultRunning: (r) => r?.state === 'running',
   });
 
-  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
-  const preferredMetadataColumns = dedupeColumns(
-    effectiveNodeColumnSelections.map((selection) => selection.column).filter(Boolean),
-  );
+  // (effectiveNodeColumnSelections is declared above so it can be referenced
+  // by the metadata-column section IIFE.)
 
+  // No auto-selection on activation: Show metadata starts empty and the user
+  // explicitly ticks the columns they want. We just clean up any selections
+  // that are no longer in the available set (e.g. after a re-run that drops
+  // a column from the source data).
   useEffect(() => {
-    setSelectedMetadataColumns((previousSelection) => {
-      const nextSelection = reconcileMetadataColumnSelection(
-        availableMetadataColumns,
-        previousSelection,
-        preferredMetadataColumns,
-      );
-      const normalizedPreviousSelection = previousSelection ?? [];
-      if (
-        normalizedPreviousSelection.length === nextSelection.length &&
-        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
-      ) {
-        return previousSelection;
-      }
-      return nextSelection;
+    setSelectedMetadataColumns((prev) => {
+      const filtered = prev.filter((column) => availableMetadataColumns.includes(column));
+      if (filtered.length === prev.length) return prev;
+      return filtered;
     });
-  }, [availableMetadataColumns, availableMetadataColumnsKey, preferredMetadataColumns]);
+  }, [availableMetadataColumns, availableMetadataColumnsKey]);
 
   const {
     handleSearch,
@@ -2157,6 +2196,7 @@ const ConcordanceFeature: React.FC = () => {
                         selectedColumns={selectedMetadataColumns ?? []}
                         onSelectedColumnsChange={setSelectedMetadataColumns}
                         sections={metadataColumnSections}
+                        disabledReason={metadataDisabledReason}
                       />
                     </div>
                   </div>

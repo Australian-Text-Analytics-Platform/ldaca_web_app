@@ -514,23 +514,25 @@ describe('ConcordanceFeature', () => {
       expect(screen.getByText('CONC_dispersion')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('document')).toBeInTheDocument();
-    expect(screen.queryByText('speaker')).not.toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'CONC_dispersion' })).toHaveStyle({ width: '400px' });
+    // Show metadata starts with no columns selected; the user must pick.
+    expect(screen.queryByRole('columnheader', { name: 'document' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'speaker' })).not.toBeInTheDocument();
 
     fireEvent.pointerDown(screen.getByRole('button', { name: /metadata columns/i }), { button: 0 });
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /document/i }));
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /speaker/i }));
     fireEvent.keyDown(screen.getByRole('menu', { name: /metadata columns/i }), { key: 'Escape' });
 
     await waitFor(() => {
       expect(screen.getByRole('columnheader', { name: /speaker/i })).toBeInTheDocument();
     });
+    expect(screen.getByRole('columnheader', { name: 'CONC_dispersion' })).toHaveStyle({ width: '400px' });
 
     unmount();
     clientWidthSpy.mockRestore();
   });
 
-  it('prefers the selected text column over the first metadata column by default', async () => {
+  it('does not auto-select metadata columns when Show metadata is enabled', async () => {
     mockInitialResult = {
       state: 'successful',
       message: 'ok',
@@ -574,10 +576,13 @@ describe('ConcordanceFeature', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /show metadata/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('columnheader', { name: /text/i })).toBeInTheDocument();
+      expect(screen.getByText('CONC_LEFT_CONTEXT')).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('columnheader', { name: /speaker/i })).not.toBeInTheDocument();
+    // No metadata column should appear as a column header until the user
+    // explicitly ticks one in the dropdown.
+    expect(screen.queryByRole('columnheader', { name: /^speaker$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^text$/i })).not.toBeInTheDocument();
   });
 
   it('shows the current page concordance occurrence count in the pagination label', async () => {

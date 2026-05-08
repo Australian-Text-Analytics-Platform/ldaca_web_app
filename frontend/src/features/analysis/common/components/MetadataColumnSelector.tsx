@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../../../components/ui/dropdown-menu';
+import { DisabledReasonTooltip } from '../../../../components/ui/disabled-reason-tooltip';
 import { normalizeMetadataColumns } from './metadataColumnSelection';
 
 export type MetadataColumnSection = {
@@ -21,6 +22,13 @@ export type MetadataColumnSection = {
    * colour is used for that block in the NodeSelectionPanel above.
    */
   color?: string;
+  /**
+   * When true, items in this section render disabled — visible (with their
+   * colour tint) but not toggleable. Used by Combined view to indicate
+   * that columns exclusive to one source can't be displayed in the
+   * combined table.
+   */
+  disabled?: boolean;
 };
 
 type MetadataColumnSelectorProps = {
@@ -31,11 +39,17 @@ type MetadataColumnSelectorProps = {
   onSelectedColumnsChange: (columns: string[]) => void;
   /**
    * Optional grouping of `availableColumns`. When provided and there is more
-   * than one section (or any section has a label), the dropdown renders each
-   * group with a heading and divider so users can tell which block a column
-   * came from. When omitted the dropdown falls back to a flat list.
+   * than one section, the dropdown renders each group with a divider so
+   * users can tell which block a column came from. When omitted the dropdown
+   * falls back to a flat list.
    */
   sections?: MetadataColumnSection[];
+  /**
+   * When provided, disables the Show metadata checkbox itself and surfaces
+   * the reason via a tooltip. Used to express "the selected data blocks
+   * have no shared metadata, so showing metadata isn't meaningful here".
+   */
+  disabledReason?: string;
 };
 
 export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
@@ -45,17 +59,32 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
   selectedColumns,
   onSelectedColumnsChange,
   sections,
+  disabledReason,
 }) => {
   const normalizedAvailableColumns = normalizeMetadataColumns(availableColumns);
   const normalizedSelectedColumns = normalizeMetadataColumns(selectedColumns).filter((column) =>
     normalizedAvailableColumns.includes(column),
   );
-  const allSelected =
-    normalizedAvailableColumns.length > 0 &&
-    normalizedSelectedColumns.length === normalizedAvailableColumns.length;
   const useSections =
     Array.isArray(sections) &&
     sections.length > 1;
+
+  // Columns that the user is allowed to toggle from this dropdown. Items in
+  // sections marked `disabled` are excluded — they're shown but inert.
+  const selectableColumns = useSections
+    ? Array.from(
+        new Set(
+          sections!
+            .filter((s) => !s.disabled)
+            .flatMap((s) => normalizeMetadataColumns(s.columns))
+            .filter((c) => normalizedAvailableColumns.includes(c)),
+        ),
+      )
+    : normalizedAvailableColumns;
+
+  const allSelectableSelected =
+    selectableColumns.length > 0 &&
+    selectableColumns.every((c) => normalizedSelectedColumns.includes(c));
 
   const toggleColumn = (column: string, checked: boolean) => {
     if (checked) {
@@ -66,16 +95,25 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
     onSelectedColumnsChange(normalizedSelectedColumns.filter((selectedColumn) => selectedColumn !== column));
   };
 
+  const isShowDisabled = !!disabledReason;
+  const dropdownTriggerDisabled =
+    isShowDisabled || !showMetadata || selectableColumns.length === 0;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label className="flex items-center gap-2 text-sm text-foreground">
-        <Checkbox
-          checked={showMetadata}
-          onCheckedChange={(checked) => onShowMetadataChange(checked === true)}
-          aria-label="Show metadata"
-        />
-        <span>Show metadata</span>
-      </label>
+      <DisabledReasonTooltip reason={isShowDisabled ? disabledReason : undefined}>
+        <label
+          className={`flex items-center gap-2 text-sm text-foreground ${isShowDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
+        >
+          <Checkbox
+            checked={showMetadata}
+            onCheckedChange={(checked) => onShowMetadataChange(checked === true)}
+            aria-label="Show metadata"
+            disabled={isShowDisabled}
+          />
+          <span>Show metadata</span>
+        </label>
+      </DisabledReasonTooltip>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -83,8 +121,9 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
             type="button"
             variant="outline"
             size="sm"
-            disabled={!showMetadata || normalizedAvailableColumns.length === 0}
+            disabled={dropdownTriggerDisabled}
             aria-label="Metadata columns"
+            title={dropdownTriggerDisabled ? disabledReason : undefined}
           >
             Metadata columns ({normalizedSelectedColumns.length})
             <ChevronDown className="ml-2 h-4 w-4" />
@@ -92,11 +131,22 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuCheckboxItem
-            checked={allSelected}
+            checked={allSelectableSelected}
+            // "Select all" only operates on selectable columns; selections
+            // already in disabled sections are preserved untouched.
             onCheckedChange={(checked) => {
-              onSelectedColumnsChange(checked === true ? normalizedAvailableColumns : []);
+              if (checked === true) {
+                onSelectedColumnsChange(
+                  normalizeMetadataColumns([...normalizedSelectedColumns, ...selectableColumns]),
+                );
+              } else {
+                onSelectedColumnsChange(
+                  normalizedSelectedColumns.filter((c) => !selectableColumns.includes(c)),
+                );
+              }
             }}
             onSelect={(event) => event.preventDefault()}
+            disabled={selectableColumns.length === 0}
           >
             Select all
           </DropdownMenuCheckboxItem>
@@ -118,6 +168,7 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
                       checked={normalizedSelectedColumns.includes(column)}
                       onCheckedChange={(checked) => toggleColumn(column, checked === true)}
                       onSelect={(event) => event.preventDefault()}
+                      disabled={section.disabled}
                       style={section.color ? { color: section.color } : undefined}
                     >
                       {column}
