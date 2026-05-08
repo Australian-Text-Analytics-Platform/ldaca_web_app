@@ -164,7 +164,8 @@ const ConcordanceFeature: React.FC = () => {
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
-  const [showDispersion, setShowDispersion] = useState(false);
+  const [concordanceView, setConcordanceView] = useState<'table' | 'dispersion'>('table');
+  const showDispersion = concordanceView === 'dispersion';
   const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
   const [colourMatches, setColourMatches] = useState(false);
   const [lowercaseMatches, setLowercaseMatches] = useState(false);
@@ -1769,22 +1770,25 @@ const ConcordanceFeature: React.FC = () => {
                   )}
                 </div>
                 <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm text-foreground">
-                      <input
-                        type="checkbox"
-                        checked={showDispersion}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setShowDispersion(isChecked);
-                          if (!isChecked) {
-                            setProportionalDispersionBars(false);
-                          }
-                        }}
-                        className="h-4 w-4"
-                      />
-                      <span>Dispersion View</span>
-                    </label>
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <Tabs
+                      value={concordanceView}
+                      onValueChange={(value) => {
+                        const newView = value as 'table' | 'dispersion';
+                        setConcordanceView(newView);
+                        if (newView === 'table') {
+                          setProportionalDispersionBars(false);
+                          setColourMatches(false);
+                          setLowercaseMatches(false);
+                          setHiddenMatchedTexts(new Set());
+                        }
+                      }}
+                    >
+                      <TabsList>
+                        <TabsTrigger value="table">Table View</TabsTrigger>
+                        <TabsTrigger value="dispersion">Dispersion View</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                     <MetadataColumnSelector
                       showMetadata={showMetadata}
                       onShowMetadataChange={(nextValue) => {
