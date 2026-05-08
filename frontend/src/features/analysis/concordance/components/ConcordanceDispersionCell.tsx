@@ -7,6 +7,10 @@ type Props = {
   hits: ConcordanceGroupedRow;
   textLength?: number;
   barWidthPercent?: number;
+  colourMatches?: boolean;
+  matchedTextColors?: Record<string, string>;
+  lowercaseMatches?: boolean;
+  hiddenMatchedTexts?: Set<string>;
 };
 
 const getNumericIndex = (value: unknown): number | null => {
@@ -24,6 +28,10 @@ export const ConcordanceDispersionCell: React.FC<Props> = ({
   hits,
   textLength,
   barWidthPercent = 100,
+  colourMatches = false,
+  matchedTextColors,
+  lowercaseMatches = false,
+  hiddenMatchedTexts,
 }) => {
   const fallbackLength = hits.reduce((max, hit) => {
     const endIndex = getNumericIndex(hit[CONCORDANCE_COLUMN_KEYS.endIdx]);
@@ -45,12 +53,18 @@ export const ConcordanceDispersionCell: React.FC<Props> = ({
           if (startIndex === null) {
             return null;
           }
+          const rawText = String(hit[CONCORDANCE_COLUMN_KEYS.matchedText] ?? '');
+          const normalizedText = lowercaseMatches ? rawText.toLowerCase() : rawText;
+          if (hiddenMatchedTexts?.has(normalizedText)) {
+            return null;
+          }
           const leftPercent = Math.min(100, (startIndex / domain) * 100);
+          const barColor = colourMatches ? (matchedTextColors?.[normalizedText] ?? '#0284c7') : undefined;
           return (
             <span
               key={`${startIndex}-${index}`}
-              className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-600"
-              style={{ left: `${leftPercent}%` }}
+              className={`absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full${barColor ? '' : ' bg-sky-600'}`}
+              style={{ left: `${leftPercent}%`, ...(barColor ? { backgroundColor: barColor } : {}) }}
             />
           );
         })}

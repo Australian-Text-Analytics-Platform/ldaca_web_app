@@ -1,5 +1,5 @@
 // NodeSelectionPanel now handles color selection UI inline
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
@@ -166,6 +166,9 @@ const ConcordanceFeature: React.FC = () => {
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
   const [showDispersion, setShowDispersion] = useState(false);
   const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
+  const [colourMatches, setColourMatches] = useState(false);
+  const [lowercaseMatches, setLowercaseMatches] = useState(false);
+  const [hiddenMatchedTexts, setHiddenMatchedTexts] = useState<Set<string>>(new Set());
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
   const [results, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
@@ -189,6 +192,27 @@ const ConcordanceFeature: React.FC = () => {
     activeNodeIds,
     palette: EXTENDED_PALETTE,
   });
+
+  const allMatchedTexts = useMemo((): string[] => {
+    if (!showDispersion || !colourMatches || !results?.data) return [];
+    const seen = new Set<string>();
+    for (const nodeData of Object.values(results.data)) {
+      for (const group of nodeData.data) {
+        for (const hit of group) {
+          const raw = String(hit[CONCORDANCE_COLUMN_KEYS.matchedText] ?? '');
+          if (raw) seen.add(lowercaseMatches ? raw.toLowerCase() : raw);
+        }
+      }
+    }
+    return [...seen].sort();
+  }, [showDispersion, colourMatches, lowercaseMatches, results?.data]);
+
+  const matchedTextColorMap = useMemo(
+    (): Record<string, string> =>
+      Object.fromEntries(allMatchedTexts.map((t, i) => [t, EXTENDED_PALETTE[i % EXTENDED_PALETTE.length]!])),
+    [allMatchedTexts],
+  );
+
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
   const [combinedLoading, setCombinedLoading] = useState(false);
@@ -1271,6 +1295,10 @@ const ConcordanceFeature: React.FC = () => {
                                   barWidthPercent={proportionalDispersionBars
                                     ? getDispersionBarWidthPercent(row, column, longestTextLength)
                                     : 100}
+                                  colourMatches={colourMatches}
+                                  matchedTextColors={matchedTextColorMap}
+                                  lowercaseMatches={lowercaseMatches}
+                                  hiddenMatchedTexts={hiddenMatchedTexts}
                                 />
                               ) : row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}
                             </TableCell>
@@ -1410,6 +1438,10 @@ const ConcordanceFeature: React.FC = () => {
                               barWidthPercent={proportionalDispersionBars
                                 ? getDispersionBarWidthPercent(row, column, longestTextLength)
                                 : 100}
+                              colourMatches={colourMatches}
+                              matchedTextColors={matchedTextColorMap}
+                              lowercaseMatches={lowercaseMatches}
+                              hiddenMatchedTexts={hiddenMatchedTexts}
                             />
                           ) : row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
                         </TableCell>
@@ -1783,6 +1815,36 @@ const ConcordanceFeature: React.FC = () => {
                         />
                         <span>Bar length proportional to text length</span>
                       </label>
+                      <label className="flex items-center gap-2 text-sm text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={colourMatches}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setColourMatches(checked);
+                            if (!checked) {
+                              setLowercaseMatches(false);
+                              setHiddenMatchedTexts(new Set());
+                            }
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <span>Colour matches</span>
+                      </label>
+                      {colourMatches && (
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={lowercaseMatches}
+                            onChange={(e) => {
+                              setLowercaseMatches(e.target.checked);
+                              setHiddenMatchedTexts(new Set());
+                            }}
+                            className="h-4 w-4"
+                          />
+                          <span>Lowercase matches</span>
+                        </label>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -1834,6 +1896,40 @@ const ConcordanceFeature: React.FC = () => {
                   </div>
                 ) : (
                   <div className="rounded-md border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">No data available</div>
+                )}
+                {showDispersion && colourMatches && allMatchedTexts.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 py-2">
+                    {allMatchedTexts.map((text) => {
+                      const color = matchedTextColorMap[text] ?? '#0284c7';
+                      const isHidden = hiddenMatchedTexts.has(text);
+                      return (
+                        <button
+                          key={text}
+                          type="button"
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-0.5 transition-opacity hover:bg-muted/60"
+                          style={{ opacity: isHidden ? 0.4 : 1 }}
+                          onClick={() => {
+                            setHiddenMatchedTexts((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(text)) next.delete(text);
+                              else next.add(text);
+                              return next;
+                            });
+                          }}
+                          aria-pressed={!isHidden}
+                          aria-label={isHidden ? `Show ${text}` : `Hide ${text}`}
+                        >
+                          <div className="h-4 w-0.5 rounded-full" style={{ backgroundColor: color }} />
+                          <span
+                            className="text-sm font-medium text-muted-foreground"
+                            style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
+                          >
+                            {text}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 </div>
               </CardContent>

@@ -67,7 +67,7 @@ Each row represents one match. If a document contains multiple matches, each app
 
 ![Dispersion view screenshot](tutorials/assets/concordance/dispersion_view.png)
 
-Each row represents one document, and all matches within that document are plotted as vertical lines on a horizontal bar. The position of each line shows the relative location of the match within the document. Toggle **Proportional bar length** to scale bars by document character length, or keep all bars the same length for easier comparison.
+Each row represents one document, and all matches within that document are plotted as vertical lines on a horizontal bar. The position of each line shows the relative location of the match within the document. Toggle **Proportional bar length** to scale bars by document character length, or keep all bars the same length for easier comparison of the relative positions of hits.
 
 <h3 id="help-concordance-display-mode">Separated and combined display</h3>
 
