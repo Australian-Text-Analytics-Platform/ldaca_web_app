@@ -122,32 +122,39 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
 
   const materialisedBinsReady = !!materialisedBins;
   const [showAllProcessed, setShowAllProcessed] = useState<boolean>(materialised);
-  // Default to "all processed" once a block is materialised; revert to the
-  // page view if materialisation goes away (e.g. user switches blocks).
+  // Auto-enable the toggle the *first* time `materialised` becomes true (so
+  // a fresh materialisation immediately switches the plot to all-processed
+  // mode). After that, respect the user's manual choice — otherwise a
+  // transient false→true flip in `materialised` (e.g. when
+  // `panelSelectedNodes` is momentarily empty during navigation) would
+  // re-tick a checkbox the user had just un-ticked.
+  const hasAutoEnabledShowAllRef = useRef<boolean>(materialised);
   useEffect(() => {
-    setShowAllProcessed(materialised);
+    if (materialised && !hasAutoEnabledShowAllRef.current) {
+      hasAutoEnabledShowAllRef.current = true;
+      setShowAllProcessed(true);
+    }
   }, [materialised]);
 
   // The plot only switches data sources once the server-side bin histogram
   // has been fetched. Until then, even with the toggle on, we keep showing
   // the current page.
   const useMaterialised = materialised && showAllProcessed && materialisedBinsReady;
-  const effectiveSplitBySource = aggregateAll ? false : splitBySource;
 
   const { bins, sources } = useMemo(() => {
     if (useMaterialised && materialisedBins) {
       return buildDispersionBinsFromBinned(materialisedBins, binCount, {
         lowercaseMatches,
-        splitBySource: effectiveSplitBySource,
+        splitBySource,
         aggregateAll,
       });
     }
     return buildDispersionBins(rows, textColumn, binCount, {
       lowercaseMatches,
-      splitBySource: effectiveSplitBySource,
+      splitBySource,
       aggregateAll,
     });
-  }, [useMaterialised, materialisedBins, rows, textColumn, binCount, lowercaseMatches, effectiveSplitBySource, aggregateAll]);
+  }, [useMaterialised, materialisedBins, rows, textColumn, binCount, lowercaseMatches, splitBySource, aggregateAll]);
 
   const title = useMaterialised
     ? `Aggregated matches of data block - ${dataBlockLabel}`
@@ -169,6 +176,19 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
 
   const series: SeriesConfig[] = useMemo(() => {
     if (aggregateAll) {
+      // No matched-text differentiation. If the user wants split-by-source,
+      // emit one aggregate line per source (solid/dashed); otherwise a
+      // single overall line.
+      if (splitBySource && sources.length > 0) {
+        return sources.map((src, idx) => ({
+          key: `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${src}`,
+          color: AGGREGATE_DEFAULT_COLOR,
+          dash: SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length],
+          name: `${AGGREGATE_LINE_LABEL} (${src})`,
+          text: AGGREGATE_LINE_LABEL,
+          source: src,
+        }));
+      }
       return [
         {
           key: DISPERSION_AGGREGATE_KEY,
@@ -183,7 +203,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
     const out: SeriesConfig[] = [];
     for (const text of visibleTexts) {
       const color = matchedTextColors[text] ?? AGGREGATE_DEFAULT_COLOR;
-      if (effectiveSplitBySource && sources.length > 0) {
+      if (splitBySource && sources.length > 0) {
         sources.forEach((src, idx) => {
           out.push({
             key: `${text}${DISPERSION_SOURCE_DELIMITER}${src}`,
@@ -199,7 +219,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
       }
     }
     return out;
-  }, [aggregateAll, visibleTexts, matchedTextColors, effectiveSplitBySource, sources]);
+  }, [aggregateAll, visibleTexts, matchedTextColors, splitBySource, sources]);
 
   const handleDownload = async (format: ChartImageFormat) => {
     if (!chartContainerRef.current) {
@@ -215,7 +235,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
       { label: 'Title', value: title },
       { label: 'Search', value: searchWord || '—' },
       { label: 'Bins', value: String(binCount) },
-      ...(effectiveSplitBySource && sources.length > 0
+      ...(splitBySource && sources.length > 0
         ? [{ label: 'Sources', value: sources.join(' / ') }]
         : []),
     ];
@@ -234,7 +254,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
           type: 'line' as const,
           hidden: hiddenMatchedTexts.has(text),
         }));
-    if (!aggregateAll && effectiveSplitBySource && sources.length > 0) {
+    if (splitBySource && sources.length > 0) {
       sources.forEach((src, idx) => {
         legend.push({
           label: `${src}${idx === 0 ? ' (solid)' : ' (dashed)'}`,
@@ -297,11 +317,9 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
             <Tooltip
               formatter={(value, name) => {
                 const rawName = String(name);
-                if (rawName === DISPERSION_AGGREGATE_KEY) {
-                  return [value as number, AGGREGATE_LINE_LABEL];
-                }
                 const { text, source } = stripSeriesKey(rawName);
-                return [value as number, source ? `${text} (${source})` : text];
+                const displayText = text === DISPERSION_AGGREGATE_KEY ? AGGREGATE_LINE_LABEL : text;
+                return [value as number, source ? `${displayText} (${source})` : displayText];
               }}
               labelFormatter={(label) => formatBinRange(Number(label), binCount)}
             />
@@ -324,7 +342,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
         </ResponsiveContainer>
       </div>
       <div className="text-center text-sm font-medium text-foreground">{title}</div>
-      {effectiveSplitBySource && sources.length > 0 && (
+      {splitBySource && sources.length > 0 && (
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
           {sources.map((src, idx) => {
             const dash = SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length];

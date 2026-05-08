@@ -527,22 +527,31 @@ const ConcordanceFeature: React.FC = () => {
       setCaseSensitive(!!reqObj.case_sensitive);
       const hydratedMode: 'separated' | 'combined' = reqObj.combined && reqObj.combinable !== false ? 'combined' : 'separated';
       setViewMode(hydratedMode);
+      // Replace (not merge) on hydration so the saved task's materialised
+      // state is the source of truth. Otherwise stale entries from a
+      // previous task could survive a re-run that produced an empty
+      // `materialized_paths`, leaving the Process All button incorrectly
+      // disabled and the bin-fetch hitting "No materialised concordance for
+      // node X" 404s. Also reset the bin cache + applied-event tracker so
+      // the consumer + bin-fetch effects re-populate cleanly for whatever
+      // the hydrated task contains.
       const paths = reqObj.materialized_paths as Record<string, string> | undefined;
-      if (paths && typeof paths === 'object') {
-        setMaterializedPaths(prev => ({ ...prev, ...paths }));
-      }
+      const nextPaths = (paths && typeof paths === 'object') ? { ...paths } : {};
+      setMaterializedPaths(nextPaths);
+      setMaterializedBins({});
+      processedMaterializedEventSeqRef.current = new Set();
       const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
+      const nextSummaries: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
       if (summaries && typeof summaries === 'object') {
-        const parsed: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
         for (const [nid, s] of Object.entries(summaries)) {
-          parsed[nid] = {
+          nextSummaries[nid] = {
             recordCount: Number(s.record_count) || 0,
             uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
             totalDocuments: Number(s.total_source_documents) || 0,
           };
         }
-        setMaterializeSummaries(prev => ({ ...prev, ...parsed }));
       }
+      setMaterializeSummaries(nextSummaries);
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -854,16 +863,33 @@ const ConcordanceFeature: React.FC = () => {
   // (e.g. the page-size reset triggers a results refresh). We hold the last
   // known value in a ref so events that arrive during the refetch window can
   // still be matched and applied.
+  //
+  // We also use the ref to detect a real task switch — `taskA` → `taskB`
+  // with both non-empty — which only happens when the user actually clicks
+  // Run/Update and a new analysis task is created. In that case the cached
+  // `materializedPaths` belongs to the previous task and would otherwise
+  // cause "No materialised concordance for node X" 404s on the bin-fetch.
+  // We deliberately skip the clear on the initial `'' → taskA` transition
+  // (mount/remount with hydration), since `onHydratedRequest` is the
+  // authoritative source for that path.
   const concordanceTaskIdRef = useRef<string>('');
+  const processedMaterializedEventSeqRef = useRef<Set<number>>(new Set());
   useEffect(() => {
-    if (concordanceTaskId) concordanceTaskIdRef.current = concordanceTaskId;
+    if (!concordanceTaskId) return;
+    const prev = concordanceTaskIdRef.current;
+    if (prev && prev !== concordanceTaskId) {
+      setMaterializedPaths({});
+      setMaterializedBins({});
+      setMaterializeSummaries({});
+      processedMaterializedEventSeqRef.current = new Set();
+    }
+    concordanceTaskIdRef.current = concordanceTaskId;
   }, [concordanceTaskId]);
 
-  // We track which event sequences have been *applied* (path written to
-  // state). Events are NEVER marked processed when the consumer can't apply
-  // them yet, so re-running the effect when the id comes back picks up any
-  // unapplied events for that task.
-  const processedMaterializedEventSeqRef = useRef<Set<number>>(new Set());
+  // The processed-event ref is declared above (alongside the task-id-change
+  // effect that resets it). Events are never marked processed when the
+  // consumer can't apply them yet, so re-running the effect when the id
+  // comes back picks up any unapplied events for that task.
   useEffect(() => {
     if (materializedEvents.length === 0) return;
     const effectiveTaskId = concordanceTaskId || concordanceTaskIdRef.current;
@@ -1390,9 +1416,13 @@ const ConcordanceFeature: React.FC = () => {
                     void handleMaterialize(nid, col);
                   }
                 }}
+                // Stays enabled while at least one block still needs
+                // processing — the click handler skips any block already in
+                // `materializedPaths`, so partial re-clicks are safe. The
+                // button does not gate on `combinedLoading` (the combined
+                // table fetch is independent of the materialise operation).
                 disabled={
-                  combinedLoading
-                  || isAnyCombinedMaterializing
+                  isAnyCombinedMaterializing
                   || allCombinedMaterialized
                   || !searchWord.trim()
                   || combinedNodeIds.length === 0
@@ -2141,6 +2171,19 @@ const ConcordanceFeature: React.FC = () => {
                         />
                         <span>Bar length proportional to text length</span>
                       </label>
+                      {!proportionalDispersionBars && viewMode === 'combined' && (
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          <span>Sources:</span>
+                          <select
+                            value={combinedSourceMode}
+                            onChange={(e) => setCombinedSourceMode(e.target.value as 'aggregate' | 'split')}
+                            className="h-7 rounded border border-input bg-background px-2 text-sm"
+                          >
+                            <option value="aggregate">Aggregate</option>
+                            <option value="split">Split (solid/dashed)</option>
+                          </select>
+                        </label>
+                      )}
                       <label className="flex items-center gap-2 text-sm text-foreground">
                         <input
                           type="checkbox"
@@ -2169,19 +2212,6 @@ const ConcordanceFeature: React.FC = () => {
                             className="h-4 w-4"
                           />
                           <span>Lowercase matches</span>
-                        </label>
-                      )}
-                      {colourMatches && !proportionalDispersionBars && viewMode === 'combined' && (
-                        <label className="flex items-center gap-2 text-sm text-foreground">
-                          <span>Sources:</span>
-                          <select
-                            value={combinedSourceMode}
-                            onChange={(e) => setCombinedSourceMode(e.target.value as 'aggregate' | 'split')}
-                            className="h-7 rounded border border-input bg-background px-2 text-sm"
-                          >
-                            <option value="aggregate">Aggregate</option>
-                            <option value="split">Split (solid/dashed)</option>
-                          </select>
                         </label>
                       )}
                     </div>
