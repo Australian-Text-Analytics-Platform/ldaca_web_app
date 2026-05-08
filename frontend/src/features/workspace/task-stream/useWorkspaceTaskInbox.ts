@@ -170,6 +170,7 @@ export const useWorkspaceTaskInbox = (
   const queryClient = useQueryClient();
   const { getAuthHeaders } = useAuth();
   const setTasks = useAnalysisStore((state) => state.setTasks);
+  const pushMaterializedEvent = useAnalysisStore((state) => state.pushMaterializedEvent);
   const [transientError, setTransientError] = useState<string | null>(null);
   const eventSequenceRef = useRef(0);
 
@@ -239,6 +240,24 @@ export const useWorkspaceTaskInbox = (
                 queryKey: queryKeys.workspaceGraph(workspaceId),
               });
             }
+          }
+          break;
+        }
+        case 'analysis_materialized': {
+          const taskType = typeof payload.task_type === 'string' ? payload.task_type : '';
+          const taskId = typeof payload.task_id === 'string' ? payload.task_id : '';
+          const parentTaskId = typeof payload.parent_task_id === 'string' ? payload.parent_task_id : '';
+          const parentNodeId = typeof payload.parent_node_id === 'string' ? payload.parent_node_id : '';
+          const materializedPath = typeof payload.materialized_path === 'string' ? payload.materialized_path : '';
+          if (taskType && parentTaskId && parentNodeId && materializedPath) {
+            pushMaterializedEvent({
+              taskType,
+              taskId,
+              parentTaskId,
+              parentNodeId,
+              materializedPath,
+              timestamp: normalizeTimestamp(payload.timestamp) ?? Date.now(),
+            });
           }
           break;
         }

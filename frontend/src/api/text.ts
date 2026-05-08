@@ -46,6 +46,19 @@ export interface ConcordanceResultEntry {
   sorting: { sort_by?: string; descending: boolean; };
   materialized?: boolean;
 }
+export interface ConcordanceDispersionBinRow {
+  matched_text?: string;
+  bin_idx?: number;
+  count?: number;
+}
+export interface ConcordanceDispersionBinsResponse {
+  node_id: string;
+  total_hits: number;
+  document_column: string | null;
+  /** Number of source bins the hits were pre-aggregated into (server-side). */
+  bin_count: number;
+  rows: ConcordanceDispersionBinRow[];
+}
 export interface ConcordanceAnalysisResponse {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   message: string;
@@ -362,6 +375,7 @@ export const textApi = {
     httpRequest<ConcordanceDetachOptionsResponse>(`/workspaces/nodes/${node}/concordance/detach-options`, { method: 'GET', headers, params: { column } }),
   getConcordanceTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/concordance/tasks/${taskId}/request`, { method: 'GET', headers }),
   getConcordanceTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest<ConcordanceAnalysisResponse>(`/workspaces/concordance/tasks/${taskId}/result`, { method: 'GET', headers }),
+  getConcordanceTaskDispersionBins: (taskId: string, nodeId: string, headers: Record<string,string> = {}) => httpRequest<ConcordanceDispersionBinsResponse>(`/workspaces/concordance/tasks/${taskId}/bins`, { method: 'GET', headers, params: { node_id: nodeId } }),
   postConcordanceTaskResult: (taskId: string, body: ConcordanceResultQuery, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance/tasks/${taskId}/result`, body, headers),
 
   // Quotation

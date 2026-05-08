@@ -33,11 +33,38 @@ vi.mock('@/components/tabs/AnalysisTaskBanner', () => ({
   default: () => null,
 }));
 
-vi.mock('@/components/ui/tabs', () => ({
-  Tabs: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TabsTrigger: ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button>,
-}));
+vi.mock('@/components/ui/tabs', () => {
+  let currentOnValueChange: ((value: string) => void) | undefined;
+  return {
+    Tabs: ({
+      children,
+      onValueChange,
+    }: {
+      children: React.ReactNode;
+      onValueChange?: (value: string) => void;
+      value?: string;
+    }) => {
+      currentOnValueChange = onValueChange;
+      return <div>{children}</div>;
+    },
+    TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    TabsTrigger: ({
+      children,
+      value,
+    }: {
+      children: React.ReactNode;
+      value: string;
+    }) => (
+      <button
+        type="button"
+        role="tab"
+        onClick={() => currentOnValueChange?.(value)}
+      >
+        {children}
+      </button>
+    ),
+  };
+});
 
 vi.mock('@/components/ui/dialog', () => ({
   Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -120,6 +147,7 @@ vi.mock('@/stores/analysisStore', () => ({
       pendingConcordance: mockPendingConcordance,
       clearPendingConcordance: vi.fn(),
       setTasks: vi.fn(),
+      materializedEvents: [],
     }),
 }));
 
@@ -422,7 +450,7 @@ describe('ConcordanceFeature', () => {
 
     const { unmount } = render(<ConcordanceFeature />);
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /dispersion view/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
 
     await waitFor(() => {
       expect(screen.getByText('CONC_dispersion')).toBeInTheDocument();
@@ -479,7 +507,7 @@ describe('ConcordanceFeature', () => {
 
     const { unmount } = render(<ConcordanceFeature />);
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /dispersion view/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
     fireEvent.click(screen.getByRole('checkbox', { name: /show metadata/i }));
 
     await waitFor(() => {

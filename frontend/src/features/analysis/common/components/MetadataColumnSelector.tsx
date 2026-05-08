@@ -12,12 +12,30 @@ import {
 } from '../../../../components/ui/dropdown-menu';
 import { normalizeMetadataColumns } from './metadataColumnSelection';
 
+export type MetadataColumnSection = {
+  columns: string[];
+  /**
+   * Optional foreground colour applied to the items in this section. When
+   * provided, the dropdown skips section headers and relies on colour alone
+   * to differentiate which data block each column came from — the same
+   * colour is used for that block in the NodeSelectionPanel above.
+   */
+  color?: string;
+};
+
 type MetadataColumnSelectorProps = {
   showMetadata: boolean;
   onShowMetadataChange: (showMetadata: boolean) => void;
   availableColumns: string[];
   selectedColumns: string[];
   onSelectedColumnsChange: (columns: string[]) => void;
+  /**
+   * Optional grouping of `availableColumns`. When provided and there is more
+   * than one section (or any section has a label), the dropdown renders each
+   * group with a heading and divider so users can tell which block a column
+   * came from. When omitted the dropdown falls back to a flat list.
+   */
+  sections?: MetadataColumnSection[];
 };
 
 export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
@@ -26,6 +44,7 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
   availableColumns,
   selectedColumns,
   onSelectedColumnsChange,
+  sections,
 }) => {
   const normalizedAvailableColumns = normalizeMetadataColumns(availableColumns);
   const normalizedSelectedColumns = normalizeMetadataColumns(selectedColumns).filter((column) =>
@@ -34,6 +53,9 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
   const allSelected =
     normalizedAvailableColumns.length > 0 &&
     normalizedSelectedColumns.length === normalizedAvailableColumns.length;
+  const useSections =
+    Array.isArray(sections) &&
+    sections.length > 1;
 
   const toggleColumn = (column: string, checked: boolean) => {
     if (checked) {
@@ -79,16 +101,41 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
             Select all
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
-          {normalizedAvailableColumns.map((column) => (
-            <DropdownMenuCheckboxItem
-              key={column}
-              checked={normalizedSelectedColumns.includes(column)}
-              onCheckedChange={(checked) => toggleColumn(column, checked === true)}
-              onSelect={(event) => event.preventDefault()}
-            >
-              {column}
-            </DropdownMenuCheckboxItem>
-          ))}
+          {useSections
+            ? sections!.flatMap((section, sectionIdx) => {
+                const items = normalizeMetadataColumns(section.columns).filter((column) =>
+                  normalizedAvailableColumns.includes(column),
+                );
+                if (items.length === 0) return [];
+                const out: React.ReactNode[] = [];
+                if (sectionIdx > 0) {
+                  out.push(<DropdownMenuSeparator key={`sep-${sectionIdx}`} />);
+                }
+                items.forEach((column) => {
+                  out.push(
+                    <DropdownMenuCheckboxItem
+                      key={`${sectionIdx}-${column}`}
+                      checked={normalizedSelectedColumns.includes(column)}
+                      onCheckedChange={(checked) => toggleColumn(column, checked === true)}
+                      onSelect={(event) => event.preventDefault()}
+                      style={section.color ? { color: section.color } : undefined}
+                    >
+                      {column}
+                    </DropdownMenuCheckboxItem>,
+                  );
+                });
+                return out;
+              })
+            : normalizedAvailableColumns.map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column}
+                  checked={normalizedSelectedColumns.includes(column)}
+                  onCheckedChange={(checked) => toggleColumn(column, checked === true)}
+                  onSelect={(event) => event.preventDefault()}
+                >
+                  {column}
+                </DropdownMenuCheckboxItem>
+              ))}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
