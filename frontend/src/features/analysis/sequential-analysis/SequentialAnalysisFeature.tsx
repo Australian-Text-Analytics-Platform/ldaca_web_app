@@ -1,40 +1,40 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
-import { useAuth } from '../../../hooks/useAuth';
-import { useUIStore } from '../../../stores/uiStore';
-import { useSchemaManagement } from '../../../hooks/useSchemaManagement';
+import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
+import { useAuth } from '@/hooks/useAuth';
+import { useUIStore } from '@/stores/uiStore';
+import { useSchemaManagement } from '@/hooks/useSchemaManagement';
 import {
   type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
-} from '../../../api/text';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
+} from '@/api/text';
+import NodeSelectionPanel from '@/components/NodeSelectionPanel';
 
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
-import { normalizeSchemaFromInfo } from '../../../hooks/useSchemaManagement';
-import { getNodeInfo } from '../../../lib/nodeInfoCache';
-import { Button } from '../../../components/ui/button';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import HelpIcon from '../../../components/help/HelpIcon';
-import InfoIcon from '../../../components/help/InfoIcon';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
+import { getNodeInfo } from '@/lib/nodeInfoCache';
+import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import HelpIcon from '@/components/help/HelpIcon';
+import InfoIcon from '@/components/help/InfoIcon';
+import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../../components/ui/select';
-import { Checkbox } from '../../../components/ui/checkbox';
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Download, Loader2, Play, Plus, Trash2 } from 'lucide-react';
-import { normalizeTypeName } from '../../../utils/columnTypes';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { normalizeTypeName } from '@/utils/columnTypes';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import {
   hasLockedParameterDiff,
   normalizeStringArray,
@@ -56,14 +56,14 @@ import {
 import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
 import { UniqueValueCount } from './components/UniqueValueCount';
 import { SequentialChart } from './components/SequentialChart';
-import { ChartImageDownloadDialog } from '../../../components/ui/ChartImageDownloadDialog';
+import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   downloadChartAs,
   findSvgInContainer,
   type ChartImageFormat,
   type ChartExportHeaderItem,
   type ChartExportLegendItem,
-} from '../../../lib/chartExport';
+} from '@/lib/chartExport';
 
 const FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
   { value: 'hourly', label: 'Hourly' },

@@ -11,15 +11,15 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 
-import { Button } from '../../../../components/ui/button';
-import { ChartImageDownloadDialog } from '../../../../components/ui/ChartImageDownloadDialog';
+import { Button } from '@/components/ui/button';
+import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   downloadChartAs,
   findSvgInContainer,
   type ChartExportHeaderItem,
   type ChartExportLegendItem,
   type ChartImageFormat,
-} from '../../../../lib/chartExport';
+} from '@/lib/chartExport';
 
 import {
   buildDispersionBins,

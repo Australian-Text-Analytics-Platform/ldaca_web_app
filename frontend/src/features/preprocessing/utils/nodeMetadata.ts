@@ -1,4 +1,4 @@
-import type { WorkspaceNodeLike } from '../../../components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
 
 const toRecord = (value: unknown): Record<string, unknown> => (value && typeof value === 'object' ? value as Record<string, unknown> : {});
 

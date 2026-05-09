@@ -1,14 +1,14 @@
 import React from 'react';
 import { Layers, Loader2, Plus } from 'lucide-react';
 
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import HelpIcon from '../../../components/help/HelpIcon';
-import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { Tag } from '../../../components/ui/tag';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
+import NodeSelectionPanel from '@/components/NodeSelectionPanel';
+import HelpIcon from '@/components/help/HelpIcon';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tag } from '@/components/ui/tag';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useConcatSubTab, type ConcatSubTabProps } from './hooks/useConcatSubTab';

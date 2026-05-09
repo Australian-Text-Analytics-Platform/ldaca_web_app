@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../../../../hooks/useAuth';
-import { nodesApi } from '../../../../api/index';
+import { useAuth } from '@/hooks/useAuth';
+import { nodesApi } from '@/api/index';
 
 interface UniqueValueCountProps {
   workspaceId: string;

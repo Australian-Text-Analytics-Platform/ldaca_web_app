@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import {
   DetachColumnsDialog,
   type DetachDialogNodeOption,
-} from '../../../components/DetachColumnsDialog';
+} from '@/features/analysis/components/DetachColumnsDialog';
 
 type DetachNodeOption = DetachDialogNodeOption;
 

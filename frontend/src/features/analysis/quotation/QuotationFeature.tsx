@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { useAuth } from '../../../hooks/useAuth';
-import { useUIStore } from '../../../stores/uiStore';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
-import { textApi } from '../../../api/text';
+import NodeSelectionPanel from '@/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
+import { useAuth } from '@/hooks/useAuth';
+import { useUIStore } from '@/stores/uiStore';
+import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
+import { textApi } from '@/api/text';
 import type {
   QuotationAnalysisResponse,
   QuotationEngineConfig,
@@ -16,18 +16,18 @@ import type {
   QuotationGroupedRow,
   QuotationHitRow,
   QuotationMetadata,
-} from '../../../api/text';
-import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '../../../stores/quotationEngineStore';
-import { Button } from '../../../components/ui/button';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
-import { Badge } from '../../../components/ui/badge';
-import HelpIcon from '../../../components/help/HelpIcon';
-import InfoIcon from '../../../components/help/InfoIcon';
+} from '@/api/text';
+import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '@/stores/quotationEngineStore';
+import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import HelpIcon from '@/components/help/HelpIcon';
+import InfoIcon from '@/components/help/InfoIcon';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +36,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../../components/ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -44,10 +44,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../../../components/ui/table';
-import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
+} from '@/components/ui/table';
+import { AnalysisTableScrollArea } from '@/components/AnalysisTableScrollArea';
 import { ArrowUpDown, Loader2, Play, Plus, Trash2 } from 'lucide-react';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import {
   getNodeIdentifier,
   getServerEngineConfig,
@@ -61,8 +61,8 @@ import {
   type WorkspaceNodeLike,
 } from '../common';
 
-import { AnalysisPagination } from '../../../components/AnalysisPagination';
-import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
+import { AnalysisPagination } from '@/components/AnalysisPagination';
+import { useAnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
 import { flattenQuotationGroups } from './quotationViewModels';

@@ -1,15 +1,15 @@
 import React from 'react';
 import { Calculator, Loader2, X } from 'lucide-react';
 
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import HelpIcon from '../../../components/help/HelpIcon';
-import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import { Separator } from '../../../components/ui/separator';
-import { Tag } from '../../../components/ui/tag';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
-import { cn } from '../../../lib/utils';
+import NodeSelectionPanel from '@/components/NodeSelectionPanel';
+import HelpIcon from '@/components/help/HelpIcon';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import { Tag } from '@/components/ui/tag';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { cn } from '@/lib/utils';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { OperationPopover } from './components/OperationPopover';
@@ -25,6 +25,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
     basicBuilder,
     preview,
     apply,
+    dropZoneRef,
   } = useAggregateSubTab(props);
 
   return (
@@ -128,7 +129,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                   <HelpIcon targetKey="preprocessing.aggregate.builder" label="Expression builder" />
                 </div>
                 <div
-                  ref={basicBuilder.dropZoneRef}
+                  ref={dropZoneRef}
                   onDragEnter={basicBuilder.handlers.builderDragOver}
                   onDragOver={basicBuilder.handlers.builderDragOver}
                   onDragLeave={basicBuilder.handlers.builderDragLeave}

@@ -3,29 +3,29 @@ import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plu
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
-import { useAuth } from '../../../hooks/useAuth';
-import { useFiles } from '../../../hooks/useFiles';
-import { queryKeys } from '../../../lib/queryKeys';
-import { filesApi } from '../../../api/files';
-import { workspacesApi } from '../../../api/workspaces';
-import { saveBlob } from '../../../lib/download';
-import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
-import { usePreferencesStore } from '../../../stores/preferencesStore';
-import { useUIStore } from '../../../stores/uiStore';
-import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '../../../types';
-import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Button } from '../../../components/ui/button';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { ScrollArea } from '../../../components/ui/scroll-area';
-import { Badge } from '../../../components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../../components/ui/collapsible';
+import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
+import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
+import { useAuth } from '@/hooks/useAuth';
+import { useFiles } from '@/hooks/useFiles';
+import { queryKeys } from '@/lib/queryKeys';
+import { filesApi } from '@/api/files';
+import { workspacesApi } from '@/api/workspaces';
+import { saveBlob } from '@/lib/download';
+import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useUIStore } from '@/stores/uiStore';
+import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '@/types';
+import { AddFilePanel, FilePreviewPanel } from '@/components/panels';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { getInvalidWorkspaceNameMessage } from '../../../lib/workspaceName';
+import { getInvalidWorkspaceNameMessage } from '@/lib/workspaceName';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +35,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../../components/ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -43,16 +43,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../../../components/ui/dialog';
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from '../../../components/ui/dropdown-menu';
-import HelpIcon from '../../../components/help/HelpIcon';
-import InfoIcon from '../../../components/help/InfoIcon';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
+} from '@/components/ui/dropdown-menu';
+import HelpIcon from '@/components/help/HelpIcon';
+import InfoIcon from '@/components/help/InfoIcon';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 
 const README_FILENAME = 'README.md';
 const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';

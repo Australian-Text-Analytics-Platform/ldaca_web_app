@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 
-import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import {
   nodesApi,
   type FilterPreviewResponse,
   type ReplaceApplyResponse,
   type ReplaceRequest,
-} from '../../../../api/nodes';
-import { useAuth } from '../../../../hooks/useAuth';
-import { mapColumnsToInfo } from '../../../../utils/columnTypes';
+} from '@/api/nodes';
+import { useAuth } from '@/hooks/useAuth';
+import { mapColumnsToInfo } from '@/utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
 

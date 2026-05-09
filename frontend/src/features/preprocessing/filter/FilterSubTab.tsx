@@ -1,11 +1,11 @@
 import React from 'react';
 import { Filter, Loader2, Plus } from 'lucide-react';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Tag } from '../../../components/ui/tag';
-import { Button } from '../../../components/ui/button';
-import HelpIcon from '../../../components/help/HelpIcon';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
+import NodeSelectionPanel from '@/components/NodeSelectionPanel';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tag } from '@/components/ui/tag';
+import { Button } from '@/components/ui/button';
+import HelpIcon from '@/components/help/HelpIcon';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { ConditionBuilder } from '../components/condition-builder';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';

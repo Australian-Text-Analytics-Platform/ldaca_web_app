@@ -1,4 +1,4 @@
-import { getTaskTypeCandidates } from '../../../../hooks/analysisTaskUtils';
+import { getTaskTypeCandidates } from '@/hooks/analysisTaskUtils';
 
 const TERMINAL_STATES = new Set(['successful', 'failed', 'cancelled']);
 

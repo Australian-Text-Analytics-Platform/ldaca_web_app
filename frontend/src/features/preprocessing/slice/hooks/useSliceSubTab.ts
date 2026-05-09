@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { nodesApi, type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '../../../../api/nodes';
-import { useAuth } from '../../../../hooks/useAuth';
-import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
+import { nodesApi, type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '@/api/nodes';
+import { useAuth } from '@/hooks/useAuth';
+import type { NodeColumnSelection, WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';

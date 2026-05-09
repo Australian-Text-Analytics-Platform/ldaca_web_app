@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 
-import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
-import { type FilterPreviewResponse, type PolarsExpressionRequest, type PolarsExpressionApplyResponse, type PolarsExpressionContext } from '../../../../api/nodes';
+import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import { type FilterPreviewResponse, type PolarsExpressionRequest, type PolarsExpressionApplyResponse, type PolarsExpressionContext } from '@/api/nodes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
 import { deriveNodeLabel } from '../../utils/nodeMetadata';
 

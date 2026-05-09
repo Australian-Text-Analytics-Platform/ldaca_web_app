@@ -7,10 +7,10 @@ import {
   type ConcordanceMaterializeRequest,
   type ConcordanceResultQuery,
   textApi,
-} from '../../../../api/text';
+} from '@/api/text';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import { takeMostRecent } from '@/utils/selectionUtils';
 
 export type PaginationState = Record<string, NodePaginationState>;
 

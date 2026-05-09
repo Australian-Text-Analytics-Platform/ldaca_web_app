@@ -6,11 +6,11 @@ import {
   type TopicModelingResponse,
   type TopicModelingDetachRequest,
   type TopicModelingDetachNodeOption,
-} from '../../../../api/text';
-import { queryKeys } from '../../../../lib/queryKeys';
+} from '@/api/text';
+import { queryKeys } from '@/lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
-import { buildSamplingAutoNodeName } from '../../../preprocessing/utils/autoNodeNames';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import { buildSamplingAutoNodeName } from '@/features/preprocessing/utils/autoNodeNames';
+import { takeMostRecent } from '@/utils/selectionUtils';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 25;
 

@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
-import { textApi, type TokenFrequencyResponse } from '../../../api/text';
-import { useAuth } from '../../../hooks/useAuth';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { textApi, type TokenFrequencyResponse } from '@/api/text';
+import { useAuth } from '@/hooks/useAuth';
+import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
+import { takeMostRecent } from '@/utils/selectionUtils';
 
-import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
+import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';
 import {
   DEFAULT_TOKEN_LIMIT,
   parseAnalysisNodeRequest,
@@ -43,11 +43,11 @@ import {
   useSafeResult,
   useNodeColorManagement,
 } from '../common';
-import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
+import { pruneTasksById } from '@/hooks/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
-import { useAnalysisStore } from '../../../stores/analysisStore';
-import { useUIStore } from '../../../stores/uiStore';
+import { useAnalysisStore } from '@/stores/analysisStore';
+import { useUIStore } from '@/stores/uiStore';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;

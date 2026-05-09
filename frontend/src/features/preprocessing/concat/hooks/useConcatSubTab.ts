@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
+import type { NodeColumnSelection, WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   ConcatNodeSummary,
@@ -11,7 +11,7 @@ import type {
 } from '../../types';
 import { MAX_CONCAT_NODES } from '../../types';
 import { buildWorkspaceNodeMap, deriveNodeLabel, extractNodeColumns, extractNodeDtypes, getNodeKey } from '../../utils/nodeMetadata';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import { takeMostRecent } from '@/utils/selectionUtils';
 
 const DEFAULT_CONCAT_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9', '#f59e0b', '#14b8a6'];
 

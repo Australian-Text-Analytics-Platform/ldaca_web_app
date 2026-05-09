@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { QuotationAnalysisResponse } from '../../../../../api/text';
+import type { QuotationAnalysisResponse } from '@/api/text';
 import { useQuotationTaskFlow } from '../useQuotationTaskFlow';
 
 const buildQuotationResponse = (): QuotationAnalysisResponse => ({

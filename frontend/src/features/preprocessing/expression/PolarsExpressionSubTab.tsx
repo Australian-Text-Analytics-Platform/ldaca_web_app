@@ -1,17 +1,17 @@
 import React from 'react';
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
-import { CodeEditor } from '../../../components/CodeEditor';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import HelpIcon from '../../../components/help/HelpIcon';
-import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import { Checkbox } from '../../../components/ui/checkbox';
-import { Label } from '../../../components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { Tag } from '../../../components/ui/tag';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
+import { CodeEditor } from '@/components/CodeEditor';
+import NodeSelectionPanel from '@/components/NodeSelectionPanel';
+import HelpIcon from '@/components/help/HelpIcon';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tag } from '@/components/ui/tag';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { usePolarsExpressionSubTab, type PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';

@@ -1,25 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import { useAuth } from '../../../hooks/useAuth';
-import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { type AiAnnotationResponse, textApi } from '../../../api/text';
-import { nodesApi } from '../../../api/nodes';
-import { Button } from '../../../components/ui/button';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import NodeSelectionPanel from '@/components/NodeSelectionPanel';
+import { useAuth } from '@/hooks/useAuth';
+import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { type AiAnnotationResponse, textApi } from '@/api/text';
+import { nodesApi } from '@/api/nodes';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
-import { useUIStore } from '../../../stores/uiStore';
+import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
+import { useUIStore } from '@/stores/uiStore';
 import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId, restoreAnalysisLockFromRequest, resetAnalysisSelectionAfterClear } from '../common';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
-import { ScrollArea } from '../../../components/ui/scroll-area';
-import { AnalysisPagination } from '../../../components/AnalysisPagination';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { AnalysisPagination } from '@/components/AnalysisPagination';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,8 +29,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../../components/ui/alert-dialog';
-import { normalizeTypeName } from '../../../utils/columnTypes';
+} from '@/components/ui/alert-dialog';
+import { normalizeTypeName } from '@/utils/columnTypes';
 import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';

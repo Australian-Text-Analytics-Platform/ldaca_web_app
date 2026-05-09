@@ -4,14 +4,14 @@ import { Download, Scan } from 'lucide-react';
 import { toast } from 'sonner';
 import { TopicSelectionPanel } from './TopicSelectionPanel';
 import type { ZoomDomain } from '../../topicModelingAdapters';
-import { ChartImageDownloadDialog } from '../../../../../components/ui/ChartImageDownloadDialog';
+import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   buildChartBlob,
   findSvgInContainer,
   type ChartImageFormat,
   type ChartExportHeaderItem,
-} from '../../../../../lib/chartExport';
-import { saveBlob } from '../../../../../lib/download';
+} from '@/lib/chartExport';
+import { saveBlob } from '@/lib/download';
 
 type TopicLike = {
   id: number;

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { textApi } from '../../../../api/text';
+import { textApi } from '@/api/text';
 
 export type ServerLockAnalysisType =
   | 'token_frequencies'

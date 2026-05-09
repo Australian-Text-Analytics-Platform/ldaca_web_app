@@ -1,16 +1,16 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 
-import { Button } from '../../../../components/ui/button';
-import { Checkbox } from '../../../../components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../../../components/ui/dropdown-menu';
-import { DisabledReasonTooltip } from '../../../../components/ui/disabled-reason-tooltip';
+} from '@/components/ui/dropdown-menu';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { normalizeMetadataColumns } from './metadataColumnSelection';
 
 export type MetadataColumnSection = {

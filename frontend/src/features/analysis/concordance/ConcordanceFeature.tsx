@@ -1,24 +1,24 @@
 // NodeSelectionPanel now handles color selection UI inline
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { useAuth } from '../../../hooks/useAuth';
-import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, type ConcordanceResultEntry, textApi } from '../../../api/text';
-import { useAnalysisStore } from '../../../stores/analysisStore';
-import { useUIStore } from '../../../stores';
-import { Button } from '../../../components/ui/button';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import NodeSelectionPanel from '@/components/NodeSelectionPanel';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
+import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
+import { useAuth } from '@/hooks/useAuth';
+import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, type ConcordanceResultEntry, textApi } from '@/api/text';
+import { useAnalysisStore } from '@/stores/analysisStore';
+import { useUIStore } from '@/stores';
+import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Play, Loader2, Trash2, Plus } from 'lucide-react';
-import HelpIcon from '../../../components/help/HelpIcon';
-import InfoIcon from '../../../components/help/InfoIcon';
+import HelpIcon from '@/components/help/HelpIcon';
+import InfoIcon from '@/components/help/InfoIcon';
 import {
   Table,
   TableBody,
@@ -26,9 +26,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../../../components/ui/table';
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
+} from '@/components/ui/table';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
 import {
   hasLockedParameterDiff,
   resetAnalysisSelectionAfterClear,
@@ -45,16 +45,16 @@ import {
 import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import {
   pruneTasksById,
-} from '../../../hooks/analysisTaskUtils';
-import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
+} from '@/hooks/analysisTaskUtils';
+import { useAnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { highlightMatchInText } from '../common/components/highlightText';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { AnalysisPagination } from '../../../components/AnalysisPagination';
-import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { AnalysisPagination } from '@/components/AnalysisPagination';
+import { AnalysisTableScrollArea } from '@/components/AnalysisTableScrollArea';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
 import { ConcordanceDispersionCell } from './components/ConcordanceDispersionCell';
 import { ConcordanceDispersionLegend } from './components/ConcordanceDispersionLegend';

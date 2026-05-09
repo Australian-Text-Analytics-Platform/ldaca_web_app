@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import {
   nodesApi,
   type FilterPreviewResponse,
   type PolarsExpressionRequest,
   type PolarsExpressionApplyResponse,
-} from '../../../../api/nodes';
-import { useAuth } from '../../../../hooks/useAuth';
-import { mapColumnsToInfo, type ColumnInfo } from '../../../../utils/columnTypes';
+} from '@/api/nodes';
+import { useAuth } from '@/hooks/useAuth';
+import { mapColumnsToInfo, type ColumnInfo } from '@/utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
 
@@ -99,7 +99,6 @@ export interface BasicBuilderConfig {
   startEditingCustom: (tokenId: string) => void;
   finishCustomEdit: (commit: boolean) => void;
   clearBuilder: () => void;
-  dropZoneRef: React.RefObject<HTMLDivElement | null>;
   handlers: {
     customDraftChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
     customInputKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -146,6 +145,7 @@ export interface UseAggregateSubTabResult {
   basicBuilder: BasicBuilderConfig;
   preview: PreviewConfig;
   apply: ApplyConfig;
+  dropZoneRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const createTokenId = (): string => {
@@ -795,7 +795,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     };
 
   const basicExpressionPreview = tokensToExpression(basicTokens);
-  const manualExpressionActive = basicTokens.length === 0 && trimmedExpression.length > 0;
   const currentExpressionMatchesApplied = lastAppliedExpression && lastAppliedExpression === trimmedExpression;
 
   const nodeColumnSelections = (limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : []);
@@ -847,7 +846,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       startEditingCustom: startEditingCustomToken,
       finishCustomEdit,
       clearBuilder: clearBasicBuilder,
-      dropZoneRef,
       handlers: {
         customDraftChange: handleCustomDraftChange,
         customInputKeyDown: handleCustomInputKeyDown,
@@ -891,5 +889,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       currentMatchesApplied: !!currentExpressionMatchesApplied,
       handleApply,
     },
+    dropZoneRef,
   };
 };

@@ -4,8 +4,8 @@ import {
   type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
-} from '../../../../api/text';
-import type { ChartConfig } from '../../../../components/ui/chart';
+} from '@/api/text';
+import type { ChartConfig } from '@/components/ui/chart';
 import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
 
 // Callers may rely on period_start and period_end being present on chart rows.

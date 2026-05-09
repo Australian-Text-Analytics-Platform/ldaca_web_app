@@ -1,4 +1,4 @@
-import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '../../../hooks/useSchemaManagement';
+import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '@/hooks/useSchemaManagement';
 
 export const DEFAULT_TOKEN_LIMIT = 25;
 

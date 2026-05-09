@@ -1,14 +1,14 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { flexRender, type ColumnDef } from '@tanstack/react-table';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
-import { ScrollArea } from '../../../components/ui/scroll-area';
-import { Button } from '../../../components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RowDetailPanel } from '../../analysis/common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../../analysis/common/components/useRowDetailDialog';
-import { useServerTable } from '../../../hooks/useServerTable';
+import { useServerTable } from '@/hooks/useServerTable';
 import { formatPreviewValue } from '../utils/typeUtils';
 import { type PreviewRow, type PreviewPagination, PREVIEW_PAGE_SIZE_OPTIONS } from '../types';
 
