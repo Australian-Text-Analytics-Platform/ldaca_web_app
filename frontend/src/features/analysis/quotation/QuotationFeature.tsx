@@ -56,6 +56,7 @@ import {
   useAnalysisFeature,
   getAnalysisActionState,
   executeAnalysisRunOrUpdate,
+  type NodePaginationState,
   type WorkspaceNodeLike,
 } from '../common';
 
@@ -568,12 +569,7 @@ const QuotationFeature: React.FC = () => {
   const canRunQuotation = Boolean(currentWorkspaceId) && displayedNodes.length > 0 && !hasIncompleteSelections && engineReady;
 
   // Per-node pagination and sorting state
-  const [nodeState, setNodeState] = useState<Record<string, {
-    currentPage: number;
-    pageSize: number;
-    sortBy?: string;
-    descending: boolean;
-  }>>({});
+  const [nodeState, setNodeState] = useState<Record<string, NodePaginationState>>({});
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
