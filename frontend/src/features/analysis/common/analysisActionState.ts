@@ -6,12 +6,15 @@ export type AnalysisActionStateInput = {
   isBusy?: boolean;
   hasActiveTask?: boolean;
   allowRunWhenLocked?: boolean;
+  /** True for tools that support re-running via parameter change (shows "or change parameters" hint) */
+  canUpdate?: boolean;
 };
 
 export type AnalysisActionState = {
   runDisabled: boolean;
   clearDisabled: boolean;
   runLabel: 'Run' | 'Update';
+  runDisabledReason: string | undefined;
 };
 
 export const getAnalysisActionState = ({
@@ -22,6 +25,7 @@ export const getAnalysisActionState = ({
   isBusy = false,
   hasActiveTask = false,
   allowRunWhenLocked = false,
+  canUpdate = false,
 }: AnalysisActionStateInput): AnalysisActionState => {
   const runDisabled =
     !hasWorkspace ||
@@ -34,5 +38,16 @@ export const getAnalysisActionState = ({
 
   const runLabel: 'Run' | 'Update' = allowRunWhenLocked ? 'Update' : 'Run';
 
-  return { runDisabled, clearDisabled, runLabel };
+  const runDisabledReason: string | undefined = (() => {
+    if (isBusy) return undefined;
+    if (!hasWorkspace) return 'Open a workspace first';
+    if (!hasSelection) return 'Select a data block and column to run';
+    if ((isLocked || hasActiveTask) && !allowRunWhenLocked)
+      return canUpdate
+        ? 'Clear results first to run a new analysis, or change parameters to update the current results'
+        : 'Clear results first to run a new analysis';
+    return undefined;
+  })();
+
+  return { runDisabled, clearDisabled, runLabel, runDisabledReason };
 };

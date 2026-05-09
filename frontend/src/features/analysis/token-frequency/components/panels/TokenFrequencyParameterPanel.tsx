@@ -1,5 +1,6 @@
 import NodeSelectionPanel from '@/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
 import type { WorkspaceNodeLike, NodeColumnSource } from '../../../common/nodeSelectionTypes';
@@ -16,7 +17,7 @@ type TokenFrequencyParameterPanelProps = {
   isLocked: boolean;
   getNodeColumns: (node: WorkspaceNodeLike, idx?: number) => NodeColumnSource;
   displayNodeCount: number;
-  actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string };
+  actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string; runDisabledReason?: string };
   isAnalyzing: boolean;
   onAnalyze: () => void;
   onClearResults: () => void;
@@ -83,6 +84,9 @@ export const TokenFrequencyParameterPanel = ({
         onRun: onAnalyze,
         onClear: onClearResults,
         runDisabled: actionState.runDisabled || hasIncompleteSelections,
+        runDisabledReason: hasIncompleteSelections
+          ? 'Select a column for each data block'
+          : actionState.runDisabledReason,
         clearDisabled: actionState.clearDisabled,
         isRunning: isAnalyzing,
         hasResult: hasResults,
@@ -103,8 +107,11 @@ export const TokenFrequencyParameterPanel = ({
                   {nodeOptions.map((option) => {
                     const isActive = (referenceNodeId ?? nodeOptions[0]?.id) === option.id;
                     return (
-                      <label
+                      <DisabledReasonTooltip
                         key={option.id}
+                        reason={isLocked ? 'Clear results first to change the reference data block' : undefined}
+                      >
+                      <label
                         className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors${isLocked ? ' cursor-not-allowed opacity-60' : ''}`}
                         title={option.label}
                         aria-label={option.label}
@@ -127,6 +134,7 @@ export const TokenFrequencyParameterPanel = ({
                           aria-hidden="true"
                         />
                       </label>
+                      </DisabledReasonTooltip>
                     );
                   })}
                 </div>

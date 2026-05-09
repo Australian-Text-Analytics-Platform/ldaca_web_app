@@ -11,6 +11,7 @@ import { Checkbox } from '../../../components/ui/checkbox';
 import { Label } from '../../../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Tag } from '../../../components/ui/tag';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { usePolarsExpressionSubTab, type PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';
@@ -76,7 +77,15 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
 
   const hasNode = !!effectiveNode;
   const canEval = hasNode;
-  const canApply = canEval && !!serializedRequest && !isApplying;
+  const canApply = canEval && !!serializedRequest && !isApplying && !preview.error;
+
+  const applyDisabledReason: string | undefined = (() => {
+    if (isApplying || isLoading.operations) return undefined;
+    if (!hasNode) return 'Select a data block first';
+    if (!serializedRequest) return 'Build and preview an expression first';
+    if (preview.error) return 'Fix the expression error shown in Preview before adding to workspace';
+    return undefined;
+  })();
 
   return (
     <div className="space-y-4">
@@ -382,24 +391,26 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               disabled={!canApply}
             />
           </div>
-          <Button
-            size="sm"
-            onClick={applyExpression}
-            disabled={!canApply || isLoading.operations}
-            className="shrink-0"
-          >
-            {isApplying ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding to Workspace…
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                Add to Workspace
-              </>
-            )}
-          </Button>
+          <DisabledReasonTooltip reason={applyDisabledReason}>
+            <Button
+              size="sm"
+              onClick={applyExpression}
+              disabled={!canApply || isLoading.operations}
+              className="shrink-0"
+            >
+              {isApplying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding to Workspace…
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Workspace
+                </>
+              )}
+            </Button>
+          </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>

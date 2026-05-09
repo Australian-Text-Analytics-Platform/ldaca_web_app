@@ -18,6 +18,7 @@ import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLocked
 import { normalizeSchemaFromInfo } from '../../../hooks/useSchemaManagement';
 import { getNodeInfo } from '../../../lib/nodeInfoCache';
 import { Button } from '../../../components/ui/button';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -33,6 +34,7 @@ import {
 import { Checkbox } from '../../../components/ui/checkbox';
 import { Download, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { normalizeTypeName } from '../../../utils/columnTypes';
+import { takeMostRecent } from '../../../utils/selectionUtils';
 import {
   hasLockedParameterDiff,
   normalizeStringArray,
@@ -144,6 +146,8 @@ const SequentialAnalysisFeature = () => {
     docTypeOnly: false,
     storageScope: 'sequential-analysis',
   });
+
+  const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
 
   const [timeColumn, setTimeColumn] = useState('');
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
@@ -457,6 +461,7 @@ const SequentialAnalysisFeature = () => {
     isBusy: isAnalyzing,
     hasActiveTask,
     allowRunWhenLocked: hasParamsChanged,
+    canUpdate: true,
   });
 
   /* eslint-disable react-hooks/set-state-in-effect -- Complex sync logic with guards to prevent infinite loops; refactoring to render-time would duplicate guard logic */
@@ -785,7 +790,7 @@ const SequentialAnalysisFeature = () => {
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
           <NodeSelectionPanel
-            selectedNodes={panelSelectedNodes}
+            selectedNodes={displayedNodes}
             nodeColumnSelections={nodeColumnSelections}
             onColumnChange={(nodeId, column) => {
               if (isLocked) return;
@@ -989,25 +994,32 @@ const SequentialAnalysisFeature = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
-          <Button
-            onClick={() => {
-              void handleRunOrUpdate();
-            }}
-            disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
-            className="w-full md:w-auto"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Running...
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-4 w-4" />
-                {actionState.runLabel}
-              </>
-            )}
-          </Button>
+          <DisabledReasonTooltip reason={(() => {
+            if (isAnalyzing || isLoading.operations) return undefined;
+            if (actionState.runDisabledReason) return actionState.runDisabledReason;
+            if (!activeTimeColumn) return 'Select a time column to run';
+            return undefined;
+          })()}>
+            <Button
+              onClick={() => {
+                void handleRunOrUpdate();
+              }}
+              disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
+              className="w-full md:w-auto"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  {actionState.runLabel}
+                </>
+              )}
+            </Button>
+          </DisabledReasonTooltip>
 
           <div className="flex items-center gap-2">
             <Button

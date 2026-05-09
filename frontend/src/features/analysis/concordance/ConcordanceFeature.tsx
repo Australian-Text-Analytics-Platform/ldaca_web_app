@@ -1,5 +1,5 @@
 // NodeSelectionPanel now handles color selection UI inline
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
@@ -9,10 +9,11 @@ import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { type ConcordanceAnalysisResponse, type ConcordanceGroupedRow, type ConcordanceResultEntry, textApi } from '../../../api/text';
+import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, type ConcordanceResultEntry, textApi } from '../../../api/text';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import { Button } from '../../../components/ui/button';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Play, Loader2, Trash2, Plus } from 'lucide-react';
@@ -56,12 +57,19 @@ import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScroll
 import { takeMostRecent } from '../../../utils/selectionUtils';
 import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
 import { ConcordanceDispersionCell } from './components/ConcordanceDispersionCell';
+import { ConcordanceDispersionLegend } from './components/ConcordanceDispersionLegend';
+import { ConcordanceDispersionSummary } from './components/ConcordanceDispersionSummary';
 import {
   buildDispersionRows,
+  DISPERSION_DEFAULT_BIN_COUNT,
+  DISPERSION_DISPLAY_BIN_COUNTS,
   flattenConcordanceGroups,
   getDispersionBarWidthPercent,
   getDispersionHits,
   getDispersionTextLength,
+  type ConcordanceDispersionRow,
+  type DispersionDisplayBinCount,
+  type TaggedBinRow,
 } from './concordanceViewModels';
 import {
   CONCORDANCE_COLUMN_KEYS,
@@ -73,7 +81,6 @@ import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
-import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
@@ -156,6 +163,7 @@ const ConcordanceFeature: React.FC = () => {
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
   const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
   const setTasks = useAnalysisStore((state) => state.setTasks);
+  const materializedEvents = useAnalysisStore((state) => state.materializedEvents);
   const [searchWord, setSearchWord] = useState('');
   const [numLeftTokens, setNumLeftTokens] = useState(10);
   const [numRightTokens, setNumRightTokens] = useState(10);
@@ -163,9 +171,19 @@ const ConcordanceFeature: React.FC = () => {
   const [wholeWord, setWholeWord] = useState(true);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
-  const [showDispersion, setShowDispersion] = useState(false);
+  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
+  const [concordanceView, setConcordanceView] = useState<'table' | 'dispersion'>('table');
+  const showDispersion = concordanceView === 'dispersion';
   const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
+  const [colourMatches, setColourMatches] = useState(false);
+  const [lowercaseMatches, setLowercaseMatches] = useState(false);
+  const [hiddenMatchedTexts, setHiddenMatchedTexts] = useState<Set<string>>(new Set());
+  const [binCount, setBinCount] = useState<DispersionDisplayBinCount>(DISPERSION_DEFAULT_BIN_COUNT);
+  const [combinedSourceMode, setCombinedSourceMode] = useState<'aggregate' | 'split'>('aggregate');
+  const [materializedBins, setMaterializedBins] = useState<Record<string, ConcordanceDispersionBinRow[]>>({});
+  // Declared early so the position-fetch effect / lookups can reference it.
+  // The setter is also used further below by the materialise-task watcher.
+  const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
   const [results, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
@@ -189,6 +207,139 @@ const ConcordanceFeature: React.FC = () => {
     activeNodeIds,
     palette: EXTENDED_PALETTE,
   });
+
+  const concordanceTaskId = useMemo(() => {
+    const md = (results as ConcordanceAnalysisResponse | null)?.metadata as
+      | Record<string, unknown>
+      | undefined;
+    const value = md?.task_id ?? md?.taskId;
+    return typeof value === 'string' ? value : '';
+  }, [results]);
+
+  const resolveNodeIdForKey = (nodeKey: string): string | null => {
+    if (nodeKey === '__COMBINED__') return null;
+    const direct = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
+      const d = n.data as Record<string, unknown> | undefined;
+      const dataName = d && typeof d === 'object' ? (d.name as string | undefined) : undefined;
+      return n.id === nodeKey || n.name === nodeKey || dataName === nodeKey;
+    });
+    if (direct?.id) return direct.id;
+    const mapped = labelToNodeId?.[nodeKey];
+    if (mapped) return mapped;
+    return null;
+  };
+
+  const relevantNodeIdsForKey = (nodeKey: string): string[] => {
+    if (nodeKey === '__COMBINED__') {
+      return panelSelectedNodes
+        .map((n: WorkspaceNodeLike) => n.id)
+        .filter((id: string | undefined): id is string => Boolean(id));
+    }
+    const id = resolveNodeIdForKey(nodeKey);
+    return id ? [id] : [];
+  };
+
+  // Fetch slim hit positions for any node that has been materialised on the
+  // backend (signalled by an entry in client-side `materializedPaths`) but
+  // whose positions aren't yet cached. Decoupled from `nodeData.materialized`
+  // so combined-view lookups and not-yet-refreshed pages still work.
+  useEffect(() => {
+    if (!showDispersion || proportionalDispersionBars) return;
+    // Same trick as the materialised-events consumer: when the bare task id is
+    // briefly empty (results being refetched after a materialise), fall back
+    // to the last known good value so we don't drop the fetch.
+    const effectiveTaskId = concordanceTaskId || concordanceTaskIdRef.current;
+    if (!effectiveTaskId) return;
+    const panelIds = panelSelectedNodes
+      .map((n: WorkspaceNodeLike) => n.id)
+      .filter((id: string | undefined): id is string => Boolean(id));
+    const validIds = Object.keys(materializedPaths).filter((id) => panelIds.includes(id));
+    const missing = validIds.filter((id) => !(id in materializedBins));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    const authHeaders = getAuthHeaders();
+    void Promise.all(
+      missing.map(async (nodeId) => {
+        try {
+          const resp = await textApi.getConcordanceTaskDispersionBins(
+            effectiveTaskId,
+            nodeId,
+            authHeaders,
+          );
+          return [nodeId, resp.rows] as const;
+        } catch (err) {
+          console.error('Failed to fetch concordance dispersion bins', nodeId, err);
+          return null;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      setMaterializedBins((prev) => {
+        const next = { ...prev };
+        for (const entry of entries) {
+          if (entry) next[entry[0]] = entry[1];
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDispersion, proportionalDispersionBars, concordanceTaskId, materializedPaths, panelSelectedNodes]);
+
+  const isBlockMaterialised = (nodeKey: string): boolean => {
+    const ids = relevantNodeIdsForKey(nodeKey);
+    return ids.length > 0 && ids.every((id) => id in materializedPaths);
+  };
+
+  const getMaterializedBinsForKey = (
+    nodeKey: string,
+  ): TaggedBinRow[] | undefined => {
+    const ids = relevantNodeIdsForKey(nodeKey);
+    if (ids.length === 0) return undefined;
+    if (!ids.every((id) => id in materializedPaths)) return undefined;
+    if (!ids.every((id) => id in materializedBins)) return undefined;
+    const tagged: TaggedBinRow[] = [];
+    for (const id of ids) {
+      const node = panelSelectedNodes.find((n: WorkspaceNodeLike) => n.id === id);
+      const sourceLabel = (node?.name as string | undefined) ?? id;
+      for (const row of materializedBins[id]!) {
+        tagged.push({ ...row, __source_node: sourceLabel });
+      }
+    }
+    return tagged;
+  };
+
+  const allMatchedTexts = useMemo((): string[] => {
+    if (!showDispersion || !colourMatches || !results?.data) return [];
+    const seen = new Set<string>();
+    for (const [nodeKey, nodeData] of Object.entries(results.data)) {
+      const binRows = getMaterializedBinsForKey(nodeKey);
+      if (binRows) {
+        for (const row of binRows) {
+          const raw = String(row.matched_text ?? '');
+          if (raw) seen.add(lowercaseMatches ? raw.toLowerCase() : raw);
+        }
+        continue;
+      }
+      for (const group of nodeData.data) {
+        for (const hit of group) {
+          const raw = String(hit[CONCORDANCE_COLUMN_KEYS.matchedText] ?? '');
+          if (raw) seen.add(lowercaseMatches ? raw.toLowerCase() : raw);
+        }
+      }
+    }
+    return [...seen].sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDispersion, colourMatches, lowercaseMatches, results?.data, materializedBins, materializedPaths, panelSelectedNodes]);
+
+  const matchedTextColorMap = useMemo(
+    (): Record<string, string> =>
+      Object.fromEntries(allMatchedTexts.map((t, i) => [t, EXTENDED_PALETTE[i % EXTENDED_PALETTE.length]!])),
+    [allMatchedTexts],
+  );
+
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
   const [combinedLoading, setCombinedLoading] = useState(false);
@@ -219,20 +370,90 @@ const ConcordanceFeature: React.FC = () => {
     };
   }, [results]);
 
-  const availableMetadataColumns = (() => {
-    const metadataColumnSet = new Set<string>();
+  // Hoisted up from below so the metadata-column section IIFE can read it
+  // (the IIFE consults each panel node's selected text column to exclude it
+  // from the metadata column list).
+  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+
+  const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } = (() => {
     const resultEntries = results?.data ?? {};
-
-    Object.values(resultEntries).forEach((entry) => {
+    // Per-block columns, preferring `results.data` per-node entries (used by
+    // Separated view; carries the same metadata_columns the per-node table
+    // displays). When only the `__COMBINED__` entry is present (typical of
+    // Combined view), fall back to each node's workspace column list via
+    // `getColumnInfos`, dropping the chosen text column and the synthetic
+    // `__source_node` tag — without this fallback the dropdown would have
+    // nothing to show in Combined view, which is what was making the
+    // checkbox/dropdown look "stuck".
+    const perBlock: { nodeKey: string; columns: string[] }[] = [];
+    for (const [nodeKey, entry] of Object.entries(resultEntries)) {
+      if (nodeKey === '__COMBINED__') continue;
       const nodeEntry = entry as ConcordanceResultEntry;
-      nodeEntry.metadata.metadata_columns.forEach((column) => {
-        if (column && column !== '__source_node') {
-          metadataColumnSet.add(column);
-        }
+      const cols = nodeEntry.metadata.metadata_columns.filter(
+        (c) => c && c !== '__source_node',
+      );
+      perBlock.push({ nodeKey, columns: cols });
+    }
+    if (perBlock.length === 0 && panelSelectedNodes.length > 0) {
+      panelSelectedNodes.forEach((node, idx) => {
+        const rawId = (node as { id?: string }).id;
+        const rawName = (node as { name?: string }).name;
+        const nodeKey = rawName || rawId || `node-${idx}`;
+        const sel = rawId
+          ? effectiveNodeColumnSelections.find((s) => s.nodeId === rawId)
+          : undefined;
+        const textColumn = sel?.column;
+        const cols = getColumnInfos(node, idx)
+          .map((info) => info.name)
+          .filter((name): name is string =>
+            !!name && name !== textColumn && name !== '__source_node',
+          );
+        if (cols.length > 0) perBlock.push({ nodeKey, columns: cols });
       });
-    });
-
-    return Array.from(metadataColumnSet);
+    }
+    const allColumns = Array.from(
+      new Set(perBlock.flatMap((b) => b.columns)),
+    );
+    const sections: { columns: string[]; color?: string; disabled?: boolean }[] = [];
+    let disabledReason: string | undefined;
+    const isCombinedView = viewMode === 'combined';
+    if (perBlock.length <= 1) {
+      // Single block (or no blocks): no need for sections.
+      if (allColumns.length > 0) sections.push({ columns: allColumns });
+    } else {
+      const common = perBlock[0]!.columns.filter((c) =>
+        perBlock.every((b) => b.columns.includes(c)),
+      );
+      // In Combined view, columns exclusive to one source can't be rendered
+      // in the merged table — they'd be NULL for the rows from the other
+      // block. So:
+      //  - If there are common columns, show them as selectable and the
+      //    per-block exclusives as visible-but-disabled (preserves discovery
+      //    of what each block has, without letting the user pick something
+      //    that won't render).
+      //  - If there are no common columns, disable Show metadata entirely
+      //    with a tooltip explaining why.
+      if (isCombinedView && common.length === 0 && perBlock.some((b) => b.columns.length > 0)) {
+        disabledReason = 'The selected data blocks share no metadata columns; nothing to display in Combined view.';
+      }
+      if (common.length > 0) sections.push({ columns: common });
+      for (const block of perBlock) {
+        const exclusive = block.columns.filter((c) => !common.includes(c));
+        if (exclusive.length === 0) continue;
+        const nodeId = resolveNodeIdForKey(block.nodeKey);
+        const color = nodeId ? nodeColors?.[nodeId] : undefined;
+        sections.push({
+          columns: exclusive,
+          color,
+          disabled: isCombinedView,
+        });
+      }
+    }
+    return {
+      availableMetadataColumns: allColumns,
+      metadataColumnSections: sections,
+      metadataDisabledReason: disabledReason,
+    };
   })();
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
@@ -279,7 +500,6 @@ const ConcordanceFeature: React.FC = () => {
   // Individual node materializing states and tracked task ids
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
-  const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
   const [materializeSummaries, setMaterializeSummaries] = useState<Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }>>({});
   
   // Detach dialog state
@@ -355,22 +575,31 @@ const ConcordanceFeature: React.FC = () => {
       setCaseSensitive(!!reqObj.case_sensitive);
       const hydratedMode: 'separated' | 'combined' = reqObj.combined && reqObj.combinable !== false ? 'combined' : 'separated';
       setViewMode(hydratedMode);
+      // Replace (not merge) on hydration so the saved task's materialised
+      // state is the source of truth. Otherwise stale entries from a
+      // previous task could survive a re-run that produced an empty
+      // `materialized_paths`, leaving the Process All button incorrectly
+      // disabled and the bin-fetch hitting "No materialised concordance for
+      // node X" 404s. Also reset the bin cache + applied-event tracker so
+      // the consumer + bin-fetch effects re-populate cleanly for whatever
+      // the hydrated task contains.
       const paths = reqObj.materialized_paths as Record<string, string> | undefined;
-      if (paths && typeof paths === 'object') {
-        setMaterializedPaths(prev => ({ ...prev, ...paths }));
-      }
+      const nextPaths = (paths && typeof paths === 'object') ? { ...paths } : {};
+      setMaterializedPaths(nextPaths);
+      setMaterializedBins({});
+      processedMaterializedEventSeqRef.current = new Set();
       const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
+      const nextSummaries: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
       if (summaries && typeof summaries === 'object') {
-        const parsed: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
         for (const [nid, s] of Object.entries(summaries)) {
-          parsed[nid] = {
+          nextSummaries[nid] = {
             recordCount: Number(s.record_count) || 0,
             uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
             totalDocuments: Number(s.total_source_documents) || 0,
           };
         }
-        setMaterializeSummaries(prev => ({ ...prev, ...parsed }));
       }
+      setMaterializeSummaries(nextSummaries);
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -400,28 +629,20 @@ const ConcordanceFeature: React.FC = () => {
     isResultRunning: (r) => r?.state === 'running',
   });
 
-  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
-  const preferredMetadataColumns = dedupeColumns(
-    effectiveNodeColumnSelections.map((selection) => selection.column).filter(Boolean),
-  );
+  // (effectiveNodeColumnSelections is declared above so it can be referenced
+  // by the metadata-column section IIFE.)
 
+  // No auto-selection on activation: Show metadata starts empty and the user
+  // explicitly ticks the columns they want. We just clean up any selections
+  // that are no longer in the available set (e.g. after a re-run that drops
+  // a column from the source data).
   useEffect(() => {
-    setSelectedMetadataColumns((previousSelection) => {
-      const nextSelection = reconcileMetadataColumnSelection(
-        availableMetadataColumns,
-        previousSelection,
-        preferredMetadataColumns,
-      );
-      const normalizedPreviousSelection = previousSelection ?? [];
-      if (
-        normalizedPreviousSelection.length === nextSelection.length &&
-        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
-      ) {
-        return previousSelection;
-      }
-      return nextSelection;
+    setSelectedMetadataColumns((prev) => {
+      const filtered = prev.filter((column) => availableMetadataColumns.includes(column));
+      if (filtered.length === prev.length) return prev;
+      return filtered;
     });
-  }, [availableMetadataColumns, availableMetadataColumnsKey, preferredMetadataColumns]);
+  }, [availableMetadataColumns, availableMetadataColumnsKey]);
 
   const {
     handleSearch,
@@ -513,6 +734,7 @@ const ConcordanceFeature: React.FC = () => {
     isBusy: isSearching,
     hasActiveTask,
     allowRunWhenLocked: hasLockedParameterChanges,
+    canUpdate: true,
   });
 
   useEffect(() => {
@@ -618,7 +840,9 @@ const ConcordanceFeature: React.FC = () => {
 
       // Refetch parent concordance task request to learn the newly-persisted
       // materialized_paths map; then reset page_size to 20 and refetch results
-      // so the table re-renders with occurrence-row semantics.
+      // so the table re-renders with occurrence-row semantics. Note: the
+      // authoritative path arrives via the `analysis_materialized` SSE event
+      // (handled separately) — this fetch is best-effort additional coverage.
       void (async () => {
         try {
           const headers = getAuthHeaders();
@@ -670,6 +894,55 @@ const ConcordanceFeature: React.FC = () => {
     resolveTaskId,
     persistResultPreferences,
   ]);
+
+  // Apply `analysis_materialized` SSE events for the current concordance task.
+  // The backend pushes these the moment the per-node parquet is persisted, so
+  // they don't race with the parent-task save the way the GET-based fallback
+  // can. Each unique event sequence is processed at most once.
+  // The concordance task id is derived from `results.metadata.task_id`, which
+  // briefly goes empty while results are being refetched after a materialise
+  // (e.g. the page-size reset triggers a results refresh). We hold the last
+  // known value in a ref so events that arrive during the refetch window can
+  // still be matched and applied.
+  //
+  // We also use the ref to detect a real task switch — `taskA` → `taskB`
+  // with both non-empty — which only happens when the user actually clicks
+  // Run/Update and a new analysis task is created. In that case the cached
+  // `materializedPaths` belongs to the previous task and would otherwise
+  // cause "No materialised concordance for node X" 404s on the bin-fetch.
+  // We deliberately skip the clear on the initial `'' → taskA` transition
+  // (mount/remount with hydration), since `onHydratedRequest` is the
+  // authoritative source for that path.
+  const concordanceTaskIdRef = useRef<string>('');
+  const processedMaterializedEventSeqRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (!concordanceTaskId) return;
+    const prev = concordanceTaskIdRef.current;
+    if (prev && prev !== concordanceTaskId) {
+      setMaterializedPaths({});
+      setMaterializedBins({});
+      setMaterializeSummaries({});
+      processedMaterializedEventSeqRef.current = new Set();
+    }
+    concordanceTaskIdRef.current = concordanceTaskId;
+  }, [concordanceTaskId]);
+
+  // The processed-event ref is declared above (alongside the task-id-change
+  // effect that resets it). Events are never marked processed when the
+  // consumer can't apply them yet, so re-running the effect when the id
+  // comes back picks up any unapplied events for that task.
+  useEffect(() => {
+    if (materializedEvents.length === 0) return;
+    const effectiveTaskId = concordanceTaskId || concordanceTaskIdRef.current;
+    if (!effectiveTaskId) return;
+    for (const event of materializedEvents) {
+      if (processedMaterializedEventSeqRef.current.has(event.sequence)) continue;
+      if (event.taskType !== 'concordance_materialize') continue;
+      if (event.parentTaskId !== effectiveTaskId) continue;
+      processedMaterializedEventSeqRef.current.add(event.sequence);
+      setMaterializedPaths((prev) => ({ ...prev, [event.parentNodeId]: event.materializedPath }));
+    }
+  }, [concordanceTaskId, materializedEvents]);
 
   // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
   const selectedNodeIds = selectedNodes.map((node) => node.id).sort();
@@ -1162,6 +1435,12 @@ const ConcordanceFeature: React.FC = () => {
       const displayColumns = dedupeColumns(rawDisplayColumns);
       const dispersionColumnStyle = getDispersionColumnStyle(showDispersion, showMetadata, resultsViewportWidth);
 
+      const combinedNodeIds = takeMostRecent(selectedNodes, 2)
+        .map((n) => n.id)
+        .filter((id): id is string => Boolean(id));
+      const isAnyCombinedMaterializing = combinedNodeIds.some((id) => Boolean(nodeMaterializing[id]));
+      const allCombinedMaterialized = combinedNodeIds.length > 0
+        && combinedNodeIds.every((id) => Boolean(materializedPaths[id]));
       return (
         <div key="__COMBINED__" className="mb-6">
           <div className="flex items-center mb-4">
@@ -1170,19 +1449,53 @@ const ConcordanceFeature: React.FC = () => {
               <span className="text-xs text-gray-500">Rows colored by source data block</span>
               <Button
                 onClick={() => {
-                  const nodeIdsForDetach = takeMostRecent(selectedNodes, 2).map(n => n.id);
-                  if (nodeIdsForDetach.length === 0 || !searchWord.trim()) return;
-                  const nodes = nodeIdsForDetach.map(nid => {
-                    const col = effectiveNodeColumnSelections.find(s => s.nodeId === nid)?.column || '';
+                  if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                  for (const nid of combinedNodeIds) {
+                    if (materializedPaths[nid]) continue;
+                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                    if (!col) continue;
+                    void handleMaterialize(nid, col);
+                  }
+                }}
+                // Stays enabled while at least one block still needs
+                // processing — the click handler skips any block already in
+                // `materializedPaths`, so partial re-clicks are safe. The
+                // button does not gate on `combinedLoading` (the combined
+                // table fetch is independent of the materialise operation).
+                disabled={
+                  isAnyCombinedMaterializing
+                  || allCombinedMaterialized
+                  || !searchWord.trim()
+                  || combinedNodeIds.length === 0
+                }
+                size="sm"
+                variant="outline"
+                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                title="Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them"
+              >
+                {isAnyCombinedMaterializing ? (
+                  <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
+                ) : allCombinedMaterialized ? (
+                  <>Processed</>
+                ) : (
+                  <>Process Both</>
+                )}
+              </Button>
+              <Button
+                onClick={() => {
+                  if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                  const nodes = combinedNodeIds.map((nid) => {
+                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
                     const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
                     const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
                     return { nodeId: nid, column: col, nodeLabel: sourceLabel };
-                  }).filter(n => n.column);
+                  }).filter((n) => n.column);
                   void openDetachDialog(nodes);
                 }}
-                disabled={combinedLoading || !searchWord.trim()}
+                disabled={combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
                 size="sm"
-                className="bg-green-600 hover:bg-green-700"
+                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                title="Create new data blocks with concordance results for both sources joined to their original tables"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Both to Workspace
@@ -1271,6 +1584,10 @@ const ConcordanceFeature: React.FC = () => {
                                   barWidthPercent={proportionalDispersionBars
                                     ? getDispersionBarWidthPercent(row, column, longestTextLength)
                                     : 100}
+                                  colourMatches={colourMatches}
+                                  matchedTextColors={matchedTextColorMap}
+                                  lowercaseMatches={lowercaseMatches}
+                                  hiddenMatchedTexts={hiddenMatchedTexts}
                                 />
                               ) : row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}
                             </TableCell>
@@ -1302,6 +1619,47 @@ const ConcordanceFeature: React.FC = () => {
               }
               loading={combinedLoading}
             />
+            {showDispersion && colourMatches && allMatchedTexts.length > 0 && (
+              <ConcordanceDispersionLegend
+                matchedTexts={allMatchedTexts}
+                matchedTextColors={matchedTextColorMap}
+                hiddenMatchedTexts={hiddenMatchedTexts}
+                onToggle={(text) => {
+                  setHiddenMatchedTexts((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(text)) next.delete(text);
+                    else next.add(text);
+                    return next;
+                  });
+                }}
+              />
+            )}
+            {showDispersion && !proportionalDispersionBars && (
+              (() => {
+                const dispersionRows = rows as ConcordanceDispersionRow[];
+                const sourceNames = panelSelectedNodes.map((n) => n.name).filter(Boolean) as string[];
+                const dataBlockLabel = sourceNames.length > 0 ? sourceNames.join(', ') : 'Combined';
+                const materialisedBins = getMaterializedBinsForKey('__COMBINED__');
+                const materialised = isBlockMaterialised('__COMBINED__');
+                return (
+                  <ConcordanceDispersionSummary
+                    rows={dispersionRows}
+                    textColumn={column}
+                    binCount={binCount}
+                    lowercaseMatches={lowercaseMatches}
+                    splitBySource={combinedSourceMode === 'split'}
+                    allMatchedTexts={allMatchedTexts}
+                    matchedTextColors={matchedTextColorMap}
+                    hiddenMatchedTexts={hiddenMatchedTexts}
+                    dataBlockLabel={dataBlockLabel}
+                    searchWord={searchWord}
+                    materialisedBins={materialisedBins}
+                    materialised={materialised}
+                    aggregateAll={!colourMatches}
+                  />
+                );
+              })()
+            )}
           </div>
         </div>
       );
@@ -1410,6 +1768,10 @@ const ConcordanceFeature: React.FC = () => {
                               barWidthPercent={proportionalDispersionBars
                                 ? getDispersionBarWidthPercent(row, column, longestTextLength)
                                 : 100}
+                              colourMatches={colourMatches}
+                              matchedTextColors={matchedTextColorMap}
+                              lowercaseMatches={lowercaseMatches}
+                              hiddenMatchedTexts={hiddenMatchedTexts}
                             />
                           ) : row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
                         </TableCell>
@@ -1489,6 +1851,46 @@ const ConcordanceFeature: React.FC = () => {
             )}
           </Button>
         </AnalysisPagination>
+        {showDispersion && colourMatches && allMatchedTexts.length > 0 && (
+          <ConcordanceDispersionLegend
+            matchedTexts={allMatchedTexts}
+            matchedTextColors={matchedTextColorMap}
+            hiddenMatchedTexts={hiddenMatchedTexts}
+            onToggle={(text) => {
+              setHiddenMatchedTexts((prev) => {
+                const next = new Set(prev);
+                if (next.has(text)) next.delete(text);
+                else next.add(text);
+                return next;
+              });
+            }}
+          />
+        )}
+        {showDispersion && !proportionalDispersionBars && (
+          (() => {
+            const dispersionRows = rows as ConcordanceDispersionRow[];
+            const dataBlockLabel = context.displayName || nodeKey;
+            const materialisedBins = getMaterializedBinsForKey(nodeKey);
+            const materialised = isBlockMaterialised(nodeKey);
+            return (
+              <ConcordanceDispersionSummary
+                rows={dispersionRows}
+                textColumn={column}
+                binCount={binCount}
+                lowercaseMatches={lowercaseMatches}
+                splitBySource={false}
+                allMatchedTexts={allMatchedTexts}
+                matchedTextColors={matchedTextColorMap}
+                hiddenMatchedTexts={hiddenMatchedTexts}
+                dataBlockLabel={dataBlockLabel}
+                searchWord={searchWord}
+                materialisedBins={materialisedBins}
+                materialised={materialised}
+                aggregateAll={!colourMatches}
+              />
+            );
+          })()
+        )}
       </div>
     );
   };
@@ -1620,23 +2022,31 @@ const ConcordanceFeature: React.FC = () => {
           </div>
         </CardContent>
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
-          <Button
-            onClick={() => {
-              void handleRunOrUpdate();
-            }}
-            disabled={
-              actionState.runDisabled ||
-              !searchWord.trim() ||
-              effectiveNodeColumnSelections.some(sel => !sel.column)
-            }
-            className="w-full md:w-auto"
-          >
-            {isSearching ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
-            ) : (
-              <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
-            )}
-          </Button>
+          <DisabledReasonTooltip reason={(() => {
+            if (isSearching) return undefined;
+            if (actionState.runDisabledReason) return actionState.runDisabledReason;
+            if (!searchWord.trim()) return 'Enter a search word first';
+            if (effectiveNodeColumnSelections.some(sel => !sel.column)) return 'Select a column for each data block';
+            return undefined;
+          })()}>
+            <Button
+              onClick={() => {
+                void handleRunOrUpdate();
+              }}
+              disabled={
+                actionState.runDisabled ||
+                !searchWord.trim() ||
+                effectiveNodeColumnSelections.some(sel => !sel.column)
+              }
+              className="w-full md:w-auto"
+            >
+              {isSearching ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
+              ) : (
+                <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
+              )}
+            </Button>
+          </DisabledReasonTooltip>
 
           <div className="flex items-center gap-2">
             <Button
@@ -1737,40 +2147,68 @@ const ConcordanceFeature: React.FC = () => {
                   )}
                 </div>
                 <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm text-foreground">
-                      <input
-                        type="checkbox"
-                        checked={showDispersion}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setShowDispersion(isChecked);
-                          if (!isChecked) {
-                            setProportionalDispersionBars(false);
-                          }
-                        }}
-                        className="h-4 w-4"
-                      />
-                      <span>Dispersion View</span>
-                    </label>
-                    <MetadataColumnSelector
-                      showMetadata={showMetadata}
-                      onShowMetadataChange={(nextValue) => {
-                        const previousValue = showMetadata;
-                        setShowMetadata(nextValue);
-                        void (async () => {
-                          try {
-                            await persistResultPreferences({ showMetadata: nextValue });
-                          } catch (error) {
-                            console.error('Failed to persist concordance metadata preference', error);
-                            setShowMetadata(previousValue);
-                          }
-                        })();
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <Tabs
+                      value={concordanceView}
+                      onValueChange={(value) => {
+                        const newView = value as 'table' | 'dispersion';
+                        setConcordanceView(newView);
+                        if (newView === 'table') {
+                          setProportionalDispersionBars(false);
+                          setColourMatches(false);
+                          setLowercaseMatches(false);
+                          setHiddenMatchedTexts(new Set());
+                        }
                       }}
-                      availableColumns={availableMetadataColumns}
-                      selectedColumns={selectedMetadataColumns ?? []}
-                      onSelectedColumnsChange={setSelectedMetadataColumns}
-                    />
+                    >
+                      <TabsList>
+                        <TabsTrigger value="table">Table View</TabsTrigger>
+                        <TabsTrigger value="dispersion">Dispersion View</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    <div className="flex flex-wrap items-center gap-4">
+                      {showDispersion && !proportionalDispersionBars && (
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          <span>Bin No.</span>
+                          <select
+                            value={binCount}
+                            onChange={(e) => {
+                              const parsed = Number.parseInt(e.target.value, 10) as DispersionDisplayBinCount;
+                              if ((DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(parsed)) {
+                                setBinCount(parsed);
+                              }
+                            }}
+                            className="h-7 rounded border border-input bg-background px-2 text-sm"
+                          >
+                            {DISPERSION_DISPLAY_BIN_COUNTS.map((value) => (
+                              <option key={value} value={value}>
+                                {value}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      <MetadataColumnSelector
+                        showMetadata={showMetadata}
+                        onShowMetadataChange={(nextValue) => {
+                          const previousValue = showMetadata;
+                          setShowMetadata(nextValue);
+                          void (async () => {
+                            try {
+                              await persistResultPreferences({ showMetadata: nextValue });
+                            } catch (error) {
+                              console.error('Failed to persist concordance metadata preference', error);
+                              setShowMetadata(previousValue);
+                            }
+                          })();
+                        }}
+                        availableColumns={availableMetadataColumns}
+                        selectedColumns={selectedMetadataColumns ?? []}
+                        onSelectedColumnsChange={setSelectedMetadataColumns}
+                        sections={metadataColumnSections}
+                        disabledReason={metadataDisabledReason}
+                      />
+                    </div>
                   </div>
                   {showDispersion ? (
                     <div className="flex flex-wrap items-center gap-4">
@@ -1783,6 +2221,49 @@ const ConcordanceFeature: React.FC = () => {
                         />
                         <span>Bar length proportional to text length</span>
                       </label>
+                      {!proportionalDispersionBars && viewMode === 'combined' && (
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          <span>Sources:</span>
+                          <select
+                            value={combinedSourceMode}
+                            onChange={(e) => setCombinedSourceMode(e.target.value as 'aggregate' | 'split')}
+                            className="h-7 rounded border border-input bg-background px-2 text-sm"
+                          >
+                            <option value="aggregate">Aggregate</option>
+                            <option value="split">Split (solid/dashed)</option>
+                          </select>
+                        </label>
+                      )}
+                      <label className="flex items-center gap-2 text-sm text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={colourMatches}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setColourMatches(checked);
+                            if (!checked) {
+                              setLowercaseMatches(false);
+                              setHiddenMatchedTexts(new Set());
+                            }
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <span>Colour matches</span>
+                      </label>
+                      {colourMatches && (
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={lowercaseMatches}
+                            onChange={(e) => {
+                              setLowercaseMatches(e.target.checked);
+                              setHiddenMatchedTexts(new Set());
+                            }}
+                            className="h-4 w-4"
+                          />
+                          <span>Lowercase matches</span>
+                        </label>
+                      )}
                     </div>
                   ) : null}
                 </div>

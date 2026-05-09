@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../c
 import { Input } from '../../../components/ui/input';
 import { Separator } from '../../../components/ui/separator';
 import { Tag } from '../../../components/ui/tag';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { cn } from '../../../lib/utils';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
@@ -283,16 +284,18 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
               className="min-w-0 flex-1"
             />
           </div>
-          <Button type="button" size="sm" onClick={apply.handleApply} disabled={!apply.canApply} className="shrink-0">
-            {apply.loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding…
-              </>
-            ) : (
-              'Add to Data Block'
-            )}
-          </Button>
+          <DisabledReasonTooltip reason={apply.disabledReason}>
+            <Button type="button" size="sm" onClick={apply.handleApply} disabled={!apply.canApply} className="shrink-0">
+              {apply.loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding…
+                </>
+              ) : (
+                'Add to Data Block'
+              )}
+            </Button>
+          </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>

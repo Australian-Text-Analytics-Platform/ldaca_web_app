@@ -62,6 +62,7 @@ interface JoinPreviewConfig {
 interface JoinApplyState {
   run: () => Promise<void>;
   disabled: boolean;
+  disabledReason: string | undefined;
   isBusy: boolean;
 }
 
@@ -378,8 +379,25 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       : 'No matching column names detected. Select compatible columns manually.';
   })();
 
+  const previewIsEmpty =
+    joinConfigReady &&
+    joinPreviewReady &&
+    !joinPreviewLoading &&
+    !joinPreviewError &&
+    (joinPreviewPagination !== null
+      ? joinPreviewPagination.total_rows === 0
+      : joinPreviewData.length === 0);
+
   const applyDisabled =
-    !joinConfigReady || !currentWorkspaceId || isJoining || isLoading.operations;
+    !joinConfigReady || !currentWorkspaceId || isJoining || isLoading.operations || previewIsEmpty || !!joinPreviewError;
+
+  const applyDisabledReason: string | undefined = (() => {
+    if (isJoining || isLoading.operations) return undefined;
+    if (!joinConfigReady) return joinConfigIssues || 'Configure the join first';
+    if (joinPreviewError) return 'Fix the error shown in Preview join output before adding to workspace';
+    if (previewIsEmpty) return 'The current join produces no matching rows — adjust the join type or key columns';
+    return undefined;
+  })();
 
   const handleSetJoinType = (value: JoinType) => {
     setJoinType(value);
@@ -414,6 +432,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     apply: {
       run: handleApplyJoin,
       disabled: applyDisabled,
+      disabledReason: applyDisabledReason,
       isBusy: isJoining,
     },
     showActivityTag: isJoining || isLoading.operations,

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FocusEvent } from 'react';
 import { CircleHelp } from 'lucide-react';
+import { DisabledReasonTooltip } from '../../../../../components/ui/disabled-reason-tooltip';
 import { Input } from '../../../../../components/ui/input';
 import { Label } from '../../../../../components/ui/label';
 import {
@@ -31,7 +32,7 @@ type Props = {
   defaultPalette: string[];
   isLocked: boolean;
   getNodeColumns: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
-  actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string };
+  actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string; runDisabledReason?: string };
   corpusSamples: CorpusSample[];
   nodeDocCounts: number[];
   onCorpusSampleChange: (idx: number, update: Partial<CorpusSample>) => void;
@@ -114,6 +115,9 @@ export function TopicModelingParameterPanel({
         onRun,
         onClear,
         runDisabled: actionState.runDisabled || isRunning || hasMissingColumns,
+        runDisabledReason: hasMissingColumns
+          ? 'Select a column for each data block'
+          : actionState.runDisabledReason,
         clearDisabled: actionState.clearDisabled || isClearing,
         isRunning,
         isClearing,
@@ -188,6 +192,7 @@ export function TopicModelingParameterPanel({
             return (
               <div key={nodeId || idx} className="flex items-center gap-2">
                 {/* Coloured circle radio toggle */}
+                <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined}>
                 <button
                   type="button"
                   onClick={() =>
@@ -201,10 +206,12 @@ export function TopicModelingParameterPanel({
                     borderColor: color,
                   }}
                 />
+                </DisabledReasonTooltip>
 
                 <span className={`text-sm font-medium${sample.enabled ? '' : ' text-muted-foreground'}`}>Random</span>
 
                 {/* % input — vertically aligned across rows by identical prefix */}
+                <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined}>
                 <Input
                   aria-label={`Sampling percentage for corpus ${idx + 1}`}
                   type="number"
@@ -224,6 +231,7 @@ export function TopicModelingParameterPanel({
                     onCorpusSampleChange(idx, { percent: String(clamped) });
                   }}
                 />
+                </DisabledReasonTooltip>
 
                 <span className="text-sm font-medium">%</span>
 
@@ -253,6 +261,7 @@ export function TopicModelingParameterPanel({
           {/* Row 1: mode dropdown + value input */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
+              <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined} className="flex-1 min-w-0">
               <Select
                 value={topicSizeMode}
                 onValueChange={(v) => onTopicSizeModeChange(v as 'target' | 'min' | 'exact')}
@@ -267,6 +276,7 @@ export function TopicModelingParameterPanel({
                   <SelectItem value="exact" className="text-sm font-medium">Exact Topic No.</SelectItem>
                 </SelectContent>
               </Select>
+              </DisabledReasonTooltip>
               {topicSizeMode === 'exact' ? (
                 <span
                   aria-label="Exact mode may run slower than Aim Topic No."
@@ -277,6 +287,7 @@ export function TopicModelingParameterPanel({
                 </span>
               ) : null}
             </div>
+            <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined}>
             <Input
               id="topic-size-value"
               aria-label="Topic size value"
@@ -304,6 +315,7 @@ export function TopicModelingParameterPanel({
               onChange={(e) => setTopicSizeValueDraft(e.target.value)}
               onBlur={handleTopicSizeValueBlur}
             />
+            </DisabledReasonTooltip>
           </div>
 
           {/* Row 2: random seed */}
@@ -327,6 +339,7 @@ export function TopicModelingParameterPanel({
             <Label htmlFor="representative-words-count" className="whitespace-nowrap pl-3 text-sm">
               Words per topic
             </Label>
+            <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined}>
             <Input
               id="representative-words-count"
               type="number"
@@ -334,11 +347,13 @@ export function TopicModelingParameterPanel({
               max={50}
               step={1}
               value={representativeWordsCount}
+              disabled={isLocked}
               className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
               onChange={(e) =>
                 onRepresentativeWordsCountChange(Math.max(1, Number(e.target.value) || 0))
               }
             />
+            </DisabledReasonTooltip>
           </div>
         </div>
 

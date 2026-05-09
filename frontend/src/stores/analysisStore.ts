@@ -31,17 +31,45 @@ export interface PendingConcordance {
   timestamp?: number;
 }
 
+/**
+ * Mirror of the backend's `analysis_materialized` SSE event. Pushed onto the
+ * store the moment the worker emits it, so feature components can react
+ * synchronously without having to refetch the parent task's request (which
+ * races with the persistence write on the backend).
+ */
+export interface AnalysisMaterializedEvent {
+  taskType: string;
+  taskId: string;
+  parentTaskId: string;
+  parentNodeId: string;
+  materializedPath: string;
+  timestamp: number;
+  /** Monotonically increasing sequence to disambiguate equal timestamps. */
+  sequence: number;
+}
+
 interface AnalysisState {
   tasks: TaskItem[];
   pendingConcordance: PendingConcordance | null;
+  /**
+   * Latest `analysis_materialized` notifications, newest first. Bounded length
+   * (`MATERIALIZED_EVENT_HISTORY_LIMIT`) — consumers should look up by
+   * `parentTaskId` + `parentNodeId` rather than scan the array.
+   */
+  materializedEvents: AnalysisMaterializedEvent[];
   setTasks: (tasks: TaskItem[] | ((prev: TaskItem[]) => TaskItem[])) => void;
   setPendingConcordance: (payload: PendingConcordance) => void;
   clearPendingConcordance: () => void;
+  pushMaterializedEvent: (event: Omit<AnalysisMaterializedEvent, 'sequence'>) => void;
 }
+
+const MATERIALIZED_EVENT_HISTORY_LIMIT = 64;
+let materializedEventSequence = 0;
 
 export const useAnalysisStore = create<AnalysisState>((set) => ({
   tasks: [],
   pendingConcordance: null,
+  materializedEvents: [],
   setTasks: (tasks) =>
     set((state) => ({
       tasks: typeof tasks === 'function' ? tasks(state.tasks) : tasks,
@@ -57,5 +85,18 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
     set(() => ({
       pendingConcordance: null,
     })),
+  pushMaterializedEvent: (event) =>
+    set((state) => {
+      materializedEventSequence += 1;
+      const next: AnalysisMaterializedEvent = {
+        ...event,
+        sequence: materializedEventSequence,
+      };
+      const merged = [next, ...state.materializedEvents].slice(
+        0,
+        MATERIALIZED_EVENT_HISTORY_LIMIT,
+      );
+      return { materializedEvents: merged };
+    }),
 }));
 

@@ -109,6 +109,7 @@ export interface UseFilterSubTabSectionsResult {
   isFiltering: boolean;
   applyFilter: () => Promise<void>;
   applyButtonDisabled: boolean;
+  applyButtonDisabledReason: string | undefined;
   preview: FilterPreviewConfig;
   selectedNodesOriginalCount: number;
 }
@@ -918,7 +919,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   };
   const previewReadyMessage = !hasSelection
     ? 'Select a data block to preview filtered results.'
-    : 'Showing original data. Configure conditions to preview filtered rows.';
+    : 'Showing original data. Configure conditions to preview filtered results.';
 
   const summaryText = conditions.length === 0
     ? 'Define at least one condition to enable preview and filtering.'
@@ -931,6 +932,14 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     isFiltering ||
     isLoading.operations ||
     !hasApplicablePreviewRows;
+
+  const applyButtonDisabledReason: string | undefined = (() => {
+    if (isFiltering || isLoading.operations) return undefined;
+    if (!hasSelection) return 'Select a data block first';
+    if (!conditionsComplete) return 'Set at least one complete filtering condition';
+    if (!hasApplicablePreviewRows) return 'Adjust your conditions until at least one result appears in Preview filtered results';
+    return undefined;
+  })();
 
   return {
     selectionPanel: {
@@ -971,6 +980,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     isFiltering,
     applyFilter: handleApplyFilter,
     applyButtonDisabled,
+    applyButtonDisabledReason,
     preview: {
       columns: previewColumnsToRender,
       data: previewData,

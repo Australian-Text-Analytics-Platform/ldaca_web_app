@@ -1,6 +1,6 @@
 [package]
 name = "ldaca-web-app"
-version = "0.2.9"
+version = "0.3.0"
 description = "LDaCA Text Analytics Desktop Application"
 authors = ["Australian Text Analytics Platform"]
 edition = "2021"

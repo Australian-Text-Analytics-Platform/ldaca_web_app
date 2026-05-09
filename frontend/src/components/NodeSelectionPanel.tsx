@@ -132,6 +132,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
         clearOptionValue={CLEAR_SELECTION_VALUE}
         label={getColumnLabel(node, index)}
         disabled={disabled}
+        disabledReason={disabled ? 'Clear results first to change the column selection' : undefined}
         noColumnsMessage={
           options?.filteredOutByType
             ? 'No columns match the allowed data types for this node'

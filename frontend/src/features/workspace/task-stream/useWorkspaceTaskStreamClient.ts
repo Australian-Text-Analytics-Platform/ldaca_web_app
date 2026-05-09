@@ -6,6 +6,15 @@ export type TaskEventPayload =
   | { type: 'tasks_snapshot'; tasks?: TaskItem[]; timestamp?: number }
   | { type: 'task_changed'; task?: TaskItem; timestamp?: number }
   | { type: 'analysis_save_failed'; task_type?: string; message?: string }
+  | {
+      type: 'analysis_materialized';
+      task_type?: string;
+      task_id?: string;
+      parent_task_id?: string;
+      parent_node_id?: string;
+      materialized_path?: string;
+      timestamp?: number;
+    }
   | { type: 'task_update'; tasks?: TaskItem[]; timestamp?: number }
   | { type: 'error'; message?: string }
   | { type: 'heartbeat' }

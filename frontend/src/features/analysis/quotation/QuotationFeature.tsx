@@ -20,6 +20,7 @@ import type {
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '../../../stores/quotationEngineStore';
 import { Button } from '../../../components/ui/button';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
@@ -1195,7 +1196,7 @@ const QuotationFeature: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
             <NodeSelectionPanel
-              selectedNodes={panelSelectedNodes}
+              selectedNodes={displayedNodes}
               nodeColumnSelections={activeSelections}
               onColumnChange={handleColumnChange}
               nodeColors={{}}
@@ -1213,26 +1214,34 @@ const QuotationFeature: React.FC = () => {
               lockedMessage={ANALYSIS_LOCKED_MESSAGE}
             />
             <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                className="w-full sm:w-auto"
-                onClick={() => {
-                  void handleRunOrUpdate();
-                }}
-                disabled={actionState.runDisabled || !canRunQuotation}
-              >
-                {isLoadingQuotations ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Running…
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    {actionState.runLabel}
-                  </>
-                )}
-              </Button>
+              <DisabledReasonTooltip reason={(() => {
+                if (isLoadingQuotations) return undefined;
+                if (actionState.runDisabledReason) return actionState.runDisabledReason;
+                if (hasIncompleteSelections) return 'Select a column for each data block';
+                if (!engineReady) return 'Configure the remote engine before running';
+                return undefined;
+              })()}>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    void handleRunOrUpdate();
+                  }}
+                  disabled={actionState.runDisabled || !canRunQuotation}
+                >
+                  {isLoadingQuotations ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Running…
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-4 w-4" />
+                      {actionState.runLabel}
+                    </>
+                  )}
+                </Button>
+              </DisabledReasonTooltip>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"

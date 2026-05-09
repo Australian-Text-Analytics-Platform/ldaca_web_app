@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../c
 import { Tag } from '../../../components/ui/tag';
 import { Button } from '../../../components/ui/button';
 import HelpIcon from '../../../components/help/HelpIcon';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { ConditionBuilder } from '../components/condition-builder';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
@@ -21,6 +22,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
     isFiltering,
     applyFilter,
     applyButtonDisabled,
+    applyButtonDisabledReason,
     preview,
     selectedNodesOriginalCount,
   } = useFilterSubTabSections(props);
@@ -137,19 +139,21 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
               className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <Button size="sm" onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
-            {isFiltering ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding to workspace…
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                Add to Workspace
-              </>
-            )}
-          </Button>
+          <DisabledReasonTooltip reason={applyButtonDisabledReason}>
+            <Button size="sm" onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
+              {isFiltering ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding to workspace…
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Workspace
+                </>
+              )}
+            </Button>
+          </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
@@ -157,7 +161,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
       <PreviewTable
         title={
           <span className="flex items-center gap-2">
-            Preview filtered rows
+            Preview filtered results
             <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
           </span>
         }
