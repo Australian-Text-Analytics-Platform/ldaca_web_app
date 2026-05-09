@@ -1,8 +1,9 @@
 import React from 'react';
 import { DocLinkIcon } from './DocLinkIcon';
+import type { InfoTargetKey } from '@/tutorials/infoRegistry';
 
 export interface InfoIconProps {
-  targetKey: string;
+  targetKey: InfoTargetKey | (string & {});
   label?: string;
   tooltip?: string;
   className?: string;
