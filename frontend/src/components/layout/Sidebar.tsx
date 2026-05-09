@@ -27,10 +27,8 @@ import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorkspaceTaskInbox';
+import { useTaskCardActions } from '@/features/workspace/task-stream/useTaskCardActions';
 import { useAuth } from '@/hooks/useAuth';
-import { filesApi } from '@/api/files';
-import { textApi } from '@/api/text';
-import { workspacesApi } from '@/api/workspaces';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { useHintsStore } from '@/stores/hintsStore';
@@ -38,17 +36,14 @@ import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
+import { ClearEmbeddingCacheMenuItem } from '@/features/analysis/topic-modeling/components/ClearEmbeddingCacheMenuItem';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
-import type {
-  SidebarTaskRecord,
-  SidebarWorkspaceNode,
-} from '@/components/layout/sidebar/types';
+import type { SidebarWorkspaceNode } from '@/components/layout/sidebar/types';
 import {
   BookOpen,
   Bot,
@@ -67,7 +62,6 @@ import {
   ChevronDown,
   Pencil,
   RotateCcw,
-  Trash2,
 } from 'lucide-react';
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
@@ -137,7 +131,7 @@ const Sidebar: React.FC = () => {
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNodeSelection, clearSelection } = useWorkspaceActions();
-  const { getAuthHeaders, user, logout, dataFolder, isMultiUserMode } = useAuth();
+  const { user, logout, dataFolder, isMultiUserMode } = useAuth();
   const queryClient = useQueryClient();
   const handleLogout = React.useCallback(async () => {
     // Drop all cached query data so the next signed-in user never sees the
@@ -145,12 +139,7 @@ const Sidebar: React.FC = () => {
     queryClient.clear();
     await logout();
   }, [logout, queryClient]);
-  const { tasks, setTasks } = useAnalysisStore(
-    useShallow((state) => ({
-      tasks: state.tasks,
-      setTasks: state.setTasks,
-    }))
-  );
+  const tasks = useAnalysisStore((state) => state.tasks);
   const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const {
     status: taskStreamStatus,
@@ -172,44 +161,6 @@ const Sidebar: React.FC = () => {
     resetHints();
     resetSessionDismissedHints();
     toast('All hints have been reset. Dismissed hints can appear again.');
-  };
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes <= 0) return '0 bytes';
-    const units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
-    const idx = Math.min(units.length - 1, Math.floor(Math.log10(bytes) / 3));
-    const value = bytes / Math.pow(1000, idx);
-    return `${value < 10 && idx > 0 ? value.toFixed(1) : Math.round(value)} ${units[idx]}`;
-  };
-
-  const [isClearCacheDialogOpen, setIsClearCacheDialogOpen] = React.useState(false);
-  const [embeddingCacheStats, setEmbeddingCacheStats] = React.useState<{ bytes: number; files: number } | null>(null);
-
-  const handleOpenClearCacheDialog = async () => {
-    setEmbeddingCacheStats(null);
-    setIsClearCacheDialogOpen(true);
-    try {
-      const resp = await textApi.getTopicModelingEmbeddingCacheSize(getAuthHeaders());
-      setEmbeddingCacheStats(resp.data ?? null);
-    } catch {
-      // Leave stats null; dialog will show a generic warning without sizes.
-    }
-  };
-
-  const handleConfirmClearCache = async () => {
-    setIsClearCacheDialogOpen(false);
-    try {
-      const resp = await textApi.clearTopicModelingEmbeddingCache(getAuthHeaders());
-      const freed = resp.data?.bytes_freed ?? 0;
-      const files = resp.data?.files_removed ?? 0;
-      if (files === 0) {
-        toast('Embedding cache was already empty.');
-      } else {
-        toast(`Cleared ${files} cached embedding ${files === 1 ? 'file' : 'files'} (${formatBytes(freed)} reclaimed).`);
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to clear embedding cache.');
-    }
   };
 
   const [isDataFolderDialogOpen, setIsDataFolderDialogOpen] = React.useState(false);
@@ -420,37 +371,7 @@ const Sidebar: React.FC = () => {
       })}
     </SidebarMenu>
   );
-  const handleClearTask = async (task: SidebarTaskRecord) => {
-    try {
-      const taskType = String(task.task_type ?? '');
-      const isFileImportTask = taskType === 'ldaca_import';
-
-      if (task.state === 'running') {
-        // Stop the running process. The task record stays; the SSE stream will
-        // push a state update to 'cancelled' so the card transitions to the
-        // clearable state without us removing it from local state here.
-        await workspacesApi.cancelTask({ task_id: task.task_id }, getAuthHeaders());
-      } else {
-        // Terminal state — remove the record entirely.
-        if (isFileImportTask) {
-          await filesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
-        } else {
-          await workspacesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
-        }
-        setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
-      }
-    } catch (error) {
-      console.error('Failed to clear task', error);
-    }
-  };
-
-  // Auto-fade dismissal: remove from the local UI list only. We must NOT call
-  // the backend clear API here, because the analysis task record may still be
-  // required by an open feature dialog (e.g. Topic Modelling "Add to
-  // Workspace" detach), which looks up the task by id when the user confirms.
-  const handleAutoDismissTask = (task: SidebarTaskRecord) => {
-    setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
-  };
+  const { handleClearTask, handleAutoDismissTask } = useTaskCardActions();
 
   return (
     <SidebarRoot
@@ -589,16 +510,7 @@ const Sidebar: React.FC = () => {
                             <RotateCcw className="mr-2 h-3.5 w-3.5" />
                             Reset all hints
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={(event) => {
-                              event.preventDefault();
-                              void handleOpenClearCacheDialog();
-                            }}
-                            className="text-xs text-muted-foreground focus:text-foreground"
-                          >
-                            <Trash2 className="mr-2 h-3.5 w-3.5" />
-                            Clear embedding cache
-                          </DropdownMenuItem>
+                          <ClearEmbeddingCacheMenuItem />
                         </DropdownMenuContent>
                       </DropdownMenu>
                       </div>
@@ -709,23 +621,6 @@ const Sidebar: React.FC = () => {
           onOpenChange={setIsDataFolderDialogOpen}
         />
       )}
-      <ConfirmDialog
-        open={isClearCacheDialogOpen}
-        onOpenChange={setIsClearCacheDialogOpen}
-        title="Clear embedding cache?"
-        description={
-          (embeddingCacheStats === null
-            ? 'Calculating size of cached embeddings…\n\n'
-            : embeddingCacheStats.files === 0
-              ? 'The embedding cache is currently empty — nothing to clear.\n\n'
-              : `${embeddingCacheStats.files} cached embedding ${embeddingCacheStats.files === 1 ? 'file' : 'files'} will be deleted, freeing ${formatBytes(embeddingCacheStats.bytes)} of disk space.\n\n`) +
-          'Topic modelling caches per-document embeddings so re-running on the same texts is fast. Clearing this cache means future topic modelling on those texts will need to recompute every embedding from scratch and may take noticeably longer (especially for large corpora).'
-        }
-        confirmText="Clear cache"
-        cancelText="Cancel"
-        onConfirm={handleConfirmClearCache}
-        variant="destructive"
-      />
     </SidebarRoot>
   );
 };
