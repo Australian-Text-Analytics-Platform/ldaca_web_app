@@ -72,6 +72,7 @@ import {
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
+import { PageSizeSelect } from '../common/components/PageSizeSelect';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
@@ -1189,27 +1190,13 @@ const QuotationFeature: React.FC = () => {
               label: 'Clear results',
             },
             extraContent: (
-              <div className="ml-auto flex items-center gap-2">
-                <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
-                <Select
-                  value={String(
-                    nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']?.pageSize
-                    ?? DEFAULT_PAGE_SIZE
-                  )}
-                  onValueChange={(val) => handlePageSizeChange(Number(val))}
-                >
-                  <SelectTrigger className="h-9 w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="start">
-                    {[10, 20, 50, 100, 200, 400, 800].map((size) => (
-                      <SelectItem key={size} value={String(size)}>
-                        {size}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <PageSizeSelect
+                value={
+                  nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']?.pageSize
+                  ?? DEFAULT_PAGE_SIZE
+                }
+                onChange={handlePageSizeChange}
+              />
             ),
           }}
         >

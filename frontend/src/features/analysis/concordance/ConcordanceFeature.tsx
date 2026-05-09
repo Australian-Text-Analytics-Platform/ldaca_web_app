@@ -15,7 +15,6 @@ import { useUIStore } from '@/stores';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Play, Loader2, Trash2, Plus } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
@@ -58,6 +57,7 @@ import { takeMostRecent } from '@/utils/selectionUtils';
 import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
+import { PageSizeSelect } from '../common/components/PageSizeSelect';
 import { ConcordanceDispersionCell } from './components/ConcordanceDispersionCell';
 import { ConcordanceDispersionLegend } from './components/ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './components/ConcordanceDispersionSummary';
@@ -2035,35 +2035,20 @@ const ConcordanceFeature: React.FC = () => {
             </Button>
             <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
-            <Select
-              value={String(globalPageSize)}
-              onValueChange={(val) => {
-                const newSize = Number(val);
-                setGlobalPageSize(newSize);
-                setNodePagination((prev) => {
-                  const updated = { ...prev };
-                  Object.keys(updated).forEach((nid) => {
-                    updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
-                  });
-                  return updated;
+          <PageSizeSelect
+            value={globalPageSize}
+            onChange={(newSize) => {
+              setGlobalPageSize(newSize);
+              setNodePagination((prev) => {
+                const updated = { ...prev };
+                Object.keys(updated).forEach((nid) => {
+                  updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
                 });
-                void persistResultPreferences({ pageSize: newSize });
-              }}
-            >
-              <SelectTrigger className="h-9 w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent align="start">
-                {[10, 20, 50, 100, 200, 400, 800].map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                return updated;
+              });
+              void persistResultPreferences({ pageSize: newSize });
+            }}
+          />
         </CardFooter>
       </Card>
 
