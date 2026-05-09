@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Column as TableColumn, SortingState, ColumnFiltersState, PaginationState as TanstackPaginationState } from '@tanstack/react-table';
 import { type ColumnDef, type ColumnPinningState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Expand, Filter, Loader2, Minimize, Pin, Settings2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RenameInput } from './RenameInput';
+import { ColumnFilterForm } from './ColumnFilterForm';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,124 +29,6 @@ import { ServerTablePagination } from './ServerTablePagination';
 import type { DataRow, FilterOperator, PaginationInfo } from '../types';
 import type { NodeSchemaResponse } from '@/types';
 import { DATA_TYPES, extractColumnTypes, getTypeDisplayName, normalizeTypeName } from '../services/schemaMutations';
-
-// --- Inline rename input ---
-function RenameInput({
-  column,
-  disabled,
-  onSubmit,
-  onCancel,
-}: {
-  column: string;
-  disabled: boolean;
-  onSubmit: (column: string, value: string) => void;
-  onCancel: () => void;
-}) {
-  const [draft, setDraft] = useState(column);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const el = inputRef.current;
-    if (el) { el.focus(); el.select(); }
-  }, []);
-
-  return (
-    <Input
-      ref={inputRef}
-      value={draft}
-      disabled={disabled}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => { if (!disabled) onSubmit(column, draft); }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); if (!disabled) onSubmit(column, draft); }
-        else if (e.key === 'Escape') onCancel();
-      }}
-      className="h-7 w-40 truncate text-xs"
-      aria-label={`Rename column ${column}`}
-    />
-  );
-}
-
-// --- Column filter form (rendered inside the settings dropdown sub-menu) ---
-const FILTER_OPS: { value: FilterOperator; label: string }[] = [
-  { value: 'contains', label: 'Contains' },
-  { value: 'eq', label: 'Equals' },
-  { value: 'startswith', label: 'Starts with' },
-  { value: 'endswith', label: 'Ends with' },
-];
-
-function ColumnFilterForm({
-  column,
-  currentOp,
-  currentValue,
-  onApply,
-  onClear,
-}: {
-  column: string;
-  currentOp: FilterOperator;
-  currentValue: string;
-  onApply: (column: string, value: string, op: FilterOperator) => void;
-  onClear: (column: string) => void;
-}) {
-  const [op, setOp] = useState<FilterOperator>(currentOp);
-  const [value, setValue] = useState(currentValue);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  return (
-    <div
-      className="flex flex-col gap-2 p-2"
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      <span className="text-xs font-medium text-muted-foreground">Filter &quot;{column}&quot;</span>
-      <select
-        value={op}
-        onChange={(e) => setOp(e.target.value as FilterOperator)}
-        className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-      >
-        {FILTER_OPS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Value..."
-        className="h-7 text-xs"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); onApply(column, value, op); }
-        }}
-      />
-      <div className="flex gap-1">
-        <Button size="sm" className="h-6 flex-1 text-xs" onClick={() => onApply(column, value, op)}>
-          Apply
-        </Button>
-        {currentValue && (
-          <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => onClear(column)}>
-            Clear
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// --- TanStack column meta ---
-declare module '@tanstack/react-table' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData, TValue> {
-    headerClassName?: string;
-    headerMinWidth?: number;
-    headerMaxWidth?: number;
-    cellClassName?: string;
-    cellMinWidth?: number;
-    cellMaxWidth?: number;
-  }
-}
 
 // --- Constants ---
 const WIDE_COLUMN_THRESHOLD = 120;
@@ -224,15 +107,15 @@ export function WorkspaceTable({
     return () => { cancelled = true; };
   }, [workspaceId, nodeId, onRefreshSchema]);
 
-  const sanitizedData = Array.isArray(data) ? data : [];
+  const sanitizedData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
-  const columns = (() => {
+  const columns = useMemo(() => {
     const firstRow = sanitizedData.find((row) => row && typeof row === 'object');
     if (firstRow) return Object.keys(firstRow);
     return Object.keys(columnTypes);
-  })();
+  }, [sanitizedData, columnTypes]);
 
-  const wideColumns = (() => {
+  const wideColumns = useMemo(() => {
     const sampleRows = sanitizedData.slice(0, WIDE_COLUMN_SAMPLE_LIMIT);
     const result = new Set<string>();
     columns.forEach((col) => {
@@ -243,11 +126,14 @@ export function WorkspaceTable({
         if (raw == null) continue;
         const display = typeof raw === 'string' ? raw : String(raw);
         maxLen = Math.max(maxLen, display.length);
-        if (maxLen > WIDE_COLUMN_THRESHOLD) { result.add(col); break; }
+        if (maxLen > WIDE_COLUMN_THRESHOLD) {
+          result.add(col);
+          break;
+        }
       }
     });
     return result;
-  })();
+  }, [columns, sanitizedData]);
 
   const performCast = async (column: string, targetType: string, format?: string) => {
     if (!onCast) return;
