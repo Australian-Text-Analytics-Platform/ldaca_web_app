@@ -146,8 +146,6 @@ export interface UseAggregateSubTabResult {
   basicBuilder: BasicBuilderConfig;
   preview: PreviewConfig;
   apply: ApplyConfig;
-  manualExpressionActive: boolean;
-  dropZoneRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const createTokenId = (): string => {
@@ -893,7 +891,5 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       currentMatchesApplied: !!currentExpressionMatchesApplied,
       handleApply,
     },
-    manualExpressionActive,
-    dropZoneRef,
   };
 };

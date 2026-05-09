@@ -2,13 +2,11 @@ import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   textApi,
-  type ConcordanceRequest,
   type ConcordanceDetachRequest,
   type ConcordanceMaterializeRequest,
   type QuotationRequest,
   type QuotationDetachRequest,
   type QuotationMaterializeRequest,
-  type ConcordanceAnalysisRequest,
 } from '../api/text';
 import { queryKeys } from '../lib/queryKeys';
 import { useWorkspaceCore } from './workspace/useWorkspaceCore';
@@ -97,41 +95,6 @@ export const useWorkspaceInternal = () => {
     }
     return currentWorkspaceId;
   };
-
-  const concordanceMutation = useMutation({
-    mutationFn: ({
-      nodeId,
-      request,
-    }: {
-      nodeId: string;
-      request: ConcordanceRequest;
-    }) => {
-      const unifiedRequest: ConcordanceAnalysisRequest = {
-        node_ids: [nodeId],
-        node_columns: { [nodeId]: request.column },
-        search_word: request.search_word,
-        num_left_tokens: request.num_left_tokens,
-        num_right_tokens: request.num_right_tokens,
-        regex: request.regex,
-        case_sensitive: request.case_sensitive,
-        combined: false,
-      };
-
-      if (request.sort_by) {
-        unifiedRequest.sort_by = request.sort_by;
-      }
-
-      return textApi.concordance(unifiedRequest, authHeaders);
-    },
-    onMutate: () => startOperation('concordance'),
-    onSuccess: () => {
-      endOperation('concordance');
-    },
-    onError: (error: Error) => {
-      setOperationError('concordance', error.message);
-      endOperation('concordance');
-    },
-  });
 
   const detachConcordanceMutation = useMutation({
     mutationFn: ({
@@ -235,11 +198,6 @@ export const useWorkspaceInternal = () => {
   });
 
   const textActions = ({
-    concordanceSearch: (nodeId: string, request: ConcordanceRequest) =>
-      concordanceMutation.mutateAsync({
-        nodeId,
-        request,
-      }),
     detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
       detachConcordanceMutation.mutateAsync({
         workspaceId: ensureWorkspaceSelected(),

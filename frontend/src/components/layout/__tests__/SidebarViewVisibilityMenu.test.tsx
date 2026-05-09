@@ -41,8 +41,8 @@ vi.mock('@/hooks/useWorkspaceActions', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceTaskStream', () => ({
-  useWorkspaceTaskStream: () => ({
+vi.mock('@/features/workspace/task-stream/useWorkspaceTaskInbox', () => ({
+  useWorkspaceTaskInbox: () => ({
     status: 'closed',
     error: null,
     reconnect: vi.fn(),

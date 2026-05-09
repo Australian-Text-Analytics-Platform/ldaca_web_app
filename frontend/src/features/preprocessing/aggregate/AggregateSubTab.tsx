@@ -25,7 +25,6 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
     basicBuilder,
     preview,
     apply,
-    dropZoneRef,
   } = useAggregateSubTab(props);
 
   return (
@@ -129,7 +128,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                   <HelpIcon targetKey="preprocessing.aggregate.builder" label="Expression builder" />
                 </div>
                 <div
-                  ref={dropZoneRef}
+                  ref={basicBuilder.dropZoneRef}
                   onDragEnter={basicBuilder.handlers.builderDragOver}
                   onDragOver={basicBuilder.handlers.builderDragOver}
                   onDragLeave={basicBuilder.handlers.builderDragLeave}

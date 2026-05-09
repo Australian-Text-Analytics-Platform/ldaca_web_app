@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
-import { useWorkspaceTaskStream } from '@/hooks/useWorkspaceTaskStream';
+import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorkspaceTaskInbox';
 import { useAuth } from '@/hooks/useAuth';
 import { filesApi } from '@/api/files';
 import { textApi } from '@/api/text';
@@ -156,7 +156,7 @@ const Sidebar: React.FC = () => {
     status: taskStreamStatus,
     error: taskStreamError,
     reconnect: reconnectTaskStream,
-  } = useWorkspaceTaskStream(currentWorkspaceId ?? null);
+  } = useWorkspaceTaskInbox(currentWorkspaceId ?? null);
 
   const nodes = (() => {
     const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;

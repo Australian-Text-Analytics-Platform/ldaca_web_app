@@ -266,7 +266,6 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   return {
     // Schema state
     currentSchema,
-    setCurrentSchema,
     lockedSchema,
     setLockedSchema,
     effectiveSchema,

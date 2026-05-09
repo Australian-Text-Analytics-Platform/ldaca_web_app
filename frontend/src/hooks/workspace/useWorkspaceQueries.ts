@@ -1,4 +1,3 @@
-import { } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import { nodesApi } from '../../api/nodes';
