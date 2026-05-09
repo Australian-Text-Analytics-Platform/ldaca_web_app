@@ -3,18 +3,15 @@ import { useEffect, useState } from 'react';
 import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import {
-  nodesApi,
   type FilterPreviewResponse,
   type ReplaceApplyResponse,
   type ReplaceRequest,
 } from '@/api/nodes';
-import { useAuth } from '@/hooks/useAuth';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { mapColumnsToInfo } from '@/utils/columnTypes';
-import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
-import type { PreviewPagination, PreviewRow } from '../../types';
+import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 
-const DEFAULT_PALETTE = ['#2563eb'];
+const SINGLE_NODE_PALETTE = ['#2563eb'];
 
 const getNodeId = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
   node.id || node.node_id || `node-${fallbackIndex}`;
@@ -34,11 +31,6 @@ export interface ReplaceSubTabProps {
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
 
-interface ReplacePreviewRequest {
-  nodeId: string;
-  payload: ReplaceRequest | null;
-}
-
 export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const {
     selectedNodeId,
@@ -50,8 +42,6 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     replaceText,
     refreshNodeSchema,
   } = props;
-  const { getAuthHeaders } = useAuth();
-
   const effectiveNodes = (() => {
     if (selectedNodes.length > 0) return takeMostRecent(selectedNodes, 1);
     if (!selectedNodeId) return [];
@@ -96,12 +86,8 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const hasSelection = Boolean(activeNodeId);
   const hasOperation = Boolean(selectedColumn && pattern.length > 0);
 
-  const replacePreviewRequest: ReplacePreviewRequest | null = (() => {
-    if (!hasSelection || !activeNodeId) return null;
-    if (!hasOperation) return { nodeId: activeNodeId, payload: null };
-    return {
-      nodeId: activeNodeId,
-      payload: {
+  const operationPayload: ReplaceRequest | null = hasOperation
+    ? {
         source_column: selectedColumn,
         pattern,
         replacement,
@@ -110,41 +96,8 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
         count,
         n: count === 'first' ? (n ?? 1) : undefined,
         connector: mode === 'extract' ? connectorValue : undefined,
-      },
-    };
-  })();
-
-  const previewSignature = (() => {
-    if (!replacePreviewRequest) return 'replace-preview-disabled';
-    if (!replacePreviewRequest.payload) return `${replacePreviewRequest.nodeId}::raw`;
-    return `${replacePreviewRequest.nodeId}::${JSON.stringify(replacePreviewRequest.payload)}`;
-  })();
-
-  const previewFetcher = async ({
-    request,
-    page,
-    pageSize,
-  }: {
-    request: ReplacePreviewRequest;
-    page: number;
-    pageSize: number;
-    signal: AbortSignal;
-  }) => {
-    if (request.payload) {
-      const response = await replaceTextPreview(request.nodeId, request.payload, page, pageSize);
-      return {
-        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-        columns: Array.isArray(response?.columns) ? response.columns : [],
-        pagination: (response?.pagination as PreviewPagination) ?? null,
-      };
-    }
-    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
-    return {
-      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-      columns: Array.isArray(response?.columns) ? response.columns : [],
-      pagination: (response?.pagination as PreviewPagination) ?? null,
-    };
-  };
+      }
+    : null;
 
   const {
     data: previewData,
@@ -156,10 +109,12 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     pageSize: previewPageSize,
     setPage: setPreviewPage,
     setPageSize: setPreviewPageSize,
-  } = usePreprocessingPreview({
-    request: replacePreviewRequest,
-    signature: previewSignature,
-    fetcher: previewFetcher,
+  } = useNodePreviewWithRawFallback<ReplaceRequest>({
+    nodeId: activeNodeId,
+    operationPayload,
+    operationFetch: replaceTextPreview,
+    signaturePrefix: 'replace',
+    enabled: hasSelection,
   });
 
   const controlsDisabled = !hasSelection || isLoading.nodeData || isLoading.operations || applyLoading;
@@ -202,7 +157,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const nodeColumnSelections: NodeColumnSelection[] = activeNodeId
     ? [{ nodeId: activeNodeId, column: selectedColumn }]
     : [];
-  const nodeColors = activeNodeId ? { [activeNodeId]: DEFAULT_PALETTE[0]! } : {};
+  const nodeColors = activeNodeId ? { [activeNodeId]: SINGLE_NODE_PALETTE[0]! } : {};
 
   const previewReadyMessage = !hasSelection
     ? 'Select a data block to configure a find operation.'
@@ -237,7 +192,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     handleApply,
     nodeColumnSelections,
     nodeColors,
-    defaultPalette: DEFAULT_PALETTE,
+    defaultPalette: SINGLE_NODE_PALETTE,
     selectedNodes,
     preview: {
       data: previewData,

@@ -3,17 +3,15 @@ import { useEffect, useRef, useState } from 'react';
 import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import {
-  nodesApi,
   type FilterPreviewResponse,
   type PolarsExpressionRequest,
   type PolarsExpressionApplyResponse,
 } from '@/api/nodes';
-import { useAuth } from '@/hooks/useAuth';
 import { mapColumnsToInfo, type ColumnInfo } from '@/utils/columnTypes';
-import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
+import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import type { PreviewPagination, PreviewRow } from '../../types';
 
-const DEFAULT_PALETTE = ['#2563eb'];
+const SINGLE_NODE_PALETTE = ['#2563eb'];
 
 const SMART_CHAR_MAP: Record<string, string> = {
   '\u201C': '"', // "
@@ -166,7 +164,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     polarsExpressionApply,
     refreshNodeSchema,
   } = props;
-  const { getAuthHeaders } = useAuth();
 
   const effectiveNodes = (() => {
     if (selectedNodes?.length) {
@@ -361,57 +358,18 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }, 250);
   };
 
-  interface AggregatePreviewRequest {
-    nodeId: string;
-    payload: PolarsExpressionRequest | null;
-  }
-
-  const aggregatePreviewRequest: AggregatePreviewRequest | null = (() => {
-    if (!hasSelection || !activeNodeId) return null;
-    if (committedExpression.length === 0) return { nodeId: activeNodeId, payload: null };
+  const operationPayload: PolarsExpressionRequest | null = (() => {
+    if (committedExpression.length === 0) return null;
     let code = committedExpression;
     if (committedColumnName.length > 0) {
       const safeName = committedColumnName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       code = `(${code}).alias("${safeName}")`;
     }
-    const payload: PolarsExpressionRequest = {
+    return {
       context: 'with_columns',
       expressions: [{ code }],
     };
-    return { nodeId: activeNodeId, payload };
   })();
-
-  const previewSignature = (() => {
-    if (!aggregatePreviewRequest) return 'aggregate-preview-disabled';
-    if (!aggregatePreviewRequest.payload) return `${aggregatePreviewRequest.nodeId}::raw`;
-    return `${aggregatePreviewRequest.nodeId}::${JSON.stringify(aggregatePreviewRequest.payload)}`;
-  })();
-
-  const previewFetcher = async ({
-    request,
-    page,
-    pageSize,
-  }: {
-    request: AggregatePreviewRequest;
-    page: number;
-    pageSize: number;
-    signal: AbortSignal;
-  }) => {
-    if (request.payload) {
-      const response = await polarsExpressionPreview(request.nodeId, request.payload, page, pageSize);
-      return {
-        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-        columns: Array.isArray(response?.columns) ? response.columns : [],
-        pagination: (response?.pagination as PreviewPagination) ?? null,
-      };
-    }
-    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
-    return {
-      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-      columns: Array.isArray(response?.columns) ? response.columns : [],
-      pagination: (response?.pagination as PreviewPagination) ?? null,
-    };
-  };
 
   const {
     data: previewData,
@@ -424,10 +382,12 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     setPage: setPreviewPage,
     setPageSize: setPreviewPageSize,
     refresh: refreshPreview,
-  } = usePreprocessingPreview({
-    request: aggregatePreviewRequest,
-    signature: previewSignature,
-    fetcher: previewFetcher,
+  } = useNodePreviewWithRawFallback<PolarsExpressionRequest>({
+    nodeId: activeNodeId,
+    operationPayload,
+    operationFetch: polarsExpressionPreview,
+    signaturePrefix: 'aggregate',
+    enabled: hasSelection,
     debounceMs: 100,
   });
 
@@ -799,7 +759,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const nodeColumnSelections = (limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : []);
 
-  const nodeColors = (limitedNodeId ? { [limitedNodeId]: DEFAULT_PALETTE[0]! } : {}) as Record<string, string>;
+  const nodeColors = (limitedNodeId ? { [limitedNodeId]: SINGLE_NODE_PALETTE[0]! } : {}) as Record<string, string>;
 
   return {
     activeNodeId,
@@ -808,7 +768,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       effectiveNodes: effectiveSelectedNodes,
       nodeColumnSelections,
       nodeColors,
-      defaultPalette: DEFAULT_PALETTE,
+      defaultPalette: SINGLE_NODE_PALETTE,
       originalCount: selectedNodes?.length ?? 0,
     },
     expression: {

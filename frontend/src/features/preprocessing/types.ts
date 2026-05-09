@@ -103,6 +103,7 @@ export interface ConcatSchemaAnalysis {
 
 export const PREVIEW_PAGE_SIZE_OPTIONS = [10, 20, 50];
 export const MAX_CONCAT_NODES = 6;
+export const MAX_JOIN_NODES = 2;
 
 export const JOIN_TYPE_OPTIONS: Array<{ value: JoinType; description: string }> = [
   { value: 'inner', description: 'Only rows with matching keys in both data blocks.' },

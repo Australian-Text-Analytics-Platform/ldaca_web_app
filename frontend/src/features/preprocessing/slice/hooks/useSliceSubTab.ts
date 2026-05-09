@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { nodesApi, type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '@/api/nodes';
-import { useAuth } from '@/hooks/useAuth';
+import { type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '@/api/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
-import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
+import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';
 import { buildWorkspaceNodeMap, deriveNodeLabel } from '../../utils/nodeMetadata';
 
@@ -111,7 +110,7 @@ export interface UseSliceSubTabResult {
   showActivityTag: boolean;
 }
 
-const DEFAULT_PALETTE = ['#2563eb'];
+const SINGLE_NODE_PALETTE = ['#2563eb'];
 const PREVIEW_DEBOUNCE_MS = 400;
 const DEFAULT_RANDOM_SEED = '42';
 
@@ -166,7 +165,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     isLoading,
     onAlert,
   } = props;
-  const { getAuthHeaders } = useAuth();
 
   const [mode, setMode] = useState<SamplingMode>('slice');
   const [offsetInput, setOffsetInput] = useState('0');
@@ -227,7 +225,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const sliceNodeSelections: NodeColumnSelection[] = selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : [];
 
-  const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: DEFAULT_PALETTE[0]! } : {};
+  const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: SINGLE_NODE_PALETTE[0]! } : {};
 
   const hasSelection = Boolean(selectedNodeId);
 
@@ -349,62 +347,16 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const previewReady = hasSelection && (mode === 'slice' ? offsetValid : true);
 
-  interface SlicePreviewRequest {
-    nodeId: string;
-    payload: SliceRequestPayload | null;
-  }
-
-  const slicePreviewRequest: SlicePreviewRequest | null = (() => {
-    if (!previewReady || !selectedNodeId) {
-      return null;
-    }
-    if (!hasOperation) {
-      return { nodeId: selectedNodeId, payload: null };
-    }
-    const payload = buildSlicePayload({
-      mode,
-      offset: offsetNumber,
-      lengthValue,
-      sampleSizeValue,
-      randomSeedValue,
-      isFullShuffle,
-    });
-    return {
-      nodeId: selectedNodeId,
-      payload,
-    };
-  })();
-
-  const previewSignature = (() => {
-    if (!slicePreviewRequest) return 'slice-preview-disabled';
-    if (!slicePreviewRequest.payload) return `${slicePreviewRequest.nodeId}::raw`;
-    return `${slicePreviewRequest.nodeId}::${JSON.stringify(slicePreviewRequest.payload)}`;
-  })();
-
-  const previewFetcher = async ({
-    request,
-    page,
-    pageSize,
-  }: {
-    request: SlicePreviewRequest;
-    page: number;
-    pageSize: number;
-  }) => {
-    if (request.payload) {
-      const response = await slicePreview(request.nodeId, request.payload, page, pageSize);
-      return {
-        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-        columns: Array.isArray(response?.columns) ? response.columns : [],
-        pagination: (response?.pagination as PreviewPagination) ?? null,
-      };
-    }
-    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
-    return {
-      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-      columns: Array.isArray(response?.columns) ? response.columns : [],
-      pagination: (response?.pagination as PreviewPagination) ?? null,
-    };
-  };
+  const operationPayload: SliceRequestPayload | null = hasOperation
+    ? buildSlicePayload({
+        mode,
+        offset: offsetNumber,
+        lengthValue,
+        sampleSizeValue,
+        randomSeedValue,
+        isFullShuffle,
+      })
+    : null;
 
   const {
     data: previewData,
@@ -416,11 +368,13 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     pageSize: previewPageSize,
     setPage: setPreviewPage,
     setPageSize: setPreviewPageSize,
-  } = usePreprocessingPreview({
-    request: slicePreviewRequest,
-    signature: previewSignature,
+  } = useNodePreviewWithRawFallback<SliceRequestPayload>({
+    nodeId: selectedNodeId,
+    operationPayload,
+    operationFetch: slicePreview,
+    signaturePrefix: 'slice',
+    enabled: previewReady,
     debounceMs: PREVIEW_DEBOUNCE_MS,
-    fetcher: previewFetcher,
   });
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
@@ -556,7 +510,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       selectedNodes: sliceSelectedNodesForPanel,
       nodeColumnSelections: sliceNodeSelections,
       nodeColors: sliceNodeColors,
-      defaultPalette: DEFAULT_PALETTE,
+      defaultPalette: SINGLE_NODE_PALETTE,
       disabled: sliceSelectedNodesForPanel.length === 0,
       originalCount: selectedNodes.length,
       onColumnChange: () => undefined,

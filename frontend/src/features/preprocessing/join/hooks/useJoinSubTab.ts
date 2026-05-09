@@ -7,10 +7,10 @@ import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { JoinPreviewRequestPayload, JoinType, PreviewPagination, PreviewRow } from '../../types';
 import { JOIN_TYPE_OPTIONS } from '../../types';
 import { buildWorkspaceNodeMap, deriveNodeLabel, extractNodeColumns, getNodeKey } from '../../utils/nodeMetadata';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { dedupeNodeIds, takeMostRecent } from '@/utils/selectionUtils';
+import { MAX_JOIN_NODES } from '../../types';
 
 const DEFAULT_JOIN_PALETTE = ['#2563eb', '#dc2626'];
-const MAX_JOIN_NODES = 2;
 
 export interface JoinSubTabProps {
   selectedNodeIds: string[];
@@ -83,15 +83,6 @@ export interface UseJoinSubTabResult {
   apply: JoinApplyState;
   showActivityTag: boolean;
 }
-
-const dedupeNodeIds = (nodeIds: string[]): string[] => {
-  const seen = new Set<string>();
-  return nodeIds.filter((nodeId) => {
-    if (!nodeId || seen.has(nodeId)) return false;
-    seen.add(nodeId);
-    return true;
-  });
-};
 
 const describeSharedColumns = (count: number, columns: string[]): string => {
   const preview = columns.slice(0, 4).join(', ');
