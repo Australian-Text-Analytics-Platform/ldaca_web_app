@@ -1,9 +1,7 @@
 import { getTaskTypeCandidates } from '@/hooks/analysisTaskUtils';
+import { isTerminalTaskState } from '@/stores/analysisStore';
 
-const TERMINAL_STATES = new Set(['successful', 'failed', 'cancelled']);
-
-export const isTerminalTaskState = (state: string | null | undefined): boolean =>
-  Boolean(state && TERMINAL_STATES.has(state));
+export { isTerminalTaskState };
 
 export interface ShouldRefreshOnCompletionInput {
   isTabActive: boolean;

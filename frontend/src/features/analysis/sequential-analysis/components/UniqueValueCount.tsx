@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { nodesApi } from '@/api/index';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface UniqueValueCountProps {
   workspaceId: string;
@@ -13,7 +14,7 @@ export const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId,
   const { getAuthHeaders } = useAuth();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['columnUniqueValues', workspaceId, nodeId, columnName],
+    queryKey: queryKeys.columnUniqueValues(workspaceId, nodeId, columnName),
     queryFn: () => nodesApi.uniqueValues(nodeId, columnName, getAuthHeaders()),
     enabled: !!workspaceId && !!nodeId && !!columnName,
   });

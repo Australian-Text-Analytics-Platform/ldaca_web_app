@@ -50,4 +50,22 @@ export const queryKeys = {
 
   /** All file-tree queries. */
   files: ['files'] as const,
+
+  /** Paginated preview of an unsaved file (sheets/CSV/etc). */
+  filePreview: (
+    filename: string,
+    page: number,
+    pageSize: number,
+    selectedSheet: string | null,
+  ) => ['file-preview', filename, page, pageSize, selectedSheet] as const,
+
+  /** Per-column unique-value counts (used by sequential-analysis). */
+  columnUniqueValues: (workspaceId: string, nodeId: string, columnName: string) =>
+    ['workspaces', workspaceId, 'nodes', nodeId, 'columns', columnName, 'unique-values'] as const,
+
+  /** Per-(analysisType, workspace) server-request-lock used by useAnalysisServerRequestLock. */
+  analysisServerRequestLock: (
+    analysisType: string,
+    workspaceId: string | null,
+  ) => ['analysis', analysisType, 'server-request-lock', workspaceId] as const,
 };

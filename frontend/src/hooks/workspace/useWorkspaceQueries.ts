@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import { nodesApi } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
+import { isGraphDebugEnabled } from '../../lib/debugFlags';
 import type { GraphNode, NodeDataResponse } from '../../types/api';
 import { type PaginationState } from './types';
 
@@ -14,11 +15,8 @@ interface WorkspaceQueriesParams {
   getPaginationForNode: (nodeId?: string | null) => PaginationState;
 }
 
-const DEBUG_GRAPH_KEY = 'debugGraph';
-
 const logGraphDebug = (result: { nodes?: GraphNode[]; edges?: { source: string; target: string }[] }) => {
-  if (typeof window === 'undefined') return;
-  if (localStorage.getItem(DEBUG_GRAPH_KEY) !== '1') return;
+  if (!isGraphDebugEnabled()) return;
 
   console.debug('=== API Response Success ===');
   console.debug('API response structure:', {

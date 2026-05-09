@@ -9,6 +9,7 @@ import {
   type PolarsExpressionRequest,
 } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
+import { isGraphDebugEnabled } from '../../lib/debugFlags';
 import { type NodeSchemaResponse } from '../../types';
 import { type WorkspaceGraphResponse } from '../../types/api';
 import { getNodeInfo, invalidateNodeInfo } from '../../lib/nodeInfoCache';
@@ -610,7 +611,7 @@ export const useWorkspaceNodeMutations = ({
       const existingNodes = graphData?.nodes || [];
       const nodeExists = existingNodes.some((node) => node.id === nodeId);
       if (!nodeExists) {
-        if (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1') {
+        if (isGraphDebugEnabled()) {
           console.debug(`Node ${nodeId} no longer exists, skipping schema refresh`);
         }
         return null;

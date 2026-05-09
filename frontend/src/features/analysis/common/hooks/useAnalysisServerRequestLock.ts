@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { textApi } from '@/api/text';
+import { queryKeys } from '@/lib/queryKeys';
 
 export type ServerLockAnalysisType =
   | 'token_frequencies'
@@ -21,7 +22,7 @@ const ANALYSIS_REQUEST_FN: Record<ServerLockAnalysisType, (taskId: string, heade
 export const analysisServerRequestLockQueryKey = (
   analysisType: ServerLockAnalysisType,
   workspaceId: string | null
-) => ['analysis', analysisType, 'server-request-lock', workspaceId] as const;
+) => queryKeys.analysisServerRequestLock(analysisType, workspaceId);
 
 type Args = {
   analysisType: ServerLockAnalysisType;
