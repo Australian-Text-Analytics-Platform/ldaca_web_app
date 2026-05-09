@@ -19,7 +19,6 @@ import { Toaster } from './components/ui/sonner';
 import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
 
 // Lazy load components for code splitting
-const TutorialView = lazy(() => import('./components/TutorialView'));
 const DocumentView = lazy(() => import('./components/DocumentView'));
 const FeedbackPanel = lazy(() => import('./components/panels/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('./components/layout/WorkspaceView'));
@@ -274,7 +273,7 @@ const WorkspaceShell: React.FC = () => {
                 <DialogTitle className="sr-only">Tutorial</DialogTitle>
                 <div className="flex-1 overflow-y-auto">
                   <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
-                    <TutorialView onClose={closeTutorialModal} target={tutorialTarget} />
+                    <DocumentView docType="tutorial" onClose={closeTutorialModal} target={tutorialTarget} />
                   </Suspense>
                 </div>
               </DialogContent>

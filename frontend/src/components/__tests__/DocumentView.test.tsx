@@ -1,13 +1,13 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
-import TutorialView from '@/components/TutorialView';
+import DocumentView from '@/components/DocumentView';
 
 vi.mock('sonner', () => ({
   toast: vi.fn(),
 }));
 
-describe('TutorialView', () => {
+describe('DocumentView (docType="tutorial")', () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
@@ -24,7 +24,8 @@ describe('TutorialView', () => {
 
   it('fetches tutorial content once per file change', async () => {
     const { rerender } = render(
-      <TutorialView
+      <DocumentView
+        docType="tutorial"
         target={{ file: 'tutorials/index.md', anchor: 'help-tutorial-index' }}
       />
     );
@@ -33,7 +34,8 @@ describe('TutorialView', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
 
     rerender(
-      <TutorialView
+      <DocumentView
+        docType="tutorial"
         target={{ file: 'tutorials/index.md', anchor: 'help-tutorial-index-2' }}
       />
     );
