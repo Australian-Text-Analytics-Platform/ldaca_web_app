@@ -1,6 +1,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
@@ -66,12 +67,18 @@ vi.mock('@/components/dialogs/DataFolderDialog', () => ({
   DataFolderDialog: () => null,
 }));
 
-const renderSidebar = () =>
-  render(
-    <SidebarProvider>
-      <Sidebar />
-    </SidebarProvider>
+const renderSidebar = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SidebarProvider>
+        <Sidebar />
+      </SidebarProvider>
+    </QueryClientProvider>
   );
+};
 
 describe('Sidebar view visibility menu', () => {
   beforeEach(() => {

@@ -168,7 +168,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const resolvedOutputColumnName = previewColumnName;
 
   const applyDisabledReason: string | undefined = (() => {
-    if (applyLoading) return undefined;
+    if (applyLoading || isLoading.operations) return undefined;
     if (!hasSelection) return 'Select a data block first';
     if (!selectedColumn) return 'No string column available in this data block';
     if (!pattern) return 'Enter a regex pattern first';

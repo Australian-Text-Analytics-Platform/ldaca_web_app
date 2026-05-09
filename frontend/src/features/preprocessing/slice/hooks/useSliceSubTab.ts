@@ -204,17 +204,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   }, [mode, offsetInput, lengthInput, sampleSizeInput, randomSeedInput, noRandomSeed, selectedNodeId]);
 
   useEffect(() => {
-    if (!selectedNodeId) {
-      setMode('slice');
-      setOffsetInput('0');
-      setLengthInput('');
-      setSampleSizeInput('');
-      setRandomSeedInput(DEFAULT_RANDOM_SEED);
-      setNoRandomSeed(false);
-      setNewNodeName('');
-      setLastResult(null);
-      return;
-    }
     setMode('slice');
     setOffsetInput('0');
     setLengthInput('');

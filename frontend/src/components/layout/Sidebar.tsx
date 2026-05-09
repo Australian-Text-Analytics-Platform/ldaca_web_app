@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useShallow } from 'zustand/react/shallow';
 import {
   Sidebar as SidebarRoot,
@@ -137,6 +138,13 @@ const Sidebar: React.FC = () => {
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNodeSelection, clearSelection } = useWorkspaceActions();
   const { getAuthHeaders, user, logout, dataFolder, isMultiUserMode } = useAuth();
+  const queryClient = useQueryClient();
+  const handleLogout = React.useCallback(async () => {
+    // Drop all cached query data so the next signed-in user never sees the
+    // previous user's files, workspaces, nodes, or preferences.
+    queryClient.clear();
+    await logout();
+  }, [logout, queryClient]);
   const { tasks, setTasks } = useAnalysisStore(
     useShallow((state) => ({
       tasks: state.tasks,
@@ -468,7 +476,7 @@ const Sidebar: React.FC = () => {
                 variant="ghost"
                 size="sm"
                 className="text-xs text-red-600 hover:text-red-700 shrink-0 h-auto py-0 px-1"
-                onClick={logout}
+                onClick={handleLogout}
               >
                 Logout
               </Button>

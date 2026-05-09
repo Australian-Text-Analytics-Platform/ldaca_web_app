@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { computeZoomDomain, type ZoomDomain } from '../topicModelingAdapters';
 
 type BrushRect = {
@@ -43,18 +43,14 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
   const chartSvgRef = useRef<SVGSVGElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const fullDomain = computeZoomDomain(topics);
+  const fullDomain = useMemo(() => computeZoomDomain(topics), [topics]);
   const activeDomain = zoomDomain ?? fullDomain;
 
-  /* eslint-disable react-hooks/set-state-in-effect -- Resetting zoom domain when topics data changes; no cascading renders */
+  // Reset zoom when the topics dataset changes. fullDomain is memoized on
+  // topics, so the effect only fires when the underlying data actually changes.
   useEffect(() => {
-    if (!fullDomain) {
-      setZoomDomain(null);
-      return;
-    }
     setZoomDomain(fullDomain);
   }, [fullDomain]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     return () => {

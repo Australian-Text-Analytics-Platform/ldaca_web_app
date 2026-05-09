@@ -370,10 +370,6 @@ const WorkspaceShell: React.FC = () => {
                   <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
                 </Suspense>
 
-                <Suspense fallback={null}>
-                  <HintsController />
-                </Suspense>
-
                 <header className="border-b border-border/40 bg-white px-4 py-3 md:hidden">
                   <div className="flex items-center justify-between">
                     <SidebarTrigger />

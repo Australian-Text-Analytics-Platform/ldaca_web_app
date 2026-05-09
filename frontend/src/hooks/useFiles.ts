@@ -5,14 +5,6 @@ import { saveBlob } from '../lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '../lib/queryKeys';
 
-/**
- * Hook returning the file-tree state plus file upload/delete/download actions.
- *
- * The file list is cached per auth-header signature so switching users (or
- * clearing the token) doesn't surface the previous user's files. Each mutation
- * invalidates `queryKeys.files` and returns a `boolean` success so callers can
- * trigger toast-style UI without needing to catch promises.
- */
 interface UseFilesProps {
   authHeaders?: Record<string, string>;
   /** Defer the initial fetch until auth has been resolved. */
@@ -21,12 +13,9 @@ interface UseFilesProps {
 
 export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {}) => {
   const queryClient = useQueryClient();
-  // The header signature ensures the query cache key changes when auth does;
-  // otherwise a logged-out user would briefly see the prior user's tree.
-  const headerSignature = JSON.stringify(authHeaders);
 
   const filesQuery = useQuery<FileTreeNode[]>({
-    queryKey: [...queryKeys.files, headerSignature],
+    queryKey: queryKeys.files,
     queryFn: () => filesApi.list(authHeaders),
     enabled,
     staleTime: 2 * 60 * 1000,
