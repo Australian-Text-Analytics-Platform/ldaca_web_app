@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction } from 'react';
+import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import {
@@ -542,7 +542,20 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
-  const actions = {
+  // Memoize the action surface so consumers (the WorkspaceProvider context
+  // value, every component that destructures useWorkspaceActions, every
+  // mutation-fn closure that captures a specific action) keep a stable
+  // identity across renders. Without this, the four-slice WorkspaceProvider
+  // value churns every parent render and cascades through ~30 consumers.
+  //
+  // Deps explanation: TanStack's `*.mutateAsync` is referentially stable
+  // across the parent's lifetime, so capturing each mutation by closure is
+  // safe even though the mutation object itself is recreated. The values
+  // that DO change between renders are `authHeaders`, `currentWorkspaceId`,
+  // and `queryClient`; those are listed below. Listing the 20 mutation refs
+  // would needlessly invalidate the memo each render without a behaviour
+  // difference.
+  const actions = useMemo(() => ({
     setCurrentWorkspace: (workspaceId: string | null) => setCurrentWorkspaceMutation.mutateAsync(workspaceId),
     createWorkspace: (name: string, description?: string) => createWorkspaceMutation.mutateAsync({ name, description }),
     deleteWorkspace: (workspaceId: string) => deleteWorkspaceMutation.mutateAsync(workspaceId),
@@ -632,7 +645,8 @@ export const useWorkspaceNodeMutations = ({
         return null;
       }
     },
-  } as const;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above; mutation refs are intentionally omitted because their mutateAsync identities are stable.
+  }), [authHeaders, currentWorkspaceId, queryClient]);
 
   return { actions } as const;
 };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '../useAuth';
 import { useSelectionStore } from '../../stores/selectionStore';
@@ -123,11 +123,15 @@ export const useWorkspaceCore = () => {
     }));
   };
 
-  const authHeaders = (() => {
+  // Memoize authHeaders so the (~25) downstream mutation closures and
+  // the four-slice WorkspaceProvider context don't see a new object
+  // identity on every render. `getAuthHeaders` is itself useCallback'd
+  // in useAuth.ts:271 so this dep is stable across the auth lifetime.
+  const authHeaders = useMemo(() => {
     if (!isAuthenticated) return {};
     const headers = getAuthHeaders();
     return headers.Authorization ? headers : {};
-  })();
+  }, [isAuthenticated, getAuthHeaders]);
 
   const operationErrorsRecord: Record<string, string> = {};
   ui.operationErrors.forEach((value, key) => { operationErrorsRecord[key] = value; });
