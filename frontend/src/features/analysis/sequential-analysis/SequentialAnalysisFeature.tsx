@@ -53,6 +53,7 @@ import {
   type ChartTypeOption,
 } from './hooks/useSequentialAnalysisTaskFlow';
 import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
+import { useSequentialResultSummary } from './hooks/useSequentialResultSummary';
 import { UniqueValueCount } from './components/UniqueValueCount';
 import { SequentialChart } from './components/SequentialChart';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
@@ -609,35 +610,23 @@ const SequentialAnalysisFeature = () => {
     });
   };
 
-  const summaryTimeColumn = ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as string | undefined) ?? timeColumn;
-  const summaryGroupBy = ((results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns as string[] | undefined) ?? groupByColumns;
-  const summaryColumnType = ((results?.analysis_params as Record<string, unknown> | undefined)?.column_type as 'datetime' | 'numeric' | undefined) ?? derivedColumnType;
-  const summaryNumericOrigin = summaryColumnType === 'numeric'
-    ? ((results?.analysis_params as Record<string, unknown> | undefined)?.numeric_origin as number | null | undefined) ?? numericOriginValue ?? null
-    : null;
-  const summaryNumericInterval = summaryColumnType === 'numeric'
-    ? ((results?.analysis_params as Record<string, unknown> | undefined)?.numeric_interval as number | null | undefined) ?? numericIntervalValue ?? null
-    : null;
-  const rawSummaryFrequency =
-    ((results?.analysis_params as Record<string, unknown> | undefined)?.frequency as SequentialFrequency | undefined) ?? frequency;
-  const summaryCustomIntervalValue =
-    ((results?.analysis_params as Record<string, unknown> | undefined)?.custom_interval_value as number | null | undefined) ??
-    customIntervalValue;
-  const rawSummaryCustomIntervalUnit =
-    ((results?.analysis_params as Record<string, unknown> | undefined)?.custom_interval_unit as unknown) ??
-    customIntervalUnitValue;
-  const summaryCustomIntervalUnit: SequentialCustomIntervalUnit | null = isCustomIntervalUnit(
-    rawSummaryCustomIntervalUnit,
-  )
-    ? rawSummaryCustomIntervalUnit
-    : null;
-  const summaryFrequency = summaryColumnType === 'numeric'
-    ? 'Numeric bins'
-    : rawSummaryFrequency === 'custom'
-      ? summaryCustomIntervalValue && summaryCustomIntervalUnit
-        ? `Every ${summaryCustomIntervalValue} ${summaryCustomIntervalUnit}`
-        : 'Custom interval'
-      : rawSummaryFrequency;
+  const {
+    timeColumn: summaryTimeColumn,
+    groupBy: summaryGroupBy,
+    columnType: summaryColumnType,
+    numericOrigin: summaryNumericOrigin,
+    numericInterval: summaryNumericInterval,
+    frequencyDisplay: summaryFrequency,
+  } = useSequentialResultSummary(results, {
+    timeColumn,
+    groupBy: groupByColumns,
+    columnType: derivedColumnType,
+    numericOrigin: numericOriginValue ?? null,
+    numericInterval: numericIntervalValue ?? null,
+    frequency,
+    customIntervalValue,
+    customIntervalUnit: customIntervalUnitValue,
+  });
   const minGroupSize = parseNonNegativeIntegerInput(minGroupSizeInput) ?? 0;
 
   const rawResultRows = Array.isArray(results?.data)
