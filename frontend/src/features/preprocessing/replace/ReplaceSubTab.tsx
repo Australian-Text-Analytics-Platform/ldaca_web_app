@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 import NodeSelectionPanel from '@/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
@@ -8,9 +8,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tag } from '@/components/ui/tag';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
+import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSubTab';
@@ -64,12 +64,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
                 />
               </CardTitle>
             </div>
-            {applyLoading && (
-              <Tag tone="muted">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Applying…
-              </Tag>
-            )}
+            <SubTabActivityTag active={applyLoading} verb="Applying" />
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">

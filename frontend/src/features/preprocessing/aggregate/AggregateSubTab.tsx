@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Tag } from '@/components/ui/tag';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 import { PreviewTable } from '../components/PreviewTable';
+import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { OperationPopover } from './components/OperationPopover';
 import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggregateSubTab';
@@ -44,12 +44,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                 />
               </CardTitle>
             </div>
-            {apply.loading && (
-              <Tag tone="muted">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Adding…
-              </Tag>
-            )}
+            <SubTabActivityTag active={apply.loading} verb="Adding" />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

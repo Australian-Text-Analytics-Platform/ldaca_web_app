@@ -10,8 +10,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tag } from '@/components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
+import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
@@ -49,12 +49,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               </CardTitle>
               
             </div>
-            {showActivityTag && (
-              <Tag tone="muted">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Running…
-              </Tag>
-            )}
+            <SubTabActivityTag active={showActivityTag} verb="Running" />
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
