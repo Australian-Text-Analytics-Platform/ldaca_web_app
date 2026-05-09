@@ -104,9 +104,30 @@ After Phase 1:
 
 ---
 
-## Phase 2 — Cross-feature shared abstractions
+## Phase 2 — Cross-feature shared abstractions — 🟡 PARTIALLY DONE
 
 Replaces the duplication patterns in analysis features and preprocessing sub-tabs. ~500 LoC removed; ~12 new shared files in `features/analysis/common/` and `features/preprocessing/{components,hooks}/`. **Effort: 2–3 days.**
+
+### What's landed so far
+
+- **`58b456f` Phase 2.5** magic-literal consolidation: `queryKeys.{filePreview, columnUniqueValues, analysisServerRequestLock}` factory entries; `TaskState` union + `PENDING_TASK_STATES`/`RUNNING_TASK_STATES`/`TERMINAL_TASK_STATES` sets and predicates in `analysisStore`; `lib/debugFlags.ts` with `isGraphDebugEnabled()` consumed by 3 call sites.
+- **`a890f5a` Phase 2.4** type-duplication consolidation: `FileTreeNode` re-export from `api/files`; `NodeColumnSelection` 4 → 1 (canonical `useAutoNodeColumns.ts`); `DetachDialogNodeOption` aliases removed from 3 dialog files; `PaginationInfo`/`PreviewPagination` re-exports of `NodeDataPagination`; new `SourceRowPagination` for concordance/quotation.
+- **`ab2b23e` Phase 2.3** doc-icon unification: `<DocLinkIcon kind="...">` is the implementation; `HelpIcon`/`InfoIcon`/`ReferenceIcon` collapsed to 3-line wrappers (call sites + tests untouched).
+- **`f9118c3` Phase 2.2** `useNodePreviewWithRawFallback` hook covers the duplicated "operation preview, with raw-data fallback" pattern; filter/aggregate/slice/replace migrated. Plus: `dedupeNodeIds` to `selectionUtils`, `MAX_JOIN_NODES` to `types`, dead `previewColumnsToRender` IIFE removed, `DEFAULT_PALETTE` single-color shadowing renamed `SINGLE_NODE_PALETTE`.
+- **`6344210` Phase 2.2** `<SubTabActivityTag>` replaces the `<Tag tone="muted"><Loader2 .../>{verb}…</Tag>` snippet across 7 sub-tabs.
+- **`fbd351b` Phase 2.1** `useDetachColumnsState` covers the duplicated detach-dialog selection logic (concordance / quotation / topic-modeling); concordance picks up an implicit bug-fix (Set-based toggle).
+
+Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-existing filter-tab failures, unchanged).
+
+### Remaining Phase 2 work (deferred for a fresh session)
+
+- **2.1** `useMaterializeLifecycle` — the materialize-task lifecycle duplicated in concordance and quotation (~250 LoC each). The most complex Phase 2 extraction; deserves a focused session because each feature has subtle differences (concordance is multi-node + consumes SSE `analysis_materialized` events; quotation is single-node).
+- **2.1** `usePerNodePagination` + `<PageSizeSelect>` — the per-node pagination state shape is reinvented three times; both extractions are ~½ day.
+- **2.1** `<AnalysisCardLayout>` migration — only AI Annotator (deferred per user) and Token Frequency use it; concordance/quotation/sequential/topic-modeling still hand-roll the parameter+results card. A drop-in migration where the existing `AnalysisCardLayout` props fit; ~½ day per feature.
+- **2.1** Lift `SortableHeader` out of `ConcordanceFeature.tsx:1385`. Trivial — included as part of the bigger Concordance decomposition in Phase 3.
+- **2.1** Concordance → `reconcileMetadataColumnSelection` migration. Small, mechanical.
+- **2.2** `<ApplyFooter>` — extracts the 30-line "New data block name + Apply button + tooltip" CardFooter shared by 6 sub-tabs. Big LoC win but invasive (6 files, 6 different prop shapes to harmonize).
+- **2.2** `buildApplyDisabledReason`, `useResetOnNodeChange`, `useSingleNodeSelectionPanel` — smaller utilities with low ROI relative to complexity; deferred until natural touchpoints.
 
 ### 2.1 Analysis-feature shared infra
 
