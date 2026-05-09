@@ -185,9 +185,28 @@ Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-exist
 
 ---
 
-## Phase 3 — God-file decomposition
+## Phase 3 — God-file decomposition — 🟡 PARTIALLY DONE
 
 Per-file split plans. Each file gets its own focused PR. **Effort: ~1 week.**
+
+### Landed this session
+
+- **`cb14ceb` Phase 3.6** App.tsx 613 → 385 LoC. Extractions: `<DocumentModalHost>`, `<ViewRouter>`, `<RefreshStatusBanner>`, `<LoginScreen>`, `authPhaseCopy.ts`. (One regression fixed mid-flight: nested object literals inside a `useShallow` selector caused a `Maximum update depth exceeded` crash; replaced with primitive selectors. Lesson saved to memory.)
+- **`0b48657` Phase 3.10** Literal-union types for tutorial / info / reference target keys. `LooseAutoComplete` pattern keeps dynamic pass-throughs working while giving autocomplete + typo-detection on direct uses.
+- **`db16915` Phase 3.7** Sidebar.tsx 733 → 628 LoC. `<ClearEmbeddingCacheMenuItem>` (topic-modeling-specific, owns its dialog state), `useTaskCardActions` (filesApi/workspacesApi branching), `formatBytes` hoisted to `lib/utils.ts`.
+- **`d39098d` Phase 3.5** `useSequentialResultSummary` hook replaces 30 lines of `((results?.analysis_params)?.X) ?? localValue` plumbing in SequentialAnalysisFeature.
+- **`8608c91` Phase 3.4** Quotation pure helpers moved to siblings: `quotationTextClip.ts` (clipTextAroundSpans + word-boundary maths, ~150 LoC) and `quotationRemoteUrl.ts` (URL normalization). QuotationFeature 1499 → 1351 LoC.
+- **`db894fc`** (cross-cutting) hydration `Failed to fetch` errors classified as `ApiError(NETWORK)` so they log at debug; recharts `width(-1)/height(-1)` warnings silenced via `minWidth={0}`.
+
+### Remaining Phase 3 work
+
+- **3.4 (rest)** Quotation: extract `<QuotationHighlightedCell>` from inline `renderHighlightedText` (closes over contextLength/hoverState/setHoverState — needs prop threading); hoist `TYPE_COLORS`/`hexToRgba`/`buildUnderlineStyle` to `quotationHighlight.ts`.
+- **3.5 (rest)** Sequential: `<SequentialAnalysisParameterPanel>` + `<SequentialAnalysisResultsPanel>`; tame the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L467-503.
+- **3.7 (rest)** Sidebar: `useStackedSplits` hook (~150 LoC vertical splitter), `<SidebarSection>` extraction, IIFE → `useMemo`.
+- **3.8** WorkspaceTable.tsx (725 LoC): lift `RenameInput` / `ColumnFilterForm` / `<WorkspaceColumnHeader>` / `<DeleteColumnConfirmDialog>`; extract `useColumnMutations` hook; memoize `wideColumns`; wrap `onRefreshSchema` in `useCallback` at the producer side.
+- **3.1** ConcordanceFeature.tsx (2383 LoC): the big one. 4 panels + 4 hooks (see plan). Best done last, in its own focused session.
+- **3.3** DataLoaderFeature.tsx (1517 LoC): move out of `features/analysis/`; decompose 6 dialogs and the file tree.
+- **3.9** useWorkspaceNodeMutations.ts (637 LoC): wrap `actions` in `useMemo`; move 6 text mutations from useWorkspaceInternal.
 
 ### 3.1 ConcordanceFeature.tsx (2383 → ~600 LoC)
 
