@@ -13,6 +13,7 @@ import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, typ
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import { Button } from '../../../components/ui/button';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Play, Loader2, Trash2, Plus } from 'lucide-react';
@@ -733,6 +734,7 @@ const ConcordanceFeature: React.FC = () => {
     isBusy: isSearching,
     hasActiveTask,
     allowRunWhenLocked: hasLockedParameterChanges,
+    canUpdate: true,
   });
 
   useEffect(() => {
@@ -2020,23 +2022,31 @@ const ConcordanceFeature: React.FC = () => {
           </div>
         </CardContent>
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
-          <Button
-            onClick={() => {
-              void handleRunOrUpdate();
-            }}
-            disabled={
-              actionState.runDisabled ||
-              !searchWord.trim() ||
-              effectiveNodeColumnSelections.some(sel => !sel.column)
-            }
-            className="w-full md:w-auto"
-          >
-            {isSearching ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
-            ) : (
-              <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
-            )}
-          </Button>
+          <DisabledReasonTooltip reason={(() => {
+            if (isSearching) return undefined;
+            if (actionState.runDisabledReason) return actionState.runDisabledReason;
+            if (!searchWord.trim()) return 'Enter a search word first';
+            if (effectiveNodeColumnSelections.some(sel => !sel.column)) return 'Select a column for each data block';
+            return undefined;
+          })()}>
+            <Button
+              onClick={() => {
+                void handleRunOrUpdate();
+              }}
+              disabled={
+                actionState.runDisabled ||
+                !searchWord.trim() ||
+                effectiveNodeColumnSelections.some(sel => !sel.column)
+              }
+              className="w-full md:w-auto"
+            >
+              {isSearching ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
+              ) : (
+                <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
+              )}
+            </Button>
+          </DisabledReasonTooltip>
 
           <div className="flex items-center gap-2">
             <Button

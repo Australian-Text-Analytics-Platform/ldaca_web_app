@@ -9,6 +9,7 @@ import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Tag } from '../../../components/ui/tag';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
@@ -38,6 +39,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
     setOutputColumnName,
     controlsDisabled,
     canApply,
+    applyDisabledReason,
     applyLoading,
     handleApply,
     nodeColors,
@@ -188,9 +190,11 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
               className="min-w-0 flex-1"
             />
           </div>
-          <Button type="button" size="sm" onClick={() => void handleApply()} disabled={!canApply} className="shrink-0">
-            {applyLoading ? 'Applying…' : 'Add to Data Block'}
-          </Button>
+          <DisabledReasonTooltip reason={applyDisabledReason}>
+            <Button type="button" size="sm" onClick={() => void handleApply()} disabled={!canApply} className="shrink-0">
+              {applyLoading ? 'Applying…' : 'Add to Data Block'}
+            </Button>
+          </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>

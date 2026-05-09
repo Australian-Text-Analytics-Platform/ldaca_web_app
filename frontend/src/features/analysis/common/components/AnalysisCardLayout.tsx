@@ -3,6 +3,7 @@ import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Play, Trash2 } from 'lucide-react';
 
 type HelpConfig = {
@@ -21,6 +22,7 @@ type AnalysisCardLayoutProps = {
     onRun: () => void | Promise<void>;
     onClear: () => void | Promise<void>;
     runDisabled?: boolean;
+    runDisabledReason?: string;
     clearDisabled?: boolean;
     isRunning?: boolean;
     isClearing?: boolean;
@@ -81,10 +83,12 @@ export function AnalysisCardLayout({
       {actions ? (
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
           <div className="flex items-center gap-2">
-            <Button onClick={actions.onRun} disabled={actions.runDisabled} className="w-full sm:w-auto">
-              {actions.isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-              {runLabel}
-            </Button>
+            <DisabledReasonTooltip reason={actions.runDisabledReason}>
+              <Button onClick={actions.onRun} disabled={actions.runDisabled} className="w-full sm:w-auto">
+                {actions.isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                {runLabel}
+              </Button>
+            </DisabledReasonTooltip>
             {actions.runHelp ? (
               <HelpIcon
                 targetKey={actions.runHelp.targetKey}

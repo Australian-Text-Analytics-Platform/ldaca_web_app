@@ -132,6 +132,7 @@ export interface PreviewConfig {
 export interface ApplyConfig {
   loading: boolean;
   canApply: boolean;
+  disabledReason: string | undefined;
   lastAppliedExpression: string | null;
   currentMatchesApplied: boolean;
   handleApply: () => Promise<void>;
@@ -258,7 +259,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const hasSelection = Boolean(activeNodeId);
   const trimmedExpression = latestExpressionRef.current.trim();
-  const canApply = hasSelection && trimmedExpression.length > 0 && !applyLoading && !isLoading.operations;
   const basicDisabled = !hasSelection || isLoading.operations;
 
   const availableColumns: ColumnInfo[] = (() => {
@@ -432,6 +432,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     fetcher: previewFetcher,
     debounceMs: 100,
   });
+
+  const canApply = hasSelection && trimmedExpression.length > 0 && !applyLoading && !isLoading.operations && !previewError;
 
   const clampIndex = (value: number, max: number) => {
     if (Number.isNaN(value)) return max;
@@ -880,6 +882,13 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     apply: {
       loading: applyLoading,
       canApply,
+      disabledReason: (() => {
+        if (applyLoading || isLoading.operations) return undefined;
+        if (!hasSelection) return 'Select a data block first';
+        if (!trimmedExpression.length) return 'Build an expression first';
+        if (previewError) return 'Fix the expression error shown in Preview before adding to the data block';
+        return undefined;
+      })(),
       lastAppliedExpression,
       currentMatchesApplied: !!currentExpressionMatchesApplied,
       handleApply,

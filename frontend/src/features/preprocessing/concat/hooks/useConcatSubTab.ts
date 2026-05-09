@@ -72,6 +72,7 @@ interface ConcatPreviewConfig {
 interface ConcatApplyState {
   run: () => Promise<void>;
   disabled: boolean;
+  disabledReason: string | undefined;
   isBusy: boolean;
 }
 
@@ -322,6 +323,12 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   const applyDisabled =
     !concatAnalysis.ready || !currentWorkspaceId || isConcatenating || isLoading.operations;
 
+  const applyDisabledReason: string | undefined = (() => {
+    if (isConcatenating || isLoading.operations) return undefined;
+    if (!concatAnalysis.ready) return concatAnalysis.issues || 'Select at least two compatible data blocks to stack';
+    return undefined;
+  })();
+
   const handleApplyConcat = async () => {
     if (!concatAnalysis.ready) {
       onAlert(concatAnalysis.issues || 'Select at least two compatible data blocks to stack.');
@@ -393,6 +400,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     apply: {
       run: handleApplyConcat,
       disabled: applyDisabled,
+      disabledReason: applyDisabledReason,
       isBusy: isConcatenating,
     },
     mismatches: concatAnalysis.mismatches,

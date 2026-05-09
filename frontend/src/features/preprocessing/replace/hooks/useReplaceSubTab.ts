@@ -164,8 +164,17 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   });
 
   const controlsDisabled = !hasSelection || isLoading.nodeData || isLoading.operations || applyLoading;
-  const canApply = Boolean(activeNodeId && selectedColumn && pattern.length > 0 && !applyLoading);
+  const canApply = Boolean(activeNodeId && selectedColumn && pattern.length > 0 && !applyLoading && !previewError);
   const resolvedOutputColumnName = previewColumnName;
+
+  const applyDisabledReason: string | undefined = (() => {
+    if (applyLoading) return undefined;
+    if (!hasSelection) return 'Select a data block first';
+    if (!selectedColumn) return 'No string column available in this data block';
+    if (!pattern) return 'Enter a regex pattern first';
+    if (previewError) return 'Fix the regex error shown in Preview results before applying';
+    return undefined;
+  })();
 
   const handleApply = async () => {
     if (!activeNodeId || !selectedColumn || pattern.length === 0) return;
@@ -224,6 +233,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     resolvedOutputColumnName,
     controlsDisabled,
     canApply,
+    applyDisabledReason,
     applyLoading,
     handleApply,
     nodeColumnSelections,

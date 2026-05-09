@@ -1,5 +1,6 @@
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 
 export interface NodeColumnSelectorProps {
@@ -8,6 +9,8 @@ export interface NodeColumnSelectorProps {
   onChange: (value: string) => void;
   label?: React.ReactNode;
   disabled?: boolean;
+  /** Tooltip shown on hover when the selector is disabled. */
+  disabledReason?: string;
   placeholder?: string;
   clearOptionValue?: string;
   clearOptionLabel?: React.ReactNode;
@@ -24,6 +27,7 @@ export const NodeColumnSelector: React.FC<NodeColumnSelectorProps> = ({
   onChange,
   label,
   disabled,
+  disabledReason,
   placeholder = 'Select column',
   clearOptionValue,
   clearOptionLabel = 'Select column…',
@@ -51,19 +55,21 @@ export const NodeColumnSelector: React.FC<NodeColumnSelectorProps> = ({
       {label && (
         <span className={cn('block text-xs font-medium text-muted-foreground', labelClassName)}>{label}</span>
       )}
-      <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger className={cn('w-full text-sm', triggerClassName)}>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {clearOptionValue && <SelectItem value={clearOptionValue}>{clearOptionLabel}</SelectItem>}
-          {optionValues.map((column) => (
-            <SelectItem key={column} value={column}>
-              {column}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <DisabledReasonTooltip reason={disabled ? disabledReason : undefined} className="w-full">
+        <Select value={value} onValueChange={onChange} disabled={disabled}>
+          <SelectTrigger className={cn('w-full text-sm', triggerClassName)}>
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {clearOptionValue && <SelectItem value={clearOptionValue}>{clearOptionLabel}</SelectItem>}
+            {optionValues.map((column) => (
+              <SelectItem key={column} value={column}>
+                {column}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </DisabledReasonTooltip>
     </div>
   );
 };

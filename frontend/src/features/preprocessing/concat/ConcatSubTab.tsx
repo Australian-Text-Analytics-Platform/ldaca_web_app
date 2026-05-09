@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../c
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Tag } from '../../../components/ui/tag';
+import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useConcatSubTab, type ConcatSubTabProps } from './hooks/useConcatSubTab';
@@ -124,19 +125,21 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
               className="min-w-0 flex-1"
             />
           </div>
-          <Button type="button" size="sm" onClick={() => void apply.run()} disabled={apply.disabled} className="shrink-0">
-            {apply.isBusy ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Concatenating…
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                Add to Workspace
-              </>
-            )}
-          </Button>
+          <DisabledReasonTooltip reason={apply.disabledReason}>
+            <Button type="button" size="sm" onClick={() => void apply.run()} disabled={apply.disabled} className="shrink-0">
+              {apply.isBusy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Concatenating…
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Workspace
+                </>
+              )}
+            </Button>
+          </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
