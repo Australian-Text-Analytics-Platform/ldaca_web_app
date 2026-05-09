@@ -1,39 +1,30 @@
 import { useState, useEffect, useRef, useCallback, Suspense, lazy, type ReactNode } from 'react';
-import { useAuth, type AuthPhase, REFRESH_FAILURE_THRESHOLD } from './hooks/useAuth';
+import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { usePreferencesInit } from './hooks/usePreferences';
 import { QueryProvider } from './providers/QueryProvider';
 import { WorkspaceProvider } from './providers/WorkspaceProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import GoogleLogin from './components/GoogleLogin';
-import CILogonLogin from './components/CILogonLogin';
 import Sidebar from './components/layout/Sidebar';
 import { InsetCard } from './components/layout/InsetCard';
 import BlockingScreen from './components/startup/BlockingScreen';
-import logo from './logo.png';
+import { LoginScreen } from './components/startup/LoginScreen';
+import { RefreshStatusBanner } from './components/startup/RefreshStatusBanner';
+import { getBlockingCopy } from './components/startup/authPhaseCopy';
 import { useUIStore } from './stores';
 import { usePreferencesStore } from './stores/preferencesStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
 import { Toaster } from './components/ui/sonner';
-import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
+import { DocumentModalHost } from './components/dialogs/DocumentModalHost';
+import { ViewRouter } from './components/layout/ViewRouter';
 
-// Lazy load components for code splitting
-const DocumentView = lazy(() => import('./components/DocumentView'));
+// Lazy load components for code splitting. Per-view feature components live
+// inside <ViewRouter> so the active feature unmounts cleanly on view switch.
 const FeedbackPanel = lazy(() => import('./components/panels/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('./components/layout/WorkspaceView'));
 const HintsController = lazy(() => import('./features/hints/HintsController'));
-const DataLoaderFeature = lazy(() => import('./features/analysis/data-loader/DataLoaderFeature'));
-const DataPreprocessingFeature = lazy(() => import('./features/analysis/data-preprocessing/DataPreprocessingFeature'));
-const ConcordanceFeature = lazy(() => import('./features/analysis/concordance/ConcordanceFeature'));
-const QuotationFeature = lazy(() => import('./features/analysis/quotation/QuotationFeature'));
-const TopicModelingFeature = lazy(() => import('./features/analysis/topic-modeling/TopicModelingFeature'));
-const SequentialAnalysisFeature = lazy(() => import('./features/analysis/sequential-analysis/SequentialAnalysisFeature'));
-const ExportFeature = lazy(() => import('./features/analysis/export/ExportFeature'));
-const TokenFrequencyFeature = lazy(() => import('./features/analysis/token-frequency/TokenFrequencyFeature'));
-const AiAnnotatorFeature = lazy(() => import('./features/analysis/ai-annotator/AiAnnotatorFeature'));
 
-const REFRESH_CHIP_DELAY_MS = 3000;
 const LAG_HINT_DELAY_MS = 8000;
 
 /**
@@ -42,37 +33,11 @@ const LAG_HINT_DELAY_MS = 8000;
  */
 const WorkspaceShell: React.FC = () => {
   const {
-    currentView,
     closeFeedbackModal,
     feedbackOpen,
-    tutorialModal,
-    tutorialTarget,
-    closeTutorialModal,
-    warningModal,
-    warningTarget,
-    closeWarningModal,
-    infoModal,
-    infoTarget,
-    closeInfoModal,
-    referenceModal,
-    referenceTarget,
-    closeReferenceModal,
   } = useUIStore(useShallow((state) => ({
-    currentView: state.currentView,
     closeFeedbackModal: state.closeFeedbackModal,
     feedbackOpen: state.modals.feedbackModal,
-    tutorialModal: state.modals.tutorialModal,
-    tutorialTarget: state.tutorialTarget,
-    closeTutorialModal: state.closeTutorialModal,
-    warningModal: state.modals.warningModal,
-    warningTarget: state.warningTarget,
-    closeWarningModal: state.closeWarningModal,
-    infoModal: state.modals.infoModal,
-    infoTarget: state.infoTarget,
-    closeInfoModal: state.closeInfoModal,
-    referenceModal: state.modals.referenceModal,
-    referenceTarget: state.referenceTarget,
-    closeReferenceModal: state.closeReferenceModal,
   })));
   const {
     phase,
@@ -92,9 +57,7 @@ const WorkspaceShell: React.FC = () => {
     if (prefsHydrated) syncVisibleViews();
   }, [prefsHydrated, syncVisibleViews]);
   const [laggingHintReady, setLaggingHintReady] = useState(false);
-  const [refreshChipReady, setRefreshChipReady] = useState(false);
   const showLaggingHint = laggingHintReady && phase.status === 'bootstrapping';
-  const refreshChipVisible = refreshChipReady && phase.status === 'refreshing';
 
   // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
   const [rightWidth, setRightWidth] = useState<number>(40); // percentage of total width
@@ -156,23 +119,8 @@ const WorkspaceShell: React.FC = () => {
     };
   }, [phase.status]);
 
-  useEffect(() => {
-    if (phase.status !== 'refreshing') return;
-    const timeoutId = window.setTimeout(() => setRefreshChipReady(true), REFRESH_CHIP_DELAY_MS);
-    return () => {
-      window.clearTimeout(timeoutId);
-      setRefreshChipReady(false);
-    };
-  }, [phase.status]);
-
   const blockingCopy = getBlockingCopy(phase, showLaggingHint);
   const shouldShowLoginCard = isMultiUserMode && !isAuthenticated && phase.status !== 'bootstrapping';
-  const degradedPhase = phase.status === 'degraded' ? phase : null;
-  const showRefreshBanner = Boolean(degradedPhase);
-  const bannerAttemptsLabel = degradedPhase ? formatAttemptLabel(degradedPhase.attempts) : null;
-  const bannerMessage = degradedPhase?.error ?? 'Having trouble refreshing your session.';
-  const bannerTime = degradedPhase ? formatTimestamp(degradedPhase.lastFailureAt) : null;
-  const showRefreshChip = phase.status === 'refreshing' && refreshChipVisible;
   const onStartResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (isRightCollapsed) return; // don't resize when collapsed
@@ -267,81 +215,9 @@ const WorkspaceShell: React.FC = () => {
             className="bg-linear-to-br from-slate-50 to-blue-50"
             style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` } as React.CSSProperties}
           >
-            {/* Tutorial Modal */}
-            <Dialog open={tutorialModal} onOpenChange={(open) => !open && closeTutorialModal()}>
-              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogTitle className="sr-only">Tutorial</DialogTitle>
-                <div className="flex-1 overflow-y-auto">
-                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
-                    <DocumentView docType="tutorial" onClose={closeTutorialModal} target={tutorialTarget} />
-                  </Suspense>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <DocumentModalHost />
 
-            {/* Warning Modal */}
-            <Dialog open={warningModal} onOpenChange={(open) => !open && closeWarningModal()}>
-              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogTitle className="sr-only">Warning</DialogTitle>
-                <div className="flex-1 overflow-y-auto">
-                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div></div>}>
-                    <DocumentView docType="warning" onClose={closeWarningModal} target={warningTarget} />
-                  </Suspense>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Information Modal */}
-            <Dialog open={infoModal} onOpenChange={(open) => !open && closeInfoModal()}>
-              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogTitle className="sr-only">Information</DialogTitle>
-                <div className="flex-1 overflow-y-auto">
-                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>}>
-                    <DocumentView docType="information" onClose={closeInfoModal} target={infoTarget} />
-                  </Suspense>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Reference Modal */}
-            <Dialog open={referenceModal} onOpenChange={(open) => !open && closeReferenceModal()}>
-              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogTitle className="sr-only">Reference</DialogTitle>
-                <div className="flex-1 overflow-y-auto">
-                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>}>
-                    <DocumentView docType="reference" onClose={closeReferenceModal} target={referenceTarget} />
-                  </Suspense>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {(showRefreshBanner || showRefreshChip) && (
-              <div className="pointer-events-none fixed left-1/2 top-4 z-50 flex -translate-x-1/2 flex-col gap-2">
-                {showRefreshBanner && bannerAttemptsLabel && (
-                  <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-lg">
-                    <span className="font-medium text-amber-900">Connection hiccup</span>
-                    <span className="text-xs text-amber-900/80">{bannerMessage}</span>
-                    <span className="text-xs text-amber-900/70">Attempts {bannerAttemptsLabel}</span>
-                    {bannerTime && (
-                      <span className="text-xs text-amber-900/60">Last failure {bannerTime}</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={refreshAuth}
-                      className="rounded-full border border-amber-400 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
-                    >
-                      Retry now
-                    </button>
-                  </div>
-                )}
-                {showRefreshChip && (
-                  <div className="flex items-center gap-2 self-center rounded-full bg-slate-900/90 px-3 py-1 text-xs font-medium text-white shadow-lg">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" aria-hidden />
-                    Reconnecting…
-                  </div>
-                )}
-              </div>
-            )}
+            <RefreshStatusBanner />
             <Suspense fallback={null}>
               <HintsController />
             </Suspense>
@@ -387,26 +263,7 @@ const WorkspaceShell: React.FC = () => {
                       innerClassName="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4"
                     >
                       <div className="w-full max-w-none mx-0">
-                        <ErrorBoundary>
-                          <Suspense fallback={
-                            <div className="flex items-center justify-center py-12">
-                              <div className="text-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                                <p className="text-gray-600 text-sm">Loading...</p>
-                              </div>
-                            </div>
-                          }>
-                            {currentView === 'data-loader' && <DataLoaderFeature />}
-                            {currentView === 'filter' && <DataPreprocessingFeature />}
-                            {currentView === 'token-frequency' && <TokenFrequencyFeature />}
-                            {currentView === 'concordance' && <ConcordanceFeature />}
-                            {currentView === 'analysis' && <SequentialAnalysisFeature />}
-                            {currentView === 'topic-modeling' && <TopicModelingFeature />}
-                            {currentView === 'quotation' && <QuotationFeature />}
-                            {currentView === 'ai-annotator' && <AiAnnotatorFeature />}
-                            {currentView === 'export' && <ExportFeature />}
-                          </Suspense>
-                        </ErrorBoundary>
+                        <ViewRouter />
                       </div>
                     </InsetCard>
 
@@ -522,91 +379,6 @@ const App: React.FC = () => {
       {content}
       <Toaster />
     </>
-  );
-};
-
-type BlockingCopy = {
-  title: string;
-  description: string;
-  status: string;
-  hint?: string;
-  error?: string;
-};
-
-const formatTimestamp = (value?: number | null) => {
-  if (!value) return null;
-  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-};
-
-const formatAttemptLabel = (attempts: number) => `${Math.min(attempts, REFRESH_FAILURE_THRESHOLD)}/${REFRESH_FAILURE_THRESHOLD}`;
-
-const getBlockingCopy = (phase: AuthPhase, showLaggingHint: boolean): BlockingCopy | null => {
-  if (phase.status === 'bootstrapping') {
-    return {
-      title: 'Signing you in',
-      description: 'The backend is healthy; finishing the authentication handshake.',
-      status: showLaggingHint ? 'Still waiting for auth…' : 'Checking your session…',
-      hint: showLaggingHint
-        ? 'This can happen if backend migrations are still running. You can retry below.'
-        : 'This usually takes just a moment.',
-      error: phase.error,
-    };
-  }
-
-  if (phase.status === 'fatal') {
-    return {
-      title: 'Reconnecting your session',
-      description: 'Multiple background refresh attempts failed, so we paused the workspace until the backend responds again.',
-      status: `Retrying (${formatAttemptLabel(phase.attempts)})…`,
-      hint: formatTimestamp(phase.lastFailureAt)
-        ? `Last failure at ${formatTimestamp(phase.lastFailureAt)}. Check your connection or restart the backend, then retry below.`
-        : 'Check your connection or restart the backend, then retry below.',
-      error: phase.error,
-    };
-  }
-
-  return null;
-};
-
-type LoginScreenProps = {
-  isLoading?: boolean;
-  error?: string | null;
-  authMethods?: Array<{ name: string; display_name: string; enabled: boolean }>;
-};
-
-const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error, authMethods = [] }) => {
-  const hasCILogon = authMethods.some((m) => m.name === 'cilogon' && m.enabled);
-  const hasGoogle = authMethods.some((m) => m.name === 'google' && m.enabled);
-  const providerLabel = hasCILogon ? 'CILogon' : hasGoogle ? 'a Google account' : 'your institutional account';
-
-  return (
-    <div className="min-h-dvh bg-linear-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-xl text-center space-y-4 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
-        <div className="flex justify-center">
-          <img
-            src={logo}
-            alt="LDaCA Logo"
-            className="h-16 w-auto object-contain drop-shadow"
-          />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold text-gray-900">Sign in to continue</h1>
-          <p className="text-base text-gray-600">
-            LDaCA Text Analytics requires you to sign in with {providerLabel}.
-          </p>
-        </div>
-        <ErrorBoundary>
-          <div className="flex justify-center pt-2">
-            {hasCILogon && (
-              <CILogonLogin isLoading={isLoading} error={error} />
-            )}
-            {hasGoogle && !hasCILogon && (
-              <GoogleLogin isLoading={isLoading} error={error} />
-            )}
-          </div>
-        </ErrorBoundary>
-      </div>
-    </div>
   );
 };
 
