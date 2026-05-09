@@ -20,14 +20,12 @@ import type {
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
 import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '@/stores/quotationEngineStore';
 import { Button } from '@/components/ui/button';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import HelpIcon from '@/components/help/HelpIcon';
-import InfoIcon from '@/components/help/InfoIcon';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,7 +44,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AnalysisTableScrollArea } from '@/components/AnalysisTableScrollArea';
-import { ArrowUpDown, Loader2, Play, Plus, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Loader2, Plus } from 'lucide-react';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import {
   getNodeIdentifier,
@@ -73,6 +71,7 @@ import {
 } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
+import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
@@ -1131,118 +1130,65 @@ const QuotationFeature: React.FC = () => {
         </DialogContent>
       </Dialog>
       <div className="space-y-4">
-        <Card>
-          <CardHeader className="space-y-0 pb-4">
-            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  Quotation Extraction
-                  <InfoIcon
-                    targetKey="quotation.overview"
-                    label="About Quotation Extraction"
-                    tooltip="Learn what quotation extraction is and how it can help you."
-                  />
-                  <HelpIcon
-                    targetKey="analysis.quotation.parameters"
-                    label="Quotation parameters"
-                    tooltip="Select a data block, choose a text column, and configure quotation settings."
-                  />
-                </CardTitle>
-              </div>
-              <div className="flex flex-col items-start gap-1 md:items-end md:text-right">
-                <Badge
-                  variant="outline"
-                  className="max-w-full break-all text-xs"
-                  title={engineBadgeTitle}
+        <AnalysisCardLayout
+          title="Quotation Extraction"
+          info={{
+            targetKey: 'quotation.overview',
+            label: 'About Quotation Extraction',
+            tooltip: 'Learn what quotation extraction is and how it can help you.',
+          }}
+          help={{
+            targetKey: 'analysis.quotation.parameters',
+            label: 'Quotation parameters',
+            tooltip: 'Select a data block, choose a text column, and configure quotation settings.',
+          }}
+          headerActions={
+            <div className="flex flex-col items-start gap-1 md:items-end md:text-right">
+              <Badge
+                variant="outline"
+                className="max-w-full break-all text-xs"
+                title={engineBadgeTitle}
+              >
+                {engineBadgeLabel}
+              </Badge>
+              {engineDisplayUrl.length ? (
+                <span
+                  className="text-xs text-muted-foreground break-all max-w-xs md:max-w-sm"
+                  title={engineDisplayUrl}
                 >
-                  {engineBadgeLabel}
-                </Badge>
-                {engineDisplayUrl.length ? (
-                  <span
-                    className="text-xs text-muted-foreground break-all max-w-xs md:max-w-sm"
-                    title={engineDisplayUrl}
-                  >
-                    {engineDisplayUrl}
-                  </span>
-                ) : null}
-              </div>
+                  {engineDisplayUrl}
+                </span>
+              ) : null}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-0">
-            <NodeSelectionPanel
-              selectedNodes={displayedNodes}
-              nodeColumnSelections={activeSelections}
-              onColumnChange={handleColumnChange}
-              nodeColors={{}}
-              onColorChange={()=>{}}
-              getNodeColumns={getColumnInfos}
-              defaultPalette={[]}
-              maxCompare={1}
-              className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-              showShape
-              showColorPicker={false}
-              disabled={!!isLocked}
-              locked={!!isLocked}
-              originalCount={displayNodeCount}
-              allowedDataTypes={['string']}
-              lockedMessage={ANALYSIS_LOCKED_MESSAGE}
-            />
-            <div className="flex flex-wrap items-center gap-3">
-              <DisabledReasonTooltip reason={(() => {
-                if (isLoadingQuotations) return undefined;
-                if (actionState.runDisabledReason) return actionState.runDisabledReason;
-                if (hasIncompleteSelections) return 'Select a column for each data block';
-                if (!engineReady) return 'Configure the remote engine before running';
-                return undefined;
-              })()}>
-                <Button
-                  type="button"
-                  className="w-full sm:w-auto"
-                  onClick={() => {
-                    void handleRunOrUpdate();
-                  }}
-                  disabled={actionState.runDisabled || !canRunQuotation}
-                >
-                  {isLoadingQuotations ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Running…
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-2 h-4 w-4" />
-                      {actionState.runLabel}
-                    </>
-                  )}
-                </Button>
-              </DisabledReasonTooltip>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="w-full sm:w-auto"
-                  onClick={async () => {
-                    if (!currentWorkspaceId) return;
-                    setIsClearing(true);
-                    await clearResults();
-                    setIsClearing(false);
-                  }}
-                  disabled={actionState.clearDisabled || isClearing}
-                >
-                  {isClearing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Clearing…
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Clear Results
-                    </>
-                  )}
-                </Button>
-                <HelpIcon targetKey="analysis.quotation.clear-results" label="Clear results" />
-              </div>
+          }
+          actions={{
+            onRun: () => {
+              void handleRunOrUpdate();
+            },
+            onClear: async () => {
+              if (!currentWorkspaceId) return;
+              setIsClearing(true);
+              await clearResults();
+              setIsClearing(false);
+            },
+            runDisabled: actionState.runDisabled || !canRunQuotation,
+            runDisabledReason: (() => {
+              if (isLoadingQuotations) return undefined;
+              if (actionState.runDisabledReason) return actionState.runDisabledReason;
+              if (hasIncompleteSelections) return 'Select a column for each data block';
+              if (!engineReady) return 'Configure the remote engine before running';
+              return undefined;
+            })(),
+            clearDisabled: actionState.clearDisabled || isClearing,
+            isRunning: isLoadingQuotations,
+            isClearing,
+            hasResult: hasLoaded,
+            runLabel: actionState.runLabel,
+            clearHelp: {
+              targetKey: 'analysis.quotation.clear-results',
+              label: 'Clear results',
+            },
+            extraContent: (
               <div className="ml-auto flex items-center gap-2">
                 <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
                 <Select
@@ -1264,9 +1210,28 @@ const QuotationFeature: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            ),
+          }}
+        >
+          <NodeSelectionPanel
+            selectedNodes={displayedNodes}
+            nodeColumnSelections={activeSelections}
+            onColumnChange={handleColumnChange}
+            nodeColors={{}}
+            onColorChange={()=>{}}
+            getNodeColumns={getColumnInfos}
+            defaultPalette={[]}
+            maxCompare={1}
+            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
+            showShape
+            showColorPicker={false}
+            disabled={!!isLocked}
+            locked={!!isLocked}
+            originalCount={displayNodeCount}
+            allowedDataTypes={['string']}
+            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+          />
+        </AnalysisCardLayout>
         {quotationWaitingBanner && (
           <AnalysisTaskBanner
             analysisName="Quotation"

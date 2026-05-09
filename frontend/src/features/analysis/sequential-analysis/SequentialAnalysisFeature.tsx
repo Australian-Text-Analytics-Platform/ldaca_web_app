@@ -18,11 +18,9 @@ import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice'
 import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
 import { getNodeInfo } from '@/lib/nodeInfoCache';
 import { Button } from '@/components/ui/button';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import HelpIcon from '@/components/help/HelpIcon';
-import InfoIcon from '@/components/help/InfoIcon';
 import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
 import {
   Select,
@@ -32,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, Loader2, Play, Plus, Trash2 } from 'lucide-react';
+import { Download, Plus, Trash2 } from 'lucide-react';
 import { normalizeTypeName } from '@/utils/columnTypes';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import {
@@ -47,6 +45,7 @@ import {
   resetAnalysisSelectionAfterClear,
   executeAnalysisRunOrUpdate,
 } from '../common';
+import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import {
   useSequentialAnalysisTaskFlow,
   isChartTypeOption,
@@ -768,27 +767,40 @@ const SequentialAnalysisFeature = () => {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="space-y-0 pb-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Trends and Sequence
-                <InfoIcon
-                  targetKey="sequential-analysis.overview"
-                  label="About Sequential Analysis"
-                  tooltip="Learn what sequential analysis is and how it can help you."
-                />
-                <HelpIcon
-                  targetKey="analysis.sequential-analysis.parameters"
-                  label="Sequential analysis parameters"
-                  tooltip="Select a time column, choose frequency, and configure group-by options."
-                />
-              </CardTitle>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0">
+      <AnalysisCardLayout
+        title="Trends and Sequence"
+        info={{
+          targetKey: 'sequential-analysis.overview',
+          label: 'About Sequential Analysis',
+          tooltip: 'Learn what sequential analysis is and how it can help you.',
+        }}
+        help={{
+          targetKey: 'analysis.sequential-analysis.parameters',
+          label: 'Sequential analysis parameters',
+          tooltip: 'Select a time column, choose frequency, and configure group-by options.',
+        }}
+        actions={{
+          onRun: () => {
+            void handleRunOrUpdate();
+          },
+          onClear: handleClearResults,
+          runDisabled: actionState.runDisabled || isLoading.operations || !activeTimeColumn,
+          runDisabledReason: (() => {
+            if (isAnalyzing || isLoading.operations) return undefined;
+            if (actionState.runDisabledReason) return actionState.runDisabledReason;
+            if (!activeTimeColumn) return 'Select a time column to run';
+            return undefined;
+          })(),
+          clearDisabled: actionState.clearDisabled,
+          isRunning: isAnalyzing,
+          hasResult: Boolean(results),
+          runLabel: actionState.runLabel,
+          clearHelp: {
+            targetKey: 'analysis.sequential-analysis.clear-results',
+            label: 'Clear results',
+          },
+        }}
+      >
           <NodeSelectionPanel
             selectedNodes={displayedNodes}
             nodeColumnSelections={nodeColumnSelections}
@@ -992,49 +1004,7 @@ const SequentialAnalysisFeature = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
-          <DisabledReasonTooltip reason={(() => {
-            if (isAnalyzing || isLoading.operations) return undefined;
-            if (actionState.runDisabledReason) return actionState.runDisabledReason;
-            if (!activeTimeColumn) return 'Select a time column to run';
-            return undefined;
-          })()}>
-            <Button
-              onClick={() => {
-                void handleRunOrUpdate();
-              }}
-              disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
-              className="w-full md:w-auto"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  {actionState.runLabel}
-                </>
-              )}
-            </Button>
-          </DisabledReasonTooltip>
-
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleClearResults}
-              variant="destructive"
-              disabled={actionState.clearDisabled}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Clear Results
-            </Button>
-            <HelpIcon targetKey="analysis.sequential-analysis.clear-results" label="Clear results" />
-          </div>
-        </div>
-        </CardContent>
-      </Card>
+      </AnalysisCardLayout>
 
       {sequentialWaitingBanner && (
         <AnalysisTaskBanner
