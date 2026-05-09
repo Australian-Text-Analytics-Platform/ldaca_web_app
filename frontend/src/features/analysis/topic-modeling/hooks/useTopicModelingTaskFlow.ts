@@ -8,6 +8,7 @@ import {
 } from '@/api/text';
 import { queryKeys } from '@/lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
+import { useDetachColumnsState } from '@/features/analysis/common/hooks/useDetachColumnsState';
 import type { DetachDialogNodeOption } from '@/features/analysis/components/DetachColumnsDialog';
 import { buildSamplingAutoNodeName } from '@/features/preprocessing/utils/autoNodeNames';
 import { takeMostRecent } from '@/utils/selectionUtils';
@@ -101,7 +102,13 @@ export function useTopicModelingTaskFlow({
   const [isDetaching, setIsDetaching] = useState(false);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
-  const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
+  const {
+    selectedDetachColumns,
+    setSelectedDetachColumns,
+    toggleDetachColumn,
+    selectAllDetachColumns,
+    deselectAllDetachColumns,
+  } = useDetachColumnsState(detachNodeOptions);
 
   const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) return;
@@ -193,37 +200,6 @@ export function useTopicModelingTaskFlow({
     } finally {
       setIsDetachLoading(false);
     }
-  };
-
-  const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
-    setSelectedDetachColumns((prev) => {
-      const current = new Set(prev[nodeId] || []);
-      if (checked) current.add(column);
-      else current.delete(column);
-      return { ...prev, [nodeId]: Array.from(current) };
-    });
-  };
-
-  const selectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = node.available_columns.filter(
-          (column) => !(node.disabled_columns || []).includes(column)
-        );
-      });
-      return next;
-    });
-  };
-
-  const deselectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = [];
-      });
-      return next;
-    });
   };
 
   const handleDetachConfirm = async () => {

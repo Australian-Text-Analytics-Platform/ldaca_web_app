@@ -57,6 +57,7 @@ import { AnalysisTableScrollArea } from '@/components/AnalysisTableScrollArea';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
+import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import { ConcordanceDispersionCell } from './components/ConcordanceDispersionCell';
 import { ConcordanceDispersionLegend } from './components/ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './components/ConcordanceDispersionSummary';
@@ -506,8 +507,14 @@ const ConcordanceFeature: React.FC = () => {
   // Detach dialog state
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodes, setPendingDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
-  const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
   const [detachNodeOptions, setDetachDialogNodeOptions] = useState<DetachDialogNodeOption[]>([]);
+  const {
+    selectedDetachColumns,
+    setSelectedDetachColumns,
+    toggleDetachColumn,
+    selectAllDetachColumns,
+    deselectAllDetachColumns,
+  } = useDetachColumnsState(detachNodeOptions);
   
   // Global page size setting
   const [globalPageSize, setGlobalPageSize] = useState(20);
@@ -1336,38 +1343,6 @@ const ConcordanceFeature: React.FC = () => {
       setPendingDetachNodes([]);
       setSelectedDetachColumns({});
     }
-  };
-
-  const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
-    setSelectedDetachColumns(prev => {
-      const current = prev[nodeId] || [];
-      const next = checked
-        ? [...current, column]
-        : current.filter(c => c !== column);
-      return { ...prev, [nodeId]: next };
-    });
-  };
-
-  const selectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = node.available_columns.filter(
-          (column) => !(node.disabled_columns || []).includes(column)
-        );
-      });
-      return next;
-    });
-  };
-
-  const deselectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = [];
-      });
-      return next;
-    });
   };
 
   const handleDetachConfirm = async () => {
