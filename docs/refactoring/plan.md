@@ -4,11 +4,24 @@ Audit performed 2026-05-09 across `frontend/src/` (~52 KLOC, 325 files). Strict 
 
 The work is split into 5 phases. Phase 1 is the "do today" subset: real bugs, dead code, and one near-duplicate file. Phase 2–4 each take 2–7 days; do them in any order based on what you're touching anyway.
 
+> **AI Annotator deferred.** The AI Annotator feature is in early iteration; expect frontend redesigns. All AI-Annotator-specific items below (notably H6 in §3.2 and any cross-feature migrations involving `useAnalysisLockMachine` → `useAnalysisLock`) are skipped until that feature stabilises. Cross-cutting fixes will not exclude AI Annotator if doing so would create exceptions.
+
 ---
 
-## Phase 1 — Bugs, dead code, and `TutorialView` consolidation
+## Phase 1 — Bugs, dead code, and `TutorialView` consolidation — ✅ DONE
 
-Net effect after Phase 1: ~9 fewer files, ~500 fewer LoC, several latent re-render/cache bugs gone, and a codemod that lets future Claude sessions stop guessing how many `../`s to write.
+Landed on the `refactoring` branch as four commits:
+- `5b96190` fix: B1–B5 (HintsController dup mount, zoom-brush effect loop, Replace-tooltip suppression while busy, slice-reset duplicate block, useFiles auth signature in query key + queryClient.clear() on logout).
+- `e64f2b8` refactor: dead-code deletion (7 files removed, 339 LoC). All items grep-verified zero-consumers before deletion.
+- `208e7e4` refactor: TutorialView → DocumentView consolidation (–268 LoC).
+- `7927805` refactor: import-path codemod (355 imports across 64 files now use `@/`); `scripts/codemod-relative-to-alias.mjs` left in tree for future re-runs.
+
+Net Phase 1: ~9 fewer files, ~500 fewer LoC. Build / typecheck / eslint clean. Tests at baseline (2 pre-existing filter-tab failures, unchanged from before this refactor).
+
+Items deferred from the original Phase 1 scope:
+- **B6** (URL parse at module load in useAuth.ts) — moved to Phase 4.7.
+- **B8** (`key={index}` on user-mutable lists in concordance/sequential/expression) — moved to Phase 2 alongside the broader expression-sub-tab work, since proper fix needs `string[]` → `{id, value}[]` state-shape changes.
+- **B9** (useNodeColumnInfos cache dep loop) — subsumed by Phase 4.3 (replace `nodeInfoCache` with react-query).
 
 ### 1.1 Real bugs
 
