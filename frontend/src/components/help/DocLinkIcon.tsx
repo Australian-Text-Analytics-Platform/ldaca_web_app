@@ -1,0 +1,116 @@
+import React from 'react';
+import { CircleHelp, Info, Quote, AlertTriangle, type LucideIcon } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useUIStore } from '@/stores';
+import { getTutorialTarget } from '@/tutorials/tutorialRegistry';
+import { getInfoTarget } from '@/tutorials/infoRegistry';
+import { getReferenceTarget } from '@/tutorials/referenceRegistry';
+
+export type DocLinkKind = 'tutorial' | 'info' | 'reference' | 'warning';
+
+type DocTarget = { file: string; anchor: string; label?: string };
+
+interface DocLinkConfig {
+  Icon: LucideIcon;
+  defaultLabel: string;
+  defaultClassName: string;
+  missingMessage: string;
+  /** Pulled lazily via getState() so this object can be a module-level constant. */
+  getTarget: (key: string) => DocTarget | null;
+  openTarget: (target: DocTarget) => void;
+}
+
+const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
+  tutorial: {
+    Icon: CircleHelp,
+    defaultLabel: 'Learn more',
+    defaultClassName: 'h-6 w-6 text-muted-foreground',
+    missingMessage: 'No anchor found for this help item.',
+    getTarget: getTutorialTarget,
+    openTarget: (target) => useUIStore.getState().openTutorialTarget(target),
+  },
+  info: {
+    Icon: Info,
+    defaultLabel: 'More info',
+    defaultClassName: 'h-6 w-6 text-blue-500',
+    missingMessage: 'No anchor found for this information item.',
+    getTarget: getInfoTarget,
+    openTarget: (target) => useUIStore.getState().openInfoTarget(target),
+  },
+  reference: {
+    Icon: Quote,
+    defaultLabel: 'View reference',
+    defaultClassName: 'h-6 w-6',
+    missingMessage: 'No anchor found for this reference item.',
+    getTarget: getReferenceTarget,
+    openTarget: (target) => useUIStore.getState().openReferenceTarget(target),
+  },
+  warning: {
+    Icon: AlertTriangle,
+    defaultLabel: 'View warning',
+    defaultClassName: 'h-6 w-6 text-amber-500',
+    missingMessage: 'No anchor found for this warning item.',
+    // No registry exists for warnings yet. The store action exists; if a
+    // warningRegistry is added later, swap this for getWarningTarget.
+    getTarget: () => null,
+    openTarget: (target) => useUIStore.getState().openWarningTarget(target),
+  },
+};
+
+export interface DocLinkIconProps {
+  kind: DocLinkKind;
+  targetKey: string;
+  label?: string;
+  tooltip?: string;
+  className?: string;
+}
+
+/**
+ * Unified help/info/reference/warning icon. The four `<XIcon>` components
+ * (HelpIcon/InfoIcon/ReferenceIcon/...) are thin wrappers over this so call
+ * sites and existing test mocks remain untouched.
+ */
+export const DocLinkIcon: React.FC<DocLinkIconProps> = ({
+  kind,
+  targetKey,
+  label,
+  tooltip,
+  className,
+}) => {
+  const config = CONFIG[kind];
+  const resolvedLabel = label ?? config.defaultLabel;
+  const tooltipText = tooltip ?? resolvedLabel;
+  const Icon = config.Icon;
+
+  const handleClick = () => {
+    const target = config.getTarget(targetKey);
+    if (!target) {
+      toast(config.missingMessage);
+      return;
+    }
+    config.openTarget(target);
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={className ?? config.defaultClassName}
+          aria-label={resolvedLabel}
+          onClick={handleClick}
+        >
+          <Icon className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tooltipText}</TooltipContent>
+    </Tooltip>
+  );
+};
+
+export default DocLinkIcon;
