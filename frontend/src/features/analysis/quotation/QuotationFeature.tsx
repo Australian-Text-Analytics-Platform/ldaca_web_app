@@ -65,6 +65,14 @@ import { useAnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
 import { flattenQuotationGroups } from './quotationViewModels';
+import {
+  DEFAULT_CONTEXT_LENGTH,
+  MAX_CONTEXT_LENGTH,
+  clampContextLength,
+  clipTextAroundSpans,
+  type HighlightSpan,
+} from './quotationTextClip';
+import { normalizeRemoteUrl } from './quotationRemoteUrl';
 import { QuotationDetachDialog } from './components/QuotationDetachDialog';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import {
@@ -101,8 +109,6 @@ interface QuotationResultState {
 }
 
 const DEFAULT_PAGE_SIZE = 50;
-const DEFAULT_CONTEXT_LENGTH = 5;
-const MAX_CONTEXT_LENGTH = 2000;
 
 const TYPE_COLORS: Record<string, string> = {
   speaker: '#2563eb', // blue-600
@@ -110,184 +116,8 @@ const TYPE_COLORS: Record<string, string> = {
   verb: '#7c3aed',    // violet-600
 };
 
-const clampContextLength = (value: number): number => {
-  if (!Number.isFinite(value)) return DEFAULT_CONTEXT_LENGTH;
-  return Math.max(0, Math.min(MAX_CONTEXT_LENGTH, Math.floor(value)));
-};
-
-type HighlightSpan = { start: number; end: number; types: string[] };
-
-interface ContextClipResult {
-  text: string;
-  spans: HighlightSpan[];
-  prefixEllipsis: boolean;
-  suffixEllipsis: boolean;
-  sliceStart: number;
-  sliceEnd: number;
-}
-
 type QuotationDisplayRow = QuotationHitRow & {
   __spans: { start: number; end: number; type: string }[];
-};
-
-const clipTextAroundSpans = (text: string, spans: HighlightSpan[], surroundingWords: number): ContextClipResult => {
-  const normalizedWords = Number.isFinite(surroundingWords)
-    ? Math.max(0, Math.floor(surroundingWords))
-    : 0;
-
-  if (!text || !spans.length) {
-    return {
-      text,
-      spans: spans.map((span) => ({ ...span })),
-      prefixEllipsis: false,
-      suffixEllipsis: false,
-      sliceStart: 0,
-      sliceEnd: text.length,
-    };
-  }
-
-  const earliestStart = Math.max(0, Math.min(...spans.map((s) => s.start)));
-  const latestEnd = Math.min(text.length, Math.max(...spans.map((s) => s.end)));
-
-  if (!Number.isFinite(earliestStart) || !Number.isFinite(latestEnd) || earliestStart >= latestEnd) {
-    return {
-      text,
-      spans: spans.map((span) => ({ ...span })),
-      prefixEllipsis: false,
-      suffixEllipsis: false,
-      sliceStart: 0,
-      sliceEnd: text.length,
-    };
-  }
-
-  const regex = /\S+/g;
-  const words: Array<{ start: number; end: number }> = [];
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
-    words.push({ start: match.index, end: match.index + match[0].length });
-  }
-
-  const projectSpans = (sliceStart: number, sliceEnd: number) =>
-    spans
-      .map((span) => {
-        const start = Math.max(span.start, sliceStart);
-        const end = Math.min(span.end, sliceEnd);
-        if (end <= start) return null;
-        return { ...span, start: start - sliceStart, end: end - sliceStart };
-      })
-      .filter((span): span is HighlightSpan => Boolean(span));
-
-  if (!words.length) {
-    const sliceStart = earliestStart;
-    const sliceEnd = latestEnd;
-    return {
-      text: text.slice(sliceStart, sliceEnd),
-      spans: projectSpans(sliceStart, sliceEnd),
-      prefixEllipsis: sliceStart > 0,
-      suffixEllipsis: sliceEnd < text.length,
-      sliceStart,
-      sliceEnd,
-    };
-  }
-
-  const findWordIndexBeforeOrAt = (pos: number) => {
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i]!;
-      if (pos < word.start) {
-        return Math.max(0, i - 1);
-      }
-      if (pos <= word.end) {
-        return i;
-      }
-    }
-    return words.length - 1;
-  };
-
-  const findWordIndexAfterOrAt = (pos: number) => {
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i]!;
-      if (pos <= word.end) {
-        return i;
-      }
-      if (pos < word.start) {
-        return i;
-      }
-    }
-    return words.length - 1;
-  };
-
-  const startWordIdx = findWordIndexBeforeOrAt(earliestStart);
-  const lastCharIndex = Math.max(0, latestEnd - 1);
-  const endWordIdx = findWordIndexAfterOrAt(lastCharIndex);
-
-  const clipStartIdx = Math.max(0, startWordIdx - normalizedWords);
-  const clipEndIdx = Math.min(words.length - 1, endWordIdx + normalizedWords);
-
-  let sliceStart = words[clipStartIdx]?.start ?? 0;
-  let sliceEnd = words[clipEndIdx]?.end ?? text.length;
-
-  if (!Number.isFinite(sliceStart) || !Number.isFinite(sliceEnd) || sliceEnd <= sliceStart) {
-    sliceStart = 0;
-    sliceEnd = text.length;
-  }
-
-  return {
-    text: text.slice(sliceStart, sliceEnd),
-    spans: projectSpans(sliceStart, sliceEnd),
-    prefixEllipsis: sliceStart > 0,
-    suffixEllipsis: sliceEnd < text.length,
-    sliceStart,
-    sliceEnd,
-  };
-};
-
-
-type NormalizationFailureReason = 'empty' | 'scheme' | 'format' | 'protocol';
-
-interface NormalizedRemoteUrl {
-  normalized: string;
-  valid: boolean;
-  reason: NormalizationFailureReason | null;
-}
-
-const NORMALIZED_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
-
-const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
-  const trimmed = value.trim();
-  if (!trimmed.length) {
-    return { normalized: '', valid: false, reason: 'empty' };
-  }
-
-  const hasScheme = NORMALIZED_SCHEME_REGEX.test(trimmed);
-
-  const isHttpScheme = /^https?:\/\//i.test(trimmed);
-
-  const canParse = (candidate: string) => {
-    try {
-      const parsed = new URL(candidate);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  if (canParse(trimmed)) {
-    return { normalized: trimmed, valid: true, reason: null };
-  }
-
-  if (!hasScheme) {
-    const prefixed = `http://${trimmed}`;
-    if (canParse(prefixed)) {
-      return { normalized: prefixed, valid: true, reason: null };
-    }
-    return { normalized: trimmed, valid: false, reason: 'format' };
-  }
-
-  if (!isHttpScheme) {
-    return { normalized: trimmed, valid: false, reason: 'protocol' };
-  }
-
-  return { normalized: trimmed, valid: false, reason: 'format' };
 };
 
 const QuotationFeature: React.FC = () => {
