@@ -198,15 +198,20 @@ Per-file split plans. Each file gets its own focused PR. **Effort: ~1 week.**
 - **`8608c91` Phase 3.4** Quotation pure helpers moved to siblings: `quotationTextClip.ts` (clipTextAroundSpans + word-boundary maths, ~150 LoC) and `quotationRemoteUrl.ts` (URL normalization). QuotationFeature 1499 → 1351 LoC.
 - **`db894fc`** (cross-cutting) hydration `Failed to fetch` errors classified as `ApiError(NETWORK)` so they log at debug; recharts `width(-1)/height(-1)` warnings silenced via `minWidth={0}`.
 
+### Additional Phase 3 work landed
+
+- **`57d32e0` Phase 3.8 (partial)** WorkspaceTable.tsx 725 → 612 LoC. `<RenameInput>` and `<ColumnFilterForm>` extracted, TanStack `ColumnMeta` augmentation moved to `tableMeta.d.ts`, `columns` and `wideColumns` memoized.
+- **`77c196a` Phase 3.9 (partial)** Memoized `actions` in useWorkspaceNodeMutations + `authHeaders` in useWorkspaceCore. The single largest re-render fix in the audit (H6 + H7) — the four-slice WorkspaceProvider value no longer churns on every parent render, cascading through ~30 consumers.
+
 ### Remaining Phase 3 work
 
 - **3.4 (rest)** Quotation: extract `<QuotationHighlightedCell>` from inline `renderHighlightedText` (closes over contextLength/hoverState/setHoverState — needs prop threading); hoist `TYPE_COLORS`/`hexToRgba`/`buildUnderlineStyle` to `quotationHighlight.ts`.
 - **3.5 (rest)** Sequential: `<SequentialAnalysisParameterPanel>` + `<SequentialAnalysisResultsPanel>`; tame the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L467-503.
 - **3.7 (rest)** Sidebar: `useStackedSplits` hook (~150 LoC vertical splitter), `<SidebarSection>` extraction, IIFE → `useMemo`.
-- **3.8** WorkspaceTable.tsx (725 LoC): lift `RenameInput` / `ColumnFilterForm` / `<WorkspaceColumnHeader>` / `<DeleteColumnConfirmDialog>`; extract `useColumnMutations` hook; memoize `wideColumns`; wrap `onRefreshSchema` in `useCallback` at the producer side.
-- **3.1** ConcordanceFeature.tsx (2383 LoC): the big one. 4 panels + 4 hooks (see plan). Best done last, in its own focused session.
+- **3.8 (rest)** WorkspaceTable: `useColumnMutations` hook (cast/rename/delete schema-mutation flows + per-column busy state, ~80 LoC). Needs careful prop threading because the rename UI state lives in the component while the mutation flow needs to clear it on success.
+- **3.1** ConcordanceFeature.tsx (2383 LoC): the big one. 4 panels + 4 hooks (see plan). Best done last, in its own focused session — file mixes pending-handoff orchestration with rAF chains, materialize SSE consumption, and 17 useEffects (several already with eslint-disables).
 - **3.3** DataLoaderFeature.tsx (1517 LoC): move out of `features/analysis/`; decompose 6 dialogs and the file tree.
-- **3.9** useWorkspaceNodeMutations.ts (637 LoC): wrap `actions` in `useMemo`; move 6 text mutations from useWorkspaceInternal.
+- **3.9 (rest)** useWorkspaceNodeMutations.ts: move 6 text mutations from useWorkspaceInternal.ts:101-228 here (or a peer `useWorkspaceTextMutations.ts`).
 
 ### 3.1 ConcordanceFeature.tsx (2383 → ~600 LoC)
 
