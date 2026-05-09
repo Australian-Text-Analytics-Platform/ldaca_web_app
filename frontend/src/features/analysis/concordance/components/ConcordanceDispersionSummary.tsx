@@ -303,7 +303,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
         </Button>
       </div>
       <div ref={chartContainerRef} className="w-full">
-        <ResponsiveContainer width="100%" height={240}>
+        <ResponsiveContainer width="100%" height={240} minWidth={0}>
           <LineChart data={bins} margin={{ top: 10, right: 24, bottom: 10, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
