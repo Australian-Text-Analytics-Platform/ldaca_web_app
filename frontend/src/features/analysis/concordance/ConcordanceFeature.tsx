@@ -55,7 +55,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AnalysisPagination } from '@/components/AnalysisPagination';
 import { AnalysisTableScrollArea } from '@/components/AnalysisTableScrollArea';
 import { takeMostRecent } from '@/utils/selectionUtils';
-import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
+import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
+import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import { ConcordanceDispersionCell } from './components/ConcordanceDispersionCell';
 import { ConcordanceDispersionLegend } from './components/ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './components/ConcordanceDispersionSummary';
@@ -506,7 +507,7 @@ const ConcordanceFeature: React.FC = () => {
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodes, setPendingDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
   const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
-  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachNodeOption[]>([]);
+  const [detachNodeOptions, setDetachDialogNodeOptions] = useState<DetachDialogNodeOption[]>([]);
   
   // Global page size setting
   const [globalPageSize, setGlobalPageSize] = useState(20);
@@ -1327,7 +1328,7 @@ const ConcordanceFeature: React.FC = () => {
         initial[node.node_id] = [];
       });
       setSelectedDetachColumns(initial);
-      setDetachNodeOptions(options);
+      setDetachDialogNodeOptions(options);
       setDetachDialogOpen(true);
     } catch (error) {
       console.error('Failed to load concordance detach options:', error);
@@ -1377,7 +1378,7 @@ const ConcordanceFeature: React.FC = () => {
     setDetachDialogOpen(false);
     setPendingDetachNodes([]);
     setSelectedDetachColumns({});
-    setDetachNodeOptions([]);
+    setDetachDialogNodeOptions([]);
   };
 
   const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));

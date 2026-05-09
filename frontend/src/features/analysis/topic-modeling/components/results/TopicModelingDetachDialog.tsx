@@ -5,13 +5,11 @@ import {
   type DetachDialogNodeOption,
 } from '@/features/analysis/components/DetachColumnsDialog';
 
-type DetachNodeOption = DetachDialogNodeOption;
-
 type Props = {
   open: boolean;
   onOpenChange: Dispatch<SetStateAction<boolean>>;
   isDetaching: boolean;
-  detachNodeOptions: DetachNodeOption[];
+  detachNodeOptions: DetachDialogNodeOption[];
   selectedDetachColumns: Record<string, string[]>;
   toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
   selectAllDetachColumns: () => void;

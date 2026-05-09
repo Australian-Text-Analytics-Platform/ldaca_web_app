@@ -9,6 +9,7 @@ import {
   type ReplaceRequest,
 } from '@/api/nodes';
 import { useAuth } from '@/hooks/useAuth';
+import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { mapColumnsToInfo } from '@/utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
@@ -17,8 +18,6 @@ const DEFAULT_PALETTE = ['#2563eb'];
 
 const getNodeId = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
   node.id || node.node_id || `node-${fallbackIndex}`;
-
-type NodeColumnSelection = { nodeId: string; column: string };
 
 export interface ReplaceSubTabProps {
   selectedNodeId: string | null;

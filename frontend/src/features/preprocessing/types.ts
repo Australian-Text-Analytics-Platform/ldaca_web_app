@@ -47,14 +47,7 @@ export interface FilterConditionWithId {
   [key: string]: ConditionValue | string | boolean | undefined;
 }
 
-export type PreviewPagination = {
-  page: number;
-  page_size: number;
-  total_rows: number;
-  total_pages: number;
-  has_next: boolean;
-  has_prev: boolean;
-};
+export type { NodeDataPagination as PreviewPagination } from '@/types/api';
 
 export type PreviewRow = Record<string, unknown>;
 

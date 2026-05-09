@@ -29,7 +29,12 @@ export interface ConcordanceDetachOptionsResponse {
 }
 export interface ConcordanceAnalysisRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; whole_word?: boolean; case_sensitive?: boolean; sort_by?: string; combined?: boolean; }
 export interface ConcordanceResultQuery { node_id?: string; combined?: boolean; page?: number; page_number?: number; page_size?: number; sort_by?: string; descending?: boolean; show_metadata?: boolean; update_only?: boolean; }
-export interface ConcordancePagination {
+/**
+ * Pagination shape used by analysis features that paginate by *source row*
+ * (e.g. concordance/quotation), where each source row may produce multiple
+ * result rows.
+ */
+export interface SourceRowPagination {
   page: number;
   page_size: number;
   total_source_rows: number;
@@ -38,6 +43,7 @@ export interface ConcordancePagination {
   has_next: boolean;
   has_prev: boolean;
 }
+export type ConcordancePagination = SourceRowPagination;
 export interface ConcordanceResultEntry {
   data: ConcordanceGroupedRow[];
   columns: string[];
@@ -77,15 +83,7 @@ export interface QuotationMetadata {
 }
 export type QuotationHitRow = Record<string, unknown>;
 export type QuotationGroupedRow = QuotationHitRow[];
-export interface QuotationPagination {
-  page: number;
-  page_size: number;
-  total_source_rows: number;
-  total_source_pages: number;
-  result_count: number;
-  has_next: boolean;
-  has_prev: boolean;
-}
+export type QuotationPagination = SourceRowPagination;
 export interface QuotationAnalysisResponse {
   data: QuotationGroupedRow[];
   columns: string[];

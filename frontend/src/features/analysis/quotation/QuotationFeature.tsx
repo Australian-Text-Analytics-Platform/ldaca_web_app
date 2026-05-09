@@ -66,10 +66,8 @@ import { useAnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
 import { flattenQuotationGroups } from './quotationViewModels';
-import {
-  QuotationDetachDialog,
-  type QuotationDetachNodeOption,
-} from './components/QuotationDetachDialog';
+import { QuotationDetachDialog } from './components/QuotationDetachDialog';
+import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';
@@ -583,7 +581,7 @@ const QuotationFeature: React.FC = () => {
   const [materializeSummary, setMaterializeSummary] = useState<{ recordCount: number; uniqueDocuments: number; totalDocuments: number } | null>(null);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
-  const [detachNodeOptions, setDetachNodeOptions] = useState<QuotationDetachNodeOption[]>([]);
+  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
   const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
   const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
 

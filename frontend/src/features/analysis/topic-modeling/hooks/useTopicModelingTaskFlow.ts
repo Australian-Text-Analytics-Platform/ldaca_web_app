@@ -5,19 +5,15 @@ import {
   type TopicModelingRequest,
   type TopicModelingResponse,
   type TopicModelingDetachRequest,
-  type TopicModelingDetachNodeOption,
 } from '@/api/text';
 import { queryKeys } from '@/lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
+import type { DetachDialogNodeOption } from '@/features/analysis/components/DetachColumnsDialog';
 import { buildSamplingAutoNodeName } from '@/features/preprocessing/utils/autoNodeNames';
 import { takeMostRecent } from '@/utils/selectionUtils';
+import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 25;
-
-type NodeColumnSelection = {
-  nodeId: string;
-  column: string;
-};
 
 interface TopicModelingState {
   currentWorkspaceId: string | null;
@@ -104,7 +100,7 @@ export function useTopicModelingTaskFlow({
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
-  const [detachNodeOptions, setDetachNodeOptions] = useState<TopicModelingDetachNodeOption[]>([]);
+  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
   const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
 
   const handleRun = async () => {
