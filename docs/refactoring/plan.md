@@ -119,13 +119,19 @@ Replaces the duplication patterns in analysis features and preprocessing sub-tab
 
 Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-existing filter-tab failures, unchanged).
 
+### Additional Phase 2 work landed in this session
+
+- **`d68ba38` Phase 2.1** `<AnalysisCardLayout>` adopted by Sequential + Quotation. Concordance still hand-rolls (deferred to Phase 3 since the layout move overlaps with the planned ParameterPanel/ResultsPanel split).
+- **`a17c077` Phase 2.1** `<PageSizeSelect>` + `features/analysis/common/constants.ts` (`PAGE_SIZE_OPTIONS_DEFAULT`, `PAGE_SIZE_OPTIONS_SMALL`); concordance + quotation footers migrated.
+- **`179f57e` Phase 2.1** Quotation's anonymous per-node pagination type aligned with the shared `NodePaginationState`.
+
 ### Remaining Phase 2 work (deferred for a fresh session)
 
 - **2.1** `useMaterializeLifecycle` — the materialize-task lifecycle duplicated in concordance and quotation (~250 LoC each). The most complex Phase 2 extraction; deserves a focused session because each feature has subtle differences (concordance is multi-node + consumes SSE `analysis_materialized` events; quotation is single-node).
-- **2.1** `usePerNodePagination` + `<PageSizeSelect>` — the per-node pagination state shape is reinvented three times; both extractions are ~½ day.
-- **2.1** `<AnalysisCardLayout>` migration — only AI Annotator (deferred per user) and Token Frequency use it; concordance/quotation/sequential/topic-modeling still hand-roll the parameter+results card. A drop-in migration where the existing `AnalysisCardLayout` props fit; ~½ day per feature.
+- **2.1** `usePerNodePagination` hook (full extraction) — concordance and quotation interleave per-node pagination updates with feature-specific request flows (handleSearch, handlePageSizeChange) that aren't mechanically separable without a wider refactor. Defer until those flows are simplified.
+- **2.1** Concordance `<AnalysisCardLayout>` migration. Deferred to Phase 3 since the layout move overlaps with the planned ParameterPanel / ResultsPanel split.
 - **2.1** Lift `SortableHeader` out of `ConcordanceFeature.tsx:1385`. Trivial — included as part of the bigger Concordance decomposition in Phase 3.
-- **2.1** Concordance → `reconcileMetadataColumnSelection` migration. Small, mechanical.
+- **2.1** Concordance → `reconcileMetadataColumnSelection` migration. Requires a `string[] → string[] | null` state-shape change with caller-side audit (3 read sites use `selectedMetadataColumns ?? []`); revisit as part of Phase 3.
 - **2.2** `<ApplyFooter>` — extracts the 30-line "New data block name + Apply button + tooltip" CardFooter shared by 6 sub-tabs. Big LoC win but invasive (6 files, 6 different prop shapes to harmonize).
 - **2.2** `buildApplyDisabledReason`, `useResetOnNodeChange`, `useSingleNodeSelectionPanel` — smaller utilities with low ROI relative to complexity; deferred until natural touchpoints.
 
