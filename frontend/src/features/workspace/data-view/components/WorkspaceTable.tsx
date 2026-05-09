@@ -712,7 +712,7 @@ export function WorkspaceTable({
         open={deleteColumnDialogOpen}
         onOpenChange={setDeleteColumnDialogOpen}
         title="Delete Column"
-        description={`Are you sure you want to delete column "${columnToDelete}"? This operation cannot be undone.`}
+        description={`Are you sure you want to delete column "${columnToDelete}"? You can undo this action afterwards.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"
