@@ -40,6 +40,7 @@ import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
 import { ClearEmbeddingCacheMenuItem } from '@/features/analysis/topic-modeling/components/ClearEmbeddingCacheMenuItem';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
+import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
@@ -147,10 +148,10 @@ const Sidebar: React.FC = () => {
     reconnect: reconnectTaskStream,
   } = useWorkspaceTaskInbox(currentWorkspaceId ?? null);
 
-  const nodes = (() => {
+  const nodes = React.useMemo<SidebarWorkspaceNode[]>(() => {
     const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
     return Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
-  })();
+  }, [workspaceGraph]);
 
   const openQuotationEngineDialog = () => {
     setCurrentView('quotation');
@@ -174,64 +175,17 @@ const Sidebar: React.FC = () => {
   const isConnecting = taskStreamStatus === 'connecting';
   const connectionError = taskStreamStatus === 'error' ? taskStreamError : null;
 
-  const [collapsedSections, setCollapsedSections] = React.useState<Record<SectionKey, boolean>>({
-    views: false,
-    nodes: false,
-    tasks: false,
+  const {
+    containerRef: sectionsContainerRef,
+    isCollapsed,
+    toggleSection,
+    getSectionFlexStyle,
+    assignSectionScrollRef,
+    handleResizeStart,
+  } = useStackedSplits<SectionKey>(SECTION_KEYS, {
+    minSectionPx: MIN_SECTION_HEIGHT,
+    initialRatios: { views: 0.34, nodes: 0.33, tasks: 0.33 },
   });
-  const [sectionHeights, setSectionHeights] = React.useState<Record<SectionKey, number>>({
-    views: 0.34,
-    nodes: 0.33,
-    tasks: 0.33,
-  });
-  const sectionsContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const sectionScrollRefs = React.useRef<Record<SectionKey, HTMLDivElement | null>>({
-    views: null,
-    nodes: null,
-    tasks: null,
-  });
-  const [sectionsContainerHeight, setSectionsContainerHeight] = React.useState(0);
-  const assignSectionScrollRef = (key: SectionKey, node: HTMLDivElement | null) => {
-    sectionScrollRefs.current[key] = node;
-  };
-  const scrollSection = (key: SectionKey, deltaPixels: number) => {
-    if (deltaPixels === 0) {
-      return;
-    }
-    const target = sectionScrollRefs.current[key];
-    if (!target) {
-      return;
-    }
-    target.scrollTop += deltaPixels;
-  };
-
-  React.useLayoutEffect(() => {
-    const container = sectionsContainerRef.current;
-    if (!container) return;
-    if (typeof ResizeObserver === 'undefined') {
-      setSectionsContainerHeight(container.getBoundingClientRect().height);
-      return;
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) {
-        setSectionsContainerHeight(entry.contentRect.height);
-      }
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
-
-  const activeSectionTotal = (() => {
-    const total = SECTION_KEYS.reduce((sum, key) => {
-      if (collapsedSections[key]) {
-        return sum;
-      }
-      return sum + (sectionHeights[key] ?? 0);
-    }, 0);
-    return total || 1;
-  })();
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
   const visibleNavItems = NAV_ITEMS.filter(({ id }) => visibleViews.includes(id));
@@ -248,81 +202,6 @@ const Sidebar: React.FC = () => {
       setCurrentView(fallbackVisibleView);
     }
   }, [currentView, fallbackVisibleView, setCurrentView, visibleViews]);
-
-  const getSectionFlexStyle = (key: SectionKey) => {
-    if (collapsedSections[key]) {
-      return { flex: '0 0 auto' } as React.CSSProperties;
-    }
-    const ratio = (sectionHeights[key] ?? 0) / activeSectionTotal;
-    return { flexGrow: ratio, flexShrink: 0, flexBasis: 0 } as React.CSSProperties;
-  };
-
-  const toggleSection = (key: SectionKey) => {
-    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleResizeStart = (upperKey: SectionKey, lowerKey: SectionKey, event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    if (collapsedSections[upperKey] || collapsedSections[lowerKey]) return;
-    const containerHeight = sectionsContainerHeight || 1;
-    if (containerHeight <= 0) return;
-
-    event.preventDefault();
-    const startY = event.clientY;
-    const startUpper = sectionHeights[upperKey] ?? 0;
-    const startLower = sectionHeights[lowerKey] ?? 0;
-    const pairTotal = startUpper + startLower;
-    if (pairTotal <= 0) {
-      return;
-    }
-
-    const rawMinRatio = MIN_SECTION_HEIGHT / containerHeight;
-    const safeMinCandidate = Math.min(Math.max(rawMinRatio, 0.02), pairTotal / 2 - 0.01);
-    if (!Number.isFinite(safeMinCandidate) || safeMinCandidate <= 0 || pairTotal - safeMinCandidate <= safeMinCandidate) {
-      return;
-    }
-
-    const minUpper = safeMinCandidate;
-    const maxUpper = pairTotal - safeMinCandidate;
-
-    const onMove = (moveEvent: MouseEvent) => {
-      const deltaY = moveEvent.clientY - startY;
-      const deltaRatio = deltaY / containerHeight;
-      const candidateUpper = startUpper + deltaRatio;
-      let nextUpper = candidateUpper;
-      let overflowTarget: SectionKey | null = null;
-      let overflowRatio = 0;
-
-      if (candidateUpper < minUpper) {
-        nextUpper = minUpper;
-        overflowTarget = upperKey;
-        overflowRatio = candidateUpper - minUpper;
-      } else if (candidateUpper > maxUpper) {
-        nextUpper = maxUpper;
-        overflowTarget = lowerKey;
-        overflowRatio = candidateUpper - maxUpper;
-      }
-
-      const nextLower = pairTotal - nextUpper;
-      setSectionHeights((prev) => ({
-        ...prev,
-        [upperKey]: nextUpper,
-        [lowerKey]: nextLower,
-      }));
-
-      if (overflowTarget && overflowRatio !== 0) {
-        scrollSection(overflowTarget, overflowRatio * containerHeight);
-      }
-    };
-
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
 
   const renderViewsBody = () => (
     <SidebarMenu>
@@ -409,7 +288,7 @@ const Sidebar: React.FC = () => {
         <div ref={sectionsContainerRef} className="flex h-full flex-col gap-2 overflow-hidden">
           {SECTION_KEYS.map((key, index) => {
             const title = SECTION_TITLES[key];
-            const isCollapsed = collapsedSections[key];
+            const collapsed = isCollapsed(key);
             const previousKey = SECTION_KEYS[index - 1];
             return (
               <div
@@ -431,7 +310,7 @@ const Sidebar: React.FC = () => {
                       type="button"
                       className="flex min-w-0 flex-1 items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                       onClick={() => toggleSection(key)}
-                      aria-expanded={!isCollapsed}
+                      aria-expanded={!collapsed}
                     >
                       <span className="flex items-center gap-1">
                         {title}
@@ -455,7 +334,7 @@ const Sidebar: React.FC = () => {
                         <ChevronDown
                           className={cn(
                             'h-3 w-3 transition-transform',
-                            isCollapsed ? '-rotate-90' : 'rotate-0'
+                            collapsed ? '-rotate-90' : 'rotate-0'
                           )}
                         />
                       </div>
@@ -520,10 +399,10 @@ const Sidebar: React.FC = () => {
                 <div
                   className={cn(
                     'flex-1 overflow-hidden transition-[max-height] duration-200',
-                    isCollapsed ? 'max-h-0' : 'max-h-full'
+                    collapsed ? 'max-h-0' : 'max-h-full'
                   )}
                 >
-                  {!isCollapsed && (
+                  {!collapsed && (
                     <div className="flex h-full flex-col overflow-hidden">
                       <div
                         ref={(node) => assignSectionScrollRef(key, node)}
