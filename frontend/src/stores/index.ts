@@ -17,3 +17,6 @@ export { usePreferencesStore } from './preferencesStore';
 
 export { useAnalysisStore } from './analysisStore';
 export type { TaskItem, PendingConcordance } from './analysisStore';
+
+export { useAuthStore, REFRESH_FAILURE_THRESHOLD } from './authStore';
+export type { AuthPhase, FetchReason } from './authStore';

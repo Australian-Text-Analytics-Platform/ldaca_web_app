@@ -19,7 +19,7 @@ Landed on the `refactoring` branch as four commits:
 Net Phase 1: ~9 fewer files, ~500 fewer LoC. Build / typecheck / eslint clean. Tests at baseline (2 pre-existing filter-tab failures, unchanged from before this refactor).
 
 Items deferred from the original Phase 1 scope:
-- **B6** (URL parse at module load in useAuth.ts) — moved to Phase 4.7.
+- **B6** (URL parse at module load in useAuth.ts) — ✅ resolved by Phase 4.7. The capture moved into `processGoogleRedirectToken()` and runs from a `useEffect` on first `useAuth()` mount.
 - **B8** (`key={index}` on user-mutable lists in concordance/sequential/expression) — moved to Phase 2 alongside the broader expression-sub-tab work, since proper fix needs `string[]` → `{id, value}[]` state-shape changes.
 - **B9** (useNodeColumnInfos cache dep loop) — ✅ resolved by Phase 4.3 (`5fd8323`). The hook now uses `useQueries`; the dep-loop pattern is gone.
 
@@ -30,7 +30,7 @@ Items deferred from the original Phase 1 scope:
 - [ ] **B3** `useReplaceSubTab.ts:170-177` disabled-reason builder doesn't suppress while global ops are running. Tooltip shows stale "Enter a regex pattern first" instead of nothing. Add `if (applyLoading || isLoading.operations) return undefined;` to match the pattern in the other 5 sub-tabs.
 - [ ] **B4** `useSliceSubTab.ts:208-227` has a duplicate reset block — the first block's setters are dead (the second runs on truthy `selectedNodeId` and is a strict superset). Delete the dead first block.
 - [ ] **B5** `useFiles.ts:26` puts `JSON.stringify(authHeaders)` into the react-query key. On logout, old key never gets evicted. Drop the auth signature from the key; add `queryClient.removeQueries({ queryKey: queryKeys.files })` to `useAuth.ts` logout.
-- [ ] **B6** `useAuth.ts:105-115` parses `window.location.search` and rewrites the URL **at module import time** (outside any hook/effect). Move into a `useEffect` in `App.tsx` or a one-shot `processGoogleRedirectToken()` called from the root component. *(Defer to Phase 4 if it touches too much auth code.)*
+- [x] **B6** `useAuth.ts:105-115` parsed `window.location.search` and rewrote the URL **at module import time**. Moved into `processGoogleRedirectToken()` on the auth store and invoked from a `useEffect` in `useAuth` on first mount (Phase 4.7).
 - [ ] **B7** `tutorials/warningRegistry.ts` is empty `{}`, so every `<WarningIcon targetKey="…">` will silently fail. Combined with §1.2 (WarningIcon is dead code), the fix is: **delete `WarningIcon.tsx` and `warningRegistry.ts` together**. Audit codebase for any consumer first; the cross-cutting auditor confirmed none. Add either back if/when needed.
 - [ ] **B8** `key={index}` on user-mutable lists (sort/filter/reorder mis-attributes row identity, breaks input focus). Fix with stable keys at:
   - [ ] `concordance/ConcordanceFeature.tsx:1579,1751,1763`
@@ -419,12 +419,11 @@ Landed in `9bd9789`. The four setters that used to fire `syncToBackend().catch((
 
 A small per-field shallow snapshot comparison gates writes so identical-but-new-reference state changes don't trigger a redundant request.
 
-### 4.7 useAuth singleton → store
+### 4.7 useAuth singleton → store — ✅ DONE
 
-`useAuth.ts:33-40` keeps 8 module-level globals; `useSyncExternalStore` bridges to React. Tests need to reset all 8 globals; HMR preserves stale state.
+The 8 module-level globals + custom `useSyncExternalStore` bridge that lived in `hooks/useAuth.ts` move to a Zustand store at `stores/authStore.ts`. The hook becomes a ~80-LoC wrapper that subscribes to a flat slice via `useShallow`, runs the autoStart bootstrap effect, and triggers `processGoogleRedirectToken()` from the same effect (B6 — used to fire at module import time).
 
-- [ ] Migrate to a Zustand store with the same external-store contract.
-- [ ] Move the URL-rewrite at L105-115 into a `useEffect` (B6).
+`authInfo` / `config` / `phase` are the only state pieces that need to drive renders, so they live in the store. The imperative bookkeeping (`bootstrapAttempts`, `refreshFailures`, `inFlight`, `refreshIntervalId`) stays as module-locals next to the store — none of it is ever read by React, and keeping it out of the store avoids unnecessary subscriber notifications. The 10 smoke tests added in Phase 5 (`c1a8f28`) all pass against the new implementation with their mocking strategy unchanged.
 
 ### 4.8 Hook layer cleanup
 

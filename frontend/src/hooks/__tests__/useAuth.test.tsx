@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import type { AuthInfoResponse } from '@/types';
 import type { ConfigResponse } from '@/api/config';
 
-// ---------- API mocks (hoisted so the module-load URL-token capture path
-// in useAuth doesn't try to hit the real network during import) ----------
+// ---------- API mocks (hoisted so they're in place before the auth store
+// imports `authApi`/`configApi`; `runAuthFetch` would otherwise hit the
+// network when the autoStart effect fires) ----------
 
 const authApiMock = vi.hoisted(() => ({
   info: vi.fn<(...args: unknown[]) => Promise<AuthInfoResponse>>(),
@@ -33,9 +34,11 @@ const buildConfig = (overrides: Partial<ConfigResponse> = {}): ConfigResponse =>
   ...overrides,
 } as ConfigResponse);
 
-// Each test wants a clean module instance because useAuth keeps every piece of
-// state in module-level globals (`globalAuthInfo`, `globalConfig`, `globalPhase`,
-// `inFlight`, etc.). `vi.resetModules()` between tests gives us a fresh slate.
+// Each test wants a clean module instance: the Zustand auth store is created
+// at module load, plus a few imperative module-locals (`bootstrapAttempts`,
+// `refreshFailures`, `inFlight`, `refreshIntervalId`) live alongside it.
+// `vi.resetModules()` re-evaluates the store module → fresh store + fresh
+// locals.
 const importUseAuth = async () => {
   const mod = await import('../useAuth');
   return mod;
