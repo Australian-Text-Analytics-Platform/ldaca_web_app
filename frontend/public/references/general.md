@@ -23,16 +23,17 @@ LDaCA and its associated tools have received investment from the **Australian Re
 
 ---
 
-## Developers and Key Contributors
+## Key Developers and Contributors
 
-The design, development, and maintenance of the LDaCA webApp have been led and supported by staff from the **Sydney Informatics Hub (SIH)**, including:
+The design, development, and maintenance of the LDaCA webApp have been led and supported by staff from the [**Sydney Informatics Hub (SIH)**](https://informatics.sydney.edu.au/) and [**Sydney Corpus Lab**](https://sydneycorpuslab.com/):
 
-- *Senhui (Alex) Guo*
-- *Chao Sun*
-- *Monika Bednarek*
+- _**Chao Sun**_
+- _**Senhui (Alex) Guo**_
+- _**Monika Bednarek**_
 - *Michael Lynch*
-- *Atiq Ur Rehman*
 - *Sebastian Hann*
+- *Atiq Ur Rehman*
+- *Kelvin Lee*
 
 
 Their contributions span software engineering, research infrastructure development, data processing pipelines, user interface design, and research translation.
