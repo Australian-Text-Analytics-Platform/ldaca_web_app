@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon, MoreHorizontal, Star } from 'lucide-react';
+import { Loader2, FolderPlus, Upload, Trash2, Download as DownloadIcon, Plus, RefreshCcw, LogOut, MoreHorizontal, Star } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,7 +13,7 @@ import { filesApi } from '@/api/files';
 import { workspacesApi } from '@/api/workspaces';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useUIStore } from '@/stores/uiStore';
-import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '@/types';
+import { type FileTreeDirectory } from '@/types';
 import { AddFilePanel, FilePreviewPanel } from '@/components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { getInvalidWorkspaceNameMessage } from '@/lib/workspaceName';
 import {
@@ -53,65 +52,9 @@ import InfoIcon from '@/components/help/InfoIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useResizableSplit } from './hooks/useResizableSplit';
 import { usePendingWorkspaceDownloads } from './hooks/usePendingWorkspaceDownloads';
-
-const README_FILENAME = 'README.md';
-const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
-
-type FileMoveTarget = {
-  key: string;
-  directoryPath: string;
-};
-
-const formatBytes = (bytes?: number | null): string => {
-  if (!bytes || Number.isNaN(bytes)) return '—';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const idx = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  const value = bytes / 1024 ** idx;
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[idx]}`;
-};
-
-const formatTimestamp = (value?: number | string | null): string => {
-  if (!value) return '—';
-  let date: Date | null = null;
-  if (typeof value === 'number') {
-    date = new Date(value * (value > 1e12 ? 1 : 1000));
-  } else if (typeof value === 'string') {
-    const parsed = Date.parse(value);
-    if (!Number.isNaN(parsed)) {
-      date = new Date(parsed);
-    }
-  }
-  return date ? date.toLocaleString() : '—';
-};
-
-const getWorkspaceId = (workspace: { id?: string; unique_id?: string }): string | null => {
-  const id = workspace?.id;
-  const uniqueId = workspace?.unique_id;
-  if (typeof id === 'string' && id) return id;
-  if (typeof uniqueId === 'string' && uniqueId) return uniqueId;
-  return null;
-};
-
-function countFilesInNode(node: FileTreeNode): number {
-  if (node.type === 'file') return node.name.toLowerCase() === README_FILENAME.toLowerCase() ? 0 : 1;
-  return node.children.reduce((sum, child) => sum + countFilesInNode(child), 0);
-}
-
-function getCitationFile(directory: FileTreeDirectory): FileTreeFile | null {
-  const child = directory.children.find(
-    (candidate): candidate is FileTreeFile => candidate.type === 'file' && candidate.name.toLowerCase() === README_FILENAME.toLowerCase(),
-  );
-  return child ?? null;
-}
-
-function getVisibleDirectoryChildren(directory: FileTreeDirectory): FileTreeNode[] {
-  return directory.children.filter((child) => child.type !== 'file' || child.name.toLowerCase() !== README_FILENAME.toLowerCase());
-}
-
-function getParentDirectoryPath(filePath: string): string {
-  const lastSlashIndex = filePath.lastIndexOf('/');
-  return lastSlashIndex === -1 ? '' : filePath.slice(0, lastSlashIndex);
-}
+import { FileTree } from './components/FileTree';
+import { countFilesInNode } from './utils/fileTreeHelpers';
+import { formatBytes, formatTimestamp, getWorkspaceId } from './utils/format';
 
 const MAX_FILE_TREE_HEIGHT_REM = 40;
 
@@ -159,8 +102,6 @@ export const DataLoaderFeature: React.FC = () => {
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [folderNameAlert, setFolderNameAlert] = useState<string | null>(null);
-  const [draggingFilePath, setDraggingFilePath] = useState<string | null>(null);
-  const [fileMoveTarget, setFileMoveTarget] = useState<FileMoveTarget | null>(null);
   const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
   const [refreshingFiles, setRefreshingFiles] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
@@ -420,83 +361,7 @@ export const DataLoaderFeature: React.FC = () => {
     }
   };
 
-  const getDraggedFilePath = (event: React.DragEvent<HTMLElement>): string | null => {
-    const customPath = event.dataTransfer.getData(FILE_DRAG_MIME_TYPE);
-    if (customPath) {
-      return customPath;
-    }
-
-    const plainTextPath = event.dataTransfer.getData('text/plain');
-    return plainTextPath || draggingFilePath;
-  };
-
-  const canDropFileIntoDirectory = (sourcePath: string | null, targetDirectoryPath: string): boolean => {
-    if (!sourcePath) {
-      return false;
-    }
-
-    return getParentDirectoryPath(sourcePath) !== targetDirectoryPath;
-  };
-
-  const handleTreeFileDragStart = (event: React.DragEvent<HTMLDivElement>, filePath: string) => {
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData(FILE_DRAG_MIME_TYPE, filePath);
-    event.dataTransfer.setData('text/plain', filePath);
-    setDraggingFilePath(filePath);
-    setFileMoveTarget(null);
-  };
-
-  const handleTreeFileDragEnd = () => {
-    setDraggingFilePath(null);
-    setFileMoveTarget(null);
-  };
-
-  const isFileMoveTargetActive = (targetKey: string, targetDirectoryPath: string): boolean => {
-    return (
-      fileMoveTarget?.key === targetKey &&
-      fileMoveTarget.directoryPath === targetDirectoryPath &&
-      canDropFileIntoDirectory(draggingFilePath, targetDirectoryPath)
-    );
-  };
-
-  const handleDirectoryDragOver = (
-    targetKey: string,
-    targetDirectoryPath: string,
-    event: React.DragEvent<HTMLElement>,
-  ) => {
-    const sourcePath = getDraggedFilePath(event);
-    if (!canDropFileIntoDirectory(sourcePath, targetDirectoryPath)) {
-      return;
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    setFileMoveTarget({ key: targetKey, directoryPath: targetDirectoryPath });
-  };
-
-  const handleDirectoryDragLeave = (targetKey: string, event: React.DragEvent<HTMLElement>) => {
-    const relatedTarget = event.relatedTarget;
-    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
-      return;
-    }
-
-    setFileMoveTarget((currentTarget) => currentTarget?.key === targetKey ? null : currentTarget);
-  };
-
-  const handleDirectoryDrop = async (targetDirectoryPath: string, event: React.DragEvent<HTMLElement>) => {
-    const sourcePath = getDraggedFilePath(event);
-    if (!canDropFileIntoDirectory(sourcePath, targetDirectoryPath)) {
-      return;
-    }
-
-    if (!sourcePath) {
-      return;
-    }
-
-    event.preventDefault();
-  setFileMoveTarget(null);
-    setDraggingFilePath(null);
-
+  const handleMoveFile = async (sourcePath: string, targetDirectoryPath: string) => {
     try {
       await filesApi.moveFile(sourcePath, targetDirectoryPath, authHeaders);
       await refetchFiles();
@@ -653,152 +518,6 @@ export const DataLoaderFeature: React.FC = () => {
 
   const workspaceFolder = dataFolder || 'data/';
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
-
-  const renderFileItem = (file: FileTreeFile, parentDirectoryPath: string) => (
-    <div
-      key={file.path}
-      draggable
-      data-file-path={file.path}
-      data-testid={`file-row-${file.path}`}
-      onDragStart={(event) => handleTreeFileDragStart(event, file.path)}
-      onDragEnd={handleTreeFileDragEnd}
-      onDragEnter={(event) => handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)}
-      onDragOver={(event) => handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)}
-      onDragLeave={(event) => handleDirectoryDragLeave(`file:${file.path}`, event)}
-      onDrop={(event) => void handleDirectoryDrop(parentDirectoryPath, event)}
-      className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 ${
-        selectedFile === file.path ? 'bg-muted/50' : ''
-      } ${
-        isFileMoveTargetActive(`file:${file.path}`, parentDirectoryPath)
-          ? 'bg-primary/10 ring-1 ring-primary/30'
-          : ''
-      }`}
-    >
-      <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-medium text-foreground">
-              {file.name}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{formatBytes(file.size)}</span>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPreviewFile(file.path)}>
-            <Eye className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Preview</span>
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2"
-            disabled={!hasWorkspaceSelected}
-            data-hint-id="data-loader.file-row.add"
-            onClick={() => {
-              if (!hasWorkspaceSelected) {
-                setWorkspaceAlertOpen(true);
-                return;
-              }
-              setAddFileName(file.path);
-              setSelectedFile(file.path);
-            }}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Add</span>
-          </Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => handleDownloadFile(file.path)}>
-            <DownloadIcon className="h-3.5 w-3.5" />
-            <span className="hidden xl:inline">Download</span>
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => handleDeleteFile(file.path)}
-            disabled={loadingFiles}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderFileTreeNode = (node: FileTreeNode): React.ReactNode => {
-    if (node.type === 'file') {
-      return renderFileItem(node, getParentDirectoryPath(node.path));
-    }
-
-    const fileCount = countFilesInNode(node);
-    const citationFile = getCitationFile(node);
-    const visibleChildren = getVisibleDirectoryChildren(node);
-    return (
-      <Collapsible key={node.path} defaultOpen>
-        <div
-          className={`flex items-center gap-1 rounded-md pr-1 hover:bg-accent/50 ${
-            isFileMoveTargetActive(`folder:${node.path}`, node.path)
-              ? 'bg-primary/10 ring-1 ring-primary/30'
-              : ''
-          }`}
-          data-folder-path={node.path}
-          data-testid={`folder-row-${node.path}`}
-          onDragEnter={(event) => handleDirectoryDragOver(`folder:${node.path}`, node.path, event)}
-          onDragOver={(event) => handleDirectoryDragOver(`folder:${node.path}`, node.path, event)}
-          onDragLeave={(event) => handleDirectoryDragLeave(`folder:${node.path}`, event)}
-          onDrop={(event) => void handleDirectoryDrop(node.path, event)}
-        >
-          <div
-            className="flex min-w-0 flex-1 items-center gap-1 rounded-md"
-          >
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="group h-8 min-w-0 justify-start gap-1 px-2 transition-none hover:bg-transparent hover:text-accent-foreground"
-              >
-                <ChevronRightIcon className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-                <FolderIcon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{node.name}</span>
-              </Button>
-            </CollapsibleTrigger>
-            {citationFile ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                aria-label={`View citation for ${node.name}`}
-                title="View citation"
-                onClick={() => void openCitation(node, citationFile.path)}
-              >
-                <Quote className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
-          </div>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-            aria-label={`Add folder inside ${node.name}`}
-            title={`Add folder inside ${node.name}`}
-            onClick={() => openCreateFolderDialog(node.path, node.name)}
-          >
-            <FolderPlus className="h-3.5 w-3.5" />
-          </Button>
-          <Badge variant="secondary" className="text-[10px]">
-            {fileCount}
-          </Badge>
-        </div>
-        <CollapsibleContent className="ml-5">
-          <div className="flex flex-col gap-0.5 border-l border-border/40 pl-2">
-            {visibleChildren.map((child) => renderFileTreeNode(child))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    );
-  };
 
   return (
     <div className="flex h-[calc(100vh-9rem)] min-h-[640px] flex-col gap-4">
@@ -1215,7 +934,21 @@ export const DataLoaderFeature: React.FC = () => {
                   style={{ maxHeight: `${MAX_FILE_TREE_HEIGHT_REM}rem` }}
                 >
                   <div className="flex flex-col gap-0.5 p-2">
-                    {fileTree.map((node) => renderFileTreeNode(node))}
+                    <FileTree
+                      nodes={fileTree}
+                      selectedFile={selectedFile}
+                      loadingFiles={loadingFiles}
+                      hasWorkspaceSelected={hasWorkspaceSelected}
+                      onPreviewFile={setPreviewFile}
+                      onAddFile={setAddFileName}
+                      onSelectFile={setSelectedFile}
+                      onDownloadFile={handleDownloadFile}
+                      onDeleteFile={handleDeleteFile}
+                      onWarnNoWorkspace={() => setWorkspaceAlertOpen(true)}
+                      onCreateFolderInside={openCreateFolderDialog}
+                      onOpenCitation={openCitation}
+                      onMoveFile={handleMoveFile}
+                    />
                   </div>
                 </ScrollArea>
               </div>
