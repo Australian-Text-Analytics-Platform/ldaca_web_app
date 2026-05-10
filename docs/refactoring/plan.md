@@ -135,7 +135,7 @@ Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-exist
 
 - **2.1** `usePerNodePagination` hook (full extraction) — concordance and quotation interleave per-node pagination updates with feature-specific request flows (handleSearch, handlePageSizeChange) that aren't mechanically separable without a wider refactor. Defer until those flows are simplified.
 - **2.1** Concordance `<AnalysisCardLayout>` migration. Deferred — Phase 3.1 used inline `<Card>` structures inside the new `<ConcordanceParameterPanel>` / `<ConcordanceResultsPanel>`. Migrating now would touch the just-extracted components; revisit when the shared layout sees a non-trivial change.
-- **2.1** Delete the now-unused `reconcileMetadataColumnSelection` + `getDefaultMetadataColumnSelection` exports from `features/analysis/common/components/metadataColumnSelection.ts` (and their tests). Both became dead code after `ab1ddfb` removed the auto-pick-document-column behaviour from all three consumers. `normalizeMetadataColumns` stays — still used by `<MetadataColumnSelector>`. (Previous version of this entry called for migrating Concordance *to* the helper — that direction is moot now.)
+- ~~**2.1** Delete the now-unused `reconcileMetadataColumnSelection` + `getDefaultMetadataColumnSelection` exports.~~ Done in `d1b4e9b` — file collapsed to just `normalizeMetadataColumns`; the dead test file removed; private helpers folded inline.
 - **2.2** `<ApplyFooter>` — extracts the 30-line "New data block name + Apply button + tooltip" CardFooter shared by 6 sub-tabs. Big LoC win but invasive (6 files, 6 different prop shapes to harmonize).
 - **2.2** `buildApplyDisabledReason`, `useResetOnNodeChange`, `useSingleNodeSelectionPanel` — smaller utilities with low ROI relative to complexity; deferred until natural touchpoints.
 
@@ -238,11 +238,19 @@ DataLoaderFeature.tsx **1517 → 734 LoC** (-52%) across seven focused commits. 
 Net Phase 3.5: SequentialAnalysisFeature 1147 → 863 LoC (-25%).
 Net Phase 3.4: QuotationFeature 1309 → 1165 LoC (-11%).
 
+### Phase 3.7 + 3.8 follow-ups landed (this session)
+
+- **`caaaf22` Phase 3.7 (rest)** Sidebar.tsx 628 → 507 LoC. `useStackedSplits` lifted to `components/layout/sidebar/useStackedSplits.ts` — owns the N-pane state (collapsed map, ratio map, ResizeObserver-backed container height), exposes `containerRef` / `isCollapsed(key)` / `toggleSection(key)` / `getSectionFlexStyle(key)` / `assignSectionScrollRef(key, node)` / `handleResizeStart(upper, lower, event)`. Behaviour preserved exactly (same `MIN_SECTION_HEIGHT` clamp, same overflow-scroll-on-overpressure trick, same window mousemove/mouseup teardown). Side cleanup: small `nodes` IIFE → `useMemo`. `<SidebarSection>` deferred — section-specific elements (views' edit-views dropdown + clear-embedding-cache, nodes' count badge, tasks' connection indicator) weave into the shared header, so a generic component would either need 6+ render-prop slots or collapse to a thin wrapper that buys nothing.
+- **`2f0b96b` Phase 3.8 (a)** WorkspaceTable.tsx 611 → 547 LoC. `useColumnMutations` owns all column-mutation state (`columnTypes`, `loadingCast`, `columnActionLoading`, `renamingColumn`, `datetimeModal`, `deleteColumnDialogOpen`, `columnToDelete`) plus the schema-bootstrap effect. WorkspaceTable consumes the API and stays focused on rendering. Stable mutation callbacks: the four async functions previously inlined into the `WorkspaceTableProps` literal are now `useCallback`-wrapped on `selectedNode.id` in `useWorkspaceDataTable.ts` — resolves the audit's "schema refetches more than intended" note. `columns` derived first from data and only falls back to `Object.keys(columnTypes)` to break the cycle with the hook. `<DeleteColumnConfirmDialog>` extraction skipped intentionally — after the hook owns its state, the inline `<ConfirmDialog>` is 8 lines.
+- **`e237638` Phase 3.8 (b)** WorkspaceTable.tsx 547 → 411 LoC. The 160-LoC TanStack column-header render-prop becomes its own `<WorkspaceColumnHeader>` component. Pin / inline-rename / sort indicator / data-type cast / wide-column expand / settings dropdown (Rename / Delete / Filter) / active-filter clear badge — all with ~25 props but no state. Lots of imports drop from the parent.
+
+Net Phase 3.7: Sidebar 733 → 507 LoC (-31%) across `db16915` + `caaaf22`.
+Net Phase 3.8: WorkspaceTable 725 → 411 LoC (-43%) across `57d32e0` + `2f0b96b` + `e237638`.
+
 ### Remaining Phase 3 work
 
 - **3.5 (rest)** Tame the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L450-485. Deferred — the effect synchronises `selectedNodeId` + `timeColumnOptions` into both `nodeColumnSelections` and a local `timeColumn` useState. A clean derived-state conversion would require either eliminating the local `timeColumn` (deriving from the selection) or restructuring the analysis-lock contract; both touch the hydration path. Risk/reward not aligned without the Phase 5 hook tests as a safety net.
-- **3.7 (rest)** Sidebar: `useStackedSplits` hook (~150 LoC vertical splitter), `<SidebarSection>` extraction, IIFE → `useMemo`.
-- **3.8 (rest)** WorkspaceTable: `useColumnMutations` hook (cast/rename/delete schema-mutation flows + per-column busy state, ~80 LoC). Needs careful prop threading because the rename UI state lives in the component while the mutation flow needs to clear it on success.
+- **3.7 (rest)** `<SidebarSection>` extraction. Deferred — section-specific JSX in the SECTION_KEYS.map weaves directly into the shared header, so a generic component would either need 6+ render-prop slots or collapse to a thin wrapper that buys nothing.
 - **3.1 (deferred)** Dispersion-only state hoisting into `<ConcordanceDispersionNodeBlock>` (or a `<ConcordanceDispersionControls>` sibling) so the Bin No. / Colour matches / Lowercase / Sources controls live where their state lives. Today they're in `<ConcordanceResultsPanel>` reading parent-owned state. Low ROI in isolation.
 - **3.1 (deferred)** Replace H8 result-prefs hydration `requestAnimationFrame(setX)` pattern with derived state. Couldn't be cleanly converted in this pass: users can override `globalPageSize` post-hydration so the value can't be derived; the rAF wrap exists only to dodge the `react-hooks/set-state-in-effect` lint rule. Revisit when the rule's intent is reviewed for one-shot hydration effects.
 - **3.9 (rest)** useWorkspaceNodeMutations.ts: move 6 text mutations from useWorkspaceInternal.ts:101-228 here (or a peer `useWorkspaceTextMutations.ts`).
@@ -310,24 +318,24 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 - [ ] Reuse `useUIStore.feedbackModal` instead of local `feedbackOpen` useState in pre-auth screen (L494).
 - [ ] Move `LAG_HINT_DELAY_MS` and `REFRESH_CHIP_DELAY_MS` to a `config/timings.ts`.
 
-### 3.7 Sidebar.tsx (725 → ~400 LoC)
+### 3.7 Sidebar.tsx (725 → 507 LoC)
 
-- [ ] Move embedding-cache business logic (L180-205, L704-720) to `features/analysis/topic-modeling/components/ClearEmbeddingCacheDialog.tsx`.
-- [ ] Move `formatBytes` (L169-175) to `lib/utils.ts`.
-- [ ] Move task-clear branching (L415-445) into `features/workspace/task-stream/useWorkspaceTaskInbox.ts`.
-- [ ] Extract `useStackedSplits<KeyT>(keys, opts)` from L218-366 (same pattern as `WorkspaceView.tsx:20-48`).
-- [ ] Extract `<SidebarSection>` from the L481-638 mapping loop.
-- [ ] Convert 5 IIFE-returned values (L153-156, L267-275) to `useMemo`.
+- [x] Move embedding-cache business logic to `ClearEmbeddingCacheMenuItem`. `db16915`.
+- [x] Move `formatBytes` to `lib/utils.ts`. `db16915`.
+- [x] Move task-clear branching into `useTaskCardActions`. `db16915`.
+- [x] Extract `useStackedSplits<KeyT>(keys, opts)` to `components/layout/sidebar/useStackedSplits.ts`. `caaaf22`.
+- [ ] Extract `<SidebarSection>` from the SECTION_KEYS.map loop. Deferred — section-specific JSX (views' edit-views dropdown, nodes' count badge, tasks' connection indicator) weaves directly into the shared header; a generic component would either need 6+ render-prop slots or collapse to a thin wrapper.
+- [x] Convert `nodes` IIFE to `useMemo`. `caaaf22`.
 
-### 3.8 WorkspaceTable.tsx (725 → ~400 LoC)
+### 3.8 WorkspaceTable.tsx (725 → 411 LoC)
 
-- [ ] Lift `RenameInput` (L33-67) and `ColumnFilterForm` (L77-135) to sibling files.
-- [ ] Extract `<WorkspaceColumnHeader>` from the 160-line render-prop at L386-544.
-- [ ] Extract `useColumnMutations({ workspaceId, nodeId, callbacks })` for cast/rename/delete schema-mutation flows (L252-328).
-- [ ] Extract `<DeleteColumnConfirmDialog>` from L711-720 + state.
-- [ ] `useMemo` the `wideColumns` IIFE at L235-250 (currently re-runs every render walking 25 rows).
-- [ ] Move global TanStack module augmentation (L138-148) to `data-view/types.d.ts`.
-- [ ] Wrap `onRefreshSchema` in `useCallback` (`useWorkspaceDataTable.ts:253`) — currently re-creates each render → schema refetches more than intended.
+- [x] Lift `RenameInput` and `ColumnFilterForm` to sibling files. `57d32e0`.
+- [x] Extract `<WorkspaceColumnHeader>` from the 160-line render-prop. `e237638`.
+- [x] Extract `useColumnMutations` for cast/rename/delete schema-mutation flows. `2f0b96b`.
+- [x] ~~Extract `<DeleteColumnConfirmDialog>`~~ — skipped intentionally; after the mutations hook owns `columnToDelete`/`deleteColumnDialogOpen`, the inline `<ConfirmDialog>` is 8 lines and earns no own file.
+- [x] `useMemo` the `wideColumns` IIFE. `57d32e0`.
+- [x] Move global TanStack module augmentation to `data-view/tableMeta.d.ts`. `57d32e0`.
+- [x] Wrap `onRefreshSchema` (and the other 3 mutation callbacks) in `useCallback`. `2f0b96b`.
 
 ### 3.9 useWorkspaceNodeMutations.ts (637 → ~450 LoC)
 
