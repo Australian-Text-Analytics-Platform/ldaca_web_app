@@ -1,5 +1,5 @@
 // NodeSelectionPanel now handles color selection UI inline
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import NodeSelectionPanel from '@/components/NodeSelectionPanel';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,8 +45,12 @@ import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import {
   pruneTasksById,
 } from '@/hooks/analysisTaskUtils';
-import { useAnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
+import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
+import { useConcordanceMaterializedEvents } from './hooks/useConcordanceMaterializedEvents';
+import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
+import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
+import { SortableHeader } from './components/SortableHeader';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { highlightMatchInText } from '../common/components/highlightText';
@@ -99,9 +103,6 @@ const dedupeColumns = (cols: string[]): string[] => {
     return true;
   });
 };
-
-const hasSuccessfulConcordanceResults = (result: ConcordanceAnalysisResponse | null): boolean =>
-  Boolean(result && result.state === 'successful');
 
 const getDispersionColumnStyle = (
   isDispersionVisible: boolean,
@@ -189,7 +190,7 @@ const ConcordanceFeature: React.FC = () => {
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
   const [results, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
-  const labelToNodeId = (() => {
+  const labelToNodeId = useMemo<Record<string, string> | null>(() => {
     const params = results?.analysis_params;
     const mapping = params?.label_to_node_map;
     if (mapping && typeof mapping === 'object') {
@@ -202,7 +203,7 @@ const ConcordanceFeature: React.FC = () => {
       return normalized;
     }
     return null;
-  })();
+  }, [results]);
 
   // Color management & view mode
   const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
@@ -218,7 +219,7 @@ const ConcordanceFeature: React.FC = () => {
     return typeof value === 'string' ? value : '';
   }, [results]);
 
-  const resolveNodeIdForKey = (nodeKey: string): string | null => {
+  const resolveNodeIdForKey = useCallback((nodeKey: string): string | null => {
     if (nodeKey === '__COMBINED__') return null;
     const direct = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
       const d = n.data as Record<string, unknown> | undefined;
@@ -229,7 +230,7 @@ const ConcordanceFeature: React.FC = () => {
     const mapped = labelToNodeId?.[nodeKey];
     if (mapped) return mapped;
     return null;
-  };
+  }, [panelSelectedNodes, labelToNodeId]);
 
   const relevantNodeIdsForKey = (nodeKey: string): string[] => {
     if (nodeKey === '__COMBINED__') {
@@ -344,7 +345,6 @@ const ConcordanceFeature: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
-  const [combinedLoading, setCombinedLoading] = useState(false);
 
   useEffect(() => {
     const element = resultsViewportRef.current;
@@ -372,95 +372,24 @@ const ConcordanceFeature: React.FC = () => {
     };
   }, [results]);
 
-  // Hoisted up from below so the metadata-column section IIFE can read it
-  // (the IIFE consults each panel node's selected text column to exclude it
-  // from the metadata column list).
+  // Hoisted up so the metadata-column hook can read it (it consults each
+  // panel node's selected text column to exclude it from the metadata list).
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
-  const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } = (() => {
-    const resultEntries = results?.data ?? {};
-    // Per-block columns, preferring `results.data` per-node entries (used by
-    // Separated view; carries the same metadata_columns the per-node table
-    // displays). When only the `__COMBINED__` entry is present (typical of
-    // Combined view), fall back to each node's workspace column list via
-    // `getColumnInfos`, dropping the chosen text column and the synthetic
-    // `__source_node` tag — without this fallback the dropdown would have
-    // nothing to show in Combined view, which is what was making the
-    // checkbox/dropdown look "stuck".
-    const perBlock: { nodeKey: string; columns: string[] }[] = [];
-    for (const [nodeKey, entry] of Object.entries(resultEntries)) {
-      if (nodeKey === '__COMBINED__') continue;
-      const nodeEntry = entry as ConcordanceResultEntry;
-      const cols = nodeEntry.metadata.metadata_columns.filter(
-        (c) => c && c !== '__source_node',
-      );
-      perBlock.push({ nodeKey, columns: cols });
-    }
-    if (perBlock.length === 0 && panelSelectedNodes.length > 0) {
-      panelSelectedNodes.forEach((node, idx) => {
-        const rawId = (node as { id?: string }).id;
-        const rawName = (node as { name?: string }).name;
-        const nodeKey = rawName || rawId || `node-${idx}`;
-        const sel = rawId
-          ? effectiveNodeColumnSelections.find((s) => s.nodeId === rawId)
-          : undefined;
-        const textColumn = sel?.column;
-        const cols = getColumnInfos(node, idx)
-          .map((info) => info.name)
-          .filter((name): name is string =>
-            !!name && name !== textColumn && name !== '__source_node',
-          );
-        if (cols.length > 0) perBlock.push({ nodeKey, columns: cols });
-      });
-    }
-    const allColumns = Array.from(
-      new Set(perBlock.flatMap((b) => b.columns)),
-    );
-    const sections: { columns: string[]; color?: string; disabled?: boolean }[] = [];
-    let disabledReason: string | undefined;
-    const isCombinedView = viewMode === 'combined';
-    if (perBlock.length <= 1) {
-      // Single block (or no blocks): no need for sections.
-      if (allColumns.length > 0) sections.push({ columns: allColumns });
-    } else {
-      const common = perBlock[0]!.columns.filter((c) =>
-        perBlock.every((b) => b.columns.includes(c)),
-      );
-      // In Combined view, columns exclusive to one source can't be rendered
-      // in the merged table — they'd be NULL for the rows from the other
-      // block. So:
-      //  - If there are common columns, show them as selectable and the
-      //    per-block exclusives as visible-but-disabled (preserves discovery
-      //    of what each block has, without letting the user pick something
-      //    that won't render).
-      //  - If there are no common columns, disable Show metadata entirely
-      //    with a tooltip explaining why.
-      if (isCombinedView && common.length === 0 && perBlock.some((b) => b.columns.length > 0)) {
-        disabledReason = 'The selected data blocks share no metadata columns; nothing to display in Combined view.';
-      }
-      if (common.length > 0) sections.push({ columns: common });
-      for (const block of perBlock) {
-        const exclusive = block.columns.filter((c) => !common.includes(c));
-        if (exclusive.length === 0) continue;
-        const nodeId = resolveNodeIdForKey(block.nodeKey);
-        const color = nodeId ? nodeColors?.[nodeId] : undefined;
-        sections.push({
-          columns: exclusive,
-          color,
-          disabled: isCombinedView,
-        });
-      }
-    }
-    return {
-      availableMetadataColumns: allColumns,
-      metadataColumnSections: sections,
-      metadataDisabledReason: disabledReason,
-    };
-  })();
+  const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } =
+    useConcordanceMetadataColumns({
+      results,
+      panelSelectedNodes,
+      effectiveNodeColumnSelections,
+      getColumnInfos,
+      viewMode,
+      nodeColors,
+      resolveNodeIdForKey,
+    });
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
-  // Map any node's id/name variants to its assigned color (used in combined table)
-  const sourceColorMap = (() => {
+  // Map any node's id/name variants to its assigned color (used in combined table).
+  const sourceColorMap = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     panelSelectedNodes.forEach((node, idx) => {
       const candidateIds = [
@@ -486,9 +415,7 @@ const ConcordanceFeature: React.FC = () => {
       });
     });
     return map;
-  })();
-  
-  const lastPendingConcordanceRef = useRef<number | null>(null);
+  }, [panelSelectedNodes, nodeColors, defaultPalette]);
 
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<PaginationState>({});
@@ -526,14 +453,6 @@ const ConcordanceFeature: React.FC = () => {
     caseSensitive: boolean;
   } | null>(null);
   
-  // State for auto-triggering search from TokenFrequencyTab
-  const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
-  const [queuedPendingConcordance, setQueuedPendingConcordance] = useState(pendingConcordance);
-  const [handoffConfirmOpen, setHandoffConfirmOpen] = useState(false);
-  const handoffConfirmingRef = useRef(false);
-
-
-
   const {
     resolveTaskId,
     setLocalTaskId: setLocalConcordanceTaskId,
@@ -595,7 +514,7 @@ const ConcordanceFeature: React.FC = () => {
       const nextPaths = (paths && typeof paths === 'object') ? { ...paths } : {};
       setMaterializedPaths(nextPaths);
       setMaterializedBins({});
-      processedMaterializedEventSeqRef.current = new Set();
+      resetProcessedEvents();
       const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
       const nextSummaries: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
       if (summaries && typeof summaries === 'object') {
@@ -745,14 +664,6 @@ const ConcordanceFeature: React.FC = () => {
     canUpdate: true,
   });
 
-  useEffect(() => {
-    if (viewMode === 'combined' && results && results.combinable === false) {
-      // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
-      const id = requestAnimationFrame(() => setViewMode('separated'));
-      return () => cancelAnimationFrame(id);
-    }
-  }, [viewMode, results]);
-
   // Track whether initial preference hydration from server results has been
   // applied.  After the first sync we stop overwriting globalPageSize from
   // response data to avoid a feedback loop: user changes page size → response
@@ -804,153 +715,23 @@ const ConcordanceFeature: React.FC = () => {
     }
   }, [results, globalPageSize, showMetadata, setNodePagination]);
 
-  // Watch materialize task status: when a tracked concordance_materialize task
-  // reaches a terminal state, clear its loading flag, refresh the task request
-  // to pick up new materialized_paths, and (on success) reset page_size to the
-  // default 20 before refetching the current page with the new semantics.
-  const materializeStatus = useAnalysisTaskStatus(['concordance_materialize']);
-  const processedMaterializeTaskIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const trackedEntries = Object.entries(materializeTaskIds);
-    if (trackedEntries.length === 0) return;
-
-    for (const task of materializeStatus.tasks) {
-      const taskId = task?.task_id;
-      if (!taskId) continue;
-      if (processedMaterializeTaskIdsRef.current.has(taskId)) continue;
-      const state = task?.state;
-      if (state !== 'successful' && state !== 'failed' && state !== 'cancelled') continue;
-
-      const nodeEntry = trackedEntries.find(([, trackedId]) => trackedId === taskId);
-      if (!nodeEntry) continue;
-      const [nodeId] = nodeEntry;
-
-      processedMaterializeTaskIdsRef.current.add(taskId);
-      setNodeMaterializing(prev => {
-        if (!prev[nodeId]) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
-      setMaterializeTaskIds(prev => {
-        if (!(nodeId in prev)) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
-
-      if (state !== 'successful') {
-        toast.error(`Process All ${state}`);
-        continue;
-      }
-
-      toast.success('Process All complete.');
-
-      // Refetch parent concordance task request to learn the newly-persisted
-      // materialized_paths map; then reset page_size to 20 and refetch results
-      // so the table re-renders with occurrence-row semantics. Note: the
-      // authoritative path arrives via the `analysis_materialized` SSE event
-      // (handled separately) — this fetch is best-effort additional coverage.
-      void (async () => {
-        try {
-          const headers = getAuthHeaders();
-          const parentTaskId = await resolveTaskId();
-          if (parentTaskId) {
-            const req = await textApi.getConcordanceTaskRequest(parentTaskId, headers);
-            const reqObj = (req as Record<string, unknown>) ?? {};
-            const paths = (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
-            if (paths && typeof paths === 'object') {
-              setMaterializedPaths(prev => ({ ...prev, ...paths }));
-            }
-            const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
-            if (summaries && typeof summaries === 'object') {
-              const parsed: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
-              for (const [nid, s] of Object.entries(summaries)) {
-                parsed[nid] = {
-                  recordCount: Number(s.record_count) || 0,
-                  uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
-                  totalDocuments: Number(s.total_source_documents) || 0,
-                };
-              }
-              setMaterializeSummaries(prev => ({ ...prev, ...parsed }));
-            }
-          }
-        } catch (error) {
-          console.warn('Failed to refresh concordance task request after materialize', error);
-        }
-
-        setGlobalPageSize(20);
-        setNodePagination(prev => {
-          const updated = { ...prev };
-          Object.keys(updated).forEach((key) => {
-            updated[key] = { ...updated[key]!, pageSize: 20, currentPage: 1 };
-          });
-          return updated;
-        });
-
-        try {
-          await persistResultPreferences({ pageSize: 20 });
-        } catch (error) {
-          console.warn('Failed to refetch concordance after materialize', error);
-        }
-      })();
-    }
-  }, [
-    materializeStatus.tasks,
+  // Materialize lifecycle: terminal-state task watcher, task-id ref reset,
+  // and `analysis_materialized` SSE consumer. See hook for details.
+  const { concordanceTaskIdRef, resetProcessedEvents } = useConcordanceMaterializedEvents({
+    concordanceTaskId,
     materializeTaskIds,
+    materializedEvents,
     getAuthHeaders,
     resolveTaskId,
     persistResultPreferences,
-  ]);
-
-  // Apply `analysis_materialized` SSE events for the current concordance task.
-  // The backend pushes these the moment the per-node parquet is persisted, so
-  // they don't race with the parent-task save the way the GET-based fallback
-  // can. Each unique event sequence is processed at most once.
-  // The concordance task id is derived from `results.metadata.task_id`, which
-  // briefly goes empty while results are being refetched after a materialise
-  // (e.g. the page-size reset triggers a results refresh). We hold the last
-  // known value in a ref so events that arrive during the refetch window can
-  // still be matched and applied.
-  //
-  // We also use the ref to detect a real task switch — `taskA` → `taskB`
-  // with both non-empty — which only happens when the user actually clicks
-  // Run/Update and a new analysis task is created. In that case the cached
-  // `materializedPaths` belongs to the previous task and would otherwise
-  // cause "No materialised concordance for node X" 404s on the bin-fetch.
-  // We deliberately skip the clear on the initial `'' → taskA` transition
-  // (mount/remount with hydration), since `onHydratedRequest` is the
-  // authoritative source for that path.
-  const concordanceTaskIdRef = useRef<string>('');
-  const processedMaterializedEventSeqRef = useRef<Set<number>>(new Set());
-  useEffect(() => {
-    if (!concordanceTaskId) return;
-    const prev = concordanceTaskIdRef.current;
-    if (prev && prev !== concordanceTaskId) {
-      setMaterializedPaths({});
-      setMaterializedBins({});
-      setMaterializeSummaries({});
-      processedMaterializedEventSeqRef.current = new Set();
-    }
-    concordanceTaskIdRef.current = concordanceTaskId;
-  }, [concordanceTaskId]);
-
-  // The processed-event ref is declared above (alongside the task-id-change
-  // effect that resets it). Events are never marked processed when the
-  // consumer can't apply them yet, so re-running the effect when the id
-  // comes back picks up any unapplied events for that task.
-  useEffect(() => {
-    if (materializedEvents.length === 0) return;
-    const effectiveTaskId = concordanceTaskId || concordanceTaskIdRef.current;
-    if (!effectiveTaskId) return;
-    for (const event of materializedEvents) {
-      if (processedMaterializedEventSeqRef.current.has(event.sequence)) continue;
-      if (event.taskType !== 'concordance_materialize') continue;
-      if (event.parentTaskId !== effectiveTaskId) continue;
-      processedMaterializedEventSeqRef.current.add(event.sequence);
-      setMaterializedPaths((prev) => ({ ...prev, [event.parentNodeId]: event.materializedPath }));
-    }
-  }, [concordanceTaskId, materializedEvents]);
+    setNodeMaterializing,
+    setMaterializeTaskIds,
+    setMaterializedPaths,
+    setMaterializeSummaries,
+    setMaterializedBins,
+    setGlobalPageSize,
+    setNodePagination,
+  });
 
   // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
   const selectedNodeIds = selectedNodes.map((node) => node.id).sort();
@@ -978,114 +759,25 @@ const ConcordanceFeature: React.FC = () => {
     }
   }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
 
-  // Queue concordance handoffs from TokenFrequencyTab so hydration can settle first.
-  useEffect(() => {
-    if (!pendingConcordance) return;
-    if (lastPendingConcordanceRef.current === pendingConcordance.timestamp) {
-      return;
-    }
-    lastPendingConcordanceRef.current = pendingConcordance.timestamp ?? null;
-    const id = requestAnimationFrame(() => {
-      setQueuedPendingConcordance(pendingConcordance);
-      clearPendingConcordance();
-    });
-    return () => cancelAnimationFrame(id);
-  }, [pendingConcordance, clearPendingConcordance]);
-
-  useEffect(() => {
-    if (!queuedPendingConcordance) {
-      if (handoffConfirmOpen) {
-        const id = requestAnimationFrame(() => setHandoffConfirmOpen(false));
-        return () => cancelAnimationFrame(id);
-      }
-      return;
-    }
-
-    const hydrationSettled =
-      hydrationState.status === 'error' ||
-      (hydrationState.status === 'idle' && typeof hydrationState.lastHydratedAt === 'number');
-    if (!hydrationSettled) {
-      return;
-    }
-
-    if (hasSuccessfulConcordanceResults(results)) {
-      if (!handoffConfirmOpen) {
-        const id = requestAnimationFrame(() => setHandoffConfirmOpen(true));
-        return () => cancelAnimationFrame(id);
-      }
-      return;
-    }
-
-    const rafIds: number[] = [];
-    const word = queuedPendingConcordance.searchWord;
-    if (word) {
-      rafIds.push(requestAnimationFrame(() => setSearchWord(word)));
-    }
-
-    if (Array.isArray(queuedPendingConcordance.selectedNodes) && queuedPendingConcordance.selectedNodes.length > 0) {
-      const targetIds = queuedPendingConcordance.selectedNodes
-        .map((node) => (typeof node?.id === 'string' ? node.id : ''))
-        .filter((id): id is string => id.trim().length > 0);
-      const effectiveTargetIds = takeMostRecent(targetIds, 2);
-      if (effectiveTargetIds.length > 0) {
-        const currentIds = selectedNodes.map((node) => node.id);
-        const needsSync =
-          effectiveTargetIds.length !== currentIds.length ||
-          effectiveTargetIds.some((id, index) => id !== currentIds[index]);
-        if (needsSync) {
-          try {
-            selectNodes(effectiveTargetIds);
-          } catch (error) {
-            console.warn('Failed to sync workspace selection from pending concordance:', error);
-          }
-        }
-      }
-    }
-
-    if (queuedPendingConcordance.nodeColumnSelections?.length) {
-      setNodeColumnSelections(queuedPendingConcordance.nodeColumnSelections, { replace: true });
-    }
-
-    if (queuedPendingConcordance.nodeColors) {
-      Object.entries(queuedPendingConcordance.nodeColors).forEach(([nodeId, color]) => {
-        handleColorChange(nodeId, color as string);
-      });
-    }
-
-    let timeoutId: number | null = null;
-    const hasNodeTargets =
-      selectedNodes.length > 0 ||
-      (queuedPendingConcordance.selectedNodes?.length ?? 0) > 0 ||
-      (queuedPendingConcordance.nodeColumnSelections?.length ?? 0) > 0;
-    if (queuedPendingConcordance.autoRun === true && queuedPendingConcordance.searchWord && hasNodeTargets) {
-      timeoutId = window.setTimeout(() => {
-        setShouldAutoSearch(true);
-      }, 50);
-    }
-
-    const resetId = requestAnimationFrame(() => {
-      setQueuedPendingConcordance(null);
-      setHandoffConfirmOpen(false);
-    });
-
-    return () => {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-      rafIds.forEach(cancelAnimationFrame);
-      cancelAnimationFrame(resetId);
-    };
-  }, [
+  const {
     queuedPendingConcordance,
-    hydrationState.status,
-    hydrationState.lastHydratedAt,
-    results,
+    setQueuedPendingConcordance,
     handoffConfirmOpen,
+    setHandoffConfirmOpen,
+    handoffConfirmingRef,
+    shouldAutoSearch,
+    setShouldAutoSearch,
+  } = useConcordancePendingHandoff({
+    pendingConcordance,
+    clearPendingConcordance,
+    hydrationState,
+    results,
     selectedNodes,
+    setSearchWord,
     setNodeColumnSelections,
     selectNodes,
     handleColorChange,
-  ]);
+  });
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {
@@ -1112,7 +804,7 @@ const ConcordanceFeature: React.FC = () => {
       void handleSearch(true);
     });
     return () => cancelAnimationFrame(id);
-  }, [shouldAutoSearch, handleSearch]);
+  }, [shouldAutoSearch, handleSearch, setShouldAutoSearch]);
 
   const handleClearResults = async () => {
     if (!currentWorkspaceId) return;
@@ -1154,93 +846,15 @@ const ConcordanceFeature: React.FC = () => {
     });
   };
 
-  const handleViewModeChange = (nextMode: 'separated' | 'combined') => {
-    if (nextMode === viewMode) {
-      return;
-    }
-
-    setViewMode(nextMode);
-
-    if (nextMode === 'combined' && results?.combinable) {
-      const prevAnchor = resultsRef.current;
-      if (prevAnchor) {
-        const rect = prevAnchor.getBoundingClientRect();
-        prevAnchor.style.minHeight = `${rect.height}px`;
-      }
-
-      setTimeout(() => {
-        const prevTop =
-          prevAnchor?.getBoundingClientRect().top ??
-          resultsRef.current?.getBoundingClientRect().top ??
-          0;
-        const prevScrollY = window.scrollY;
-
-        setCombinedLoading(true);
-        updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize }).finally(() => {
-          setCombinedLoading(false);
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              const newAnchor = resultsRef.current;
-              if (newAnchor) {
-                const newTop = newAnchor.getBoundingClientRect().top;
-                const delta = newTop - prevTop;
-                if (Math.abs(delta) > 1) {
-                  window.scrollTo({ top: prevScrollY + delta });
-                }
-                newAnchor.style.minHeight = '';
-              } else {
-                window.scrollTo({ top: prevScrollY });
-              }
-            });
-          });
-        });
-      }, 30);
-
-      return;
-    }
-
-    if (nextMode === 'separated') {
-      const prevAnchor = resultsRef.current;
-      const prevTop = prevAnchor?.getBoundingClientRect().top ?? 0;
-      const prevScrollY = window.scrollY;
-
-      updateStoredResult({ combined: false, page: 1, page_size: globalPageSize }).finally(() => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const newAnchor = resultsRef.current;
-            if (newAnchor) {
-              const newTop = newAnchor.getBoundingClientRect().top;
-              const delta = newTop - prevTop;
-              if (Math.abs(delta) > 1) {
-                window.scrollTo({ top: prevScrollY + delta });
-              }
-              newAnchor.style.minHeight = '';
-            } else {
-              window.scrollTo({ top: prevScrollY });
-            }
-          });
-        });
-      });
-    }
-  };
-
-  // Refetch combined results when combined page changes
-  const lastCombinedQueryRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (viewMode !== 'combined' || !results) {
-      return;
-    }
-    const taskId =
-      results?.metadata?.task_id ??
-      (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
-      '';
-    const key = `${taskId}|${combinedPage}|${globalPageSize}`;
-    if (lastCombinedQueryRef.current === key) {
-      return;
-    }
-    lastCombinedQueryRef.current = key;
-    void updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize });
-  }, [viewMode, results, combinedPage, globalPageSize, updateStoredResult]);
+  const { combinedLoading, handleViewModeChange } = useConcordanceViewModeSwap({
+    viewMode,
+    setViewMode,
+    results,
+    combinedPage,
+    globalPageSize,
+    updateStoredResult,
+    resultsRef,
+  });
 
 
   const handleRowClick = (
@@ -1357,26 +971,6 @@ const ConcordanceFeature: React.FC = () => {
   };
 
   const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));
-
-  const SortableHeader: React.FC<{ columnKey: string; label: string; paginationKey: string; requestNodeId: string }> = ({ columnKey, label, paginationKey, requestNodeId }) => {
-    const nodeState = nodePagination[paginationKey] || { sortBy: '', descending: false };
-    const isSorted = nodeState.sortBy === columnKey;
-    const sortIcon = isSorted ? (nodeState.descending ? '▼' : '▲') : '▲▼';
-    
-    return (
-      <TableHead 
-        className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${isSorted ? 'text-blue-600' : 'text-gray-500'}`}
-        onClick={() => handleSort(columnKey, paginationKey, requestNodeId)}
-      >
-        <div className="flex items-center space-x-1">
-          <span>{label}</span>
-          <span className={`text-xs ${isSorted ? 'text-blue-600' : 'text-gray-400'}`}>
-            {sortIcon}
-          </span>
-        </div>
-      </TableHead>
-    );
-  };
 
   const renderConcordanceTable = (
     nodeKey: string,
@@ -1701,7 +1295,15 @@ const ConcordanceFeature: React.FC = () => {
                   {tableColumns.map(key => {
                     const isSortable = showMetadata && sortableColumns.has(key);
                     return isSortable ? (
-                      <SortableHeader key={key} columnKey={key} label={key} paginationKey={paginationKey} requestNodeId={requestNodeId} />
+                      <SortableHeader
+                        key={key}
+                        columnKey={key}
+                        label={key}
+                        paginationKey={paginationKey}
+                        requestNodeId={requestNodeId}
+                        nodePagination={nodePagination}
+                        onSort={handleSort}
+                      />
                     ) : (
                       <TableHead
                         key={key}
