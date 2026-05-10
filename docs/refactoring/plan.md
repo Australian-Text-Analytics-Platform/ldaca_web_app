@@ -229,10 +229,18 @@ DataLoaderFeature.tsx **1517 → 734 LoC** (-52%) across seven focused commits. 
 - **`c1af023` Phase 3.3 (6/7)** `<ActiveWorkspaceCard>` owns its rename / description / new-workspace-name / new-workspace-description input state; resets via the React-blessed render-time derived-state pattern (not `useEffect`) when the active workspace switches or its persisted name/description change. Parent's create handler now returns `Promise<boolean>` so the card knows whether to clear the create-form inputs. 1001 → 872 LoC.
 - **`26c762d` Phase 3.3 (7/7)** `<DataLoaderDialogs>` consolidates the 6 inline dialogs (no-workspace alert, invalid-name alert, invalid-folder-name alert, delete-workspace confirm, LDaCA import, create-folder, citation viewer) into a single component. Props are grouped per-dialog so the parent passes `{ open, onClose, ... }` bundles instead of a flat list of ~25 individual props. `react-markdown` + `remark-gfm` and the Dialog/AlertDialog primitive imports move with the dialogs. 872 → 734 LoC.
 
+### Phase 3.4 + 3.5 panel extractions landed (this session)
+
+- **`bec4df5` Phase 3.4 (rest)** QuotationFeature.tsx 1309 → 1165 LoC. `quotation/quotationHighlight.ts` for the pure `TYPE_COLORS` / `hexToRgba` / `buildUnderlineStyle` helpers; `quotation/components/QuotationHighlightedCell.tsx` replaces the 116-LoC closure-capturing `renderHighlightedText`. `hoverState` and `setHoverState` stay on the parent (typed via the exported `QuotationHoverState`) and pass through as props. Behaviour preserved (priority-order hover, segment boundary union, error fallback to plain text).
+- **`eabbc9a` Phase 3.5 (a)** SequentialAnalysisFeature.tsx 1147 → 1061 LoC. `<SequentialAnalysisResultsPanel>` covers the 130-line Results card (Min Group Size + Chart Type + Download header, six-stat summary grid, SequentialChart). Props bundled into `summary` + `counts` records; container ref typed as `React.RefObject<HTMLDivElement | null>`.
+- **`6f47e55` Phase 3.5 (b)** 1061 → 863 LoC. `<SequentialAnalysisParameterPanel>` covers the NodeSelectionPanel + the frequency / numeric / group-by / case-sensitive configuration block. The surrounding `<AnalysisCardLayout>` frame stays in the parent (run/clear actions are orchestration state). `FREQUENCY_OPTIONS` / `CUSTOM_INTERVAL_UNIT_OPTIONS` move with the panel; the parent retains a smaller `VALID_CUSTOM_INTERVAL_UNITS` array for the hydration-path type guard. `inputsDisabled` is computed once at the call site instead of duplicated three times in the original JSX.
+
+Net Phase 3.5: SequentialAnalysisFeature 1147 → 863 LoC (-25%).
+Net Phase 3.4: QuotationFeature 1309 → 1165 LoC (-11%).
+
 ### Remaining Phase 3 work
 
-- **3.4 (rest)** Quotation: extract `<QuotationHighlightedCell>` from inline `renderHighlightedText` (closes over contextLength/hoverState/setHoverState — needs prop threading); hoist `TYPE_COLORS`/`hexToRgba`/`buildUnderlineStyle` to `quotationHighlight.ts`.
-- **3.5 (rest)** Sequential: `<SequentialAnalysisParameterPanel>` + `<SequentialAnalysisResultsPanel>`; tame the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L467-503.
+- **3.5 (rest)** Tame the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L450-485. Deferred — the effect synchronises `selectedNodeId` + `timeColumnOptions` into both `nodeColumnSelections` and a local `timeColumn` useState. A clean derived-state conversion would require either eliminating the local `timeColumn` (deriving from the selection) or restructuring the analysis-lock contract; both touch the hydration path. Risk/reward not aligned without the Phase 5 hook tests as a safety net.
 - **3.7 (rest)** Sidebar: `useStackedSplits` hook (~150 LoC vertical splitter), `<SidebarSection>` extraction, IIFE → `useMemo`.
 - **3.8 (rest)** WorkspaceTable: `useColumnMutations` hook (cast/rename/delete schema-mutation flows + per-column busy state, ~80 LoC). Needs careful prop threading because the rename UI state lives in the component while the mutation flow needs to clear it on success.
 - **3.1 (deferred)** Dispersion-only state hoisting into `<ConcordanceDispersionNodeBlock>` (or a `<ConcordanceDispersionControls>` sibling) so the Bin No. / Colour matches / Lowercase / Sources controls live where their state lives. Today they're in `<ConcordanceResultsPanel>` reading parent-owned state. Low ROI in isolation.
@@ -277,20 +285,20 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 - [x] `data-loader/hooks/usePendingWorkspaceDownloads.ts`. `3f96e9d`.
 - [x] `data-loader/utils/fileTreeHelpers.ts` + `data-loader/utils/format.ts` (pure helpers + 1024-based formatters). `6e8c02a`.
 
-### 3.4 QuotationFeature.tsx (1599 → ~700 LoC)
+### 3.4 QuotationFeature.tsx (1599 → 1165 LoC)
 
-- [ ] Move 180 LoC of pure helpers (`clipTextAroundSpans`, `findWordIndexBeforeOrAt`, `findWordIndexAfterOrAt`, `clampContextLength`, `NORMALIZED_SCHEME_REGEX`) at L113-291 to `quotation/quotationTextClip.ts`.
-- [ ] Move `normalizeRemoteUrl` to `quotation/quotationEngine.ts`.
-- [ ] Hoist `TYPE_COLORS` (L107-111), `hexToRgba` (L644-651), `buildUnderlineStyle` (L654-667) to `quotation/quotationHighlight.ts`.
-- [ ] Extract `<QuotationHighlightedCell row text contextLength hoverState onHover>` from the 116-LoC closure-capturing `renderHighlightedText` at L670-786.
+- [x] Move pure helpers (`clipTextAroundSpans`, `findWordIndexBeforeOrAt`, `findWordIndexAfterOrAt`, `clampContextLength`) to `quotation/quotationTextClip.ts`. `8608c91`.
+- [x] Move `normalizeRemoteUrl` to `quotation/quotationRemoteUrl.ts`. `8608c91`.
+- [x] Hoist `TYPE_COLORS`, `hexToRgba`, `buildUnderlineStyle` to `quotation/quotationHighlight.ts`. `bec4df5`.
+- [x] Extract `<QuotationHighlightedCell>` from the 116-LoC closure-capturing `renderHighlightedText`. `bec4df5`.
 - [x] Use shared materialize-lifecycle hook (Phase 2.1). `65696a6`.
 
-### 3.5 SequentialAnalysisFeature.tsx (1188 → ~500 LoC)
+### 3.5 SequentialAnalysisFeature.tsx (1188 → 863 LoC)
 
-- [ ] `sequential-analysis/hooks/useSequentialResultSummary.ts` (extracts the 12 derived values at L613-770).
-- [ ] `sequential-analysis/components/panels/SequentialAnalysisParameterPanel.tsx` (L771-1037).
-- [ ] `sequential-analysis/components/panels/SequentialAnalysisResultsPanel.tsx` (L1049-1184).
-- [ ] Replace the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L467-503 with derived state.
+- [x] `sequential-analysis/hooks/useSequentialResultSummary.ts`. `d39098d`.
+- [x] `sequential-analysis/components/panels/SequentialAnalysisParameterPanel.tsx`. `6f47e55`.
+- [x] `sequential-analysis/components/panels/SequentialAnalysisResultsPanel.tsx`. `eabbc9a`.
+- [ ] Replace the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L450-485 with derived state. Deferred — see "Remaining Phase 3 work" above for rationale.
 
 ### 3.6 App.tsx (618 → ~150 LoC)
 
