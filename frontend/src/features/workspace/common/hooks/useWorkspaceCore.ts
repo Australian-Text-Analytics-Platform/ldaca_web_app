@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectionStore } from '@/stores/selectionStore';
@@ -53,29 +53,45 @@ export const useWorkspaceCore = () => {
 
   const [pagination, setPaginationState] = useState<PaginationMap>({});
 
-  const updatePagination = (nodeId: string, updater: (existing: PaginationState) => PaginationState) => {
-    setPaginationState((prev) => {
-      const existing = prev[nodeId] || createDefaultPagination();
-      const next = updater(existing);
-      if (next === existing) return prev;
-      return { ...prev, [nodeId]: next };
-    });
-  };
+  // useCallback'd so the WorkspaceProvider selection slice (which exposes
+  // these to every component that reads `useWorkspaceSelection`) stays
+  // referentially stable across renders. setPaginationState is stable
+  // (React useState setter), so updatePagination has no real deps;
+  // downstream handlers depend only on stable refs + selectedNodeId.
+  const updatePagination = useCallback(
+    (nodeId: string, updater: (existing: PaginationState) => PaginationState) => {
+      setPaginationState((prev) => {
+        const existing = prev[nodeId] || createDefaultPagination();
+        const next = updater(existing);
+        if (next === existing) return prev;
+        return { ...prev, [nodeId]: next };
+      });
+    },
+    [],
+  );
 
-  const updateCurrentPage = (nodeId: string, page: number) =>
-    updatePagination(nodeId, (existing) =>
-      existing.currentPage === page ? existing : { ...existing, currentPage: page }
-    );
+  const updateCurrentPage = useCallback(
+    (nodeId: string, page: number) =>
+      updatePagination(nodeId, (existing) =>
+        existing.currentPage === page ? existing : { ...existing, currentPage: page },
+      ),
+    [updatePagination],
+  );
 
-  const updatePageSize = (nodeId: string, pageSize: number) =>
-    updatePagination(nodeId, (existing) =>
-      existing.pageSize === pageSize && existing.currentPage === 1
-        ? existing
-        : { ...existing, pageSize, currentPage: 1 }
-    );
+  const updatePageSize = useCallback(
+    (nodeId: string, pageSize: number) =>
+      updatePagination(nodeId, (existing) =>
+        existing.pageSize === pageSize && existing.currentPage === 1
+          ? existing
+          : { ...existing, pageSize, currentPage: 1 },
+      ),
+    [updatePagination],
+  );
 
-  const getPaginationForNode = (nodeId?: string | null) =>
-    (nodeId && pagination[nodeId]) || createDefaultPagination();
+  const getPaginationForNode = useCallback(
+    (nodeId?: string | null) => (nodeId && pagination[nodeId]) || createDefaultPagination(),
+    [pagination],
+  );
 
   // Reset pagination + selection when the workspace changes. First render is
   // skipped (previous ref starts as null) so we don't clobber the caller's
@@ -99,33 +115,45 @@ export const useWorkspaceCore = () => {
   }, [pagination, selectedNodeId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const handlePageChange = (page: number) => {
-    if (selectedNodeId) updateCurrentPage(selectedNodeId, page);
-  };
-  const handlePageSizeChange = (pageSize: number) => {
-    if (selectedNodeId) updatePageSize(selectedNodeId, pageSize);
-  };
+  const handlePageChange = useCallback(
+    (page: number) => {
+      if (selectedNodeId) updateCurrentPage(selectedNodeId, page);
+    },
+    [selectedNodeId, updateCurrentPage],
+  );
+  const handlePageSizeChange = useCallback(
+    (pageSize: number) => {
+      if (selectedNodeId) updatePageSize(selectedNodeId, pageSize);
+    },
+    [selectedNodeId, updatePageSize],
+  );
 
-  const handleSortingChange = (sortBy: string | undefined, descending: boolean | undefined) => {
-    if (!selectedNodeId) return;
-    updatePagination(selectedNodeId, (existing) => ({
-      ...existing,
-      sortBy,
-      descending,
-      currentPage: 1,
-    }));
-  };
+  const handleSortingChange = useCallback(
+    (sortBy: string | undefined, descending: boolean | undefined) => {
+      if (!selectedNodeId) return;
+      updatePagination(selectedNodeId, (existing) => ({
+        ...existing,
+        sortBy,
+        descending,
+        currentPage: 1,
+      }));
+    },
+    [selectedNodeId, updatePagination],
+  );
 
-  const handleFilterChange = (filterColumn: string | undefined, filterValue: string | undefined, filterOp: string | undefined) => {
-    if (!selectedNodeId) return;
-    updatePagination(selectedNodeId, (existing) => ({
-      ...existing,
-      filterColumn,
-      filterValue,
-      filterOp,
-      currentPage: 1,
-    }));
-  };
+  const handleFilterChange = useCallback(
+    (filterColumn: string | undefined, filterValue: string | undefined, filterOp: string | undefined) => {
+      if (!selectedNodeId) return;
+      updatePagination(selectedNodeId, (existing) => ({
+        ...existing,
+        filterColumn,
+        filterValue,
+        filterOp,
+        currentPage: 1,
+      }));
+    },
+    [selectedNodeId, updatePagination],
+  );
 
   // Memoize authHeaders so the (~25) downstream mutation closures and
   // the four-slice WorkspaceProvider context don't see a new object

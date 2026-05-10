@@ -1,28 +1,49 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useWorkspaceInternal } from './hooks/useWorkspaceInternal';
-import { WorkspaceContext } from './WorkspaceContext';
+import {
+  WorkspaceActionsContext,
+  WorkspaceDataContext,
+  WorkspaceSelectionContext,
+  WorkspaceStatusContext,
+} from './WorkspaceContext';
 
 /**
- * Workspace provider.
+ * Workspace provider — Phase 4.2 split.
  *
- * The underlying `useWorkspaceInternal` hook exposes a wide surface; this
- * component groups it into the four `data / selection / status / actions`
- * slices defined in `WorkspaceContext.ts` so consumers only pull what they
- * actually depend on.
+ * Renders four nested context providers, one per slice. Each slice value
+ * is memoized on its underlying primitives so the providers only push a
+ * new value when something in *that* slice actually changed; the action
+ * surface (~30 consumers, biggest re-render multiplier) stays referentially
+ * stable across data/selection churn.
+ *
+ * Internally everything still flows through `useWorkspaceInternal` so the
+ * sub-hooks (core / queries / mutations) keep their orchestration in one
+ * place; the provider's only job is to fan-out into the four contexts.
  */
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const ws = useWorkspaceInternal();
 
-  const value = {
-    data: {
+  const dataValue = useMemo(
+    () => ({
       workspaces: ws.workspaces,
       currentWorkspace: ws.currentWorkspace,
       currentWorkspaceId: ws.currentWorkspaceId,
       nodes: ws.nodes,
       workspaceGraph: ws.workspaceGraph,
       nodeData: ws.nodeData,
-    },
-    selection: {
+    }),
+    [
+      ws.workspaces,
+      ws.currentWorkspace,
+      ws.currentWorkspaceId,
+      ws.nodes,
+      ws.workspaceGraph,
+      ws.nodeData,
+    ],
+  );
+
+  const selectionValue = useMemo(
+    () => ({
       selectedNode: ws.selectedNode,
       selectedNodes: ws.selectedNodes,
       selectedNodeId: ws.selectedNodeId,
@@ -32,13 +53,37 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       handleSortingChange: ws.handleSortingChange,
       handleFilterChange: ws.handleFilterChange,
       getPaginationForNode: ws.getPaginationForNode,
-    },
-    status: {
+    }),
+    [
+      ws.selectedNode,
+      ws.selectedNodes,
+      ws.selectedNodeId,
+      ws.selectedNodeIds,
+      ws.handlePageChange,
+      ws.handlePageSizeChange,
+      ws.handleSortingChange,
+      ws.handleFilterChange,
+      ws.getPaginationForNode,
+    ],
+  );
+
+  const statusValue = useMemo(
+    () => ({
       isLoading: ws.isLoading,
       errors: ws.errors,
-    },
-    actions: ws.actions,
-  };
+    }),
+    [ws.isLoading, ws.errors],
+  );
 
-  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
+  return (
+    <WorkspaceActionsContext.Provider value={ws.actions}>
+      <WorkspaceDataContext.Provider value={dataValue}>
+        <WorkspaceSelectionContext.Provider value={selectionValue}>
+          <WorkspaceStatusContext.Provider value={statusValue}>
+            {children}
+          </WorkspaceStatusContext.Provider>
+        </WorkspaceSelectionContext.Provider>
+      </WorkspaceDataContext.Provider>
+    </WorkspaceActionsContext.Provider>
+  );
 };

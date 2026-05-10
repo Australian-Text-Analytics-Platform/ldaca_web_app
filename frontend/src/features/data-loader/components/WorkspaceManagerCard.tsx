@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import HelpIcon from '@/components/help/HelpIcon';
+import { useShallow } from 'zustand/react/shallow';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { formatBytes, formatTimestamp, getWorkspaceId } from '../utils/format';
 import type { PendingWorkspaceDownloadsHandle } from '../hooks/usePendingWorkspaceDownloads';
@@ -52,7 +53,15 @@ export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
   onDeleteWorkspace,
 }) => {
   const zipInputRef = useRef<HTMLInputElement | null>(null);
-  const { toggleFavorite, isFavorite } = usePreferencesStore();
+  // Selecting only the two action functions; reading the full state would
+  // re-render this card every time the `syncing` flag flips during the
+  // 800ms preferences-sync debounce.
+  const { toggleFavorite, isFavorite } = usePreferencesStore(
+    useShallow((state) => ({
+      toggleFavorite: state.toggleFavorite,
+      isFavorite: state.isFavorite,
+    })),
+  );
 
   const handleZipChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

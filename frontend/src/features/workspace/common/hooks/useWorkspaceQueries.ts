@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workspacesApi } from '@/api/workspaces';
 import { nodesApi } from '@/api/nodes';
@@ -5,6 +6,24 @@ import { queryKeys } from '@/lib/queryKeys';
 import { isGraphDebugEnabled } from '@/lib/debugFlags';
 import type { GraphNode, NodeDataResponse } from '@/types/api';
 import { type PaginationState } from './types';
+
+// Frozen module-scope fallback so every "no node selected" render shares
+// the same reference — the WorkspaceProvider's `data` slice would
+// otherwise see a fresh `nodeData` literal every render and force every
+// downstream consumer to re-render.
+const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
+  data: [],
+  pagination: {
+    page: 0,
+    page_size: 20,
+    total_rows: 0,
+    total_pages: 0,
+    has_next: false,
+    has_prev: false,
+  },
+  columns: [],
+  dtypes: {},
+}) as NodeDataResponse;
 
 interface WorkspaceQueriesParams {
   authHeaders: Record<string, string>;
@@ -110,23 +129,39 @@ export const useWorkspaceQueries = ({
         .map((id: string) => nodes.find((node) => node.id === id))
         .filter((n): n is GraphNode => Boolean(n));
 
-  const nodeData: NodeDataResponse = nodeDataQuery.data || { data: [], pagination: { page: 0, page_size: 20, total_rows: 0, total_pages: 0, has_next: false, has_prev: false }, columns: [], dtypes: {} };
+  const nodeData: NodeDataResponse = nodeDataQuery.data ?? EMPTY_NODE_DATA;
 
-  const queryLoadingState = ({
+  const queryLoadingState = useMemo(
+    () => ({
       workspaces: workspacesQuery.isLoading,
       currentWorkspace: currentWorkspaceQuery.isLoading,
       nodes: graphQuery.isLoading,
       graph: graphQuery.isLoading,
       nodeData: nodeDataQuery.isLoading,
-    });
+    }),
+    [
+      workspacesQuery.isLoading,
+      currentWorkspaceQuery.isLoading,
+      graphQuery.isLoading,
+      nodeDataQuery.isLoading,
+    ],
+  );
 
-  const queryErrorState = ({
+  const queryErrorState = useMemo(
+    () => ({
       workspaces: workspacesQuery.error?.message || null,
       currentWorkspace: currentWorkspaceQuery.error?.message || null,
       nodes: graphQuery.error?.message || null,
       graph: graphQuery.error?.message || null,
       nodeData: nodeDataQuery.error?.message || null,
-    });
+    }),
+    [
+      workspacesQuery.error?.message,
+      currentWorkspaceQuery.error?.message,
+      graphQuery.error?.message,
+      nodeDataQuery.error?.message,
+    ],
+  );
 
   return {
     workspacesQuery,

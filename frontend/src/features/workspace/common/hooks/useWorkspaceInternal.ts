@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   textApi,
@@ -208,58 +208,82 @@ export const useWorkspaceInternal = () => {
     },
   });
 
-  const selectionActions = ({
-    selectNode,
-    selectNodes: setSelectedNodes,
-    toggleNodeSelection,
-    clearSelection,
-  });
+  const selectionActions = useMemo(
+    () => ({
+      selectNode,
+      selectNodes: setSelectedNodes,
+      toggleNodeSelection,
+      clearSelection,
+    }),
+    [selectNode, setSelectedNodes, toggleNodeSelection, clearSelection],
+  );
 
-  const textActions = ({
-    detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
-      detachConcordanceMutation.mutateAsync({
-        workspaceId: ensureWorkspaceSelected(),
-        nodeId,
-        request,
-      }),
-    materializeConcordance: (nodeId: string, request: ConcordanceMaterializeRequest) =>
-      materializeConcordanceMutation.mutateAsync({
-        nodeId,
-        request,
-      }),
-    quotationSearch: (nodeId: string, request: QuotationRequest) =>
-      quotationMutation.mutateAsync({
-        nodeId,
-        request,
-      }),
-    detachQuotation: (nodeId: string, request: QuotationDetachRequest) =>
-      detachQuotationMutation.mutateAsync({
-        workspaceId: ensureWorkspaceSelected(),
-        nodeId,
-        request,
-      }),
-    materializeQuotation: (nodeId: string, request: QuotationMaterializeRequest) =>
-      materializeQuotationMutation.mutateAsync({
-        nodeId,
-        request,
-      }),
-  });
+  // Same memo discipline as useWorkspaceNodeMutations: TanStack
+  // `mutateAsync` refs are referentially stable across the parent's
+  // lifetime, so we only depend on values that are actually captured by
+  // the closures (currentWorkspaceId via `ensureWorkspaceSelected`).
+  // Listing the mutation refs would invalidate this every render with no
+  // behaviour difference.
+  const textActions = useMemo(
+    () => ({
+      detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
+        detachConcordanceMutation.mutateAsync({
+          workspaceId: ensureWorkspaceSelected(),
+          nodeId,
+          request,
+        }),
+      materializeConcordance: (nodeId: string, request: ConcordanceMaterializeRequest) =>
+        materializeConcordanceMutation.mutateAsync({
+          nodeId,
+          request,
+        }),
+      quotationSearch: (nodeId: string, request: QuotationRequest) =>
+        quotationMutation.mutateAsync({
+          nodeId,
+          request,
+        }),
+      detachQuotation: (nodeId: string, request: QuotationDetachRequest) =>
+        detachQuotationMutation.mutateAsync({
+          workspaceId: ensureWorkspaceSelected(),
+          nodeId,
+          request,
+        }),
+      materializeQuotation: (nodeId: string, request: QuotationMaterializeRequest) =>
+        materializeQuotationMutation.mutateAsync({
+          nodeId,
+          request,
+        }),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutation refs are intentionally omitted; their mutateAsync identities are stable.
+    [currentWorkspaceId],
+  );
 
-  const actions = ({
-    ...selectionActions,
-    ...nodeActions,
-    ...textActions,
-  });
+  const actions = useMemo(
+    () => ({
+      ...selectionActions,
+      ...nodeActions,
+      ...textActions,
+    }),
+    [selectionActions, nodeActions, textActions],
+  );
 
-  const isLoading = ({
-    ...queryLoadingState,
-    operations: loadingOperationCount > 0,
-  });
+  const operationsLoading = loadingOperationCount > 0;
+  const isLoading = useMemo(
+    () => ({
+      ...queryLoadingState,
+      operations: operationsLoading,
+    }),
+    [queryLoadingState, operationsLoading],
+  );
 
-  const errors = ({
-    ...queryErrorState,
-    operations: Object.values(operationErrorsRecord)[0] || null,
-  });
+  const operationsError = Object.values(operationErrorsRecord)[0] || null;
+  const errors = useMemo(
+    () => ({
+      ...queryErrorState,
+      operations: operationsError,
+    }),
+    [queryErrorState, operationsError],
+  );
 
   return {
     workspaces,

@@ -31,11 +31,18 @@ export type WorkspaceStatusSlice = {
 
 export type WorkspaceActionsSlice = WorkspaceInternal['actions'];
 
-export interface WorkspaceContextValue {
-  data: WorkspaceDataSlice;
-  selection: WorkspaceSelectionSlice;
-  actions: WorkspaceActionsSlice;
-  status: WorkspaceStatusSlice;
-}
-
-export const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
+/**
+ * Phase 4.2: each slice gets its own context so consumers re-render only
+ * when *their* slice changes. The `actions` slice is the highest-leverage
+ * split — it has the most consumers (~30) and rarely changes, so isolating
+ * it from `data`/`selection` churn cuts a lot of unnecessary work.
+ *
+ * Consumers should always go through `useWorkspaceData` /
+ * `useWorkspaceSelection` / `useWorkspaceStatus` / `useWorkspaceActions`
+ * rather than reading these contexts directly — the wrappers add the
+ * "must-be-inside-WorkspaceProvider" runtime check.
+ */
+export const WorkspaceDataContext = createContext<WorkspaceDataSlice | undefined>(undefined);
+export const WorkspaceSelectionContext = createContext<WorkspaceSelectionSlice | undefined>(undefined);
+export const WorkspaceStatusContext = createContext<WorkspaceStatusSlice | undefined>(undefined);
+export const WorkspaceActionsContext = createContext<WorkspaceActionsSlice | undefined>(undefined);

@@ -362,16 +362,17 @@ The id used to live in three places: `useState` in `useWorkspaceCore.ts`, a reac
 
 Tests: `useWorkspaceInternal.test.tsx` 10 → 12 (4 reconciler tests reshaped for the new direct-value contract; 2 added: idempotent no-call when already cleared, and the post-bootstrap-revert protection). The orphaned `queryClient.getQueryData(['workspaces','current'])` assertion in `useWorkspaceNodeMutations.test.tsx > setCurrentWorkspace` removed.
 
-### 4.2 WorkspaceProvider re-render fix
+### 4.2 WorkspaceProvider re-render fix — ✅ DONE
 
-`WorkspaceProvider.tsx:16-41` builds 4 slices as fresh literals every render. The four `useWorkspaceData/Selection/Status/Actions` wrappers don't narrow re-render scope (they read the same context). Combined with `useWorkspaceInternal.ts:272-286` (fresh `actions`/`isLoading`/`errors` literals) and `useWorkspaceCore.ts:126-130` (auth headers recreated every render → all 25 mutation `mutationFn`s change identity), this is the single biggest re-render source.
+`WorkspaceContext` is split into four separate React contexts (`WorkspaceDataContext` / `WorkspaceSelectionContext` / `WorkspaceStatusContext` / `WorkspaceActionsContext`). The provider renders them as nested providers and each slice value is memoized on its own primitive deps — so a `useWorkspaceActions()` consumer no longer re-renders when only `data` or `selection` churn. `actions` is the highest-leverage split (~30 consumers, rarely changes).
 
-- [ ] Either split into 4 separate React contexts so a `useWorkspaceActions()` consumer doesn't re-render on `data` change.
-- [ ] Or use `use-context-selector` so consumers can subscribe to specific keys.
-- [ ] Wrap `authHeaders` in `useMemo([isAuthenticated, getAuthHeaders])`.
-- [ ] Wrap `actions`/`isLoading`/`errors` in `useMemo` with the right deps (or migrate to `useCallback` per action).
-- [ ] Freeze the `EMPTY_NODE_DATA` fallback at module scope (`useWorkspaceQueries.ts:116`).
-- [ ] `useShallow` selector pattern in `DataLoaderFeature.tsx:251` (currently uses `usePreferencesStore()` with no selector, re-renders on `syncing` flag).
+To make those slice memos actually stick, the inputs are stabilized at the source:
+
+- `useWorkspaceInternal` wraps `selectionActions`, `textActions`, `actions`, `isLoading`, and `errors` in `useMemo`. The textActions memo uses the same intentional-omission pattern as `useWorkspaceNodeMutations` (mutation `mutateAsync` refs are referentially stable; only `currentWorkspaceId` is a real capture).
+- `useWorkspaceQueries` wraps `queryLoadingState` + `queryErrorState` in `useMemo` and freezes `EMPTY_NODE_DATA` at module scope.
+- `useWorkspaceCore` wraps the five pagination handlers (`handlePageChange` / `handlePageSizeChange` / `handleSortingChange` / `handleFilterChange`) plus `getPaginationForNode`, `updatePagination`, `updateCurrentPage`, `updatePageSize` in `useCallback`. `authHeaders` was already memoized in Phase 4.1's neighbourhood. The composite `useWorkspaceContext` reader is removed (no consumers — the four slice wrappers each read their own context now).
+
+`WorkspaceManagerCard.tsx` switches from `usePreferencesStore()` (no selector — re-rendered on every `syncing` flip during the 800 ms debounce) to a shallow-selected `{ toggleFavorite, isFavorite }`.
 
 ### 4.3 Replace `lib/nodeInfoCache.ts` with react-query — ✅ DONE
 
