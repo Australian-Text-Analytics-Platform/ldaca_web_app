@@ -18,7 +18,6 @@ import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice'
 import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
 import { getNodeInfo } from '@/lib/nodeInfoCache';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import HelpIcon from '@/components/help/HelpIcon';
 import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
@@ -30,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { normalizeTypeName } from '@/utils/columnTypes';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import {
@@ -55,7 +54,7 @@ import {
 import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
 import { useSequentialResultSummary } from './hooks/useSequentialResultSummary';
 import { UniqueValueCount } from './components/UniqueValueCount';
-import { SequentialChart } from './components/SequentialChart';
+import { SequentialAnalysisResultsPanel } from './components/panels/SequentialAnalysisResultsPanel';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   downloadChartAs,
@@ -1005,134 +1004,49 @@ const SequentialAnalysisFeature = () => {
         />
       )}
 
-      {/* Results Display */}
       {results && (
-        <Card className="mt-6">
-          <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Trends and Sequence Results
-                <HelpIcon
-                  targetKey="analysis.sequential-analysis.results"
-                  label="Sequential analysis results"
-                  tooltip={`${resultsSummary}. Review the chart, summaries, and adjust chart type.`}
-                />
-              </CardTitle>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">Min Group Size</span>
-              <Input
-                type="number"
-                min="0"
-                step="1"
-                value={minGroupSizeInput}
-                onChange={(event) => setMinGroupSizeInput(event.target.value)}
-                className="w-24 text-sm"
-                aria-label="Min Group Size"
-              />
-              <span className="text-sm text-muted-foreground">Chart Type</span>
-              <Select
-                value={chartType}
-                onValueChange={(value) => handleChartTypeChange(value as ChartTypeOption)}
-              >
-                <SelectTrigger className="w-35 text-sm">
-                  <SelectValue placeholder="Select chart" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="line">Line Chart</SelectItem>
-                  <SelectItem value="bar">Bar Chart</SelectItem>
-                  <SelectItem value="area">Area Chart</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Download chart"
-                onClick={() => setDownloadDialogOpen(true)}
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 xl:grid-cols-6">
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Time Column
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {summaryTimeColumn || '—'}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {summaryColumnType === 'numeric' ? 'Numeric Interval' : 'Frequency'}
-                </span>
-                <div className="mt-1 text-base font-semibold capitalize text-foreground">
-                  {summaryColumnType === 'numeric'
-                    ? summaryNumericInterval != null
-                      ? `${summaryNumericInterval}${summaryNumericOrigin != null ? ` (origin ${summaryNumericOrigin})` : ''}`
-                      : '—'
-                    : summaryFrequency}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {`${totalPointCount}/${totalDocumentCount}`}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Shown
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {`${shownPointCount}/${shownDocumentCount}`}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Chosen
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {`${chosenPointCount}/${chosenDocumentCount}`}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Groups
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None'}
-                </div>
-              </div>
-            </div>
-
-            <SequentialChart
-              chartType={chartType}
-              chartData={chartData}
-              chartConfig={chartConfig}
-              groupKeys={filteredGroupKeys}
-              groupPointCounts={groupPointCounts}
-              hiddenKeys={hiddenKeys}
-              selectedPeriodIndices={selectedPeriodIndices}
-              canDetach={canDetach}
-              isDetaching={isDetaching}
-              onToggleKey={handleToggleKey}
-              onPeriodClick={handlePeriodClick}
-              onClearSelection={clearPeriodSelection}
-              detachNodeName={detachNodeName}
-              detachNodeNamePlaceholder={defaultNodeName}
-              onDetachNodeNameChange={setDetachNodeName}
-              onDetach={() => {
-                void handleDetach();
-              }}
-              containerRef={chartContainerRef}
-            />
-          </CardContent>
-        </Card>
+        <SequentialAnalysisResultsPanel
+          resultsSummary={resultsSummary}
+          summary={{
+            timeColumn: summaryTimeColumn,
+            groupBy: summaryGroupBy,
+            columnType: summaryColumnType,
+            numericOrigin: summaryNumericOrigin,
+            numericInterval: summaryNumericInterval,
+            frequencyDisplay: summaryFrequency,
+          }}
+          counts={{
+            total: totalPointCount,
+            totalDocuments: totalDocumentCount,
+            shown: shownPointCount,
+            shownDocuments: shownDocumentCount,
+            chosen: chosenPointCount,
+            chosenDocuments: chosenDocumentCount,
+          }}
+          minGroupSizeInput={minGroupSizeInput}
+          onMinGroupSizeChange={setMinGroupSizeInput}
+          chartType={chartType}
+          onChartTypeChange={handleChartTypeChange}
+          onDownloadClick={() => setDownloadDialogOpen(true)}
+          chartData={chartData}
+          chartConfig={chartConfig}
+          groupKeys={filteredGroupKeys}
+          groupPointCounts={groupPointCounts}
+          hiddenKeys={hiddenKeys}
+          selectedPeriodIndices={selectedPeriodIndices}
+          canDetach={canDetach}
+          isDetaching={isDetaching}
+          onToggleKey={handleToggleKey}
+          onPeriodClick={handlePeriodClick}
+          onClearSelection={clearPeriodSelection}
+          detachNodeName={detachNodeName}
+          detachNodeNamePlaceholder={defaultNodeName}
+          onDetachNodeNameChange={setDetachNodeName}
+          onDetach={() => {
+            void handleDetach();
+          }}
+          containerRef={chartContainerRef}
+        />
       )}
       <ChartImageDownloadDialog
         open={downloadDialogOpen}
