@@ -22,8 +22,8 @@ vi.mock('@/api/config', () => ({ configApi: configApiMock }));
 
 const buildAuthInfo = (overrides: Partial<AuthInfoResponse> = {}): AuthInfoResponse => ({
   authenticated: true,
-  user: { id: 'u-1', email: 'u@example.com', name: 'User' },
-  available_auth_methods: ['google'],
+  user: { id: 'u-1', email: 'u@example.com', name: 'User', picture: null },
+  available_auth_methods: [{ name: 'google', display_name: 'Google', enabled: true }],
   requires_authentication: true,
   ...overrides,
 });
