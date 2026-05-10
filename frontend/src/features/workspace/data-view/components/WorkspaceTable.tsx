@@ -1,30 +1,16 @@
 import { useMemo, useState } from 'react';
 import type { Column as TableColumn, SortingState, ColumnFiltersState, PaginationState as TanstackPaginationState } from '@tanstack/react-table';
 import { type ColumnDef, type ColumnPinningState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Expand, Filter, Loader2, Minimize, Pin, Settings2, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { RenameInput } from './RenameInput';
-import { ColumnFilterForm } from './ColumnFilterForm';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DatetimeFormatPanel } from '@/components/panels/DatetimeFormatPanel';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RowDetailPanel } from '@/features/analysis/common/components/RowDetailPanel';
 import { useRowDetailDialog } from '@/features/analysis/common/components/useRowDetailDialog';
 import { ServerTablePagination } from './ServerTablePagination';
+import { WorkspaceColumnHeader } from './WorkspaceColumnHeader';
 import type { DataRow, FilterOperator, PaginationInfo } from '../types';
 import { DATA_TYPES, getTypeDisplayName, normalizeTypeName } from '../services/schemaMutations';
 import { useColumnMutations } from '../hooks/useColumnMutations';
@@ -202,169 +188,47 @@ export function WorkspaceTable({
     const isFiltered = activeFilterColumn === column;
     const isStringLike = ['string', 'categorical', 'unknown'].includes(currentType);
 
+    const onToggleExpand = () => setExpandedColumns((prev) => {
+      if (prev[column]) {
+        const { [column]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [column]: true };
+    });
+
     return {
       id: column,
       accessorFn: (row) => row?.[column],
-      header: ({ column: colInst }) => {
-        const isPinnedLeft = colInst.getIsPinned() === 'left';
-        return (
-          <div className="flex min-w-0 items-center gap-1">
-            {/* Pin */}
-            <button
-              type="button"
-              onClick={() => colInst.pin(isPinnedLeft ? false : 'left')}
-              className={cn(
-                'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-                isPinnedLeft && 'text-primary',
-              )}
-              aria-pressed={isPinnedLeft}
-              aria-label={isPinnedLeft ? `Unpin column ${column}` : `Pin column ${column} to the left`}
-            >
-              <Pin className="h-3.5 w-3.5" fill={isPinnedLeft ? 'currentColor' : 'none'} />
-            </button>
-
-            {/* Name / rename */}
-            {isRenaming ? (
-              <RenameInput column={column} disabled={isColumnBusy} onSubmit={submitRename} onCancel={cancelRename} />
-            ) : (
-              <div className="min-w-0">
-                {canRename ? (
-                  <button
-                    type="button"
-                    className="block max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                    onClick={() => { if (!isColumnBusy) startRename(column); }}
-                    disabled={isColumnBusy}
-                    title={column}
-                  >
-                    {column}
-                  </button>
-                ) : (
-                  <span className="block max-w-[160px] truncate text-xs font-medium text-foreground" title={column}>{column}</span>
-                )}
-              </div>
-            )}
-
-            {/* Sort indicator + click-to-sort */}
-            <button
-              type="button"
-              onClick={() => handleSort(column)}
-              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-              aria-label={`Sort by ${column}`}
-            >
-              {sortState ? (
-                sortState.desc
-                  ? <ArrowDown className="h-3.5 w-3.5 text-primary" />
-                  : <ArrowUp className="h-3.5 w-3.5 text-primary" />
-              ) : (
-                <ArrowUpDown className="h-3.5 w-3.5" />
-              )}
-            </button>
-
-            {/* Data type selector */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isColumnBusy || !onCast}
-                  className={cn('h-7 w-fit justify-between gap-1 px-1.5 text-xs font-medium', isColumnBusy && 'cursor-progress opacity-80')}
-                  aria-label={`Change data type for column ${column}`}
-                >
-                  <span className="truncate">{displayLabel}</span>
-                  {isColumnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-40 p-1">
-                <DropdownMenuRadioGroup value={currentType} onValueChange={(v) => { if (!isColumnBusy) handleTypeChange(column, v); }}>
-                  {availableTypes.map((t) => <DropdownMenuRadioItem key={t.value} value={t.value} className="text-xs">{t.label}</DropdownMenuRadioItem>)}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Expand / collapse wide column */}
-            {isWideColumn && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setExpandedColumns((prev) => prev[column] ? (() => { const { [column]: _, ...rest } = prev; return rest; })() : { ...prev, [column]: true })}
-                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
-                aria-label={isCollapsedColumn ? `Expand column ${column}` : `Collapse column ${column}`}
-              >
-                {isCollapsedColumn ? <Expand className="h-3.5 w-3.5" /> : <Minimize className="h-3.5 w-3.5" />}
-              </Button>
-            )}
-
-            {/* Settings dropdown: Rename / Delete / Filter */}
-            {(canRename || canDelete || isStringLike) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={isColumnBusy}
-                    className={cn('h-7 w-7 shrink-0 text-muted-foreground hover:text-primary', isColumnBusy && 'cursor-progress opacity-80')}
-                    aria-label={`Column settings for ${column}`}
-                  >
-                    {isColumnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Settings2 className="h-3.5 w-3.5" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52 p-1">
-                  {canRename && (
-                    <DropdownMenuItem disabled={isColumnBusy} onSelect={() => { if (!isColumnBusy) startRename(column); }} className="text-xs">
-                      Rename
-                    </DropdownMenuItem>
-                  )}
-                  {canDelete && (
-                    <DropdownMenuItem
-                      disabled={isColumnBusy}
-                      onSelect={() => { if (!isColumnBusy) requestDeleteColumn(column); }}
-                      className="text-xs text-destructive focus:text-destructive"
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  )}
-                  {isStringLike && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="text-xs">
-                          <Filter className={cn('mr-1.5 h-3.5 w-3.5', isFiltered && 'text-primary')} />
-                          {isFiltered ? 'Edit Filter' : 'Filter'}
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-56 p-0">
-                          <ColumnFilterForm
-                            column={column}
-                            currentOp={isFiltered && activeFilterParts ? activeFilterParts.op : 'contains'}
-                            currentValue={isFiltered && activeFilterParts ? activeFilterParts.value : ''}
-                            onApply={applyFilter}
-                            onClear={clearFilter}
-                          />
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
-            {/* Active filter badge */}
-            {isFiltered && (
-              <button
-                type="button"
-                onClick={() => clearFilter(column)}
-                className="inline-flex h-5 items-center gap-0.5 rounded-full bg-primary/10 px-1.5 text-[10px] font-medium text-primary hover:bg-primary/20"
-                aria-label={`Clear filter on ${column}`}
-              >
-                <Filter className="h-2.5 w-2.5" />
-                <X className="h-2.5 w-2.5" />
-              </button>
-            )}
-          </div>
-        );
-      },
+      header: ({ column: colInst }) => (
+        <WorkspaceColumnHeader
+          column={column}
+          colInst={colInst}
+          currentType={currentType}
+          displayLabel={displayLabel}
+          availableTypes={availableTypes}
+          isColumnBusy={isColumnBusy}
+          isRenaming={isRenaming}
+          canCast={Boolean(onCast)}
+          canRename={canRename}
+          canDelete={canDelete}
+          isStringLike={isStringLike}
+          isWideColumn={isWideColumn}
+          isCollapsedColumn={isCollapsedColumn}
+          onToggleExpand={onToggleExpand}
+          sortState={sortState ? { id: sortState.id, desc: Boolean(sortState.desc) } : undefined}
+          onSort={() => handleSort(column)}
+          isFiltered={isFiltered}
+          currentFilterOp={isFiltered && activeFilterParts ? activeFilterParts.op : 'contains'}
+          currentFilterValue={isFiltered && activeFilterParts ? activeFilterParts.value : ''}
+          onApplyFilter={applyFilter}
+          onClearFilter={clearFilter}
+          onStartRename={() => startRename(column)}
+          onSubmitRename={submitRename}
+          onCancelRename={cancelRename}
+          onTypeChange={(newType) => handleTypeChange(column, newType)}
+          onRequestDelete={() => requestDeleteColumn(column)}
+        />
+      ),
       cell: ({ getValue }) => {
         const cellValue = getValue();
         const displayValue = cellValue == null ? '' : String(cellValue);
