@@ -432,15 +432,17 @@ A small per-field shallow snapshot comparison gates writes so identical-but-new-
 - [ ] Move 6 text mutations from `useWorkspaceInternal.ts` to `useWorkspaceNodeMutations.ts` (also Phase 3.9).
 - [ ] After 4.1, `useWorkspaceCore.ts:79-87` workspace-change reset effect can become a Zustand `subscribe(state => state.currentWorkspaceId, …)` callback. Removes a useEffect.
 
-### 4.9 features/workspace structural alignment
+### 4.9 features/workspace structural alignment — ✅ DONE
 
-- [ ] Add `features/workspace/common/` mirroring the `features/analysis/common/` and `features/preprocessing/{components,utils,hooks}/` patterns.
-- [ ] Move `lib/workspaceName.ts`, `lib/nodeInfoCache.ts` (or its replacement), `hooks/useWorkspace*`, `hooks/workspace/*`, `providers/Workspace*`, `components/layout/sidebar/types.ts` into it.
-- [ ] Move `components/AnalysisPagination.tsx`, `components/AnalysisTableScrollArea.tsx` to `features/analysis/common/components/`.
-- [ ] Move `components/CustomNode.tsx` to `features/workspace/graph-view/components/`.
-- [ ] Move `components/NodeSelectionPanel.tsx` to `features/analysis/common/components/`.
-- [ ] Move `components/CodeEditor.tsx` to `features/preprocessing/expression/`.
-- [ ] Move `components/tabs/{AnalysisTaskBanner,AnalysisLockedNotice,tokenFrequencyHelpers}` to `features/analysis/common/`.
+Landed across three commits this session:
+
+- **`988f712` (1/3)** — six analysis-shared components/helpers move out of top-level `components/` into `features/analysis/common/components/` (and `features/analysis/token-frequency/` for `tokenFrequencyHelpers`). Tests for `AnalysisPagination` + `AnalysisTableScrollArea` move alongside their components. `components/tabs/` directory removed (empty).
+- **`b417b5e` (2/3)** — `CustomNode.tsx` → `features/workspace/graph-view/components/`; `CodeEditor.tsx` → `features/preprocessing/expression/`. The `CustomNode` test moves alongside.
+- **`00f1c57` (3/3)** — workspace state, hooks, and providers move into a new `features/workspace/common/` directory mirroring `features/analysis/common/` (13 files moved: `lib/workspaceName.ts`, the 5 `hooks/useWorkspace*.ts`, the 4 `hooks/workspace/*.ts`, the 3 `providers/Workspace*` files). `src/providers/` keeps only `QueryProvider.tsx`. The `src/hooks/workspace/` directory is removed.
+
+Internal relative imports inside the moved set convert to `@/` aliases (matches the Phase 1.4 codemod). 9 test files have their `vi.mock()` paths bulk-rewritten.
+
+Note: `components/layout/sidebar/types.ts` is listed in the original audit under this phase but holds Sidebar-specific types (SidebarTaskRecord / SidebarWorkspaceNode), not workspace-state — kept where it lives next to its consumers.
 
 ### 4.10 Pagination components consolidation — ✅ DONE
 
