@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { SortingState, ColumnFiltersState } from '@tanstack/react-table';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
@@ -229,32 +229,41 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     }
   };
 
+  // Mutation callbacks are stable per-selectedNodeId so the WorkspaceTable
+  // effect that depends on `onRefreshSchema` only fires when the selection
+  // actually changes, not on every parent render.
+  const selectedNodeIdForCallbacks = selectedNode?.id;
+
+  const handleCast = useCallback(async (column: string, targetType: string, format?: string) => {
+    if (!selectedNodeIdForCallbacks) return;
+    await castColumn(selectedNodeIdForCallbacks, column, targetType, format);
+  }, [selectedNodeIdForCallbacks, castColumn]);
+
+  const handleRenameColumn = useCallback(async (column: string, nextName: string) => {
+    if (!selectedNodeIdForCallbacks) return;
+    await renameColumn(selectedNodeIdForCallbacks, column, nextName);
+  }, [selectedNodeIdForCallbacks, renameColumn]);
+
+  const handleDeleteColumn = useCallback(async (column: string) => {
+    if (!selectedNodeIdForCallbacks) return;
+    await deleteColumn(selectedNodeIdForCallbacks, column);
+  }, [selectedNodeIdForCallbacks, deleteColumn]);
+
+  const handleRefreshSchema = useCallback(async () => {
+    if (!selectedNodeIdForCallbacks) return undefined;
+    return await refreshNodeSchema(selectedNodeIdForCallbacks);
+  }, [selectedNodeIdForCallbacks, refreshNodeSchema]);
+
   const table: WorkspaceTableProps = {
     data: nodeData.data,
     loading: isLoading.nodeData,
     workspaceId: currentWorkspaceId || undefined,
     nodeId: selectedNode?.id,
     documentColumn: getNodeDocumentColumn(selectedNode),
-    onCast: selectedNode
-      ? async (column: string, targetType: string, format?: string) => {
-          await castColumn(selectedNode.id, column, targetType, format);
-        }
-      : undefined,
-    onRenameColumn: selectedNode
-      ? async (column: string, nextName: string) => {
-          await renameColumn(selectedNode.id, column, nextName);
-        }
-      : undefined,
-    onDeleteColumn: selectedNode
-      ? async (column: string) => {
-          await deleteColumn(selectedNode.id, column);
-        }
-      : undefined,
-    onRefreshSchema: selectedNode
-      ? async () => {
-          return await refreshNodeSchema(selectedNode.id);
-        }
-      : undefined,
+    onCast: selectedNodeIdForCallbacks ? handleCast : undefined,
+    onRenameColumn: selectedNodeIdForCallbacks ? handleRenameColumn : undefined,
+    onDeleteColumn: selectedNodeIdForCallbacks ? handleDeleteColumn : undefined,
+    onRefreshSchema: selectedNodeIdForCallbacks ? handleRefreshSchema : undefined,
     pagination: nodeData.pagination,
     rowCount: nodeData.pagination?.total_rows ?? 0,
     sorting,

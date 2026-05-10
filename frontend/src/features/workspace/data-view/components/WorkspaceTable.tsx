@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Column as TableColumn, SortingState, ColumnFiltersState, PaginationState as TanstackPaginationState } from '@tanstack/react-table';
 import { type ColumnDef, type ColumnPinningState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Expand, Filter, Loader2, Minimize, Pin, Settings2, X } from 'lucide-react';
@@ -20,15 +20,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
 import { DatetimeFormatPanel } from '@/components/panels/DatetimeFormatPanel';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RowDetailPanel } from '@/features/analysis/common/components/RowDetailPanel';
 import { useRowDetailDialog } from '@/features/analysis/common/components/useRowDetailDialog';
 import { ServerTablePagination } from './ServerTablePagination';
 import type { DataRow, FilterOperator, PaginationInfo } from '../types';
-import type { NodeSchemaResponse } from '@/types';
-import { DATA_TYPES, extractColumnTypes, getTypeDisplayName, normalizeTypeName } from '../services/schemaMutations';
+import { DATA_TYPES, getTypeDisplayName, normalizeTypeName } from '../services/schemaMutations';
+import { useColumnMutations } from '../hooks/useColumnMutations';
 
 // --- Constants ---
 const WIDE_COLUMN_THRESHOLD = 120;
@@ -81,39 +80,54 @@ export function WorkspaceTable({
   onPageChange,
   onPageSizeChange,
 }: WorkspaceTableProps) {
-  const [columnTypes, setColumnTypes] = useState<Record<string, string>>({});
-  const [loadingCast, setLoadingCast] = useState<Record<string, boolean>>({});
-  const [datetimeModal, setDatetimeModal] = useState<{ isOpen: boolean; column: string; targetType: string }>({ isOpen: false, column: '', targetType: '' });
-  const [columnActionLoading, setColumnActionLoading] = useState<Record<string, boolean>>({});
-  const [renamingColumn, setRenamingColumn] = useState<string | null>(null);
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
-  const [deleteColumnDialogOpen, setDeleteColumnDialogOpen] = useState(false);
-  const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
   const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
 
-  const applySchema = (schema: unknown) => {
-    const mapping = extractColumnTypes(schema as NodeSchemaResponse | null);
-    setColumnTypes(mapping);
-    return mapping;
-  };
-
-  useEffect(() => {
-    if (!workspaceId || !nodeId || !onRefreshSchema) return;
-    let cancelled = false;
-    onRefreshSchema()
-      .then((schema) => { if (!cancelled) applySchema(schema); })
-      .catch((error) => { if (!cancelled) console.error('WorkspaceTable: failed to refresh schema', error); });
-    return () => { cancelled = true; };
-  }, [workspaceId, nodeId, onRefreshSchema]);
-
   const sanitizedData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
-  const columns = useMemo(() => {
+  // We need column names to validate uniqueness inside `submitRename`, but the
+  // hook returns `columnTypes` which is itself derived from the schema fetch
+  // it manages. To break the cycle, derive `columns` from `sanitizedData`
+  // first, then fall back to whatever `columnTypes` ends up being.
+  const initialColumns = useMemo(() => {
     const firstRow = sanitizedData.find((row) => row && typeof row === 'object');
-    if (firstRow) return Object.keys(firstRow);
+    return firstRow ? Object.keys(firstRow) : [];
+  }, [sanitizedData]);
+
+  const mutations = useColumnMutations({
+    workspaceId,
+    nodeId,
+    columns: initialColumns,
+    onCast,
+    onRenameColumn,
+    onDeleteColumn,
+    onRefreshSchema,
+  });
+
+  const {
+    columnTypes,
+    loadingCast,
+    columnActionLoading,
+    renamingColumn,
+    datetimeModal,
+    closeDatetimeModal,
+    handleDatetimeFormatConfirm,
+    deleteColumnDialogOpen,
+    setDeleteColumnDialogOpen,
+    columnToDelete,
+    requestDeleteColumn,
+    confirmDeleteColumn,
+    handleTypeChange,
+    startRename,
+    cancelRename,
+    submitRename,
+  } = mutations;
+
+  const columns = useMemo(() => {
+    if (initialColumns.length > 0) return initialColumns;
     return Object.keys(columnTypes);
-  }, [sanitizedData, columnTypes]);
+  }, [initialColumns, columnTypes]);
 
   const wideColumns = useMemo(() => {
     const sampleRows = sanitizedData.slice(0, WIDE_COLUMN_SAMPLE_LIMIT);
@@ -134,84 +148,6 @@ export function WorkspaceTable({
     });
     return result;
   }, [columns, sanitizedData]);
-
-  const performCast = async (column: string, targetType: string, format?: string) => {
-    if (!onCast) return;
-    setLoadingCast((prev) => ({ ...prev, [column]: true }));
-    try {
-      await onCast(column, targetType, format);
-      if (onRefreshSchema) { const schema = await onRefreshSchema(); applySchema(schema); }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to convert column "${column}" to ${targetType}: ${message}`);
-    } finally {
-      setLoadingCast((prev) => ({ ...prev, [column]: false }));
-    }
-  };
-
-  const handleTypeChange = (column: string, newType: string) => {
-    if (!onCast) return;
-    const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
-    if (newType.toLowerCase() === currentType.toLowerCase()) return;
-    const isStringToDatetime = newType.toLowerCase() === 'datetime' && (currentType === 'string' || currentType.includes('utf8'));
-    if (isStringToDatetime) { setDatetimeModal({ isOpen: true, column, targetType: newType }); return; }
-    void performCast(column, newType);
-  };
-
-  const handleDatetimeFormatConfirm = (format?: string) => {
-    const { column, targetType } = datetimeModal;
-    setDatetimeModal({ isOpen: false, column: '', targetType: '' });
-    if (column && targetType) void performCast(column, targetType, format);
-  };
-
-  const setColumnBusy = (column: string, active: boolean) => {
-    setColumnActionLoading((prev) => {
-      if (active) return prev[column] ? prev : { ...prev, [column]: true };
-      if (!(column in prev)) return prev;
-      const { [column]: _, ...next } = prev;
-      return next;
-    });
-  };
-
-  const submitRename = async (column: string, value: string) => {
-    if (!onRenameColumn) { setRenamingColumn(null); return; }
-    const trimmed = value.trim();
-    if (!trimmed) { toast.error('Column name cannot be empty.'); return; }
-    if (trimmed === column) { setRenamingColumn(null); return; }
-    if (columns.some((c) => c !== column && c === trimmed)) { toast.error(`A column named "${trimmed}" already exists.`); return; }
-    setColumnBusy(column, true);
-    try {
-      await onRenameColumn(column, trimmed);
-      if (onRefreshSchema) { const schema = await onRefreshSchema(); applySchema(schema); }
-      setRenamingColumn(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to rename column "${column}": ${message}`);
-    } finally { setColumnBusy(column, false); }
-  };
-
-  const confirmDeleteColumn = async () => {
-    if (!columnToDelete || !onDeleteColumn) return;
-    const column = columnToDelete;
-    setDeleteColumnDialogOpen(false);
-    setColumnToDelete(null);
-    setColumnBusy(column, true);
-    try {
-      await onDeleteColumn(column);
-      if (onRefreshSchema) { const schema = await onRefreshSchema(); applySchema(schema); }
-      else {
-        setColumnTypes((prev) => {
-          if (!(column in prev)) return prev;
-          const { [column]: _, ...next } = prev;
-          return next;
-        });
-      }
-      if (renamingColumn === column) setRenamingColumn(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete column "${column}": ${message}`);
-    } finally { setColumnBusy(column, false); }
-  };
 
   // Filter helpers
   const activeFilter = columnFilters.length > 0 ? columnFilters[0] : null;
@@ -289,14 +225,14 @@ export function WorkspaceTable({
 
             {/* Name / rename */}
             {isRenaming ? (
-              <RenameInput column={column} disabled={isColumnBusy} onSubmit={submitRename} onCancel={() => setRenamingColumn(null)} />
+              <RenameInput column={column} disabled={isColumnBusy} onSubmit={submitRename} onCancel={cancelRename} />
             ) : (
               <div className="min-w-0">
                 {canRename ? (
                   <button
                     type="button"
                     className="block max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                    onClick={() => { if (!isColumnBusy) setRenamingColumn(column); }}
+                    onClick={() => { if (!isColumnBusy) startRename(column); }}
                     disabled={isColumnBusy}
                     title={column}
                   >
@@ -377,14 +313,14 @@ export function WorkspaceTable({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 p-1">
                   {canRename && (
-                    <DropdownMenuItem disabled={isColumnBusy} onSelect={() => { if (!isColumnBusy) setRenamingColumn(column); }} className="text-xs">
+                    <DropdownMenuItem disabled={isColumnBusy} onSelect={() => { if (!isColumnBusy) startRename(column); }} className="text-xs">
                       Rename
                     </DropdownMenuItem>
                   )}
                   {canDelete && (
                     <DropdownMenuItem
                       disabled={isColumnBusy}
-                      onSelect={() => { if (!isColumnBusy) { setColumnToDelete(column); setDeleteColumnDialogOpen(true); } }}
+                      onSelect={() => { if (!isColumnBusy) requestDeleteColumn(column); }}
                       className="text-xs text-destructive focus:text-destructive"
                     >
                       Delete
@@ -585,7 +521,7 @@ export function WorkspaceTable({
 
       <DatetimeFormatPanel
         open={datetimeModal.isOpen}
-        onClose={() => setDatetimeModal({ isOpen: false, column: '', targetType: '' })}
+        onClose={closeDatetimeModal}
         onConfirm={handleDatetimeFormatConfirm}
         columnName={datetimeModal.column}
         sampleValues={sanitizedData.slice(0, 25).map((row) => {
