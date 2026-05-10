@@ -125,19 +125,22 @@ Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-exist
 - **`a17c077` Phase 2.1** `<PageSizeSelect>` + `features/analysis/common/constants.ts` (`PAGE_SIZE_OPTIONS_DEFAULT`, `PAGE_SIZE_OPTIONS_SMALL`); concordance + quotation footers migrated.
 - **`179f57e` Phase 2.1** Quotation's anonymous per-node pagination type aligned with the shared `NodePaginationState`.
 
+### Additional Phase 2 work landed
+
+- **`65696a6` Phase 2.1** `useMaterializeLifecycle` lands in `features/analysis/common/hooks`. Concordance + Quotation now share the watcher skeleton; feature-specific success/failure logic moves into caller-supplied callbacks (concordance multi-node + SSE-aware via `useConcordanceMaterializedEvents`; quotation single-node). Concordance's task-id-change reset effect and `analysis_materialized` SSE consumer remain feature-specific. (Same commit as Phase 3.1 (4/4) above.)
+- **`b6b8789` Phase 2.1** `SortableHeader` lifted out of `ConcordanceFeature.tsx`. (Bundled with Phase 3.1 (1/4); originally listed as a Phase 2.1 trivial item.)
+
 ### Remaining Phase 2 work (deferred for a fresh session)
 
-- **2.1** `useMaterializeLifecycle` — the materialize-task lifecycle duplicated in concordance and quotation (~250 LoC each). The most complex Phase 2 extraction; deserves a focused session because each feature has subtle differences (concordance is multi-node + consumes SSE `analysis_materialized` events; quotation is single-node).
 - **2.1** `usePerNodePagination` hook (full extraction) — concordance and quotation interleave per-node pagination updates with feature-specific request flows (handleSearch, handlePageSizeChange) that aren't mechanically separable without a wider refactor. Defer until those flows are simplified.
-- **2.1** Concordance `<AnalysisCardLayout>` migration. Deferred to Phase 3 since the layout move overlaps with the planned ParameterPanel / ResultsPanel split.
-- **2.1** Lift `SortableHeader` out of `ConcordanceFeature.tsx:1385`. Trivial — included as part of the bigger Concordance decomposition in Phase 3.
+- **2.1** Concordance `<AnalysisCardLayout>` migration. Deferred — Phase 3.1 used inline `<Card>` structures inside the new `<ConcordanceParameterPanel>` / `<ConcordanceResultsPanel>`. Migrating now would touch the just-extracted components; revisit when the shared layout sees a non-trivial change.
 - **2.1** Concordance → `reconcileMetadataColumnSelection` migration. Requires a `string[] → string[] | null` state-shape change with caller-side audit (3 read sites use `selectedMetadataColumns ?? []`); revisit as part of Phase 3.
 - **2.2** `<ApplyFooter>` — extracts the 30-line "New data block name + Apply button + tooltip" CardFooter shared by 6 sub-tabs. Big LoC win but invasive (6 files, 6 different prop shapes to harmonize).
 - **2.2** `buildApplyDisabledReason`, `useResetOnNodeChange`, `useSingleNodeSelectionPanel` — smaller utilities with low ROI relative to complexity; deferred until natural touchpoints.
 
 ### 2.1 Analysis-feature shared infra
 
-- [ ] Build `features/analysis/common/hooks/useMaterializeLifecycle.ts` covering the "track materialize task → on terminal: prune → refetch parent → reset pagination" sequence currently duplicated in `ConcordanceFeature.tsx:803-896` and `QuotationFeature.tsx:889-961`.
+- [x] Build `features/analysis/common/hooks/useMaterializeLifecycle.ts` covering the "track materialize task → on terminal: prune → refetch parent → reset pagination" sequence. Concordance (multi-node) and Quotation (single-node) both consume; concordance pairs it with the SSE consumer in `useConcordanceMaterializedEvents`. `65696a6`.
 - [ ] Build `features/analysis/common/hooks/useDetachColumnsState.ts` returning `{ selectedDetachColumns, toggle, selectAll, deselectAll, reset }`. Migrate concordance, quotation, topic-modeling.
 - [ ] Build `features/analysis/common/hooks/usePerNodePagination.ts` (or just stabilize the shape). Migrate concordance/quotation/ai-annotator.
 - [ ] Build `features/analysis/common/components/PageSizeSelect.tsx` with the `[10,20,50,100,200,400,800]` default. Migrate concordance and quotation.
@@ -145,7 +148,7 @@ Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-exist
 - [ ] Migrate AI Annotator to `useAnalysisLock` (currently uses `useAnalysisLockMachine` directly with no documented reason).
 - [ ] Migrate Concordance to use shared `reconcileMetadataColumnSelection` (`metadataColumnSelection.ts`) instead of its inline reimplementation at L639-645.
 - [ ] Migrate Concordance/Quotation/Sequential to use `<AnalysisCardLayout>` for parameter+results cards (currently only AI Annotator and Token Frequency use it).
-- [ ] Lift `SortableHeader` out of `ConcordanceFeature.tsx:1385` to its own file.
+- [x] Lift `SortableHeader` out of `ConcordanceFeature.tsx` to its own file. `b6b8789`.
 - [ ] Add `useAiAnnotatorTaskFlow` hook (currently the only feature missing this hook).
 
 ### 2.2 Preprocessing sub-tab shared infra
@@ -203,29 +206,41 @@ Per-file split plans. Each file gets its own focused PR. **Effort: ~1 week.**
 - **`57d32e0` Phase 3.8 (partial)** WorkspaceTable.tsx 725 → 612 LoC. `<RenameInput>` and `<ColumnFilterForm>` extracted, TanStack `ColumnMeta` augmentation moved to `tableMeta.d.ts`, `columns` and `wideColumns` memoized.
 - **`77c196a` Phase 3.9 (partial)** Memoized `actions` in useWorkspaceNodeMutations + `authHeaders` in useWorkspaceCore. The single largest re-render fix in the audit (H6 + H7) — the four-slice WorkspaceProvider value no longer churns on every parent render, cascading through ~30 consumers.
 
+### Phase 3.1 Concordance decomposition landed (this session)
+
+ConcordanceFeature.tsx **2344 → 1070 LoC** (-54%) across four focused commits. The split deviated from the original plan on one important axis: instead of `<ConcordanceCombinedTable>` + `<ConcordanceSeparatedTable>` (combined-vs-separated layout split), the decomposition split on the **functional view axis** — instance-row table vs document-aggregated dispersion — because the data shape genuinely differs by view (`flattenConcordanceGroups` produces one row per hit; `buildDispersionRows` produces one row per source-document with hits aggregated). The combined/separated branching is a layout detail handled internally by each view block; this leaves a clean seam for the future per-document chunked detach in dispersion view.
+
+- **`b6b8789` Phase 3.1 (1/4)** Mechanical extractions, 2344 → 1946 LoC. `SortableHeader` lifted to its own file (was redefined inside the component every render). Four hooks extracted: `useConcordanceMetadataColumns` (the L380-459 IIFE; result memoized), `useConcordanceMaterializedEvents` (terminal task watcher + task-id ref reset + `analysis_materialized` SSE consumer; returns the live task-id ref + a `resetProcessedEvents` callback the hydration path calls), `useConcordancePendingHandoff` (queue + apply effects for TokenFrequencyTab handoffs), `useConcordanceViewModeSwap` (auto-revert to separated when `combinable === false`, scroll-preserving `handleViewModeChange`, combined-page-change refetch). `labelToNodeId` and `sourceColorMap` memoized; `resolveNodeIdForKey` wrapped in `useCallback`.
+- **`dd91802` Phase 3.1 (2/4)** The view split, 1946 → 1444 LoC. `renderConcordanceTable` (500-LoC closure) replaced by `<ConcordanceTableNodeBlock>` (instance rows, sortable metadata header, Process All / Add to Workspace footer; combined and per-node both rendered here) and `<ConcordanceDispersionNodeBlock>` (document-aggregated rows + `<ConcordanceDispersionLegend>` + `<ConcordanceDispersionSummary>`; combined and per-node both rendered here). Each block owns its own Detach button — the seam for future per-document detach divergence in dispersion view. Dispersion-only state (`proportionalDispersionBars`, `colourMatches`, `lowercaseMatches`, `hiddenMatchedTexts`, `binCount`, `combinedSourceMode`, `materializedBins`) stays in the parent for this commit; hoisting into the dispersion view is deferred (would let the Bin No. / Colour matches / etc. controls move into a `ConcordanceDispersionControls` component owned by the dispersion view).
+- **`8b3c8f1` Phase 3.1 (3/4)** Panel extractions, 1444 → 1070 LoC. `<ConcordanceParameterPanel>` (search inputs, regex/whole-word/case-sensitive checkboxes, Run/Update + Clear buttons, page-size selector) and `<ConcordanceResultsPanel>` (results card frame with Separated/Combined view tabs, Table/Dispersion view tabs, dispersion controls row, MetadataColumnSelector, and the iteration loop dispatching to the per-block components). The `results.state === 'failed'` branch stays as a tiny inline Card (6 lines, no extraction value).
+- **`65696a6` Phase 3.1 (4/4)** = **Phase 2.1** — shared `useMaterializeLifecycle` in `features/analysis/common/hooks` finally lands. Concordance (multi-node) supplies a success callback that merges per-node materialized paths + summaries, resets globalPageSize to 20 + nodePagination, calls `persistResultPreferences`, and a failure callback that toasts the state. Quotation (single-node) supplies a success callback that writes the singular `materialized_path` + summary and calls `handlePageSizeChange(20)`; no failure handler. The watcher skeleton is now shared. Concordance's task-id-change reset effect and SSE consumer remain in `useConcordanceMaterializedEvents` (concordance-specific). Net –56 LoC across the two consumers; the Concordance hook drops its private `processedMaterializeTaskIdsRef`.
+
 ### Remaining Phase 3 work
 
 - **3.4 (rest)** Quotation: extract `<QuotationHighlightedCell>` from inline `renderHighlightedText` (closes over contextLength/hoverState/setHoverState — needs prop threading); hoist `TYPE_COLORS`/`hexToRgba`/`buildUnderlineStyle` to `quotationHighlight.ts`.
 - **3.5 (rest)** Sequential: `<SequentialAnalysisParameterPanel>` + `<SequentialAnalysisResultsPanel>`; tame the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L467-503.
 - **3.7 (rest)** Sidebar: `useStackedSplits` hook (~150 LoC vertical splitter), `<SidebarSection>` extraction, IIFE → `useMemo`.
 - **3.8 (rest)** WorkspaceTable: `useColumnMutations` hook (cast/rename/delete schema-mutation flows + per-column busy state, ~80 LoC). Needs careful prop threading because the rename UI state lives in the component while the mutation flow needs to clear it on success.
-- **3.1** ConcordanceFeature.tsx (2383 LoC): the big one. 4 panels + 4 hooks (see plan). Best done last, in its own focused session — file mixes pending-handoff orchestration with rAF chains, materialize SSE consumption, and 17 useEffects (several already with eslint-disables).
+- **3.1 (deferred)** Dispersion-only state hoisting into `<ConcordanceDispersionNodeBlock>` (or a `<ConcordanceDispersionControls>` sibling) so the Bin No. / Colour matches / Lowercase / Sources controls live where their state lives. Today they're in `<ConcordanceResultsPanel>` reading parent-owned state. Low ROI in isolation.
+- **3.1 (deferred)** Replace H8 result-prefs hydration `requestAnimationFrame(setX)` pattern with derived state. Couldn't be cleanly converted in this pass: users can override `globalPageSize` post-hydration so the value can't be derived; the rAF wrap exists only to dodge the `react-hooks/set-state-in-effect` lint rule. Revisit when the rule's intent is reviewed for one-shot hydration effects.
 - **3.3** DataLoaderFeature.tsx (1517 LoC): move out of `features/analysis/`; decompose 6 dialogs and the file tree.
 - **3.9 (rest)** useWorkspaceNodeMutations.ts: move 6 text mutations from useWorkspaceInternal.ts:101-228 here (or a peer `useWorkspaceTextMutations.ts`).
 
-### 3.1 ConcordanceFeature.tsx (2383 → ~600 LoC)
+### 3.1 ConcordanceFeature.tsx (2344 → 1070 LoC)
 
-- [ ] `concordance/components/ConcordanceParameterPanel.tsx` (search inputs, regex/whole-word, page-size — currently L1898-2092)
-- [ ] `concordance/components/ConcordanceCombinedTable.tsx` (one branch of `renderConcordanceTable`)
-- [ ] `concordance/components/ConcordanceSeparatedTable.tsx` (the other branch)
-- [ ] `concordance/components/ConcordanceResultsPanel.tsx` (extracts L2105-2323)
-- [ ] `concordance/components/SortableHeader.tsx` (already in Phase 2.1)
-- [ ] `concordance/hooks/useConcordancePendingHandoff.ts` (extracts the 110-LoC rAF chain at L987-1080)
-- [ ] `concordance/hooks/useConcordanceMaterializedEvents.ts` (SSE seq tracking + paths)
-- [ ] `concordance/hooks/useConcordanceMetadataColumns.ts` (the IIFE at L378-457)
-- [ ] `concordance/hooks/useConcordanceViewModeSwap.ts` (scroll-preserving toggle at L1149-1217)
-- [ ] Replace H8 result-prefs hydration `requestAnimationFrame(setX)` pattern (L753-797) with derived state.
-- [ ] Memoize `availableMetadataColumns` and `sourceColorMap` IIFEs that re-run every render (L378-457, L461-487).
+Landed across `b6b8789`, `dd91802`, `8b3c8f1`, `65696a6`. View axis swapped from combined-vs-separated to instance-vs-dispersion (see "Phase 3.1 Concordance decomposition landed" above).
+
+- [x] `concordance/components/ConcordanceParameterPanel.tsx` (search inputs, regex/whole-word, page-size). `8b3c8f1`.
+- [x] ~~`ConcordanceCombinedTable.tsx` / `ConcordanceSeparatedTable.tsx`~~ → split on the **view axis** instead: `ConcordanceTableNodeBlock.tsx` (instance rows) + `ConcordanceDispersionNodeBlock.tsx` (document-aggregated rows + Legend + Summary). Each handles combined and per-node internally. `dd91802`.
+- [x] `concordance/components/ConcordanceResultsPanel.tsx`. `8b3c8f1`.
+- [x] `concordance/components/SortableHeader.tsx`. `b6b8789`.
+- [x] `concordance/hooks/useConcordancePendingHandoff.ts`. `b6b8789`.
+- [x] `concordance/hooks/useConcordanceMaterializedEvents.ts` (SSE seq tracking + paths; composes the shared `useMaterializeLifecycle` after `65696a6`).
+- [x] `concordance/hooks/useConcordanceMetadataColumns.ts`. `b6b8789`.
+- [x] `concordance/hooks/useConcordanceViewModeSwap.ts`. `b6b8789`.
+- [x] Memoize `availableMetadataColumns` (now inside the metadata hook) and `sourceColorMap`; also memoize `labelToNodeId` and wrap `resolveNodeIdForKey` in `useCallback`. `b6b8789`.
+- [ ] Replace H8 result-prefs hydration `requestAnimationFrame(setX)` pattern with derived state. Deferred — users override `globalPageSize` post-hydration so it can't be derived; the rAF wrap exists only to dodge the lint rule.
+- [ ] Hoist dispersion-only state (`proportionalDispersionBars` / `colourMatches` / `lowercase` / `hiddenMatchedTexts` / `binCount` / `combinedSourceMode` / `materializedBins`) into `ConcordanceDispersionNodeBlock` (or a sibling `ConcordanceDispersionControls`). State stays in parent for now.
 
 ### 3.2 AiAnnotatorFeature.tsx (1558 → ~600 LoC)
 
@@ -252,7 +267,7 @@ Per-file split plans. Each file gets its own focused PR. **Effort: ~1 week.**
 - [ ] Move `normalizeRemoteUrl` to `quotation/quotationEngine.ts`.
 - [ ] Hoist `TYPE_COLORS` (L107-111), `hexToRgba` (L644-651), `buildUnderlineStyle` (L654-667) to `quotation/quotationHighlight.ts`.
 - [ ] Extract `<QuotationHighlightedCell row text contextLength hoverState onHover>` from the 116-LoC closure-capturing `renderHighlightedText` at L670-786.
-- [ ] Use shared materialize-lifecycle hook (Phase 2.1).
+- [x] Use shared materialize-lifecycle hook (Phase 2.1). `65696a6`.
 
 ### 3.5 SequentialAnalysisFeature.tsx (1188 → ~500 LoC)
 
