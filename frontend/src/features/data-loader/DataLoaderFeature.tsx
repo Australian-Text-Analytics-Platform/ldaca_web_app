@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon, MoreHorizontal, Star } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,8 +11,6 @@ import { useFiles } from '@/hooks/useFiles';
 import { queryKeys } from '@/lib/queryKeys';
 import { filesApi } from '@/api/files';
 import { workspacesApi } from '@/api/workspaces';
-import { saveBlob } from '@/lib/download';
-import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useUIStore } from '@/stores/uiStore';
 import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '@/types';
@@ -54,6 +52,7 @@ import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useResizableSplit } from './hooks/useResizableSplit';
+import { usePendingWorkspaceDownloads } from './hooks/usePendingWorkspaceDownloads';
 
 const README_FILENAME = 'README.md';
 const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
@@ -167,9 +166,6 @@ export const DataLoaderFeature: React.FC = () => {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [isFileDropActive, setIsFileDropActive] = useState(false);
   const [uploadingWorkspaceZip, setUploadingWorkspaceZip] = useState(false);
-  const [downloadingWorkspaceId, setDownloadingWorkspaceId] = useState<string | null>(null);
-  const [pendingDownloads, setPendingDownloads] = useState<Record<string, { taskId: string; workspaceName: string }>>({});
-  const tasks = useAnalysisStore((state) => state.tasks);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const workspaceZipInputRef = useRef<HTMLInputElement | null>(null);
@@ -180,7 +176,7 @@ export const DataLoaderFeature: React.FC = () => {
   } = useResizableSplit({ defaultRatio: 0.4 });
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
 
-  const notify = (type: 'success' | 'error' | 'info', message: string) => {
+  const notify = useCallback((type: 'success' | 'error' | 'info', message: string) => {
     const duration = type === 'error' ? 6000 : 3500;
     if (type === 'success') {
       toast.success(message, { duration });
@@ -189,7 +185,9 @@ export const DataLoaderFeature: React.FC = () => {
     } else {
       toast(message, { duration });
     }
-  };
+  }, []);
+
+  const workspaceDownloads = usePendingWorkspaceDownloads({ authHeaders, notify });
 
   useEffect(() => {
     const active = workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId);
@@ -358,57 +356,6 @@ export const DataLoaderFeature: React.FC = () => {
       event.target.value = '';
     }
   };
-
-  const handleDownloadWorkspaceZip = async (workspaceId: string, workspaceName: string) => {
-    try {
-      setDownloadingWorkspaceId(workspaceId);
-      const response = await workspacesApi.startDownloadTask(authHeaders);
-      const taskId = response?.metadata?.task_id;
-      if (!taskId) throw new Error('No task ID returned');
-      setPendingDownloads((prev) => ({ ...prev, [workspaceId]: { taskId, workspaceName } }));
-      notify('info', 'Preparing workspace download…');
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to start workspace download.');
-    } finally {
-      setDownloadingWorkspaceId(null);
-    }
-  };
-
-  // Auto-download when a workspace_download task completes
-  useEffect(() => {
-    const entries = Object.entries(pendingDownloads);
-    if (!entries.length) return;
-
-    for (const [workspaceId, { taskId, workspaceName }] of entries) {
-      const task = tasks.find((t: TaskItem) => t.task_id === taskId);
-      if (!task) continue;
-
-      if (task.state === 'successful') {
-        // Remove from pending immediately to prevent double-trigger
-        setPendingDownloads((prev) => {
-          const { [workspaceId]: _, ...next } = prev;
-          return next;
-        });
-        // Fetch the artifact and trigger browser download
-        (async () => {
-          try {
-            const blob = await workspacesApi.downloadTaskArtifact(taskId, authHeaders);
-            const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
-            await saveBlob(blob, filename);
-            notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
-          } catch (err) {
-            notify('error', (err as Error).message || 'Failed to download workspace ZIP.');
-          }
-        })();
-      } else if (task.state === 'failed' || task.state === 'cancelled') {
-        setPendingDownloads((prev) => {
-          const { [workspaceId]: _, ...next } = prev;
-          return next;
-        });
-        notify('error', task.message || 'Workspace download failed.');
-      }
-    }
-  }, [tasks, pendingDownloads, authHeaders]);
 
   const handleRefreshFiles = async () => {
     setRefreshingFiles(true);
@@ -1115,11 +1062,15 @@ export const DataLoaderFeature: React.FC = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDownloadWorkspaceZip(workspaceId, workspace.name || workspaceId)}
-                          disabled={downloadingWorkspaceId === workspaceId || Boolean(pendingDownloads[workspaceId])}
+                          onClick={() => void workspaceDownloads.startDownload(workspaceId, workspace.name || workspaceId)}
+                          disabled={workspaceDownloads.isStarting(workspaceId) || workspaceDownloads.isPending(workspaceId)}
                         >
                           <DownloadIcon className="mr-1.5 h-4 w-4" />
-                          {pendingDownloads[workspaceId] ? 'Preparing…' : downloadingWorkspaceId === workspaceId ? 'Starting…' : 'Download'}
+                          {workspaceDownloads.isPending(workspaceId)
+                            ? 'Preparing…'
+                            : workspaceDownloads.isStarting(workspaceId)
+                              ? 'Starting…'
+                              : 'Download'}
                         </Button>
                         <Button
                           size="sm"
