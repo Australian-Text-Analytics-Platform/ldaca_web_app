@@ -408,12 +408,16 @@ Public surface unchanged: `import { textApi, FooType } from '@/api/text'` resolv
 
 Landed in `f8da9d2`. The shadow `useQuotationEngineConfigStore` is deleted; `QuotationFeature` reads quotation-engine config + last-remote-url straight from `preferencesStore`. New `updateQuotationRemoteUrl(url)` action on preferencesStore atomically writes `lastRemoteUrl` AND (if engine is in remote mode) the engine's URL — preserves the old shadow's `updateRemoteUrl` semantics. The legacy localStorage migration (`ldaca.quotation.engine` → preferences) moves into `preferencesStore.ts` as a one-shot at module load. `useQuotationEngineDialogStore` (pure dialog visibility, used by Sidebar trigger + QuotationFeature body) survives — that's not a mirror, just cross-component UI state. `quotationEngineStore.ts` shrinks 99 → 23 LoC.
 
-### 4.6 preferencesStore sync side effects
+### 4.6 preferencesStore sync side effects — ✅ DONE
 
-`preferencesStore.ts:65-94` setters fire `syncToBackend().catch(() => {})` synchronously. Setters become silently effectful, debouncing fails, auth headers are missing.
+Landed in `9bd9789`. The four setters that used to fire `syncToBackend().catch(() => {})` inline are now pure local-state writers; backend writes flow through a debounced subscriber registered in `usePreferencesInit` (`hooks/usePreferences.ts`):
 
-- [ ] Move sync to a debounced `preferencesStore.subscribe(...)` registration.
-- [ ] Or do sync at the component level where auth context is available.
+  - 800 ms debounce coalesces bursts into one PUT.
+  - Subscribes only after `hydrated` flips true, so the initial load-from-backend doesn't echo back as a write.
+  - Skips when not authenticated — anonymous edits stay in localStorage until the user signs in.
+  - Auth headers are read fresh from `useAuth().getAuthHeaders` at fire-time, fixing the audit's "auth headers are missing" note.
+
+A small per-field shallow snapshot comparison gates writes so identical-but-new-reference state changes don't trigger a redundant request.
 
 ### 4.7 useAuth singleton → store
 
@@ -438,10 +442,14 @@ Landed in `f8da9d2`. The shadow `useQuotationEngineConfigStore` is deleted; `Quo
 - [ ] Move `components/CodeEditor.tsx` to `features/preprocessing/expression/`.
 - [ ] Move `components/tabs/{AnalysisTaskBanner,AnalysisLockedNotice,tokenFrequencyHelpers}` to `features/analysis/common/`.
 
-### 4.10 Pagination components consolidation
+### 4.10 Pagination components consolidation — ✅ DONE
 
-- [ ] Merge `AnalysisPagination.tsx:38-91 buildPaginationRange` and `ServerTablePagination.tsx:20-46 buildPaginationRange` (currently identical) into `components/ui/Pagination.tsx`.
-- [ ] Same for `PaginationJump` popover-input (`AnalysisPagination.tsx:103-214` ≡ `ServerTablePagination.tsx:49-142`).
+Landed in `2e31c01`. The duplicated `buildPaginationRange` and `<PaginationJump>` move into the shared UI module:
+
+  - `components/ui/paginationRange.ts` — `buildPaginationRange` + `PaginationRangeItem` type. Sibling file (not in `Pagination.tsx`) so the component module stays component-only for `react-refresh/only-export-components`.
+  - `components/ui/Pagination.tsx` — `<PaginationJump>` exported alongside the existing `<Pagination*>` primitives. Density differences preserved via `triggerClassName?` and `showPageLabel?` props (ServerTablePagination uses `size-8` + no label to fit its tighter footer).
+
+Per-file: `AnalysisPagination.tsx` 383→188, `ServerTablePagination.tsx` 236→114; `Pagination.tsx` 128→263 (gains the jump component).
 - [ ] Optionally collapse the two components into one with a `mode: 'server' | 'tanstack'` adapter.
 
 ---
