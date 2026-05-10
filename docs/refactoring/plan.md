@@ -456,18 +456,22 @@ Per-file: `AnalysisPagination.tsx` 383→188, `ServerTablePagination.tsx` 236→
 
 ---
 
-## Phase 5 — Tests (interleaved with Phases 3 & 4)
+## Phase 5 — Tests (interleaved with Phases 3 & 4) — ✅ DONE
 
-`src/hooks/` has zero tests today. The big ones deserve smoke tests **before** their refactors land so Phase 3/4 can ride the safety net.
+Landed across five commits this session totalling **104 new tests** across 8 new test files. The Phase 4 items that wanted a safety net (4.1 / 4.2 / 4.7) now have one.
 
-- [ ] `useAuth.ts` (305 LoC, complex global singleton + `useSyncExternalStore`).
-- [ ] `useWorkspaceInternal.ts` (308 LoC).
-- [ ] `useWorkspaceNodeMutations.ts` (637 LoC).
+- [x] `useAuth.ts` — 10 smoke tests in `c1a8f28`. Bootstrap success/failure, autoStart vs manual refresh, `getAuthHeaders` token+auth-required matrix, logout (multi-user vs single-user), `loginWithGoogle`. `vi.resetModules()` between tests handles the singleton state. Unblocks **Phase 4.7**.
+- [x] `useWorkspaceInternal.ts` — 10 tests in `bf9b91e`. Covers the H4 reconciler effect (clears on no-auth, syncs on server query, clears on query error, no-op when undefined+no-error), actions composition (selection + node mutations + text actions all merged), `isLoading.operations` / `errors.operations` aggregation, `detachConcordance` synchronous-throw on no-workspace, pagination passthrough. Sub-hooks mocked. Unblocks **Phase 4.1 + 4.2**.
+- [x] `useWorkspaceNodeMutations.ts` — 13 tests in `bf9b91e`. All 27 actions present + callable, `actions` identity stability under stable `[authHeaders, currentWorkspaceId]` (the H6 fix), createWorkspace happy + error paths, setCurrentWorkspace + deleteWorkspace + deleteNode + castColumn + refreshNodeSchema. Unblocks **Phase 4.2 + 3.9 (rest)**.
 - [x] ~~`useNodeColumnInfos.ts` (127 LoC, has the dep-loop bug B9)~~ — bug fixed wholesale via the Phase 4.3 rewrite to `useQueries`. The hook is now ~99 LoC of declarative TanStack-backed code; smoke tests would be redundant with the existing react-query test surface.
-- [ ] `useSchemaManagement.ts` (283 LoC).
-- [ ] `useAutoNodeColumns.ts` (281 LoC).
-- [ ] Add unit tests for the new extracted hooks in Phase 2 (`useMaterializeLifecycle`, `useDetachColumnsState`, `useNodePreviewWithRawFallback`, `buildApplyDisabledReason`).
-- [ ] Add tests for aggregate's token-builder index arithmetic (`useAggregateSubTab.ts:438-500`) before Phase 2 extraction — easy to break silently.
+- [x] `useSchemaManagement.ts` — 20 tests in `e253fd7`. Pure helpers (`normalizeSchemaFromInfo` / `applySelectedColumnsToSnapshots` / `createNodeSnapshot[s]`) plus the hook contract (availableColumns fallback chain, lockCurrentSchema/clearLockedSchema, getColumnsByType, schema-query gating).
+- [x] `useAutoNodeColumns.ts` — 14 tests in `e253fd7`. Empty initial state, sessionStorage hydration, setSelection/setSelections (merge vs replace, structural equality returns prev ref), recomputeAutoColumns (auto-pick document column, fallback to first column, gated by `docTypeOnly` and `isLocked`), `allowedDataTypes` filter (drops non-matching types, marks `filteredOutByType: true`), `maxNodes` window.
+- [x] Phase 2 hook tests (23 tests across 3 files in `97c0ae7`):
+  - `useDetachColumnsState` (9 tests) — toggle / select-all / deselect-all / reset
+  - `useMaterializeLifecycle` (6 tests) — terminal-success/failure callbacks, processed-id ref ensures at-most-once, only matches tracked entries
+  - `useNodePreviewWithRawFallback` (8 tests) — signature shape, fetcher routing (operation vs raw), response normalisation, debounce passthrough
+  - `buildApplyDisabledReason` deferred — extraction never landed (Phase 2.2 partially deferred), so no test target.
+- [x] `useAggregateSubTab` token-builder index arithmetic — 24 tests in `d510846`. The splice + clamp logic is extracted into `aggregate/hooks/tokenIndexMath.ts` (pure helpers: `clampIndex` / `insertItemAt` / `removeItemAt` / `moveItemTo`); the subtle "fromIndex < toIndex → target -= 1" adjustment in `moveItemTo` has dedicated coverage so future Phase 2 extractions can touch it safely.
 
 ---
 
