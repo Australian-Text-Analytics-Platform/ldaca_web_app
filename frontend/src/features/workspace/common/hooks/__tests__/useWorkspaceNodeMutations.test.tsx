@@ -110,9 +110,11 @@ const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => (
   authHeaders: overrides.authHeaders ?? { Authorization: 'Bearer test' },
   // `'currentWorkspaceId' in overrides` so callers can pass `null` to test
   // the no-workspace-selected branches; `?? 'ws-1'` would silently coerce
-  // nullish overrides back to 'ws-1'.
-  currentWorkspaceId:
-    'currentWorkspaceId' in overrides ? overrides.currentWorkspaceId : 'ws-1',
+  // nullish overrides back to 'ws-1'. The cast preserves the
+  // `WorkspaceNodeMutationsParams` shape (which doesn't allow undefined).
+  currentWorkspaceId: ('currentWorkspaceId' in overrides
+    ? overrides.currentWorkspaceId
+    : 'ws-1') as string | null,
   selectedNodeId: overrides.selectedNodeId ?? null,
   setCurrentWorkspaceId: overrides.setCurrentWorkspaceId ?? mkSetWorkspaceId(),
   setSelectedNodes: overrides.setSelectedNodes ?? mkSetSelectedNodes(),

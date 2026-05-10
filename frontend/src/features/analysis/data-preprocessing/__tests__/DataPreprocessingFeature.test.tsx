@@ -319,12 +319,15 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     expect(nameInput).toHaveValue('custom_filter_name');
 
-    const addButton = within(filterPanel).getByRole('button', { name: 'Add to Workspace' });
-
+    // Re-query the button inside waitFor: the surrounding
+    // <DisabledReasonTooltip> swaps its child when its `reason` prop
+    // transitions undefined↔defined, so a once-grabbed DOM ref goes
+    // stale (still references a detached node with disabled="").
     await waitFor(() => {
-      expect(addButton).toBeEnabled();
+      expect(within(filterPanel).getByRole('button', { name: 'Add to Workspace' })).toBeEnabled();
     });
 
+    const addButton = within(filterPanel).getByRole('button', { name: 'Add to Workspace' });
     fireEvent.click(addButton);
 
     await waitFor(() => {
@@ -360,10 +363,16 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     render(<DataPreprocessingFeature />);
 
-    const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
-    const addButton = within(filterPanel).getByRole('button', { name: 'Add to Workspace' });
+    // Re-query the Add-to-Workspace button on each assertion: the
+    // surrounding <DisabledReasonTooltip> swaps its child whenever its
+    // `reason` prop transitions undefined↔defined, so a once-grabbed
+    // DOM ref goes stale.
+    const getAddButton = () =>
+      within(screen.getByRole('tabpanel', { name: 'Filter' }))
+        .getByRole('button', { name: 'Add to Workspace' });
 
-    expect(addButton).toBeDisabled();
+    const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
+    expect(getAddButton()).toBeDisabled();
 
     const [columnSelect] = within(filterPanel).getAllByRole('combobox');
     columnSelect!.focus();
@@ -377,7 +386,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
 
     await waitFor(() => {
-      expect(addButton).toBeDisabled();
+      expect(getAddButton()).toBeDisabled();
     });
 
     mockFilterPreview.mockResolvedValueOnce({
@@ -394,7 +403,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     fireEvent.change(valueInput, { target: { value: 'election' } });
 
     await waitFor(() => {
-      expect(addButton).toBeEnabled();
+      expect(getAddButton()).toBeEnabled();
     });
   });
 });
