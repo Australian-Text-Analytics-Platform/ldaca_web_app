@@ -21,7 +21,7 @@ Net Phase 1: ~9 fewer files, ~500 fewer LoC. Build / typecheck / eslint clean. T
 Items deferred from the original Phase 1 scope:
 - **B6** (URL parse at module load in useAuth.ts) — moved to Phase 4.7.
 - **B8** (`key={index}` on user-mutable lists in concordance/sequential/expression) — moved to Phase 2 alongside the broader expression-sub-tab work, since proper fix needs `string[]` → `{id, value}[]` state-shape changes.
-- **B9** (useNodeColumnInfos cache dep loop) — subsumed by Phase 4.3 (replace `nodeInfoCache` with react-query).
+- **B9** (useNodeColumnInfos cache dep loop) — ✅ resolved by Phase 4.3 (`5fd8323`). The hook now uses `useQueries`; the dep-loop pattern is gone.
 
 ### 1.1 Real bugs
 
@@ -36,7 +36,7 @@ Items deferred from the original Phase 1 scope:
   - [ ] `concordance/ConcordanceFeature.tsx:1579,1751,1763`
   - [ ] `sequential-analysis/SequentialAnalysisFeature.tsx:943`
   - [ ] `expression/PolarsExpressionSubTab.tsx:170,209,248,312`
-- [ ] **B9** `useNodeColumnInfos.ts:55-110` lists `cache` in effect deps then calls `setCache` → re-runs every fetch. Replace `cache` with `cacheRef.current` access pattern, or remove `cache` from deps with a justified eslint-disable. *(Defer to Phase 4 if `useNodeColumnInfos` is replaced wholesale by react-query — see §4.3.)*
+- [x] **B9** `useNodeColumnInfos.ts` cache dep loop — resolved by the wholesale rewrite to `useQueries` in Phase 4.3 (`5fd8323`). Original `cache` useState + effect-with-`cache`-dep + `setCache` pattern is gone.
 
 ### 1.2 Pure dead code — verified zero external consumers
 
@@ -374,13 +374,20 @@ Currently in three places: `useState` in `useWorkspaceCore.ts:49`, react-query c
 - [ ] Freeze the `EMPTY_NODE_DATA` fallback at module scope (`useWorkspaceQueries.ts:116`).
 - [ ] `useShallow` selector pattern in `DataLoaderFeature.tsx:251` (currently uses `usePreferencesStore()` with no selector, re-renders on `syncing` flag).
 
-### 4.3 Replace `lib/nodeInfoCache.ts` with react-query
+### 4.3 Replace `lib/nodeInfoCache.ts` with react-query — ✅ DONE
 
-`nodeInfoCache` is a parallel cache (`Map<key, T>` + in-flight-promise dedup) duplicating what react-query already does. Consumers: `useNodeColumnInfos.ts:76`, `useSchemaManagement.ts:46/171`, `useWorkspaceNodeMutations.ts:619`.
+Landed in `5fd8323`. The parallel `Map`-based cache is gone; every node-info read routes through the shared TanStack `QueryClient` via `queryKeys.nodeInfo(workspaceId, nodeId)`.
 
-- [ ] Build a `useNodeInfo` hook around `useQuery({ queryKey: queryKeys.nodeInfo(...), queryFn: nodesApi.info })`.
-- [ ] For non-hook async sites (mutation success handlers), use `queryClient.fetchQuery({queryKey, queryFn})` for built-in dedup.
-- [ ] Delete `lib/nodeInfoCache.ts`. This also resolves the dep-loop in `useNodeColumnInfos` (B9).
+New `lib/nodeInfo.ts`:
+  - `nodeInfoQueryOptions(args)` for `useQuery` / `useQueries` consumers.
+  - `fetchNodeInfo({ queryClient, ... })` for non-hook async sites (mutation handlers, hydration callbacks). `queryClient.fetchQuery` gives built-in inflight dedup; `force: true` does a `removeQueries` first.
+  - `invalidateNodeInfoQuery(qc, ws, nodeId?)` — node-scoped or workspace-wide predicate-based invalidation.
+
+`useNodeColumnInfos` (127 → 99 LoC) rewritten on `useQueries` — the manual effect + `pendingRef` + `cache` useState collapses to one declarative `useQueries({ queries: nodeIds.map(...) })`. **Resolves bug B9** — the original effect listed `cache` in its deps and called `setCache` inside, causing re-fetch loops; `useQueries` doesn't have that pitfall.
+
+`createNodeSnapshot[s]` + `restoreAnalysisLockFromRequest` accept a new `queryClient` parameter (threaded through every analysis feature's task-flow hooks). `useWorkspaceNodeMutations` uses `invalidateNodeInfoQuery` after undo/redo/cast and `fetchNodeInfo({ queryClient, force: true })` for `refreshNodeSchema`.
+
+Test fixtures updated: `ConcordanceFeature.test.tsx` wraps each render in a `QueryClientProvider` via a small `renderWithClient` helper (10 sites); `useQuotationTaskFlow.test.tsx` mock lock fixtures get a `queryClient: new QueryClient()` (2 sites).
 
 ### 4.4 Split api/text.ts (478 → 7 files) — ✅ DONE
 
@@ -446,7 +453,7 @@ Landed in `f8da9d2`. The shadow `useQuotationEngineConfigStore` is deleted; `Quo
 - [ ] `useAuth.ts` (305 LoC, complex global singleton + `useSyncExternalStore`).
 - [ ] `useWorkspaceInternal.ts` (308 LoC).
 - [ ] `useWorkspaceNodeMutations.ts` (637 LoC).
-- [ ] `useNodeColumnInfos.ts` (127 LoC, has the dep-loop bug B9).
+- [x] ~~`useNodeColumnInfos.ts` (127 LoC, has the dep-loop bug B9)~~ — bug fixed wholesale via the Phase 4.3 rewrite to `useQueries`. The hook is now ~99 LoC of declarative TanStack-backed code; smoke tests would be redundant with the existing react-query test surface.
 - [ ] `useSchemaManagement.ts` (283 LoC).
 - [ ] `useAutoNodeColumns.ts` (281 LoC).
 - [ ] Add unit tests for the new extracted hooks in Phase 2 (`useMaterializeLifecycle`, `useDetachColumnsState`, `useNodePreviewWithRawFallback`, `buildApplyDisabledReason`).
