@@ -1,8 +1,5 @@
-// NodeSelectionPanel now handles color selection UI inline
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import NodeSelectionPanel from '@/components/NodeSelectionPanel';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
@@ -12,13 +9,7 @@ import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
 import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, textApi } from '@/api/text';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
-import { Button } from '@/components/ui/button';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Play, Loader2, Trash2 } from 'lucide-react';
-import HelpIcon from '@/components/help/HelpIcon';
-import InfoIcon from '@/components/help/InfoIcon';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import { Card, CardContent } from '@/components/ui/card';
 import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
 import {
   hasLockedParameterDiff,
@@ -41,8 +32,8 @@ import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataCol
 import { useConcordanceMaterializedEvents } from './hooks/useConcordanceMaterializedEvents';
 import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
 import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
-import { ConcordanceTableNodeBlock } from './components/ConcordanceTableNodeBlock';
-import { ConcordanceDispersionNodeBlock } from './components/ConcordanceDispersionNodeBlock';
+import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
+import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { highlightMatchInText } from '../common/components/highlightText';
@@ -50,10 +41,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
-import { PageSizeSelect } from '../common/components/PageSizeSelect';
 import {
   DISPERSION_DEFAULT_BIN_COUNT,
-  DISPERSION_DISPLAY_BIN_COUNTS,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
 } from './concordanceViewModels';
@@ -62,9 +51,6 @@ import {
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_FREQ_COLUMNS,
 } from '../generatedColumns';
-import {
-  MetadataColumnSelector,
-} from '../common/components/MetadataColumnSelector';
 
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
@@ -921,184 +907,37 @@ const ConcordanceFeature: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="space-y-0 pb-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Concordance Search
-                <InfoIcon
-                  targetKey="concordance.overview"
-                  label="About Concordance Search"
-                  tooltip="Learn what concordance search is and how it can help you."
-                />
-                <HelpIcon
-                  targetKey="analysis.concordance.parameters"
-                  label="Concordance parameters"
-                  tooltip="Select data blocks, choose the search term, and set context options before running."
-                />
-              </CardTitle>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0">
-          <NodeSelectionPanel
-            selectedNodes={panelSelectedNodes}
-            nodeColumnSelections={effectiveNodeColumnSelections}
-            onColumnChange={handleColumnChange}
-            nodeColors={nodeColors}
-            onColorChange={handleColorChange}
-            defaultPalette={defaultPalette}
-            maxCompare={2}
-            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-            showShape
-            disabled={!!isLocked}
-            locked={!!isLocked}
-            showColorPicker={true}
-            getNodeColumns={getColumnInfos}
-            allowedDataTypes={['string']}
-            originalCount={displayNodeCount}
-            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
-          />
-
-          <div className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <label className="block text-sm font-medium text-foreground">Search word or phrase</label>
-                  <HelpIcon targetKey="analysis.concordance.search-term" label="Concordance search term" />
-                </div>
-                <input
-                  type="text"
-                  value={searchWord}
-                  onChange={(e) => setSearchWord(e.target.value)}
-                  placeholder="Enter word or phrase to search for"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">Left context (tokens)</label>
-                  <input
-                    type="number"
-                    value={numLeftTokens}
-                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 0)}
-                    min="0"
-                    max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">Right context (tokens)</label>
-                  <input
-                    type="number"
-                    value={numRightTokens}
-                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 0)}
-                    min="0"
-                    max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={wholeWord}
-                    onChange={(e) => setWholeWord(e.target.checked)}
-                    disabled={regex}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-foreground">Whole word</span>
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={regex}
-                    onChange={(e) => {
-                      const nextRegex = e.target.checked;
-                      setRegex(nextRegex);
-                      if (nextRegex) {
-                        setWholeWord(false);
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-foreground">Use regular expression</span>
-                </label>
-                <HelpIcon targetKey="analysis.concordance.regex-toggle" label="Regex mode toggle" />
-              </div>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={caseSensitive}
-                  onChange={(e) => setCaseSensitive(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm text-foreground">Case sensitive</span>
-              </label>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
-          <DisabledReasonTooltip reason={(() => {
-            if (isSearching) return undefined;
-            if (actionState.runDisabledReason) return actionState.runDisabledReason;
-            if (!searchWord.trim()) return 'Enter a search word first';
-            if (effectiveNodeColumnSelections.some(sel => !sel.column)) return 'Select a column for each data block';
-            return undefined;
-          })()}>
-            <Button
-              onClick={() => {
-                void handleRunOrUpdate();
-              }}
-              disabled={
-                actionState.runDisabled ||
-                !searchWord.trim() ||
-                effectiveNodeColumnSelections.some(sel => !sel.column)
-              }
-              className="w-full md:w-auto"
-            >
-              {isSearching ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
-              ) : (
-                <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
-              )}
-            </Button>
-          </DisabledReasonTooltip>
-
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleClearResults}
-              variant="destructive"
-              disabled={actionState.clearDisabled}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Clear Results
-            </Button>
-            <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
-          </div>
-          <PageSizeSelect
-            value={globalPageSize}
-            onChange={(newSize) => {
-              setGlobalPageSize(newSize);
-              setNodePagination((prev) => {
-                const updated = { ...prev };
-                Object.keys(updated).forEach((nid) => {
-                  updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
-                });
-                return updated;
-              });
-              void persistResultPreferences({ pageSize: newSize });
-            }}
-          />
-        </CardFooter>
-      </Card>
+      <ConcordanceParameterPanel
+        panelSelectedNodes={panelSelectedNodes}
+        effectiveNodeColumnSelections={effectiveNodeColumnSelections}
+        handleColumnChange={handleColumnChange}
+        nodeColors={nodeColors}
+        handleColorChange={handleColorChange}
+        defaultPalette={defaultPalette}
+        getColumnInfos={getColumnInfos}
+        displayNodeCount={displayNodeCount}
+        isLocked={!!isLocked}
+        searchWord={searchWord}
+        setSearchWord={setSearchWord}
+        numLeftTokens={numLeftTokens}
+        setNumLeftTokens={setNumLeftTokens}
+        numRightTokens={numRightTokens}
+        setNumRightTokens={setNumRightTokens}
+        regex={regex}
+        setRegex={setRegex}
+        wholeWord={wholeWord}
+        setWholeWord={setWholeWord}
+        caseSensitive={caseSensitive}
+        setCaseSensitive={setCaseSensitive}
+        isSearching={isSearching}
+        actionState={actionState}
+        handleRunOrUpdate={handleRunOrUpdate}
+        handleClearResults={handleClearResults}
+        globalPageSize={globalPageSize}
+        setGlobalPageSize={setGlobalPageSize}
+        setNodePagination={setNodePagination}
+        persistResultPreferences={persistResultPreferences}
+      />
 
       {concordanceWaitingBanner && (
         <AnalysisTaskBanner
@@ -1112,275 +951,62 @@ const ConcordanceFeature: React.FC = () => {
 
       {/* Results */}
       {results?.state === 'successful' && (
-        <Card ref={resultsRef}>
-          <>
-              <CardHeader className="space-y-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2">
-                      Search Results
-                      <HelpIcon
-                        targetKey="analysis.concordance.results"
-                        label="Concordance results"
-                        tooltip="Browse keyword-in-context hits, switch between separated/combined views, and adjust pagination."
-                      />
-                    </CardTitle>
-                    {results.message && (
-                      <CardDescription className="max-w-2xl text-sm text-muted-foreground">
-                        {results.message}
-                      </CardDescription>
-                    )}
-                  </div>
-                  {panelSelectedNodes.length > 1 && (
-                    <Tabs
-                      value={viewMode}
-                      onValueChange={(mode) => handleViewModeChange(mode as 'separated' | 'combined')}
-                      className="w-full md:w-auto"
-                    >
-                      <TabsList aria-label="Concordance view mode">
-                        <TabsTrigger value="separated">Separated</TabsTrigger>
-                        {results?.combinable && (
-                          <TabsTrigger value="combined">
-                            {combinedLoading ? (
-                              <span className="flex items-center gap-1">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Combined
-                              </span>
-                            ) : (
-                              'Combined'
-                            )}
-                          </TabsTrigger>
-                        )}
-                      </TabsList>
-                    </Tabs>
-                  )}
-                </div>
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <Tabs
-                      value={concordanceView}
-                      onValueChange={(value) => {
-                        const newView = value as 'table' | 'dispersion';
-                        setConcordanceView(newView);
-                        if (newView === 'table') {
-                          setProportionalDispersionBars(false);
-                          setColourMatches(false);
-                          setLowercaseMatches(false);
-                          setHiddenMatchedTexts(new Set());
-                        }
-                      }}
-                    >
-                      <TabsList>
-                        <TabsTrigger value="table">Table View</TabsTrigger>
-                        <TabsTrigger value="dispersion">Dispersion View</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                    <div className="flex flex-wrap items-center gap-4">
-                      {showDispersion && !proportionalDispersionBars && (
-                        <label className="flex items-center gap-2 text-sm text-foreground">
-                          <span>Bin No.</span>
-                          <select
-                            value={binCount}
-                            onChange={(e) => {
-                              const parsed = Number.parseInt(e.target.value, 10) as DispersionDisplayBinCount;
-                              if ((DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(parsed)) {
-                                setBinCount(parsed);
-                              }
-                            }}
-                            className="h-7 rounded border border-input bg-background px-2 text-sm"
-                          >
-                            {DISPERSION_DISPLAY_BIN_COUNTS.map((value) => (
-                              <option key={value} value={value}>
-                                {value}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                      <MetadataColumnSelector
-                        showMetadata={showMetadata}
-                        onShowMetadataChange={(nextValue) => {
-                          const previousValue = showMetadata;
-                          setShowMetadata(nextValue);
-                          void (async () => {
-                            try {
-                              await persistResultPreferences({ showMetadata: nextValue });
-                            } catch (error) {
-                              console.error('Failed to persist concordance metadata preference', error);
-                              setShowMetadata(previousValue);
-                            }
-                          })();
-                        }}
-                        availableColumns={availableMetadataColumns}
-                        selectedColumns={selectedMetadataColumns ?? []}
-                        onSelectedColumnsChange={setSelectedMetadataColumns}
-                        sections={metadataColumnSections}
-                        disabledReason={metadataDisabledReason}
-                      />
-                    </div>
-                  </div>
-                  {showDispersion ? (
-                    <div className="flex flex-wrap items-center gap-4">
-                      <label className="flex items-center gap-2 text-sm text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={proportionalDispersionBars}
-                          onChange={(e) => setProportionalDispersionBars(e.target.checked)}
-                          className="h-4 w-4"
-                        />
-                        <span>Bar length proportional to text length</span>
-                      </label>
-                      {!proportionalDispersionBars && viewMode === 'combined' && (
-                        <label className="flex items-center gap-2 text-sm text-foreground">
-                          <span>Sources:</span>
-                          <select
-                            value={combinedSourceMode}
-                            onChange={(e) => setCombinedSourceMode(e.target.value as 'aggregate' | 'split')}
-                            className="h-7 rounded border border-input bg-background px-2 text-sm"
-                          >
-                            <option value="aggregate">Aggregate</option>
-                            <option value="split">Split (solid/dashed)</option>
-                          </select>
-                        </label>
-                      )}
-                      <label className="flex items-center gap-2 text-sm text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={colourMatches}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setColourMatches(checked);
-                            if (!checked) {
-                              setLowercaseMatches(false);
-                              setHiddenMatchedTexts(new Set());
-                            }
-                          }}
-                          className="h-4 w-4"
-                        />
-                        <span>Colour matches</span>
-                      </label>
-                      {colourMatches && (
-                        <label className="flex items-center gap-2 text-sm text-foreground">
-                          <input
-                            type="checkbox"
-                            checked={lowercaseMatches}
-                            onChange={(e) => {
-                              setLowercaseMatches(e.target.checked);
-                              setHiddenMatchedTexts(new Set());
-                            }}
-                            className="h-4 w-4"
-                          />
-                          <span>Lowercase matches</span>
-                        </label>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div ref={resultsViewportRef} className="space-y-4">
-                {results.data && Object.keys(results.data).length > 0 ? (
-                  <div className={`grid gap-4 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
-                    {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
-                      const nodesForDetail = panelSelectedNodes;
-                      const keyedOrder = Object.keys(results.data);
-                      const approxIndex = keyedOrder.indexOf(nodeName);
-                      let node = nodesForDetail.find((n: WorkspaceNodeLike) => {const d = n.data as Record<string,unknown> | undefined; return ((d?.name as string | undefined) || n.id) === nodeName;});
-                      if (!node) {
-                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.id === nodeName);
-                      }
-                      if (!node) {
-                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.name === nodeName);
-                      }
-                      const mappedNodeId = labelToNodeId?.[nodeName];
-                      if (!node && mappedNodeId) {
-                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.id === mappedNodeId);
-                      }
-                      if (!node) {
-                        node = nodesForDetail[approxIndex];
-                      }
-                      
-                      const resolvedNodeId = node?.id || mappedNodeId || '';
-                      const paginationKey = resolvedNodeId || nodeName;
-                      const requestNodeId = resolvedNodeId || nodeName;
-                      const selection = effectiveNodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
-                      const column = selection?.column || '';
-                      
-                      const nodeDisplayName = (node?.name || nodeName) as string;
-                      const nodeColor = sourceColorMap[nodeName.toLowerCase()]
-                        || sourceColorMap[(node?.id || '').toLowerCase()]
-                        || sourceColorMap[(node?.name || '').toLowerCase()]
-                        || defaultPalette[approxIndex % defaultPalette.length];
-
-                      const blockContext = {
-                        nodeId: node?.id || '',
-                        paginationKey,
-                        requestNodeId,
-                        column,
-                        displayName: nodeDisplayName,
-                        nodeColor,
-                      };
-                      const sharedProps = {
-                        nodeKey: nodeName,
-                        nodeData,
-                        context: blockContext,
-                        searchWord,
-                        showMetadata,
-                        selectedMetadataColumns,
-                        selectedNodes,
-                        panelSelectedNodes,
-                        effectiveNodeColumnSelections,
-                        labelToNodeId,
-                        sourceColorMap,
-                        defaultPalette,
-                        nodePagination,
-                        globalPageSize,
-                        combinedPage,
-                        combinedLoading,
-                        nodeLoading,
-                        nodeDetaching,
-                        nodeMaterializing,
-                        materializedPaths,
-                        materializeSummaries,
-                        handlePageChange,
-                        handleRowClick,
-                        handleMaterialize,
-                        setCombinedPage,
-                        openDetachDialog,
-                      };
-                      return concordanceView === 'dispersion' ? (
-                        <ConcordanceDispersionNodeBlock
-                          key={nodeName}
-                          {...sharedProps}
-                          resultsViewportWidth={resultsViewportWidth}
-                          proportionalDispersionBars={proportionalDispersionBars}
-                          colourMatches={colourMatches}
-                          lowercaseMatches={lowercaseMatches}
-                          hiddenMatchedTexts={hiddenMatchedTexts}
-                          setHiddenMatchedTexts={setHiddenMatchedTexts}
-                          binCount={binCount}
-                          combinedSourceMode={combinedSourceMode}
-                          allMatchedTexts={allMatchedTexts}
-                          matchedTextColorMap={matchedTextColorMap}
-                          getMaterializedBinsForKey={getMaterializedBinsForKey}
-                          isBlockMaterialised={isBlockMaterialised}
-                        />
-                      ) : (
-                        <ConcordanceTableNodeBlock
-                          key={nodeName}
-                          {...sharedProps}
-                          handleSort={handleSort}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">No data available</div>
-                )}
-                </div>
-              </CardContent>
-          </>
-        </Card>
+        <ConcordanceResultsPanel
+          results={results}
+          resultsRef={resultsRef}
+          resultsViewportRef={resultsViewportRef}
+          resultsViewportWidth={resultsViewportWidth}
+          viewMode={viewMode}
+          handleViewModeChange={handleViewModeChange}
+          combinedLoading={combinedLoading}
+          concordanceView={concordanceView}
+          setConcordanceView={setConcordanceView}
+          showMetadata={showMetadata}
+          setShowMetadata={setShowMetadata}
+          availableMetadataColumns={availableMetadataColumns}
+          metadataColumnSections={metadataColumnSections}
+          metadataDisabledReason={metadataDisabledReason}
+          selectedMetadataColumns={selectedMetadataColumns}
+          setSelectedMetadataColumns={setSelectedMetadataColumns}
+          persistResultPreferences={persistResultPreferences}
+          proportionalDispersionBars={proportionalDispersionBars}
+          setProportionalDispersionBars={setProportionalDispersionBars}
+          combinedSourceMode={combinedSourceMode}
+          setCombinedSourceMode={setCombinedSourceMode}
+          colourMatches={colourMatches}
+          setColourMatches={setColourMatches}
+          lowercaseMatches={lowercaseMatches}
+          setLowercaseMatches={setLowercaseMatches}
+          hiddenMatchedTexts={hiddenMatchedTexts}
+          setHiddenMatchedTexts={setHiddenMatchedTexts}
+          binCount={binCount}
+          setBinCount={setBinCount}
+          allMatchedTexts={allMatchedTexts}
+          matchedTextColorMap={matchedTextColorMap}
+          getMaterializedBinsForKey={getMaterializedBinsForKey}
+          isBlockMaterialised={isBlockMaterialised}
+          searchWord={searchWord}
+          selectedNodes={selectedNodes}
+          panelSelectedNodes={panelSelectedNodes}
+          effectiveNodeColumnSelections={effectiveNodeColumnSelections}
+          labelToNodeId={labelToNodeId}
+          sourceColorMap={sourceColorMap}
+          defaultPalette={defaultPalette}
+          nodePagination={nodePagination}
+          globalPageSize={globalPageSize}
+          combinedPage={combinedPage}
+          setCombinedPage={setCombinedPage}
+          nodeLoading={nodeLoading}
+          nodeDetaching={nodeDetaching}
+          nodeMaterializing={nodeMaterializing}
+          materializedPaths={materializedPaths}
+          materializeSummaries={materializeSummaries}
+          handleSort={handleSort}
+          handlePageChange={handlePageChange}
+          handleRowClick={handleRowClick}
+          handleMaterialize={handleMaterialize}
+          openDetachDialog={openDetachDialog}
+        />
       )}
 
       {results?.state === 'failed' && (
