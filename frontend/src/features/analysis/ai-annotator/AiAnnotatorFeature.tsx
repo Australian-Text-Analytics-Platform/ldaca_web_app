@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { useAuth } from '@/hooks/useAuth';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { type AiAnnotationResponse, textApi } from '@/api/text';
 import { nodesApi } from '@/api/nodes';
 import { Button } from '@/components/ui/button';

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAuth } from '../useAuth';
-import { useSelectionStore } from '../../stores/selectionStore';
-import { useUIStore } from '../../stores/uiStore';
+import { useAuth } from '@/hooks/useAuth';
+import { useSelectionStore } from '@/stores/selectionStore';
+import { useUIStore } from '@/stores/uiStore';
 import { type PaginationMap, type PaginationState, createDefaultPagination } from './types';
 
 const useSelectionSlice = () =>

@@ -48,11 +48,11 @@ vi.mock('sonner', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => mockWorkspaceState,
 }));
 
-vi.mock('@/hooks/useWorkspaceActions', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     createWorkspace: vi.fn(),
     renameWorkspace: vi.fn(),
@@ -64,7 +64,7 @@ vi.mock('@/hooks/useWorkspaceActions', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceStatus', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
   useWorkspaceStatus: () => ({
     isLoading: { workspaces: false, currentWorkspace: false },
   }),

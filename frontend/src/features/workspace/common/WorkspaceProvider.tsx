@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useWorkspaceInternal } from '../hooks/useWorkspaceInternal';
+import { useWorkspaceInternal } from './hooks/useWorkspaceInternal';
 import { WorkspaceContext } from './WorkspaceContext';
 
 /**

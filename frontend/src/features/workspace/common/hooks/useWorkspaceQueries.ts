@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { workspacesApi } from '../../api/workspaces';
-import { nodesApi } from '../../api/nodes';
-import { queryKeys } from '../../lib/queryKeys';
-import { isGraphDebugEnabled } from '../../lib/debugFlags';
-import type { GraphNode, NodeDataResponse } from '../../types/api';
+import { workspacesApi } from '@/api/workspaces';
+import { nodesApi } from '@/api/nodes';
+import { queryKeys } from '@/lib/queryKeys';
+import { isGraphDebugEnabled } from '@/lib/debugFlags';
+import type { GraphNode, NodeDataResponse } from '@/types/api';
 import { type PaginationState } from './types';
 
 interface WorkspaceQueriesParams {

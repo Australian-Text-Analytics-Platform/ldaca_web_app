@@ -117,21 +117,21 @@ vi.mock('@/components/ui/confirm-dialog', () => ({
     ) : null,
 }));
 
-vi.mock('@/hooks/useWorkspaceSelection', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   useWorkspaceSelection: () => ({
     selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceStatus', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
   useWorkspaceStatus: () => ({ isLoading: { graph: false } }),
 }));
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({ currentWorkspaceId: 'ws-1' }),
 }));
 
-vi.mock('@/hooks/useWorkspaceActions', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     detachConcordance: vi.fn(),
     materializeConcordance: vi.fn(),

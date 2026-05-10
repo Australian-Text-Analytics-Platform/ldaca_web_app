@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { SortingState, ColumnFiltersState } from '@tanstack/react-table';
-import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
-import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { nodesApi } from '@/api/nodes';
 import { useAuth } from '@/hooks/useAuth';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';

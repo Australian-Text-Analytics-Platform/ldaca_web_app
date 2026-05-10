@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Download } from 'lucide-react';
 import type { GraphNode } from '@/types/api';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useAuth } from '@/hooks/useAuth';
 import { getApiBase } from '@/api/env';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

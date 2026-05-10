@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useAuth } from '@/hooks/useAuth';
 import { takeMostRecent } from '@/utils/selectionUtils';
 // Updated to use modular API object pattern

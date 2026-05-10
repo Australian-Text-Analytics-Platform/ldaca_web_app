@@ -26,11 +26,11 @@ const mockUIState = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => mockWorkspaceData,
 }));
 
-vi.mock('@/hooks/useWorkspaceSelection', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   useWorkspaceSelection: () => mockSelection,
 }));
 

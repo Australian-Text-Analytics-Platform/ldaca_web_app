@@ -22,20 +22,20 @@ const authState = {
   isMultiUserMode: false,
 };
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     workspaceGraph: { nodes: [] },
     currentWorkspaceId: 'ws-1',
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceSelection', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   useWorkspaceSelection: () => ({
     selectedNodeIds: [],
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceActions', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     toggleNodeSelection: vi.fn(),
   }),

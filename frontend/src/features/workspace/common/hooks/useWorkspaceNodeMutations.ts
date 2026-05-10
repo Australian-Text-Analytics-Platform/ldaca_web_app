@@ -1,19 +1,19 @@
 import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
-import { workspacesApi } from '../../api/workspaces';
+import { workspacesApi } from '@/api/workspaces';
 import {
   nodesApi,
   type FilterRequest,
   type SliceRequest,
   type ReplaceRequest,
   type PolarsExpressionRequest,
-} from '../../api/nodes';
-import { queryKeys } from '../../lib/queryKeys';
-import { isGraphDebugEnabled } from '../../lib/debugFlags';
-import { type NodeSchemaResponse } from '../../types';
-import { type WorkspaceGraphResponse } from '../../types/api';
-import { fetchNodeInfo, invalidateNodeInfoQuery } from '../../lib/nodeInfo';
-import { normalizeSchemaFromInfo } from '../useSchemaManagement';
+} from '@/api/nodes';
+import { queryKeys } from '@/lib/queryKeys';
+import { isGraphDebugEnabled } from '@/lib/debugFlags';
+import { type NodeSchemaResponse } from '@/types';
+import { type WorkspaceGraphResponse } from '@/types/api';
+import { fetchNodeInfo, invalidateNodeInfoQuery } from '@/lib/nodeInfo';
+import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
 
 interface WorkspaceNodeMutationsParams {
   authHeaders: Record<string, string>;

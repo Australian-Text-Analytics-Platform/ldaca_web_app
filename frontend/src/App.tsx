@@ -3,7 +3,7 @@ import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { usePreferencesInit } from './hooks/usePreferences';
 import { QueryProvider } from './providers/QueryProvider';
-import { WorkspaceProvider } from './providers/WorkspaceProvider';
+import { WorkspaceProvider } from '@/features/workspace/common/WorkspaceProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Sidebar from './components/layout/Sidebar';
 import { InsetCard } from './components/layout/InsetCard';

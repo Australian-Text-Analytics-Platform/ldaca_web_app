@@ -7,11 +7,11 @@ import {
   type QuotationRequest,
   type QuotationDetachRequest,
   type QuotationMaterializeRequest,
-} from '../api/text';
-import { queryKeys } from '../lib/queryKeys';
-import { useWorkspaceCore } from './workspace/useWorkspaceCore';
-import { useWorkspaceQueries } from './workspace/useWorkspaceQueries';
-import { useWorkspaceNodeMutations } from './workspace/useWorkspaceNodeMutations';
+} from '@/api/text';
+import { queryKeys } from '@/lib/queryKeys';
+import { useWorkspaceCore } from './useWorkspaceCore';
+import { useWorkspaceQueries } from './useWorkspaceQueries';
+import { useWorkspaceNodeMutations } from './useWorkspaceNodeMutations';
 
 export const useWorkspaceInternal = () => {
   const core = useWorkspaceCore();

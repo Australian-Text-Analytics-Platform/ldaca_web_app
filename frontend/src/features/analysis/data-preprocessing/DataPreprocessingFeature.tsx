@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucide-react';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
-import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FilterSubTab } from '../../preprocessing/filter/FilterSubTab';

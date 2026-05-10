@@ -10,7 +10,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/hooks/useWorkspaceSelection', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   useWorkspaceSelection: () => ({
     selectedNodes: [
       {
@@ -22,7 +22,7 @@ vi.mock('@/hooks/useWorkspaceSelection', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     currentWorkspaceId: 'ws-1',
     currentWorkspace: { name: 'Workspace One' },

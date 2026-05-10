@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { useWorkspaceInternal } from '../hooks/useWorkspaceInternal';
+import type { useWorkspaceInternal } from './hooks/useWorkspaceInternal';
 
 type WorkspaceInternal = ReturnType<typeof useWorkspaceInternal>;
 

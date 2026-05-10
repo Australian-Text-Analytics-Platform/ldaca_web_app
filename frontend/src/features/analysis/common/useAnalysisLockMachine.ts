@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';
 import { useAutoNodeColumns } from '@/hooks/useAutoNodeColumns';
 import {

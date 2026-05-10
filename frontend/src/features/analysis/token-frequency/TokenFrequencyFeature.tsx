@@ -2,9 +2,9 @@ import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { textApi, type TokenFrequencyResponse } from '@/api/text';
 import { useAuth } from '@/hooks/useAuth';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { takeMostRecent } from '@/utils/selectionUtils';
 
 import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';

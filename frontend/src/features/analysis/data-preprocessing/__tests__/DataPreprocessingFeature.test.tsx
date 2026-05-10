@@ -28,7 +28,7 @@ const mockSelectedNode = {
   shape: [2, 2] as [number, number],
 };
 
-vi.mock('@/hooks/useWorkspaceSelection', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   useWorkspaceSelection: () => ({
     selectedNodeId: 'node-1',
     selectedNode: mockSelectedNode,
@@ -37,7 +37,7 @@ vi.mock('@/hooks/useWorkspaceSelection', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     nodeData: {
       columns: ['Body', 'Count'],
@@ -51,7 +51,7 @@ vi.mock('@/hooks/useWorkspaceData', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceActions', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     filterNode: mockFilterNode,
     filterPreview: mockFilterPreview,
@@ -68,7 +68,7 @@ vi.mock('@/hooks/useWorkspaceActions', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceStatus', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
   useWorkspaceStatus: () => ({
     isLoading: {
       nodeData: false,
