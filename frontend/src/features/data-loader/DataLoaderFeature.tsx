@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Download as DownloadIcon, Plus, RefreshCcw, LogOut } from 'lucide-react';
+import React, { useCallback, useRef, useState } from 'react';
+import { Loader2, FolderPlus, Upload, Download as DownloadIcon, RefreshCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { getInvalidWorkspaceNameMessage } from '@/lib/workspaceName';
 import {
@@ -43,13 +42,13 @@ import {
 } from '@/components/ui/dialog';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useResizableSplit } from './hooks/useResizableSplit';
 import { usePendingWorkspaceDownloads } from './hooks/usePendingWorkspaceDownloads';
 import { FileTree } from './components/FileTree';
 import { WorkspaceManagerCard } from './components/WorkspaceManagerCard';
+import { ActiveWorkspaceCard } from './components/ActiveWorkspaceCard';
 import { countFilesInNode } from './utils/fileTreeHelpers';
-import { formatBytes, formatTimestamp, getWorkspaceId } from './utils/format';
+import { getWorkspaceId } from './utils/format';
 
 const MAX_FILE_TREE_HEIGHT_REM = 40;
 
@@ -73,10 +72,6 @@ export const DataLoaderFeature: React.FC = () => {
     refetchFiles,
   } = useFiles({ authHeaders });
 
-  const [newWorkspaceName, setNewWorkspaceName] = useState('');
-  const [newWorkspaceDescription, setNewWorkspaceDescription] = useState('');
-  const [renameValue, setRenameValue] = useState('');
-  const [descriptionValue, setDescriptionValue] = useState('');
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
   const [importingSamples, setImportingSamples] = useState(false);
@@ -124,16 +119,6 @@ export const DataLoaderFeature: React.FC = () => {
 
   const workspaceDownloads = usePendingWorkspaceDownloads({ authHeaders, notify });
 
-  useEffect(() => {
-    const active = workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId);
-    if (active?.name) {
-      setRenameValue(active.name);
-    } else {
-      setRenameValue('');
-    }
-    setDescriptionValue(active?.description || '');
-  }, [currentWorkspaceId, workspaces]);
-
   const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
 
   const sortedWorkspaces = workspaces.toSorted((a, b) => {
@@ -150,8 +135,6 @@ export const DataLoaderFeature: React.FC = () => {
   const totalFileCount = fileTree.reduce((sum, node) => sum + countFilesInNode(node), 0);
 
   const currentWorkspace = workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId) || null;
-  const normalizedCurrentDescription = (currentWorkspace?.description || '').trim();
-  const normalizedDescriptionValue = descriptionValue.trim();
 
   const nodeCount =
     workspaceGraph?.nodes?.length ??
@@ -159,27 +142,26 @@ export const DataLoaderFeature: React.FC = () => {
     currentWorkspace?.dataframe_count ??
     0;
 
-  const handleCreateWorkspace = async () => {
-    const trimmed = newWorkspaceName.trim();
-    if (!trimmed) return;
+  const handleCreateWorkspace = async (name: string, description: string): Promise<boolean> => {
+    if (!name) return false;
     try {
-      await workspaceActions.createWorkspace(trimmed, newWorkspaceDescription.trim() || undefined);
-      setNewWorkspaceName('');
-      setNewWorkspaceDescription('');
-      notify('success', `Workspace "${trimmed}" created.`);
+      await workspaceActions.createWorkspace(name, description || undefined);
+      notify('success', `Workspace "${name}" created.`);
+      return true;
     } catch (error) {
       const message = getInvalidWorkspaceNameMessage(error);
       if (message) {
         setWorkspaceNameAlert(message);
-        return;
+        return false;
       }
       notify('error', (error as Error).message || 'Failed to create workspace.');
+      return false;
     }
   };
 
-  const handleRenameWorkspace = async () => {
+  const handleRenameWorkspace = async (value: string) => {
     try {
-      await workspaceActions.renameWorkspace(renameValue.trim());
+      await workspaceActions.renameWorkspace(value);
       notify('success', 'Workspace renamed.');
     } catch (error) {
       const message = getInvalidWorkspaceNameMessage(error);
@@ -209,9 +191,9 @@ export const DataLoaderFeature: React.FC = () => {
     }
   };
 
-  const handleUpdateWorkspaceDescription = async () => {
+  const handleUpdateWorkspaceDescription = async (value: string) => {
     try {
-      await workspaceActions.updateWorkspaceDescription(descriptionValue.trim());
+      await workspaceActions.updateWorkspaceDescription(value);
       notify('success', 'Workspace description updated.');
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to update workspace description.');
@@ -530,127 +512,16 @@ export const DataLoaderFeature: React.FC = () => {
           style={{ flexBasis: `${topRatio * 100}%` }}
         >
           <div className="grid h-full min-h-0 gap-4 lg:grid-cols-2">
-            <Card
-              data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}
-              data-hint-id="workspace.create-or-load"
-              className="flex h-full flex-col overflow-hidden"
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {currentWorkspace ? 'Active workspace' : 'Create workspace'}
-                  {currentWorkspace ? (
-                    <HelpIcon
-                      targetKey="data-loader.active-workspace.section"
-                      label="Active workspace overview"
-                      tooltip="Choose or rename the workspace where new data blocks will be added. Save regularly to persist your progress."
-                    />
-                  ) : (
-                    <HelpIcon
-                      targetKey="data-loader.create-workspace.name"
-                      label="Create workspace overview"
-                      tooltip="Create a new workspace before uploading files or adding data blocks. Add an optional description if you want to capture its purpose."
-                    />
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4">
-
-            {currentWorkspace ? (
-              <>
-                <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-                  <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
-                    {currentWorkspace.name}
-                    <Badge>{nodeCount} data block{nodeCount === 1 ? '' : 's'}</Badge>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} | Size {formatBytes(Number(currentWorkspace.workspace_size_Byte || 0))} | Created {formatTimestamp(currentWorkspace.created_at)}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="rename-workspace">Rename workspace</Label>
-                    <HelpIcon targetKey="data-loader.rename-workspace.input" label="Rename workspace input" />
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      id="rename-workspace"
-                      value={renameValue}
-                      onChange={(event) => setRenameValue(event.target.value)}
-                      placeholder="Enter new name"
-                      disabled={!hasWorkspaceSelected || workspaceBusy}
-                    />
-                    <Button onClick={handleRenameWorkspace} disabled={!hasWorkspaceSelected || !renameValue.trim()}>
-                      Rename
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="workspace-description">Workspace description</Label>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      id="workspace-description"
-                      aria-label="Workspace description"
-                      value={descriptionValue}
-                      onChange={(event) => setDescriptionValue(event.target.value)}
-                      placeholder="Enter workspace description"
-                      disabled={!hasWorkspaceSelected || workspaceBusy}
-                    />
-                    <Button
-                      onClick={handleUpdateWorkspaceDescription}
-                      disabled={!hasWorkspaceSelected || workspaceBusy || normalizedDescriptionValue === normalizedCurrentDescription}
-                    >
-                      Update description
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
-                    <RefreshCcw className="mr-2 h-4 w-4" /> Save
-                  </Button>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        void handleSetCurrentWorkspace(null);
-                      }}
-                      disabled={!hasWorkspaceSelected || workspaceBusy}
-                    >
-                      <LogOut className="mr-2 h-4 w-4" /> Unload
-                    </Button>
-                    <HelpIcon targetKey="data-loader.unload.button" label="Unload workspace" />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-2">
-                <Input
-                  id="new-workspace-name"
-                  value={newWorkspaceName}
-                  onChange={(event) => setNewWorkspaceName(event.target.value)}
-                  placeholder="Workspace name"
-                />
-                <Input
-                  value={newWorkspaceDescription}
-                  onChange={(event) => setNewWorkspaceDescription(event.target.value)}
-                  placeholder="Optional description"
-                />
-                <div className="flex items-center gap-2">
-                  <DisabledReasonTooltip reason={!newWorkspaceName.trim() ? 'Enter a workspace name first' : undefined}>
-                    <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
-                      <Plus className="mr-2 h-4 w-4" /> Create workspace
-                    </Button>
-                  </DisabledReasonTooltip>
-                  <HelpIcon targetKey="data-loader.create-workspace.button" label="Create workspace" />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            <ActiveWorkspaceCard
+              currentWorkspace={currentWorkspace}
+              nodeCount={nodeCount}
+              busy={workspaceBusy}
+              onCreate={handleCreateWorkspace}
+              onRename={handleRenameWorkspace}
+              onUpdateDescription={handleUpdateWorkspaceDescription}
+              onSave={handleSaveWorkspace}
+              onUnload={() => handleSetCurrentWorkspace(null)}
+            />
 
         <WorkspaceManagerCard
           workspaces={sortedWorkspaces}
