@@ -8,6 +8,8 @@ import { type PaginationMap, type PaginationState, createDefaultPagination } fro
 const useSelectionSlice = () =>
   useSelectionStore(
     useShallow((state) => ({
+      currentWorkspaceId: state.currentWorkspaceId,
+      setCurrentWorkspaceId: state.setCurrentWorkspaceId,
       selectedNodeId: state.selectedNodeId,
       selectedNodeIds: state.selectedNodeIds,
       selectNode: state.selectNode,
@@ -30,13 +32,16 @@ const useUISlice = () =>
 
 /**
  * Core workspace wiring: bundles auth, current-workspace id, selection, and
- * per-node pagination. Pagination is kept as local state (not in a store)
- * because it's tightly coupled to `selectedNodeId` lifecycle and shouldn't
- * persist across workspaces.
+ * per-node pagination. `currentWorkspaceId` lives in `selectionStore` (Phase
+ * 4.1) so this hook just re-exposes the slice. Pagination stays as local
+ * state because it's tightly coupled to `selectedNodeId` lifecycle and
+ * shouldn't persist across workspaces.
  */
 export const useWorkspaceCore = () => {
   const { getAuthHeaders, isAuthenticated } = useAuth();
   const {
+    currentWorkspaceId,
+    setCurrentWorkspaceId,
     selectedNodeId,
     selectedNodeIds,
     selectNode,
@@ -46,7 +51,6 @@ export const useWorkspaceCore = () => {
   } = useSelectionSlice();
   const ui = useUISlice();
 
-  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const [pagination, setPaginationState] = useState<PaginationMap>({});
 
   const updatePagination = (nodeId: string, updater: (existing: PaginationState) => PaginationState) => {

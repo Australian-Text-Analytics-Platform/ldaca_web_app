@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   textApi,
@@ -61,20 +61,38 @@ export const useWorkspaceInternal = () => {
     getPaginationForNode,
   });
 
+  // Phase 4.1: the `current.get` server query is treated as a one-shot
+  // bootstrap that hydrates the selectionStore. After the first hydration
+  // (or first error after authentication), `setCurrentWorkspace` mutations
+  // are the only writer — without this guard, every refetch of the
+  // currentWorkspace query would otherwise revert local state back to the
+  // server's stale value during the brief window before the post-mutation
+  // invalidate lands.
+  const hasBootstrappedRef = useRef(false);
   useEffect(() => {
     if (!isAuthenticated) {
-      setCurrentWorkspaceId((prev) => (prev === null ? prev : null));
+      hasBootstrappedRef.current = false;
+      if (currentWorkspaceId !== null) setCurrentWorkspaceId(null);
       return;
     }
+    if (hasBootstrappedRef.current) return;
 
     if (currentWorkspaceIdFromQuery !== undefined) {
-      setCurrentWorkspaceId((prev) =>
-        prev === currentWorkspaceIdFromQuery ? prev : currentWorkspaceIdFromQuery
-      );
+      hasBootstrappedRef.current = true;
+      if (currentWorkspaceId !== currentWorkspaceIdFromQuery) {
+        setCurrentWorkspaceId(currentWorkspaceIdFromQuery);
+      }
     } else if (currentWorkspaceQueryError) {
-      setCurrentWorkspaceId((prev) => (prev === null ? prev : null));
+      hasBootstrappedRef.current = true;
+      if (currentWorkspaceId !== null) setCurrentWorkspaceId(null);
     }
-  }, [currentWorkspaceIdFromQuery, currentWorkspaceQueryError, isAuthenticated, setCurrentWorkspaceId]);
+  }, [
+    currentWorkspaceId,
+    currentWorkspaceIdFromQuery,
+    currentWorkspaceQueryError,
+    isAuthenticated,
+    setCurrentWorkspaceId,
+  ]);
 
   const { actions: nodeActions } = useWorkspaceNodeMutations({
     authHeaders,

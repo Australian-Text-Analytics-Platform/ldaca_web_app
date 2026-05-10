@@ -145,6 +145,12 @@ describe('useWorkspaceInternal', () => {
   });
 
   describe('reconciler effect', () => {
+    // Phase 4.1: the `current.get` server query is one-shot bootstrap that
+    // hydrates the selectionStore. After the first hydration (or first
+    // error after authentication), the reconciler hands control to the
+    // setCurrentWorkspace mutation — which is what these direct-value
+    // assertions check.
+
     it('clears currentWorkspaceId when not authenticated', () => {
       const setCurrentWorkspaceId = vi.fn();
       useWorkspaceCoreMock.mockReturnValue(
@@ -159,15 +165,27 @@ describe('useWorkspaceInternal', () => {
 
       renderInternal();
 
-      // The reconciler asks setCurrentWorkspaceId to clear; it uses the
-      // updater form so we just check it was called once.
       expect(setCurrentWorkspaceId).toHaveBeenCalledTimes(1);
-      const updater = setCurrentWorkspaceId.mock.calls[0]![0] as (prev: string | null) => string | null;
-      expect(updater('ws-1')).toBeNull();
-      expect(updater(null)).toBeNull();
+      expect(setCurrentWorkspaceId).toHaveBeenCalledWith(null);
     });
 
-    it('syncs currentWorkspaceId from the server query when authenticated', () => {
+    it('does not re-call setCurrentWorkspaceId when not authenticated and store is already null', () => {
+      const setCurrentWorkspaceId = vi.fn();
+      useWorkspaceCoreMock.mockReturnValue(
+        buildCoreReturn({
+          isAuthenticated: false,
+          currentWorkspaceId: null,
+          setCurrentWorkspaceId,
+        }),
+      );
+      useWorkspaceQueriesMock.mockReturnValue(buildQueriesReturn());
+      useWorkspaceNodeMutationsMock.mockReturnValue(buildMutationsReturn());
+
+      renderInternal();
+      expect(setCurrentWorkspaceId).not.toHaveBeenCalled();
+    });
+
+    it('syncs currentWorkspaceId from the server query on first hydration', () => {
       const setCurrentWorkspaceId = vi.fn();
       useWorkspaceCoreMock.mockReturnValue(
         buildCoreReturn({
@@ -184,14 +202,10 @@ describe('useWorkspaceInternal', () => {
       renderInternal();
 
       expect(setCurrentWorkspaceId).toHaveBeenCalledTimes(1);
-      const updater = setCurrentWorkspaceId.mock.calls[0]![0] as (
-        prev: string | null,
-      ) => string | null;
-      expect(updater(null)).toBe('ws-server');
-      expect(updater('ws-server')).toBe('ws-server'); // identity-stable on match
+      expect(setCurrentWorkspaceId).toHaveBeenCalledWith('ws-server');
     });
 
-    it('clears currentWorkspaceId when the server query errors', () => {
+    it('clears currentWorkspaceId when the server query errors on first hydration', () => {
       const setCurrentWorkspaceId = vi.fn();
       useWorkspaceCoreMock.mockReturnValue(
         buildCoreReturn({
@@ -211,10 +225,7 @@ describe('useWorkspaceInternal', () => {
       renderInternal();
 
       expect(setCurrentWorkspaceId).toHaveBeenCalledTimes(1);
-      const updater = setCurrentWorkspaceId.mock.calls[0]![0] as (
-        prev: string | null,
-      ) => string | null;
-      expect(updater('ws-1')).toBeNull();
+      expect(setCurrentWorkspaceId).toHaveBeenCalledWith(null);
     });
 
     it('does nothing when authenticated, server query is undefined, and no error', () => {
@@ -233,6 +244,45 @@ describe('useWorkspaceInternal', () => {
 
       renderInternal();
       expect(setCurrentWorkspaceId).not.toHaveBeenCalled();
+    });
+
+    it('does not re-bootstrap once hydrated even if the server query later returns a different value', () => {
+      // After the first server response hydrates the store, mutations win:
+      // a stale subsequent server value (e.g. cached refetch landing right
+      // after a setCurrentWorkspace mutation) must not revert the store.
+      const setCurrentWorkspaceId = vi.fn();
+      useWorkspaceCoreMock.mockReturnValue(
+        buildCoreReturn({
+          isAuthenticated: true,
+          currentWorkspaceId: null,
+          setCurrentWorkspaceId,
+        }),
+      );
+      useWorkspaceQueriesMock.mockReturnValue(
+        buildQueriesReturn({ currentWorkspaceIdFromQuery: 'ws-A' }),
+      );
+      useWorkspaceNodeMutationsMock.mockReturnValue(buildMutationsReturn());
+
+      const { rerender } = renderInternal();
+      expect(setCurrentWorkspaceId).toHaveBeenCalledTimes(1);
+      expect(setCurrentWorkspaceId).toHaveBeenLastCalledWith('ws-A');
+
+      // Mutation moved store to ws-B. Server is still serving the old ws-A
+      // (refetch hasn't landed yet) — the reconciler must NOT revert.
+      useWorkspaceCoreMock.mockReturnValue(
+        buildCoreReturn({
+          isAuthenticated: true,
+          currentWorkspaceId: 'ws-B',
+          setCurrentWorkspaceId,
+        }),
+      );
+      useWorkspaceQueriesMock.mockReturnValue(
+        buildQueriesReturn({ currentWorkspaceIdFromQuery: 'ws-A' }),
+      );
+      useWorkspaceNodeMutationsMock.mockReturnValue(buildMutationsReturn());
+      rerender();
+
+      expect(setCurrentWorkspaceId).toHaveBeenCalledTimes(1); // still just the initial hydration
     });
   });
 

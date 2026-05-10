@@ -1,4 +1,4 @@
-import { useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useMemo } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
 import { workspacesApi } from '@/api/workspaces';
 import {
@@ -19,7 +19,7 @@ interface WorkspaceNodeMutationsParams {
   authHeaders: Record<string, string>;
   currentWorkspaceId: string | null;
   selectedNodeId: string | null;
-  setCurrentWorkspaceId: Dispatch<SetStateAction<string | null>>;
+  setCurrentWorkspaceId: (workspaceId: string | null) => void;
   setSelectedNodes: (nodeIds: string[]) => void;
   clearSelection: () => void;
   queryClient: QueryClient;
@@ -71,7 +71,11 @@ export const useWorkspaceNodeMutations = ({
     onSuccess: (_data, workspaceId, context) => {
       const previousId = context?.previousId ?? null;
       const nextId = workspaceId ?? null;
-      queryClient.setQueryData(queryKeys.currentWorkspace, nextId);
+      // Phase 4.1: store is canonical, the server query is one-shot
+      // bootstrap. We used to also `setQueryData(currentWorkspace, nextId)`
+      // here to keep the query cache in step, but with the bootstrap guard
+      // the reconciler ignores subsequent query updates anyway, so the
+      // query cache no longer drives state.
       setCurrentWorkspaceId(nextId);
       clearSelection();
 

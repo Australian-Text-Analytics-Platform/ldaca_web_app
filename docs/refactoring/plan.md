@@ -354,14 +354,13 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 
 The biggest perf wins concentrate here. **Effort: ~1 week.** Optional — codebase works fine without these but they're the structural debt that grows fastest.
 
-### 4.1 Single source of truth for `currentWorkspaceId`
+### 4.1 Single source of truth for `currentWorkspaceId` — ✅ DONE
 
-Currently in three places: `useState` in `useWorkspaceCore.ts:49`, react-query cache via `setQueryData` in `useWorkspaceNodeMutations.ts:73`, and a server-fetched query at `useWorkspaceQueries.ts:55`. Reconciler effect at `useWorkspaceInternal.ts:66-79` tries to keep them in sync.
+The id used to live in three places: `useState` in `useWorkspaceCore.ts`, a react-query cache write via `setQueryData(queryKeys.currentWorkspace, …)` inside the `setCurrentWorkspace` mutation, and the server-fetched `current.get` query. The reconciler effect tried (and only partially succeeded) at keeping them in sync — every refetch of the currentWorkspace query would happily revert local state to whatever the server had cached.
 
-- [ ] Pick the Zustand `selectionStore` as canonical alongside `selectedNodeId`.
-- [ ] Drop the `useState` from `useWorkspaceCore`.
-- [ ] Remove the `setQueryData(queryKeys.currentWorkspace, …)` write.
-- [ ] Treat the `current.get` query as one-shot bootstrap that hydrates the store.
+`selectionStore` now owns `currentWorkspaceId` alongside `selectedNodeId`. `useWorkspaceCore` re-exposes the store slice. The `setQueryData` write in `useWorkspaceNodeMutations` is gone — mutations call `setCurrentWorkspaceId` directly. The reconciler in `useWorkspaceInternal` keeps the auth-aware shape (clear on no-auth, hydrate on first authenticated query, clear on first error) but is now gated by a `hasBootstrappedRef`: after the first hydration (or first error), the server query is one-shot — subsequent refetches no longer drive state, so the post-mutation invalidate window can't revert. The `setCurrentWorkspaceId` parameter type drops `Dispatch<SetStateAction<…>>` for a plain `(string|null)=>void` setter; callers in the reconciler use direct values now.
+
+Tests: `useWorkspaceInternal.test.tsx` 10 → 12 (4 reconciler tests reshaped for the new direct-value contract; 2 added: idempotent no-call when already cleared, and the post-bootstrap-revert protection). The orphaned `queryClient.getQueryData(['workspaces','current'])` assertion in `useWorkspaceNodeMutations.test.tsx > setCurrentWorkspace` removed.
 
 ### 4.2 WorkspaceProvider re-render fix
 

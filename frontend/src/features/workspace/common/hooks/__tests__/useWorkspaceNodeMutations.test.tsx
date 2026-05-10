@@ -1,4 +1,4 @@
-import React, { type Dispatch, type SetStateAction } from 'react';
+import React from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -73,7 +73,7 @@ const wrapWithClient = (client: QueryClient): React.FC<{ children: React.ReactNo
 
 // Narrowly-typed mock factories so the args object satisfies
 // WorkspaceNodeMutationsParams without `as any` casts.
-type SetWorkspaceIdSpy = ReturnType<typeof vi.fn> & Dispatch<SetStateAction<string | null>>;
+type SetWorkspaceIdSpy = ReturnType<typeof vi.fn> & ((workspaceId: string | null) => void);
 type SetSelectedNodesSpy = ReturnType<typeof vi.fn> & ((nodeIds: string[]) => void);
 type ClearSelectionSpy = ReturnType<typeof vi.fn> & (() => void);
 type OperationFnSpy = ReturnType<typeof vi.fn> & ((operationId: string) => void);
@@ -249,9 +249,11 @@ describe('useWorkspaceNodeMutations', () => {
   });
 
   describe('setCurrentWorkspace', () => {
-    it('clears selection and updates the cached current-workspace key on success', async () => {
+    it('writes the new id to the selectionStore setter and clears node selection', async () => {
+      // Phase 4.1: the mutation no longer writes to the
+      // `['workspaces','current']` query cache — the selectionStore is
+      // canonical and the server query is one-shot bootstrap.
       const queryClient = createTestClient();
-      queryClient.setQueryData(['workspaces', 'current'], 'ws-1');
       workspacesApiMock.current.set.mockResolvedValue({ ok: true });
       const setCurrentWorkspaceId = mkSetWorkspaceId();
       const clearSelection = mkClearSelection();
@@ -273,7 +275,6 @@ describe('useWorkspaceNodeMutations', () => {
       });
       expect(setCurrentWorkspaceId).toHaveBeenCalledWith('ws-2');
       expect(clearSelection).toHaveBeenCalled();
-      expect(queryClient.getQueryData(['workspaces', 'current'])).toBe('ws-2');
     });
   });
 
