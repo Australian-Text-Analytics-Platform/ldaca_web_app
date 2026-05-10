@@ -1,7 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Loader2, FolderPlus, Upload, Download as DownloadIcon, RefreshCcw } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
@@ -17,29 +15,9 @@ import { type FileTreeDirectory } from '@/types';
 import { AddFilePanel, FilePreviewPanel } from '@/components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { getInvalidWorkspaceNameMessage } from '@/lib/workspaceName';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import { useResizableSplit } from './hooks/useResizableSplit';
@@ -47,6 +25,7 @@ import { usePendingWorkspaceDownloads } from './hooks/usePendingWorkspaceDownloa
 import { FileTree } from './components/FileTree';
 import { WorkspaceManagerCard } from './components/WorkspaceManagerCard';
 import { ActiveWorkspaceCard } from './components/ActiveWorkspaceCard';
+import { DataLoaderDialogs } from './components/DataLoaderDialogs';
 import { countFilesInNode } from './utils/fileTreeHelpers';
 import { getWorkspaceId } from './utils/format';
 
@@ -698,173 +677,56 @@ export const DataLoaderFeature: React.FC = () => {
         onClose={() => setAddFileName(null)}
         onConfirm={handleAddToWorkspace}
       />
-      <AlertDialog open={workspaceAlertOpen} onOpenChange={setWorkspaceAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>No workspace selected</AlertDialogTitle>
-            <AlertDialogDescription>
-              Choose or create a workspace in the Active workspace panel before adding files. The Add action will be available once a workspace is active.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setWorkspaceAlertOpen(false)}>Got it</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={Boolean(workspaceNameAlert)} onOpenChange={(open: boolean) => !open && setWorkspaceNameAlert(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Invalid workspace name</AlertDialogTitle>
-            <AlertDialogDescription>
-              {workspaceNameAlert || 'Workspace names cannot include path separators or traversal sequences.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setWorkspaceNameAlert(null)}>Got it</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={Boolean(workspaceToDelete)} onOpenChange={(open: boolean) => !open && setWorkspaceToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete workspace?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {workspaceToDelete
-                ? `This will permanently delete "${workspaceToDelete.name || workspaceToDelete.id}" and its data. This action cannot be undone.`
-                : 'This will permanently delete the workspace and its data. This action cannot be undone.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setWorkspaceToDelete(null)} disabled={deletingWorkspace}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDeleteWorkspace}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deletingWorkspace}
-            >
-              {deletingWorkspace ? 'Deleting…' : 'Delete workspace'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={ldacaImportOpen} onOpenChange={setLdacaImportOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Import from LDaCA</DialogTitle>
-            <DialogDescription>
-              Enter the LDaCA Zip URL to download and convert the dataset. This will run as a background task.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>LDaCA URL</Label>
-              <Input
-                value={ldacaUrl}
-                onChange={(e) => setLdacaUrl(e.target.value)}
-                placeholder="https://data.ldaca.edu.au/..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLdacaImportOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleLdacaImport} disabled={ldacaImporting || !ldacaUrl.trim()}>
-              {ldacaImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Import
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={createFolderOpen}
-        onOpenChange={(open) => {
-          setCreateFolderOpen(open);
-          if (!open) {
-            setNewFolderName('');
-          }
+      <DataLoaderDialogs
+        noWorkspaceAlert={{
+          open: workspaceAlertOpen,
+          onClose: () => setWorkspaceAlertOpen(false),
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create folder</DialogTitle>
-            <DialogDescription>
-              {createFolderParentPath ? `Create a subfolder inside ${createFolderParentLabel}.` : 'Create a folder under the root files directory.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-folder-name">Folder name</Label>
-              <Input
-                id="new-folder-name"
-                value={newFolderName}
-                onChange={(event) => setNewFolderName(event.target.value)}
-                placeholder="Enter folder name"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateFolderOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateFolder} disabled={creatingFolder || !newFolderName.trim()}>
-              {creatingFolder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Create folder
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(citationDirectory)}
-        onOpenChange={(open) => {
-          if (!open) {
+        workspaceNameAlert={{
+          message: workspaceNameAlert,
+          onClose: () => setWorkspaceNameAlert(null),
+        }}
+        folderNameAlert={{
+          message: folderNameAlert,
+          onClose: () => setFolderNameAlert(null),
+        }}
+        deleteWorkspace={{
+          target: workspaceToDelete,
+          deleting: deletingWorkspace,
+          onCancel: () => setWorkspaceToDelete(null),
+          onConfirm: () => void handleConfirmDeleteWorkspace(),
+        }}
+        ldacaImport={{
+          open: ldacaImportOpen,
+          onOpenChange: setLdacaImportOpen,
+          url: ldacaUrl,
+          onUrlChange: setLdacaUrl,
+          importing: ldacaImporting,
+          onImport: () => void handleLdacaImport(),
+        }}
+        createFolder={{
+          open: createFolderOpen,
+          onOpenChange: setCreateFolderOpen,
+          parentPath: createFolderParentPath,
+          parentLabel: createFolderParentLabel,
+          name: newFolderName,
+          onNameChange: setNewFolderName,
+          creating: creatingFolder,
+          onCreate: () => void handleCreateFolder(),
+        }}
+        citation={{
+          directory: citationDirectory,
+          path: citationPath,
+          content: citationContent,
+          loading: citationLoading,
+          onClose: () => {
             setCitationDirectory(null);
             setCitationPath(null);
             setCitationContent(null);
             setCitationLoading(false);
-          }
+          },
         }}
-      >
-        <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Citation</DialogTitle>
-            <DialogDescription>
-              {citationPath ? `Source: ${citationPath}` : 'Citation metadata'}
-            </DialogDescription>
-          </DialogHeader>
-          {citationLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading citation…
-            </div>
-          ) : citationContent ? (
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{citationContent}</ReactMarkdown>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No citation available for this folder.</p>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={Boolean(folderNameAlert)} onOpenChange={(open: boolean) => !open && setFolderNameAlert(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Invalid folder name</AlertDialogTitle>
-            <AlertDialogDescription>
-              {folderNameAlert || 'Folder names cannot include path separators or traversal sequences.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setFolderNameAlert(null)}>Got it</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      />
     </div>
   );
 };
