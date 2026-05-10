@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Trash2, Download as DownloadIcon, Plus, RefreshCcw, LogOut, MoreHorizontal, Star } from 'lucide-react';
+import { Loader2, FolderPlus, Upload, Download as DownloadIcon, Plus, RefreshCcw, LogOut } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
@@ -41,18 +41,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useResizableSplit } from './hooks/useResizableSplit';
 import { usePendingWorkspaceDownloads } from './hooks/usePendingWorkspaceDownloads';
 import { FileTree } from './components/FileTree';
+import { WorkspaceManagerCard } from './components/WorkspaceManagerCard';
 import { countFilesInNode } from './utils/fileTreeHelpers';
 import { formatBytes, formatTimestamp, getWorkspaceId } from './utils/format';
 
@@ -109,7 +104,6 @@ export const DataLoaderFeature: React.FC = () => {
   const [uploadingWorkspaceZip, setUploadingWorkspaceZip] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const workspaceZipInputRef = useRef<HTMLInputElement | null>(null);
   const {
     containerRef: splitContainerRef,
     topRatio,
@@ -140,7 +134,7 @@ export const DataLoaderFeature: React.FC = () => {
     setDescriptionValue(active?.description || '');
   }, [currentWorkspaceId, workspaces]);
 
-  const { favoriteWorkspaces, toggleFavorite, isFavorite } = usePreferencesStore();
+  const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
 
   const sortedWorkspaces = workspaces.toSorted((a, b) => {
     const aId = getWorkspaceId(a) ?? '';
@@ -278,15 +272,9 @@ export const DataLoaderFeature: React.FC = () => {
     }
   };
 
-  const openWorkspaceZipPicker = () => {
-    workspaceZipInputRef.current?.click();
-  };
-
-  const handleWorkspaceZipInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleUploadWorkspaceZip = async (file: File) => {
+    setUploadingWorkspaceZip(true);
     try {
-      setUploadingWorkspaceZip(true);
       await workspacesApi.uploadZip(file, authHeaders);
       await queryClient.refetchQueries({ queryKey: queryKeys.workspaces, exact: true });
       notify('success', `Workspace ZIP "${file.name}" uploaded.`);
@@ -294,7 +282,6 @@ export const DataLoaderFeature: React.FC = () => {
       notify('error', (error as Error).message || 'Failed to upload workspace ZIP.');
     } finally {
       setUploadingWorkspaceZip(false);
-      event.target.value = '';
     }
   };
 
@@ -665,147 +652,18 @@ export const DataLoaderFeature: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card
-          className="flex h-full flex-col overflow-hidden"
-        >
-          <CardHeader>
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2">
-                Workspace manager
-                <HelpIcon
-                  targetKey="data-loader.workspace-manager.section"
-                  label="Workspace manager overview"
-                  tooltip="Switch between saved workspaces or remove ones you no longer need."
-                />
-              </CardTitle>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={openWorkspaceZipPicker}
-                  disabled={uploadingWorkspaceZip || workspaceBusy}
-                >
-                  <Upload className="mr-1.5 h-4 w-4" />
-                  {uploadingWorkspaceZip ? 'Uploading…' : 'Upload workspace'}
-                </Button>
-                <input
-                  ref={workspaceZipInputRef}
-                  type="file"
-                  accept=".zip,application/zip"
-                  className="hidden"
-                  onChange={handleWorkspaceZipInputChange}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label="Refresh workspace list"
-                  title="Refresh workspace list"
-                  onClick={handleRefreshWorkspaces}
-                  disabled={refreshingWorkspaces || workspaceBusy}
-                >
-                  <RefreshCcw className={`h-4 w-4 ${refreshingWorkspaces ? 'animate-spin' : ''}`} />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col min-h-0 overflow-hidden">
-            {workspaceBusy && !sortedWorkspaces.length ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading workspaces…
-              </div>
-            ) : sortedWorkspaces.length === 0 ? (
-              <div className="rounded-md border border-dashed border-muted-foreground/60 px-4 py-3 text-center text-sm text-muted-foreground">
-                No workspaces yet. Create one to get started.
-              </div>
-            ) : (
-              <div className="space-y-3 overflow-y-auto pr-2">
-                {sortedWorkspaces.map((workspace) => {
-                  const workspaceId = getWorkspaceId(workspace);
-                  if (!workspaceId) return null;
-                  const isActive = workspaceId === currentWorkspaceId;
-                  return (
-                    <div
-                      key={workspaceId}
-                      data-testid={`workspace-manager-item-${workspaceId}`}
-                      className={`flex flex-col gap-2 rounded-md border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
-                        isActive ? 'border-primary bg-primary/10 ring-1 ring-primary/20 shadow-sm' : 'border-border/70 bg-background'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center gap-1 font-medium text-foreground">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 shrink-0"
-                            aria-label={isFavorite(workspaceId) ? 'Remove from favorites' : 'Add to favorites'}
-                            onClick={() => toggleFavorite(workspaceId)}
-                          >
-                            <Star
-                              className={`h-4 w-4 ${isFavorite(workspaceId) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
-                            />
-                          </Button>
-                          <span>{workspace.name || workspaceId}</span>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6"
-                                aria-label="View workspace description"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="max-w-xs">
-                              <DropdownMenuLabel>Description</DropdownMenuLabel>
-                              <div className="px-2 py-1.5 text-sm text-popover-foreground whitespace-pre-wrap">
-                                {workspace.description?.trim() || 'No description added yet.'}
-                              </div>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} | {workspace.total_nodes ?? workspace.dataframe_count ?? 0} data block{(workspace.total_nodes ?? workspace.dataframe_count ?? 0) === 1 ? '' : 's'} | Size {formatBytes(Number(workspace.workspace_size_Byte || 0))}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant={isActive ? 'outline' : 'secondary'}
-                          onClick={() => {
-                            void handleSetCurrentWorkspace(isActive ? null : workspaceId);
-                          }}
-                        >
-                          {isActive ? 'Unload' : 'Load'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void workspaceDownloads.startDownload(workspaceId, workspace.name || workspaceId)}
-                          disabled={workspaceDownloads.isStarting(workspaceId) || workspaceDownloads.isPending(workspaceId)}
-                        >
-                          <DownloadIcon className="mr-1.5 h-4 w-4" />
-                          {workspaceDownloads.isPending(workspaceId)
-                            ? 'Preparing…'
-                            : workspaceDownloads.isStarting(workspaceId)
-                              ? 'Starting…'
-                              : 'Download'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => openDeleteWorkspaceDialog(workspaceId)}
-                        >
-                          <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <WorkspaceManagerCard
+          workspaces={sortedWorkspaces}
+          currentWorkspaceId={currentWorkspaceId}
+          busy={workspaceBusy}
+          uploadingZip={uploadingWorkspaceZip}
+          refreshing={refreshingWorkspaces}
+          downloads={workspaceDownloads}
+          onUploadZip={handleUploadWorkspaceZip}
+          onRefresh={() => void handleRefreshWorkspaces()}
+          onLoadWorkspace={(workspaceId) => void handleSetCurrentWorkspace(workspaceId)}
+          onDeleteWorkspace={openDeleteWorkspaceDialog}
+        />
           </div>
         </div>
 
