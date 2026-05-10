@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { insertItemAt, moveItemTo, removeItemAt } from './tokenIndexMath';
 
 import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { takeMostRecent } from '@/utils/selectionUtils';
@@ -393,33 +394,20 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const canApply = hasSelection && trimmedExpression.length > 0 && !applyLoading && !isLoading.operations && !previewError;
 
-  const clampIndex = (value: number, max: number) => {
-    if (Number.isNaN(value)) return max;
-    if (value < 0) return 0;
-    if (value > max) return max;
-    return value;
-  };
-
   const addColumnToken = (column: string, dtype: string, index?: number) => {
       if (basicDisabled || !column) return;
-      applyBasicTokenUpdate((prev) => {
-        const next = [...prev];
-        const insertIndex = clampIndex(index ?? next.length, next.length);
-        next.splice(insertIndex, 0, { id: createTokenId(), kind: 'column', column, dtype, operations: [] });
-        return next;
-      });
+      applyBasicTokenUpdate((prev) =>
+        insertItemAt(prev, index, { id: createTokenId(), kind: 'column', column, dtype, operations: [] }),
+      );
       scheduleCommit();
     };
 
   const addCustomToken = (index?: number) => {
       if (basicDisabled) return;
       const tokenId = createTokenId();
-      applyBasicTokenUpdate((prev) => {
-        const next = [...prev];
-        const insertIndex = clampIndex(index ?? next.length, next.length);
-        next.splice(insertIndex, 0, { id: tokenId, kind: 'custom', value: '' });
-        return next;
-      });
+      applyBasicTokenUpdate((prev) =>
+        insertItemAt(prev, index, { id: tokenId, kind: 'custom', value: '' }),
+      );
       setEditingTokenId(tokenId);
       setCustomDraft('');
       customOriginalRef.current = '';
@@ -430,9 +418,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       applyBasicTokenUpdate((prev) => {
         const idx = prev.findIndex((token) => token.id === tokenId);
         if (idx === -1) return prev;
-        const next = [...prev];
-        next.splice(idx, 1);
-        return next;
+        return removeItemAt(prev, idx);
       });
       scheduleCommit();
     };
@@ -442,17 +428,14 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       applyBasicTokenUpdate((prev) => {
         const currentIndex = prev.findIndex((token) => token.id === tokenId);
         if (currentIndex === -1) return prev;
-        const next = [...prev];
-        const [item] = next.splice(currentIndex, 1) as [BasicToken];
-        let targetIndex = clampIndex(index, next.length + 1);
-        if (currentIndex < targetIndex) {
-          targetIndex -= 1;
-        }
-        if (targetIndex === currentIndex) {
-          return prev;
-        }
-        next.splice(targetIndex, 0, item);
-        return next;
+        const moved = moveItemTo(prev, currentIndex, index);
+        // moveItemTo returns a fresh array even on no-op moves; preserve the
+        // hook's prev-reference contract so consumers don't see a spurious
+        // re-render.
+        const isNoOp =
+          moved.length === prev.length
+          && moved.every((token, i) => token === prev[i]);
+        return isNoOp ? prev : moved;
       });
       scheduleCommit();
     };
