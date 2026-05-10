@@ -3,7 +3,7 @@ import React, { lazy, Suspense } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useUIStore, type ViewType } from '@/stores';
 
-const DataLoaderFeature = lazy(() => import('@/features/analysis/data-loader/DataLoaderFeature'));
+const DataLoaderFeature = lazy(() => import('@/features/data-loader/DataLoaderFeature'));
 const DataPreprocessingFeature = lazy(() => import('@/features/analysis/data-preprocessing/DataPreprocessingFeature'));
 const ConcordanceFeature = lazy(() => import('@/features/analysis/concordance/ConcordanceFeature'));
 const QuotationFeature = lazy(() => import('@/features/analysis/quotation/QuotationFeature'));
