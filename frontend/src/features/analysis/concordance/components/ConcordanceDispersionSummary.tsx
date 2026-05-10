@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import {
   CartesianGrid,
@@ -127,14 +127,13 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
   // mode). After that, respect the user's manual choice — otherwise a
   // transient false→true flip in `materialised` (e.g. when
   // `panelSelectedNodes` is momentarily empty during navigation) would
-  // re-tick a checkbox the user had just un-ticked.
-  const hasAutoEnabledShowAllRef = useRef<boolean>(materialised);
-  useEffect(() => {
-    if (materialised && !hasAutoEnabledShowAllRef.current) {
-      hasAutoEnabledShowAllRef.current = true;
-      setShowAllProcessed(true);
-    }
-  }, [materialised]);
+  // re-tick a checkbox the user had just un-ticked. Implemented via the
+  // React-blessed render-time set-state pattern, gated by a sticky flag.
+  const [hasAutoEnabledShowAll, setHasAutoEnabledShowAll] = useState<boolean>(materialised);
+  if (materialised && !hasAutoEnabledShowAll) {
+    setHasAutoEnabledShowAll(true);
+    setShowAllProcessed(true);
+  }
 
   // The plot only switches data sources once the server-side bin histogram
   // has been fetched. Until then, even with the toggle on, we keep showing
