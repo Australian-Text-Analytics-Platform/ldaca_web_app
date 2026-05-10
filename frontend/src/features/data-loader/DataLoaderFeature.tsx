@@ -53,6 +53,7 @@ import {
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { useResizableSplit } from './hooks/useResizableSplit';
 
 const README_FILENAME = 'README.md';
 const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
@@ -172,60 +173,12 @@ export const DataLoaderFeature: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const workspaceZipInputRef = useRef<HTMLInputElement | null>(null);
-  const splitContainerRef = useRef<HTMLDivElement | null>(null);
-  const splitDraggingRef = useRef(false);
-  const [topRatio, setTopRatio] = useState(0.4);
+  const {
+    containerRef: splitContainerRef,
+    topRatio,
+    splitterProps,
+  } = useResizableSplit({ defaultRatio: 0.4 });
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
-
-  const clampRatio = (value: number) => Math.min(0.85, Math.max(0.15, value));
-
-  const handleSplitterPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    splitDraggingRef.current = true;
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // ignore pointer capture errors
-    }
-  };
-
-  const handleSplitterPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!splitDraggingRef.current) return;
-    const container = splitContainerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    if (rect.height <= 0) return;
-    const offset = event.clientY - rect.top;
-    setTopRatio(clampRatio(offset / rect.height));
-  };
-
-  const handleSplitterPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    splitDraggingRef.current = false;
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // ignore pointer capture errors
-    }
-  };
-
-  const handleSplitterKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setTopRatio((prev) => clampRatio(prev - 0.05));
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setTopRatio((prev) => clampRatio(prev + 0.05));
-    } else if (event.key === 'Home') {
-      event.preventDefault();
-      setTopRatio(0.15);
-    } else if (event.key === 'End') {
-      event.preventDefault();
-      setTopRatio(0.85);
-    } else if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      setTopRatio(0.5);
-    }
-  };
 
   const notify = (type: 'success' | 'error' | 'info', message: string) => {
     const duration = type === 'error' ? 6000 : 3500;
@@ -1187,19 +1140,8 @@ export const DataLoaderFeature: React.FC = () => {
         </div>
 
         <div
-          role="separator"
-          aria-orientation="horizontal"
+          {...splitterProps}
           aria-label="Resize data loader sections"
-          aria-valuenow={Math.round(topRatio * 100)}
-          aria-valuemin={15}
-          aria-valuemax={85}
-          tabIndex={0}
-          onPointerDown={handleSplitterPointerDown}
-          onPointerMove={handleSplitterPointerMove}
-          onPointerUp={handleSplitterPointerUp}
-          onPointerCancel={handleSplitterPointerUp}
-          onKeyDown={handleSplitterKeyDown}
-          onDoubleClick={() => setTopRatio(0.5)}
           className="my-1 flex h-2 shrink-0 cursor-row-resize items-center justify-center rounded-full bg-border transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title="Drag to resize. Double-click to reset."
         >
