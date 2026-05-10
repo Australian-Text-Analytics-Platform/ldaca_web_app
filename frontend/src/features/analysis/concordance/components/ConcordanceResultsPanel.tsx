@@ -34,13 +34,11 @@ export type ConcordanceResultsPanelProps = {
 
   // Display + metadata
   showMetadata: boolean;
-  setShowMetadata: Dispatch<SetStateAction<boolean>>;
   availableMetadataColumns: string[];
   metadataColumnSections: Section[];
   metadataDisabledReason: string | undefined;
   selectedMetadataColumns: string[];
   setSelectedMetadataColumns: Dispatch<SetStateAction<string[]>>;
-  persistResultPreferences: (partial: { pageSize?: number; showMetadata?: boolean }) => Promise<unknown>;
 
   // Dispersion-only state
   proportionalDispersionBars: boolean;
@@ -104,13 +102,11 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
   concordanceView,
   setConcordanceView,
   showMetadata,
-  setShowMetadata,
   availableMetadataColumns,
   metadataColumnSections,
   metadataDisabledReason,
   selectedMetadataColumns,
   setSelectedMetadataColumns,
-  persistResultPreferences,
   proportionalDispersionBars,
   setProportionalDispersionBars,
   combinedSourceMode,
@@ -237,19 +233,6 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
                 </label>
               )}
               <MetadataColumnSelector
-                showMetadata={showMetadata}
-                onShowMetadataChange={(nextValue) => {
-                  const previousValue = showMetadata;
-                  setShowMetadata(nextValue);
-                  void (async () => {
-                    try {
-                      await persistResultPreferences({ showMetadata: nextValue });
-                    } catch (error) {
-                      console.error('Failed to persist concordance metadata preference', error);
-                      setShowMetadata(previousValue);
-                    }
-                  })();
-                }}
                 availableColumns={availableMetadataColumns}
                 selectedColumns={selectedMetadataColumns ?? []}
                 onSelectedColumnsChange={setSelectedMetadataColumns}

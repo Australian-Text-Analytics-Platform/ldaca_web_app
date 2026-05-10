@@ -20,7 +20,7 @@ type Params = {
   materializedEvents: AnalysisMaterializedEvent[];
   getAuthHeaders: () => Record<string, string>;
   resolveTaskId: () => Promise<string | null>;
-  persistResultPreferences: (partial: { pageSize?: number; showMetadata?: boolean }) => Promise<unknown>;
+  persistResultPreferences: (partial: { pageSize?: number }) => Promise<unknown>;
   setNodeMaterializing: Dispatch<SetStateAction<Record<string, boolean>>>;
   setMaterializeTaskIds: Dispatch<SetStateAction<Record<string, string>>>;
   setMaterializedPaths: Dispatch<SetStateAction<Record<string, string>>>;

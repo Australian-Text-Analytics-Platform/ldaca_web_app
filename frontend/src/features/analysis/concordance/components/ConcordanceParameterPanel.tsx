@@ -51,7 +51,7 @@ export type ConcordanceParameterPanelProps = {
   globalPageSize: number;
   setGlobalPageSize: Dispatch<SetStateAction<number>>;
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
-  persistResultPreferences: (partial: { pageSize?: number; showMetadata?: boolean }) => Promise<unknown>;
+  persistResultPreferences: (partial: { pageSize?: number }) => Promise<unknown>;
 };
 
 export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps> = ({

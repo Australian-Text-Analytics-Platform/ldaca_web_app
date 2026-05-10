@@ -34,7 +34,6 @@ import { normalizeTypeName } from '@/utils/columnTypes';
 import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';
-import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 
 type EndpointPreset = 'openai' | 'lmstudio' | 'custom';
 const LMSTUDIO_BASE_URL = 'http://127.0.0.1:1234/v1';
@@ -159,8 +158,7 @@ const AiAnnotatorFeature: React.FC = () => {
   const [resultNodeId, setResultNodeId] = useState<string | null>(null);
   const [resultNode, setResultNode] = useState<AiAnnotationNodeResult | null>(null);
   const [isPaging, setIsPaging] = useState(false);
-  const [showMetadata, setShowMetadata] = useState(false);
-  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
+  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   const [panelTab, setPanelTab] = useState<'ai-annotation' | 'review'>('ai-annotation');
   const [isDetaching, setIsDetaching] = useState(false);
   const [reviewEdits, setReviewEdits] = useState<Record<string, string>>({});
@@ -522,20 +520,14 @@ const AiAnnotatorFeature: React.FC = () => {
   );
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
+  // Drop selections that are no longer in the available set after a re-run
+  // (e.g. a column got renamed or removed from the source data). No
+  // auto-selection — only the user's explicit picks survive.
   useEffect(() => {
     setSelectedMetadataColumns((previousSelection) => {
-      const nextSelection = reconcileMetadataColumnSelection(
-        availableMetadataColumns,
-        previousSelection,
-      );
-      const normalizedPreviousSelection = previousSelection ?? [];
-      if (
-        normalizedPreviousSelection.length === nextSelection.length &&
-        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
-      ) {
-        return previousSelection;
-      }
-      return nextSelection;
+      const filtered = previousSelection.filter((column) => availableMetadataColumns.includes(column));
+      if (filtered.length === previousSelection.length) return previousSelection;
+      return filtered;
     });
   }, [availableMetadataColumns, availableMetadataColumnsKey]);
 
@@ -544,9 +536,9 @@ const AiAnnotatorFeature: React.FC = () => {
       ...annotationColumns,
       ...(inferredTextColumn ? [inferredTextColumn] : []),
     ];
-    const visibleMetadataColumns = showMetadata
-      ? (selectedMetadataColumns ?? []).filter((column) => availableMetadataColumns.includes(column))
-      : [];
+    const visibleMetadataColumns = selectedMetadataColumns.filter((column) =>
+      availableMetadataColumns.includes(column),
+    );
     const unique = Array.from(new Set([...prioritized.filter(Boolean), ...visibleMetadataColumns]));
     return unique.length > 0 ? unique : resultColumns;
   })();
@@ -1248,10 +1240,8 @@ const AiAnnotatorFeature: React.FC = () => {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center gap-4">
               <MetadataColumnSelector
-                showMetadata={showMetadata}
-                onShowMetadataChange={setShowMetadata}
                 availableColumns={availableMetadataColumns}
-                selectedColumns={selectedMetadataColumns ?? []}
+                selectedColumns={selectedMetadataColumns}
                 onSelectedColumnsChange={setSelectedMetadataColumns}
               />
             </div>

@@ -321,15 +321,12 @@ export function useConcordanceTaskFlow({
     })();
   };
 
-  const persistResultPreferences = async (partial: { pageSize?: number; showMetadata?: boolean }) => {
+  const persistResultPreferences = async (partial: { pageSize?: number }) => {
     if (!currentWorkspaceId) return;
 
     const preferenceUpdates: Record<string, unknown> = {};
     if (partial.pageSize !== undefined) {
       preferenceUpdates.page_size = partial.pageSize;
-    }
-    if (partial.showMetadata !== undefined) {
-      preferenceUpdates.show_metadata = partial.showMetadata;
     }
 
     if (Object.keys(preferenceUpdates).length === 0) return;

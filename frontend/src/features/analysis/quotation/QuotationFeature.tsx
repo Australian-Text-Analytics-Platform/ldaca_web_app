@@ -79,7 +79,6 @@ import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
-import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { PageSizeSelect } from '../common/components/PageSizeSelect';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
@@ -158,8 +157,10 @@ const QuotationFeature: React.FC = () => {
   const setEngineDialogOpen = useQuotationEngineDialogStore((state) => state.setOpen);
   const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const closeEngineDialog = useQuotationEngineDialogStore((state) => state.close);
-  const [showMetadata, setShowMetadata] = useState(false);
-  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
+  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
+  // Metadata visibility derives from the selected columns: any selection
+  // shows the corresponding metadata columns in the results table.
+  const showMetadata = selectedMetadataColumns.length > 0;
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -298,7 +299,7 @@ const QuotationFeature: React.FC = () => {
         setEngineConfigStore({ type: 'local' });
       }
       setNodeColumnSelections([{ nodeId, column }], { replace: true });
-      setShowMetadata(false);
+      setSelectedMetadataColumns([]);
       const matPath = requestData.materialized_path;
       if (typeof matPath === 'string' && matPath) {
         setMaterializedPaths(prev => ({ ...prev, [nodeId]: matPath }));
@@ -840,19 +841,10 @@ const QuotationFeature: React.FC = () => {
 
     return Array.from(new Set([...baseColumns, ...generatedMetadataColumns]));
   })();
-  const preferredMetadataColumns = (() => {
-    const nodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '';
-    if (!nodeId) {
-      return [] as string[];
-    }
-
-    const selection = activeSelections.find((item) => item.nodeId === nodeId);
-    return selection?.column ? [selection.column] : [];
-  })();
-  const resolvedMetadataColumns = reconcileMetadataColumnSelection(
-    quotationMetadataColumns,
-    selectedMetadataColumns,
-    preferredMetadataColumns,
+  // No auto-selection: only honour columns the user has explicitly picked,
+  // filtered against the columns currently available from the result.
+  const resolvedMetadataColumns = selectedMetadataColumns.filter((column) =>
+    quotationMetadataColumns.includes(column),
   );
 
   return (
@@ -1039,8 +1031,6 @@ const QuotationFeature: React.FC = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex flex-wrap items-center gap-4">
                   <MetadataColumnSelector
-                    showMetadata={showMetadata}
-                    onShowMetadataChange={setShowMetadata}
                     availableColumns={quotationMetadataColumns}
                     selectedColumns={resolvedMetadataColumns}
                     onSelectedColumnsChange={setSelectedMetadataColumns}

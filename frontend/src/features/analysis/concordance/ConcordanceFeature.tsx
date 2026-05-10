@@ -105,8 +105,10 @@ const ConcordanceFeature: React.FC = () => {
   const [regex, setRegex] = useState(false);
   const [wholeWord, setWholeWord] = useState(true);
   const [caseSensitive, setCaseSensitive] = useState(false);
-  const [showMetadata, setShowMetadata] = useState(false);
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
+  // Metadata visibility derives from the selected columns: any selection
+  // shows the corresponding metadata columns in the results table.
+  const showMetadata = selectedMetadataColumns.length > 0;
   const [concordanceView, setConcordanceView] = useState<'table' | 'dispersion'>('table');
   const showDispersion = concordanceView === 'dispersion';
   const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
@@ -640,12 +642,7 @@ const ConcordanceFeature: React.FC = () => {
       return () => cancelAnimationFrame(id);
     }
 
-    const nextShowMetadata = preferenceSource?.show_metadata ?? analysisParams?.show_metadata;
-    if (typeof nextShowMetadata === 'boolean' && nextShowMetadata !== showMetadata) {
-      const id = requestAnimationFrame(() => setShowMetadata(nextShowMetadata));
-      return () => cancelAnimationFrame(id);
-    }
-  }, [results, globalPageSize, showMetadata, setNodePagination]);
+  }, [results, globalPageSize, setNodePagination]);
 
   // Materialize lifecycle: terminal-state task watcher, task-id ref reset,
   // and `analysis_materialized` SSE consumer. See hook for details.
@@ -962,13 +959,11 @@ const ConcordanceFeature: React.FC = () => {
           concordanceView={concordanceView}
           setConcordanceView={setConcordanceView}
           showMetadata={showMetadata}
-          setShowMetadata={setShowMetadata}
           availableMetadataColumns={availableMetadataColumns}
           metadataColumnSections={metadataColumnSections}
           metadataDisabledReason={metadataDisabledReason}
           selectedMetadataColumns={selectedMetadataColumns}
           setSelectedMetadataColumns={setSelectedMetadataColumns}
-          persistResultPreferences={persistResultPreferences}
           proportionalDispersionBars={proportionalDispersionBars}
           setProportionalDispersionBars={setProportionalDispersionBars}
           combinedSourceMode={combinedSourceMode}
