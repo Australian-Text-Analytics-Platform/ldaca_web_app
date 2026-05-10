@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import NodeSelectionPanel from '@/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
@@ -61,7 +61,7 @@ import {
 } from '../common';
 
 import { AnalysisPagination } from '@/components/AnalysisPagination';
-import { useAnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
+import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
 import { flattenQuotationGroups } from './quotationViewModels';
@@ -713,83 +713,51 @@ const QuotationFeature: React.FC = () => {
     },
   });
 
-  // Watch quotation_materialize task status: clear flag on terminal state; on
-  // success, refresh request to learn materialized_path, reset page_size to
-  // the default 20, and refetch the current page (which will now slice from
-  // the cached parquet with occurrence-row semantics).
-  const quotationMaterializeStatus = useAnalysisTaskStatus(['quotation_materialize']);
-  const processedQuotationMaterializeTaskIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const trackedEntries = Object.entries(materializeTaskIds);
-    if (trackedEntries.length === 0) return;
-
-    for (const task of quotationMaterializeStatus.tasks) {
-      const taskId = task?.task_id;
-      if (!taskId) continue;
-      if (processedQuotationMaterializeTaskIdsRef.current.has(taskId)) continue;
-      const state = task?.state;
-      if (state !== 'successful' && state !== 'failed' && state !== 'cancelled') continue;
-
-      const nodeEntry = trackedEntries.find(([, trackedId]) => trackedId === taskId);
-      if (!nodeEntry) continue;
-      const [nodeId] = nodeEntry;
-
-      processedQuotationMaterializeTaskIdsRef.current.add(taskId);
-      setNodeMaterializing((prev) => {
-        if (!prev[nodeId]) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
-      setMaterializeTaskIds((prev) => {
-        if (!(nodeId in prev)) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
-
-      if (state !== 'successful') continue;
-
-      void (async () => {
-        try {
-          const headers = getAuthHeaders();
-          const parentTaskId = await resolveTaskId();
-          if (parentTaskId) {
-            const req = await textApi.getQuotationTaskRequest(parentTaskId, headers);
-            const reqObj = (req as Record<string, unknown>) ?? {};
-            const path = typeof reqObj.materialized_path === 'string'
-              ? (reqObj.materialized_path as string)
-              : null;
-            if (path) {
-              setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
-            }
-            const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
-            if (summary) {
-              setMaterializeSummary({
-                recordCount: Number(summary.record_count) || 0,
-                uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
-                totalDocuments: Number(summary.total_source_documents) || 0,
-              });
-            }
-          }
-        } catch (error) {
-          console.warn('Failed to refresh quotation task request after materialize', error);
+  // Watch quotation_materialize task status: on success, refresh the parent
+  // request to learn materialized_path, reset page_size to the default 20,
+  // and refetch the current page (which now slices from the cached parquet
+  // with occurrence-row semantics).
+  const handleQuotationMaterializeSuccess = useCallback(async (nodeId: string, _taskId: string) => {
+    void _taskId;
+    try {
+      const headers = getAuthHeaders();
+      const parentTaskId = await resolveTaskId();
+      if (parentTaskId) {
+        const req = await textApi.getQuotationTaskRequest(parentTaskId, headers);
+        const reqObj = (req as Record<string, unknown>) ?? {};
+        const path = typeof reqObj.materialized_path === 'string'
+          ? (reqObj.materialized_path as string)
+          : null;
+        if (path) {
+          setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
         }
-
-        try {
-          handlePageSizeChange(20);
-        } catch (error) {
-          console.warn('Failed to reset quotation page size after materialize', error);
+        const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
+        if (summary) {
+          setMaterializeSummary({
+            recordCount: Number(summary.record_count) || 0,
+            uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
+            totalDocuments: Number(summary.total_source_documents) || 0,
+          });
         }
-      })();
+      }
+    } catch (error) {
+      console.warn('Failed to refresh quotation task request after materialize', error);
     }
-  }, [
-    quotationMaterializeStatus.tasks,
+
+    try {
+      handlePageSizeChange(20);
+    } catch (error) {
+      console.warn('Failed to reset quotation page size after materialize', error);
+    }
+  }, [getAuthHeaders, resolveTaskId, handlePageSizeChange]);
+
+  useMaterializeLifecycle({
+    taskType: 'quotation_materialize',
     materializeTaskIds,
-    getAuthHeaders,
-    resolveTaskId,
-    handlePageSizeChange,
-  ]);
+    setNodeMaterializing,
+    setMaterializeTaskIds,
+    onTerminalSuccess: handleQuotationMaterializeSuccess,
+  });
 
   const handleEngineDialogSave = () => {
     const payload = buildEngineRequest();
