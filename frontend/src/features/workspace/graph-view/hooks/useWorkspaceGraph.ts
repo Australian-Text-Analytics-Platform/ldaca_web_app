@@ -11,7 +11,7 @@ import {
   useNodesState,
 } from '@xyflow/react';
 
-import CustomNode from '@/components/CustomNode';
+import CustomNode from '@/features/workspace/graph-view/components/CustomNode';
 import type { GraphNode, GraphEdge } from '@/types/api';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';

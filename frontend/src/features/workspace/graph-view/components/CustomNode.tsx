@@ -10,8 +10,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from './ui/alert-dialog';
-import { type WorkspaceNode } from '../types';
+} from '@/components/ui/alert-dialog';
+import { type WorkspaceNode } from '@/types';
 
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;

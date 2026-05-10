@@ -1,7 +1,7 @@
 import React from 'react';
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
-import { CodeEditor } from '@/components/CodeEditor';
+import { CodeEditor } from '@/features/preprocessing/expression/CodeEditor';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
