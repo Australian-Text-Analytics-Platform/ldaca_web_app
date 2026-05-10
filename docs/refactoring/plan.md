@@ -215,6 +215,18 @@ ConcordanceFeature.tsx **2344 → 1070 LoC** (-54%) across four focused commits.
 - **`8b3c8f1` Phase 3.1 (3/4)** Panel extractions, 1444 → 1070 LoC. `<ConcordanceParameterPanel>` (search inputs, regex/whole-word/case-sensitive checkboxes, Run/Update + Clear buttons, page-size selector) and `<ConcordanceResultsPanel>` (results card frame with Separated/Combined view tabs, Table/Dispersion view tabs, dispersion controls row, MetadataColumnSelector, and the iteration loop dispatching to the per-block components). The `results.state === 'failed'` branch stays as a tiny inline Card (6 lines, no extraction value).
 - **`65696a6` Phase 3.1 (4/4)** = **Phase 2.1** — shared `useMaterializeLifecycle` in `features/analysis/common/hooks` finally lands. Concordance (multi-node) supplies a success callback that merges per-node materialized paths + summaries, resets globalPageSize to 20 + nodePagination, calls `persistResultPreferences`, and a failure callback that toasts the state. Quotation (single-node) supplies a success callback that writes the singular `materialized_path` + summary and calls `handlePageSizeChange(20)`; no failure handler. The watcher skeleton is now shared. Concordance's task-id-change reset effect and SSE consumer remain in `useConcordanceMaterializedEvents` (concordance-specific). Net –56 LoC across the two consumers; the Concordance hook drops its private `processedMaterializeTaskIdsRef`.
 
+### Phase 3.3 DataLoader decomposition landed (this session)
+
+DataLoaderFeature.tsx **1517 → 734 LoC** (-52%) across seven focused commits. The directory move from `features/analysis/data-loader/` to `features/data-loader/` happened first (Data Loader manages workspaces/files/imports — not analysis), then two hooks, four components, and two utility modules came out of the god-file in dependency order. Each commit is independently lint/typecheck/test clean; the 11-test data-loader suite passes after every step.
+
+- **`2e685de` Phase 3.3 (1/7)** Directory relocation. `src/features/analysis/data-loader/` → `src/features/data-loader/`. Lazy import in `ViewRouter.tsx` updated; tests/imports unchanged.
+- **`8d3fcfc` Phase 3.3 (2/7)** `useResizableSplit` hook (top-bottom splitter for the data-loader vertical split). Returns `{ containerRef, topRatio, splitterProps }`; the component spreads `splitterProps` onto the separator div. Behaviour preserved (min 0.15 / max 0.85, 0.05 keyboard nudge, Home/End jump to bounds, Enter/Space + double-click reset to 0.5). 1517 → 1459 LoC.
+- **`3f96e9d` Phase 3.3 (3/7)** `usePendingWorkspaceDownloads` hook. Encapsulates the start-download → watch-tasks → fetch-artifact flow. Owns its state (`pendingDownloads`, `startingWorkspaceId`), subscribes to the analysis-store tasks, and triggers the artifact download + toast on terminal task state. Component reads `isStarting(id)` / `isPending(id)` predicates. `notify` wrapped in stable `useCallback`. 1459 → 1410 LoC.
+- **`6e8c02a` Phase 3.3 (4/7)** `<FileTree>` component owns the recursive file/folder rendering and the in-tree DnD state (`draggingFilePath` / `fileMoveTarget`); side-effects exposed via callbacks (onPreviewFile / onAddFile / onSelectFile / onDownloadFile / onDeleteFile / onCreateFolderInside / onOpenCitation / onMoveFile / onWarnNoWorkspace). Pure helpers move to `utils/fileTreeHelpers.ts` (`README_FILENAME`, `FILE_DRAG_MIME_TYPE`, `countFilesInNode`, `getCitationFile`, `getVisibleDirectoryChildren`, `getParentDirectoryPath`); data-loader-local formatters to `utils/format.ts` (1024-based `formatBytes`, distinct from `lib/utils.formatBytes`'s 1000-based variant; `formatTimestamp`; `getWorkspaceId`). 1410 → 1143 LoC.
+- **`c21e891` Phase 3.3 (5/7)** `<WorkspaceManagerCard>` owns its own zip-input ref and the favorites read; parent supplies upload-zip / refresh / load / delete callbacks plus the workspace list and pending-downloads handle. The `openWorkspaceZipPicker` indirection collapses into the card's local `zipInputRef.current?.click()`; `handleWorkspaceZipInputChange` becomes a single-arg `handleUploadWorkspaceZip(file)`. 1143 → 1001 LoC.
+- **`c1af023` Phase 3.3 (6/7)** `<ActiveWorkspaceCard>` owns its rename / description / new-workspace-name / new-workspace-description input state; resets via the React-blessed render-time derived-state pattern (not `useEffect`) when the active workspace switches or its persisted name/description change. Parent's create handler now returns `Promise<boolean>` so the card knows whether to clear the create-form inputs. 1001 → 872 LoC.
+- **`26c762d` Phase 3.3 (7/7)** `<DataLoaderDialogs>` consolidates the 6 inline dialogs (no-workspace alert, invalid-name alert, invalid-folder-name alert, delete-workspace confirm, LDaCA import, create-folder, citation viewer) into a single component. Props are grouped per-dialog so the parent passes `{ open, onClose, ... }` bundles instead of a flat list of ~25 individual props. `react-markdown` + `remark-gfm` and the Dialog/AlertDialog primitive imports move with the dialogs. 872 → 734 LoC.
+
 ### Remaining Phase 3 work
 
 - **3.4 (rest)** Quotation: extract `<QuotationHighlightedCell>` from inline `renderHighlightedText` (closes over contextLength/hoverState/setHoverState — needs prop threading); hoist `TYPE_COLORS`/`hexToRgba`/`buildUnderlineStyle` to `quotationHighlight.ts`.
@@ -223,7 +235,6 @@ ConcordanceFeature.tsx **2344 → 1070 LoC** (-54%) across four focused commits.
 - **3.8 (rest)** WorkspaceTable: `useColumnMutations` hook (cast/rename/delete schema-mutation flows + per-column busy state, ~80 LoC). Needs careful prop threading because the rename UI state lives in the component while the mutation flow needs to clear it on success.
 - **3.1 (deferred)** Dispersion-only state hoisting into `<ConcordanceDispersionNodeBlock>` (or a `<ConcordanceDispersionControls>` sibling) so the Bin No. / Colour matches / Lowercase / Sources controls live where their state lives. Today they're in `<ConcordanceResultsPanel>` reading parent-owned state. Low ROI in isolation.
 - **3.1 (deferred)** Replace H8 result-prefs hydration `requestAnimationFrame(setX)` pattern with derived state. Couldn't be cleanly converted in this pass: users can override `globalPageSize` post-hydration so the value can't be derived; the rAF wrap exists only to dodge the `react-hooks/set-state-in-effect` lint rule. Revisit when the rule's intent is reviewed for one-shot hydration effects.
-- **3.3** DataLoaderFeature.tsx (1517 LoC): move out of `features/analysis/`; decompose 6 dialogs and the file tree.
 - **3.9 (rest)** useWorkspaceNodeMutations.ts: move 6 text mutations from useWorkspaceInternal.ts:101-228 here (or a peer `useWorkspaceTextMutations.ts`).
 
 ### 3.1 ConcordanceFeature.tsx (2344 → 1070 LoC)
@@ -251,15 +262,18 @@ Landed across `b6b8789`, `dd91802`, `8b3c8f1`, `65696a6`. View axis swapped from
 - [ ] Add `useAiAnnotatorTaskFlow` (Phase 2.1).
 - [ ] Extract `buildAiAnnotationCommonPayload(state)` for the 9-field shared payload between `handleDetach` and `handleRun` (L411-428, L451-470).
 
-### 3.3 DataLoaderFeature.tsx (1517 → ~600 LoC)
+### 3.3 DataLoaderFeature.tsx (1517 → 734 LoC)
 
-- [ ] **Move out of `features/analysis/`** — it manages workspaces/files/imports, not analysis. Relocate to `features/data-loader/`.
-- [ ] `data-loader/components/DataLoaderDialogs.tsx` (consolidates 6 inline dialogs at L1339-1512).
-- [ ] `data-loader/components/FileTree.tsx` (extracts `renderFileTreeNode` L757-901).
-- [ ] `data-loader/components/WorkspaceManagerCard.tsx` (L1049-1185 + workspace-download polling effect at L425-458).
-- [ ] `data-loader/components/ActiveWorkspaceCard.tsx` (L926-1047).
-- [ ] `data-loader/hooks/useResizableSplit.ts` (splitter pointer/key handlers at L177-228).
-- [ ] `data-loader/hooks/usePendingWorkspaceDownloads.ts` (L425-458 polling).
+Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, `26c762d`. See "Phase 3.3 DataLoader decomposition landed" above for per-commit details.
+
+- [x] **Move out of `features/analysis/`** — relocated to `features/data-loader/`. `2e685de`.
+- [x] `data-loader/components/DataLoaderDialogs.tsx` (6 inline dialogs consolidated). `26c762d`.
+- [x] `data-loader/components/FileTree.tsx` (recursive renderer + DnD state owner). `6e8c02a`.
+- [x] `data-loader/components/WorkspaceManagerCard.tsx` (zip-input + favorites read are owned here; workspace-download polling lives in `usePendingWorkspaceDownloads`). `c21e891`.
+- [x] `data-loader/components/ActiveWorkspaceCard.tsx` (owns rename/description/new-workspace input state; render-time derived-state reset on workspace switch). `c1af023`.
+- [x] `data-loader/hooks/useResizableSplit.ts`. `8d3fcfc`.
+- [x] `data-loader/hooks/usePendingWorkspaceDownloads.ts`. `3f96e9d`.
+- [x] `data-loader/utils/fileTreeHelpers.ts` + `data-loader/utils/format.ts` (pure helpers + 1024-based formatters). `6e8c02a`.
 
 ### 3.4 QuotationFeature.tsx (1599 → ~700 LoC)
 
