@@ -69,11 +69,13 @@ import {
   DEFAULT_CONTEXT_LENGTH,
   MAX_CONTEXT_LENGTH,
   clampContextLength,
-  clipTextAroundSpans,
-  type HighlightSpan,
 } from './quotationTextClip';
 import { normalizeRemoteUrl } from './quotationRemoteUrl';
 import { QuotationDetachDialog } from './components/QuotationDetachDialog';
+import {
+  QuotationHighlightedCell,
+  type QuotationHoverState,
+} from './components/QuotationHighlightedCell';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import {
   MetadataColumnSelector,
@@ -108,12 +110,6 @@ interface QuotationResultState {
 }
 
 const DEFAULT_PAGE_SIZE = 50;
-
-const TYPE_COLORS: Record<string, string> = {
-  speaker: '#2563eb', // blue-600
-  quote: '#059669',   // emerald-600
-  verb: '#7c3aed',    // violet-600
-};
 
 type QuotationDisplayRow = QuotationHitRow & {
   __spans: { start: number; end: number; type: string }[];
@@ -470,152 +466,7 @@ const QuotationFeature: React.FC = () => {
     setNodeColumnSelection(nodeId, column);
   };
 
-  // Track hovered segment per cell to highlight only that particular part
-  const [hoverState, setHoverState] = useState<{ key: string; segIndex: number; type?: 'speaker'|'quote'|'verb' } | null>(null);
-
-  const hexToRgba = (hex: string, alpha = 0.18) => {
-    const h = hex.replace('#', '');
-    const bigint = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
-
-  // Build multiple text decorations for proper multi-line underlines
-  const buildUnderlineStyle = (types: string[]): React.CSSProperties => {
-    if (!types.length) return {};
-    // Use text-decoration-line with multiple underlines for proper line wrapping
-    const decorations = types.map(() => 'underline').join(' ');
-    const colors = types.map(t => TYPE_COLORS[t] || '#111827');
-    return {
-      textDecorationLine: decorations as string,
-      textDecorationColor: colors.join(' ') as string,
-      textDecorationThickness: '2px',
-      textUnderlineOffset: '4px',
-      textDecorationSkipInk: 'none',
-      display: 'inline',
-    } as React.CSSProperties;
-  };
-
-  // Render a single text cell with underline spans using indices and label badges
-  const renderHighlightedText = (text: string, row: Record<string, unknown>, cellKey: string): React.ReactNode => {
-    try {
-      if (typeof text !== 'string' || !text.length) return text ?? '';
-      const spans: HighlightSpan[] = [];
-      const addSpan = (start?: unknown, end?: unknown, type?: string) => {
-        if (type && Number.isFinite(start) && Number.isFinite(end) && (start as number) < (end as number) && (start as number) >= 0 && (end as number) <= text.length) {
-          spans.push({ start: Number(start), end: Number(end), types: [type] });
-        }
-      };
-      // Prefer aggregated spans if present
-      if (Array.isArray(row?.__spans) && row.__spans.length > 0) {
-        row.__spans.forEach((s: Record<string, unknown>) => addSpan(s?.start, s?.end, s?.type as string | undefined));
-      } else {
-        addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
-        addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
-        addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
-      }
-
-      if (!spans.length) return text;
-
-      const clipped = clipTextAroundSpans(text, spans, contextLength);
-      let workingText = clipped.text;
-      let workingSpans = clipped.spans;
-      if (!workingSpans.length) {
-        workingText = text.slice(clipped.sliceStart, clipped.sliceEnd);
-        workingSpans = spans
-          .map((span) => {
-            const start = Math.max(span.start, clipped.sliceStart);
-            const end = Math.min(span.end, clipped.sliceEnd);
-            if (end <= start) return null;
-            return { ...span, start: start - clipped.sliceStart, end: end - clipped.sliceStart };
-          })
-          .filter((span): span is HighlightSpan => Boolean(span));
-      }
-
-      // Build segmentation boundaries
-      const bounds = new Set<number>([0, workingText.length]);
-      workingSpans.forEach(s => { bounds.add(s.start); bounds.add(s.end); });
-      const points = Array.from(bounds).sort((a, b) => a - b);
-
-      const segs: Array<{ start: number; end: number; types: string[] }> = [];
-      for (let i = 0; i < points.length - 1; i++) {
-        const s = points[i]!;
-        const e = points[i + 1]!;
-        if (e <= s) continue;
-        const covering = workingSpans.filter(sp => sp.start < e && sp.end > s).flatMap(sp => sp.types);
-        segs.push({ start: s, end: e, types: Array.from(new Set(covering)) });
-      }
-
-      const renderLabels = (types: string[], segIndex: number) => {
-        if (!types.length) return null;
-        return types.map((t, idx) => (
-          <span
-            key={idx}
-            className="text-[10px] font-semibold px-1 py-0.5 rounded border mr-1 align-baseline cursor-pointer"
-            style={{
-              color: '#0f172a',
-              borderColor: TYPE_COLORS[t] || '#334155',
-              backgroundColor: hoverState && hoverState.key === cellKey && hoverState.segIndex === segIndex && hoverState.type === t
-                ? hexToRgba(TYPE_COLORS[t] || '#cbd5e1', 0.28)
-                : '#f1f5f9',
-            }}
-            onMouseEnter={() => setHoverState({ key: cellKey, segIndex, type: t as 'speaker'|'quote'|'verb' })}
-            onMouseLeave={() => setHoverState(null)}
-          >
-            {t.toUpperCase()}
-          </span>
-        ));
-      };
-
-      return (
-        <span>
-          {clipped.prefixEllipsis && <span className="mr-1 text-muted-foreground">...</span>}
-          {segs.map((seg, i) => {
-            const str = workingText.slice(seg.start, seg.end);
-            if (!seg.types.length) return <span key={i}>{str}</span>;
-            const style = buildUnderlineStyle(seg.types);
-            // Determine hover match for this segment: if the currently hovered type applies to this cell and segment
-            const isHoveredSeg = !!(hoverState && hoverState.key === cellKey && hoverState.segIndex === i);
-            const colorForSeg = (hoverState?.type && isHoveredSeg && seg.types.includes(hoverState.type))
-              ? hoverState.type
-              : undefined;
-            const bgStyle: React.CSSProperties = isHoveredSeg ? {
-              backgroundColor: hexToRgba(TYPE_COLORS[colorForSeg || 'quote'] || '#cbd5e1', 0.22),
-              borderRadius: 3,
-              paddingLeft: 1,
-              paddingRight: 1,
-            } : {};
-
-            // On text hover, pick a deterministic type to highlight (priority: quote > speaker > verb)
-            const choosePriorityType = (ts: string[]) => {
-              const order = ['quote', 'speaker', 'verb'];
-              for (const t of order) if (ts.includes(t)) return t as 'quote'|'speaker'|'verb';
-              return ts[0] as 'quote'|'speaker'|'verb';
-            };
-            const segHoverType = choosePriorityType(seg.types);
-            return (
-              <span key={i}>
-                {renderLabels(seg.types, i)}
-                <span
-                  style={{ ...style, ...bgStyle }}
-                  onMouseEnter={() => setHoverState({ key: cellKey, segIndex: i, type: segHoverType })}
-                  onMouseLeave={() => setHoverState(null)}
-                >{str}</span>
-              </span>
-            );
-          })}
-          {clipped.suffixEllipsis && <span className="ml-1 text-muted-foreground">...</span>}
-          {row?.[QUOTATION_COLUMN_KEYS.quoteType] ? (
-            <span className="ml-1 align-baseline text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">{String(row[QUOTATION_COLUMN_KEYS.quoteType])}</span>
-          ) : null}
-        </span>
-      );
-    } catch {
-      return text;
-    }
-  };
+  const [hoverState, setHoverState] = useState<QuotationHoverState | null>(null);
 
   const buildQuotationResultState = (result: QuotationAnalysisResponse, column: string): QuotationResultState => {
     const groupedRows = result.data;
@@ -1160,11 +1011,16 @@ const QuotationFeature: React.FC = () => {
                                       const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
                                       const shouldHighlight = Boolean(textCol) && c === QUOTATION_DOCUMENT_COLUMN;
                                       const content = shouldHighlight
-                                        ? renderHighlightedText(
-                                            typeof val === 'string' ? val : String(val ?? ''),
-                                            row,
-                                            cellKey,
-                                          )
+                                        ? (
+                                          <QuotationHighlightedCell
+                                            text={typeof val === 'string' ? val : String(val ?? '')}
+                                            row={row}
+                                            cellKey={cellKey}
+                                            contextLength={contextLength}
+                                            hoverState={hoverState}
+                                            onHoverChange={setHoverState}
+                                          />
+                                        )
                                         : val !== undefined && val !== null
                                         ? String(val)
                                         : '';
