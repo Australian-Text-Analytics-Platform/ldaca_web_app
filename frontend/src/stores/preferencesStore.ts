@@ -1,3 +1,20 @@
+/**
+ * User preferences store. State is persisted to `localStorage` via the
+ * `persist` middleware and to the backend via a debounced subscriber set
+ * up in `usePreferencesInit` (`hooks/usePreferences.ts`):
+ *
+ *   - Setters update local state only. They do *not* call
+ *     `syncToBackend` directly.
+ *   - The init hook subscribes to changes after `hydrated` flips true,
+ *     coalesces bursts via a 800 ms debounce, and pushes the latest
+ *     snapshot using auth headers from the React-side `useAuth`.
+ *
+ * Doing the sync at the hook level means the call always has fresh auth
+ * headers; doing it via subscribe (instead of inline in each setter)
+ * coalesces rapid edits (e.g. dragging the favourites list) into a
+ * single request and never fires before the initial server load
+ * completes.
+ */
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -96,9 +113,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
               state.hiddenViews.splice(idx, 1);
             }
           });
-          // Fire-and-forget sync
-          const { syncToBackend } = get();
-          syncToBackend().catch(() => {});
         },
 
         toggleFavorite: (workspaceId) => {
@@ -110,8 +124,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
               state.favoriteWorkspaces.splice(idx, 1);
             }
           });
-          const { syncToBackend } = get();
-          syncToBackend().catch(() => {});
         },
 
         isFavorite: (workspaceId) => get().favoriteWorkspaces.includes(workspaceId),
@@ -123,8 +135,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
               state.quotationLastRemoteUrl = config.url;
             }
           });
-          const { syncToBackend } = get();
-          syncToBackend().catch(() => {});
         },
 
         setQuotationLastRemoteUrl: (url) => {
@@ -141,8 +151,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
               state.quotationEngine = { type: 'remote', url: trimmed };
             }
           });
-          const { syncToBackend } = get();
-          syncToBackend().catch(() => {});
         },
 
         loadFromBackend: async (headers) => {
