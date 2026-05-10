@@ -8,6 +8,14 @@ import {
   type ReplaceRequest,
   type PolarsExpressionRequest,
 } from '@/api/nodes';
+import {
+  textApi,
+  type ConcordanceDetachRequest,
+  type ConcordanceMaterializeRequest,
+  type QuotationRequest,
+  type QuotationDetachRequest,
+  type QuotationMaterializeRequest,
+} from '@/api/text';
 import { queryKeys } from '@/lib/queryKeys';
 import { isGraphDebugEnabled } from '@/lib/debugFlags';
 import { type NodeSchemaResponse } from '@/types';
@@ -546,6 +554,103 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
+  // ---- Text-analysis mutations (Phase 4.8: moved here from
+  // useWorkspaceInternal so the mutation surface lives in one place). ----
+
+  const detachConcordanceMutation = useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      workspaceId: string;
+      nodeId: string;
+      request: ConcordanceDetachRequest;
+    }) => textApi.concordanceDetach(nodeId, request, authHeaders),
+    onMutate: () => startOperation('detachConcordance'),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
+      endOperation('detachConcordance');
+    },
+    onError: (error: Error) => {
+      setOperationError('detachConcordance', error.message);
+      endOperation('detachConcordance');
+    },
+  });
+
+  const materializeConcordanceMutation = useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      nodeId: string;
+      request: ConcordanceMaterializeRequest;
+    }) => textApi.concordanceMaterialize(nodeId, request, authHeaders),
+    onMutate: () => startOperation('materializeConcordance'),
+    onSuccess: () => {
+      endOperation('materializeConcordance');
+    },
+    onError: (error: Error) => {
+      setOperationError('materializeConcordance', error.message);
+      endOperation('materializeConcordance');
+    },
+  });
+
+  const quotationMutation = useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      nodeId: string;
+      request: QuotationRequest;
+    }) => textApi.quotation(nodeId, request, authHeaders),
+    onMutate: () => startOperation('quotation'),
+    onSuccess: () => {
+      endOperation('quotation');
+    },
+    onError: (error: Error) => {
+      setOperationError('quotation', error.message);
+      endOperation('quotation');
+    },
+  });
+
+  const detachQuotationMutation = useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      workspaceId: string;
+      nodeId: string;
+      request: QuotationDetachRequest;
+    }) => textApi.quotationDetach(nodeId, request, authHeaders),
+    onMutate: () => startOperation('detachQuotation'),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
+      endOperation('detachQuotation');
+    },
+    onError: (error: Error) => {
+      setOperationError('detachQuotation', error.message);
+      endOperation('detachQuotation');
+    },
+  });
+
+  const materializeQuotationMutation = useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      nodeId: string;
+      request: QuotationMaterializeRequest;
+    }) => textApi.quotationMaterialize(nodeId, request, authHeaders),
+    onMutate: () => startOperation('materializeQuotation'),
+    onSuccess: () => {
+      endOperation('materializeQuotation');
+    },
+    onError: (error: Error) => {
+      setOperationError('materializeQuotation', error.message);
+      endOperation('materializeQuotation');
+    },
+  });
+
   // Memoize the action surface so consumers (the WorkspaceProvider context
   // value, every component that destructures useWorkspaceActions, every
   // mutation-fn closure that captures a specific action) keep a stable
@@ -622,6 +727,33 @@ export const useWorkspaceNodeMutations = ({
     renameColumn: (nodeId: string, column: string, newName: string) =>
       renameColumnMutation.mutateAsync({ nodeId, column, newName }),
     deleteColumn: (nodeId: string, column: string) => deleteColumnMutation.mutateAsync({ nodeId, column }),
+    detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
+      detachConcordanceMutation.mutateAsync({
+        workspaceId: ensureWorkspaceSelected(),
+        nodeId,
+        request,
+      }),
+    materializeConcordance: (nodeId: string, request: ConcordanceMaterializeRequest) =>
+      materializeConcordanceMutation.mutateAsync({
+        nodeId,
+        request,
+      }),
+    quotationSearch: (nodeId: string, request: QuotationRequest) =>
+      quotationMutation.mutateAsync({
+        nodeId,
+        request,
+      }),
+    detachQuotation: (nodeId: string, request: QuotationDetachRequest) =>
+      detachQuotationMutation.mutateAsync({
+        workspaceId: ensureWorkspaceSelected(),
+        nodeId,
+        request,
+      }),
+    materializeQuotation: (nodeId: string, request: QuotationMaterializeRequest) =>
+      materializeQuotationMutation.mutateAsync({
+        nodeId,
+        request,
+      }),
     refreshNodeSchema: async (nodeId: string): Promise<NodeSchemaResponse | null> => {
       if (!currentWorkspaceId) return null;
       const graphData = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));

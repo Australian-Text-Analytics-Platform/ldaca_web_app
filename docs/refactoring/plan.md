@@ -425,11 +425,11 @@ The 8 module-level globals + custom `useSyncExternalStore` bridge that lived in 
 
 `authInfo` / `config` / `phase` are the only state pieces that need to drive renders, so they live in the store. The imperative bookkeeping (`bootstrapAttempts`, `refreshFailures`, `inFlight`, `refreshIntervalId`) stays as module-locals next to the store — none of it is ever read by React, and keeping it out of the store avoids unnecessary subscriber notifications. The 10 smoke tests added in Phase 5 (`c1a8f28`) all pass against the new implementation with their mocking strategy unchanged.
 
-### 4.8 Hook layer cleanup
+### 4.8 Hook layer cleanup — partial
 
-- [ ] Decide on the four 6-line `useWorkspaceData/Actions/Selection/Status` wrappers: either delete (inline `useWorkspaceContext().X`) or keep for context-split (Phase 4.2).
-- [ ] Move 6 text mutations from `useWorkspaceInternal.ts` to `useWorkspaceNodeMutations.ts` (also Phase 3.9).
-- [ ] After 4.1, `useWorkspaceCore.ts:79-87` workspace-change reset effect can become a Zustand `subscribe(state => state.currentWorkspaceId, …)` callback. Removes a useEffect.
+- [x] Decide on the four `useWorkspaceData/Actions/Selection/Status` wrappers — kept and split into one-context-per-wrapper as part of Phase 4.2 (the composite `useWorkspaceContext` reader is gone).
+- [x] Move text-analysis mutations from `useWorkspaceInternal` to `useWorkspaceNodeMutations`. The five mutations (`detachConcordance` / `materializeConcordance` / `quotation` / `detachQuotation` / `materializeQuotation`) plus their action wrappers now live alongside the node mutations, sharing the local `ensureWorkspaceSelected` and the existing `actions` `useMemo`. `useWorkspaceInternal` shrinks from 308 → ~180 LoC and no longer imports `@/api/text` or `useMutation`. Test surface: useWorkspaceInternal.test.tsx 12 → 11 (the inline-throw assertion moves to useWorkspaceNodeMutations.test.tsx); useWorkspaceNodeMutations.test.tsx 13 → 16 (added throw + `detachConcordance` happy path + `quotationSearch` happy path; `buildHookArgs` `?? 'ws-1'` replaced with an `'in' overrides` check so explicit `null` is preserved).
+- [ ] After 4.1, `useWorkspaceCore.ts:79-87` workspace-change reset effect can become a Zustand `subscribe(state => state.currentWorkspaceId, …)` callback. **Deferred**: pagination is local React state, so any subscribe-based reset still needs an effect for the pagination half — not a clear net simplification.
 
 ### 4.9 features/workspace structural alignment — ✅ DONE
 

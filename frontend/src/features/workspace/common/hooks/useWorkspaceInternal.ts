@@ -1,14 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  textApi,
-  type ConcordanceDetachRequest,
-  type ConcordanceMaterializeRequest,
-  type QuotationRequest,
-  type QuotationDetachRequest,
-  type QuotationMaterializeRequest,
-} from '@/api/text';
-import { queryKeys } from '@/lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceCore } from './useWorkspaceCore';
 import { useWorkspaceQueries } from './useWorkspaceQueries';
 import { useWorkspaceNodeMutations } from './useWorkspaceNodeMutations';
@@ -107,107 +98,6 @@ export const useWorkspaceInternal = () => {
     setOperationError,
   });
 
-  const ensureWorkspaceSelected = () => {
-    if (!currentWorkspaceId) {
-      throw new Error('No workspace selected');
-    }
-    return currentWorkspaceId;
-  };
-
-  const detachConcordanceMutation = useMutation({
-    mutationFn: ({
-      nodeId,
-      request,
-    }: {
-      workspaceId: string;
-      nodeId: string;
-      request: ConcordanceDetachRequest;
-    }) => textApi.concordanceDetach(nodeId, request, authHeaders),
-    onMutate: () => startOperation('detachConcordance'),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
-      endOperation('detachConcordance');
-    },
-    onError: (error: Error) => {
-      setOperationError('detachConcordance', error.message);
-      endOperation('detachConcordance');
-    },
-  });
-
-  const materializeConcordanceMutation = useMutation({
-    mutationFn: ({
-      nodeId,
-      request,
-    }: {
-      nodeId: string;
-      request: ConcordanceMaterializeRequest;
-    }) => textApi.concordanceMaterialize(nodeId, request, authHeaders),
-    onMutate: () => startOperation('materializeConcordance'),
-    onSuccess: () => {
-      endOperation('materializeConcordance');
-    },
-    onError: (error: Error) => {
-      setOperationError('materializeConcordance', error.message);
-      endOperation('materializeConcordance');
-    },
-  });
-
-  const quotationMutation = useMutation({
-    mutationFn: ({
-      nodeId,
-      request,
-    }: {
-      nodeId: string;
-      request: QuotationRequest;
-    }) => textApi.quotation(nodeId, request, authHeaders),
-    onMutate: () => startOperation('quotation'),
-    onSuccess: () => {
-      endOperation('quotation');
-    },
-    onError: (error: Error) => {
-      setOperationError('quotation', error.message);
-      endOperation('quotation');
-    },
-  });
-
-  const detachQuotationMutation = useMutation({
-    mutationFn: ({
-      nodeId,
-      request,
-    }: {
-      workspaceId: string;
-      nodeId: string;
-      request: QuotationDetachRequest;
-    }) => textApi.quotationDetach(nodeId, request, authHeaders),
-    onMutate: () => startOperation('detachQuotation'),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
-      endOperation('detachQuotation');
-    },
-    onError: (error: Error) => {
-      setOperationError('detachQuotation', error.message);
-      endOperation('detachQuotation');
-    },
-  });
-
-  const materializeQuotationMutation = useMutation({
-    mutationFn: ({
-      nodeId,
-      request,
-    }: {
-      nodeId: string;
-      request: QuotationMaterializeRequest;
-    }) => textApi.quotationMaterialize(nodeId, request, authHeaders),
-    onMutate: () => startOperation('materializeQuotation'),
-    onSuccess: () => {
-      endOperation('materializeQuotation');
-    },
-    onError: (error: Error) => {
-      setOperationError('materializeQuotation', error.message);
-      endOperation('materializeQuotation');
-    },
-  });
-
   const selectionActions = useMemo(
     () => ({
       selectNode,
@@ -218,53 +108,12 @@ export const useWorkspaceInternal = () => {
     [selectNode, setSelectedNodes, toggleNodeSelection, clearSelection],
   );
 
-  // Same memo discipline as useWorkspaceNodeMutations: TanStack
-  // `mutateAsync` refs are referentially stable across the parent's
-  // lifetime, so we only depend on values that are actually captured by
-  // the closures (currentWorkspaceId via `ensureWorkspaceSelected`).
-  // Listing the mutation refs would invalidate this every render with no
-  // behaviour difference.
-  const textActions = useMemo(
-    () => ({
-      detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
-        detachConcordanceMutation.mutateAsync({
-          workspaceId: ensureWorkspaceSelected(),
-          nodeId,
-          request,
-        }),
-      materializeConcordance: (nodeId: string, request: ConcordanceMaterializeRequest) =>
-        materializeConcordanceMutation.mutateAsync({
-          nodeId,
-          request,
-        }),
-      quotationSearch: (nodeId: string, request: QuotationRequest) =>
-        quotationMutation.mutateAsync({
-          nodeId,
-          request,
-        }),
-      detachQuotation: (nodeId: string, request: QuotationDetachRequest) =>
-        detachQuotationMutation.mutateAsync({
-          workspaceId: ensureWorkspaceSelected(),
-          nodeId,
-          request,
-        }),
-      materializeQuotation: (nodeId: string, request: QuotationMaterializeRequest) =>
-        materializeQuotationMutation.mutateAsync({
-          nodeId,
-          request,
-        }),
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutation refs are intentionally omitted; their mutateAsync identities are stable.
-    [currentWorkspaceId],
-  );
-
   const actions = useMemo(
     () => ({
       ...selectionActions,
       ...nodeActions,
-      ...textActions,
     }),
-    [selectionActions, nodeActions, textActions],
+    [selectionActions, nodeActions],
   );
 
   const operationsLoading = loadingOperationCount > 0;

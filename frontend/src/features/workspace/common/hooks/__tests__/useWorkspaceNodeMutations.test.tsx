@@ -42,10 +42,19 @@ const nodesApiMock = vi.hoisted(() => ({
   polarsExpressionApply: vi.fn(),
 }));
 
+const textApiMock = vi.hoisted(() => ({
+  concordanceDetach: vi.fn(),
+  concordanceMaterialize: vi.fn(),
+  quotation: vi.fn(),
+  quotationDetach: vi.fn(),
+  quotationMaterialize: vi.fn(),
+}));
+
 const fetchNodeInfoMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/api/workspaces', () => ({ workspacesApi: workspacesApiMock }));
 vi.mock('@/api/nodes', () => ({ nodesApi: nodesApiMock }));
+vi.mock('@/api/text', () => ({ textApi: textApiMock }));
 vi.mock('@/lib/nodeInfo', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -99,7 +108,11 @@ interface BuildArgs {
 
 const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => ({
   authHeaders: overrides.authHeaders ?? { Authorization: 'Bearer test' },
-  currentWorkspaceId: overrides.currentWorkspaceId ?? 'ws-1',
+  // `'currentWorkspaceId' in overrides` so callers can pass `null` to test
+  // the no-workspace-selected branches; `?? 'ws-1'` would silently coerce
+  // nullish overrides back to 'ws-1'.
+  currentWorkspaceId:
+    'currentWorkspaceId' in overrides ? overrides.currentWorkspaceId : 'ws-1',
   selectedNodeId: overrides.selectedNodeId ?? null,
   setCurrentWorkspaceId: overrides.setCurrentWorkspaceId ?? mkSetWorkspaceId(),
   setSelectedNodes: overrides.setSelectedNodes ?? mkSetSelectedNodes(),
@@ -118,6 +131,9 @@ describe('useWorkspaceNodeMutations', () => {
     workspacesApiMock.current.set.mockReset();
     Object.values(nodesApiMock).forEach((value) => {
       if (typeof value === 'function') (value as ReturnType<typeof vi.fn>).mockReset();
+    });
+    Object.values(textApiMock).forEach((value) => {
+      (value as ReturnType<typeof vi.fn>).mockReset();
     });
     fetchNodeInfoMock.mockReset();
   });
@@ -158,6 +174,12 @@ describe('useWorkspaceNodeMutations', () => {
         'renameColumn',
         'deleteColumn',
         'refreshNodeSchema',
+        // Phase 4.8: text-analysis actions moved here from useWorkspaceInternal.
+        'detachConcordance',
+        'materializeConcordance',
+        'quotationSearch',
+        'detachQuotation',
+        'materializeQuotation',
       ];
 
       const { actions } = result.current;
@@ -452,4 +474,84 @@ describe('useWorkspaceNodeMutations', () => {
     });
   });
 
+  describe('text-analysis actions (Phase 4.8 move)', () => {
+    it('detachConcordance synchronously throws when no workspace is selected', () => {
+      // ensureWorkspaceSelected runs while building the mutateAsync args, so
+      // the failure surfaces as a synchronous throw rather than a rejected
+      // promise — keep this assertion tight (() => …) instead of awaiting.
+      const queryClient = createTestClient();
+      const { result } = renderHook(
+        () =>
+          useWorkspaceNodeMutations(
+            buildHookArgs(queryClient, { currentWorkspaceId: null }),
+          ),
+        { wrapper: wrapWithClient(queryClient) },
+      );
+
+      expect(() =>
+        result.current.actions.detachConcordance('node-1', {
+          node_id: 'node-1',
+          column: 'c',
+          search_word: 'w',
+        }),
+      ).toThrow(/No workspace selected/);
+      expect(textApiMock.concordanceDetach).not.toHaveBeenCalled();
+    });
+
+    it('detachConcordance forwards through textApi and invalidates the workspace graph', async () => {
+      const queryClient = createTestClient();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+      textApiMock.concordanceDetach.mockResolvedValue(undefined);
+
+      const { result } = renderHook(
+        () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
+        { wrapper: wrapWithClient(queryClient) },
+      );
+
+      await act(async () => {
+        await result.current.actions.detachConcordance('node-1', {
+          node_id: 'node-1',
+          column: 'c',
+          search_word: 'w',
+        });
+      });
+
+      expect(textApiMock.concordanceDetach).toHaveBeenCalledWith(
+        'node-1',
+        { node_id: 'node-1', column: 'c', search_word: 'w' },
+        { Authorization: 'Bearer test' },
+      );
+
+      const invalidatedKeys = invalidateSpy.mock.calls.map((call) => call[0]);
+      expect(invalidatedKeys).toEqual(
+        expect.arrayContaining([{ queryKey: ['workspaces', 'ws-1', 'graph'] }]),
+      );
+    });
+
+    it('quotationSearch forwards through textApi.quotation without requiring a workspace', async () => {
+      // quotationSearch (and the materialize variants) deliberately don't
+      // call ensureWorkspaceSelected — the backend route is node-scoped, so
+      // a node id is enough.
+      const queryClient = createTestClient();
+      textApiMock.quotation.mockResolvedValue({ rows: [] });
+
+      const { result } = renderHook(
+        () =>
+          useWorkspaceNodeMutations(
+            buildHookArgs(queryClient, { currentWorkspaceId: null }),
+          ),
+        { wrapper: wrapWithClient(queryClient) },
+      );
+
+      await act(async () => {
+        await result.current.actions.quotationSearch('node-1', { column: 'c' });
+      });
+
+      expect(textApiMock.quotation).toHaveBeenCalledWith(
+        'node-1',
+        { column: 'c' },
+        { Authorization: 'Bearer test' },
+      );
+    });
+  });
 });

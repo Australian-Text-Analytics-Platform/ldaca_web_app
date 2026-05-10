@@ -19,16 +19,9 @@ vi.mock('../useWorkspaceNodeMutations', () => ({
   useWorkspaceNodeMutations: useWorkspaceNodeMutationsMock,
 }));
 
-// Minimize the textApi surface used by the internal mutations.
-vi.mock('@/api/text', () => ({
-  textApi: {
-    concordanceDetach: vi.fn().mockResolvedValue(undefined),
-    concordanceMaterialize: vi.fn().mockResolvedValue({}),
-    quotation: vi.fn().mockResolvedValue({}),
-    quotationDetach: vi.fn().mockResolvedValue(undefined),
-    quotationMaterialize: vi.fn().mockResolvedValue({}),
-  },
-}));
+// Phase 4.8: text-analysis mutations now live in useWorkspaceNodeMutations
+// (which is mocked above). useWorkspaceInternal no longer imports
+// `@/api/text`, so no `vi.mock` for it is required here.
 
 import { useWorkspaceInternal } from '../useWorkspaceInternal';
 
@@ -123,6 +116,12 @@ const buildMutationsReturn = (actions: Record<string, unknown> = {}) => ({
     renameColumn: vi.fn(),
     deleteColumn: vi.fn(),
     refreshNodeSchema: vi.fn(),
+    // Phase 4.8: text-analysis actions now come from useWorkspaceNodeMutations.
+    detachConcordance: vi.fn(),
+    materializeConcordance: vi.fn(),
+    quotationSearch: vi.fn(),
+    detachQuotation: vi.fn(),
+    materializeQuotation: vi.fn(),
     ...actions,
   },
 });
@@ -287,25 +286,24 @@ describe('useWorkspaceInternal', () => {
   });
 
   describe('actions composition', () => {
-    it('merges selection actions, node mutations, and text-action mutations into one bundle', () => {
+    it('merges selection actions and node mutations into one bundle', () => {
+      // Phase 4.8: text-analysis actions also live in
+      // useWorkspaceNodeMutations now, so this hook only stitches together
+      // selection (from core) + everything from the mutations sub-hook.
       useWorkspaceCoreMock.mockReturnValue(buildCoreReturn());
       useWorkspaceQueriesMock.mockReturnValue(buildQueriesReturn());
       useWorkspaceNodeMutationsMock.mockReturnValue(buildMutationsReturn());
 
       const { result } = renderInternal();
 
-      // selection actions (from core)
       for (const key of ['selectNode', 'selectNodes', 'toggleNodeSelection', 'clearSelection']) {
         expect(typeof (result.current.actions as Record<string, unknown>)[key]).toBe('function');
       }
-
-      // node mutations (from useWorkspaceNodeMutations)
-      for (const key of ['createWorkspace', 'castColumn', 'refreshNodeSchema', 'renameNode']) {
-        expect(typeof (result.current.actions as Record<string, unknown>)[key]).toBe('function');
-      }
-
-      // text actions (defined inline in useWorkspaceInternal)
       for (const key of [
+        'createWorkspace',
+        'castColumn',
+        'refreshNodeSchema',
+        'renameNode',
         'detachConcordance',
         'materializeConcordance',
         'quotationSearch',
@@ -314,24 +312,6 @@ describe('useWorkspaceInternal', () => {
       ]) {
         expect(typeof (result.current.actions as Record<string, unknown>)[key]).toBe('function');
       }
-    });
-
-    it('detachConcordance throws when no workspace is selected', () => {
-      useWorkspaceCoreMock.mockReturnValue(buildCoreReturn({ currentWorkspaceId: null }));
-      useWorkspaceQueriesMock.mockReturnValue(buildQueriesReturn());
-      useWorkspaceNodeMutationsMock.mockReturnValue(buildMutationsReturn());
-
-      const { result } = renderInternal();
-
-      // ensureWorkspaceSelected runs while building the mutateAsync args, so
-      // the failure surfaces as a synchronous throw (not a rejected promise).
-      expect(() =>
-        result.current.actions.detachConcordance('node-1', {
-          node_id: 'node-1',
-          column: 'c',
-          search_word: 'w',
-        }),
-      ).toThrow(/No workspace selected/);
     });
   });
 
