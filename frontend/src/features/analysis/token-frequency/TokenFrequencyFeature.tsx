@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { textApi, type TokenFrequencyResponse } from '@/api/text';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
@@ -57,6 +58,7 @@ const TOKEN_FREQUENCY_PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspaceData();
   const {
     isLocked,
@@ -171,6 +173,7 @@ const TokenFrequencyFeature = () => {
             requestData: req,
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 2,
           });
         } catch { /* ignore */ }
@@ -265,6 +268,7 @@ const TokenFrequencyFeature = () => {
     lock: {
       getAuthHeaders,
       lockWithSnapshots,
+      queryClient,
     },
     navigation: {
       selectNodes,

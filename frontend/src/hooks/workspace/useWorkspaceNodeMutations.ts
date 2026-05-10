@@ -12,7 +12,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import { isGraphDebugEnabled } from '../../lib/debugFlags';
 import { type NodeSchemaResponse } from '../../types';
 import { type WorkspaceGraphResponse } from '../../types/api';
-import { getNodeInfo, invalidateNodeInfo } from '../../lib/nodeInfoCache';
+import { fetchNodeInfo, invalidateNodeInfoQuery } from '../../lib/nodeInfo';
 import { normalizeSchemaFromInfo } from '../useSchemaManagement';
 
 interface WorkspaceNodeMutationsParams {
@@ -260,7 +260,7 @@ export const useWorkspaceNodeMutations = ({
     },
     onSuccess: (_data, variables) => {
       if (currentWorkspaceId) {
-        invalidateNodeInfo(currentWorkspaceId, variables.nodeId);
+        invalidateNodeInfoQuery(queryClient, currentWorkspaceId, variables.nodeId);
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
@@ -280,7 +280,7 @@ export const useWorkspaceNodeMutations = ({
     },
     onSuccess: (_data, variables) => {
       if (currentWorkspaceId) {
-        invalidateNodeInfo(currentWorkspaceId, variables.nodeId);
+        invalidateNodeInfoQuery(queryClient, currentWorkspaceId, variables.nodeId);
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
@@ -485,7 +485,7 @@ export const useWorkspaceNodeMutations = ({
     },
     onSuccess: (_data, variables) => {
       if (currentWorkspaceId && variables?.nodeId) {
-        invalidateNodeInfo(currentWorkspaceId, variables.nodeId);
+        invalidateNodeInfoQuery(queryClient, currentWorkspaceId, variables.nodeId);
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
@@ -630,7 +630,7 @@ export const useWorkspaceNodeMutations = ({
         return null;
       }
       try {
-        const info = await getNodeInfo({ workspaceId: currentWorkspaceId, nodeId, headers: authHeaders, force: true });
+        const info = await fetchNodeInfo({ queryClient, workspaceId: currentWorkspaceId, nodeId, headers: authHeaders, force: true });
         const schemaMap = normalizeSchemaFromInfo(info);
         const schema = schemaMap;
         return {

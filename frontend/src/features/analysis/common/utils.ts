@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/react-query';
 import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '@/hooks/useSchemaManagement';
 
 export const DEFAULT_TOKEN_LIMIT = 25;
@@ -114,6 +115,8 @@ export interface RestoreAnalysisLockFromRequestArgs {
   requestData: AnalysisNodeRequestShape | null | undefined;
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
+  /** Shared TanStack QueryClient — node-info reads route through its cache. */
+  queryClient: QueryClient;
   maxNodes?: number;
 }
 
@@ -122,12 +125,13 @@ export const restoreAnalysisLockFromRequest = async ({
   requestData,
   getAuthHeaders,
   lockWithSnapshots,
+  queryClient,
   maxNodes = 2,
 }: RestoreAnalysisLockFromRequestArgs): Promise<ParsedAnalysisNodeRequest> => {
   const parsed = parseAnalysisNodeRequest(requestData, maxNodes);
 
   if (workspaceId && parsed.nodeIds.length) {
-    const snapshots = await createNodeSnapshots(workspaceId, parsed.nodeIds, getAuthHeaders);
+    const snapshots = await createNodeSnapshots(workspaceId, parsed.nodeIds, getAuthHeaders, queryClient);
     const normalizedSnapshots = applySelectedColumnsToSnapshots(snapshots, parsed.nodeColumns);
     lockWithSnapshots(normalizedSnapshots);
   }

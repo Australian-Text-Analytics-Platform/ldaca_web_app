@@ -45,6 +45,15 @@ export const queryKeys = {
   nodeSchema: (workspaceId: string, nodeId: string) =>
     ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,
 
+  /**
+   * Full backend node info (`GET /workspaces/nodes/:id`) — schema, columns,
+   * shape, undo/redo flags. Replaces the previous `lib/nodeInfoCache.ts`
+   * parallel cache. `nodeSchema` lives separately so it can be invalidated
+   * without dropping the heavier full-info payload.
+   */
+  nodeInfo: (workspaceId: string, nodeId: string) =>
+    ['workspaces', workspaceId, 'nodes', nodeId, 'info'] as const,
+
   workspaceGraph: (workspaceId: string) =>
     ['workspaces', workspaceId, 'graph'] as const,
 

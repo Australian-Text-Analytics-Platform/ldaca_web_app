@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import type { QueryClient } from '@tanstack/react-query';
 import {
   textApi,
   type TopicModelingRequest,
@@ -42,7 +43,7 @@ interface TopicModelingActions {
 interface TopicModelingLock {
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
-  queryClient: { invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown> };
+  queryClient: QueryClient;
 }
 
 type Params = {
@@ -150,6 +151,7 @@ export function useTopicModelingTaskFlow({
             requestData: req,
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 2,
           });
         }

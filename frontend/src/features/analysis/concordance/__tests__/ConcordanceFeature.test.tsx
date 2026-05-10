@@ -1,6 +1,14 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const renderWithClient = (ui: React.ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+};
 
 const handleSearchMock = vi.fn();
 const clearResultsMock = vi.fn(async () => {});
@@ -291,7 +299,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('clears previous results before rerunning when clicking Update', () => {
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
@@ -306,7 +314,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('passes the locked-update flag when clicking Update', () => {
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
@@ -320,7 +328,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('defaults whole-word on and disables it when regex is enabled', () => {
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     const wholeWordCheckbox = screen.getByRole('checkbox', { name: /whole word/i });
     const regexCheckbox = screen.getByRole('checkbox', { name: /use regular expression/i });
@@ -348,7 +356,7 @@ describe('ConcordanceFeature', () => {
       timestamp: 1,
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
       expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue('keyword');
@@ -390,7 +398,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
       expect(screen.getByText('Replace concordance results?')).toBeInTheDocument();
@@ -448,7 +456,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
 
@@ -505,7 +513,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
 
@@ -571,7 +579,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    render(<ConcordanceFeature />);
+    renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
       expect(screen.getByText('CONC_left_context')).toBeInTheDocument();
@@ -629,7 +637,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    render(<ConcordanceFeature />);
+    renderWithClient(<ConcordanceFeature />);
 
     expect(screen.getAllByText('Documents per batch').length).toBeGreaterThan(0);
     expect(screen.getByText('(Found 2 instances in 1 document after processing 20 documents).')).toBeInTheDocument();
@@ -662,7 +670,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     expect(screen.queryByRole('checkbox', { name: /bar length proportional to text length/i })).not.toBeInTheDocument();
 

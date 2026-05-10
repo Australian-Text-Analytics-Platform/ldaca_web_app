@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { QuotationAnalysisResponse } from '@/api/text';
@@ -68,6 +69,7 @@ describe('useQuotationTaskFlow', () => {
           detachQuotation: vi.fn(async () => undefined),
           materializeQuotation: vi.fn(async () => undefined),
           openEngineDialog: vi.fn(),
+          queryClient: new QueryClient(),
         },
       })
     );
@@ -139,6 +141,7 @@ describe('useQuotationTaskFlow', () => {
           detachQuotation: vi.fn(async () => undefined),
           materializeQuotation: vi.fn(async () => undefined),
           openEngineDialog: vi.fn(),
+          queryClient: new QueryClient(),
         },
       })
     );

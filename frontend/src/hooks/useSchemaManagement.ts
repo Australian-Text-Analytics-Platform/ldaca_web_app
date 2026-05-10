@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { normalizeTypeName } from '../utils/columnTypes';
-import { getNodeInfo } from '../lib/nodeInfoCache';
+import { fetchNodeInfo } from '../lib/nodeInfo';
 import { queryKeys } from '../lib/queryKeys';
 
 export interface NodeSnapshot {
@@ -37,20 +37,26 @@ export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
 
 /**
  * Utility function to create a node snapshot with info fetched from backend.
+ *
+ * Takes a `QueryClient` so the fetch goes through the shared TanStack cache
+ * (deduped against `useNodeInfo` subscribers, automatically invalidated by
+ * mutation handlers). Hook-context callers obtain the client via
+ * `useQueryClient`; non-hook callers must thread one in explicitly.
  */
 export async function createNodeSnapshot(
   workspaceId: string,
   nodeId: string,
-  getAuthHeaders: () => Record<string, string>
+  getAuthHeaders: () => Record<string, string>,
+  queryClient: QueryClient,
 ): Promise<NodeSnapshot> {
-  const info = await getNodeInfo({ workspaceId, nodeId, getAuthHeaders });
-  
+  const info = await fetchNodeInfo({ queryClient, workspaceId, nodeId, getAuthHeaders });
+
   const name = info?.name || info?.data?.name || nodeId;
   const columns = Array.isArray(info?.columns)
     ? info.columns
     : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
   const schema = normalizeSchemaFromInfo(info);
-  
+
   const shape = (info as Record<string, unknown>)?.shape as [number | null, number | null] | number[] | undefined;
 
   return {
@@ -65,12 +71,13 @@ export async function createNodeSnapshot(
 export async function createNodeSnapshots(
   workspaceId: string,
   nodeIds: string[],
-  getAuthHeaders: () => Record<string, string>
+  getAuthHeaders: () => Record<string, string>,
+  queryClient: QueryClient,
 ): Promise<NodeSnapshot[]> {
   const snapshots = await Promise.all(
     nodeIds.map(async (nodeId) => {
       try {
-        return await createNodeSnapshot(workspaceId, nodeId, getAuthHeaders);
+        return await createNodeSnapshot(workspaceId, nodeId, getAuthHeaders, queryClient);
       } catch {
         return {
           id: nodeId,
@@ -163,12 +170,14 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     currentSchemaRef.current = currentSchema;
   }, [currentSchema]);
 
+  const queryClient = useQueryClient();
+
   // Fetch schema via React Query so invalidation (e.g. after cast) triggers re-fetch
   const schemaQuery = useQuery({
     queryKey: (nodeId && workspaceId) ? queryKeys.nodeSchema(workspaceId, nodeId) : ['_no_schema_'],
     queryFn: async () => {
       if (!workspaceId || !nodeId) return {};
-      const info = await getNodeInfo({ workspaceId, nodeId, getAuthHeaders });
+      const info = await fetchNodeInfo({ queryClient, workspaceId, nodeId, getAuthHeaders });
       return normalizeSchemaFromInfo(info);
     },
     enabled: !!nodeId && !isLocked && !!workspaceId,

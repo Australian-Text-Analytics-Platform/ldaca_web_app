@@ -156,6 +156,7 @@ const TopicModelingFeature: React.FC = () => {
             requestData: req,
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 2,
           });
         } catch { /* ignore */ }

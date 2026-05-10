@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
@@ -74,6 +75,7 @@ const ConcordanceFeature: React.FC = () => {
   });
 
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const {
     isLocked,
     lockWithSnapshots,
@@ -467,6 +469,7 @@ const ConcordanceFeature: React.FC = () => {
           requestData: req,
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 2,
         });
       } catch { /* ignore */ }
@@ -548,6 +551,7 @@ const ConcordanceFeature: React.FC = () => {
       resolveTaskId,
       detachConcordance,
       materializeConcordance,
+      queryClient,
     },
   });
 

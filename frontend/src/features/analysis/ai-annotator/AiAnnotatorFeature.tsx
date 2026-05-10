@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import NodeSelectionPanel from '@/components/NodeSelectionPanel';
 import { useAuth } from '@/hooks/useAuth';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
@@ -135,6 +136,7 @@ const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
 const AiAnnotatorFeature: React.FC = () => {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'ai-annotator';
   const [endpointPreset, setEndpointPreset] = useState<EndpointPreset>(DEFAULT_PARAMS.endpointPreset);
@@ -307,6 +309,7 @@ const AiAnnotatorFeature: React.FC = () => {
           requestData: requestData as { node_ids?: string[]; node_columns?: Record<string, string> },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 1,
         });
       } catch {
@@ -483,6 +486,7 @@ const AiAnnotatorFeature: React.FC = () => {
           },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 1,
         });
       } catch {

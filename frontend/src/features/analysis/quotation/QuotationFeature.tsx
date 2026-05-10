@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import NodeSelectionPanel from '@/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
@@ -121,6 +122,7 @@ const QuotationFeature: React.FC = () => {
   const { currentWorkspaceId } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'quotation';
   const {
@@ -318,6 +320,7 @@ const QuotationFeature: React.FC = () => {
           },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 1,
         });
       } catch {
@@ -563,6 +566,7 @@ const QuotationFeature: React.FC = () => {
       detachQuotation,
       materializeQuotation,
       openEngineDialog,
+      queryClient,
     },
   });
 

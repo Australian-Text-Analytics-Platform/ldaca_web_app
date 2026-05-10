@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   type ConcordanceAnalysisRequest,
@@ -53,6 +54,7 @@ interface ConcordanceLock {
     nodeId: string,
     request: ConcordanceMaterializeRequest
   ) => Promise<{ metadata?: { task_id?: string } } | undefined>;
+  queryClient: QueryClient;
 }
 
 type Params = {
@@ -96,6 +98,7 @@ export function useConcordanceTaskFlow({
     resolveTaskId,
     detachConcordance,
     materializeConcordance,
+    queryClient,
   },
 }: Params) {
 
@@ -224,6 +227,7 @@ export function useConcordanceTaskFlow({
           requestData: { node_ids: requestNodeIds, node_columns: nodeColumns },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 2,
         });
       } catch {

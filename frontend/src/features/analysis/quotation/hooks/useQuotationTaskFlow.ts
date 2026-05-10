@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { QueryClient } from '@tanstack/react-query';
 import type {
   QuotationAnalysisResponse,
   QuotationRequest,
@@ -93,6 +94,7 @@ interface QuotationLock {
     request: QuotationMaterializeRequest,
   ) => Promise<{ metadata?: { task_id?: string } } | undefined>;
   openEngineDialog: () => void;
+  queryClient: QueryClient;
 }
 
 type Params = {
@@ -137,6 +139,7 @@ export function useQuotationTaskFlow({
     detachQuotation,
     materializeQuotation,
     openEngineDialog,
+    queryClient,
   },
 }: Params) {
   const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
@@ -346,6 +349,7 @@ export function useQuotationTaskFlow({
           },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 1,
         });
       } catch {

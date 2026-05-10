@@ -14,7 +14,7 @@ import {
 } from '@/api/text';
 
 import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
-import { getNodeInfo } from '@/lib/nodeInfoCache';
+import { fetchNodeInfo } from '@/lib/nodeInfo';
 import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
 import { normalizeTypeName } from '@/utils/columnTypes';
 import { takeMostRecent } from '@/utils/selectionUtils';
@@ -306,9 +306,10 @@ const SequentialAnalysisFeature = () => {
             requestData: { node_ids: [nodeIdStr], node_columns: { [nodeIdStr]: reqTimeColumn } },
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 1,
           });
-          const info = await getNodeInfo({ workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
+          const info = await fetchNodeInfo({ queryClient, workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
           const normalizedSchema = normalizeSchemaFromInfo(info);
           if (Object.keys(normalizedSchema).length > 0) {
             setLockedSchema(normalizedSchema);
@@ -537,7 +538,7 @@ const SequentialAnalysisFeature = () => {
       resolveTaskId,
       clearResults,
     },
-    lock: { getAuthHeaders },
+    lock: { getAuthHeaders, queryClient },
   });
 
   const handlePeriodClick = (index: number, shiftHeld: boolean) => {

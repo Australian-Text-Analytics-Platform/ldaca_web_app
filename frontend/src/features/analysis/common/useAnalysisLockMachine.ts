@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
@@ -228,6 +229,7 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
 
   const lockState = useAnalysisLockCore(lockConfig);
   const { activeNodeIds, lockWithSnapshots } = lockState;
+  const queryClient = useQueryClient();
 
   const captureSnapshotsForNodes = async (
       nodeIds: string[],
@@ -241,7 +243,8 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
         const snapshots = await createNodeSnapshots(
           workspaceId,
           nodeIds,
-          getAuthHeaders
+          getAuthHeaders,
+          queryClient,
         );
         return columnMap
           ? applySelectedColumnsToSnapshots(snapshots, columnMap)

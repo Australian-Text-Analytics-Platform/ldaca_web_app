@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import type { QueryClient } from '@tanstack/react-query';
 import {
   type SequentialAnalysisRequest,
   type SequentialCustomIntervalUnit,
@@ -93,6 +94,7 @@ interface SequentialAnalysisActions {
 
 interface SequentialAnalysisLock {
   getAuthHeaders: () => Record<string, string>;
+  queryClient: QueryClient;
 }
 
 type Params = {
@@ -131,7 +133,7 @@ export function useSequentialAnalysisTaskFlow({
     resolveTaskId,
     clearResults,
   },
-  lock: { getAuthHeaders },
+  lock: { getAuthHeaders, queryClient },
 }: Params) {
   const handleAnalyze = async () => {
     const nodeIdForAnalysis = activeNodeId;
@@ -232,6 +234,7 @@ export function useSequentialAnalysisTaskFlow({
           requestData: { node_ids: [nodeIdForAnalysis], node_columns: { [nodeIdForAnalysis]: picked } },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 1,
         });
         lockCurrentSchema();
