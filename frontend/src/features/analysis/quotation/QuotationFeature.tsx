@@ -18,7 +18,8 @@ import type {
   QuotationMetadata,
 } from '@/api/text';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
-import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '@/stores/quotationEngineStore';
+import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -144,10 +145,10 @@ const QuotationFeature: React.FC = () => {
     docTypeOnly: true,
   });
 
-  const engineConfig = useQuotationEngineConfigStore((state) => state.config);
-  const lastRemoteUrl = useQuotationEngineConfigStore((state) => state.lastRemoteUrl);
-  const setEngineConfigStore = useQuotationEngineConfigStore((state) => state.setConfig);
-  const updateRemoteUrl = useQuotationEngineConfigStore((state) => state.updateRemoteUrl);
+  const engineConfig = usePreferencesStore((state) => state.quotationEngine);
+  const lastRemoteUrl = usePreferencesStore((state) => state.quotationLastRemoteUrl);
+  const setEngineConfigStore = usePreferencesStore((state) => state.setQuotationEngine);
+  const updateRemoteUrl = usePreferencesStore((state) => state.updateQuotationRemoteUrl);
   const [engineError, setEngineError] = useState<string | null>(null);
   const engineDialogOpen = useQuotationEngineDialogStore((state) => state.isOpen);
   const setEngineDialogOpen = useQuotationEngineDialogStore((state) => state.setOpen);
