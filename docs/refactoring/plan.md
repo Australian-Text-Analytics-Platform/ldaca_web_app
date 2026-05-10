@@ -382,18 +382,24 @@ Currently in three places: `useState` in `useWorkspaceCore.ts:49`, react-query c
 - [ ] For non-hook async sites (mutation success handlers), use `queryClient.fetchQuery({queryKey, queryFn})` for built-in dedup.
 - [ ] Delete `lib/nodeInfoCache.ts`. This also resolves the dep-loop in `useNodeColumnInfos` (B9).
 
-### 4.4 Split api/text.ts (478 → 6 files)
+### 4.4 Split api/text.ts (478 → 7 files) — ✅ DONE
 
-- [ ] Split into `api/text/{concordance,quotation,sequential,tokenFrequency,topicModeling,aiAnnotation}.ts`.
-- [ ] Re-export from `api/text/index.ts` to keep import sites stable.
-- [ ] Reformat single-line interface declarations (one field per line) for diff readability.
+Landed in `8adf13e`. `api/text.ts` becomes a directory:
 
-### 4.5 Eliminate quotationEngineStore mirror
+  - `shared.ts` (14 LoC) — `SourceRowPagination` (used by concordance + quotation)
+  - `concordance.ts` (194 LoC) — types + `concordanceApi`
+  - `quotation.ts` (139 LoC) — types + `quotationApi`
+  - `sequential.ts` (80 LoC) — types + `sequentialAnalysisApi`
+  - `tokenFrequency.ts` (72 LoC) — types + `tokenFrequencyApi`
+  - `topicModeling.ts` (132 LoC) — types + `topicModelingApi`
+  - `aiAnnotation.ts` (205 LoC) — types + `aiAnnotationApi`
+  - `index.ts` (129 LoC) — type re-exports + composed `textApi` (spread of every feature slice) + `getAnalysisCurrent` (the only method that spans every feature)
 
-`quotationEngineStore.ts:57-99` is a manually-mirrored shadow of `preferencesStore`. Every setter calls `usePreferencesStore.getState().setQuotationEngine(...)` then `syncFromPrefs()`. No subscription to the source → goes stale if prefs change elsewhere.
+Public surface unchanged: `import { textApi, FooType } from '@/api/text'` resolves to the directory's index. Single-line interface declarations reformatted to one field per line for diff readability.
 
-- [ ] Either subscribe `quotationEngineStore` to `preferencesStore` via `usePreferencesStore.subscribe`.
-- [ ] Or simpler: delete `quotationEngineStore.ts`, have `QuotationFeature.tsx` (the only consumer at L322-330) read `preferencesStore` with selectors.
+### 4.5 Eliminate quotationEngineStore mirror — ✅ DONE
+
+Landed in `f8da9d2`. The shadow `useQuotationEngineConfigStore` is deleted; `QuotationFeature` reads quotation-engine config + last-remote-url straight from `preferencesStore`. New `updateQuotationRemoteUrl(url)` action on preferencesStore atomically writes `lastRemoteUrl` AND (if engine is in remote mode) the engine's URL — preserves the old shadow's `updateRemoteUrl` semantics. The legacy localStorage migration (`ldaca.quotation.engine` → preferences) moves into `preferencesStore.ts` as a one-shot at module load. `useQuotationEngineDialogStore` (pure dialog visibility, used by Sidebar trigger + QuotationFeature body) survives — that's not a mirror, just cross-component UI state. `quotationEngineStore.ts` shrinks 99 → 23 LoC.
 
 ### 4.6 preferencesStore sync side effects
 
