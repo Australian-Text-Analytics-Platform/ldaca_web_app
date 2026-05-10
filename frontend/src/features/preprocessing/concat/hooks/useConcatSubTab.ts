@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { NodeColumnSelection, WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   ConcatNodeSummary,

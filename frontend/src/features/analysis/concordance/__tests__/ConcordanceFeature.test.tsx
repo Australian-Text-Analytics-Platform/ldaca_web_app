@@ -25,7 +25,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/components/NodeSelectionPanel', () => ({
+vi.mock('@/features/analysis/common/components/NodeSelectionPanel', () => ({
   default: () => <div data-testid="node-selection-panel" />,
 }));
 
@@ -37,7 +37,7 @@ vi.mock('@/components/help/InfoIcon', () => ({
   default: () => <span data-testid="info-icon" />,
 }));
 
-vi.mock('@/components/tabs/AnalysisTaskBanner', () => ({
+vi.mock('@/features/analysis/common/components/AnalysisTaskBanner', () => ({
   default: () => null,
 }));
 

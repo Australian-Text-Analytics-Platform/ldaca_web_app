@@ -1,7 +1,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import { Card, CardContent } from '../ui/card';
-import { cn } from '../../lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface AnalysisTaskBannerProps {
   analysisName: string;

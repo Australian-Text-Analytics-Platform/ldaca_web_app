@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertCircle, Loader2, Plus, Shuffle } from 'lucide-react';
 
-import NodeSelectionPanel from '@/components/NodeSelectionPanel';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';

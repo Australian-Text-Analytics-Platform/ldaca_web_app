@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { nodesApi } from '@/api/nodes';
 import { useAuth } from '@/hooks/useAuth';
-import type { NodeColumnSelection, WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { JoinPreviewRequestPayload, JoinType, PreviewPagination, PreviewRow } from '../../types';
 import { JOIN_TYPE_OPTIONS } from '../../types';

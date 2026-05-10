@@ -15,7 +15,7 @@ import {
 
 import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
 import { fetchNodeInfo } from '@/lib/nodeInfo';
-import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
+import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
 import { normalizeTypeName } from '@/utils/columnTypes';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import {

@@ -1,5 +1,5 @@
-import type { ConcordanceAnalysisRequest } from '../../api/text';
-import type { NodeColumnSelection } from '../../hooks/useAutoNodeColumns';
+import type { ConcordanceAnalysisRequest } from '@/api/text';
+import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 
 export interface TokenFrequencyAnalysisParams {
   node_ids?: string[];

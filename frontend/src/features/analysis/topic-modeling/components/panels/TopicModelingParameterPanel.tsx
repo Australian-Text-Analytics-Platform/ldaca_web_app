@@ -11,8 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import HelpIcon from '@/components/help/HelpIcon';
-import NodeSelectionPanel from '@/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import type { ColumnInfo } from '@/utils/columnTypes';
 import type { NodeLike } from '@/hooks/useNodeColumnInfos';

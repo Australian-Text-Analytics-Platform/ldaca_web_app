@@ -1,5 +1,5 @@
-import NodeSelectionPanel from '@/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';

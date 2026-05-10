@@ -1,12 +1,12 @@
 import React, { type ReactNode } from 'react';
 import { AlertTriangle, Lock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '../lib/utils';
-import type { NodeColumnSelection, NodeColumnSource, WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
-import { getNodeIdentifier } from '@/features/analysis/common/nodeSelectionTypes';
-import { NodeColumnSelector, NodeSelectionList } from '@/features/analysis/common/components';
-import type { NodeSelectionRenderArgs } from '@/features/analysis/common/components';
-import { useNodeColumnOptions } from '@/features/analysis/common/useNodeColumnOptions';
+import { cn } from '@/lib/utils';
+import type { NodeColumnSelection, NodeColumnSource, WorkspaceNodeLike } from '../nodeSelectionTypes';
+import { getNodeIdentifier } from '../nodeSelectionTypes';
+import { NodeColumnSelector, NodeSelectionList } from '.';
+import type { NodeSelectionRenderArgs } from '.';
+import { useNodeColumnOptions } from '../useNodeColumnOptions';
 
 const CLEAR_SELECTION_VALUE = '__ldaca__clear__';
 

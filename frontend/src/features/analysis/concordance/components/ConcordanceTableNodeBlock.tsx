@@ -10,8 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceGroupedRow, ConcordanceResultEntry } from '@/api/text';
-import { AnalysisTableScrollArea } from '@/components/AnalysisTableScrollArea';
-import { AnalysisPagination } from '@/components/AnalysisPagination';
+import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
+import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import { getNodeIdentifier } from '../../common';

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import {
   type FilterPreviewResponse,

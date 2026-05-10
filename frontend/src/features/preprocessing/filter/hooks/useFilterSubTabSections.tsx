@@ -3,7 +3,7 @@ import { nodesApi } from '@/api/nodes';
 import { useAuth } from '@/hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { NodeColumnSelection, WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { DateTimePickerField } from '../../utils/dateTimeUtils';
 import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from '../../utils/typeUtils';
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';

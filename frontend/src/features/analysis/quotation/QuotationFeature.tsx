@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import NodeSelectionPanel from '@/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
-import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
+import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
 import { textApi } from '@/api/text';
 import type {
   QuotationAnalysisResponse,
@@ -45,7 +45,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AnalysisTableScrollArea } from '@/components/AnalysisTableScrollArea';
+import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
 import { ArrowUpDown, Loader2, Plus } from 'lucide-react';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import {
@@ -62,7 +62,7 @@ import {
   type WorkspaceNodeLike,
 } from '../common';
 
-import { AnalysisPagination } from '@/components/AnalysisPagination';
+import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
 import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';

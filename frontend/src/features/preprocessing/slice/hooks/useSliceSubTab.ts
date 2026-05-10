@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '@/api/nodes';
-import type { NodeColumnSelection, WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';

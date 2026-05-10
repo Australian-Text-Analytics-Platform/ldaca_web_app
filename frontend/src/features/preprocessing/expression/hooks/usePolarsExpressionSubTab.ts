@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { type FilterPreviewResponse, type PolarsExpressionRequest, type PolarsExpressionApplyResponse, type PolarsExpressionContext } from '@/api/nodes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { takeMostRecent } from '@/utils/selectionUtils';

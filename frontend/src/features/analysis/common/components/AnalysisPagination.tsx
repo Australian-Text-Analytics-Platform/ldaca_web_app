@@ -1,4 +1,4 @@
-import { cn } from '../lib/utils';
+import { cn } from '@/lib/utils';
 import {
   Pagination,
   PaginationContent,
@@ -7,8 +7,8 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from './ui/Pagination';
-import { buildPaginationRange } from './ui/paginationRange';
+} from '@/components/ui/Pagination';
+import { buildPaginationRange } from '@/components/ui/paginationRange';
 import {
   Select,
   SelectContent,
@@ -16,8 +16,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select';
-import { Label } from './ui/label';
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 // ---------------------------------------------------------------------------
 // AnalysisPagination – main exported component

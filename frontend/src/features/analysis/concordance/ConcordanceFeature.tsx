@@ -11,7 +11,7 @@ import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, typ
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
-import AnalysisTaskBanner from '@/components/tabs/AnalysisTaskBanner';
+import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
 import {
   hasLockedParameterDiff,
   resetAnalysisSelectionAfterClear,
