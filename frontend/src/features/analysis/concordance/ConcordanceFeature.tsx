@@ -1005,8 +1005,9 @@ const ConcordanceFeature: React.FC = () => {
       );
       // Adapt the per-hit detach-options shape for dispersion: hide the
       // CONC_* mandatory columns (the worker computes the dispersion-
-      // specific output columns regardless), and default-select the
-      // document/text column so it shows as opt-out.
+      // specific output columns regardless). All optional columns
+      // (including the document/text column) start unticked so the user
+      // opts in to whatever metadata they want preserved.
       const options = responses.flatMap((response) => response.data?.nodes ?? []).map((node) => {
         const disabled = new Set(node.disabled_columns || []);
         return {
@@ -1017,7 +1018,7 @@ const ConcordanceFeature: React.FC = () => {
       });
       const initial: Record<string, string[]> = {};
       options.forEach((node) => {
-        initial[node.node_id] = node.text_column ? [node.text_column] : [];
+        initial[node.node_id] = [];
       });
       setSelectedDispersionColumns(initial);
       setDispersionDetachOptions(options);
