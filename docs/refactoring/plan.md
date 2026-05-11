@@ -316,10 +316,10 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 - [x] Wrap the `actions` object in `useMemo`. `77c196a`.
 - [x] Move text mutations from `useWorkspaceInternal.ts` to this hook (covers the five `detachConcordance` / `materializeConcordance` / `quotationSearch` / `detachQuotation` / `materializeQuotation` flows). Phase 4.8 (`d9fb774`).
 
-### 3.10 tutorialRegistry.ts — partial
+### 3.10 tutorialRegistry.ts — design landed; implementation deferred
 
 - [x] Make `TutorialTargetKey` / `InfoTargetKey` / `ReferenceTargetKey` literal unions with `LooseAutoComplete<…>` for the dynamic pass-throughs. `0b48657`. So typos in *direct* call sites are compile errors now; runtime resolution is still string-keyed for dynamically-built targets.
-- [ ] **Open**: move the inline 456 LoC registry to `public/tutorials/registry.json` (loaded once on app start) OR a Vite plugin that scans markdown for `<a id="help-…">` markers and emits the registry at build time. Either eliminates the drift-between-markdown-and-registry maintenance burden, but is the largest single remaining piece of the refactor.
+- [ ] **Out of scope for this branch.** The original design (build-time scan of `public/tutorials/**/*.md`) was superseded by a richer plan: externalize the registry AND markdown content to a versioned docs site, load registry dynamically with SWR cache + bundled fallback. Full plan lives in [`online-tutorial-migration.md`](./online-tutorial-migration.md) — 3.10A (loader infrastructure) is the meaningful structural change; 3.10B/C/D are content move + docs-repo setup + drift CI. Start this in a separate branch when doc-update friction becomes painful or rich-media docs are needed.
 
 ---
 
