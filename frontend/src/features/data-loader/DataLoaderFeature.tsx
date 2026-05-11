@@ -80,9 +80,9 @@ export const DataLoaderFeature: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     containerRef: splitContainerRef,
-    topRatio,
+    value: topRatio,
     splitterProps,
-  } = useResizableSplit({ defaultRatio: 0.4 });
+  } = useResizableSplit({ defaultValue: 0.4 });
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
 
   const notify = useCallback((type: 'success' | 'error' | 'info', message: string) => {

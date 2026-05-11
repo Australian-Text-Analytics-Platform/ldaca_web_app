@@ -1,56 +1,73 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * Shared "drag-to-resize between two stacked panels" hook for horizontal
- * splits (top/bottom panes, horizontal separator).
+ * Shared drag-to-resize hook for splitter UIs. Phase A unification:
+ * covers the three previously hand-rolled implementations (DataLoader's
+ * top/bottom percent split, WorkspaceView's top/bottom percent split,
+ * App.tsx's sidebar pixel column + right-panel percent column).
  *
- * Two perf modes:
+ * Axes:
+ * - `orientation: 'horizontal'` — panes are stacked top/bottom, the
+ *   separator is a horizontal line, drag moves on the Y axis.
+ *   `aria-orientation='horizontal'`, ArrowUp/ArrowDown nudge.
+ * - `orientation: 'vertical'` — panes are side-by-side, the separator
+ *   is a vertical line, drag moves on the X axis.
+ *   `aria-orientation='vertical'`, ArrowLeft/ArrowRight nudge.
  *
- * 1. **State-driven (default)** — every pointer-move commits the new
- *    ratio to React state. Cheapest API, fine when the panes are
- *    flex/grid layouts whose children re-render cheaply (DataLoader's
- *    file tree + workspace manager cards).
+ * Modes:
+ * - `mode: 'percent'` — value is a ratio in `[0, 1]` of the container's
+ *   long axis. Good for content panes that should scale with screen size.
+ * - `mode: 'pixel'` — value is the absolute pixel offset from the
+ *   container's start edge, clamped to `[min, max]`. Good for fixed-cost
+ *   rails (sidebars) whose content doesn't grow with screen size.
  *
- * 2. **DOM-imperative (opt-in via `panelRefs`)** — during the drag, the
- *    pane DOM nodes' height styles are mutated directly via refs;
- *    React state is only updated on pointerUp. Used by WorkspaceView
- *    where the graph view (React Flow) and data table are expensive to
- *    re-render every frame. Pass `panelRefs={ primary, secondary }` and
- *    apply your `style.height`/`flexBasis` based on `ratio` in the JSX —
- *    the drag itself stays off the React render path.
- *
- * Vertical (column) splits aren't supported yet; App.tsx's sidebar and
- * right-panel resizers are still hand-rolled.
+ * Two perf modes (orthogonal to the above):
+ * - **State-driven (default)** — every pointer-move calls `setValue`.
+ *   Cheapest API; fine when the panes' children re-render cheaply.
+ * - **DOM-imperative** — pass `onLiveUpdate` (and optionally
+ *   `onDragStart`/`onDragEnd`). The callback runs once per rAF during
+ *   the drag; the hook still commits the final value to state on
+ *   pointerUp. Use this when a child is expensive to re-render (React
+ *   Flow, TanStack tables, etc.).
  */
 
-type PanelRefs = {
-  primary: React.RefObject<HTMLElement | null>;
-  secondary: React.RefObject<HTMLElement | null>;
-};
+export type ResizableSplitOrientation = 'horizontal' | 'vertical';
+export type ResizableSplitMode = 'percent' | 'pixel';
 
 type UseResizableSplitOptions = {
-  defaultRatio?: number;
+  /** Default 'horizontal' (top/bottom panes). */
+  orientation?: ResizableSplitOrientation;
+  /** Default 'percent'. */
+  mode?: ResizableSplitMode;
+  /** Initial value: ratio (`0..1`) or pixels, depending on `mode`. */
+  defaultValue: number;
   min?: number;
   max?: number;
   /**
-   * When provided, the hook writes `style.height` on these refs during
-   * pointer-move (commit-on-release model). When omitted, the hook
-   * commits to React state on every move (live model).
+   * Called during the drag with the live value (rAF-coalesced). Use to
+   * mutate DOM directly when child renders are expensive. The hook
+   * still commits the final value via `setValue` on pointerUp.
    */
-  panelRefs?: PanelRefs;
+  onLiveUpdate?: (value: number) => void;
+  /** Called once when the drag starts (e.g. to disable CSS transitions). */
+  onDragStart?: () => void;
+  /** Called once when the drag ends (e.g. to re-enable CSS transitions). */
+  onDragEnd?: () => void;
+  /**
+   * Keyboard nudge step. Defaults: 0.05 (percent), 10 (pixel). Same units
+   * as `defaultValue` / `min` / `max`.
+   */
+  keyboardStep?: number;
 };
 
 export type ResizableSplitHandle = {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  ratio: number;
-  /** Convenience alias for legacy callers; same value as `ratio`. */
-  topRatio: number;
-  setRatio: React.Dispatch<React.SetStateAction<number>>;
-  /** True while a drag is in flight — useful for cursor/visual state. */
+  value: number;
+  setValue: React.Dispatch<React.SetStateAction<number>>;
   isDragging: boolean;
   splitterProps: {
     role: 'separator';
-    'aria-orientation': 'horizontal';
+    'aria-orientation': ResizableSplitOrientation;
     'aria-valuenow': number;
     'aria-valuemin': number;
     'aria-valuemax': number;
@@ -64,81 +81,106 @@ export type ResizableSplitHandle = {
   };
 };
 
+const DEFAULT_PERCENT_MIN = 0.15;
+const DEFAULT_PERCENT_MAX = 0.85;
+
 export function useResizableSplit({
-  defaultRatio = 0.4,
-  min = 0.15,
-  max = 0.85,
-  panelRefs,
-}: UseResizableSplitOptions = {}): ResizableSplitHandle {
+  orientation = 'horizontal',
+  mode = 'percent',
+  defaultValue,
+  min: minOpt,
+  max: maxOpt,
+  onLiveUpdate,
+  onDragStart,
+  onDragEnd,
+  keyboardStep,
+}: UseResizableSplitOptions): ResizableSplitHandle {
+  // Pick sensible defaults for the bounds when callers don't supply them.
+  // Percent mode falls back to [0.15, 0.85]; pixel mode has no universal
+  // sensible default, so we keep the value unclamped if the caller is
+  // silent (treat as [-Infinity, Infinity]).
+  const min = minOpt ?? (mode === 'percent' ? DEFAULT_PERCENT_MIN : Number.NEGATIVE_INFINITY);
+  const max = maxOpt ?? (mode === 'percent' ? DEFAULT_PERCENT_MAX : Number.POSITIVE_INFINITY);
+  const step = keyboardStep ?? (mode === 'percent' ? 0.05 : 10);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
-  const liveRatioRef = useRef(defaultRatio);
+  const liveValueRef = useRef(defaultValue);
   const rafIdRef = useRef<number | null>(null);
-  // Mirror `panelRefs` into our own ref so the move handler can read the
-  // caller's pane DOM nodes without taking the caller's object as a
-  // dependency (and tripping react-hooks/immutability).
-  const panelRefsRef = useRef<PanelRefs | undefined>(panelRefs);
-  const [ratio, setRatio] = useState(defaultRatio);
+  // Mirror the live callbacks into refs so the per-pointer-event closures
+  // can read the latest version without listing them as deps (and
+  // tripping react-hooks/immutability).
+  const onLiveUpdateRef = useRef(onLiveUpdate);
+  const onDragStartRef = useRef(onDragStart);
+  const onDragEndRef = useRef(onDragEnd);
+  const [value, setValue] = useState(defaultValue);
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
-    panelRefsRef.current = panelRefs;
-  }, [panelRefs]);
+    onLiveUpdateRef.current = onLiveUpdate;
+    onDragStartRef.current = onDragStart;
+    onDragEndRef.current = onDragEnd;
+  }, [onLiveUpdate, onDragStart, onDragEnd]);
 
-  const clamp = useCallback((value: number) => Math.min(max, Math.max(min, value)), [min, max]);
-
-  // Cancel any pending rAF on unmount so a stale handle doesn't fire after the
-  // component unmounts mid-drag.
+  // Cancel any pending rAF on unmount so a stale handle doesn't fire after
+  // the component unmounts mid-drag.
   useEffect(() => {
     return () => {
       if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
     };
   }, []);
 
-  const applyToPanels = useCallback((next: number) => {
-    const refs = panelRefsRef.current;
-    if (!refs) return;
-    const primary = refs.primary.current;
-    const secondary = refs.secondary.current;
-    if (primary) primary.style.height = `${next * 100}%`;
-    if (secondary) secondary.style.height = `${(1 - next) * 100}%`;
-  }, []);
+  const clamp = useCallback((v: number) => Math.min(max, Math.max(min, v)), [min, max]);
+
+  const computeFromPointer = useCallback(
+    (event: { clientX: number; clientY: number }): number | null => {
+      const container = containerRef.current;
+      if (!container) return null;
+      const rect = container.getBoundingClientRect();
+      if (orientation === 'horizontal') {
+        if (rect.height <= 0) return null;
+        const offset = event.clientY - rect.top;
+        return clamp(mode === 'percent' ? offset / rect.height : offset);
+      }
+      if (rect.width <= 0) return null;
+      const offset = event.clientX - rect.left;
+      return clamp(mode === 'percent' ? offset / rect.width : offset);
+    },
+    [orientation, mode, clamp],
+  );
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     draggingRef.current = true;
     setIsDragging(true);
-    liveRatioRef.current = ratio;
+    liveValueRef.current = value;
+    onDragStartRef.current?.();
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
       // ignore pointer capture errors
     }
-  }, [ratio]);
+  }, [value]);
 
   const onPointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (!draggingRef.current) return;
-      const container = containerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      if (rect.height <= 0) return;
-      const offset = event.clientY - rect.top;
-      const next = clamp(offset / rect.height);
-      liveRatioRef.current = next;
+      const next = computeFromPointer(event);
+      if (next === null) return;
+      liveValueRef.current = next;
 
-      if (panelRefsRef.current) {
-        // DOM-imperative mode: coalesce updates with rAF so we don't
-        // do more than one style write per frame.
+      if (onLiveUpdateRef.current) {
+        // DOM-imperative mode: coalesce updates with rAF so we don't do
+        // more than one write per frame.
         if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = requestAnimationFrame(() => {
-          applyToPanels(liveRatioRef.current);
+          onLiveUpdateRef.current?.(liveValueRef.current);
         });
       } else {
-        setRatio(next);
+        setValue(next);
       }
     },
-    [clamp, applyToPanels],
+    [computeFromPointer],
   );
 
   const onPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -149,10 +191,8 @@ export function useResizableSplit({
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
     }
-    // Commit the final ratio. In DOM-imperative mode the inline style
-    // is reset implicitly: the next render writes `${ratio * 100}%`
-    // again and React reconciles.
-    setRatio(liveRatioRef.current);
+    setValue(liveValueRef.current);
+    onDragEndRef.current?.();
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {
@@ -162,34 +202,45 @@ export function useResizableSplit({
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'ArrowUp') {
+      const isPrev = orientation === 'horizontal' ? event.key === 'ArrowUp' : event.key === 'ArrowLeft';
+      const isNext = orientation === 'horizontal' ? event.key === 'ArrowDown' : event.key === 'ArrowRight';
+      if (isPrev) {
         event.preventDefault();
-        setRatio((prev) => clamp(prev - 0.05));
-      } else if (event.key === 'ArrowDown') {
+        setValue((prev) => clamp(prev - step));
+      } else if (isNext) {
         event.preventDefault();
-        setRatio((prev) => clamp(prev + 0.05));
+        setValue((prev) => clamp(prev + step));
       } else if (event.key === 'Home') {
         event.preventDefault();
-        setRatio(min);
+        setValue(clamp(min));
       } else if (event.key === 'End') {
         event.preventDefault();
-        setRatio(max);
+        setValue(clamp(max));
       } else if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        setRatio(0.5);
+        // Reset to default: midpoint for percent, defaultValue for pixel.
+        setValue(mode === 'percent' ? 0.5 : defaultValue);
       }
     },
-    [clamp, min, max],
+    [orientation, clamp, step, min, max, mode, defaultValue],
   );
 
-  const onDoubleClick = useCallback(() => setRatio(0.5), []);
+  const onDoubleClick = useCallback(() => {
+    setValue(mode === 'percent' ? 0.5 : defaultValue);
+  }, [mode, defaultValue]);
+
+  // ARIA value reporting: clamp to a 0..100 integer scale so screen readers
+  // get a sensible % regardless of mode.
+  const reportedNow = mode === 'percent' ? value * 100 : value;
+  const reportedMin = mode === 'percent' ? min * 100 : (Number.isFinite(min) ? min : 0);
+  const reportedMax = mode === 'percent' ? max * 100 : (Number.isFinite(max) ? max : 100);
 
   const splitterProps: ResizableSplitHandle['splitterProps'] = {
     role: 'separator',
-    'aria-orientation': 'horizontal',
-    'aria-valuenow': Math.round(ratio * 100),
-    'aria-valuemin': Math.round(min * 100),
-    'aria-valuemax': Math.round(max * 100),
+    'aria-orientation': orientation,
+    'aria-valuenow': Math.round(reportedNow),
+    'aria-valuemin': Math.round(reportedMin),
+    'aria-valuemax': Math.round(reportedMax),
     tabIndex: 0,
     onPointerDown,
     onPointerMove,
@@ -199,5 +250,5 @@ export function useResizableSplit({
     onDoubleClick,
   };
 
-  return { containerRef, ratio, topRatio: ratio, setRatio, isDragging, splitterProps };
+  return { containerRef, value, setValue, isDragging, splitterProps };
 }

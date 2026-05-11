@@ -16,11 +16,14 @@ import { useResizableSplit } from '@/hooks/useResizableSplit';
 const WorkspaceView: React.FC = () => {
   const topRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const { containerRef, ratio, isDragging, splitterProps } = useResizableSplit({
-    defaultRatio: 0.5,
+  const { containerRef, value: ratio, isDragging, splitterProps } = useResizableSplit({
+    defaultValue: 0.5,
     min: 0.2,
     max: 0.8,
-    panelRefs: { primary: topRef, secondary: bottomRef },
+    onLiveUpdate: (next) => {
+      if (topRef.current) topRef.current.style.height = `${next * 100}%`;
+      if (bottomRef.current) bottomRef.current.style.height = `${(1 - next) * 100}%`;
+    },
   });
 
   return (

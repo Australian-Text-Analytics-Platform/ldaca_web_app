@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Suspense, lazy, type ReactNode } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy, type ReactNode } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { usePreferencesInit } from './hooks/usePreferences';
@@ -19,6 +19,7 @@ import { Toaster } from './components/ui/sonner';
 import { DocumentModalHost } from './components/dialogs/DocumentModalHost';
 import { ViewRouter } from './components/layout/ViewRouter';
 import { LAG_HINT_DELAY_MS } from './config/timings';
+import { useResizableSplit } from './hooks/useResizableSplit';
 
 // Lazy load components for code splitting. Per-view feature components live
 // inside <ViewRouter> so the active feature unmounts cleanly on view switch.
@@ -58,42 +59,45 @@ const WorkspaceShell: React.FC = () => {
   const [laggingHintReady, setLaggingHintReady] = useState(false);
   const showLaggingHint = laggingHintReady && phase.status === 'bootstrapping';
 
-  // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
-  const [rightWidth, setRightWidth] = useState<number>(40); // percentage of total width
-  const [lastRightWidth, setLastRightWidth] = useState<number>(40); // remember last width when collapsing
+  // Resize state lives in two useResizableSplit calls below — the sidebar
+  // (vertical+pixel, mutating shadcn's primitive via querySelector) and
+  // the right panel (vertical+percent, DOM-imperative via mainRef/asideRef).
+  // Both must be declared before any early returns (Hooks rule).
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState<number>(208); // px, matches default SIDEBAR_WIDTH (16rem at 13px base)
-  const layoutRef = useRef<HTMLDivElement>(null);
+  const [lastMainPanelRatio, setLastMainPanelRatio] = useState<number>(0.6);
   const mainRef = useRef<HTMLDivElement>(null);
   const asideRef = useRef<HTMLElement>(null);
-  const rightWidthLiveRef = useRef<number>(rightWidth);
 
-  const onStartSidebarResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizingSidebar(true);
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-    const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
-    const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
-    // Disable primitive's width transition so the sidebar tracks the cursor exactly (same pattern as other separators)
-    if (gapEl) gapEl.style.transition = 'none';
-    if (containerEl) containerEl.style.transition = 'none';
-    let rafId: number | null = null;
-    let liveWidth = startWidth;
-    const onMove = (ev: MouseEvent) => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        liveWidth = Math.min(400, Math.max(160, startWidth + (ev.clientX - startX)));
-        if (gapEl) gapEl.style.width = `${liveWidth}px`;
-        if (containerEl) containerEl.style.width = `${liveWidth}px`;
-      });
-    };
-    const onUp = () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      setSidebarWidth(liveWidth);
-      setIsResizingSidebar(false);
+  // Sidebar: pixel-based, vertical axis. The shadcn Sidebar primitive
+  // controls its own DOM via `[data-slot="sidebar-gap"]` and
+  // `[data-slot="sidebar-container"]`; we mutate those during drag and
+  // reset them on release so the primitive's width prop takes back over.
+  const {
+    containerRef: sidebarHostRef,
+    value: sidebarWidth,
+    isDragging: isResizingSidebar,
+    splitterProps: sidebarSplitterProps,
+  } = useResizableSplit({
+    orientation: 'vertical',
+    mode: 'pixel',
+    defaultValue: 208,
+    min: 160,
+    max: 400,
+    onDragStart: () => {
+      const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
+      const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
+      if (gapEl) gapEl.style.transition = 'none';
+      if (containerEl) containerEl.style.transition = 'none';
+    },
+    onLiveUpdate: (next) => {
+      const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
+      const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
+      if (gapEl) gapEl.style.width = `${next}px`;
+      if (containerEl) containerEl.style.width = `${next}px`;
+    },
+    onDragEnd: () => {
+      const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
+      const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
       if (gapEl) {
         gapEl.style.transition = '';
         gapEl.style.width = '';
@@ -102,12 +106,31 @@ const WorkspaceShell: React.FC = () => {
         containerEl.style.transition = '';
         containerEl.style.width = '';
       }
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [sidebarWidth]);
+    },
+  });
+
+  // Right panel: percent-based, vertical axis. `value` is the LEFT (main)
+  // pane's ratio of the layout container — the right pane is `1 - value`.
+  // We mutate widths on mainRef/asideRef during drag to keep React Flow
+  // and TanStack tables off the per-frame render path.
+  const {
+    containerRef: layoutRef,
+    value: mainPanelRatio,
+    setValue: setMainPanelRatio,
+    isDragging: isResizing,
+    splitterProps: rightPanelSplitterProps,
+  } = useResizableSplit({
+    orientation: 'vertical',
+    mode: 'percent',
+    defaultValue: 0.6,
+    min: 0.2,
+    max: 0.8,
+    onLiveUpdate: (next) => {
+      if (isRightCollapsed) return;
+      if (mainRef.current) mainRef.current.style.width = `${next * 100}%`;
+      if (asideRef.current) asideRef.current.style.width = `${(1 - next) * 100}%`;
+    },
+  });
 
   useEffect(() => {
     if (phase.status !== 'bootstrapping') return;
@@ -120,61 +143,19 @@ const WorkspaceShell: React.FC = () => {
 
   const blockingCopy = getBlockingCopy(phase, showLaggingHint);
   const shouldShowLoginCard = isMultiUserMode && !isAuthenticated && phase.status !== 'bootstrapping';
-  const onStartResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    if (isRightCollapsed) return; // don't resize when collapsed
-    setIsResizing(true);
-    let rafId: number | null = null;
-    // Capture starting state to compute deltas (prevents jump on first move)
-    const startX = e.clientX;
-    const startPct = rightWidth;
-    const onMove = (ev: MouseEvent) => {
-      if (!layoutRef.current) return;
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        if (!layoutRef.current) return;
-        const rect = layoutRef.current.getBoundingClientRect();
-        // Compute delta from initial drag position to avoid any jump
-        const dx = ev.clientX - startX;
-        const deltaPct = -(dx / rect.width) * 100; // moving right shrinks right panel
-        const pctRight = Math.min(80, Math.max(20, startPct + deltaPct));
-        rightWidthLiveRef.current = pctRight;
-        // Apply widths directly to avoid React rerenders during drag
-        const mainEl = mainRef.current;
-        const asideEl = asideRef.current;
-        if (mainEl && !isRightCollapsed) {
-          mainEl.style.width = `${100 - pctRight}%`;
-        }
-        if (asideEl && !isRightCollapsed) {
-          asideEl.style.width = `${pctRight}%`;
-        }
-      });
-    };
-    const onUp = () => {
-      setIsResizing(false);
-      // flush any pending frame
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      // Commit the final width to state once
-      const finalPct = rightWidthLiveRef.current ?? rightWidth;
-      setRightWidth(finalPct);
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [isRightCollapsed, rightWidth, setIsResizing, setRightWidth, layoutRef]);
 
-  // Collapse/expand the entire right panel (Outlook-like behavior)
+  // Collapse/expand the entire right panel (Outlook-like behavior). We
+  // remember the last drag value so an uncollapse restores it. While
+  // collapsed the splitter doesn't render, so the hook's value sits
+  // unchanged in state.
   const toggleRightPanel = () => {
     setIsRightCollapsed((prev) => {
-      const next = !prev;
-      if (next) {
-        setLastRightWidth(rightWidth);
-      } else {
-        // restore previous width
-        setRightWidth((w) => (w === 0 ? lastRightWidth || 40 : w));
+      if (prev) {
+        setMainPanelRatio(lastMainPanelRatio);
+        return false;
       }
-      return next;
+      setLastMainPanelRatio(mainPanelRatio);
+      return true;
     });
   };
 
@@ -220,17 +201,15 @@ const WorkspaceShell: React.FC = () => {
             <Suspense fallback={null}>
               <HintsController />
             </Suspense>
-            <div className="flex h-dvh w-full overflow-hidden">
+            <div className="flex h-dvh w-full overflow-hidden" ref={sidebarHostRef}>
               <ErrorBoundary>
                 <Sidebar />
               </ErrorBoundary>
 
               <div
                 className={`hidden md:flex shrink-0 cursor-col-resize group relative w-2 items-center justify-center ${isResizingSidebar ? 'z-20' : ''}`}
-                onMouseDown={onStartSidebarResize}
-                role="separator"
-                aria-orientation="vertical"
                 aria-label="Resize sidebar"
+                {...sidebarSplitterProps}
               >
                 <div
                   className={`pointer-events-none w-1 h-10 rounded-full transition-colors ${
@@ -258,7 +237,7 @@ const WorkspaceShell: React.FC = () => {
                       className={`relative h-full p-2 pl-1 ${
                         isRightCollapsed ? 'pr-2' : 'pr-1'
                       } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
-                      style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
+                      style={{ width: isRightCollapsed ? '100%' : `${mainPanelRatio * 100}%`, minWidth: 280 }}
                       innerClassName="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4"
                     >
                       <div className="w-full max-w-none mx-0">
@@ -269,10 +248,8 @@ const WorkspaceShell: React.FC = () => {
                     {!isRightCollapsed && (
                       <div
                         className="w-2 shrink-0 cursor-col-resize group relative flex items-center justify-center"
-                        onMouseDown={onStartResize}
-                        role="separator"
-                        aria-orientation="vertical"
                         aria-label="Resize right panel"
+                        {...rightPanelSplitterProps}
                       >
                         <div
                           className={`pointer-events-none w-1 h-10 rounded-full transition-colors ${
@@ -287,7 +264,7 @@ const WorkspaceShell: React.FC = () => {
                       className={`relative flex h-full flex-col overflow-hidden bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
                         isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
                       }`}
-                      style={{ width: isRightCollapsed ? 0 : `${rightWidth}%` }}
+                      style={{ width: isRightCollapsed ? 0 : `${(1 - mainPanelRatio) * 100}%` }}
                     >
                       {!isRightCollapsed && (
                         <button
