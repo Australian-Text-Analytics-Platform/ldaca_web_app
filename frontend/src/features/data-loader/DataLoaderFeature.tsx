@@ -82,7 +82,10 @@ export const DataLoaderFeature: React.FC = () => {
     containerRef: splitContainerRef,
     value: topRatio,
     splitterProps,
-  } = useResizableSplit({ defaultValue: 0.4 });
+  } = useResizableSplit({
+    defaultValue: 0.4,
+    persistKey: 'ldaca.layout.dataLoaderTopRatio',
+  });
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
 
   const notify = useCallback((type: 'success' | 'error' | 'info', message: string) => {

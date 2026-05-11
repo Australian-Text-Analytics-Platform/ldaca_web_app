@@ -33,16 +33,34 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type ResizableSplitOrientation = 'horizontal' | 'vertical';
 export type ResizableSplitMode = 'percent' | 'pixel';
+export type ResizableSplitAnchor = 'start' | 'end';
 
 type UseResizableSplitOptions = {
   /** Default 'horizontal' (top/bottom panes). */
   orientation?: ResizableSplitOrientation;
   /** Default 'percent'. */
   mode?: ResizableSplitMode;
+  /**
+   * Which pane the `value` represents.
+   * - 'start' (default) — the value tracks the top/left pane: a value of
+   *   0.6 means "top/left pane takes 60% of the container".
+   * - 'end' — the value tracks the bottom/right pane. Useful when the
+   *   sensible cap (`maxPixels`) belongs to that pane (e.g. a right-anchored
+   *   workspace view that shouldn't grow past 800 px on ultrawide screens).
+   */
+  anchor?: ResizableSplitAnchor;
   /** Initial value: ratio (`0..1`) or pixels, depending on `mode`. */
   defaultValue: number;
   min?: number;
   max?: number;
+  /**
+   * Percent mode only. Adaptive cap in pixels on the value's anchored pane:
+   * the effective max becomes `min(max, maxPixels / containerSize)`, so an
+   * ultrawide screen doesn't stretch the pane past `maxPixels`. Example:
+   * `anchor: 'end', max: 0.8, maxPixels: 800` — the end-anchored pane is
+   * up to 80%, but never more than 800 px wide.
+   */
+  maxPixels?: number;
   /**
    * Called during the drag with the live value (rAF-coalesced). Use to
    * mutate DOM directly when child renders are expensive. The hook
@@ -58,6 +76,13 @@ type UseResizableSplitOptions = {
    * as `defaultValue` / `min` / `max`.
    */
   keyboardStep?: number;
+  /**
+   * When set, the hook reads the initial value from `localStorage[persistKey]`
+   * (falling back to `defaultValue` if missing/invalid) and writes the
+   * committed value back on every change. Storage is sync; failures are
+   * silent (Safari private mode, etc).
+   */
+  persistKey?: string;
 };
 
 export type ResizableSplitHandle = {
@@ -84,16 +109,40 @@ export type ResizableSplitHandle = {
 const DEFAULT_PERCENT_MIN = 0.15;
 const DEFAULT_PERCENT_MAX = 0.85;
 
+const readPersisted = (key: string | undefined, fallback: number): number => {
+  if (!key || typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const writePersisted = (key: string | undefined, value: number) => {
+  if (!key || typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // ignore storage errors (Safari private mode, etc.)
+  }
+};
+
 export function useResizableSplit({
   orientation = 'horizontal',
   mode = 'percent',
+  anchor = 'start',
   defaultValue,
   min: minOpt,
   max: maxOpt,
+  maxPixels,
   onLiveUpdate,
   onDragStart,
   onDragEnd,
   keyboardStep,
+  persistKey,
 }: UseResizableSplitOptions): ResizableSplitHandle {
   // Pick sensible defaults for the bounds when callers don't supply them.
   // Percent mode falls back to [0.15, 0.85]; pixel mode has no universal
@@ -105,7 +154,10 @@ export function useResizableSplit({
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
-  const liveValueRef = useRef(defaultValue);
+  // Lazy initializer so we read localStorage exactly once on mount,
+  // then drive state through normal setValue paths.
+  const [value, setValue] = useState(() => readPersisted(persistKey, defaultValue));
+  const liveValueRef = useRef(value);
   const rafIdRef = useRef<number | null>(null);
   // Mirror the live callbacks into refs so the per-pointer-event closures
   // can read the latest version without listing them as deps (and
@@ -113,8 +165,15 @@ export function useResizableSplit({
   const onLiveUpdateRef = useRef(onLiveUpdate);
   const onDragStartRef = useRef(onDragStart);
   const onDragEndRef = useRef(onDragEnd);
-  const [value, setValue] = useState(defaultValue);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Write committed value to localStorage on every change. Skips the
+  // initial commit since the value came from persistence in the first
+  // place; subsequent renders pay the cost of a setItem call (cheap).
+  useEffect(() => {
+    if (!persistKey) return;
+    writePersisted(persistKey, value);
+  }, [persistKey, value]);
 
   useEffect(() => {
     onLiveUpdateRef.current = onLiveUpdate;
@@ -130,7 +189,28 @@ export function useResizableSplit({
     };
   }, []);
 
-  const clamp = useCallback((v: number) => Math.min(max, Math.max(min, v)), [min, max]);
+  /**
+   * Clamp a value against [min, max] plus the adaptive `maxPixels` cap
+   * (percent mode only). `containerSize` is the long-axis size of the
+   * container (height for horizontal split, width for vertical) — passed
+   * in so the pointer-move path can use the live rect without a second
+   * getBoundingClientRect().
+   */
+  const clamp = useCallback(
+    (v: number, containerSize?: number): number => {
+      let effectiveMax = max;
+      if (
+        mode === 'percent' &&
+        typeof maxPixels === 'number' &&
+        typeof containerSize === 'number' &&
+        containerSize > 0
+      ) {
+        effectiveMax = Math.min(effectiveMax, maxPixels / containerSize);
+      }
+      return Math.min(effectiveMax, Math.max(min, v));
+    },
+    [min, max, mode, maxPixels],
+  );
 
   const computeFromPointer = useCallback(
     (event: { clientX: number; clientY: number }): number | null => {
@@ -139,14 +219,18 @@ export function useResizableSplit({
       const rect = container.getBoundingClientRect();
       if (orientation === 'horizontal') {
         if (rect.height <= 0) return null;
-        const offset = event.clientY - rect.top;
-        return clamp(mode === 'percent' ? offset / rect.height : offset);
+        const offsetFromStart = event.clientY - rect.top;
+        // anchor='end' flips the offset so the value represents the
+        // distance from the END (bottom) edge instead of the start.
+        const anchored = anchor === 'end' ? rect.height - offsetFromStart : offsetFromStart;
+        return clamp(mode === 'percent' ? anchored / rect.height : anchored, rect.height);
       }
       if (rect.width <= 0) return null;
-      const offset = event.clientX - rect.left;
-      return clamp(mode === 'percent' ? offset / rect.width : offset);
+      const offsetFromStart = event.clientX - rect.left;
+      const anchored = anchor === 'end' ? rect.width - offsetFromStart : offsetFromStart;
+      return clamp(mode === 'percent' ? anchored / rect.width : anchored, rect.width);
     },
-    [orientation, mode, clamp],
+    [orientation, anchor, mode, clamp],
   );
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -202,14 +286,22 @@ export function useResizableSplit({
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      const isPrev = orientation === 'horizontal' ? event.key === 'ArrowUp' : event.key === 'ArrowLeft';
-      const isNext = orientation === 'horizontal' ? event.key === 'ArrowDown' : event.key === 'ArrowRight';
-      if (isPrev) {
+      // ArrowUp/ArrowLeft moves the splitter toward the START edge of the
+      // container; ArrowDown/ArrowRight moves it toward the END. For
+      // anchor='start', moving startward shrinks the value; for
+      // anchor='end', it grows the value (the end pane gets bigger as the
+      // splitter moves away from it… err, no — as the splitter moves
+      // toward the START edge, the END pane grows). Sign flip via anchor.
+      const isStartward = orientation === 'horizontal' ? event.key === 'ArrowUp' : event.key === 'ArrowLeft';
+      const isEndward = orientation === 'horizontal' ? event.key === 'ArrowDown' : event.key === 'ArrowRight';
+      const startwardDelta = anchor === 'end' ? +step : -step;
+      const endwardDelta = anchor === 'end' ? -step : +step;
+      if (isStartward) {
         event.preventDefault();
-        setValue((prev) => clamp(prev - step));
-      } else if (isNext) {
+        setValue((prev) => clamp(prev + startwardDelta));
+      } else if (isEndward) {
         event.preventDefault();
-        setValue((prev) => clamp(prev + step));
+        setValue((prev) => clamp(prev + endwardDelta));
       } else if (event.key === 'Home') {
         event.preventDefault();
         setValue(clamp(min));
@@ -222,7 +314,7 @@ export function useResizableSplit({
         setValue(mode === 'percent' ? 0.5 : defaultValue);
       }
     },
-    [orientation, clamp, step, min, max, mode, defaultValue],
+    [orientation, anchor, clamp, step, min, max, mode, defaultValue],
   );
 
   const onDoubleClick = useCallback(() => {

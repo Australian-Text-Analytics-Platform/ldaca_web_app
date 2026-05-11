@@ -64,7 +64,7 @@ const WorkspaceShell: React.FC = () => {
   // the right panel (vertical+percent, DOM-imperative via mainRef/asideRef).
   // Both must be declared before any early returns (Hooks rule).
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
-  const [lastMainPanelRatio, setLastMainPanelRatio] = useState<number>(0.6);
+  const [lastAsidePanelRatio, setLastAsidePanelRatio] = useState<number>(0.4);
   const mainRef = useRef<HTMLDivElement>(null);
   const asideRef = useRef<HTMLElement>(null);
 
@@ -72,6 +72,10 @@ const WorkspaceShell: React.FC = () => {
   // controls its own DOM via `[data-slot="sidebar-gap"]` and
   // `[data-slot="sidebar-container"]`; we mutate those during drag and
   // reset them on release so the primitive's width prop takes back over.
+  // `persistKey` holds the EXPANDED width only — if/when shadcn's icon
+  // mode is wired up, that mode keys off `data-state="collapsed"` on the
+  // sidebar root and uses its own `--sidebar-width-icon` var (separate
+  // from this persisted value).
   const {
     containerRef: sidebarHostRef,
     value: sidebarWidth,
@@ -83,6 +87,7 @@ const WorkspaceShell: React.FC = () => {
     defaultValue: 208,
     min: 160,
     max: 400,
+    persistKey: 'ldaca.layout.sidebarWidth',
     onDragStart: () => {
       const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
       const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
@@ -109,26 +114,34 @@ const WorkspaceShell: React.FC = () => {
     },
   });
 
-  // Right panel: percent-based, vertical axis. `value` is the LEFT (main)
-  // pane's ratio of the layout container — the right pane is `1 - value`.
+  // Right panel: percent-based, vertical axis, end-anchored. `value` is
+  // the RIGHT (aside) pane's ratio of the layout container; the main pane
+  // is `1 - value`. End-anchoring lets `maxPixels: 800` cap the aside
+  // pane directly — on a 4K display 80% would be ~3000 px of workspace
+  // view which is wasted whitespace; the cap keeps it sensible while
+  // still letting the pane scale on normal laptops.
+  //
   // We mutate widths on mainRef/asideRef during drag to keep React Flow
   // and TanStack tables off the per-frame render path.
   const {
     containerRef: layoutRef,
-    value: mainPanelRatio,
-    setValue: setMainPanelRatio,
+    value: asidePanelRatio,
+    setValue: setAsidePanelRatio,
     isDragging: isResizing,
     splitterProps: rightPanelSplitterProps,
   } = useResizableSplit({
     orientation: 'vertical',
+    anchor: 'end',
     mode: 'percent',
-    defaultValue: 0.6,
+    defaultValue: 0.4,
     min: 0.2,
     max: 0.8,
+    maxPixels: 800,
+    persistKey: 'ldaca.layout.asidePanelRatio',
     onLiveUpdate: (next) => {
       if (isRightCollapsed) return;
-      if (mainRef.current) mainRef.current.style.width = `${next * 100}%`;
-      if (asideRef.current) asideRef.current.style.width = `${(1 - next) * 100}%`;
+      if (mainRef.current) mainRef.current.style.width = `${(1 - next) * 100}%`;
+      if (asideRef.current) asideRef.current.style.width = `${next * 100}%`;
     },
   });
 
@@ -151,10 +164,10 @@ const WorkspaceShell: React.FC = () => {
   const toggleRightPanel = () => {
     setIsRightCollapsed((prev) => {
       if (prev) {
-        setMainPanelRatio(lastMainPanelRatio);
+        setAsidePanelRatio(lastAsidePanelRatio);
         return false;
       }
-      setLastMainPanelRatio(mainPanelRatio);
+      setLastAsidePanelRatio(asidePanelRatio);
       return true;
     });
   };
@@ -237,7 +250,7 @@ const WorkspaceShell: React.FC = () => {
                       className={`relative h-full p-2 pl-1 ${
                         isRightCollapsed ? 'pr-2' : 'pr-1'
                       } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
-                      style={{ width: isRightCollapsed ? '100%' : `${mainPanelRatio * 100}%`, minWidth: 280 }}
+                      style={{ width: isRightCollapsed ? '100%' : `${(1 - asidePanelRatio) * 100}%`, minWidth: 280 }}
                       innerClassName="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4"
                     >
                       <div className="w-full max-w-none mx-0">
@@ -247,7 +260,11 @@ const WorkspaceShell: React.FC = () => {
 
                     {!isRightCollapsed && (
                       <div
-                        className="w-2 shrink-0 cursor-col-resize group relative flex items-center justify-center"
+                        // Hide the drag handle on touch viewports — it's
+                        // hard to grab on small screens and the aside
+                        // layout itself collapses to stacked below `md`
+                        // (separate change; tracked in plan §3.6 Phase C).
+                        className="hidden md:flex w-2 shrink-0 cursor-col-resize group relative items-center justify-center"
                         aria-label="Resize right panel"
                         {...rightPanelSplitterProps}
                       >
@@ -264,7 +281,7 @@ const WorkspaceShell: React.FC = () => {
                       className={`relative flex h-full flex-col overflow-hidden bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
                         isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
                       }`}
-                      style={{ width: isRightCollapsed ? 0 : `${(1 - mainPanelRatio) * 100}%` }}
+                      style={{ width: isRightCollapsed ? 0 : `${asidePanelRatio * 100}%` }}
                     >
                       {!isRightCollapsed && (
                         <button

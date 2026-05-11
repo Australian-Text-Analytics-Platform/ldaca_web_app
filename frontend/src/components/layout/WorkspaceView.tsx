@@ -20,6 +20,7 @@ const WorkspaceView: React.FC = () => {
     defaultValue: 0.5,
     min: 0.2,
     max: 0.8,
+    persistKey: 'ldaca.layout.workspaceGraphRatio',
     onLiveUpdate: (next) => {
       if (topRef.current) topRef.current.style.height = `${next * 100}%`;
       if (bottomRef.current) bottomRef.current.style.height = `${(1 - next) * 100}%`;

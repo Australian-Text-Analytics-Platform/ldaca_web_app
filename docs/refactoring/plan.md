@@ -279,11 +279,16 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 - [x] Extract `<DocumentModalHost>`. `cb14ceb`.
 - [x] Extract `<RefreshStatusBanner>`. `cb14ceb`.
 - [x] Move `LoginScreen` + `getBlockingCopy` to `components/startup/`. `cb14ceb`.
-- [x] Shared `useResizableSplit` at `src/hooks/useResizableSplit.ts`. Phase A unification (af3784c + this commit) collapses all three hand-rolled drag implementations into a single hook:
+- [x] Shared `useResizableSplit` at `src/hooks/useResizableSplit.ts`. Phases A + B + C + D landed across `af3784c`, `a5ff121`, and the current commit. Hook surface:
   - `orientation: 'horizontal' | 'vertical'` — horizontal = top/bottom panes (drag on Y axis, ArrowUp/Down nudge); vertical = left/right panes (drag on X axis, ArrowLeft/Right nudge).
   - `mode: 'percent' | 'pixel'` — value is either a 0–1 ratio (good for content panes that scale with screen size) or absolute pixels clamped by `[min, max]` (good for fixed-cost rails like sidebars).
-  - Optional `onLiveUpdate` (rAF-coalesced) + `onDragStart`/`onDragEnd` callbacks for DOM-imperative drag, so callers can mutate DOM directly when child re-renders are expensive (App.tsx sidebar mutates shadcn's primitive via `querySelector` + transition disable; right panel mutates `mainRef`/`asideRef` widths; WorkspaceView mutates pane heights). State-driven default still works for cheap consumers (DataLoader).
-  - App.tsx loses ~95 LoC of inline drag-handler boilerplate (the old `onStartSidebarResize` + `onStartResize` `useCallback`s) plus `rightWidth` / `lastRightWidth` / `setRightWidth` / `rightWidthLiveRef` / `isResizing` / `isResizingSidebar` / `setIsResizingSidebar` / `setSidebarWidth` / `setIsResizing` state. The hook returns `value` / `isDragging` / `splitterProps` per call site.
+  - `anchor: 'start' | 'end'` (Phase B) — picks which pane the value tracks. End-anchoring lets `maxPixels` cap the trailing pane directly (used by App.tsx's right panel).
+  - `maxPixels?: number` (Phase B) — adaptive cap in pixels on the anchored pane (percent mode only). Effective max becomes `min(max, maxPixels / containerSize)` so ultrawide screens don't stretch the pane past `maxPixels`. App.tsx right panel: `max: 0.8, maxPixels: 800`.
+  - Optional `onLiveUpdate` (rAF-coalesced) + `onDragStart`/`onDragEnd` callbacks for DOM-imperative drag, so callers can mutate DOM directly when child re-renders are expensive (App.tsx sidebar mutates shadcn's primitive via `querySelector` + transition disable; right panel mutates `mainRef`/`asideRef` widths; WorkspaceView mutates pane heights).
+  - `persistKey?: string` (Phase D) — lazy-reads `localStorage[persistKey]` on mount; writes committed values on every change. Used by all four call sites: `ldaca.layout.sidebarWidth`, `ldaca.layout.asidePanelRatio`, `ldaca.layout.workspaceGraphRatio`, `ldaca.layout.dataLoaderTopRatio`.
+  - **Phase C breakpoint gating**: right-panel splitter gains `hidden md:flex` (matches the sidebar splitter, which has had it from the start). Below `md` the resize handles disappear; the splits themselves still render side-by-side for now (a true mobile-stacking layout is a separate, larger change).
+
+  App.tsx loses ~95 LoC of inline drag-handler boilerplate. Future-friendly: when shadcn icon-mode collapse (sidebar to vertical icon stripe) lands, the hook's persisted value will continue to represent the *expanded* sidebar width — icon mode keys off `data-state="collapsed"` on the sidebar root and uses shadcn's separate `--sidebar-width-icon` var.
 - [x] Pre-auth `feedbackOpen` now reads `state.modals.feedbackModal` from `useUIStore` via a `useShallow` selector. The local `useState` is gone — pre- and post-auth screens share the same Send-feedback control.
 - [x] `LAG_HINT_DELAY_MS` moved to `config/timings.ts` along with `REFRESH_CHIP_DELAY_MS` (which `RefreshStatusBanner` now imports from there).
 
