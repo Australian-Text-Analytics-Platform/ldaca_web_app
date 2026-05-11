@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useQueryClient } from '@tanstack/react-query';
+import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';
 import { useAutoNodeColumns } from '@/hooks/useAutoNodeColumns';
 import {
@@ -228,6 +229,7 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
 
   const lockState = useAnalysisLockCore(lockConfig);
   const { activeNodeIds, lockWithSnapshots } = lockState;
+  const queryClient = useQueryClient();
 
   const captureSnapshotsForNodes = async (
       nodeIds: string[],
@@ -241,7 +243,8 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
         const snapshots = await createNodeSnapshots(
           workspaceId,
           nodeIds,
-          getAuthHeaders
+          getAuthHeaders,
+          queryClient,
         );
         return columnMap
           ? applySelectedColumnsToSnapshots(snapshots, columnMap)

@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 
-import { Button } from '../../../components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,8 +11,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../../components/ui/alert-dialog';
-import { Checkbox } from '../../../components/ui/checkbox';
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export type DetachDialogNodeOption = {
   node_id: string;

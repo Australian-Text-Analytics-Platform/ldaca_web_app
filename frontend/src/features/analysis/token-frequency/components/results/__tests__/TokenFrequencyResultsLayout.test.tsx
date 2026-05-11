@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TokenFrequencySingleTokenSection } from '../TokenFrequencySingleTokenSection';
 import { TokenFrequencyUnifiedTokenSection } from '../TokenFrequencyUnifiedTokenSection';
-import type { NodeResultView, TokenFrequencyStatisticsEntry } from '../../../tokenFrequencyAdapters';
+import type { NodeResultView, TokenFrequencyStatisticsEntry } from '@/features/analysis/token-frequency/tokenFrequencyAdapters';
 
 vi.mock('@/components/help/HelpIcon', () => ({
   default: () => <span data-testid="help-icon" />,

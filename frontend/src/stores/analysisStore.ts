@@ -3,13 +3,40 @@ import { create } from 'zustand';
 import type { ConcordanceAnalysisResponse } from '../api/text';
 import type { NodeColumnSelection } from '../hooks/useAutoNodeColumns';
 
+/**
+ * Canonical task lifecycle states. Backend may add string variants (e.g.
+ * 'submitted'); the union widens with `string` to preserve forward-compat.
+ */
+export type TaskState =
+  | 'pending'
+  | 'queued'
+  | 'submitted'
+  | 'running'
+  | 'successful'
+  | 'failed'
+  | 'cancelled';
+
+/** States representing work the backend has accepted but not started. */
+export const PENDING_TASK_STATES: ReadonlySet<string> = new Set<string>(['pending', 'queued', 'submitted']);
+/** States representing in-flight execution. */
+export const RUNNING_TASK_STATES: ReadonlySet<string> = new Set<string>(['running']);
+/** States the task can never leave (i.e. polling can stop). */
+export const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>(['successful', 'failed', 'cancelled']);
+
+export const isPendingTaskState = (state: string | null | undefined): boolean =>
+  Boolean(state && PENDING_TASK_STATES.has(state));
+export const isRunningTaskState = (state: string | null | undefined): boolean =>
+  Boolean(state && RUNNING_TASK_STATES.has(state));
+export const isTerminalTaskState = (state: string | null | undefined): boolean =>
+  Boolean(state && TERMINAL_TASK_STATES.has(state));
+
 export interface TaskItem {
   task_id: string;
   task_type?: string;
   name?: string;
   user_id?: string;
   workspace_id?: string;
-  state?: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled' | string;
+  state?: TaskState | string;
   progress?: number;
   message?: string;
   created_at?: string;

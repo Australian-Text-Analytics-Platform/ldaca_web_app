@@ -1,20 +1,25 @@
 import React from 'react';
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
-import { CodeEditor } from '../../../components/CodeEditor';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import HelpIcon from '../../../components/help/HelpIcon';
-import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import { Checkbox } from '../../../components/ui/checkbox';
-import { Label } from '../../../components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { Tag } from '../../../components/ui/tag';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
+import { CodeEditor } from '@/features/preprocessing/expression/CodeEditor';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import HelpIcon from '@/components/help/HelpIcon';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
+import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
-import { usePolarsExpressionSubTab, type PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';
+import {
+  usePolarsExpressionSubTab,
+  blankExpression,
+  blankSortExpression,
+  type PolarsExpressionSubTabProps,
+} from './hooks/usePolarsExpressionSubTab';
 
 export type { PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';
 
@@ -61,10 +66,10 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
 
     filterCode,
     setFilterCode,
-    withColumnsCodes,
-    setWithColumnsCodes,
-    selectCodes,
-    setSelectCodes,
+    withColumns,
+    setWithColumns,
+    selectExpressions,
+    setSelectExpressions,
     sortItems,
     setSortItems,
     groupByState,
@@ -103,12 +108,7 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
                 />
               </CardTitle>
             </div>
-            {isApplying && (
-              <Tag tone="muted">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Adding…
-              </Tag>
-            )}
+            <SubTabActivityTag active={isApplying} verb="Adding" />
           </div>
         </CardHeader>
 
@@ -166,15 +166,13 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
             {/* With Columns */}
             <TabsContent value="with_columns" className="space-y-2">
               <CodeHint context="with_columns" />
-              {withColumnsCodes.map((code, i) => (
-                <div key={i} className="flex gap-2">
+              {withColumns.map((item) => (
+                <div key={item.id} className="flex gap-2">
                   <CodeEditor
                     className="flex-1"
-                    value={code}
+                    value={item.code}
                     onChange={(val) => {
-                      const next = [...withColumnsCodes];
-                      next[i] = val;
-                      setWithColumnsCodes(next);
+                      setWithColumns((prev) => prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)));
                     }}
                     onBlur={evalExpressions}
                     disabled={!hasNode}
@@ -184,8 +182,8 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
                     variant="ghost"
                     size="icon"
                     className="mt-1 shrink-0"
-                    disabled={withColumnsCodes.length <= 1}
-                    onClick={() => setWithColumnsCodes(withColumnsCodes.filter((_, idx) => idx !== i))}
+                    disabled={withColumns.length <= 1}
+                    onClick={() => setWithColumns((prev) => prev.filter((it) => it.id !== item.id))}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -194,7 +192,7 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setWithColumnsCodes([...withColumnsCodes, ''])}
+                onClick={() => setWithColumns((prev) => [...prev, blankExpression()])}
                 disabled={!hasNode}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
@@ -205,15 +203,13 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
             {/* Select */}
             <TabsContent value="select" className="space-y-2">
               <CodeHint context="select" />
-              {selectCodes.map((code, i) => (
-                <div key={i} className="flex gap-2">
+              {selectExpressions.map((item) => (
+                <div key={item.id} className="flex gap-2">
                   <CodeEditor
                     className="flex-1"
-                    value={code}
+                    value={item.code}
                     onChange={(val) => {
-                      const next = [...selectCodes];
-                      next[i] = val;
-                      setSelectCodes(next);
+                      setSelectExpressions((prev) => prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)));
                     }}
                     onBlur={evalExpressions}
                     disabled={!hasNode}
@@ -223,8 +219,8 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
                     variant="ghost"
                     size="icon"
                     className="mt-1 shrink-0"
-                    disabled={selectCodes.length <= 1}
-                    onClick={() => setSelectCodes(selectCodes.filter((_, idx) => idx !== i))}
+                    disabled={selectExpressions.length <= 1}
+                    onClick={() => setSelectExpressions((prev) => prev.filter((it) => it.id !== item.id))}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -233,7 +229,7 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSelectCodes([...selectCodes, ''])}
+                onClick={() => setSelectExpressions((prev) => [...prev, blankExpression()])}
                 disabled={!hasNode}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
@@ -244,29 +240,27 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
             {/* Sort */}
             <TabsContent value="sort" className="space-y-2">
               <CodeHint context="sort" />
-              {sortItems.map((item, i) => (
-                <div key={i} className="flex items-start gap-2">
+              {sortItems.map((item) => (
+                <div key={item.id} className="flex items-start gap-2">
                   <CodeEditor
                     className="flex-1"
                     value={item.code}
                     onChange={(val) => {
-                      const next = [...sortItems];
-                      next[i] = { ...next[i]!, code: val };
-                      setSortItems(next);
+                      setSortItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)));
                     }}
                     onBlur={evalExpressions}
                     disabled={!hasNode}
                     placeholder='pl.col("date")'
                   />
                   <div className="flex flex-col items-center gap-1 pt-2">
-                    <Label htmlFor={`sort-desc-${i}`} className="text-xs text-muted-foreground">Desc</Label>
+                    <Label htmlFor={`sort-desc-${item.id}`} className="text-xs text-muted-foreground">Desc</Label>
                     <Checkbox
-                      id={`sort-desc-${i}`}
+                      id={`sort-desc-${item.id}`}
                       checked={item.descending}
                       onCheckedChange={(checked) => {
-                        const next = [...sortItems];
-                        next[i] = { ...next[i]!, descending: Boolean(checked) };
-                        setSortItems(next);
+                        setSortItems((prev) =>
+                          prev.map((it) => (it.id === item.id ? { ...it, descending: Boolean(checked) } : it)),
+                        );
                       }}
                       disabled={!hasNode}
                     />
@@ -276,7 +270,7 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
                     size="icon"
                     className="mt-1 shrink-0"
                     disabled={sortItems.length <= 1}
-                    onClick={() => setSortItems(sortItems.filter((_, idx) => idx !== i))}
+                    onClick={() => setSortItems((prev) => prev.filter((it) => it.id !== item.id))}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -285,7 +279,7 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSortItems([...sortItems, { code: '', descending: false }])}
+                onClick={() => setSortItems((prev) => [...prev, blankSortExpression()])}
                 disabled={!hasNode}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
@@ -308,15 +302,18 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Aggregation expressions</Label>
-                {groupByState.aggCodes.map((code, i) => (
-                  <div key={i} className="flex gap-2">
+                {groupByState.aggExpressions.map((item) => (
+                  <div key={item.id} className="flex gap-2">
                     <CodeEditor
                       className="flex-1"
-                      value={code}
+                      value={item.code}
                       onChange={(val) => {
-                        const next = [...groupByState.aggCodes];
-                        next[i] = val;
-                        setGroupByState({ ...groupByState, aggCodes: next });
+                        setGroupByState((prev) => ({
+                          ...prev,
+                          aggExpressions: prev.aggExpressions.map((it) =>
+                            it.id === item.id ? { ...it, code: val } : it,
+                          ),
+                        }));
                       }}
                       onBlur={evalExpressions}
                       disabled={!hasNode}
@@ -326,12 +323,12 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
                       variant="ghost"
                       size="icon"
                       className="mt-1 shrink-0"
-                      disabled={groupByState.aggCodes.length <= 1}
+                      disabled={groupByState.aggExpressions.length <= 1}
                       onClick={() =>
-                        setGroupByState({
-                          ...groupByState,
-                          aggCodes: groupByState.aggCodes.filter((_, idx) => idx !== i),
-                        })
+                        setGroupByState((prev) => ({
+                          ...prev,
+                          aggExpressions: prev.aggExpressions.filter((it) => it.id !== item.id),
+                        }))
                       }
                     >
                       <Trash2 className="h-4 w-4" />
@@ -342,7 +339,10 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    setGroupByState({ ...groupByState, aggCodes: [...groupByState.aggCodes, ''] })
+                    setGroupByState((prev) => ({
+                      ...prev,
+                      aggExpressions: [...prev.aggExpressions, blankExpression()],
+                    }))
                   }
                   disabled={!hasNode}
                 >

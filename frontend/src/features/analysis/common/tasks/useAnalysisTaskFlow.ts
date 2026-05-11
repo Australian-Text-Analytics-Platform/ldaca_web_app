@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { getTaskTypeCandidates, normalizeTaskDedupeKey } from '../../../../hooks/analysisTaskUtils';
-import { useAnalysisTaskStatus } from '../../../../hooks/useAnalysisTaskStatus';
+import { getTaskTypeCandidates, normalizeTaskDedupeKey } from '@/hooks/analysisTaskUtils';
+import { useAnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
 import { shouldRefreshOnCompletion } from './policies';
 import type {
   AnalysisTaskBannerFallback,

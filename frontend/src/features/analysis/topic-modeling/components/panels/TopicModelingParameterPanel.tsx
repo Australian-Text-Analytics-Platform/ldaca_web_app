@@ -1,22 +1,22 @@
 import { useEffect, useState, type FocusEvent } from 'react';
 import { CircleHelp } from 'lucide-react';
-import { DisabledReasonTooltip } from '../../../../../components/ui/disabled-reason-tooltip';
-import { Input } from '../../../../../components/ui/input';
-import { Label } from '../../../../../components/ui/label';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../../../../components/ui/select';
-import HelpIcon from '../../../../../components/help/HelpIcon';
-import NodeSelectionPanel from '../../../../../components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../../../components/tabs/AnalysisLockedNotice';
-import type { NodeColumnSelection } from '../../../../../hooks/useAutoNodeColumns';
-import type { ColumnInfo } from '../../../../../utils/columnTypes';
-import type { NodeLike } from '../../../../../hooks/useNodeColumnInfos';
-import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
+} from '@/components/ui/select';
+import HelpIcon from '@/components/help/HelpIcon';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
+import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
+import type { ColumnInfo } from '@/utils/columnTypes';
+import type { NodeLike } from '@/hooks/useNodeColumnInfos';
+import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
 
 export type CorpusSample = {
   percent: string;

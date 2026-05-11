@@ -1,14 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { useAuth } from '../../../hooks/useAuth';
-import { useUIStore } from '../../../stores/uiStore';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
-import { textApi } from '../../../api/text';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useAuth } from '@/hooks/useAuth';
+import { useUIStore } from '@/stores/uiStore';
+import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
+import { textApi } from '@/api/text';
 import type {
   QuotationAnalysisResponse,
   QuotationEngineConfig,
@@ -16,18 +17,17 @@ import type {
   QuotationGroupedRow,
   QuotationHitRow,
   QuotationMetadata,
-} from '../../../api/text';
-import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '../../../stores/quotationEngineStore';
-import { Button } from '../../../components/ui/button';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
-import { Badge } from '../../../components/ui/badge';
-import HelpIcon from '../../../components/help/HelpIcon';
-import InfoIcon from '../../../components/help/InfoIcon';
+} from '@/api/text';
+import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import HelpIcon from '@/components/help/HelpIcon';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +36,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../../components/ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -44,10 +44,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../../../components/ui/table';
-import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
-import { ArrowUpDown, Loader2, Play, Plus, Trash2 } from 'lucide-react';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+} from '@/components/ui/table';
+import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
+import { ArrowUpDown, Loader2, Plus } from 'lucide-react';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import {
   getNodeIdentifier,
   getServerEngineConfig,
@@ -58,23 +58,34 @@ import {
   useAnalysisFeature,
   getAnalysisActionState,
   executeAnalysisRunOrUpdate,
+  type NodePaginationState,
   type WorkspaceNodeLike,
 } from '../common';
 
-import { AnalysisPagination } from '../../../components/AnalysisPagination';
-import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
+import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
+import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
 import { flattenQuotationGroups } from './quotationViewModels';
 import {
-  QuotationDetachDialog,
-  type QuotationDetachNodeOption,
-} from './components/QuotationDetachDialog';
+  DEFAULT_CONTEXT_LENGTH,
+  MAX_CONTEXT_LENGTH,
+  clampContextLength,
+} from './quotationTextClip';
+import { normalizeRemoteUrl } from './quotationRemoteUrl';
+import { QuotationDetachDialog } from './components/QuotationDetachDialog';
+import {
+  QuotationHighlightedCell,
+  type QuotationHoverState,
+} from './components/QuotationHighlightedCell';
+import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
-import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
+import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
+import { PageSizeSelect } from '../common/components/PageSizeSelect';
+import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { renderQuotationDetailText } from './components/quotationDetailText';
@@ -101,193 +112,9 @@ interface QuotationResultState {
 }
 
 const DEFAULT_PAGE_SIZE = 50;
-const DEFAULT_CONTEXT_LENGTH = 5;
-const MAX_CONTEXT_LENGTH = 2000;
-
-const TYPE_COLORS: Record<string, string> = {
-  speaker: '#2563eb', // blue-600
-  quote: '#059669',   // emerald-600
-  verb: '#7c3aed',    // violet-600
-};
-
-const clampContextLength = (value: number): number => {
-  if (!Number.isFinite(value)) return DEFAULT_CONTEXT_LENGTH;
-  return Math.max(0, Math.min(MAX_CONTEXT_LENGTH, Math.floor(value)));
-};
-
-type HighlightSpan = { start: number; end: number; types: string[] };
-
-interface ContextClipResult {
-  text: string;
-  spans: HighlightSpan[];
-  prefixEllipsis: boolean;
-  suffixEllipsis: boolean;
-  sliceStart: number;
-  sliceEnd: number;
-}
 
 type QuotationDisplayRow = QuotationHitRow & {
   __spans: { start: number; end: number; type: string }[];
-};
-
-const clipTextAroundSpans = (text: string, spans: HighlightSpan[], surroundingWords: number): ContextClipResult => {
-  const normalizedWords = Number.isFinite(surroundingWords)
-    ? Math.max(0, Math.floor(surroundingWords))
-    : 0;
-
-  if (!text || !spans.length) {
-    return {
-      text,
-      spans: spans.map((span) => ({ ...span })),
-      prefixEllipsis: false,
-      suffixEllipsis: false,
-      sliceStart: 0,
-      sliceEnd: text.length,
-    };
-  }
-
-  const earliestStart = Math.max(0, Math.min(...spans.map((s) => s.start)));
-  const latestEnd = Math.min(text.length, Math.max(...spans.map((s) => s.end)));
-
-  if (!Number.isFinite(earliestStart) || !Number.isFinite(latestEnd) || earliestStart >= latestEnd) {
-    return {
-      text,
-      spans: spans.map((span) => ({ ...span })),
-      prefixEllipsis: false,
-      suffixEllipsis: false,
-      sliceStart: 0,
-      sliceEnd: text.length,
-    };
-  }
-
-  const regex = /\S+/g;
-  const words: Array<{ start: number; end: number }> = [];
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
-    words.push({ start: match.index, end: match.index + match[0].length });
-  }
-
-  const projectSpans = (sliceStart: number, sliceEnd: number) =>
-    spans
-      .map((span) => {
-        const start = Math.max(span.start, sliceStart);
-        const end = Math.min(span.end, sliceEnd);
-        if (end <= start) return null;
-        return { ...span, start: start - sliceStart, end: end - sliceStart };
-      })
-      .filter((span): span is HighlightSpan => Boolean(span));
-
-  if (!words.length) {
-    const sliceStart = earliestStart;
-    const sliceEnd = latestEnd;
-    return {
-      text: text.slice(sliceStart, sliceEnd),
-      spans: projectSpans(sliceStart, sliceEnd),
-      prefixEllipsis: sliceStart > 0,
-      suffixEllipsis: sliceEnd < text.length,
-      sliceStart,
-      sliceEnd,
-    };
-  }
-
-  const findWordIndexBeforeOrAt = (pos: number) => {
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i]!;
-      if (pos < word.start) {
-        return Math.max(0, i - 1);
-      }
-      if (pos <= word.end) {
-        return i;
-      }
-    }
-    return words.length - 1;
-  };
-
-  const findWordIndexAfterOrAt = (pos: number) => {
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i]!;
-      if (pos <= word.end) {
-        return i;
-      }
-      if (pos < word.start) {
-        return i;
-      }
-    }
-    return words.length - 1;
-  };
-
-  const startWordIdx = findWordIndexBeforeOrAt(earliestStart);
-  const lastCharIndex = Math.max(0, latestEnd - 1);
-  const endWordIdx = findWordIndexAfterOrAt(lastCharIndex);
-
-  const clipStartIdx = Math.max(0, startWordIdx - normalizedWords);
-  const clipEndIdx = Math.min(words.length - 1, endWordIdx + normalizedWords);
-
-  let sliceStart = words[clipStartIdx]?.start ?? 0;
-  let sliceEnd = words[clipEndIdx]?.end ?? text.length;
-
-  if (!Number.isFinite(sliceStart) || !Number.isFinite(sliceEnd) || sliceEnd <= sliceStart) {
-    sliceStart = 0;
-    sliceEnd = text.length;
-  }
-
-  return {
-    text: text.slice(sliceStart, sliceEnd),
-    spans: projectSpans(sliceStart, sliceEnd),
-    prefixEllipsis: sliceStart > 0,
-    suffixEllipsis: sliceEnd < text.length,
-    sliceStart,
-    sliceEnd,
-  };
-};
-
-
-type NormalizationFailureReason = 'empty' | 'scheme' | 'format' | 'protocol';
-
-interface NormalizedRemoteUrl {
-  normalized: string;
-  valid: boolean;
-  reason: NormalizationFailureReason | null;
-}
-
-const NORMALIZED_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
-
-const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
-  const trimmed = value.trim();
-  if (!trimmed.length) {
-    return { normalized: '', valid: false, reason: 'empty' };
-  }
-
-  const hasScheme = NORMALIZED_SCHEME_REGEX.test(trimmed);
-
-  const isHttpScheme = /^https?:\/\//i.test(trimmed);
-
-  const canParse = (candidate: string) => {
-    try {
-      const parsed = new URL(candidate);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  if (canParse(trimmed)) {
-    return { normalized: trimmed, valid: true, reason: null };
-  }
-
-  if (!hasScheme) {
-    const prefixed = `http://${trimmed}`;
-    if (canParse(prefixed)) {
-      return { normalized: prefixed, valid: true, reason: null };
-    }
-    return { normalized: trimmed, valid: false, reason: 'format' };
-  }
-
-  if (!isHttpScheme) {
-    return { normalized: trimmed, valid: false, reason: 'protocol' };
-  }
-
-  return { normalized: trimmed, valid: false, reason: 'format' };
 };
 
 const QuotationFeature: React.FC = () => {
@@ -295,6 +122,7 @@ const QuotationFeature: React.FC = () => {
   const { currentWorkspaceId } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'quotation';
   const {
@@ -319,17 +147,19 @@ const QuotationFeature: React.FC = () => {
     docTypeOnly: true,
   });
 
-  const engineConfig = useQuotationEngineConfigStore((state) => state.config);
-  const lastRemoteUrl = useQuotationEngineConfigStore((state) => state.lastRemoteUrl);
-  const setEngineConfigStore = useQuotationEngineConfigStore((state) => state.setConfig);
-  const updateRemoteUrl = useQuotationEngineConfigStore((state) => state.updateRemoteUrl);
+  const engineConfig = usePreferencesStore((state) => state.quotationEngine);
+  const lastRemoteUrl = usePreferencesStore((state) => state.quotationLastRemoteUrl);
+  const setEngineConfigStore = usePreferencesStore((state) => state.setQuotationEngine);
+  const updateRemoteUrl = usePreferencesStore((state) => state.updateQuotationRemoteUrl);
   const [engineError, setEngineError] = useState<string | null>(null);
   const engineDialogOpen = useQuotationEngineDialogStore((state) => state.isOpen);
   const setEngineDialogOpen = useQuotationEngineDialogStore((state) => state.setOpen);
   const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const closeEngineDialog = useQuotationEngineDialogStore((state) => state.close);
-  const [showMetadata, setShowMetadata] = useState(false);
-  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
+  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
+  // Metadata visibility derives from the selected columns: any selection
+  // shows the corresponding metadata columns in the results table.
+  const showMetadata = selectedMetadataColumns.length > 0;
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -468,7 +298,7 @@ const QuotationFeature: React.FC = () => {
         setEngineConfigStore({ type: 'local' });
       }
       setNodeColumnSelections([{ nodeId, column }], { replace: true });
-      setShowMetadata(false);
+      setSelectedMetadataColumns([]);
       const matPath = requestData.materialized_path;
       if (typeof matPath === 'string' && matPath) {
         setMaterializedPaths(prev => ({ ...prev, [nodeId]: matPath }));
@@ -490,6 +320,7 @@ const QuotationFeature: React.FC = () => {
           },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 1,
         });
       } catch {
@@ -569,12 +400,7 @@ const QuotationFeature: React.FC = () => {
   const canRunQuotation = Boolean(currentWorkspaceId) && displayedNodes.length > 0 && !hasIncompleteSelections && engineReady;
 
   // Per-node pagination and sorting state
-  const [nodeState, setNodeState] = useState<Record<string, {
-    currentPage: number;
-    pageSize: number;
-    sortBy?: string;
-    descending: boolean;
-  }>>({});
+  const [nodeState, setNodeState] = useState<Record<string, NodePaginationState>>({});
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
@@ -583,8 +409,14 @@ const QuotationFeature: React.FC = () => {
   const [materializeSummary, setMaterializeSummary] = useState<{ recordCount: number; uniqueDocuments: number; totalDocuments: number } | null>(null);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
-  const [detachNodeOptions, setDetachNodeOptions] = useState<QuotationDetachNodeOption[]>([]);
-  const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
+  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
+  const {
+    selectedDetachColumns,
+    setSelectedDetachColumns,
+    toggleDetachColumn,
+    selectAllDetachColumns,
+    deselectAllDetachColumns,
+  } = useDetachColumnsState(detachNodeOptions);
   const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
 
   const hasParamsChanged = hasLockedParameterDiff({
@@ -638,152 +470,7 @@ const QuotationFeature: React.FC = () => {
     setNodeColumnSelection(nodeId, column);
   };
 
-  // Track hovered segment per cell to highlight only that particular part
-  const [hoverState, setHoverState] = useState<{ key: string; segIndex: number; type?: 'speaker'|'quote'|'verb' } | null>(null);
-
-  const hexToRgba = (hex: string, alpha = 0.18) => {
-    const h = hex.replace('#', '');
-    const bigint = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
-
-  // Build multiple text decorations for proper multi-line underlines
-  const buildUnderlineStyle = (types: string[]): React.CSSProperties => {
-    if (!types.length) return {};
-    // Use text-decoration-line with multiple underlines for proper line wrapping
-    const decorations = types.map(() => 'underline').join(' ');
-    const colors = types.map(t => TYPE_COLORS[t] || '#111827');
-    return {
-      textDecorationLine: decorations as string,
-      textDecorationColor: colors.join(' ') as string,
-      textDecorationThickness: '2px',
-      textUnderlineOffset: '4px',
-      textDecorationSkipInk: 'none',
-      display: 'inline',
-    } as React.CSSProperties;
-  };
-
-  // Render a single text cell with underline spans using indices and label badges
-  const renderHighlightedText = (text: string, row: Record<string, unknown>, cellKey: string): React.ReactNode => {
-    try {
-      if (typeof text !== 'string' || !text.length) return text ?? '';
-      const spans: HighlightSpan[] = [];
-      const addSpan = (start?: unknown, end?: unknown, type?: string) => {
-        if (type && Number.isFinite(start) && Number.isFinite(end) && (start as number) < (end as number) && (start as number) >= 0 && (end as number) <= text.length) {
-          spans.push({ start: Number(start), end: Number(end), types: [type] });
-        }
-      };
-      // Prefer aggregated spans if present
-      if (Array.isArray(row?.__spans) && row.__spans.length > 0) {
-        row.__spans.forEach((s: Record<string, unknown>) => addSpan(s?.start, s?.end, s?.type as string | undefined));
-      } else {
-        addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
-        addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
-        addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
-      }
-
-      if (!spans.length) return text;
-
-      const clipped = clipTextAroundSpans(text, spans, contextLength);
-      let workingText = clipped.text;
-      let workingSpans = clipped.spans;
-      if (!workingSpans.length) {
-        workingText = text.slice(clipped.sliceStart, clipped.sliceEnd);
-        workingSpans = spans
-          .map((span) => {
-            const start = Math.max(span.start, clipped.sliceStart);
-            const end = Math.min(span.end, clipped.sliceEnd);
-            if (end <= start) return null;
-            return { ...span, start: start - clipped.sliceStart, end: end - clipped.sliceStart };
-          })
-          .filter((span): span is HighlightSpan => Boolean(span));
-      }
-
-      // Build segmentation boundaries
-      const bounds = new Set<number>([0, workingText.length]);
-      workingSpans.forEach(s => { bounds.add(s.start); bounds.add(s.end); });
-      const points = Array.from(bounds).sort((a, b) => a - b);
-
-      const segs: Array<{ start: number; end: number; types: string[] }> = [];
-      for (let i = 0; i < points.length - 1; i++) {
-        const s = points[i]!;
-        const e = points[i + 1]!;
-        if (e <= s) continue;
-        const covering = workingSpans.filter(sp => sp.start < e && sp.end > s).flatMap(sp => sp.types);
-        segs.push({ start: s, end: e, types: Array.from(new Set(covering)) });
-      }
-
-      const renderLabels = (types: string[], segIndex: number) => {
-        if (!types.length) return null;
-        return types.map((t, idx) => (
-          <span
-            key={idx}
-            className="text-[10px] font-semibold px-1 py-0.5 rounded border mr-1 align-baseline cursor-pointer"
-            style={{
-              color: '#0f172a',
-              borderColor: TYPE_COLORS[t] || '#334155',
-              backgroundColor: hoverState && hoverState.key === cellKey && hoverState.segIndex === segIndex && hoverState.type === t
-                ? hexToRgba(TYPE_COLORS[t] || '#cbd5e1', 0.28)
-                : '#f1f5f9',
-            }}
-            onMouseEnter={() => setHoverState({ key: cellKey, segIndex, type: t as 'speaker'|'quote'|'verb' })}
-            onMouseLeave={() => setHoverState(null)}
-          >
-            {t.toUpperCase()}
-          </span>
-        ));
-      };
-
-      return (
-        <span>
-          {clipped.prefixEllipsis && <span className="mr-1 text-muted-foreground">...</span>}
-          {segs.map((seg, i) => {
-            const str = workingText.slice(seg.start, seg.end);
-            if (!seg.types.length) return <span key={i}>{str}</span>;
-            const style = buildUnderlineStyle(seg.types);
-            // Determine hover match for this segment: if the currently hovered type applies to this cell and segment
-            const isHoveredSeg = !!(hoverState && hoverState.key === cellKey && hoverState.segIndex === i);
-            const colorForSeg = (hoverState?.type && isHoveredSeg && seg.types.includes(hoverState.type))
-              ? hoverState.type
-              : undefined;
-            const bgStyle: React.CSSProperties = isHoveredSeg ? {
-              backgroundColor: hexToRgba(TYPE_COLORS[colorForSeg || 'quote'] || '#cbd5e1', 0.22),
-              borderRadius: 3,
-              paddingLeft: 1,
-              paddingRight: 1,
-            } : {};
-
-            // On text hover, pick a deterministic type to highlight (priority: quote > speaker > verb)
-            const choosePriorityType = (ts: string[]) => {
-              const order = ['quote', 'speaker', 'verb'];
-              for (const t of order) if (ts.includes(t)) return t as 'quote'|'speaker'|'verb';
-              return ts[0] as 'quote'|'speaker'|'verb';
-            };
-            const segHoverType = choosePriorityType(seg.types);
-            return (
-              <span key={i}>
-                {renderLabels(seg.types, i)}
-                <span
-                  style={{ ...style, ...bgStyle }}
-                  onMouseEnter={() => setHoverState({ key: cellKey, segIndex: i, type: segHoverType })}
-                  onMouseLeave={() => setHoverState(null)}
-                >{str}</span>
-              </span>
-            );
-          })}
-          {clipped.suffixEllipsis && <span className="ml-1 text-muted-foreground">...</span>}
-          {row?.[QUOTATION_COLUMN_KEYS.quoteType] ? (
-            <span className="ml-1 align-baseline text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">{String(row[QUOTATION_COLUMN_KEYS.quoteType])}</span>
-          ) : null}
-        </span>
-      );
-    } catch {
-      return text;
-    }
-  };
+  const [hoverState, setHoverState] = useState<QuotationHoverState | null>(null);
 
   const buildQuotationResultState = (result: QuotationAnalysisResponse, column: string): QuotationResultState => {
     const groupedRows = result.data;
@@ -879,86 +566,55 @@ const QuotationFeature: React.FC = () => {
       detachQuotation,
       materializeQuotation,
       openEngineDialog,
+      queryClient,
     },
   });
 
-  // Watch quotation_materialize task status: clear flag on terminal state; on
-  // success, refresh request to learn materialized_path, reset page_size to
-  // the default 20, and refetch the current page (which will now slice from
-  // the cached parquet with occurrence-row semantics).
-  const quotationMaterializeStatus = useAnalysisTaskStatus(['quotation_materialize']);
-  const processedQuotationMaterializeTaskIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const trackedEntries = Object.entries(materializeTaskIds);
-    if (trackedEntries.length === 0) return;
-
-    for (const task of quotationMaterializeStatus.tasks) {
-      const taskId = task?.task_id;
-      if (!taskId) continue;
-      if (processedQuotationMaterializeTaskIdsRef.current.has(taskId)) continue;
-      const state = task?.state;
-      if (state !== 'successful' && state !== 'failed' && state !== 'cancelled') continue;
-
-      const nodeEntry = trackedEntries.find(([, trackedId]) => trackedId === taskId);
-      if (!nodeEntry) continue;
-      const [nodeId] = nodeEntry;
-
-      processedQuotationMaterializeTaskIdsRef.current.add(taskId);
-      setNodeMaterializing((prev) => {
-        if (!prev[nodeId]) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
-      setMaterializeTaskIds((prev) => {
-        if (!(nodeId in prev)) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
-
-      if (state !== 'successful') continue;
-
-      void (async () => {
-        try {
-          const headers = getAuthHeaders();
-          const parentTaskId = await resolveTaskId();
-          if (parentTaskId) {
-            const req = await textApi.getQuotationTaskRequest(parentTaskId, headers);
-            const reqObj = (req as Record<string, unknown>) ?? {};
-            const path = typeof reqObj.materialized_path === 'string'
-              ? (reqObj.materialized_path as string)
-              : null;
-            if (path) {
-              setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
-            }
-            const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
-            if (summary) {
-              setMaterializeSummary({
-                recordCount: Number(summary.record_count) || 0,
-                uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
-                totalDocuments: Number(summary.total_source_documents) || 0,
-              });
-            }
-          }
-        } catch (error) {
-          console.warn('Failed to refresh quotation task request after materialize', error);
+  // Watch quotation_materialize task status: on success, refresh the parent
+  // request to learn materialized_path, reset page_size to the default 20,
+  // and refetch the current page (which now slices from the cached parquet
+  // with occurrence-row semantics).
+  const handleQuotationMaterializeSuccess = useCallback(async (nodeId: string, _taskId: string) => {
+    void _taskId;
+    try {
+      const headers = getAuthHeaders();
+      const parentTaskId = await resolveTaskId();
+      if (parentTaskId) {
+        const req = await textApi.getQuotationTaskRequest(parentTaskId, headers);
+        const reqObj = (req as Record<string, unknown>) ?? {};
+        const path = typeof reqObj.materialized_path === 'string'
+          ? (reqObj.materialized_path as string)
+          : null;
+        if (path) {
+          setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
         }
-
-        try {
-          handlePageSizeChange(20);
-        } catch (error) {
-          console.warn('Failed to reset quotation page size after materialize', error);
+        const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
+        if (summary) {
+          setMaterializeSummary({
+            recordCount: Number(summary.record_count) || 0,
+            uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
+            totalDocuments: Number(summary.total_source_documents) || 0,
+          });
         }
-      })();
+      }
+    } catch (error) {
+      console.warn('Failed to refresh quotation task request after materialize', error);
     }
-  }, [
-    quotationMaterializeStatus.tasks,
+
+    try {
+      handlePageSizeChange(20);
+    } catch (error) {
+      console.warn('Failed to reset quotation page size after materialize', error);
+    }
+  }, [getAuthHeaders, resolveTaskId, handlePageSizeChange]);
+
+  useMaterializeLifecycle({
+    taskType: 'quotation_materialize',
     materializeTaskIds,
-    getAuthHeaders,
-    resolveTaskId,
-    handlePageSizeChange,
-  ]);
+    setNodeMaterializing,
+    setMaterializeTaskIds,
+    onTerminalSuccess: handleQuotationMaterializeSuccess,
+  });
 
   const handleEngineDialogSave = () => {
     const payload = buildEngineRequest();
@@ -991,37 +647,6 @@ const QuotationFeature: React.FC = () => {
       const message = error instanceof Error ? error.message : 'Failed to load quotation detach options';
       showErrorDialog(message);
     }
-  };
-
-  const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
-    setSelectedDetachColumns((prev) => {
-      const current = new Set(prev[nodeId] || []);
-      if (checked) current.add(column);
-      else current.delete(column);
-      return { ...prev, [nodeId]: Array.from(current) };
-    });
-  };
-
-  const selectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = node.available_columns.filter(
-          (column) => !(node.disabled_columns || []).includes(column)
-        );
-      });
-      return next;
-    });
-  };
-
-  const deselectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = [];
-      });
-      return next;
-    });
   };
 
   const handleDetachConfirm = async () => {
@@ -1072,19 +697,10 @@ const QuotationFeature: React.FC = () => {
 
     return Array.from(new Set([...baseColumns, ...generatedMetadataColumns]));
   })();
-  const preferredMetadataColumns = (() => {
-    const nodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '';
-    if (!nodeId) {
-      return [] as string[];
-    }
-
-    const selection = activeSelections.find((item) => item.nodeId === nodeId);
-    return selection?.column ? [selection.column] : [];
-  })();
-  const resolvedMetadataColumns = reconcileMetadataColumnSelection(
-    quotationMetadataColumns,
-    selectedMetadataColumns,
-    preferredMetadataColumns,
+  // No auto-selection: only honour columns the user has explicitly picked,
+  // filtered against the columns currently available from the result.
+  const resolvedMetadataColumns = selectedMetadataColumns.filter((column) =>
+    quotationMetadataColumns.includes(column),
   );
 
   return (
@@ -1157,142 +773,94 @@ const QuotationFeature: React.FC = () => {
         </DialogContent>
       </Dialog>
       <div className="space-y-4">
-        <Card>
-          <CardHeader className="space-y-0 pb-4">
-            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  Quotation Extraction
-                  <InfoIcon
-                    targetKey="quotation.overview"
-                    label="About Quotation Extraction"
-                    tooltip="Learn what quotation extraction is and how it can help you."
-                  />
-                  <HelpIcon
-                    targetKey="analysis.quotation.parameters"
-                    label="Quotation parameters"
-                    tooltip="Select a data block, choose a text column, and configure quotation settings."
-                  />
-                </CardTitle>
-              </div>
-              <div className="flex flex-col items-start gap-1 md:items-end md:text-right">
-                <Badge
-                  variant="outline"
-                  className="max-w-full break-all text-xs"
-                  title={engineBadgeTitle}
+        <AnalysisCardLayout
+          title="Quotation Extraction"
+          info={{
+            targetKey: 'quotation.overview',
+            label: 'About Quotation Extraction',
+            tooltip: 'Learn what quotation extraction is and how it can help you.',
+          }}
+          help={{
+            targetKey: 'analysis.quotation.parameters',
+            label: 'Quotation parameters',
+            tooltip: 'Select a data block, choose a text column, and configure quotation settings.',
+          }}
+          headerActions={
+            <div className="flex flex-col items-start gap-1 md:items-end md:text-right">
+              <Badge
+                variant="outline"
+                className="max-w-full break-all text-xs"
+                title={engineBadgeTitle}
+              >
+                {engineBadgeLabel}
+              </Badge>
+              {engineDisplayUrl.length ? (
+                <span
+                  className="text-xs text-muted-foreground break-all max-w-xs md:max-w-sm"
+                  title={engineDisplayUrl}
                 >
-                  {engineBadgeLabel}
-                </Badge>
-                {engineDisplayUrl.length ? (
-                  <span
-                    className="text-xs text-muted-foreground break-all max-w-xs md:max-w-sm"
-                    title={engineDisplayUrl}
-                  >
-                    {engineDisplayUrl}
-                  </span>
-                ) : null}
-              </div>
+                  {engineDisplayUrl}
+                </span>
+              ) : null}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-0">
-            <NodeSelectionPanel
-              selectedNodes={displayedNodes}
-              nodeColumnSelections={activeSelections}
-              onColumnChange={handleColumnChange}
-              nodeColors={{}}
-              onColorChange={()=>{}}
-              getNodeColumns={getColumnInfos}
-              defaultPalette={[]}
-              maxCompare={1}
-              className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-              showShape
-              showColorPicker={false}
-              disabled={!!isLocked}
-              locked={!!isLocked}
-              originalCount={displayNodeCount}
-              allowedDataTypes={['string']}
-              lockedMessage={ANALYSIS_LOCKED_MESSAGE}
-            />
-            <div className="flex flex-wrap items-center gap-3">
-              <DisabledReasonTooltip reason={(() => {
-                if (isLoadingQuotations) return undefined;
-                if (actionState.runDisabledReason) return actionState.runDisabledReason;
-                if (hasIncompleteSelections) return 'Select a column for each data block';
-                if (!engineReady) return 'Configure the remote engine before running';
-                return undefined;
-              })()}>
-                <Button
-                  type="button"
-                  className="w-full sm:w-auto"
-                  onClick={() => {
-                    void handleRunOrUpdate();
-                  }}
-                  disabled={actionState.runDisabled || !canRunQuotation}
-                >
-                  {isLoadingQuotations ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Running…
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-2 h-4 w-4" />
-                      {actionState.runLabel}
-                    </>
-                  )}
-                </Button>
-              </DisabledReasonTooltip>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="w-full sm:w-auto"
-                  onClick={async () => {
-                    if (!currentWorkspaceId) return;
-                    setIsClearing(true);
-                    await clearResults();
-                    setIsClearing(false);
-                  }}
-                  disabled={actionState.clearDisabled || isClearing}
-                >
-                  {isClearing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Clearing…
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Clear Results
-                    </>
-                  )}
-                </Button>
-                <HelpIcon targetKey="analysis.quotation.clear-results" label="Clear results" />
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
-                <Select
-                  value={String(
-                    nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']?.pageSize
-                    ?? DEFAULT_PAGE_SIZE
-                  )}
-                  onValueChange={(val) => handlePageSizeChange(Number(val))}
-                >
-                  <SelectTrigger className="h-9 w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="start">
-                    {[10, 20, 50, 100, 200, 400, 800].map((size) => (
-                      <SelectItem key={size} value={String(size)}>
-                        {size}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          }
+          actions={{
+            onRun: () => {
+              void handleRunOrUpdate();
+            },
+            onClear: async () => {
+              if (!currentWorkspaceId) return;
+              setIsClearing(true);
+              await clearResults();
+              setIsClearing(false);
+            },
+            runDisabled: actionState.runDisabled || !canRunQuotation,
+            runDisabledReason: (() => {
+              if (isLoadingQuotations) return undefined;
+              if (actionState.runDisabledReason) return actionState.runDisabledReason;
+              if (hasIncompleteSelections) return 'Select a column for each data block';
+              if (!engineReady) return 'Configure the remote engine before running';
+              return undefined;
+            })(),
+            clearDisabled: actionState.clearDisabled || isClearing,
+            isRunning: isLoadingQuotations,
+            isClearing,
+            hasResult: hasLoaded,
+            runLabel: actionState.runLabel,
+            clearHelp: {
+              targetKey: 'analysis.quotation.clear-results',
+              label: 'Clear results',
+            },
+            extraContent: (
+              <PageSizeSelect
+                value={
+                  nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']?.pageSize
+                  ?? DEFAULT_PAGE_SIZE
+                }
+                onChange={handlePageSizeChange}
+              />
+            ),
+          }}
+        >
+          <NodeSelectionPanel
+            selectedNodes={displayedNodes}
+            nodeColumnSelections={activeSelections}
+            onColumnChange={handleColumnChange}
+            nodeColors={{}}
+            onColorChange={()=>{}}
+            getNodeColumns={getColumnInfos}
+            defaultPalette={[]}
+            maxCompare={1}
+            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
+            showShape
+            showColorPicker={false}
+            disabled={!!isLocked}
+            locked={!!isLocked}
+            originalCount={displayNodeCount}
+            allowedDataTypes={['string']}
+            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+          />
+        </AnalysisCardLayout>
         {quotationWaitingBanner && (
           <AnalysisTaskBanner
             analysisName="Quotation"
@@ -1319,8 +887,6 @@ const QuotationFeature: React.FC = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex flex-wrap items-center gap-4">
                   <MetadataColumnSelector
-                    showMetadata={showMetadata}
-                    onShowMetadataChange={setShowMetadata}
                     availableColumns={quotationMetadataColumns}
                     selectedColumns={resolvedMetadataColumns}
                     onSelectedColumnsChange={setSelectedMetadataColumns}
@@ -1450,11 +1016,16 @@ const QuotationFeature: React.FC = () => {
                                       const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
                                       const shouldHighlight = Boolean(textCol) && c === QUOTATION_DOCUMENT_COLUMN;
                                       const content = shouldHighlight
-                                        ? renderHighlightedText(
-                                            typeof val === 'string' ? val : String(val ?? ''),
-                                            row,
-                                            cellKey,
-                                          )
+                                        ? (
+                                          <QuotationHighlightedCell
+                                            text={typeof val === 'string' ? val : String(val ?? '')}
+                                            row={row}
+                                            cellKey={cellKey}
+                                            contextLength={contextLength}
+                                            hoverState={hoverState}
+                                            onHoverChange={setHoverState}
+                                          />
+                                        )
                                         : val !== undefined && val !== null
                                         ? String(val)
                                         : '';

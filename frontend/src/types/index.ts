@@ -37,21 +37,11 @@ export interface AuthInfoResponse {
 
 // ---------- Files ----------
 
-export interface FileTreeFile {
-  name: string;
-  path: string;
-  type: 'file';
-  size: number;
-}
-
-export interface FileTreeDirectory {
-  name: string;
-  path: string;
-  type: 'directory';
-  children: FileTreeNode[];
-}
-
-export type FileTreeNode = FileTreeFile | FileTreeDirectory;
+export type {
+  FileTreeFile,
+  FileTreeDirectory,
+  FileTreeNode,
+} from '../api/files';
 
 // ---------- Workspace / Node ----------
 

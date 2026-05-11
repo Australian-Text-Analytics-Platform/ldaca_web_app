@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { Skeleton } from '../../../../components/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { WorkspaceDataHeader } from './WorkspaceDataHeader';
 import { WorkspaceSelectionTabs } from './WorkspaceSelectionTabs';
 import { WorkspaceTable } from './WorkspaceTable';

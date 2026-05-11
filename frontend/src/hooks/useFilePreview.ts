@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { filesApi } from '../api/files';
+import { queryKeys } from '../lib/queryKeys';
 import { useAuth } from './useAuth';
 
 export const useFilePreview = (filename: string | null, isOpen: boolean) => {
@@ -20,7 +21,7 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['file-preview', filename, page, pageSize, selectedSheet],
+    queryKey: queryKeys.filePreview(filename ?? '', page, pageSize, selectedSheet),
     queryFn: async () => {
       if (!filename) throw new Error('No filename provided');
       const headers = getAuthHeaders();

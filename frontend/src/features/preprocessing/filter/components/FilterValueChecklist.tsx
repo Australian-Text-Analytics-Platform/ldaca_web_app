@@ -1,8 +1,8 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import { Button } from '../../../../components/ui/button';
-import { Checkbox } from '../../../../components/ui/checkbox';
-import { Input } from '../../../../components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { matchChecklistOption } from '../utils/checklistSearch';
 
 export type FilterChecklistValue = string | number | boolean | null;

@@ -1,9 +1,9 @@
-import NodeSelectionPanel from '@/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
-import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
-import type { WorkspaceNodeLike, NodeColumnSource } from '../../../common/nodeSelectionTypes';
+import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
+import type { WorkspaceNodeLike, NodeColumnSource } from '@/features/analysis/common/nodeSelectionTypes';
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
 

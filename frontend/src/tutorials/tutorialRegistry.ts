@@ -4,7 +4,7 @@ export type TutorialTarget = {
   label?: string;
 };
 
-const registry: Record<string, TutorialTarget> = {
+const registry = {
   'ui.tool-choice': {
     file: 'tutorials/ui.md',
     anchor: 'help-ui-tool-choice',
@@ -445,9 +445,19 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-export-run',
     label: 'Export action',
   },
-};
+} as const satisfies Record<string, TutorialTarget>;
 
-export const getTutorialTarget = (key: string): TutorialTarget | null => registry[key] ?? null;
+/**
+ * String-literal union of all known tutorial-target keys. Use this as the
+ * `targetKey` prop type on `<HelpIcon>` so typos become compile errors.
+ *
+ * Existing call sites that haven't been narrowed yet pass `string`; the
+ * `LooseAutoComplete` pattern preserves autocomplete without breaking those.
+ */
+export type TutorialTargetKey = keyof typeof registry;
+
+export const getTutorialTarget = (key: string): TutorialTarget | null =>
+  (registry as Record<string, TutorialTarget>)[key] ?? null;
 
 export const tutorialIndexTarget: TutorialTarget = {
   file: 'tutorials/index.md',

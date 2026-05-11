@@ -4,15 +4,18 @@ export type ReferenceTarget = {
   label?: string;
 };
 
-const registry: Record<string, ReferenceTarget> = {
+const registry = {
   'general.platform': {
     file: 'references/general.md',
     anchor: 'ref-general-platform',
     label: 'Cite LDaCA Text Analytics',
   },
-};
+} as const satisfies Record<string, ReferenceTarget>;
 
-export const getReferenceTarget = (key: string): ReferenceTarget | null => registry[key] ?? null;
+export type ReferenceTargetKey = keyof typeof registry;
+
+export const getReferenceTarget = (key: string): ReferenceTarget | null =>
+  (registry as Record<string, ReferenceTarget>)[key] ?? null;
 
 export const referenceIndexTarget: ReferenceTarget = {
   file: 'references/index.md',

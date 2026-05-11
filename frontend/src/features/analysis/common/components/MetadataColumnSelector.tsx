@@ -1,16 +1,15 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 
-import { Button } from '../../../../components/ui/button';
-import { Checkbox } from '../../../../components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../../../components/ui/dropdown-menu';
-import { DisabledReasonTooltip } from '../../../../components/ui/disabled-reason-tooltip';
+} from '@/components/ui/dropdown-menu';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { normalizeMetadataColumns } from './metadataColumnSelection';
 
 export type MetadataColumnSection = {
@@ -32,8 +31,6 @@ export type MetadataColumnSection = {
 };
 
 type MetadataColumnSelectorProps = {
-  showMetadata: boolean;
-  onShowMetadataChange: (showMetadata: boolean) => void;
   availableColumns: string[];
   selectedColumns: string[];
   onSelectedColumnsChange: (columns: string[]) => void;
@@ -45,16 +42,16 @@ type MetadataColumnSelectorProps = {
    */
   sections?: MetadataColumnSection[];
   /**
-   * When provided, disables the Show metadata checkbox itself and surfaces
-   * the reason via a tooltip. Used to express "the selected data blocks
-   * have no shared metadata, so showing metadata isn't meaningful here".
+   * When provided, disables the dropdown trigger and surfaces the reason via
+   * a tooltip. Used to express "the selected data blocks have no shared
+   * metadata, so showing metadata isn't meaningful here" — currently only
+   * triggered by Combined view in Concordance when two blocks have no
+   * intersecting metadata columns.
    */
   disabledReason?: string;
 };
 
 export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
-  showMetadata,
-  onShowMetadataChange,
   availableColumns,
   selectedColumns,
   onSelectedColumnsChange,
@@ -95,40 +92,25 @@ export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
     onSelectedColumnsChange(normalizedSelectedColumns.filter((selectedColumn) => selectedColumn !== column));
   };
 
-  const isShowDisabled = !!disabledReason;
-  const dropdownTriggerDisabled =
-    isShowDisabled || !showMetadata || selectableColumns.length === 0;
+  const triggerDisabled = Boolean(disabledReason);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <DisabledReasonTooltip reason={isShowDisabled ? disabledReason : undefined}>
-        <label
-          className={`flex items-center gap-2 text-sm text-foreground ${isShowDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
-        >
-          <Checkbox
-            checked={showMetadata}
-            onCheckedChange={(checked) => onShowMetadataChange(checked === true)}
-            aria-label="Show metadata"
-            disabled={isShowDisabled}
-          />
-          <span>Show metadata</span>
-        </label>
-      </DisabledReasonTooltip>
-
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={dropdownTriggerDisabled}
-            aria-label="Metadata columns"
-            title={dropdownTriggerDisabled ? disabledReason : undefined}
-          >
-            Metadata columns ({normalizedSelectedColumns.length})
-            <ChevronDown className="ml-2 h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
+        <DisabledReasonTooltip reason={triggerDisabled ? disabledReason : undefined}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={triggerDisabled}
+              aria-label="Show metadata"
+            >
+              Show metadata ({normalizedSelectedColumns.length})
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+        </DisabledReasonTooltip>
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuCheckboxItem
             checked={allSelectableSelected}

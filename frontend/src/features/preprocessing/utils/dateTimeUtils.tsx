@@ -1,9 +1,9 @@
 import React from 'react';
 import { CalendarIcon, Clock2Icon } from 'lucide-react';
-import { Calendar } from '../../../components/ui/calendar';
-import { Card, CardContent, CardFooter } from '../../../components/ui/card';
-import { Label } from '../../../components/ui/label';
-import { Input } from '../../../components/ui/input';
+import { Calendar } from '@/components/ui/calendar';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   ISO_PLACEHOLDER,
   normalizeIsoDraft,
