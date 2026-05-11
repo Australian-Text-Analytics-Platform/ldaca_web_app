@@ -156,7 +156,6 @@ export type ConcordanceDispersionNodeBlockProps = {
   ) => void;
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
-  openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
 };
 
 export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeBlockProps> = ({
@@ -204,7 +203,6 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
   handleRowClick,
   handleMaterialize,
   setCombinedPage,
-  openDetachDialog,
 }) => {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
@@ -269,25 +267,60 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 <>Process Both</>
               )}
             </Button>
-            <Button
-              onClick={() => {
-                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                const nodes = combinedNodeIds.map((nid) => {
-                  const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
-                  const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
-                  const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
-                  return { nodeId: nid, column: col, nodeLabel: sourceLabel };
-                }).filter((n) => n.column);
-                openDetachDialog(nodes);
-              }}
-              disabled={combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
-              size="sm"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title="Create new data blocks with concordance results for both sources joined to their original tables"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Both to Workspace
-            </Button>
+            {(() => {
+              const combinedSelection =
+                (selectedBinIndices['__COMBINED__'] as ReadonlySet<number> | undefined) ??
+                EMPTY_BIN_SELECTION;
+              const combinedMaterialisedBins = getMaterializedBinsForKey('__COMBINED__');
+              const combinedHasSelection = combinedSelection.size > 0;
+              const combinedScopeMismatch =
+                combinedHasSelection && !combinedMaterialisedBins;
+              const combinedDetachDisabled =
+                combinedLoading
+                || !searchWord.trim()
+                || combinedNodeIds.length === 0
+                || combinedScopeMismatch;
+              const combinedDetachTitle = combinedScopeMismatch
+                ? 'Materialise the corpus first (Process Both) to safely apply this bin selection across all source documents.'
+                : combinedHasSelection
+                  ? 'Add a per-document aggregation of the selected bin hits to the workspace'
+                  : 'Add a per-document aggregation of all hits to the workspace';
+              return (
+                <Button
+                  onClick={() => {
+                    if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                    const nodes = combinedNodeIds
+                      .map((nid) => {
+                        const col = effectiveNodeColumnSelections.find(
+                          (s) => s.nodeId === nid,
+                        )?.column;
+                        if (!col) return null;
+                        const sourceNode = panelSelectedNodes.find(
+                          (node, idx) => getNodeIdentifier(node, idx) === nid,
+                        );
+                        const label =
+                          (sourceNode?.name || sourceNode?.id || nid) as string;
+                        return { nodeId: nid, column: col, nodeLabel: label };
+                      })
+                      .filter(
+                        (
+                          n,
+                        ): n is { nodeId: string; column: string; nodeLabel: string } =>
+                          n !== null,
+                      );
+                    void onDispersionDetach(nodes, combinedSelection, binCount);
+                  }}
+                  disabled={combinedDetachDisabled}
+                  size="sm"
+                  className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                  title={combinedDetachTitle}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Workspace
+                  {combinedHasSelection ? ` (${combinedSelection.size} bin${combinedSelection.size === 1 ? '' : 's'})` : ''}
+                </Button>
+              );
+            })()}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card">
@@ -389,14 +422,12 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               </TableBody>
             </Table>
           </AnalysisTableScrollArea>
-          <AnalysisPagination
-            page={combinedPage}
-            pageSize={globalPageSize}
-            hasNext={combinedHasNext}
-            hasPrev={combinedHasPrev}
-            totalPages={nodeData.pagination?.total_source_pages}
-            onPageChange={(newPage) => setCombinedPage(newPage)}
-            pageSizeSummary={nodeData.materialized
+          {(() => {
+            // Page-size summary is rendered ABOVE the pagination row so the
+            // "Found N instances in M documents..." line doesn't have to
+            // compete for horizontal space with the page-size selector and
+            // the page buttons.
+            const summary = nodeData.materialized
               ? (Object.keys(materializeSummaries).length > 0
                 ? <GroupedResultsPageSizeSummary
                     groups={[]}
@@ -404,9 +435,21 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     totalDocuments={Object.values(materializeSummaries).reduce((sum, s) => sum + s.uniqueDocuments, 0)}
                     totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
                   />
-                : undefined)
-              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />
-            }
+                : null)
+              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />;
+            return summary ? (
+              <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+                {summary}
+              </div>
+            ) : null;
+          })()}
+          <AnalysisPagination
+            page={combinedPage}
+            pageSize={globalPageSize}
+            hasNext={combinedHasNext}
+            hasPrev={combinedHasPrev}
+            totalPages={nodeData.pagination?.total_source_pages}
+            onPageChange={(newPage) => setCombinedPage(newPage)}
             loading={combinedLoading}
           />
           {colourMatches && allMatchedTexts.length > 0 && (
@@ -600,14 +643,8 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
         </AnalysisTableScrollArea>
       </div>
 
-      <AnalysisPagination
-        page={currentPage}
-        pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
-        hasNext={hasNext}
-        hasPrev={hasPrev}
-        totalPages={nodeData.pagination?.total_source_pages}
-        onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-        pageSizeSummary={nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
+      {(() => {
+        const summary = nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
           ? <GroupedResultsPageSizeSummary
               groups={[]}
               totalInstances={materializeSummaries[detachNodeId].recordCount}
@@ -615,9 +652,21 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
             />
           : (nodeData.materialized
-            ? undefined
-            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />)
-        }
+            ? null
+            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />);
+        return summary ? (
+          <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+            {summary}
+          </div>
+        ) : null;
+      })()}
+      <AnalysisPagination
+        page={currentPage}
+        pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
+        hasNext={hasNext}
+        hasPrev={hasPrev}
+        totalPages={nodeData.pagination?.total_source_pages}
+        onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
         loading={nodeIsLoading}
       >
         <Button
@@ -647,25 +696,55 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             <>Process All</>
           )}
         </Button>
-        <Button
-          onClick={() => {
-            if (detachNodeId) {
-              const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-              const detachLabel = (detachNode?.name || nodeKey) as string;
-              openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
-            }
-          }}
-          disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
-          size="sm"
-          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title="Create a new data block with concordance results joined to the original table"
-        >
-          {isDetaching ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
-          ) : (
-            <><Plus className="mr-2 h-4 w-4" />Add to Workspace</>
-          )}
-        </Button>
+        {(() => {
+          const nodeSelection =
+            (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
+            EMPTY_BIN_SELECTION;
+          const nodeMaterialisedBins = getMaterializedBinsForKey(nodeKey);
+          const nodeHasSelection = nodeSelection.size > 0;
+          const nodeScopeMismatch =
+            nodeHasSelection && !nodeMaterialisedBins;
+          const nodeDetachDisabled =
+            nodeIsLoading
+            || isDetaching
+            || !searchWord.trim()
+            || !canDetach
+            || !detachNodeId
+            || nodeScopeMismatch;
+          const nodeDetachTitle = nodeScopeMismatch
+            ? 'Materialise the corpus first (Process All) to safely apply this bin selection across all documents.'
+            : nodeHasSelection
+              ? 'Add a per-document aggregation of the selected bin hits to the workspace'
+              : 'Add a per-document aggregation of all hits to the workspace';
+          return (
+            <Button
+              onClick={() => {
+                if (!detachNodeId) return;
+                const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
+                const label = (detachNode?.name || nodeKey) as string;
+                void onDispersionDetach(
+                  [{ nodeId: detachNodeId, column, nodeLabel: label }],
+                  nodeSelection,
+                  binCount,
+                );
+              }}
+              disabled={nodeDetachDisabled}
+              size="sm"
+              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+              title={nodeDetachTitle}
+            >
+              {isDetaching ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Workspace
+                  {nodeHasSelection ? ` (${nodeSelection.size} bin${nodeSelection.size === 1 ? '' : 's'})` : ''}
+                </>
+              )}
+            </Button>
+          );
+        })()}
       </AnalysisPagination>
       {colourMatches && allMatchedTexts.length > 0 && (
         <ConcordanceDispersionLegend
