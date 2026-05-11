@@ -15,7 +15,7 @@ import { buildSamplingAutoNodeName } from '@/features/preprocessing/utils/autoNo
 import { takeMostRecent } from '@/utils/selectionUtils';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 
-const DEFAULT_TOPIC_SIZE_VALUE = 25;
+const DEFAULT_TOPIC_SIZE_VALUE = 20;
 
 interface TopicModelingState {
   currentWorkspaceId: string | null;
@@ -26,7 +26,7 @@ interface TopicModelingState {
   representativeWordsCount: number;
   selectedTopicIds: Set<number>;
   sampleFractions?: (number | null)[] | null;
-  topicSizeMode?: 'target' | 'min' | 'exact';
+  topicSizeMode?: 'min' | 'exact';
   topicSizeValue?: number;
 }
 
@@ -139,7 +139,7 @@ export function useTopicModelingTaskFlow({
         node_columns: nodeColumns,
         random_seed: randomSeed,
         representative_words_count: representativeWordsCount,
-        topic_size_mode: topicSizeMode ?? 'target',
+        topic_size_mode: topicSizeMode ?? 'exact',
         topic_size_value: topicSizeValue ?? DEFAULT_TOPIC_SIZE_VALUE,
         ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
       };

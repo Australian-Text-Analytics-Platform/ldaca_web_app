@@ -76,6 +76,7 @@ export interface JoinPreviewRequestSignature {
 
 export interface ConcatPreviewRequestPayload {
   nodeIds: string[];
+  deduplicate: boolean;
 }
 
 export interface ConcatNodeSummary {

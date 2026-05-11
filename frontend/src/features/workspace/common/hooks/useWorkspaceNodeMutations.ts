@@ -120,8 +120,16 @@ export const useWorkspaceNodeMutations = ({
     onMutate: () => {
       startOperation('createWorkspace');
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const newWorkspaceId = (data?.id as string | undefined) ?? null;
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+      if (newWorkspaceId) {
+        // Backend already marks the new workspace as current; sync the
+        // client store so the UI auto-loads it without an extra click.
+        setCurrentWorkspaceId(newWorkspaceId);
+        clearSelection();
+        queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
+      }
       endOperation('createWorkspace');
     },
     onError: (error: Error) => {
@@ -393,8 +401,8 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const concatNodesMutation = useMutation({
-    mutationFn: ({ nodeIds, newNodeName }: { nodeIds: string[]; newNodeName?: string }) =>
-      nodesApi.concat({ node_ids: nodeIds, new_node_name: newNodeName }, authHeaders),
+    mutationFn: ({ nodeIds, newNodeName, deduplicate }: { nodeIds: string[]; newNodeName?: string; deduplicate?: boolean }) =>
+      nodesApi.concat({ node_ids: nodeIds, new_node_name: newNodeName, deduplicate }, authHeaders),
     onMutate: () => {
       startOperation('concatNodes');
       const previousGraph = currentWorkspaceId
@@ -702,10 +710,10 @@ export const useWorkspaceNodeMutations = ({
         rightColumns,
         newNodeName,
       }),
-    concatNodes: (nodeIds: string[], newNodeName?: string) =>
-      concatNodesMutation.mutateAsync({ nodeIds, newNodeName }),
-    concatPreview: (nodeIds: string[], page = 1, pageSize = 10) =>
-      nodesApi.concatPreview({ node_ids: nodeIds }, page, pageSize, authHeaders),
+    concatNodes: (nodeIds: string[], newNodeName?: string, deduplicate?: boolean) =>
+      concatNodesMutation.mutateAsync({ nodeIds, newNodeName, deduplicate }),
+    concatPreview: (nodeIds: string[], page = 1, pageSize = 10, deduplicate?: boolean) =>
+      nodesApi.concatPreview({ node_ids: nodeIds, deduplicate }, page, pageSize, authHeaders),
     filterNode: (nodeId: string, request: FilterRequest) =>
       filterNodeMutation.mutateAsync({ nodeId, request }),
     filterPreview: (nodeId: string, request: FilterRequest, page = 1, pageSize = 10) =>

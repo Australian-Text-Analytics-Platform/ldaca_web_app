@@ -16,6 +16,7 @@ import { Loader2, Plus } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { ChartConfig } from '@/components/ui/chart';
 import { acceptPlaceholderOnTab } from '@/features/preprocessing/utils/placeholderTabFill';
 import type { SequentialAnalysisDatum, ChartTypeOption } from '../hooks/useSequentialAnalysisTaskFlow';
@@ -106,16 +107,18 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 className="min-w-0 flex-1"
               />
             </div>
-            <Button
-              type="button"
-              size="sm"
-              className="w-full sm:w-auto"
-              disabled
-              onClick={onDetach}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add to Workspace ({selectedPeriodIndices.size})
-            </Button>
+            <DisabledReasonTooltip reason="No groups meet the current minimum group size — adjust the filter to enable selecting periods.">
+              <Button
+                type="button"
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled
+                onClick={onDetach}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Workspace ({selectedPeriodIndices.size})
+              </Button>
+            </DisabledReasonTooltip>
           </div>
         </div>
       </div>
@@ -340,25 +343,35 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 className="min-w-0 flex-1"
               />
             </div>
-            <Button
-              type="button"
-              size="sm"
-              className="w-full sm:w-auto"
-              disabled={!canDetach || isDetaching}
-              onClick={onDetach}
+            <DisabledReasonTooltip
+              reason={
+                isDetaching
+                  ? undefined
+                  : !canDetach
+                    ? 'Click periods on the chart (shift-click to extend) to pick a subset to add as a new data block.'
+                    : undefined
+              }
             >
-              {isDetaching ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                <>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add to Workspace ({selectedPeriodIndices.size})
-                </>
-              )}
-            </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={!canDetach || isDetaching}
+                onClick={onDetach}
+              >
+                {isDetaching ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace ({selectedPeriodIndices.size})
+                  </>
+                )}
+              </Button>
+            </DisabledReasonTooltip>
           </div>
         </div>
       </ChartContainer>

@@ -534,12 +534,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
             <Checkbox
               id={`regex-${condition.id}`}
               checked={Boolean(condition.regex)}
-              onCheckedChange={(checked) => {
-                const nextRegex = checked === true;
-                setConditions((prev) => prev.map((c) =>
-                  c.id !== condition.id ? c : { ...c, regex: nextRegex, caseSensitive: nextRegex ? false : c.caseSensitive }
-                ));
-              }}
+              onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
               disabled={rowDisabled}
             />
             <span>regex</span>
@@ -549,7 +544,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
               id={`case-sensitive-${condition.id}`}
               checked={Boolean(condition.caseSensitive)}
               onCheckedChange={(checked) => handleConditionChange(condition.id, 'caseSensitive', checked === true)}
-              disabled={rowDisabled || Boolean(condition.regex)}
+              disabled={rowDisabled}
             />
             <span>case sensitive</span>
           </label>

@@ -5,6 +5,7 @@ import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelect
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
@@ -106,6 +107,20 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
               {statusMessage}
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              id="concat-deduplicate"
+              checked={form.deduplicate}
+              onCheckedChange={(checked) => form.setDeduplicate(checked === true)}
+            />
+            <span>Drop duplicate rows after stacking</span>
+            <HelpIcon
+              targetKey="preprocessing.concat.deduplicate"
+              label="Deduplicate stacked rows"
+              tooltip="Run polars .unique() across all columns so identical rows from different inputs collapse into one."
+            />
+          </label>
         </CardContent>
         <CardFooter className="flex items-center gap-3 border-t pt-4">
           <div className="flex flex-1 items-center gap-2">
