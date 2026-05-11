@@ -1,10 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Download, Loader2, Plus } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import {
   downloadChartAs,
   findSvgInContainer,
@@ -71,16 +70,6 @@ type Props = {
     onSelect: (index: number, shiftHeld: boolean) => void;
     onClear: () => void;
   };
-  /**
-   * Wires the per-document aggregated "Add to Workspace" button. The summary
-   * passes the current selection (or `null` if empty) to the parent, which
-   * resolves the source-node(s), names the result, and dispatches the detach.
-   */
-  detach?: {
-    onClick: (selectedBins: ReadonlySet<number> | null) => void | Promise<void>;
-    isLoading: boolean;
-    disabled?: boolean;
-  };
 };
 
 const AGGREGATE_DEFAULT_COLOR = '#0284c7';
@@ -141,7 +130,6 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
   onChartTypeChange,
   onBinCountChange,
   selection,
-  detach,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
@@ -411,68 +399,6 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
           )}
         </select>
       </div>
-      {detach && (() => {
-        const hasSelection = !!(
-          selection && selection.selectedIndices.size > 0
-        );
-        // Selections made on the per-page plot can't be safely projected onto
-        // a corpus-wide aggregation — the page distribution may differ from
-        // the full-corpus one, so the user's chosen bins might not pick out
-        // the same hits once we read the whole data block. Force them to
-        // either switch the scope to "whole data block" (selection now
-        // corresponds to the same data the detach will aggregate) or clear
-        // the selection (detach all hits, no scope mismatch).
-        const selectionFromPageOnly = hasSelection && !useMaterialised;
-        const isDisabled =
-          (detach.disabled ?? false) || detach.isLoading || selectionFromPageOnly;
-        const disabledReason = detach.isLoading
-          ? undefined
-          : selectionFromPageOnly
-            ? 'Selection was made on the page above, which may differ from the full corpus. Switch the scope to "whole data block" to detach this selection, or clear the selection to detach all hits.'
-            : detach.disabled
-              ? 'No source data block available to detach.'
-              : undefined;
-        return (
-          <div className="flex justify-center">
-            <DisabledReasonTooltip reason={isDisabled ? disabledReason : undefined}>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  void detach.onClick(
-                    hasSelection ? selection!.selectedIndices : null,
-                  );
-                }}
-                disabled={isDisabled}
-                title={
-                  isDisabled
-                    ? undefined
-                    : hasSelection
-                      ? 'Add a per-document aggregation of the selected bin hits to the workspace'
-                      : 'Add a per-document aggregation of all hits to the workspace'
-                }
-              >
-                {detach.isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add to Workspace
-                    {hasSelection
-                      ? ` (${selection!.selectedIndices.size} bin${
-                          selection!.selectedIndices.size === 1 ? '' : 's'
-                        })`
-                      : ''}
-                  </>
-                )}
-              </Button>
-            </DisabledReasonTooltip>
-          </div>
-        );
-      })()}
       {splitBySource && sources.length > 0 && (
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
           {sources.map((src, idx) => {

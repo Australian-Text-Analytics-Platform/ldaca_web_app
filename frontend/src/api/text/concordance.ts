@@ -69,6 +69,20 @@ export interface ConcordanceDispersionDetachRequest {
   materialized_path?: string | null;
   selected_bins?: number[];
   total_bins?: number;
+  /**
+   * Legend-filter projection: when set, only hits whose `CONC_matched_text`
+   * is in this list contribute to the per-document aggregation. Omit (or set
+   * to `undefined`) for "all matches". An empty array means "none" and the
+   * backend returns a zero-row aggregate.
+   */
+  selected_matched_texts?: string[];
+  /**
+   * Mirrors the chart's `lowercaseMatches` toggle. When true, the backend
+   * lowercases both `CONC_matched_text` and `selected_matched_texts` before
+   * the `is_in` check so a single lowercase legend entry matches all original
+   * case variants in the corpus.
+   */
+  match_case_insensitive?: boolean;
 }
 
 export interface ConcordanceMaterializeRequest {

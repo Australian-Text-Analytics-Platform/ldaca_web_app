@@ -104,6 +104,10 @@ export type ConcordanceResultsPanelProps = {
     nodes: Array<{ nodeId: string; column: string; nodeLabel: string }>,
     selectedBins: ReadonlySet<number> | null,
     binCount: number,
+    options?: {
+      selectedMatchedTexts?: string[] | null;
+      matchCaseInsensitive?: boolean;
+    },
   ) => Promise<void> | void;
 };
 

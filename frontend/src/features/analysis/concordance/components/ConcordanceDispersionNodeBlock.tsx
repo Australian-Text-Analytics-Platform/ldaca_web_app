@@ -144,6 +144,10 @@ export type ConcordanceDispersionNodeBlockProps = {
     nodes: Array<{ nodeId: string; column: string; nodeLabel: string }>,
     selectedBins: ReadonlySet<number> | null,
     binCount: number,
+    options?: {
+      selectedMatchedTexts?: string[] | null;
+      matchCaseInsensitive?: boolean;
+    },
   ) => Promise<void> | void;
 
   // Handlers
@@ -275,16 +279,26 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               const combinedHasSelection = combinedSelection.size > 0;
               const combinedScopeMismatch =
                 combinedHasSelection && !combinedMaterialisedBins;
+              const visibleMatchedTexts = colourMatches
+                ? allMatchedTexts.filter((t) => !hiddenMatchedTexts.has(t))
+                : null;
+              const allLegendHidden =
+                visibleMatchedTexts !== null
+                && allMatchedTexts.length > 0
+                && visibleMatchedTexts.length === 0;
               const combinedDetachDisabled =
                 combinedLoading
                 || !searchWord.trim()
                 || combinedNodeIds.length === 0
-                || combinedScopeMismatch;
+                || combinedScopeMismatch
+                || allLegendHidden;
               const combinedDetachTitle = combinedScopeMismatch
                 ? 'Materialise the corpus first (Process Both) to safely apply this bin selection across all source documents.'
-                : combinedHasSelection
-                  ? 'Add a per-document aggregation of the selected bin hits to the workspace'
-                  : 'Add a per-document aggregation of all hits to the workspace';
+                : allLegendHidden
+                  ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
+                  : combinedHasSelection
+                    ? 'Add a per-document aggregation of the selected bin hits to the workspace'
+                    : 'Add a per-document aggregation of all hits to the workspace';
               return (
                 <Button
                   onClick={() => {
@@ -308,7 +322,10 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                         ): n is { nodeId: string; column: string; nodeLabel: string } =>
                           n !== null,
                       );
-                    void onDispersionDetach(nodes, combinedSelection, binCount);
+                    void onDispersionDetach(nodes, combinedSelection, binCount, {
+                      selectedMatchedTexts: visibleMatchedTexts,
+                      matchCaseInsensitive: lowercaseMatches,
+                    });
                   }}
                   disabled={combinedDetachDisabled}
                   size="sm"
@@ -499,34 +516,6 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     onBinSelect('__COMBINED__', index, shiftHeld),
                   onClear: () => onClearBinSelection('__COMBINED__'),
                 }}
-                detach={{
-                  onClick: (selectedBins) => {
-                    const detachNodes = combinedNodeIds
-                      .map((nid) => {
-                        const col = effectiveNodeColumnSelections.find(
-                          (s) => s.nodeId === nid,
-                        )?.column;
-                        if (!col) return null;
-                        const sourceNode = panelSelectedNodes.find(
-                          (n) => n.id === nid,
-                        );
-                        const label =
-                          (sourceNode?.name as string | undefined) || nid;
-                        return { nodeId: nid, column: col, nodeLabel: label };
-                      })
-                      .filter(
-                        (
-                          n,
-                        ): n is { nodeId: string; column: string; nodeLabel: string } =>
-                          n !== null,
-                      );
-                    void onDispersionDetach(detachNodes, selectedBins, binCount);
-                  },
-                  isLoading: combinedNodeIds.some((id) =>
-                    Boolean(nodeDetaching[id]),
-                  ),
-                  disabled: combinedNodeIds.length === 0,
-                }}
               />
             );
           })()}
@@ -704,18 +693,28 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
           const nodeHasSelection = nodeSelection.size > 0;
           const nodeScopeMismatch =
             nodeHasSelection && !nodeMaterialisedBins;
+          const visibleMatchedTexts = colourMatches
+            ? allMatchedTexts.filter((t) => !hiddenMatchedTexts.has(t))
+            : null;
+          const allLegendHidden =
+            visibleMatchedTexts !== null
+            && allMatchedTexts.length > 0
+            && visibleMatchedTexts.length === 0;
           const nodeDetachDisabled =
             nodeIsLoading
             || isDetaching
             || !searchWord.trim()
             || !canDetach
             || !detachNodeId
-            || nodeScopeMismatch;
+            || nodeScopeMismatch
+            || allLegendHidden;
           const nodeDetachTitle = nodeScopeMismatch
             ? 'Materialise the corpus first (Process All) to safely apply this bin selection across all documents.'
-            : nodeHasSelection
-              ? 'Add a per-document aggregation of the selected bin hits to the workspace'
-              : 'Add a per-document aggregation of all hits to the workspace';
+            : allLegendHidden
+              ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
+              : nodeHasSelection
+                ? 'Add a per-document aggregation of the selected bin hits to the workspace'
+                : 'Add a per-document aggregation of all hits to the workspace';
           return (
             <Button
               onClick={() => {
@@ -726,6 +725,10 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                   [{ nodeId: detachNodeId, column, nodeLabel: label }],
                   nodeSelection,
                   binCount,
+                  {
+                    selectedMatchedTexts: visibleMatchedTexts,
+                    matchCaseInsensitive: lowercaseMatches,
+                  },
                 );
               }}
               disabled={nodeDetachDisabled}
@@ -790,23 +793,6 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 EMPTY_BIN_SELECTION,
               onSelect: (index, shiftHeld) => onBinSelect(nodeKey, index, shiftHeld),
               onClear: () => onClearBinSelection(nodeKey),
-            }}
-            detach={{
-              onClick: (selectedBins) => {
-                if (!detachNodeId || !canDetach) return;
-                const sourceNode = panelSelectedNodes.find(
-                  (n) => n.id === detachNodeId,
-                );
-                const label =
-                  (sourceNode?.name as string | undefined) || nodeKey;
-                void onDispersionDetach(
-                  [{ nodeId: detachNodeId, column, nodeLabel: label }],
-                  selectedBins,
-                  binCount,
-                );
-              },
-              isLoading: Boolean(detachNodeId && nodeDetaching[detachNodeId]),
-              disabled: !canDetach || !detachNodeId,
             }}
           />
         );

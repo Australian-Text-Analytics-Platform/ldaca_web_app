@@ -404,6 +404,14 @@ export function useConcordanceTaskFlow({
       selectedBins?: ReadonlySet<number> | null;
       binCount: number;
       selectedColumns?: string[];
+      /**
+       * Legend-filter projection. Pass the visible-on-legend matched-text
+       * set (as displayed, i.e. already lowercased when
+       * `matchCaseInsensitive` is true) to restrict the aggregation. Pass
+       * `null`/omit for "all matches".
+       */
+      selectedMatchedTexts?: string[] | null;
+      matchCaseInsensitive?: boolean;
     },
   ) => {
     if (!currentWorkspaceId || !searchWord.trim()) return;
@@ -449,6 +457,12 @@ export function useConcordanceTaskFlow({
         ...(parentTaskId ? { parent_task_id: parentTaskId } : {}),
         ...(options.materializedPath ? { materialized_path: options.materializedPath } : {}),
         ...(selectedBinsArr ? { selected_bins: selectedBinsArr, total_bins: options.binCount } : {}),
+        ...(options.selectedMatchedTexts != null
+          ? {
+              selected_matched_texts: options.selectedMatchedTexts,
+              match_case_insensitive: !!options.matchCaseInsensitive,
+            }
+          : {}),
       };
       await detachConcordanceDispersion(nodeId, request);
       toast.success('Aggregated detach started.');

@@ -443,6 +443,8 @@ const ConcordanceFeature: React.FC = () => {
   const [dispersionDetachOptions, setDispersionDetachOptions] = useState<DetachDialogNodeOption[]>([]);
   const [pendingDispersionBinSelection, setPendingDispersionBinSelection] = useState<number[] | null>(null);
   const [pendingDispersionBinCount, setPendingDispersionBinCount] = useState<number>(0);
+  const [pendingDispersionMatchedTexts, setPendingDispersionMatchedTexts] = useState<string[] | null>(null);
+  const [pendingDispersionCaseInsensitive, setPendingDispersionCaseInsensitive] = useState<boolean>(false);
   const {
     selectedDetachColumns: selectedDispersionColumns,
     setSelectedDetachColumns: setSelectedDispersionColumns,
@@ -982,12 +984,18 @@ const ConcordanceFeature: React.FC = () => {
     nodes: { nodeId: string; column: string; nodeLabel: string }[],
     selectedBins: ReadonlySet<number> | null,
     binCount: number,
+    options?: {
+      selectedMatchedTexts?: string[] | null;
+      matchCaseInsensitive?: boolean;
+    },
   ) => {
     setPendingDispersionDetachNodes(nodes);
     setPendingDispersionBinSelection(
       selectedBins && selectedBins.size > 0 ? Array.from(selectedBins) : null,
     );
     setPendingDispersionBinCount(binCount);
+    setPendingDispersionMatchedTexts(options?.selectedMatchedTexts ?? null);
+    setPendingDispersionCaseInsensitive(!!options?.matchCaseInsensitive);
 
     try {
       const responses = await Promise.all(
@@ -1021,6 +1029,8 @@ const ConcordanceFeature: React.FC = () => {
       );
       setPendingDispersionDetachNodes([]);
       setSelectedDispersionColumns({});
+      setPendingDispersionMatchedTexts(null);
+      setPendingDispersionCaseInsensitive(false);
     }
   };
 
@@ -1036,6 +1046,8 @@ const ConcordanceFeature: React.FC = () => {
         selectedBins: binsSet,
         binCount: pendingDispersionBinCount,
         selectedColumns: cols,
+        selectedMatchedTexts: pendingDispersionMatchedTexts,
+        matchCaseInsensitive: pendingDispersionCaseInsensitive,
       });
     }
     setDispersionDetachDialogOpen(false);
@@ -1044,6 +1056,8 @@ const ConcordanceFeature: React.FC = () => {
     setDispersionDetachOptions([]);
     setPendingDispersionBinSelection(null);
     setPendingDispersionBinCount(0);
+    setPendingDispersionMatchedTexts(null);
+    setPendingDispersionCaseInsensitive(false);
   };
 
   const anyDispersionNodeDetaching = pendingDispersionDetachNodes.some(
