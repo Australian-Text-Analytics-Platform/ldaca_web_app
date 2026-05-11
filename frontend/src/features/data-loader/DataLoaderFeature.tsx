@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
-import { useResizableSplit } from './hooks/useResizableSplit';
+import { useResizableSplit } from '@/hooks/useResizableSplit';
 import { usePendingWorkspaceDownloads } from './hooks/usePendingWorkspaceDownloads';
 import { FileTree } from './components/FileTree';
 import { WorkspaceManagerCard } from './components/WorkspaceManagerCard';

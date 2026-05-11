@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
 import { useAuth } from '@/hooks/useAuth';
+import { REFRESH_CHIP_DELAY_MS } from '@/config/timings';
 import { formatAttemptLabel, formatTimestamp } from './authPhaseCopy';
-
-const REFRESH_CHIP_DELAY_MS = 3000;
 
 /**
  * Top-of-screen banner + chip for "we're trying to refresh your session"

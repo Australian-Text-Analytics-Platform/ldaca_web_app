@@ -1,35 +1,6 @@
-/**
- * Normalize data type names to standard forms
- */
-export const normalizeTypeName = (type: string): string => {
-  const lowercaseType = type.toLowerCase();
-  if (
-    lowercaseType === 'annotation' ||
-    (lowercaseType.includes('list') &&
-      lowercaseType.includes('struct') &&
-      lowercaseType.includes('provider') &&
-      lowercaseType.includes('annotation'))
-  ) {
-    return 'annotation';
-  }
-  if (
-    lowercaseType === 'list_string' ||
-    lowercaseType.includes('list(string') ||
-    lowercaseType.includes('list[utf8') ||
-    lowercaseType.includes('list[str')
-  ) {
-    return 'list_string';
-  }
-  if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'unknown';
-  if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
-  if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) return 'categorical';
-  if (lowercaseType.includes('int') && !lowercaseType.includes('interval')) return 'integer';
-  if (lowercaseType.includes('float') || lowercaseType.includes('double')) return 'float';
-  if (lowercaseType.includes('bool')) return 'boolean';
-  if (lowercaseType.includes('datetime') || lowercaseType.includes('timestamp')) return 'datetime';
-  if (lowercaseType.includes('unknown')) return 'unknown';
-  return 'string'; // Default fallback
-};
+// Canonical implementation lives in `@/utils/columnTypes`. Re-exported
+// here so preprocessing call sites can keep their existing import.
+export { normalizeTypeName } from '@/utils/columnTypes';
 
 /**
  * Get available filter operators for each data type

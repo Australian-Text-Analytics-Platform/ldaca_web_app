@@ -2,6 +2,20 @@
  * Shared types for data preprocessing features
  */
 
+// `FilterCondition` and `FilterRequest` are canonical in `@/api/nodes`
+// (the snake_case API shape with `value: unknown` for runtime tolerance).
+// Re-exported here so preprocessing call sites don't have to know about
+// the api/ layer and so the narrower UI types live alongside the API
+// shape.
+export type { FilterCondition, FilterRequest } from '@/api/nodes';
+import type { FilterCondition } from '@/api/nodes';
+
+/**
+ * UI-side narrowing of the value space — what the filter form actually
+ * produces before serialization. The serializer in
+ * `filter/utils/serializers.ts` widens this into the `value: unknown`
+ * the API accepts.
+ */
 export type ConditionRange = { start: string | Date | null; end: string | Date | null };
 export type ConditionValue =
   | string
@@ -12,33 +26,21 @@ export type ConditionValue =
   | null
   | Array<string | number | boolean | Date | null>;
 
-export interface FilterCondition {
-  [key: string]: ConditionValue | string | boolean | undefined;
-  column: string;
-  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
-  value: ConditionValue;
-  negate?: boolean;
-  regex?: boolean;
-  case_sensitive?: boolean;
-}
-
 export interface ConditionColumnOption {
   name: string;
   dataType: string;
   label?: string;
 }
 
-export interface FilterRequest {
-  conditions: FilterCondition[];
-  logic?: string;
-  new_node_name?: string;
-}
-
-/** Extended interface for UI with tracking ID */
+/**
+ * Extended interface for UI with tracking ID. Uses camelCase
+ * `caseSensitive` (the form state shape) which the serializer converts
+ * to `case_sensitive` for the API.
+ */
 export interface FilterConditionWithId {
   id: string;
   column: string;
-  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
+  operator: FilterCondition['operator'];
   value: ConditionValue;
   negate?: boolean;
   regex?: boolean;

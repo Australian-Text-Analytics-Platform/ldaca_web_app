@@ -18,14 +18,13 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/s
 import { Toaster } from './components/ui/sonner';
 import { DocumentModalHost } from './components/dialogs/DocumentModalHost';
 import { ViewRouter } from './components/layout/ViewRouter';
+import { LAG_HINT_DELAY_MS } from './config/timings';
 
 // Lazy load components for code splitting. Per-view feature components live
 // inside <ViewRouter> so the active feature unmounts cleanly on view switch.
 const FeedbackPanel = lazy(() => import('./components/panels/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('./components/layout/WorkspaceView'));
 const HintsController = lazy(() => import('./features/hints/HintsController'));
-
-const LAG_HINT_DELAY_MS = 8000;
 
 /**
  * Shell that renders the main workspace experience once the backend is healthy
@@ -344,7 +343,18 @@ const WorkspaceShell: React.FC = () => {
  */
 const App: React.FC = () => {
   const { ready: backendReady, error: backendError } = useBackendHealth();
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Read feedback-modal state from the shared UI store; the pre-auth and
+  // post-auth paths both surface the same Send-feedback button so it'd be
+  // surprising for them to maintain separate visibility state.
+  const {
+    feedbackOpen,
+    openFeedbackModal,
+    closeFeedbackModal,
+  } = useUIStore(useShallow((state) => ({
+    feedbackOpen: state.modals.feedbackModal,
+    openFeedbackModal: state.openFeedbackModal,
+    closeFeedbackModal: state.closeFeedbackModal,
+  })));
   let content: ReactNode;
 
   if (!backendReady) {
@@ -358,7 +368,7 @@ const App: React.FC = () => {
           actions={(
             <button
               type="button"
-              onClick={() => setFeedbackOpen(true)}
+              onClick={openFeedbackModal}
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 font-medium shadow-sm hover:bg-gray-50 focus-visible:outline-offset-2 focus-visible:outline-blue-500 focus-visible:outline-2"
             >
               Send feedback
@@ -366,7 +376,7 @@ const App: React.FC = () => {
           )}
         />
         <Suspense fallback={null}>
-          <FeedbackPanel open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+          <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
         </Suspense>
       </>
     );

@@ -141,8 +141,8 @@ Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-exist
 - [x] **`FileTreeFile/Directory/Node`** — canonical in `api/files.ts`; `types/index.ts` re-exports. `a890f5a`.
 - [x] **`NodeColumnSelection`** — single canonical at `useAutoNodeColumns.ts`. `a890f5a`.
 - [x] **`DetachDialogNodeOption`** — single canonical at `components/DetachColumnsDialog.tsx`. `a890f5a`.
-- [ ] **`FilterCondition` / `FilterRequest`** — still two definitions: `api/nodes.ts:28` (API shape) and `features/preprocessing/types.ts:15` (richer client shape with `negate`/`regex`/`caseSensitive`/`dataType`). The duplication is intentional (API ⇄ UI), but neither file re-exports/imports from the other; a comment + one-direction import would clarify. Cosmetic.
-- [ ] **`normalizeTypeName`** — three definitions (`utils/columnTypes.ts:54`, `data-view/services/schemaMutations.ts:32`, `preprocessing/utils/typeUtils.ts:4`). Test file already imports two side by side. Cosmetic; the three bodies differ slightly in handling of `null`/`unknown`/array forms — needs careful consolidation.
+- [x] **`FilterCondition` / `FilterRequest`** — `api/nodes.ts` is canonical (API shape, snake_case, `value: unknown`); `features/preprocessing/types.ts` `export type { … } from '@/api/nodes'` and adds the UI-side `FilterConditionWithId` + `ConditionValue` + `ConditionRange` separately. The redundant body in `preprocessing/types.ts` is gone.
+- [x] **`normalizeTypeName`** — `@/utils/columnTypes` is canonical (most rigorous: data-driven `TYPE_RULES`, `interval`/`update` guards, `'string'` default). `features/preprocessing/utils/typeUtils.ts` and `features/workspace/data-view/services/schemaMutations.ts` are now `export { normalizeTypeName } from '@/utils/columnTypes'` re-exports. Existing test verifies both call paths return identical results.
 
 ### 2.5 Magic literal cleanup — ✅ DONE
 
@@ -279,9 +279,9 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 - [x] Extract `<DocumentModalHost>`. `cb14ceb`.
 - [x] Extract `<RefreshStatusBanner>`. `cb14ceb`.
 - [x] Move `LoginScreen` + `getBlockingCopy` to `components/startup/`. `cb14ceb`.
-- [ ] Extract a shared resizable-split hook. **Partial**: `useResizableSplit` exists at `features/data-loader/hooks/useResizableSplit.ts` and is consumed by DataLoader. App.tsx's two inline implementations (`onStartSidebarResize` for the sidebar column resize + `onStartResize` for the right-panel column resize) and `WorkspaceView.tsx`'s `onStartDrag` (top/bottom split) are still inline. Migrating would require generalising the data-loader hook to cover three axes/contexts; non-trivial.
-- [ ] Reuse `useUIStore.feedbackModal` instead of local `feedbackOpen` useState in the pre-auth screen (`App.tsx:347`). The post-auth `WorkspaceShell` already reads `state.modals.feedbackModal` from `useUIStore`; the pre-auth path keeps its own `useState` (legitimate independence — pre-auth doesn't need the store's hint integration). Cosmetic.
-- [ ] Move `LAG_HINT_DELAY_MS` to a `config/timings.ts`. `REFRESH_CHIP_DELAY_MS` already gone (no longer referenced in App.tsx).
+- [x] Shared `useResizableSplit` moved out of `features/data-loader/hooks/` into `src/hooks/useResizableSplit.ts`. Added optional `panelRefs` for DOM-imperative drag mode (writes `style.height` on the caller's refs during drag, commits to React state on pointerUp). `WorkspaceView` migrated to that mode so the React-Flow graph + TanStack table aren't re-rendered every frame. DataLoader keeps the state-driven default. App.tsx's two **vertical** (column) splits — `onStartSidebarResize` (pixel-based sidebar) and `onStartResize` (percent-based right panel) — stay hand-rolled; generalising to vertical axis + mixed pixel/percent commits is a separate change.
+- [x] Pre-auth `feedbackOpen` now reads `state.modals.feedbackModal` from `useUIStore` via a `useShallow` selector. The local `useState` is gone — pre- and post-auth screens share the same Send-feedback control.
+- [x] `LAG_HINT_DELAY_MS` moved to `config/timings.ts` along with `REFRESH_CHIP_DELAY_MS` (which `RefreshStatusBanner` now imports from there).
 
 ### 3.7 Sidebar.tsx (725 → 507 LoC)
 

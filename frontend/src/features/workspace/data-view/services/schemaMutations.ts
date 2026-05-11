@@ -1,5 +1,9 @@
 import { type NodeSchemaResponse } from '@/types';
 
+// Canonical implementation lives in `@/utils/columnTypes`. Re-exported
+// here so workspace/data-view call sites can keep their existing import.
+export { normalizeTypeName } from '@/utils/columnTypes';
+
 export const DATA_TYPES = [
   { value: 'string', label: 'string' },
   { value: 'annotation', label: 'annotation' },
@@ -27,37 +31,6 @@ export const extractColumnTypes = (
   }
 
   return {};
-};
-
-export const normalizeTypeName = (type: string): string => {
-  const lowercaseType = type.toLowerCase();
-  if (
-    lowercaseType === 'annotation' ||
-    (lowercaseType.includes('list') &&
-      lowercaseType.includes('struct') &&
-      lowercaseType.includes('provider') &&
-      lowercaseType.includes('annotation'))
-  ) {
-    return 'annotation';
-  }
-  if (
-    lowercaseType === 'list_string' ||
-    lowercaseType.includes('list(string') ||
-    lowercaseType.includes('list[utf8') ||
-    lowercaseType.includes('list[str')
-  ) {
-    return 'list_string';
-  }
-  if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'unknown';
-  if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
-  if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) return 'categorical';
-  if (lowercaseType.includes('int')) return 'integer';
-  if (lowercaseType.includes('float') || lowercaseType.includes('double')) return 'float';
-  if (lowercaseType.includes('bool')) return 'boolean';
-  if (lowercaseType.includes('date')) return 'datetime';
-  if (lowercaseType.includes('datetime')) return 'datetime';
-  if (lowercaseType.includes('unknown')) return 'unknown';
-  return type;
 };
 
 export const getTypeDisplayName = (type: string): string => {
