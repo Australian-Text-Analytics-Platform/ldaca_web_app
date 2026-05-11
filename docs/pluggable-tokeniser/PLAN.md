@@ -3,6 +3,7 @@
 **Branch:** `pluggable_tokeniser` (root + `backend/`, `polars-text/`, `docworkspace/`)
 **Status:** Planning — no code changes yet
 **Started:** 2026-05-09
+**Last synced from `dev`:** 2026-05-11 (merge `292342e`)
 **Owner:** chao.sun@sydney.edu.au
 
 This is the cross-module plan. Per-module sub-plans (to be added if needed):
@@ -162,14 +163,16 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 **Goal:** expose the choice. Default is invisible to existing users.
 
+> **Note (2026-05-11):** Frontend has been heavily refactored on `dev` since this plan was written. File paths below are current as of the last sync, but line numbers and component locations may drift further before Phase 4 starts. Verify each reference at implementation time. The directories most relevant to this phase — `frontend/src/api/text/`, `frontend/src/stores/`, `frontend/src/features/workspace/`, `frontend/src/components/panels/` — are stable; the per-feature file split inside them is what tends to move.
+
 | #   | Task | File(s) | Acceptance |
 |-----|------|---------|------------|
-| 4.1 | Extend `preferencesStore` with `defaultLanguage`, `defaultTokenizerModel` | `frontend/src/stores/preferencesStore.ts` | Persisted across reloads |
-| 4.2 | Language selector in `AddFilePanel` | `frontend/src/components/panels/AddFilePanel.tsx:73-97` | New corpus carries language tag |
-| 4.3 | Right-click "Tokenise" action on doc nodes | workspace tree component | Spawns Phase 2 task; shows progress |
-| 4.4 | Add `tokenizer`/`language` to request types | `frontend/src/api/text.ts` | Backend receives the values |
-| 4.5 | Disabled-reason tooltip "English-only" on quotation for non-EN nodes | quotation feature panel | Matches existing tooltip pattern from `da55cb8` |
-| 4.6 | Node inspector shows language + tokenizer model | node info panel | Visible on selection |
+| 4.1 | Extend `preferencesStore` with `defaultLanguage`, `defaultTokenizerModel` (store now uses typed-slice pattern: `PreferencesState` + `PreferencesActions` with debounced subscribe-sync — add the new fields to `PreferencesState` and a setter to `PreferencesActions`) | `frontend/src/stores/preferencesStore.ts` | Persisted across reloads; round-trips through `UserPreferences` API |
+| 4.2 | Language selector in `AddFilePanel` (insert above the sheet selector / preview block) | `frontend/src/components/panels/AddFilePanel.tsx` (sheet-selector block ~line 73 onward at last check) | New corpus carries language tag |
+| 4.3 | Right-click "Tokenise" action on doc nodes | workspace tree component under `frontend/src/features/workspace/` (graph-view or data-view depending on context-menu location at the time) | Spawns Phase 2 task; shows progress |
+| 4.4 | Add `tokenizer`/`language` to request types in the per-feature API modules | `frontend/src/api/text/` — `tokenFrequency.ts`, `concordance.ts`, `topicModeling.ts`, `aiAnnotation.ts`, `sequential.ts`; shared types in `shared.ts` and re-exports in `index.ts` | Backend receives the values |
+| 4.5 | Disabled-reason tooltip "English-only" on quotation for non-EN nodes | quotation feature panel under `frontend/src/features/workspace/` (locate via `quotation_core` request usage) | Matches existing tooltip pattern from `da55cb8` |
+| 4.6 | Node inspector shows language + tokenizer model | node info panel (whichever panel renders `nodeInfo` from `frontend/src/lib/nodeInfo.ts`) | Visible on selection |
 
 **Tests:**
 - Browser dev-server walkthrough: import a small ZH CSV → tokenise → run frequency → see ZH tokens. Try quotation → see disabled tooltip. Save and reload workspace → state preserved.
