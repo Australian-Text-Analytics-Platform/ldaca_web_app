@@ -42,7 +42,7 @@ export interface ConcordanceDetachRequest {
 /**
  * Detach a per-document aggregation of concordance hits from the dispersion
  * view. Output rows are one-per-source-document with hits collapsed into
- * `List<T>` columns and a multi-line `extracted_contents` string.
+ * `List<T>` columns and a multi-line `CONC_extraction` string.
  *
  * When `selected_bins` is provided, only hits whose position
  * (`start_idx / doc_length * total_bins`, floored) lands in one of the bins
