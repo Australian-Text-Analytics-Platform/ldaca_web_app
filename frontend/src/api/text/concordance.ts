@@ -39,6 +39,38 @@ export interface ConcordanceDetachRequest {
   materialized_path?: string | null;
 }
 
+/**
+ * Detach a per-document aggregation of concordance hits from the dispersion
+ * view. Output rows are one-per-source-document with hits collapsed into
+ * `List<T>` columns and a multi-line `extracted_contents` string.
+ *
+ * When `selected_bins` is provided, only hits whose position
+ * (`start_idx / doc_length * total_bins`, floored) lands in one of the bins
+ * are included — matches the "in-range hits only" semantic of the chart.
+ */
+export interface ConcordanceDispersionDetachRequest {
+  column: string;
+  search_word: string;
+  num_left_tokens?: number;
+  num_right_tokens?: number;
+  regex?: boolean;
+  whole_word?: boolean;
+  case_sensitive?: boolean;
+  new_node_name?: string;
+  selected_columns?: string[];
+  /**
+   * Parent concordance analysis task id. When set and the slow path runs,
+   * the worker writes the materialised parquet too and publishes the same
+   * `analysis_materialized` event that "Process All" emits — saving the
+   * user from a redundant materialisation when they iterate on bin
+   * selections after a no-selection detach.
+   */
+  parent_task_id?: string;
+  materialized_path?: string | null;
+  selected_bins?: number[];
+  total_bins?: number;
+}
+
 export interface ConcordanceMaterializeRequest {
   parent_task_id: string;
   column: string;
@@ -136,6 +168,20 @@ export const concordanceApi = {
     headers: Record<string, string> = {},
   ): Promise<void> => {
     await post(`/workspaces/nodes/${node}/concordance/detach`, req, headers);
+  },
+
+  concordanceDispersionDetach: async (
+    node: string,
+    req: ConcordanceDispersionDetachRequest,
+    headers: Record<string, string> = {},
+  ): Promise<{ task_id?: string }> => {
+    const resp = await post<{
+      state: string;
+      message: string;
+      data: null;
+      metadata?: { task_id?: string };
+    }>(`/workspaces/nodes/${node}/concordance/dispersion-detach`, req, headers);
+    return { task_id: resp?.metadata?.task_id };
   },
 
   concordanceMaterialize: (

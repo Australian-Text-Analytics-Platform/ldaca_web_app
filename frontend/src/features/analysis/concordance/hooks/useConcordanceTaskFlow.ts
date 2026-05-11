@@ -5,10 +5,12 @@ import {
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
   type ConcordanceDetachRequest,
+  type ConcordanceDispersionDetachRequest,
   type ConcordanceMaterializeRequest,
   type ConcordanceResultQuery,
   textApi,
 } from '@/api/text';
+import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
 import { takeMostRecent } from '@/utils/selectionUtils';
@@ -50,6 +52,10 @@ interface ConcordanceLock {
   lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   resolveTaskId: () => Promise<string | null>;
   detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) => Promise<void>;
+  detachConcordanceDispersion: (
+    nodeId: string,
+    request: ConcordanceDispersionDetachRequest,
+  ) => Promise<{ task_id?: string }>;
   materializeConcordance?: (
     nodeId: string,
     request: ConcordanceMaterializeRequest
@@ -97,6 +103,7 @@ export function useConcordanceTaskFlow({
     lockWithSnapshots,
     resolveTaskId,
     detachConcordance,
+    detachConcordanceDispersion,
     materializeConcordance,
     queryClient,
   },
@@ -388,6 +395,73 @@ export function useConcordanceTaskFlow({
     }
   };
 
+  const handleDispersionDetach = async (
+    nodeId: string,
+    column: string,
+    options: {
+      nodeLabel?: string;
+      materializedPath?: string | null;
+      selectedBins?: ReadonlySet<number> | null;
+      binCount: number;
+      selectedColumns?: string[];
+    },
+  ) => {
+    if (!currentWorkspaceId || !searchWord.trim()) return;
+    setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
+    try {
+      const resolvedLabel = (options.nodeLabel && options.nodeLabel.trim().length > 0)
+        ? options.nodeLabel
+        : nodeId;
+      const selectedBinsArr =
+        options.selectedBins && options.selectedBins.size > 0
+          ? Array.from(options.selectedBins).sort((a, b) => a - b)
+          : null;
+      const rangeLabel = selectedBinsArr
+        ? formatBinIndicesAsRangeLabel(selectedBinsArr, options.binCount)
+        : '';
+      // Naming convention (per design): `_conc_aggregated` differentiates from
+      // the per-hit `_conc` detach, and the range suffix carries the bin
+      // filter context for future reference (the workspace can otherwise lose
+      // track of which dispersion-detach was scoped to which bins).
+      const suffix = rangeLabel ? `_conc_aggregated_${rangeLabel}` : '_conc_aggregated';
+      // Resolve parent_task_id so the worker can publish the
+      // `analysis_materialized` event for the slow path's side-effect.
+      // Best-effort: if the lock has no task id yet, we skip it and
+      // accept that the user might need to materialise again later.
+      let parentTaskId: string | null = null;
+      try {
+        parentTaskId = await resolveTaskId();
+      } catch (resolveErr) {
+        console.warn('Failed to resolve concordance task id for dispersion detach:', resolveErr);
+      }
+      const request: ConcordanceDispersionDetachRequest = {
+        column,
+        search_word: searchWord.trim(),
+        num_left_tokens: numLeftTokens,
+        num_right_tokens: numRightTokens,
+        regex,
+        whole_word: wholeWord,
+        case_sensitive: caseSensitive,
+        new_node_name: buildDetachNodeName(resolvedLabel, suffix),
+        ...(options.selectedColumns && options.selectedColumns.length > 0
+          ? { selected_columns: options.selectedColumns }
+          : {}),
+        ...(parentTaskId ? { parent_task_id: parentTaskId } : {}),
+        ...(options.materializedPath ? { materialized_path: options.materializedPath } : {}),
+        ...(selectedBinsArr ? { selected_bins: selectedBinsArr, total_bins: options.binCount } : {}),
+      };
+      await detachConcordanceDispersion(nodeId, request);
+      toast.success('Aggregated detach started.');
+    } catch (error) {
+      console.error('Error detaching aggregated concordance:', error);
+      toast.error(
+        `Error detaching aggregated concordance: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    } finally {
+      setNodeDetaching(prev => ({ ...prev, [nodeId]: false }));
+    }
+  };
+
   const handleMaterialize = async (nodeId: string, column: string) => {
     if (!currentWorkspaceId || !searchWord.trim()) {
       toast.error('Run a concordance search first.');
@@ -434,6 +508,7 @@ export function useConcordanceTaskFlow({
     handlePageChange,
     persistResultPreferences,
     handleDetach,
+    handleDispersionDetach,
     handleMaterialize,
   };
 }

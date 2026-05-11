@@ -11,6 +11,7 @@ import {
 import {
   textApi,
   type ConcordanceDetachRequest,
+  type ConcordanceDispersionDetachRequest,
   type ConcordanceMaterializeRequest,
   type QuotationRequest,
   type QuotationDetachRequest,
@@ -585,6 +586,27 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
+  const detachConcordanceDispersionMutation = useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      workspaceId: string;
+      nodeId: string;
+      request: ConcordanceDispersionDetachRequest;
+    }) =>
+      textApi.concordanceDispersionDetach(nodeId, request, authHeaders),
+    onMutate: () => startOperation('detachConcordanceDispersion'),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
+      endOperation('detachConcordanceDispersion');
+    },
+    onError: (error: Error) => {
+      setOperationError('detachConcordanceDispersion', error.message);
+      endOperation('detachConcordanceDispersion');
+    },
+  });
+
   const materializeConcordanceMutation = useMutation({
     mutationFn: ({
       nodeId,
@@ -737,6 +759,15 @@ export const useWorkspaceNodeMutations = ({
     deleteColumn: (nodeId: string, column: string) => deleteColumnMutation.mutateAsync({ nodeId, column }),
     detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
       detachConcordanceMutation.mutateAsync({
+        workspaceId: ensureWorkspaceSelected(),
+        nodeId,
+        request,
+      }),
+    detachConcordanceDispersion: (
+      nodeId: string,
+      request: ConcordanceDispersionDetachRequest,
+    ) =>
+      detachConcordanceDispersionMutation.mutateAsync({
         workspaceId: ensureWorkspaceSelected(),
         nodeId,
         request,

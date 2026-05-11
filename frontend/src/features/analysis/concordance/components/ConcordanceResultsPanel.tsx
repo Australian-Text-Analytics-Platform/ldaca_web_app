@@ -7,8 +7,8 @@ import type { ConcordanceAnalysisResponse, ConcordanceGroupedRow } from '@/api/t
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
+import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
 import {
-  DISPERSION_DISPLAY_BIN_COUNTS,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
 } from '../concordanceViewModels';
@@ -45,6 +45,11 @@ export type ConcordanceResultsPanelProps = {
   setProportionalDispersionBars: Dispatch<SetStateAction<boolean>>;
   combinedSourceMode: 'aggregate' | 'split';
   setCombinedSourceMode: Dispatch<SetStateAction<'aggregate' | 'split'>>;
+  dispersionChartType: MultiSeriesChartType;
+  setDispersionChartType: Dispatch<SetStateAction<MultiSeriesChartType>>;
+  selectedBinIndices: Record<string, Set<number>>;
+  onBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
+  onClearBinSelection: (blockKey: string) => void;
   colourMatches: boolean;
   setColourMatches: Dispatch<SetStateAction<boolean>>;
   lowercaseMatches: boolean;
@@ -52,7 +57,7 @@ export type ConcordanceResultsPanelProps = {
   hiddenMatchedTexts: Set<string>;
   setHiddenMatchedTexts: Dispatch<SetStateAction<Set<string>>>;
   binCount: DispersionDisplayBinCount;
-  setBinCount: Dispatch<SetStateAction<DispersionDisplayBinCount>>;
+  setBinCount: (value: DispersionDisplayBinCount) => void;
   allMatchedTexts: string[];
   matchedTextColorMap: Record<string, string>;
   getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
@@ -89,6 +94,17 @@ export type ConcordanceResultsPanelProps = {
   ) => void;
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
+  /**
+   * Open the per-document detach dialog. Parent gathers the source-node
+   * info(s) (one for per-node view, multiple for combined view) and the
+   * current bin selection; the dialog handles column picking and confirm
+   * dispatches the actual detach call(s).
+   */
+  onDispersionDetach: (
+    nodes: Array<{ nodeId: string; column: string; nodeLabel: string }>,
+    selectedBins: ReadonlySet<number> | null,
+    binCount: number,
+  ) => Promise<void> | void;
 };
 
 export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = ({
@@ -111,6 +127,11 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
   setProportionalDispersionBars,
   combinedSourceMode,
   setCombinedSourceMode,
+  dispersionChartType,
+  setDispersionChartType,
+  selectedBinIndices,
+  onBinSelect,
+  onClearBinSelection,
   colourMatches,
   setColourMatches,
   lowercaseMatches,
@@ -144,6 +165,7 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
   handleRowClick,
   handleMaterialize,
   openDetachDialog,
+  onDispersionDetach,
 }) => {
   const showDispersion = concordanceView === 'dispersion';
 
@@ -211,27 +233,6 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
               </TabsList>
             </Tabs>
             <div className="flex flex-wrap items-center gap-4">
-              {showDispersion && !proportionalDispersionBars && (
-                <label className="flex items-center gap-2 text-sm text-foreground">
-                  <span>Bin No.</span>
-                  <select
-                    value={binCount}
-                    onChange={(e) => {
-                      const parsed = Number.parseInt(e.target.value, 10) as DispersionDisplayBinCount;
-                      if ((DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(parsed)) {
-                        setBinCount(parsed);
-                      }
-                    }}
-                    className="h-7 rounded border border-input bg-background px-2 text-sm"
-                  >
-                    {DISPERSION_DISPLAY_BIN_COUNTS.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
               <MetadataColumnSelector
                 availableColumns={availableMetadataColumns}
                 selectedColumns={selectedMetadataColumns ?? []}
@@ -385,11 +386,18 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
                       hiddenMatchedTexts={hiddenMatchedTexts}
                       setHiddenMatchedTexts={setHiddenMatchedTexts}
                       binCount={binCount}
+                      onBinCountChange={setBinCount}
                       combinedSourceMode={combinedSourceMode}
+                      dispersionChartType={dispersionChartType}
+                      onDispersionChartTypeChange={setDispersionChartType}
+                      selectedBinIndices={selectedBinIndices}
+                      onBinSelect={onBinSelect}
+                      onClearBinSelection={onClearBinSelection}
                       allMatchedTexts={allMatchedTexts}
                       matchedTextColorMap={matchedTextColorMap}
                       getMaterializedBinsForKey={getMaterializedBinsForKey}
                       isBlockMaterialised={isBlockMaterialised}
+                      onDispersionDetach={onDispersionDetach}
                     />
                   ) : (
                     <ConcordanceTableNodeBlock

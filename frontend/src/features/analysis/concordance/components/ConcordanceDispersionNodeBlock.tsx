@@ -31,6 +31,9 @@ import {
 import { ConcordanceDispersionCell } from './ConcordanceDispersionCell';
 import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
+import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
+
+const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
 
 const dedupeColumns = (cols: string[]): string[] => {
   const seen = new Set<string>();
@@ -42,6 +45,14 @@ const dedupeColumns = (cols: string[]): string[] => {
     return true;
   });
 };
+
+// When metadata columns are visible, lock the dispersion bar column to 85 %
+// of the viewport so the bars retain enough length to read. Metadata columns
+// then claim the remaining 15 % and overflow horizontally — the ScrollArea
+// wrapping the table exposes scrollbars in both directions, signalling the
+// user to scroll right for any extra metadata that didn't fit.
+const DISPERSION_COLUMN_WIDTH_RATIO = 0.85;
+const METADATA_COLUMN_MIN_WIDTH_PX = 200;
 
 const getDispersionColumnStyle = (
   isMetadataVisible: boolean,
@@ -55,13 +66,22 @@ const getDispersionColumnStyle = (
     return undefined;
   }
 
-  const columnWidth = `${Math.floor(visibleWidth / 2)}px`;
+  const columnWidth = `${Math.floor(visibleWidth * DISPERSION_COLUMN_WIDTH_RATIO)}px`;
   return {
     width: columnWidth,
     minWidth: columnWidth,
     maxWidth: columnWidth,
   };
 };
+
+// Force a sensible minimum width on each visible metadata column so the
+// table extends beyond the viewport when needed, enabling horizontal scroll.
+const getMetadataColumnStyle = (
+  isMetadataVisible: boolean,
+): React.CSSProperties | undefined =>
+  isMetadataVisible
+    ? { minWidth: `${METADATA_COLUMN_MIN_WIDTH_PX}px` }
+    : undefined;
 
 export type ConcordanceDispersionNodeBlockProps = {
   nodeKey: string;
@@ -109,11 +129,22 @@ export type ConcordanceDispersionNodeBlockProps = {
   hiddenMatchedTexts: Set<string>;
   setHiddenMatchedTexts: React.Dispatch<React.SetStateAction<Set<string>>>;
   binCount: DispersionDisplayBinCount;
+  onBinCountChange: (value: DispersionDisplayBinCount) => void;
   combinedSourceMode: 'aggregate' | 'split';
+  dispersionChartType: MultiSeriesChartType;
+  onDispersionChartTypeChange: (value: MultiSeriesChartType) => void;
+  selectedBinIndices: Record<string, Set<number>>;
+  onBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
+  onClearBinSelection: (blockKey: string) => void;
   allMatchedTexts: string[];
   matchedTextColorMap: Record<string, string>;
   getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
   isBlockMaterialised: (nodeKey: string) => boolean;
+  onDispersionDetach: (
+    nodes: Array<{ nodeId: string; column: string; nodeLabel: string }>,
+    selectedBins: ReadonlySet<number> | null,
+    binCount: number,
+  ) => Promise<void> | void;
 
   // Handlers
   handlePageChange: (newPage: number, paginationKey: string, requestNodeId: string) => void;
@@ -157,11 +188,18 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
   hiddenMatchedTexts,
   setHiddenMatchedTexts,
   binCount,
+  onBinCountChange,
   combinedSourceMode,
+  dispersionChartType,
+  onDispersionChartTypeChange,
+  selectedBinIndices,
+  onBinSelect,
+  onClearBinSelection,
   allMatchedTexts,
   matchedTextColorMap,
   getMaterializedBinsForKey,
   isBlockMaterialised,
+  onDispersionDetach,
   handlePageChange,
   handleRowClick,
   handleMaterialize,
@@ -187,6 +225,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
       : [CONCORDANCE_DISPERSION_COLUMN];
     const displayColumns = dedupeColumns(rawDisplayColumns);
     const dispersionColumnStyle = getDispersionColumnStyle(showMetadata, resultsViewportWidth);
+    const metadataColumnStyle = getMetadataColumnStyle(showMetadata);
 
     const combinedNodeIds = takeMostRecent(selectedNodes, 2)
       .map((n) => n.id)
@@ -260,7 +299,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     <TableHead
                       key={c}
                       className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                      style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}
+                      style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : metadataColumnStyle}
                     >
                       {c}
                     </TableHead>
@@ -327,7 +366,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                         }}
                       >
                         {displayColumns.map((c: string, i: number) => (
-                          <TableCell key={i} style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}>
+                          <TableCell key={i} style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : metadataColumnStyle}>
                             {c === CONCORDANCE_DISPERSION_COLUMN ? (
                               <ConcordanceDispersionCell
                                 hits={getDispersionHits(row)}
@@ -406,6 +445,45 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 materialisedBins={materialisedBins}
                 materialised={materialised}
                 aggregateAll={!colourMatches}
+                chartType={dispersionChartType}
+                onChartTypeChange={onDispersionChartTypeChange}
+                onBinCountChange={onBinCountChange}
+                selection={{
+                  selectedIndices:
+                    (selectedBinIndices['__COMBINED__'] as ReadonlySet<number> | undefined) ??
+                    EMPTY_BIN_SELECTION,
+                  onSelect: (index, shiftHeld) =>
+                    onBinSelect('__COMBINED__', index, shiftHeld),
+                  onClear: () => onClearBinSelection('__COMBINED__'),
+                }}
+                detach={{
+                  onClick: (selectedBins) => {
+                    const detachNodes = combinedNodeIds
+                      .map((nid) => {
+                        const col = effectiveNodeColumnSelections.find(
+                          (s) => s.nodeId === nid,
+                        )?.column;
+                        if (!col) return null;
+                        const sourceNode = panelSelectedNodes.find(
+                          (n) => n.id === nid,
+                        );
+                        const label =
+                          (sourceNode?.name as string | undefined) || nid;
+                        return { nodeId: nid, column: col, nodeLabel: label };
+                      })
+                      .filter(
+                        (
+                          n,
+                        ): n is { nodeId: string; column: string; nodeLabel: string } =>
+                          n !== null,
+                      );
+                    void onDispersionDetach(detachNodes, selectedBins, binCount);
+                  },
+                  isLoading: combinedNodeIds.some((id) =>
+                    Boolean(nodeDetaching[id]),
+                  ),
+                  disabled: combinedNodeIds.length === 0,
+                }}
               />
             );
           })()}
@@ -429,6 +507,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
   const displayColumns = dedupeColumns(rawDisplayColumns);
   const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
   const dispersionColumnStyle = getDispersionColumnStyle(showMetadata, resultsViewportWidth);
+  const metadataColumnStyle = getMetadataColumnStyle(showMetadata);
 
   const currentNodePagination = nodePagination[paginationKey];
   const currentPage = currentNodePagination?.currentPage ?? 1;
@@ -468,7 +547,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                   <TableHead
                     key={key}
                     className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                    style={key === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}
+                    style={key === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : metadataColumnStyle}
                   >
                     {key}
                   </TableHead>
@@ -497,7 +576,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     }}
                   >
                     {tableColumns.map((colKey: string, cellIndex) => (
-                      <TableCell key={cellIndex} style={colKey === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}>
+                      <TableCell key={cellIndex} style={colKey === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : metadataColumnStyle}>
                         {colKey === CONCORDANCE_DISPERSION_COLUMN ? (
                           <ConcordanceDispersionCell
                             hits={getDispersionHits(row)}
@@ -623,6 +702,33 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             materialisedBins={materialisedBins}
             materialised={materialised}
             aggregateAll={!colourMatches}
+            chartType={dispersionChartType}
+            onChartTypeChange={onDispersionChartTypeChange}
+            onBinCountChange={onBinCountChange}
+            selection={{
+              selectedIndices:
+                (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
+                EMPTY_BIN_SELECTION,
+              onSelect: (index, shiftHeld) => onBinSelect(nodeKey, index, shiftHeld),
+              onClear: () => onClearBinSelection(nodeKey),
+            }}
+            detach={{
+              onClick: (selectedBins) => {
+                if (!detachNodeId || !canDetach) return;
+                const sourceNode = panelSelectedNodes.find(
+                  (n) => n.id === detachNodeId,
+                );
+                const label =
+                  (sourceNode?.name as string | undefined) || nodeKey;
+                void onDispersionDetach(
+                  [{ nodeId: detachNodeId, column, nodeLabel: label }],
+                  selectedBins,
+                  binCount,
+                );
+              },
+              isLoading: Boolean(detachNodeId && nodeDetaching[detachNodeId]),
+              disabled: !canDetach || !detachNodeId,
+            }}
           />
         );
       })()}
