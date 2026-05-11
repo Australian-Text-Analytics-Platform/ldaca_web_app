@@ -1,6 +1,14 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const renderWithClient = (ui: React.ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+};
 
 const handleSearchMock = vi.fn();
 const clearResultsMock = vi.fn(async () => {});
@@ -17,7 +25,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/components/NodeSelectionPanel', () => ({
+vi.mock('@/features/analysis/common/components/NodeSelectionPanel', () => ({
   default: () => <div data-testid="node-selection-panel" />,
 }));
 
@@ -29,7 +37,7 @@ vi.mock('@/components/help/InfoIcon', () => ({
   default: () => <span data-testid="info-icon" />,
 }));
 
-vi.mock('@/components/tabs/AnalysisTaskBanner', () => ({
+vi.mock('@/features/analysis/common/components/AnalysisTaskBanner', () => ({
   default: () => null,
 }));
 
@@ -109,21 +117,21 @@ vi.mock('@/components/ui/confirm-dialog', () => ({
     ) : null,
 }));
 
-vi.mock('@/hooks/useWorkspaceSelection', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   useWorkspaceSelection: () => ({
     selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceStatus', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
   useWorkspaceStatus: () => ({ isLoading: { graph: false } }),
 }));
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({ currentWorkspaceId: 'ws-1' }),
 }));
 
-vi.mock('@/hooks/useWorkspaceActions', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     detachConcordance: vi.fn(),
     materializeConcordance: vi.fn(),
@@ -291,7 +299,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('clears previous results before rerunning when clicking Update', () => {
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
@@ -306,7 +314,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('passes the locked-update flag when clicking Update', () => {
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
@@ -320,7 +328,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('defaults whole-word on and disables it when regex is enabled', () => {
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     const wholeWordCheckbox = screen.getByRole('checkbox', { name: /whole word/i });
     const regexCheckbox = screen.getByRole('checkbox', { name: /use regular expression/i });
@@ -348,7 +356,7 @@ describe('ConcordanceFeature', () => {
       timestamp: 1,
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
       expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue('keyword');
@@ -390,7 +398,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
       expect(screen.getByText('Replace concordance results?')).toBeInTheDocument();
@@ -448,7 +456,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
 
@@ -505,23 +513,23 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /show metadata/i }));
 
     await waitFor(() => {
       expect(screen.getByText('CONC_dispersion')).toBeInTheDocument();
     });
 
-    // Show metadata starts with no columns selected; the user must pick.
+    // The Show metadata dropdown starts with no columns selected; the user
+    // must pick before any metadata column appears.
     expect(screen.queryByRole('columnheader', { name: 'document' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'speaker' })).not.toBeInTheDocument();
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: /metadata columns/i }), { button: 0 });
+    fireEvent.pointerDown(screen.getByRole('button', { name: /show metadata/i }), { button: 0 });
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /document/i }));
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /speaker/i }));
-    fireEvent.keyDown(screen.getByRole('menu', { name: /metadata columns/i }), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('menu', { name: /show metadata/i }), { key: 'Escape' });
 
     await waitFor(() => {
       expect(screen.getByRole('columnheader', { name: /speaker/i })).toBeInTheDocument();
@@ -532,7 +540,7 @@ describe('ConcordanceFeature', () => {
     clientWidthSpy.mockRestore();
   });
 
-  it('does not auto-select metadata columns when Show metadata is enabled', async () => {
+  it('does not auto-select metadata columns; the dropdown starts empty', async () => {
     mockInitialResult = {
       state: 'successful',
       message: 'ok',
@@ -543,19 +551,19 @@ describe('ConcordanceFeature', () => {
               {
                 speaker: 'A',
                 text: 'alpha beta alpha',
-                CONC_LEFT_CONTEXT: '',
-                CONC_MATCHED_TEXT: 'alpha',
-                CONC_RIGHT_CONTEXT: 'beta alpha',
-                CONC_START_IDX: 0,
-                CONC_END_IDX: 5,
+                CONC_left_context: '',
+                CONC_matched_text: 'alpha',
+                CONC_right_context: 'beta alpha',
+                CONC_start_idx: 0,
+                CONC_end_idx: 5,
               },
             ],
           ],
-          columns: ['speaker', 'text', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          columns: ['speaker', 'text', 'CONC_left_context', 'CONC_matched_text', 'CONC_right_context'],
           metadata: {
             metadata_columns: ['speaker', 'text'],
-            concordance_columns: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
-            all_columns: ['speaker', 'text', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+            concordance_columns: ['CONC_left_context', 'CONC_matched_text', 'CONC_right_context'],
+            all_columns: ['speaker', 'text', 'CONC_left_context', 'CONC_matched_text', 'CONC_right_context'],
           },
           pagination: {
             page: 1,
@@ -571,16 +579,14 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    render(<ConcordanceFeature />);
-
-    fireEvent.click(screen.getByRole('checkbox', { name: /show metadata/i }));
+    renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
-      expect(screen.getByText('CONC_LEFT_CONTEXT')).toBeInTheDocument();
+      expect(screen.getByText('CONC_left_context')).toBeInTheDocument();
     });
 
     // No metadata column should appear as a column header until the user
-    // explicitly ticks one in the dropdown.
+    // explicitly ticks one in the Show metadata dropdown.
     expect(screen.queryByRole('columnheader', { name: /^speaker$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^text$/i })).not.toBeInTheDocument();
   });
@@ -631,7 +637,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    render(<ConcordanceFeature />);
+    renderWithClient(<ConcordanceFeature />);
 
     expect(screen.getAllByText('Documents per batch').length).toBeGreaterThan(0);
     expect(screen.getByText('(Found 2 instances in 1 document after processing 20 documents).')).toBeInTheDocument();
@@ -664,7 +670,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = render(<ConcordanceFeature />);
+    const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     expect(screen.queryByRole('checkbox', { name: /bar length proportional to text length/i })).not.toBeInTheDocument();
 

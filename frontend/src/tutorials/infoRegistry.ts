@@ -4,7 +4,7 @@ export type InfoTarget = {
   label?: string;
 };
 
-const registry: Record<string, InfoTarget> = {
+const registry = {
   'general.overview': {
     file: 'information/general.md',
     anchor: 'info-general-overview',
@@ -55,9 +55,12 @@ const registry: Record<string, InfoTarget> = {
     anchor: 'info-ai-annotator-overview',
     label: 'About AI Annotation and Review',
   },
-};
+} as const satisfies Record<string, InfoTarget>;
 
-export const getInfoTarget = (key: string): InfoTarget | null => registry[key] ?? null;
+export type InfoTargetKey = keyof typeof registry;
+
+export const getInfoTarget = (key: string): InfoTarget | null =>
+  (registry as Record<string, InfoTarget>)[key] ?? null;
 
 export const infoIndexTarget: InfoTarget = {
   file: 'information/index.md',

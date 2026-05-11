@@ -80,11 +80,22 @@ export async function httpRequest<T=unknown>(path: string, opts: RequestOptions 
     return await parseResponse(res, expectBlob) as T;
   } catch (e: unknown) {
     if (e instanceof DOMException && e.name === 'AbortError') throw new ApiError('Request timeout', { code: 'TIMEOUT' });
+    if (e instanceof TypeError) {
+      // Browsers throw TypeError("Failed to fetch") when the network request
+      // can't reach the server (offline, backend restarting, CORS preflight
+      // refused). Tag it so callers can distinguish recoverable network
+      // failures from real server errors.
+      throw new ApiError(e.message || 'Network unreachable', { code: 'NETWORK', detail: e });
+    }
     throw e;
   } finally {
     clearTimeout(id);
   }
 }
+
+/** True for ApiError instances that represent a transient network failure. */
+export const isNetworkError = (error: unknown): boolean =>
+  error instanceof ApiError && error.code === 'NETWORK';
 
 // Convenience helpers
 export const get = <T=unknown>(path: string, headers?: Record<string,string>, params?: Record<string,unknown>) => httpRequest<T>(path, { method: 'GET', headers, params });

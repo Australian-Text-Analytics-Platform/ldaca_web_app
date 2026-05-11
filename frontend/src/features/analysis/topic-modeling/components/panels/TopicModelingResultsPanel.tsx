@@ -1,10 +1,10 @@
 import React, { useRef, useState, type KeyboardEvent } from 'react';
-import { Button } from '../../../../../components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
-import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
-import { AnalysisRunningStateCard } from '../../../common/components/AnalysisRunningStateCard';
+import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
+import { AnalysisRunningStateCard } from '@/features/analysis/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
 type TopicModelingTopic = { id: number; label: string; size: number[]; total_size: number; x: number; y: number };

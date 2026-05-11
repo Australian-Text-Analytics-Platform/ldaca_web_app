@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useAuth } from '../../../hooks/useAuth';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useAuth } from '@/hooks/useAuth';
+import { takeMostRecent } from '@/utils/selectionUtils';
 // Updated to use modular API object pattern
-import { textApi, type TopicModelingResponse, type TopicModelingTopic } from '../../../api/text';
-import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
-import { useUIStore } from '../../../stores';
-import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
+import { textApi, type TopicModelingResponse, type TopicModelingTopic } from '@/api/text';
+import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
+import { useUIStore } from '@/stores';
+import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import { pruneTasksById } from '@/hooks/analysisTaskUtils';
 import {
   hasLockedParameterDiff,
   getNodeIdentifier,
@@ -156,6 +156,7 @@ const TopicModelingFeature: React.FC = () => {
             requestData: req,
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 2,
           });
         } catch { /* ignore */ }

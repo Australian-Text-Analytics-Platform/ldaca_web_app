@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { saveBlob } from '../../../lib/download';
+import { saveBlob } from '@/lib/download';
 
 const toSafeExportFilename = (label: string, suffix: string, extension: string) => {
   const base = (label || 'token-frequency')

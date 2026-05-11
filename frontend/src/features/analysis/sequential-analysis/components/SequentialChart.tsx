@@ -13,11 +13,11 @@ import {
   Cell,
 } from 'recharts';
 import { Loader2, Plus } from 'lucide-react';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../../../../components/ui/chart';
-import { Button } from '../../../../components/ui/button';
-import { Input } from '../../../../components/ui/input';
-import type { ChartConfig } from '../../../../components/ui/chart';
-import { acceptPlaceholderOnTab } from '../../../preprocessing/utils/placeholderTabFill';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import type { ChartConfig } from '@/components/ui/chart';
+import { acceptPlaceholderOnTab } from '@/features/preprocessing/utils/placeholderTabFill';
 import type { SequentialAnalysisDatum, ChartTypeOption } from '../hooks/useSequentialAnalysisTaskFlow';
 import { getPaletteColor, formatTimeLabel } from '../hooks/useSequentialAnalysisTaskFlow';
 
@@ -173,7 +173,12 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
     <div ref={containerRef}>
       <ChartContainer config={chartConfig} className={chartData.length ? 'w-full cursor-pointer' : 'w-full'}>
         <div className="aspect-auto h-100 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          {/*
+            minWidth={0} silences the transient "width(-1) and height(-1)" warning
+            recharts emits during the first paint before its ResizeObserver has
+            measured the parent. Behaviour after the observer fires is unchanged.
+          */}
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             {chartType === 'bar' ? (
               <BarChart
                 data={chartData}

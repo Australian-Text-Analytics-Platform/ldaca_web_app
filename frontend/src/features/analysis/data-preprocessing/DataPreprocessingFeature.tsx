@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucide-react';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../../components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FilterSubTab } from '../../preprocessing/filter/FilterSubTab';
 import { JoinSubTab } from '../../preprocessing/join/JoinSubTab';
 import { ConcatSubTab } from '../../preprocessing/concat/ConcatSubTab';
 import { SliceSubTab } from '../../preprocessing/slice/SliceSubTab';
 import { AggregateSubTab } from '../../preprocessing/aggregate/AggregateSubTab';
 import { ReplaceSubTab } from '../../preprocessing/replace/ReplaceSubTab';
-import InfoIcon from '../../../components/help/InfoIcon';
+import InfoIcon from '@/components/help/InfoIcon';
 import { PolarsExpressionSubTab } from '../../preprocessing/expression/PolarsExpressionSubTab';
 
 type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';

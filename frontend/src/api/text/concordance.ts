@@ -1,0 +1,194 @@
+import { httpRequest, post } from '../http';
+
+import type { SourceRowPagination } from './shared';
+
+export interface ConcordanceMetadata {
+  /** Core concordance columns (CONC_left_context, CONC_matched_text, CONC_right_context, etc.) */
+  concordance_columns: string[];
+  /** Original document metadata columns. */
+  metadata_columns: string[];
+  /** All available columns. */
+  all_columns: string[];
+}
+
+export type ConcordanceHitRow = Record<string, unknown>;
+export type ConcordanceGroupedRow = ConcordanceHitRow[];
+
+export interface ConcordanceRequest {
+  column: string;
+  search_word: string;
+  num_left_tokens?: number;
+  num_right_tokens?: number;
+  regex?: boolean;
+  whole_word?: boolean;
+  case_sensitive?: boolean;
+  sort_by?: string;
+}
+
+export interface ConcordanceDetachRequest {
+  node_id: string;
+  column: string;
+  search_word: string;
+  num_left_tokens?: number;
+  num_right_tokens?: number;
+  regex?: boolean;
+  whole_word?: boolean;
+  case_sensitive?: boolean;
+  new_node_name?: string;
+  selected_columns?: string[];
+  materialized_path?: string | null;
+}
+
+export interface ConcordanceMaterializeRequest {
+  parent_task_id: string;
+  column: string;
+  search_word: string;
+  num_left_tokens?: number;
+  num_right_tokens?: number;
+  regex?: boolean;
+  whole_word?: boolean;
+  case_sensitive?: boolean;
+}
+
+export interface ConcordanceDetachNodeOption {
+  node_id: string;
+  node_name: string;
+  text_column?: string | null;
+  available_columns: string[];
+  disabled_columns: string[];
+}
+
+export interface ConcordanceDetachOptionsResponse {
+  state: 'running' | 'successful' | 'failed' | 'cancelled';
+  message: string;
+  data?: { nodes: ConcordanceDetachNodeOption[] };
+  metadata?: { task_id?: string; [key: string]: unknown };
+}
+
+export interface ConcordanceAnalysisRequest {
+  node_ids: string[];
+  node_columns: Record<string, string>;
+  search_word: string;
+  num_left_tokens?: number;
+  num_right_tokens?: number;
+  regex?: boolean;
+  whole_word?: boolean;
+  case_sensitive?: boolean;
+  sort_by?: string;
+  combined?: boolean;
+}
+
+export interface ConcordanceResultQuery {
+  node_id?: string;
+  combined?: boolean;
+  page?: number;
+  page_number?: number;
+  page_size?: number;
+  sort_by?: string;
+  descending?: boolean;
+  show_metadata?: boolean;
+  update_only?: boolean;
+}
+
+export type ConcordancePagination = SourceRowPagination;
+
+export interface ConcordanceResultEntry {
+  data: ConcordanceGroupedRow[];
+  columns: string[];
+  metadata: ConcordanceMetadata;
+  pagination: ConcordancePagination;
+  sorting: { sort_by?: string; descending: boolean };
+  materialized?: boolean;
+}
+
+export interface ConcordanceDispersionBinRow {
+  matched_text?: string;
+  bin_idx?: number;
+  count?: number;
+}
+
+export interface ConcordanceDispersionBinsResponse {
+  node_id: string;
+  total_hits: number;
+  document_column: string | null;
+  /** Number of source bins the hits were pre-aggregated into (server-side). */
+  bin_count: number;
+  rows: ConcordanceDispersionBinRow[];
+}
+
+export interface ConcordanceAnalysisResponse {
+  state: 'running' | 'successful' | 'failed' | 'cancelled';
+  message: string;
+  data: Record<string, ConcordanceResultEntry>;
+  analysis_params?: Record<string, unknown>;
+  combinable?: boolean;
+  preferences?: { page_size?: number; show_metadata?: boolean; [key: string]: unknown };
+  metadata?: { task_id?: string; [key: string]: unknown };
+}
+
+export const concordanceApi = {
+  concordance: (req: ConcordanceAnalysisRequest, headers: Record<string, string> = {}) =>
+    post<ConcordanceAnalysisResponse>(`/workspaces/concordance`, req, headers),
+
+  concordanceDetach: async (
+    node: string,
+    req: ConcordanceDetachRequest,
+    headers: Record<string, string> = {},
+  ): Promise<void> => {
+    await post(`/workspaces/nodes/${node}/concordance/detach`, req, headers);
+  },
+
+  concordanceMaterialize: (
+    node: string,
+    req: ConcordanceMaterializeRequest,
+    headers: Record<string, string> = {},
+  ) =>
+    post<{ state: string; message: string; data: null; metadata?: { task_id?: string } }>(
+      `/workspaces/nodes/${node}/concordance/materialize`,
+      req,
+      headers,
+    ),
+
+  getConcordanceDetachOptions: (
+    node: string,
+    column: string,
+    headers: Record<string, string> = {},
+  ) =>
+    httpRequest<ConcordanceDetachOptionsResponse>(
+      `/workspaces/nodes/${node}/concordance/detach-options`,
+      { method: 'GET', headers, params: { column } },
+    ),
+
+  getConcordanceTaskRequest: (taskId: string, headers: Record<string, string> = {}) =>
+    httpRequest<Record<string, unknown>>(
+      `/workspaces/concordance/tasks/${taskId}/request`,
+      { method: 'GET', headers },
+    ),
+
+  getConcordanceTaskResult: (taskId: string, headers: Record<string, string> = {}) =>
+    httpRequest<ConcordanceAnalysisResponse>(
+      `/workspaces/concordance/tasks/${taskId}/result`,
+      { method: 'GET', headers },
+    ),
+
+  getConcordanceTaskDispersionBins: (
+    taskId: string,
+    nodeId: string,
+    headers: Record<string, string> = {},
+  ) =>
+    httpRequest<ConcordanceDispersionBinsResponse>(
+      `/workspaces/concordance/tasks/${taskId}/bins`,
+      { method: 'GET', headers, params: { node_id: nodeId } },
+    ),
+
+  postConcordanceTaskResult: (
+    taskId: string,
+    body: ConcordanceResultQuery,
+    headers: Record<string, string> = {},
+  ) =>
+    post<ConcordanceAnalysisResponse>(
+      `/workspaces/concordance/tasks/${taskId}/result`,
+      body,
+      headers,
+    ),
+};

@@ -3,6 +3,7 @@ export * from './useAnalysisLockMachine';
 export * from './hooks/useAnalysisServerRequestLock';
 export * from './hooks/useAnalysisLock';
 export * from './hooks/useAnalysisFeature';
+export * from './hooks/useMaterializeLifecycle';
 export * from './lockComparison';
 export * from './useColorStackAllocator';
 export * from './useNodeColumnOptions';

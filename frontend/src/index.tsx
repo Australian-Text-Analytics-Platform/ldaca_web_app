@@ -18,7 +18,6 @@ const GOOGLE_CLIENT_ID =
 
 // CILogon uses server-side OIDC; __CILOGON_CLIENT_ID__ is injected for
 // informational use only — the actual auth flow starts at /api/auth/cilogon/login.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _CILOGON_CLIENT_ID =
   typeof window !== 'undefined' ? window.__CILOGON_CLIENT_ID__ : undefined;
 

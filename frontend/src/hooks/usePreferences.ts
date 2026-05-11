@@ -3,8 +3,56 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
- * Triggers a one-time fetch of user preferences from the backend on mount,
- * then keeps the Zustand store in sync with localStorage as a cache.
+ * Coalesce rapid preference changes into a single backend write. Hand-tuned:
+ * long enough that toggling a few view-visibility checkboxes in quick
+ * succession only fires one PUT, short enough that the user perceives the
+ * change as "saved" by the time they navigate away.
+ */
+const SYNC_DEBOUNCE_MS = 800;
+
+interface PersistedSnapshot {
+  hiddenViews: readonly string[];
+  favoriteWorkspaces: readonly string[];
+  quotationEngineKey: string;
+  quotationLastRemoteUrl: string;
+}
+
+/**
+ * Cheap stable string for change detection. Persisted shape is small
+ * (≤ a handful of strings + one engine config object), so re-stringifying
+ * on every store change is fine — saves writing a per-field shallow eq.
+ */
+const snapshotPersisted = (
+  state: ReturnType<typeof usePreferencesStore.getState>,
+): PersistedSnapshot => ({
+  hiddenViews: state.hiddenViews,
+  favoriteWorkspaces: state.favoriteWorkspaces,
+  quotationEngineKey: JSON.stringify(state.quotationEngine),
+  quotationLastRemoteUrl: state.quotationLastRemoteUrl,
+});
+
+const snapshotsEqual = (a: PersistedSnapshot, b: PersistedSnapshot) => {
+  if (a.quotationEngineKey !== b.quotationEngineKey) return false;
+  if (a.quotationLastRemoteUrl !== b.quotationLastRemoteUrl) return false;
+  if (a.hiddenViews.length !== b.hiddenViews.length) return false;
+  if (a.favoriteWorkspaces.length !== b.favoriteWorkspaces.length) return false;
+  for (let i = 0; i < a.hiddenViews.length; i++) {
+    if (a.hiddenViews[i] !== b.hiddenViews[i]) return false;
+  }
+  for (let i = 0; i < a.favoriteWorkspaces.length; i++) {
+    if (a.favoriteWorkspaces[i] !== b.favoriteWorkspaces[i]) return false;
+  }
+  return true;
+};
+
+/**
+ * One-time fetch of user preferences from the backend on mount, plus a
+ * debounced subscriber that pushes local changes back to the server.
+ *
+ * The subscriber only registers after `hydrated` flips true (so the
+ * load-from-backend step doesn't immediately trigger a sync of the same
+ * data we just received) and only when authenticated (anonymous edits
+ * stay in `localStorage` until the user signs in).
  */
 export function usePreferencesInit() {
   const { getAuthHeaders, isAuthenticated } = useAuth();
@@ -16,4 +64,28 @@ export function usePreferencesInit() {
     const headers = isAuthenticated ? getAuthHeaders() : undefined;
     loadFromBackend(headers);
   }, [hydrated, isAuthenticated, getAuthHeaders, loadFromBackend]);
+
+  useEffect(() => {
+    if (!hydrated || !isAuthenticated) return;
+
+    let lastSnapshot = snapshotPersisted(usePreferencesStore.getState());
+    let pending: ReturnType<typeof setTimeout> | null = null;
+
+    const unsubscribe = usePreferencesStore.subscribe((state) => {
+      const snapshot = snapshotPersisted(state);
+      if (snapshotsEqual(snapshot, lastSnapshot)) return;
+      lastSnapshot = snapshot;
+
+      if (pending !== null) clearTimeout(pending);
+      pending = setTimeout(() => {
+        pending = null;
+        usePreferencesStore.getState().syncToBackend(getAuthHeaders());
+      }, SYNC_DEBOUNCE_MS);
+    });
+
+    return () => {
+      if (pending !== null) clearTimeout(pending);
+      unsubscribe();
+    };
+  }, [hydrated, isAuthenticated, getAuthHeaders]);
 }

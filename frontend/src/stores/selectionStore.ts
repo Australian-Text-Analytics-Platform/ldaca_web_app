@@ -3,23 +3,37 @@ import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
 /**
- * Node selection for the active workspace.
+ * Workspace + node selection state.
+ *
+ * `currentWorkspaceId` is the canonical "which workspace is open" pointer
+ * (Phase 4.1: previously triple-sourced across a useWorkspaceCore useState,
+ * a react-query cache write, and the server `current.get` query — those are
+ * all gone now; the server query is treated as a one-shot bootstrap that
+ * hydrates this store).
  *
  * `selectedNodeId` is the "focused" node (drives the data table / detail
  * panels); `selectedNodeIds` is the tab strip, ordered left-to-right. Every
- * mutator keeps the two fields in sync so components can read either without
- * an extra derivation step.
+ * mutator keeps the two node fields in sync so components can read either
+ * without an extra derivation step.
  *
  * Graph-level selection (React Flow, multi-select pagination, etc.) lives
  * with those feature components — don't add it back here.
  */
 
 interface SelectionState {
+  currentWorkspaceId: string | null;
   selectedNodeId: string | null;
   selectedNodeIds: string[];
 }
 
 interface SelectionActions {
+  /**
+   * Set the active workspace id. Pass `null` to clear. Node selection is
+   * reset only by callers (the workspace-change effect in
+   * `useWorkspaceCore`); intentionally not bundled here so mutations that
+   * just rehydrate the same workspace don't clobber selection.
+   */
+  setCurrentWorkspaceId: (workspaceId: string | null) => void;
   /** Replace the single focused node; also resets the tab strip. */
   selectNode: (nodeId: string | null) => void;
   /** Replace the tab strip; focus follows the rightmost (most recent) entry. */
@@ -34,8 +48,13 @@ type SelectionStore = SelectionState & SelectionActions;
 export const useSelectionStore = create<SelectionStore>()(
   devtools(
     immer((set) => ({
+      currentWorkspaceId: null,
       selectedNodeId: null,
       selectedNodeIds: [],
+
+      setCurrentWorkspaceId: (workspaceId) => set((state) => {
+        state.currentWorkspaceId = workspaceId;
+      }),
 
       selectNode: (nodeId) => set((state) => {
         state.selectedNodeId = nodeId;

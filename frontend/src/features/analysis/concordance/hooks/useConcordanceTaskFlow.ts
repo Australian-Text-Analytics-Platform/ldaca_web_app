@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   type ConcordanceAnalysisRequest,
@@ -7,10 +8,10 @@ import {
   type ConcordanceMaterializeRequest,
   type ConcordanceResultQuery,
   textApi,
-} from '../../../../api/text';
+} from '@/api/text';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import { takeMostRecent } from '@/utils/selectionUtils';
 
 export type PaginationState = Record<string, NodePaginationState>;
 
@@ -53,6 +54,7 @@ interface ConcordanceLock {
     nodeId: string,
     request: ConcordanceMaterializeRequest
   ) => Promise<{ metadata?: { task_id?: string } } | undefined>;
+  queryClient: QueryClient;
 }
 
 type Params = {
@@ -96,6 +98,7 @@ export function useConcordanceTaskFlow({
     resolveTaskId,
     detachConcordance,
     materializeConcordance,
+    queryClient,
   },
 }: Params) {
 
@@ -224,6 +227,7 @@ export function useConcordanceTaskFlow({
           requestData: { node_ids: requestNodeIds, node_columns: nodeColumns },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 2,
         });
       } catch {
@@ -321,15 +325,12 @@ export function useConcordanceTaskFlow({
     })();
   };
 
-  const persistResultPreferences = async (partial: { pageSize?: number; showMetadata?: boolean }) => {
+  const persistResultPreferences = async (partial: { pageSize?: number }) => {
     if (!currentWorkspaceId) return;
 
     const preferenceUpdates: Record<string, unknown> = {};
     if (partial.pageSize !== undefined) {
       preferenceUpdates.page_size = partial.pageSize;
-    }
-    if (partial.showMetadata !== undefined) {
-      preferenceUpdates.show_metadata = partial.showMetadata;
     }
 
     if (Object.keys(preferenceUpdates).length === 0) return;

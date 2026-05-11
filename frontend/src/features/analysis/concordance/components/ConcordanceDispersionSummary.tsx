@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import {
   CartesianGrid,
@@ -11,15 +11,15 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 
-import { Button } from '../../../../components/ui/button';
-import { ChartImageDownloadDialog } from '../../../../components/ui/ChartImageDownloadDialog';
+import { Button } from '@/components/ui/button';
+import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   downloadChartAs,
   findSvgInContainer,
   type ChartExportHeaderItem,
   type ChartExportLegendItem,
   type ChartImageFormat,
-} from '../../../../lib/chartExport';
+} from '@/lib/chartExport';
 
 import {
   buildDispersionBins,
@@ -127,14 +127,13 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
   // mode). After that, respect the user's manual choice — otherwise a
   // transient false→true flip in `materialised` (e.g. when
   // `panelSelectedNodes` is momentarily empty during navigation) would
-  // re-tick a checkbox the user had just un-ticked.
-  const hasAutoEnabledShowAllRef = useRef<boolean>(materialised);
-  useEffect(() => {
-    if (materialised && !hasAutoEnabledShowAllRef.current) {
-      hasAutoEnabledShowAllRef.current = true;
-      setShowAllProcessed(true);
-    }
-  }, [materialised]);
+  // re-tick a checkbox the user had just un-ticked. Implemented via the
+  // React-blessed render-time set-state pattern, gated by a sticky flag.
+  const [hasAutoEnabledShowAll, setHasAutoEnabledShowAll] = useState<boolean>(materialised);
+  if (materialised && !hasAutoEnabledShowAll) {
+    setHasAutoEnabledShowAll(true);
+    setShowAllProcessed(true);
+  }
 
   // The plot only switches data sources once the server-side bin histogram
   // has been fetched. Until then, even with the toggle on, we keep showing
@@ -303,7 +302,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
         </Button>
       </div>
       <div ref={chartContainerRef} className="w-full">
-        <ResponsiveContainer width="100%" height={240}>
+        <ResponsiveContainer width="100%" height={240} minWidth={0}>
           <LineChart data={bins} margin={{ top: 10, right: 24, bottom: 10, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis

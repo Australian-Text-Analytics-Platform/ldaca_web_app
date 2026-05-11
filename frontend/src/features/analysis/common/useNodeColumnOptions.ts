@@ -1,4 +1,3 @@
-import { } from 'react';
 import type { ColumnInfo } from '@/utils/columnTypes';
 import { filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '@/utils/columnTypes';
 import type { NodeColumnSource, WorkspaceNodeLike } from './nodeSelectionTypes';

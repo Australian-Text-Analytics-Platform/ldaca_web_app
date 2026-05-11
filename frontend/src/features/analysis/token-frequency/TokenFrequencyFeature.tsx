@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react';
-import { textApi, type TokenFrequencyResponse } from '../../../api/text';
-import { useAuth } from '../../../hooks/useAuth';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { useQueryClient } from '@tanstack/react-query';
+import { textApi, type TokenFrequencyResponse } from '@/api/text';
+import { useAuth } from '@/hooks/useAuth';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { takeMostRecent } from '@/utils/selectionUtils';
 
-import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
+import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';
 import {
   DEFAULT_TOKEN_LIMIT,
   parseAnalysisNodeRequest,
@@ -43,11 +44,11 @@ import {
   useSafeResult,
   useNodeColorManagement,
 } from '../common';
-import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
+import { pruneTasksById } from '@/hooks/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
-import { useAnalysisStore } from '../../../stores/analysisStore';
-import { useUIStore } from '../../../stores/uiStore';
+import { useAnalysisStore } from '@/stores/analysisStore';
+import { useUIStore } from '@/stores/uiStore';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
@@ -57,6 +58,7 @@ const TOKEN_FREQUENCY_PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspaceData();
   const {
     isLocked,
@@ -171,6 +173,7 @@ const TokenFrequencyFeature = () => {
             requestData: req,
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 2,
           });
         } catch { /* ignore */ }
@@ -265,6 +268,7 @@ const TokenFrequencyFeature = () => {
     lock: {
       getAuthHeaders,
       lockWithSnapshots,
+      queryClient,
     },
     navigation: {
       selectNodes,

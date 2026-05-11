@@ -5,13 +5,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { WorkspaceControls } from '../WorkspaceControls';
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     currentWorkspace: { id: 'ws-1', name: 'Main Workspace' },
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceActions', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     saveWorkspace: vi.fn(),
     renameWorkspace: vi.fn(),
