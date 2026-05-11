@@ -287,14 +287,8 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
               </TableBody>
             </Table>
           </AnalysisTableScrollArea>
-          <AnalysisPagination
-            page={combinedPage}
-            pageSize={globalPageSize}
-            hasNext={combinedHasNext}
-            hasPrev={combinedHasPrev}
-            totalPages={nodeData.pagination?.total_source_pages}
-            onPageChange={(newPage) => setCombinedPage(newPage)}
-            pageSizeSummary={nodeData.materialized
+          {(() => {
+            const summary = nodeData.materialized
               ? (Object.keys(materializeSummaries).length > 0
                 ? <GroupedResultsPageSizeSummary
                     groups={[]}
@@ -302,9 +296,21 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                     totalDocuments={Object.values(materializeSummaries).reduce((sum, s) => sum + s.uniqueDocuments, 0)}
                     totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
                   />
-                : undefined)
-              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />
-            }
+                : null)
+              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />;
+            return summary ? (
+              <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+                {summary}
+              </div>
+            ) : null;
+          })()}
+          <AnalysisPagination
+            page={combinedPage}
+            pageSize={globalPageSize}
+            hasNext={combinedHasNext}
+            hasPrev={combinedHasPrev}
+            totalPages={nodeData.pagination?.total_source_pages}
+            onPageChange={(newPage) => setCombinedPage(newPage)}
             loading={combinedLoading}
           />
         </div>
@@ -414,14 +420,8 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
         </AnalysisTableScrollArea>
       </div>
 
-      <AnalysisPagination
-        page={currentPage}
-        pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
-        hasNext={hasNext}
-        hasPrev={hasPrev}
-        totalPages={nodeData.pagination?.total_source_pages}
-        onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-        pageSizeSummary={nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
+      {(() => {
+        const summary = nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
           ? <GroupedResultsPageSizeSummary
               groups={[]}
               totalInstances={materializeSummaries[detachNodeId].recordCount}
@@ -429,9 +429,21 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
               totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
             />
           : (nodeData.materialized
-            ? undefined
-            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />)
-        }
+            ? null
+            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />);
+        return summary ? (
+          <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+            {summary}
+          </div>
+        ) : null;
+      })()}
+      <AnalysisPagination
+        page={currentPage}
+        pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
+        hasNext={hasNext}
+        hasPrev={hasPrev}
+        totalPages={nodeData.pagination?.total_source_pages}
+        onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
         loading={nodeIsLoading}
       >
         <Button
