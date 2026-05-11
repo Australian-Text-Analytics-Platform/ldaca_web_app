@@ -52,21 +52,18 @@ Landed in `e64f2b8` (Phase 1.2 dead-code deletion, 7 files removed, 339 LoC). Al
 
 Landed in `208e7e4` (TutorialView → DocumentView consolidation, –268 LoC). `App.tsx` now lazy-imports `DocumentView` for the tutorial route with `docType="tutorial"`.
 
-### 1.4 Import-path codemod
+### 1.4 Import-path codemod — ✅ DONE
 
-65 files use `../../../` even though `@/` alias is configured. Worst offenders are deeply nested feature components.
+Landed in `7927805` (355 imports across 64 files now use `@/`). Three intentionally-untouched deep-relative imports remain:
+- `src/test/__tests__/viteConfig.test.ts` — `../../../vite.config` (config file lives outside `src/`, can't be aliased).
+- `src/test/__tests__/frontendManifest.test.ts` — `../../../package.json` (same reason).
+- `src/features/analysis/common/hooks/__tests__/useDetachColumnsState.test.tsx` — `../../../components/DetachColumnsDialog` (still resolvable; could be migrated to `@/features/analysis/components/DetachColumnsDialog` for consistency, but cosmetic).
 
-- [ ] Run regex replace `from '(\.\./){3,}([^']+)'` → `from '@/$2'` across `frontend/src/**/*.{ts,tsx}`.
-- [ ] Verify TS still compiles (`npm run build`).
-- [ ] Optionally enforce going forward via ESLint `no-restricted-imports` or `eslint-plugin-import` rule.
+Optional ESLint enforcement rule (`no-restricted-imports`) not added; not on the critical path.
 
-### 1.5 Validation gate
+### 1.5 Validation gate — ✅ PASSING
 
-After Phase 1:
-- [ ] `cd frontend && npm run build` clean.
-- [ ] `cd frontend && npx eslint 'src/**/*.{ts,tsx}'` clean.
-- [ ] `cd frontend && npm test -- --run` (existing tests still pass).
-- [ ] Manual smoke: app boots, login works, workspace loads, one of each analysis feature opens.
+As of audit (2026-05-11): `tsc --noEmit` clean, `eslint --max-warnings=0` clean repo-wide, vitest 291/291 pass. Manual smoke not re-run this session — relying on the green test suite + the eslint-clean baseline.
 
 ---
 
@@ -107,52 +104,52 @@ Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-exist
 
 ### 2.1 Analysis-feature shared infra
 
-- [x] Build `features/analysis/common/hooks/useMaterializeLifecycle.ts` covering the "track materialize task → on terminal: prune → refetch parent → reset pagination" sequence. Concordance (multi-node) and Quotation (single-node) both consume; concordance pairs it with the SSE consumer in `useConcordanceMaterializedEvents`. `65696a6`.
-- [ ] Build `features/analysis/common/hooks/useDetachColumnsState.ts` returning `{ selectedDetachColumns, toggle, selectAll, deselectAll, reset }`. Migrate concordance, quotation, topic-modeling.
-- [ ] Build `features/analysis/common/hooks/usePerNodePagination.ts` (or just stabilize the shape). Migrate concordance/quotation/ai-annotator.
-- [ ] Build `features/analysis/common/components/PageSizeSelect.tsx` with the `[10,20,50,100,200,400,800]` default. Migrate concordance and quotation.
-- [ ] Build `features/analysis/common/constants.ts` exporting `PAGE_SIZE_OPTIONS_DEFAULT` and `PAGE_SIZE_OPTIONS_SMALL` (the latter is `[5,10,20,50,100]` used by AI Annotator).
-- [ ] Migrate AI Annotator to `useAnalysisLock` (currently uses `useAnalysisLockMachine` directly with no documented reason).
-- [x] ~~Migrate Concordance to use shared `reconcileMetadataColumnSelection`~~ — superseded by `ab1ddfb`: the auto-pick-document-column behaviour was removed from all three consumers (Concordance / Quotation / AI Annotator), so the helper itself is now dead code. See deferred item above for the cleanup follow-up.
-- [x] `<MetadataColumnSelector>` UX collapse — checkbox removed; dropdown trigger reads "Show metadata (n)" and is always active unless a `disabledReason` is supplied (Concordance combined view with no shared columns), in which case the disabled-tooltip lives on the dropdown trigger. `ab1ddfb`.
-- [ ] Migrate Concordance/Quotation/Sequential to use `<AnalysisCardLayout>` for parameter+results cards (currently only AI Annotator and Token Frequency use it).
-- [x] Lift `SortableHeader` out of `ConcordanceFeature.tsx` to its own file. `b6b8789`.
-- [ ] Add `useAiAnnotatorTaskFlow` hook (currently the only feature missing this hook).
+- [x] `useMaterializeLifecycle`. `65696a6`.
+- [x] `useDetachColumnsState`. `fbd351b`.
+- [ ] `usePerNodePagination` — **Deferred**: concordance/quotation interleave per-node pagination with feature-specific request flows.
+- [x] `PageSizeSelect`. `a17c077`.
+- [x] `features/analysis/common/constants.ts` exporting `PAGE_SIZE_OPTIONS_DEFAULT` / `PAGE_SIZE_OPTIONS_SMALL`. `a17c077`.
+- [ ] Migrate AI Annotator to `useAnalysisLock` — **Deferred** (AI Annotator is out of scope until it stabilises, per the note at the top of this doc).
+- [x] ~~Migrate Concordance to use shared `reconcileMetadataColumnSelection`~~ — superseded by `ab1ddfb` + cleanup in `d1b4e9b`.
+- [x] `<MetadataColumnSelector>` UX collapse. `ab1ddfb`.
+- [x] Migrate Sequential + Quotation to `<AnalysisCardLayout>`. `d68ba38`. Concordance still hand-rolls (deferred — Phase 3.1 used inline Card structures).
+- [x] Lift `SortableHeader` out of `ConcordanceFeature.tsx`. `b6b8789`.
+- [ ] Add `useAiAnnotatorTaskFlow` — **Deferred** (AI Annotator scope).
 
 ### 2.2 Preprocessing sub-tab shared infra
 
-- [ ] Build `features/preprocessing/hooks/useNodePreviewWithRawFallback.ts` consolidating the 5-copy preview-fetcher with raw-fallback (filter/aggregate/slice/replace) into a single `{ nodeId, operationPayload, operationFetch, signaturePrefix }` API.
-- [ ] Build `features/preprocessing/components/ApplyFooter.tsx` for the duplicated "New data block name + Apply button + tooltip" CardFooter (currently 6 copies). Driven by `applyMode: 'create-node' | 'mutate-node'` for the "Add to Workspace" / "Add to Data Block" copy split.
-- [ ] Build `features/preprocessing/components/SubTabActivityTag.tsx` for the duplicated "Running…" / "Joining…" / "Adding…" header chip (currently 7 copies).
-- [ ] Build `features/preprocessing/utils/applyDisabledReason.ts` (`buildApplyDisabledReason({ isBusy, isOperationLoading, hasSelection, configIssue, hasPreviewError, emptyPreview })`) replacing the 7 hand-rolled IIFEs.
-- [ ] Build `features/preprocessing/hooks/useResetOnNodeChange.ts` for the duplicated "reset on selectedNodeId change" effects.
-- [ ] Build `features/preprocessing/hooks/useSingleNodeSelectionPanel.ts` returning the panel config for single-node sub-tabs (filter/aggregate/slice/replace/expression).
-- [ ] Migrate all 5 single-color `DEFAULT_PALETTE = ['#2563eb']` shadowed locals (aggregate/slice/replace/expression) to use this hook (or rename to `SINGLE_NODE_PALETTE` to stop shadowing the multi-color `DEFAULT_PALETTE` from `analysis/common/palette.ts`).
-- [ ] Move `dedupeNodeIds` (duplicated in `useConcatSubTab.ts:202-209` and `useJoinSubTab.ts:87-94`) to `utils/selectionUtils.ts` (or add a `unique` option to `takeMostRecent`).
-- [ ] Move `MAX_JOIN_NODES` from `useJoinSubTab.ts:13` to `features/preprocessing/types.ts` next to `MAX_CONCAT_NODES`.
-- [ ] Delete dead `previewColumnsToRender` IIFEs in filter/concat/join (`PreviewTable.tsx` already does the same fallback).
+- [x] `useNodePreviewWithRawFallback`. `f9118c3`.
+- [ ] `<ApplyFooter>` — **Deferred** (6 sub-tabs, 6 different prop shapes; high invasion vs LoC win).
+- [x] `<SubTabActivityTag>`. `6344210`.
+- [ ] `buildApplyDisabledReason` — **Deferred**.
+- [ ] `useResetOnNodeChange` — **Deferred**.
+- [ ] `useSingleNodeSelectionPanel` — **Deferred**.
+- [x] `SINGLE_NODE_PALETTE` rename. `f9118c3`.
+- [x] Move `dedupeNodeIds` to `utils/selectionUtils.ts`. `f9118c3`.
+- [x] Move `MAX_JOIN_NODES` to `features/preprocessing/types.ts`. `f9118c3`.
+- [x] Delete dead `previewColumnsToRender` IIFEs. `f9118c3`.
 
-### 2.3 Doc-icon unification
+### 2.3 Doc-icon unification — ✅ DONE
 
-- [ ] Build `components/help/DocLinkIcon.tsx` driven by `kind: 'tutorial' | 'info' | 'warning' | 'reference'` + a config map of `{Icon, defaultColor, openAction, getTarget}`. Replace `HelpIcon`, `InfoIcon`, `ReferenceIcon`. (`WarningIcon` already deleted in Phase 1.)
-- [ ] Optionally: collapse the 3 remaining registries into one `tutorials/registry.ts` with `getTarget(kind, key)` keyed by `${kind}.${key}`.
+- [x] `<DocLinkIcon kind="...">` is the implementation; `HelpIcon`/`InfoIcon`/`ReferenceIcon` collapsed to 3-line wrappers. `ab2b23e`.
+- [ ] Optional: collapse the 3 registries into one keyed by `${kind}.${key}`. **Deferred** — the three registries are independent edit surfaces and overlap with §3.10 (which would address the registries more fundamentally).
 
-### 2.4 Type duplication consolidation
+### 2.4 Type duplication consolidation — mostly done
 
-- [ ] **Pagination** — settle on two canonical shapes: server-shape (snake_case, used in API responses) and client-state (camelCase, with sort/filter). Migrate the six existing variants (`NodeDataPagination`, `PreviewPagination`, `PaginationInfo`, `ConcordancePagination` ≡ `QuotationPagination`, `PaginationState`).
-- [ ] **`User`** — keep one in `types/index.ts:11`; delete from `api/auth.ts:12`.
-- [ ] **`FileTreeFile/Directory/Node`** — keep in `api/files.ts`; have `types/index.ts` re-export.
-- [ ] **`FilterCondition` / `FilterRequest`** — pick one home and re-export.
-- [ ] **`NodeColumnSelection`** — keep `features/analysis/common/nodeSelectionTypes.ts:15` as canonical; remove the three private aliases.
-- [ ] **`DetachDialogNodeOption`** — keep canonical in `features/analysis/components/DetachColumnsDialog.tsx:17`; remove the three feature-local aliases. Reconcile with the three independent types in `api/text.ts` (`Quotation/Concordance/TopicModelingDetachNodeOption`).
-- [ ] **`normalizeTypeName`** — three definitions (`utils/columnTypes.ts:54`, `data-view/services/schemaMutations.ts:32`, `preprocessing/utils/typeUtils.ts:4`); the test file already imports two side by side. Document why or consolidate.
+- [x] **Pagination** — `NodeDataPagination` is canonical (server shape); `PreviewPagination` / `PaginationInfo` re-export it; `SourceRowPagination` for concordance/quotation; `NodePaginationState` for analysis client state; `PaginationState` for workspace pagination. `a890f5a` + `8adf13e`.
+- [x] **`User`** — single definition in `types/index.ts:11`; no duplicate in `api/auth.ts`. Verified.
+- [x] **`FileTreeFile/Directory/Node`** — canonical in `api/files.ts`; `types/index.ts` re-exports. `a890f5a`.
+- [x] **`NodeColumnSelection`** — single canonical at `useAutoNodeColumns.ts`. `a890f5a`.
+- [x] **`DetachDialogNodeOption`** — single canonical at `components/DetachColumnsDialog.tsx`. `a890f5a`.
+- [ ] **`FilterCondition` / `FilterRequest`** — still two definitions: `api/nodes.ts:28` (API shape) and `features/preprocessing/types.ts:15` (richer client shape with `negate`/`regex`/`caseSensitive`/`dataType`). The duplication is intentional (API ⇄ UI), but neither file re-exports/imports from the other; a comment + one-direction import would clarify. Cosmetic.
+- [ ] **`normalizeTypeName`** — three definitions (`utils/columnTypes.ts:54`, `data-view/services/schemaMutations.ts:32`, `preprocessing/utils/typeUtils.ts:4`). Test file already imports two side by side. Cosmetic; the three bodies differ slightly in handling of `null`/`unknown`/array forms — needs careful consolidation.
 
-### 2.5 Magic literal cleanup
+### 2.5 Magic literal cleanup — ✅ DONE
 
-- [ ] Export `TaskState` union and `PENDING_STATES` / `TERMINAL_STATES` / `RUNNING_STATES` from `stores/analysisStore.ts`. Replace ~140 inline string-equality comparisons (`isTerminalTaskState` already exists in `policies.ts:5` but isn't used everywhere).
-- [ ] Move `DEBUG_GRAPH_KEY` constant from `useWorkspaceQueries.ts:18` to a shared `lib/debugFlags.ts`. Have `useWorkspaceGraph.ts:72` and `useWorkspaceNodeMutations.ts:613` use it.
-- [ ] Add `queryKeys.filePreview(filename, page, pageSize, sheet)` and `queryKeys.columnUniqueValues(workspaceId, nodeId, column)` to `lib/queryKeys.ts`. Migrate the two ad-hoc inline keys in `useFilePreview.ts:23` and `UniqueValueCount.tsx:16`.
-- [ ] Move `analysisServerRequestLockQueryKey` from features into `lib/queryKeys.ts`.
+Landed in `58b456f`:
+- [x] `TaskState` union + `PENDING_TASK_STATES` / `RUNNING_TASK_STATES` / `TERMINAL_TASK_STATES` sets and predicates in `analysisStore`.
+- [x] `lib/debugFlags.ts` with `isGraphDebugEnabled()` consumed by all three call sites.
+- [x] `queryKeys.filePreview` / `queryKeys.columnUniqueValues` / `queryKeys.analysisServerRequestLock` factory entries.
 
 ---
 
@@ -237,14 +234,16 @@ Landed across `b6b8789`, `dd91802`, `8b3c8f1`, `65696a6`. View axis swapped from
 - [ ] Replace H8 result-prefs hydration `requestAnimationFrame(setX)` pattern with derived state. Deferred — users override `globalPageSize` post-hydration so it can't be derived; the rAF wrap exists only to dodge the lint rule.
 - [ ] Hoist dispersion-only state (`proportionalDispersionBars` / `colourMatches` / `lowercase` / `hiddenMatchedTexts` / `binCount` / `combinedSourceMode` / `materializedBins`) into `ConcordanceDispersionNodeBlock` (or a sibling `ConcordanceDispersionControls`). State stays in parent for now.
 
-### 3.2 AiAnnotatorFeature.tsx (1558 → ~600 LoC)
+### 3.2 AiAnnotatorFeature.tsx (1558 → ~600 LoC) — DEFERRED
 
-- [ ] `ai-annotator/components/AiAnnotationTab.tsx` (annotation tab, L939-1148)
-- [ ] `ai-annotator/components/ReviewTab.tsx` (review tab, L1151-1206 + L1316-1553)
-- [ ] `ai-annotator/hooks/useReviewEditing.ts` (extracts ~10 useStates + per-cell save logic at L740-846)
-- [ ] Convert 11 LLM-config useStates (L141-153) to a `useReducer<AiAnnotatorParams>` with `RESET`/`SET_FIELD` actions.
+Per the scope note at the top of this doc, the AI Annotator feature is in early iteration. All §3.2 items are deferred until that feature stabilises:
+
+- [ ] `ai-annotator/components/AiAnnotationTab.tsx`.
+- [ ] `ai-annotator/components/ReviewTab.tsx`.
+- [ ] `ai-annotator/hooks/useReviewEditing.ts`.
+- [ ] Convert 11 LLM-config useStates to a `useReducer<AiAnnotatorParams>`.
 - [ ] Add `useAiAnnotatorTaskFlow` (Phase 2.1).
-- [ ] Extract `buildAiAnnotationCommonPayload(state)` for the 9-field shared payload between `handleDetach` and `handleRun` (L411-428, L451-470).
+- [ ] Extract `buildAiAnnotationCommonPayload(state)`.
 
 ### 3.3 DataLoaderFeature.tsx (1517 → 734 LoC)
 
@@ -274,15 +273,15 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 - [x] `sequential-analysis/components/panels/SequentialAnalysisResultsPanel.tsx`. `eabbc9a`.
 - [ ] Replace the 36-line `eslint-disable react-hooks/set-state-in-effect` block at L450-485 with derived state. Deferred — see "Remaining Phase 3 work" above for rationale.
 
-### 3.6 App.tsx (618 → ~150 LoC)
+### 3.6 App.tsx (618 → 385 LoC) — mostly done
 
-- [ ] Extract `<ViewRouter>` — the 9-way `currentView === 'X' && <…>` chain at L404-413.
-- [ ] Extract `<DocumentModalHost>` — the 4 near-identical `<Dialog>` blocks at L271-317.
-- [ ] Extract `useResizableSplit({ axis, min, max, container })` — currently implemented 3× in App.tsx (L112-149, L177-219) and `WorkspaceView.tsx:20-48`.
-- [ ] Extract `<RefreshStatusBanner>` from L319-345 + L151-167.
-- [ ] Move `LoginScreen` (L582-615) and `getBlockingCopy` to `components/startup/`.
-- [ ] Reuse `useUIStore.feedbackModal` instead of local `feedbackOpen` useState in pre-auth screen (L494).
-- [ ] Move `LAG_HINT_DELAY_MS` and `REFRESH_CHIP_DELAY_MS` to a `config/timings.ts`.
+- [x] Extract `<ViewRouter>`. `cb14ceb`.
+- [x] Extract `<DocumentModalHost>`. `cb14ceb`.
+- [x] Extract `<RefreshStatusBanner>`. `cb14ceb`.
+- [x] Move `LoginScreen` + `getBlockingCopy` to `components/startup/`. `cb14ceb`.
+- [ ] Extract a shared resizable-split hook. **Partial**: `useResizableSplit` exists at `features/data-loader/hooks/useResizableSplit.ts` and is consumed by DataLoader. App.tsx's two inline implementations (`onStartSidebarResize` for the sidebar column resize + `onStartResize` for the right-panel column resize) and `WorkspaceView.tsx`'s `onStartDrag` (top/bottom split) are still inline. Migrating would require generalising the data-loader hook to cover three axes/contexts; non-trivial.
+- [ ] Reuse `useUIStore.feedbackModal` instead of local `feedbackOpen` useState in the pre-auth screen (`App.tsx:347`). The post-auth `WorkspaceShell` already reads `state.modals.feedbackModal` from `useUIStore`; the pre-auth path keeps its own `useState` (legitimate independence — pre-auth doesn't need the store's hint integration). Cosmetic.
+- [ ] Move `LAG_HINT_DELAY_MS` to a `config/timings.ts`. `REFRESH_CHIP_DELAY_MS` already gone (no longer referenced in App.tsx).
 
 ### 3.7 Sidebar.tsx (725 → 507 LoC)
 
@@ -303,16 +302,15 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 - [x] Move global TanStack module augmentation to `data-view/tableMeta.d.ts`. `57d32e0`.
 - [x] Wrap `onRefreshSchema` (and the other 3 mutation callbacks) in `useCallback`. `2f0b96b`.
 
-### 3.9 useWorkspaceNodeMutations.ts (637 → ~450 LoC)
+### 3.9 useWorkspaceNodeMutations.ts (637 → ~450 LoC) — ✅ DONE
 
-- [ ] Wrap the `actions` object (L544-634) in `useMemo` keyed on the mutation refs. Currently rebuilt every render → cascades through `WorkspaceProvider` context.
-- [ ] Move 6 text mutations from `useWorkspaceInternal.ts:101-228` here (or to a peer `useWorkspaceTextMutations.ts`).
+- [x] Wrap the `actions` object in `useMemo`. `77c196a`.
+- [x] Move text mutations from `useWorkspaceInternal.ts` to this hook (covers the five `detachConcordance` / `materializeConcordance` / `quotationSearch` / `detachQuotation` / `materializeQuotation` flows). Phase 4.8 (`d9fb774`).
 
-### 3.10 tutorialRegistry.ts (456 → 0 LoC of TS)
+### 3.10 tutorialRegistry.ts — partial
 
-- [ ] Either: move to `public/tutorials/registry.json` (loaded once on app start, merged with the other registries).
-- [ ] Or: Vite plugin / build script that scans `public/tutorials/**/*.md` for `<a id="help-…">` markers and emits the registry at build time, eliminating drift entirely.
-- [ ] Either way: make `TutorialTargetKey` a string literal union for type safety so typos in `targetKey` are compile errors instead of runtime toasts.
+- [x] Make `TutorialTargetKey` / `InfoTargetKey` / `ReferenceTargetKey` literal unions with `LooseAutoComplete<…>` for the dynamic pass-throughs. `0b48657`. So typos in *direct* call sites are compile errors now; runtime resolution is still string-keyed for dynamically-built targets.
+- [ ] **Open**: move the inline 456 LoC registry to `public/tutorials/registry.json` (loaded once on app start) OR a Vite plugin that scans markdown for `<a id="help-…">` markers and emits the registry at build time. Either eliminates the drift-between-markdown-and-registry maintenance burden, but is the largest single remaining piece of the refactor.
 
 ---
 
