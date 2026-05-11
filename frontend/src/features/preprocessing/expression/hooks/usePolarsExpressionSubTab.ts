@@ -9,15 +9,33 @@ import { deriveNodeLabel } from '../../utils/nodeMetadata';
 
 export type ExpressionContextTab = PolarsExpressionContext;
 
-export interface SortExpressionItem {
+/**
+ * Each user-mutable expression entry carries its own opaque `id` so React
+ * can use it for the list `key`. Using array index keys here was the B8
+ * bug — adding/removing an item mid-list re-attributed the CodeEditor
+ * focus to the wrong row.
+ */
+export interface ExpressionItem {
+  id: string;
   code: string;
+}
+
+export interface SortExpressionItem extends ExpressionItem {
   descending: boolean;
 }
 
 export interface GroupByAggState {
   keyCode: string;
-  aggCodes: string[];
+  aggExpressions: ExpressionItem[];
 }
+
+const newId = () =>
+  (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+export const blankExpression = (): ExpressionItem => ({ id: newId(), code: '' });
+export const blankSortExpression = (): SortExpressionItem => ({ id: newId(), code: '', descending: false });
 
 export interface PolarsExpressionSubTabProps {
   selectedNodeId: string | null;
@@ -55,12 +73,13 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     context: activeContext,
   });
 
-  // Per-context state
+  // Per-context state. Lists carry stable `id`s so React keys survive
+  // add/remove/reorder without losing CodeEditor focus on the wrong row.
   const [filterCode, setFilterCode] = useState('');
-  const [withColumnsCodes, setWithColumnsCodes] = useState(['']);
-  const [selectCodes, setSelectCodes] = useState(['']);
-  const [sortItems, setSortItems] = useState<SortExpressionItem[]>([{ code: '', descending: false }]);
-  const [groupByState, setGroupByState] = useState<GroupByAggState>({ keyCode: '', aggCodes: [''] });
+  const [withColumns, setWithColumns] = useState<ExpressionItem[]>(() => [blankExpression()]);
+  const [selectExpressions, setSelectExpressions] = useState<ExpressionItem[]>(() => [blankExpression()]);
+  const [sortItems, setSortItems] = useState<SortExpressionItem[]>(() => [blankSortExpression()]);
+  const [groupByState, setGroupByState] = useState<GroupByAggState>(() => ({ keyCode: '', aggExpressions: [blankExpression()] }));
 
   // Serialized expressions (after eval)
   const [serializedRequest, setSerializedRequest] = useState<PolarsExpressionRequest | null>(null);
@@ -78,27 +97,41 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
       if (activeContext === 'group_by_agg') {
         request = {
           context: 'group_by_agg',
-          expressions: groupByState.aggCodes.filter(Boolean).map((c) => ({ code: c.trim() })),
+          expressions: groupByState.aggExpressions
+            .filter((it) => it.code.trim())
+            .map((it) => ({ code: it.code.trim() })),
           group_by_keys: [{ code: groupByState.keyCode.trim() }],
         };
       } else if (activeContext === 'sort') {
         request = {
           context: 'sort',
-          expressions: sortItems.filter((it) => it.code.trim()).map((it) => ({ code: it.code.trim(), descending: it.descending })),
+          expressions: sortItems
+            .filter((it) => it.code.trim())
+            .map((it) => ({ code: it.code.trim(), descending: it.descending })),
         };
       } else if (activeContext === 'filter') {
         request = { context: 'filter', expressions: [{ code: filterCode.trim() }] };
       } else if (activeContext === 'with_columns') {
-        request = { context: 'with_columns', expressions: withColumnsCodes.filter(Boolean).map((c) => ({ code: c.trim() })) };
+        request = {
+          context: 'with_columns',
+          expressions: withColumns
+            .filter((it) => it.code.trim())
+            .map((it) => ({ code: it.code.trim() })),
+        };
       } else {
-        request = { context: 'select', expressions: selectCodes.filter(Boolean).map((c) => ({ code: c.trim() })) };
+        request = {
+          context: 'select',
+          expressions: selectExpressions
+            .filter((it) => it.code.trim())
+            .map((it) => ({ code: it.code.trim() })),
+        };
       }
 
       setSerializedRequest(request);
     } catch (err) {
       setEvalError(err instanceof Error ? err.message : String(err));
     }
-  }, [activeContext, filterCode, groupByState, selectCodes, sortItems, withColumnsCodes]);
+  }, [activeContext, filterCode, groupByState, selectExpressions, sortItems, withColumns]);
 
   // Preview
   const preview = usePreprocessingPreview({
@@ -142,10 +175,10 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
     filterCode,
     setFilterCode,
-    withColumnsCodes,
-    setWithColumnsCodes,
-    selectCodes,
-    setSelectCodes,
+    withColumns,
+    setWithColumns,
+    selectExpressions,
+    setSelectExpressions,
     sortItems,
     setSortItems,
     groupByState,

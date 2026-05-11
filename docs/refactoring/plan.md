@@ -25,66 +25,32 @@ Items deferred from the original Phase 1 scope:
 
 ### 1.1 Real bugs
 
-- [ ] **B1** Delete duplicate `<HintsController />` mount at `frontend/src/App.tsx:373-375`. Lazy-imported component is mounted at both line 347 and line 374 → two component instances, two Suspense boundaries, doubled subscriptions. Keep the outer one (line 347).
-- [ ] **B2** Fix infinite-effect risk in `useTopicModelingZoomBrush.ts:46-56`. `fullDomain = computeZoomDomain(topics)` returns a fresh object every render and is in the effect deps → effect re-fires every render. The `eslint-disable react-hooks/set-state-in-effect` masks it. Wrap with `useMemo(() => computeZoomDomain(topics), [topics])`.
-- [ ] **B3** `useReplaceSubTab.ts:170-177` disabled-reason builder doesn't suppress while global ops are running. Tooltip shows stale "Enter a regex pattern first" instead of nothing. Add `if (applyLoading || isLoading.operations) return undefined;` to match the pattern in the other 5 sub-tabs.
-- [ ] **B4** `useSliceSubTab.ts:208-227` has a duplicate reset block — the first block's setters are dead (the second runs on truthy `selectedNodeId` and is a strict superset). Delete the dead first block.
-- [ ] **B5** `useFiles.ts:26` puts `JSON.stringify(authHeaders)` into the react-query key. On logout, old key never gets evicted. Drop the auth signature from the key; add `queryClient.removeQueries({ queryKey: queryKeys.files })` to `useAuth.ts` logout.
+- [x] **B1** ~~Duplicate `<HintsController />` mount~~ — already a single mount at the current `App.tsx`; the duplicate the audit flagged is gone (cleaned up alongside the layout consolidation).
+- [x] **B2** ~~Infinite-effect risk in `useTopicModelingZoomBrush`~~ — already fixed: `fullDomain = useMemo(() => computeZoomDomain(topics), [topics])`. Verified at L46.
+- [x] **B3** ~~`useReplaceSubTab` disabled-reason while ops are running~~ — already fixed: `if (applyLoading || isLoading.operations) return undefined;` is in place at L125.
+- [N/A] **B4** ~~`useSliceSubTab` duplicate reset block~~ — re-audit on current code: the three reset effects each have a distinct role (L200 input-change inlineError clear; L204 full reset on workspace change; L216 lastResult clear on mode change). No dead block to delete; the original audit applied to an older shape.
+- [x] **B5** ~~`useFiles.ts` auth signature in query key~~ — already fixed: `queryKey: queryKeys.files` (no JSON.stringify of headers). Logout side: `Sidebar.tsx` `handleLogout` calls `queryClient.clear()` before `logout()`, which is more thorough than the targeted `removeQueries` the audit suggested.
 - [x] **B6** `useAuth.ts:105-115` parsed `window.location.search` and rewrote the URL **at module import time**. Moved into `processGoogleRedirectToken()` on the auth store and invoked from a `useEffect` in `useAuth` on first mount (Phase 4.7).
-- [ ] **B7** `tutorials/warningRegistry.ts` is empty `{}`, so every `<WarningIcon targetKey="…">` will silently fail. Combined with §1.2 (WarningIcon is dead code), the fix is: **delete `WarningIcon.tsx` and `warningRegistry.ts` together**. Audit codebase for any consumer first; the cross-cutting auditor confirmed none. Add either back if/when needed.
-- [ ] **B8** `key={index}` on user-mutable lists (sort/filter/reorder mis-attributes row identity, breaks input focus). Fix with stable keys at:
-  - [ ] `concordance/ConcordanceFeature.tsx:1579,1751,1763`
-  - [ ] `sequential-analysis/SequentialAnalysisFeature.tsx:943`
-  - [ ] `expression/PolarsExpressionSubTab.tsx:170,209,248,312`
+- [x] **B7** ~~`warningRegistry.ts` is empty + `WarningIcon` is dead code~~ — both deleted in Phase 1.2 (`e64f2b8`).
+- [x] **B8** `key={index}` on user-mutable lists. **PolarsExpressionSubTab** state shape converted from `string[]` (and `{ code, descending }[]` for sort) to `{ id, code }[]` (and `{ id, code, descending }[]` for sort) so React keys are stable across add/remove. `usePolarsExpressionSubTab` exports two `blank…` factories that mint new ids via `crypto.randomUUID()`. The component re-renders the four lists keyed by `item.id`; onChange/remove handlers operate by id (functional `setState((prev) => prev.map(...))` instead of `[...arr]; arr[i] = …`). Backend serialization still flattens to `{ code }[]` / `{ code, descending }[]` for the API call. **Concordance/Sequential-analysis** locations from the original audit no longer apply: Concordance lines 1579/1751/1763 were rewritten away during Phase 3.1, and the only remaining `key={index}` in user-mutable Sequential UI is `SequentialAnalysisParameterPanel.tsx:284` (groupByColumns Select rows). Deferred for now — no typing focus to lose, and the shape change ripples through lock/restore + serialization for low user-visible benefit.
 - [x] **B9** `useNodeColumnInfos.ts` cache dep loop — resolved by the wholesale rewrite to `useQueries` in Phase 4.3 (`5fd8323`). Original `cache` useState + effect-with-`cache`-dep + `setCache` pattern is gone.
 
-### 1.2 Pure dead code — verified zero external consumers
+### 1.2 Pure dead code — ✅ DONE
 
-Each item: confirm with `grep -r "<symbol>" frontend/src/` first. Audit was thorough but verify before deleting. ~150 LoC total.
+Landed in `e64f2b8` (Phase 1.2 dead-code deletion, 7 files removed, 339 LoC). All items grep-verified zero-consumers before deletion. Specifically:
 
-Hooks/components:
-- [ ] Delete `frontend/src/hooks/useLocalTable.ts` entirely (entire hook unused).
-- [ ] Delete `frontend/src/components/help/WarningIcon.tsx` entirely (also covers B7).
-- [ ] Delete `frontend/src/hooks/useWorkspaceTaskStream.ts` (just re-exports `useWorkspaceTaskInbox`); update `Sidebar.tsx:28` to import directly.
+- Hooks/components: deleted `hooks/useLocalTable.ts`, `components/help/WarningIcon.tsx` (covers B7), `hooks/useWorkspaceTaskStream.ts` (Sidebar.tsx now imports `useWorkspaceTaskInbox` directly).
+- API: removed `nodesApi.shape`, `UserMeResponse`, `GoogleAuthResponseType`, plus 8 internal-only types from `api/nodes.ts` made non-exported.
+- Stores: dropped `isGlobalLoading`/`globalError` and 5 undeclared modal keys from `uiStore` initial state; deleted `concordanceSearch` action + mutation from `useWorkspaceInternal.ts`.
+- Token frequency: deleted `filterStatisticsByStopWords` / `filterStatisticsByTokenPattern` / `sortStatistics` (~80 LoC).
+- Hook returns: dropped `setCurrentSchema` from `useSchemaManagement`; dropped `manualExpressionActive` and the outer `dropZoneRef` from `useAggregateSubTab`.
+- Barrels: deleted `components/index.ts`, `components/ui/index.ts`, `components/tabs/index.ts`.
+- Empty React imports: cleaned in `useNodeColumnOptions.ts` and `useWorkspaceQueries.ts`.
+- Tutorial registries: kept `tutorialIndexTarget` (used in Sidebar); the unused `infoIndexTarget`/`referenceIndexTarget` were absent or already cleaned by separate commits.
 
-API:
-- [ ] Remove `nodesApi.shape` (`api/nodes.ts:174`).
-- [ ] Remove `UserMeResponse` (`api/auth.ts:23`).
-- [ ] Remove `GoogleAuthResponseType` alias (`api/auth.ts:43`).
-- [ ] Remove the 8 internal-only types exported from `api/nodes.ts:45-113` (`JoinNodesRequest`, `JoinPreviewParams`, `CastNodeRequest`, `ConcatPreviewRequest`, `ConcatRequest`, `JoinPreviewResponse`, `OperationInfo`, `PolarsExpressionItem`). Make non-exported.
+### 1.3 `TutorialView` → `DocumentView` consolidation — ✅ DONE
 
-Stores (silent dead state):
-- [ ] Delete `isGlobalLoading`, `globalError`, and the 5 undeclared modal keys (`joinModal`, `filterModal`, `documentColumnModal`, `renameModal`, `deleteConfirmModal`) from `uiStore` initial state (`stores/uiStore.ts:150-165`). The TS type doesn't declare them; they survive only because the literal is wider than the type.
-- [ ] Delete `concordanceSearch` action and its mutation (`useWorkspaceInternal.ts:101-134, 238-242`). The concordance feature calls `textApi.concordance` directly.
-
-Token frequency:
-- [ ] Delete `filterStatisticsByStopWords`, `filterStatisticsByTokenPattern`, `sortStatistics` from `tokenFrequencyAdapters.ts:239-269` (~80 LoC; filtering happens in tanstack column model).
-
-Hook returns (drop unused fields):
-- [ ] `useSchemaManagement.ts:266-272` → drop `setCurrentSchema` from return shape (only `setLockedSchema` is consumed externally).
-- [ ] `useAggregateSubTab.ts` → drop `manualExpressionActive` from result (computed but never read).
-- [ ] `useAggregateSubTab.ts` → drop the outer `dropZoneRef` (returned at two paths; component reads the inner one).
-
-Tutorial registries:
-- [ ] Delete unused `tutorialIndexTarget`/`infoIndexTarget`/`referenceIndexTarget` exports where unused (verify each via grep — `tutorialIndexTarget` IS used in Sidebar; the others are not).
-
-Barrels:
-- [ ] Delete `components/index.ts` (every consumer imports from leaf).
-- [ ] Delete `components/ui/index.ts` (same).
-- [ ] Delete `components/tabs/index.ts` (same).
-
-Empty React imports:
-- [ ] `useNodeColumnOptions.ts:1` — remove vestigial `import { } from 'react';`.
-- [ ] `useWorkspaceQueries.ts:1` — same.
-
-### 1.3 `TutorialView` → `DocumentView` consolidation
-
-`TutorialView.tsx` (269 LoC) is 95% byte-identical to `DocumentView.tsx` (283 LoC). `DocumentView` already accepts `docType="tutorial"`.
-
-- [ ] Switch the lazy import in `App.tsx:22` to point at `DocumentView` with `docType="tutorial"`.
-- [ ] Verify all `useUIStore` actions used by `TutorialView` are also wired into `DocumentView`'s code path.
-- [ ] Delete `frontend/src/components/TutorialView.tsx`.
-- [ ] Update any other imports of `TutorialView` (search the tree).
+Landed in `208e7e4` (TutorialView → DocumentView consolidation, –268 LoC). `App.tsx` now lazy-imports `DocumentView` for the tutorial route with `docType="tutorial"`.
 
 ### 1.4 Import-path codemod
 
