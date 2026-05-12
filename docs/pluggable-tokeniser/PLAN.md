@@ -55,6 +55,10 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 5. **Tokenizer paradigm pluggability is achievable in pure Rust.** `jieba-rs` and `lindera` are mature Rust crates. The polars-text architecture is not bound to HuggingFace's `tokenizers` crate; a small `TokenizerBackend` enum behind a trait keeps everything in one Polars expression.
 
+6. **Concordance keeps TWO modes, not one.** The current regex-on-raw-text mode is preserved as the default because partial-word patterns like `equ\w*` are a real linguistic affordance for English users that any DTM-only design would destroy. A second tokens-column-driven mode is added in Phase 2.6 for CJK and any case where exact-token-match + N-actual-token context (with language-appropriate segmentation) is the right semantics.
+   - **Why this matters for CJK**: today, when concordance is run on Chinese text, `num_left_tokens=5` silently means "5 characters" because `BertPreTokenizer` falls back to per-character splitting in the absence of whitespace. The text-mode search still works (literal substring match), but the context window is much less semantically useful than the user expects. The tokens-column mode (after Phase 5 with Jieba/Lindera) gives "5 actual words left/right" which is what a corpus linguist actually wants.
+   - **English `equ\w*` is not lost**: regex-mode stays the default; CJK users can opt into tokens-mode after running Tokenise on their node.
+
 ## Scope summary
 
 | Module        | Role                                                                                         | Branch needed |
@@ -117,7 +121,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 | 2.3 | Add `worker_tasks_tokenize.py` worker | new in `backend/src/ldaca_web_app/core/` | Produces child node with tokens column persisted to `.plbin` |
 | 2.4 | Add `language` + `tokenizer_model` fields to Node metadata (NOT the dataframe) | `docworkspace/src/docworkspace/node/core.py:48-51`, `node/io.py:44-53` | Round-trips through plbin save/load |
 | 2.5 | Add API endpoint `POST /workspaces/{id}/nodes/{node_id}/tokenize` | new in `backend/src/ldaca_web_app/api/workspaces/analyses/` | Creates child node with lineage |
-| 2.6 | Modify concordance to detect tokens column and consume it | `polars-text/src/concordance.rs`, `backend/src/ldaca_web_app/core/worker_tasks_concordance.py:93` | KWIC `l1`/`r1` match upstream tokens exactly |
+| 2.6 | Concordance: keep regex-on-text mode as default; add a `search_mode="tokens"` option that consumes the tokens column (exact-token-match search, N-actual-token context windows). See architectural decision 6. | `polars-text/src/concordance.rs`, `backend/src/ldaca_web_app/core/worker_tasks_concordance.py:93` | Regex mode: identical English KWIC to Phase 0 golden. Tokens mode: `l1`/`r1` and context match upstream tokens column exactly. Both selectable per request. |
 | 2.7 | Modify token frequency to consume tokens column when present | `backend/src/ldaca_web_app/core/worker_tasks_token.py:99` | Counts agree with persisted tokens |
 | 2.8 | Fix `Node.shape` to avoid materialising list columns | `docworkspace/src/docworkspace/node/core.py:88-90` | Tokenised node `shape` query is fast and memory-stable |
 | 2.9 | Source-path rebasing handles the new schema (`rebase_workspace_sources()`) | `docworkspace/src/docworkspace/workspace/io.py:168-184` | Move + reload workspace works |
@@ -173,6 +177,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 | 4.4 | Add `tokenizer`/`language` to request types in the per-feature API modules | `frontend/src/api/text/` — `tokenFrequency.ts`, `concordance.ts`, `topicModeling.ts`, `aiAnnotation.ts`, `sequential.ts`; shared types in `shared.ts` and re-exports in `index.ts` | Backend receives the values |
 | 4.5 | Disabled-reason tooltip "English-only" on quotation for non-EN nodes | quotation feature panel under `frontend/src/features/workspace/` (locate via `quotation_core` request usage) | Matches existing tooltip pattern from `da55cb8` |
 | 4.6 | Node inspector shows language + tokenizer model | node info panel (whichever panel renders `nodeInfo` from `frontend/src/lib/nodeInfo.ts`) | Visible on selection |
+| 4.7 | Concordance panel: "Search mode" toggle (regex vs. tokens); auto-pick tokens-mode when the active node has a tokens column; tooltip on `num_left/right_tokens` reads "characters in regex-mode on CJK; tokens in tokens-mode" | concordance feature under `frontend/src/features/workspace/` | Toggle visible; tokens-mode disabled when no tokens column present; CJK regex-mode shows the character-vs-token tooltip |
 
 **Tests:**
 - Browser dev-server walkthrough: import a small ZH CSV → tokenise → run frequency → see ZH tokens. Try quotation → see disabled tooltip. Save and reload workspace → state preserved.
