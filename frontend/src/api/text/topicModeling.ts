@@ -1,6 +1,8 @@
 import { httpRequest, post } from '../http';
 
-export interface TopicModelingRequest {
+import type { LanguageHint } from './shared';
+
+export interface TopicModelingRequest extends LanguageHint {
   node_ids: string[];
   node_columns?: Record<string, string>;
   min_topic_size?: number;

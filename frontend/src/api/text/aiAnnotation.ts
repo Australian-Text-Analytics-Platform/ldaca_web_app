@@ -1,5 +1,7 @@
 import { httpRequest, post } from '../http';
 
+import type { LanguageHint } from './shared';
+
 export interface AiAnnotationClassDef {
   name: string;
   description: string;
@@ -10,7 +12,7 @@ export interface AiAnnotationExample {
   classification: string;
 }
 
-export interface AiAnnotationRequest {
+export interface AiAnnotationRequest extends LanguageHint {
   node_ids: string[];
   node_columns: Record<string, string>;
   annotation_column?: string | null;
@@ -29,7 +31,7 @@ export interface AiAnnotationRequest {
   descending?: boolean;
 }
 
-export interface AiAnnotationDetachRequest {
+export interface AiAnnotationDetachRequest extends LanguageHint {
   column: string;
   new_node_name?: string | null;
   annotation_column?: string | null;

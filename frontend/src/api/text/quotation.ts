@@ -1,6 +1,6 @@
 import { httpRequest, post } from '../http';
 
-import type { SourceRowPagination } from './shared';
+import type { LanguageHint, SourceRowPagination } from './shared';
 
 export type QuotationEngineType = 'local' | 'remote';
 
@@ -29,7 +29,7 @@ export interface QuotationAnalysisResponse {
   task_id?: string;
 }
 
-export interface QuotationRequest {
+export interface QuotationRequest extends LanguageHint {
   column: string;
   page?: number;
   page_size?: number;
@@ -38,7 +38,7 @@ export interface QuotationRequest {
   engine?: QuotationEngineConfig;
 }
 
-export interface QuotationDetachRequest {
+export interface QuotationDetachRequest extends LanguageHint {
   node_id: string;
   column: string;
   new_node_name?: string;
@@ -47,7 +47,7 @@ export interface QuotationDetachRequest {
   materialized_path?: string | null;
 }
 
-export interface QuotationMaterializeRequest {
+export interface QuotationMaterializeRequest extends LanguageHint {
   parent_task_id: string;
   column: string;
   engine?: QuotationEngineConfig;

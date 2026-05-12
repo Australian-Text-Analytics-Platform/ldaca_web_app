@@ -1,6 +1,8 @@
 import { get, httpRequest, post } from '../http';
 
-export interface TokenFrequencyRequest {
+import type { LanguageHint } from './shared';
+
+export interface TokenFrequencyRequest extends LanguageHint {
   node_ids: string[];
   node_columns: Record<string, string>;
   stop_words?: string[] | null;

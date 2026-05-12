@@ -16,7 +16,8 @@ import { topicModelingApi } from './topicModeling';
 // Public type surface — re-export every type-level export from the feature
 // files so existing `import { Foo } from '@/api/text'` call sites keep
 // resolving without churn.
-export type { SourceRowPagination } from './shared';
+export type { LanguageCode, LanguageHint, SourceRowPagination } from './shared';
+export { buildLanguageHint } from './shared';
 
 export type {
   ConcordanceAnalysisRequest,
@@ -35,6 +36,7 @@ export type {
   ConcordanceRequest,
   ConcordanceResultEntry,
   ConcordanceResultQuery,
+  ConcordanceSearchMode,
 } from './concordance';
 
 export type {

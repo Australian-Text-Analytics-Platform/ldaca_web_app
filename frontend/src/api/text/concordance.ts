@@ -1,6 +1,19 @@
 import { httpRequest, post } from '../http';
 
-import type { SourceRowPagination } from './shared';
+import type { LanguageHint, SourceRowPagination } from './shared';
+
+/**
+ * Concordance has two search modes (decision 6 / Phase 2.6):
+ *
+ * - ``regex`` — the historical default. Polars-text walks raw text;
+ *   partial-word patterns like ``equ\w*`` survive. On CJK,
+ *   ``num_left_tokens`` silently means "characters" because there's no
+ *   whitespace.
+ * - ``tokens`` — walks the derived tokens column added by Tokenise.
+ *   N-actual-token left/right context, exact-token match. Only meaningful
+ *   on nodes that have been tokenised.
+ */
+export type ConcordanceSearchMode = 'regex' | 'tokens';
 
 export interface ConcordanceMetadata {
   /** Core concordance columns (CONC_left_context, CONC_matched_text, CONC_right_context, etc.) */
@@ -14,7 +27,7 @@ export interface ConcordanceMetadata {
 export type ConcordanceHitRow = Record<string, unknown>;
 export type ConcordanceGroupedRow = ConcordanceHitRow[];
 
-export interface ConcordanceRequest {
+export interface ConcordanceRequest extends LanguageHint {
   column: string;
   search_word: string;
   num_left_tokens?: number;
@@ -25,7 +38,7 @@ export interface ConcordanceRequest {
   sort_by?: string;
 }
 
-export interface ConcordanceDetachRequest {
+export interface ConcordanceDetachRequest extends LanguageHint {
   node_id: string;
   column: string;
   search_word: string;
@@ -48,7 +61,7 @@ export interface ConcordanceDetachRequest {
  * (`start_idx / doc_length * total_bins`, floored) lands in one of the bins
  * are included — matches the "in-range hits only" semantic of the chart.
  */
-export interface ConcordanceDispersionDetachRequest {
+export interface ConcordanceDispersionDetachRequest extends LanguageHint {
   column: string;
   search_word: string;
   num_left_tokens?: number;
@@ -85,7 +98,7 @@ export interface ConcordanceDispersionDetachRequest {
   match_case_insensitive?: boolean;
 }
 
-export interface ConcordanceMaterializeRequest {
+export interface ConcordanceMaterializeRequest extends LanguageHint {
   parent_task_id: string;
   column: string;
   search_word: string;
@@ -111,7 +124,7 @@ export interface ConcordanceDetachOptionsResponse {
   metadata?: { task_id?: string; [key: string]: unknown };
 }
 
-export interface ConcordanceAnalysisRequest {
+export interface ConcordanceAnalysisRequest extends LanguageHint {
   node_ids: string[];
   node_columns: Record<string, string>;
   search_word: string;
@@ -122,6 +135,13 @@ export interface ConcordanceAnalysisRequest {
   case_sensitive?: boolean;
   sort_by?: string;
   combined?: boolean;
+  /**
+   * Phase 2.6 / 4.7: pick concordance engine. Defaults to ``"regex"`` so
+   * existing EN flows are unchanged; ``"tokens"`` walks the derived
+   * tokens column for N-actual-token context on CJK nodes that have
+   * been tokenised.
+   */
+  search_mode?: ConcordanceSearchMode;
 }
 
 export interface ConcordanceResultQuery {
