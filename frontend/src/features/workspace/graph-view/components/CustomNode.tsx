@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Settings2, Copy, Check, Sparkles } from 'lucide-react';
 import {
   AlertDialog,
@@ -12,6 +13,47 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { type WorkspaceNode, parseDerivedColumn } from '@/types';
+import TokeniseDialog from './TokeniseDialog';
+import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+
+/**
+ * Encapsulates the TanStack Query + workspace-context dependencies the
+ * tokenise dialog needs to invalidate the node-info cache after a
+ * successful POST. Rendered only when ``open`` is true so existing
+ * CustomNode tests don't need to wrap with a QueryClientProvider /
+ * WorkspaceProvider just to render the card.
+ */
+function TokeniseDialogContainer({
+  open,
+  onClose,
+  nodeId,
+  nodeName,
+  columns,
+}: {
+  open: boolean;
+  onClose: () => void;
+  nodeId: string;
+  nodeName: string;
+  columns: string[];
+}) {
+  const queryClient = useQueryClient();
+  const { currentWorkspaceId } = useWorkspaceData();
+  return (
+    <TokeniseDialog
+      open={open}
+      onClose={onClose}
+      nodeId={nodeId}
+      nodeName={nodeName}
+      columns={columns}
+      onSuccess={() => {
+        if (currentWorkspaceId && nodeId) {
+          invalidateNodeInfoQuery(queryClient, currentWorkspaceId, nodeId);
+        }
+      }}
+    />
+  );
+}
 
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
@@ -34,6 +76,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const [newName, setNewName] = useState('');
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTokeniseDialog, setShowTokeniseDialog] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -213,6 +256,22 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
               Clone
             </button>
 
+            {/* Phase 4.3 — Tokenise a string column on this node into a
+                hidden derived column. Only shown when the node has at
+                least one column to pick (no-op otherwise). */}
+            {Array.isArray(node?.columns) && node.columns.length > 0 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  setShowTokeniseDialog(true);
+                }}
+                className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
+              >
+                Tokenise…
+              </button>
+            ) : null}
+
             <button
               onClick={handleUndoNode}
               disabled={!node?.can_undo}
@@ -260,6 +319,19 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     </AlertDialog>
   );
 
+  // Mount the dialog (and its TanStack-Query / workspace-context hooks)
+  // only when the user actually opens it — keeps CustomNode tests that
+  // don't exercise tokenise from needing to wrap providers.
+  const tokeniseDialog = showTokeniseDialog && node?.node_id ? (
+    <TokeniseDialogContainer
+      open={showTokeniseDialog}
+      onClose={() => setShowTokeniseDialog(false)}
+      nodeId={node.node_id}
+      nodeName={nodeName}
+      columns={Array.isArray(node.columns) ? node.columns : []}
+    />
+  ) : null;
+
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
     const compactClasses = `
@@ -289,6 +361,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         {deleteDialog}
+        {tokeniseDialog}
       </div>
     );
   }
@@ -376,6 +449,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       {deleteDialog}
+      {tokeniseDialog}
     </div>
   );
 };

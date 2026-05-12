@@ -220,6 +220,76 @@ describe('CustomNode', () => {
     expect(screen.getByText('tokens: text · jieba')).toBeInTheDocument();
   });
 
+  it('exposes a Tokenise entry in the node menu when the node has columns', async () => {
+    mockZoom = 1;
+    const user = userEvent.setup();
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: {
+        node: {
+          node_id: 'node-1',
+          name: 'tokenisable',
+          shape: [3, 2] as [number, number],
+          columns: ['text', 'title'],
+          preview: [],
+          is_text_data: true,
+        },
+        onDelete: vi.fn(),
+      },
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+    await user.click(getLatestNodeSettingsButton());
+    expect(
+      screen.getByRole('button', { name: 'Tokenise…' }),
+    ).toBeInTheDocument();
+  });
+
+  it('omits the Tokenise entry when the node has no columns', async () => {
+    mockZoom = 1;
+    const user = userEvent.setup();
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: {
+        node: {
+          node_id: 'node-1',
+          name: 'empty',
+          shape: [0, 0] as [number, number],
+          columns: [],
+          preview: [],
+          is_text_data: false,
+        },
+        onDelete: vi.fn(),
+      },
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+    await user.click(getLatestNodeSettingsButton());
+    expect(
+      screen.queryByRole('button', { name: 'Tokenise…' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('summarises multiple tokens columns', () => {
     mockZoom = 1;
     const props = {
