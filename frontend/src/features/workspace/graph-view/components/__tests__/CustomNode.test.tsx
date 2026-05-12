@@ -324,4 +324,76 @@ describe('CustomNode', () => {
     render(<CustomNode {...props} />);
     expect(screen.getByText('2 tokens columns')).toBeInTheDocument();
   });
+
+  it('exposes a Manage tokens entry only when the node has registered derived columns', async () => {
+    mockZoom = 1;
+    const user = userEvent.setup();
+    const baseNode = {
+      node_id: 'node-1',
+      name: 'tokenisable',
+      shape: [3, 2] as [number, number],
+      columns: ['text'],
+      preview: [],
+      is_text_data: true,
+    };
+
+    // 1. No derived: menu must NOT show "Manage tokens…".
+    const { unmount } = render(
+      <CustomNode
+        id="node-1"
+        type="custom"
+        data={{ node: baseNode, onDelete: vi.fn() }}
+        selected={false}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        draggable
+        isConnectable
+        positionAbsoluteX={0}
+        positionAbsoluteY={0}
+      />,
+    );
+    await user.click(getLatestNodeSettingsButton());
+    expect(
+      screen.queryByRole('button', { name: 'Manage tokens…' }),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    // 2. With a registered derivation: entry surfaces.
+    render(
+      <CustomNode
+        id="node-1"
+        type="custom"
+        data={{
+          node: {
+            ...baseNode,
+            derived: {
+              '__derived__.tokens.text.jieba': {
+                source_column: 'text',
+                form: 'tokens',
+                model: 'jieba',
+                language: 'zh',
+                generated_at: '2026-05-12T00:00:00+00:00',
+              },
+            },
+          },
+          onDelete: vi.fn(),
+        }}
+        selected={false}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        draggable
+        isConnectable
+        positionAbsoluteX={0}
+        positionAbsoluteY={0}
+      />,
+    );
+    await user.click(getLatestNodeSettingsButton());
+    expect(
+      screen.getByRole('button', { name: 'Manage tokens…' }),
+    ).toBeInTheDocument();
+  });
 });

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { type WorkspaceNode, parseDerivedColumn } from '@/types';
 import TokeniseDialog from './TokeniseDialog';
+import DerivedColumnsDialog from './DerivedColumnsDialog';
 import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
 import { queryKeys } from '@/lib/queryKeys';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -65,6 +66,46 @@ function TokeniseDialogContainer({
   );
 }
 
+/**
+ * Companion container for DerivedColumnsDialog — mirrors the lazy-mount
+ * pattern of TokeniseDialogContainer so that CustomNode tests that don't
+ * exercise derived-column management can render without a workspace +
+ * query provider. Invalidates the same two caches on delete success.
+ */
+function DerivedColumnsDialogContainer({
+  open,
+  onClose,
+  nodeId,
+  nodeName,
+  derived,
+}: {
+  open: boolean;
+  onClose: () => void;
+  nodeId: string;
+  nodeName: string;
+  derived: Record<string, import('@/types').DerivedColumnMeta>;
+}) {
+  const queryClient = useQueryClient();
+  const { currentWorkspaceId } = useWorkspaceData();
+  return (
+    <DerivedColumnsDialog
+      open={open}
+      onClose={onClose}
+      nodeId={nodeId}
+      nodeName={nodeName}
+      derived={derived}
+      onDeleted={() => {
+        if (currentWorkspaceId && nodeId) {
+          invalidateNodeInfoQuery(queryClient, currentWorkspaceId, nodeId);
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.workspaceGraph(currentWorkspaceId),
+          });
+        }
+      }}
+    />
+  );
+}
+
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
   isMultiSelected?: boolean;
@@ -87,6 +128,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTokeniseDialog, setShowTokeniseDialog] = useState(false);
+  const [showDerivedDialog, setShowDerivedDialog] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -282,6 +324,23 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
               </button>
             ) : null}
 
+            {/* Surfaced only when the node has at least one derivation
+                registered (post-Phase 4.6). Lets the user remove a wrong
+                tokenisation (e.g. CJK column tokenised under en model by
+                mistake) without an API call. */}
+            {node?.derived && Object.keys(node.derived).length > 0 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  setShowDerivedDialog(true);
+                }}
+                className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
+              >
+                Manage tokens…
+              </button>
+            ) : null}
+
             <button
               onClick={handleUndoNode}
               disabled={!node?.can_undo}
@@ -342,6 +401,16 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     />
   ) : null;
 
+  const derivedDialog = showDerivedDialog && node?.node_id && node?.derived ? (
+    <DerivedColumnsDialogContainer
+      open={showDerivedDialog}
+      onClose={() => setShowDerivedDialog(false)}
+      nodeId={node.node_id}
+      nodeName={nodeName}
+      derived={node.derived}
+    />
+  ) : null;
+
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
     const compactClasses = `
@@ -372,6 +441,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         {deleteDialog}
         {tokeniseDialog}
+        {derivedDialog}
       </div>
     );
   }
@@ -460,6 +530,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       {deleteDialog}
       {tokeniseDialog}
+      {derivedDialog}
     </div>
   );
 };
