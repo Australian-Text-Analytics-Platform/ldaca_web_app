@@ -1,10 +1,22 @@
 # Pluggable Tokeniser & Multilingual Support — Implementation Plan
 
 **Branch:** `pluggable_tokeniser` (root + `backend/`, `polars-text/`, `docworkspace/`)
-**Status:** Planning — no code changes yet
+**Status:** In progress — Phase 2 (Phases 0, 1, and 1.9 complete; Phase 2 partial)
 **Started:** 2026-05-09
 **Last synced from `dev`:** 2026-05-12 (merge `3a94214`); references audited and confirmed current
 **Owner:** chao.sun@sydney.edu.au
+
+## Progress snapshot (updated as work lands)
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 0 — Baseline & fixtures | ✅ done | 502 baseline tests green; EN goldens committed |
+| 1 — Pluggable HF tokenizer in Rust | ✅ done | tokenizer + POS + embedder registries, model= kwarg, prefetch helpers, models.py |
+| 1.9 — Jieba Chinese backend | ✅ done | TokenizerBackend enum (HF + Jieba); `zh = "jieba"` |
+| 2 — Persisted tokens column + Tokenize op | 🔄 in progress | 2.2, 2.4, 2.8, 2.9 done; 2.1 done in code (backend reinstall pending); 2.3, 2.5, 2.6, 2.7 pending |
+| 3 — Per-tool language routing | ⏳ pending | |
+| 4 — Frontend UI | ⏳ pending | |
+| 5 (opt) — Lindera (Japanese) backend | ⏳ deferred | decision gate after Phase 4 ships |
 
 This is the cross-module plan. Per-module sub-plans (to be added if needed):
 
@@ -71,7 +83,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 0 — Baseline & test fixtures (~1–2 days)
+## Phase 0 — Baseline & test fixtures (~1–2 days) ✅ COMPLETE
 
 **Goal:** establish a regression net so every later change is provable.
 
@@ -85,7 +97,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 1 — Pluggable HF tokenizer in Rust (~1.5–2 weeks)
+## Phase 1 — Pluggable HF tokenizer in Rust (~1.5–2 weeks) ✅ COMPLETE (including 1.9)
 
 **Goal:** parameterise model selection through the Polars expression API. No new tokenizer backends yet (still HF only). No persisted tokens column yet.
 
@@ -112,7 +124,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 2 — Persisted tokens column + Tokenize node op (~1.5 weeks)
+## Phase 2 — Persisted tokens column + Tokenize node op (~1.5 weeks) 🔄 IN PROGRESS
 
 **Goal:** make a tokenised representation a first-class, persistent thing. Token-consuming tools auto-detect and use it. **This is the load-bearing phase** — it's what makes Jieba/MeCab integration trivial later, and what makes concordance/frequency consistent.
 
@@ -140,7 +152,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 3 — Per-tool language routing (~1.5–2 weeks)
+## Phase 3 — Per-tool language routing (~1.5–2 weeks) ⏳ PENDING
 
 **Goal:** every remaining English assumption is either parameterised by language or explicitly declared English-only.
 
@@ -165,7 +177,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 4 — Frontend UI (~3–5 days)
+## Phase 4 — Frontend UI (~3–5 days) ⏳ PENDING
 
 **Goal:** expose the choice. Default is invisible to existing users.
 
@@ -189,7 +201,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 5 (optional) — Lindera (Japanese morphology) backend (~3–5 days)
+## Phase 5 (optional) — Lindera (Japanese morphology) backend (~3–5 days) ⏳ DEFERRED
 
 **Goal:** word-level Japanese morpheme segmentation as an alternative to char-level / WordPiece tokenization. Jieba (Chinese) was pulled forward into Phase 1.9; Phase 5 now covers Lindera only.
 
