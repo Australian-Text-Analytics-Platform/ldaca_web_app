@@ -20,6 +20,7 @@ import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { CONCORDANCE_DISPERSION_COLUMN } from '../../generatedColumns';
 import {
+  batchProcessedCount,
   buildDispersionRows,
   getDispersionBarWidthPercent,
   getDispersionHits,
@@ -453,7 +454,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
                   />
                 : null)
-              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />;
+              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={batchProcessedCount(nodeData.pagination)} />;
             return summary ? (
               <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
                 {summary}
@@ -642,7 +643,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             />
           : (nodeData.materialized
             ? null
-            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />);
+            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={batchProcessedCount(nodeData.pagination)} />);
         return summary ? (
           <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
             {summary}
