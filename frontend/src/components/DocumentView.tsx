@@ -94,7 +94,15 @@ const DocumentView: React.FC<{
         const resp = await fetch(url, { cache: 'no-store' });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const text = await resp.text();
-        if (!cancelled) setContent(text);
+        // Substitute build-time placeholders so docs like
+        // `references/general.md` can show the current app version /
+        // build date without manual edits per release. Inserted via
+        // Vite's `define` (see vite.config.ts).
+        const rendered = text
+          .replace(/\{\{\s*VERSION\s*\}\}/g, import.meta.env.VITE_APP_VERSION ?? '')
+          .replace(/\{\{\s*BUILD_DATE\s*\}\}/g, import.meta.env.VITE_APP_BUILD_DATE ?? '')
+          .replace(/\{\{\s*BUILD\s*\}\}/g, import.meta.env.VITE_APP_BUILD ?? '');
+        if (!cancelled) setContent(rendered);
       } catch (err: unknown) {
         if (!cancelled) {
           const message = err instanceof Error && err.message ? err.message : 'Failed to load document';
