@@ -30,6 +30,14 @@ interface PreferencesState {
   favoriteWorkspaces: string[];
   quotationEngine: QuotationEngineConfig;
   quotationLastRemoteUrl: string;
+  /**
+   * Phase 4.1: per-user multilingual defaults. ``null`` lets the backend
+   * fall back to its per-request resolution chain
+   * (request → derived metadata → "en"); set this when the user wants
+   * every new corpus to default to their language without manual entry.
+   */
+  defaultLanguage: string | null;
+  defaultTokenizerModel: string | null;
   /** True once the first backend fetch completes */
   hydrated: boolean;
   /** True while a backend sync is in-flight */
@@ -48,6 +56,14 @@ interface PreferencesActions {
    * single call keeps the two in sync.
    */
   updateQuotationRemoteUrl: (url: string) => void;
+  /**
+   * Phase 4.1: persist a language code (e.g. ``"zh"``) or ``null`` to
+   * unset. Pairs with the AddFilePanel language selector and is honored by
+   * the per-feature API request builders when their explicit
+   * ``language`` field is unset.
+   */
+  setDefaultLanguage: (language: string | null) => void;
+  setDefaultTokenizerModel: (model: string | null) => void;
   /** Fetch preferences from backend and hydrate the store */
   loadFromBackend: (headers?: Record<string, string>) => Promise<void>;
   /** Push current state to backend */
@@ -61,6 +77,8 @@ function applyServerState(state: PreferencesState, data: UserPreferences) {
   state.favoriteWorkspaces = data.favorite_workspaces;
   state.quotationEngine = data.quotation.engine;
   state.quotationLastRemoteUrl = data.quotation.last_remote_url;
+  state.defaultLanguage = data.default_language;
+  state.defaultTokenizerModel = data.default_tokenizer_model;
   state.hydrated = true;
 }
 
@@ -100,6 +118,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
         favoriteWorkspaces: [],
         quotationEngine: { type: 'local' } as QuotationEngineConfig,
         quotationLastRemoteUrl: '',
+        defaultLanguage: null,
+        defaultTokenizerModel: null,
         hydrated: false,
         syncing: false,
 
@@ -153,6 +173,26 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        setDefaultLanguage: (language) => {
+          // Normalise to a trimmed lowercase code so backend resolution
+          // doesn't see stray case / whitespace from form inputs.
+          const value =
+            typeof language === 'string' && language.trim()
+              ? language.trim().toLowerCase()
+              : null;
+          set((state) => {
+            state.defaultLanguage = value;
+          });
+        },
+
+        setDefaultTokenizerModel: (model) => {
+          const value =
+            typeof model === 'string' && model.trim() ? model.trim() : null;
+          set((state) => {
+            state.defaultTokenizerModel = value;
+          });
+        },
+
         loadFromBackend: async (headers) => {
           try {
             const data = await preferencesApi.get(headers);
@@ -178,6 +218,16 @@ export const usePreferencesStore = create<PreferencesStore>()(
               engine: state.quotationEngine,
               last_remote_url: state.quotationLastRemoteUrl,
             },
+            // Backend's partial-update contract treats ``null`` as
+            // "no change". To avoid losing a previously-set value when
+            // the user hasn't touched the language UI this session, only
+            // include the field when the user explicitly has one.
+            ...(state.defaultLanguage !== null
+              ? { default_language: state.defaultLanguage }
+              : {}),
+            ...(state.defaultTokenizerModel !== null
+              ? { default_tokenizer_model: state.defaultTokenizerModel }
+              : {}),
           };
           try {
             await preferencesApi.update(body, headers);
@@ -196,6 +246,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
           favoriteWorkspaces: state.favoriteWorkspaces,
           quotationEngine: state.quotationEngine,
           quotationLastRemoteUrl: state.quotationLastRemoteUrl,
+          defaultLanguage: state.defaultLanguage,
+          defaultTokenizerModel: state.defaultTokenizerModel,
         }),
       }
     ),
