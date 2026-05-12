@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import { useFilePreview } from '../../hooks/useFilePreview';
+import { SUPPORTED_LANGUAGES } from '@/lib/languages';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -24,6 +26,15 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
     selectedSheet,
     setSelectedSheet,
   } = useFilePreview(filename, open);
+
+  // Phase 4.2: language selector. Selecting a non-English language here
+  // updates the per-user ``defaultLanguage`` preference, which the
+  // per-feature ``effective_language`` resolvers (Phase 3 / 4.5) then
+  // honor for every analysis on the new corpus. Existing English flows
+  // are unchanged when the user leaves the default selected.
+  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
+  const setDefaultLanguage = usePreferencesStore((state) => state.setDefaultLanguage);
+  const selectedLanguage = defaultLanguage ?? 'en';
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,6 +82,36 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
           </CardHeader>
 
           <CardContent className="flex-1 min-w-0 space-y-4 overflow-auto px-6 py-6">
+            <div>
+              <label
+                htmlFor="add-file-language"
+                className="mb-2 block text-sm font-medium text-foreground"
+              >
+                Language
+              </label>
+              <Select
+                value={selectedLanguage}
+                onValueChange={(value) => {
+                  setDefaultLanguage(value);
+                }}
+              >
+                <SelectTrigger id="add-file-language" aria-label="Corpus language">
+                  <SelectValue placeholder="English" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_LANGUAGES.map((option) => (
+                    <SelectItem key={option.code} value={option.code}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sets the default for this and future corpora. Analysis tools
+                without a language-specific implementation (e.g. quotation
+                extractor) will disable themselves on non-English corpora.
+              </p>
+            </div>
             {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">Sheet</label>
