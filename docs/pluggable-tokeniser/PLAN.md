@@ -1,7 +1,7 @@
 # Pluggable Tokeniser & Multilingual Support — Implementation Plan
 
 **Branch:** `pluggable_tokeniser` (root + `backend/`, `polars-text/`, `docworkspace/`)
-**Status:** In progress — Phase 2 (Phases 0, 1, and 1.9 complete; Phase 2 partial)
+**Status:** In progress — Phase 2 complete (all v2 redesign tasks landed); Phase 3 next
 **Started:** 2026-05-09
 **Last synced from `dev`:** 2026-05-12 (merge `3a94214`); references audited and confirmed current
 **Owner:** chao.sun@sydney.edu.au
@@ -13,7 +13,7 @@
 | 0 — Baseline & fixtures | ✅ done | 502 baseline tests green; EN goldens committed |
 | 1 — Pluggable HF tokenizer in Rust | ✅ done | tokenizer + POS + embedder registries, model= kwarg, prefetch helpers, models.py |
 | 1.9 — Jieba Chinese backend | ✅ done | TokenizerBackend enum (HF + Jieba); `zh = "jieba"` |
-| 2 — Derived tokens column on source node | 🔄 in progress, **redesigned per decision 7** | 2.2 ✅; 2.8 ✅; 2.9 ✅; 2.1 v1 / 2.4 v1 landed but need revision to derived-column model; 2.3, 2.5, 2.6, 2.7, 2.10 pending |
+| 2 — Derived tokens column on source node | ✅ done (v2 design — decision 7) | all 7 tasks landed across docworkspace + backend; 431 backend + 91 docworkspace tests green; consistency proof (2.6 tokens-mode + 2.7 freq path) lives |
 | 3 — Per-tool language routing | ⏳ pending | |
 | 4 — Frontend UI | ⏳ pending | |
 | 5 (opt) — Lindera (Japanese) backend | ⏳ deferred | decision gate after Phase 4 ships |
@@ -132,7 +132,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 2 — Derived tokens column on the source node (~1.5 weeks) 🔄 IN PROGRESS — REDESIGNED PER DECISION 7
+## Phase 2 — Derived tokens column on the source node (~1.5 weeks) ✅ COMPLETE (v2 design — decision 7)
 
 **Goal:** make a tokenised representation of any string column on a Node a first-class, persistent thing — **as a hidden derived column on the same Node**, not as a detached child node (see decision 7). Token-consuming tools (concordance tokens-mode, token-frequency tokens-path, future POS) auto-detect and use it. **This is the load-bearing phase** — it's what makes Jieba/MeCab consistency real, and what makes concordance/frequency agree across tools.
 
@@ -144,16 +144,16 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 | #   | Task | File(s) | Acceptance |
 |-----|------|---------|------------|
-| 2.1 v2 | Replace fixed `TOKENS_*` constants with `derived_column_name(form, source, model) -> str` and `parse_derived_column(name) -> (form, source, model) \| None`. Keep `tokens_struct_dtype()` (unchanged) and rename `is_tokens_column` → `is_derived_tokens_column(node, col_name)` reading from `Node.derived`. | `backend/.../generated_columns.py` | Names round-trip; live polars-text dtype still matches; existing 7 schema tests revised |
+| 2.1 v2 ✅ | Replace fixed `TOKENS_*` constants with `derived_column_name(form, source, model) -> str` and `parse_derived_column(name) -> (form, source, model) \| None`. Keep `tokens_struct_dtype()` (unchanged); add `is_derived_tokens_column(node, col_name)` reading from `Node.derived`; add `is_derived_column_name(name)` prefix check for the Phase 2.10 filter. | `backend/.../generated_columns.py` | landed (commit `a8b5e59`); 10 schema tests green |
 | 2.2 ✅ | Polars expression `tokenize_with_offsets` (DONE — design unchanged) | `polars-text/src/expressions.rs` | landed (commit `5e5d025`), 44 polars-text tests green |
-| 2.3 | Synchronous `tokenise_column(node, source_column, model, language) -> str` operation. Mutates the node's LazyFrame plan via `with_columns(pt.tokenize_with_offsets(pl.col(source_column), model=model).alias(derived_column_name(...)))` and updates `Node.derived`. Idempotent: re-call with same (source, model) replaces; different model adds another column. No child node created. Long-running model loads can be wrapped in a worker for progress UX but the result mutates the source node. | `backend/.../core/derived_columns.py` (new) | Calling twice with same args replaces in place; calling with different model adds; undo restores prior state |
-| 2.4 v2 | Replace `Node.language` / `Node.tokenizer_model` with `Node.derived: dict[str, DerivedColumnMeta]` where the meta records source_column, form, model, language, generated_at. Optional `Workspace.default_language` as a hint only. Auto-drop derived columns when their source column is dropped or renamed; emit a UI notice. | `docworkspace/.../node/core.py`, `node/io.py`, `workspace/core.py` | Per-column metadata round-trips through plbin; legacy nodes default `derived={}`; dropping source col cascades |
-| 2.5 | API: `POST /workspaces/{ws_id}/nodes/{node_id}/derived/tokens` body `{ source_column, model, language }`. Returns `{ column, is_new, replaced_column? }`. Symmetric `DELETE /derived/{column_name}`. Both update `Node.derived` and persist. | `backend/.../api/workspaces/analyses/derived_columns.py` (new) | Idempotent POST; DELETE removes; both mutate same node; status returned |
-| 2.6 | Concordance two-mode. Regex-mode (default) unchanged. Tokens-mode (`search_mode="tokens"`) calls `find_tokens_column(node, source_column, prefer_model=...)`; if a hit, walks the list-of-struct column for exact-token matches and N-actual-token context. Phase 0 EN goldens unchanged. See decision 6. | `polars-text/src/concordance.rs` (may not need changes), `backend/.../worker_tasks_concordance.py` | Regex mode byte-identical to Phase 0 golden; tokens-mode on a ZH node with Jieba derived col yields word-level KWIC |
-| 2.7 | Token frequency: if `find_tokens_column(node, source_column)` returns a hit, count from that column (exploding the list, grouping by `token`). Otherwise re-tokenise raw text as today. | `backend/.../worker_tasks_token.py` | Counts on a derived-tokens node equal manual `pl.col(derived).list.explode().value_counts()`; EN goldens unchanged |
-| 2.8 ✅ | `Node.shape` lazy on List[Struct] columns (DONE — even more relevant now that derived columns ARE on the source node) | `docworkspace/.../node/core.py` | landed (commit `533cb5a`), regression test in place |
-| 2.9 ✅ | Workspace rebase schema-agnostic (DONE — trivially works since no new node is created) | `docworkspace/.../workspace/io.py` | landed (commit `ee14f16`); the test stays as a guard |
-| 2.10 | **NEW.** Frontend-facing schema projections strip `__derived__.*` columns from `node.info()`, data-view payloads, export schemas. Analytics tools that consume tokens see the full schema. | `backend/.../api/workspaces/nodes.py` and schema projection layer | Data view, export dialog, and code editor schema panel hide derived columns by default; the `node.derived` dict surfaces them via a separate panel (Phase 4) |
+| 2.3 ✅ | Synchronous `tokenise_column(node, source_column, model, language) -> str` operation. Mutates the node's LazyFrame plan via `with_columns(pt.tokenize_with_offsets(pl.col(source_column), model=model).alias(derived_column_name(...)))` and updates `Node.derived`. Idempotent: re-call with same (source, model) replaces; different model adds another column. No child node created. | `backend/.../core/derived_columns.py` (new) | landed (commit `1966b5e`); 7 tests including jieba word-level ZH check |
+| 2.4 v2 ✅ | Replace `Node.language` / `Node.tokenizer_model` with `Node.derived: dict[str, DerivedColumnMeta]` recording source_column, form, model, language, generated_at. Auto-drop derived columns when source is dropped or renamed. | `docworkspace/.../node/core.py`, `node/io.py` | landed (commit `ac50497`); 91 docworkspace tests green; drop/rename cascade verified |
+| 2.5 ✅ | API: `POST /workspaces/nodes/{node_id}/derived/tokens` body `{ source_column, model, language }`. Returns `{ column, is_new, replaced_column? }`. Symmetric `DELETE /derived/{column_name:path}` (`:path` so model IDs with slashes work). Both update `Node.derived` and persist. | `backend/.../api/workspaces/analyses/derived_columns.py` (new) | landed (commit `fb7aee9`); 6 endpoint tests green |
+| 2.6 ✅ | Concordance two-mode. Regex-mode (default) unchanged so Phase 0 goldens stay byte-identical. Tokens-mode (`search_mode="tokens"`) calls `Node.find_derived_column(column, form="tokens")`; if a hit, walks the list-of-struct column for exact-token matches with N-actual-token context. Materialised parquet flow keeps regex semantics for this phase. | `backend/.../api/workspaces/analyses/concordance_tokens_mode.py` (new), `concordance_core.py` (routing) | landed (commit `dd0cdbf`); 7 tokens-mode tests green |
+| 2.7 ✅ | Token frequency: if `Node.find_derived_column(source_column, form="tokens")` returns a hit, extract the per-doc token lists at the API layer and pass them to the worker via a new `node_tokens` kwarg, which counts with `Counter`. Otherwise re-tokenise raw text as today. | `backend/.../api/workspaces/analyses/token_frequencies.py`, `core/worker_tasks_token.py` | landed (commit `c5f868b`); 4 derived-path tests including the consistency proof (tokens-path matches `col.list.explode().value_counts()`) |
+| 2.8 ✅ | `Node.shape` lazy on List[Struct] columns | `docworkspace/.../node/core.py` | landed (commit `533cb5a`), regression test in place |
+| 2.9 ✅ | Workspace rebase schema-agnostic | `docworkspace/.../workspace/io.py` | landed (commit `ee14f16`) |
+| 2.10 ✅ | Frontend-facing schema projections strip `__derived__.*` from `node.info()`, data-view payloads. Analytics tools that consume tokens see the full schema (they read `node.data` directly). `node.derived` keys surface separately so a future panel can list them. | `backend/.../api/workspaces/schema_filter.py` (new), `nodes.py`, `base.py` | landed (commit `63d1e84`); 5 filter tests; 10 call sites updated |
 
 **Tests per task:**
 - 2.1 v2 (backend unit): naming round-trips; dtype contract holds against live polars-text.
