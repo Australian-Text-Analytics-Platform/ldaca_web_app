@@ -1,7 +1,8 @@
 # Pluggable Tokeniser & Multilingual Support — Implementation Plan
 
-**Branch:** `pluggable_tokeniser` (root + `backend/`, `polars-text/`, `docworkspace/`)
+**Branch:** `multilingual` (root + `backend/`, `polars-text/`, `docworkspace/`)
 **Status:** Phase 4 frontend done — branch ready for user testing. Phase 3.2 (POS registry) and Phase 5 (Lindera) intentionally deferred.
+**Branch history note:** Originally developed on `pluggable_tokeniser` — renamed to `multilingual` after Phase 4 to better reflect the actual scope (i18n resolver, multilingual embedder, language-aware UI all apply to any non-English corpus). The doc directory name (`docs/pluggable-tokeniser/`) is preserved to keep git history continuous.
 **Started:** 2026-05-09
 **Last synced from `dev`:** 2026-05-12 (merge `3a94214`); references audited and confirmed current
 **Owner:** chao.sun@sydney.edu.au
@@ -99,7 +100,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 |-----|------|------------|
 | 0.1 | Add tiny multilingual fixtures: 100-doc EN, ZH, JA samples under `tests/fixtures/multilingual/` | Files present, loadable |
 | 0.2 | Snapshot current English outputs (token freq top-50, concordance KWIC for one keyword, topic count for k=5) into golden files | Golden files committed |
-| 0.3 | Inventory existing tests in `polars-text/tests/`, `docworkspace/tests/`, `backend/tests/`, `tests/`; record green baseline on `pluggable_tokeniser` | All currently-passing tests still pass |
+| 0.3 | Inventory existing tests in `polars-text/tests/`, `docworkspace/tests/`, `backend/tests/`, `tests/`; record green baseline on `multilingual` | All currently-passing tests still pass |
 
 **Exit:** `cargo test`, `pytest` in all three Python packages, and the existing golden English flows all green on the branch.
 
@@ -236,18 +237,18 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ## Branching strategy
 
-The work spans the root repo and three submodules; phase-by-phase isolation matters because the consistency proof (Phase 2) depends on the Rust pluggability landing first.
+The work spans the root repo and three submodules and lives on long-running `multilingual` branches in each repo. After Phase 4 the plan shifted from "merge to `dev` at the end" to "keep `multilingual` as a parallel release line" — see the post-Phase-4 update at the bottom of this section for the rationale.
 
-**Long-running feature branches (named `pluggable_tokeniser`):**
+**Long-running feature branches (named `multilingual`):**
 - root repo (this branch)
 - `polars-text/` submodule
 - `backend/` submodule
 - `docworkspace/` submodule
 
-The root `pluggable_tokeniser` branch always pins each submodule to a commit on that submodule's `pluggable_tokeniser` branch. Other ongoing work (releases, bug fixes) targets `dev`/`main` on the parent and `main` (or equivalent default) on each submodule, untouched.
+The root `multilingual` branch always pins each submodule to a commit on that submodule's `multilingual` branch. Other ongoing work (releases, bug fixes) targets `dev`/`main` on the parent and `main` (or equivalent default) on each submodule, untouched.
 
 **Phase branches:**
-For each phase, create `pluggable_tokeniser/phase-N` off `pluggable_tokeniser` on whichever module(s) the phase touches. When the phase passes its exit criteria, fast-forward (or PR-merge) into the module's `pluggable_tokeniser` branch, then update the parent's submodule pin.
+For each phase, create `multilingual/phase-N` off `multilingual` on whichever module(s) the phase touches. When the phase passes its exit criteria, fast-forward (or PR-merge) into the module's `multilingual` branch, then update the parent's submodule pin.
 
 Phase-to-module map:
 - Phase 0: root only (test fixtures)
@@ -258,19 +259,29 @@ Phase-to-module map:
 - Phase 5: `polars-text` + frontend (root)
 
 **Periodic sync from `dev`:**
-Merge `dev` into each `pluggable_tokeniser` branch at minimum at every phase boundary, ideally every 1–2 weeks. The longer the divergence, the more painful the eventual reconciliation — particularly in `polars-text/src/expressions.rs`, `backend/.../worker_tasks_*.py`, and the docworkspace Node code, all of which see active bug-fix traffic.
+Merge `dev` into each `multilingual` branch at minimum at every phase boundary, ideally every 1–2 weeks. The longer the divergence, the more painful the eventual reconciliation — particularly in `polars-text/src/expressions.rs`, `backend/.../worker_tasks_*.py`, and the docworkspace Node code, all of which see active bug-fix traffic.
 
 **Tagging at phase exits:**
-After each phase passes its exit criteria, tag the root repo: `pluggable_tokeniser/phase-N`. Useful for rollback, and for sharing snapshots with CJK testers.
+After each phase passes its exit criteria, tag the root repo: `multilingual/phase-N`. Useful for rollback, and for sharing snapshots with CJK testers.
 
-**Final merge to `dev`:**
-Only after Phase 4 is fully tested end-to-end on EN, ZH, JA corpora, including a Tauri build to confirm packaging. Phase 5 can ship later as an independent follow-up.
+### Post-Phase-4 update — `multilingual` becomes a parallel release line
+
+The original plan called for a final merge to `dev` once Phase 4 stabilised. That plan was revised after Phase 4 completed (2026-05-12 discussion):
+
+- **`multilingual` stays alive as a parallel release line.** Tagged pre-releases (e.g. `0.4.0-multi.1`) ship from this branch while the CJK workflow is being validated by real users. `dev`/`main` keeps shipping the English-only `0.3.x` line unchanged, so existing users see no behaviour change and no install-size hit they didn't ask for.
+- **`dev` → `multilingual` merges continue.** Bug fixes and general features land on `dev` as usual; `multilingual` merges from `dev` regularly so it doesn't fall behind.
+- **Reverse cherry-picks** (`multilingual` → `dev`) are encouraged for the bits of work that aren't CJK-specific and would harden `dev` independently. Concrete candidates from this branch:
+  - `backend/src/ldaca_web_app/core/i18n.py` — `effective_language` resolver + `UnsupportedLanguageError`. Already useful for *any* multilingual-aware tool, doesn't gate on the rest of the multilingual UI.
+  - The `LanguageHint` mixin in `frontend/src/api/text/shared.ts` and the `language?: string` field on every analysis request — purely additive TypeScript types, no runtime change.
+  - The `derived` metadata field on `schema_filter.frontend_node_info` and the matching `Node.derived` dict in docworkspace — generalises beyond tokens (POS, NER, anything else we add later).
+  - The `__derived__.*` schema-projection filter in `schema_filter.py` — keeps the hidden-column convention consistent across any future derivation, multilingual or not.
+- **Eventual merge to `dev` is optional, not required.** If `multilingual` proves stable and small enough, fold it back into `dev`. If it accumulates ML-heavy dependencies that don't suit the default install, keep it as a separate release line indefinitely.
 
 **Why this is acceptable for parallel work:**
-- Bug fixes on `dev` and feature work on other branches are not blocked at any point — `pluggable_tokeniser` does not touch `dev` until the very end.
+- Bug fixes on `dev` and feature work on other branches are not blocked at any point — `multilingual` doesn't have to touch `dev` until/unless it's ready.
 - The submodule branches isolate the deep Rust/Python refactor from any release cuts that need to ship from `main`.
 - Phase branches mean each ~1–2 week chunk has a defined scope, exit test, and rollback point.
-- The main risk (long-running branch drift) is mitigated by phase-boundary merges from `dev`.
+- The main risk (long-running branch drift) is mitigated by regular `dev`→`multilingual` merges plus the reverse cherry-pick discipline.
 
 **Alternative considered and rejected:** stacked-PR / Graphite-style stack of dependent phase PRs. More elegant but the multi-submodule pinning makes the tooling fight the workflow.
 
