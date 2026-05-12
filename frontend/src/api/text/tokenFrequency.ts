@@ -53,8 +53,24 @@ export const tokenFrequencyApi = {
   tokenFrequencies: (req: TokenFrequencyRequest, headers: Record<string, string> = {}) =>
     post<TokenFrequencyResponse>(`/workspaces/token-frequencies`, req, headers),
 
-  defaultStopWords: (headers: Record<string, string> = {}) =>
-    get<{ stopwords?: string[]; error?: string }>('/text/default-stop-words', headers),
+  /**
+   * Fetch the bundled default stop-word list for a language. ``strict``
+   * controls fallback: when ``true``, unknown languages return ``[]``;
+   * when ``false`` (default, used by token-frequency), unknown languages
+   * silently substitute the English list — keeps the existing
+   * "fill defaults" UX working when language metadata is missing.
+   */
+  defaultStopWords: (
+    headers: Record<string, string> = {},
+    options?: { language?: string; strict?: boolean },
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.language) params.set('language', options.language);
+    if (options?.strict) params.set('strict', 'true');
+    const qs = params.toString();
+    const path = qs ? `/text/default-stop-words?${qs}` : '/text/default-stop-words';
+    return get<{ stopwords?: string[]; error?: string }>(path, headers);
+  },
 
   getTokenFrequenciesTaskRequest: (taskId: string, headers: Record<string, string> = {}) =>
     httpRequest<Record<string, unknown>>(
