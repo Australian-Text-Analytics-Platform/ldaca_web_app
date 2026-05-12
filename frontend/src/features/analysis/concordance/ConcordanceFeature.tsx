@@ -1007,12 +1007,21 @@ const ConcordanceFeature: React.FC = () => {
       // CONC_* mandatory columns (the worker computes the dispersion-
       // specific output columns regardless). All optional columns
       // (including the document/text column) start unticked so the user
-      // opts in to whatever metadata they want preserved.
+      // opts in to whatever metadata they want preserved. Also hide
+      // `CONC_extraction` — the dispersion-detach worker always emits it
+      // as the per-document joined string, so it would be misleading to
+      // present it as an opt-in pick (and the dispersion endpoint can't
+      // source-select a generated column).
+      const dispersionHiddenColumns = new Set<string>([
+        CONCORDANCE_COLUMN_KEYS.extraction,
+      ]);
       const options = responses.flatMap((response) => response.data?.nodes ?? []).map((node) => {
         const disabled = new Set(node.disabled_columns || []);
         return {
           ...node,
-          available_columns: node.available_columns.filter((c) => !disabled.has(c)),
+          available_columns: node.available_columns.filter(
+            (c) => !disabled.has(c) && !dispersionHiddenColumns.has(c),
+          ),
           disabled_columns: [],
         };
       });

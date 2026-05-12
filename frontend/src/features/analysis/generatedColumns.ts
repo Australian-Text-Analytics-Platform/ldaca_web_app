@@ -31,6 +31,7 @@ export const CONCORDANCE_COLUMN_KEYS = {
   leftTokenFreq: 'CONC_l1_freq',
   rightTokenFreq: 'CONC_r1_freq',
   dispersion: CONCORDANCE_DISPERSION_COLUMN,
+  extraction: 'CONC_extraction',
 } as const;
 
 export const QUOTATION_COLUMN_KEYS = {
