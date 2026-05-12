@@ -45,6 +45,15 @@ type Props = {
    * (the filter UI lives in the parent panel for the list view).
    */
   tokenFilter?: string;
+  /**
+   * Display name + colour for the reference (Corpus 1) and study (Corpus 2)
+   * data blocks. Drives the "Reference corpus: ... ; Study corpus: ..."
+   * caption rendered under the section heading.
+   */
+  referenceNodeName?: string | null;
+  referenceColor?: string | null;
+  studyNodeName?: string | null;
+  studyColor?: string | null;
 };
 
 const parseStatisticsNumericValue = (value: unknown): number => {
@@ -223,6 +232,10 @@ export const TokenFrequencyStatisticsTable = ({
   statistics,
   onDownloadFrequencyCsv,
   tokenFilter: tokenFilterProp,
+  referenceNodeName,
+  referenceColor,
+  studyNodeName,
+  studyColor,
 }: Props) => {
   const data = useMemo(() => enhanceRows(statistics), [statistics]);
   const columns = useMemo(() => buildColumns(), []);
@@ -269,16 +282,38 @@ export const TokenFrequencyStatisticsTable = ({
   const filteredCount = table.getFilteredRowModel().rows.length;
   const totalCount = data.length;
 
+  const hasCorpusCaption = Boolean(referenceNodeName || studyNodeName);
+
   return (
     <div className="space-y-3 rounded-lg border p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h4 className="font-semibold">Statistics</h4>
-          <HelpIcon
-            targetKey="analysis.token-frequency.statistical-measures"
-            label="Statistics"
-            tooltip="Displays comparative token-level statistical measures for the selected data blocks."
-          />
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h4 className="font-semibold">Keyword Analysis</h4>
+            <HelpIcon
+              targetKey="analysis.token-frequency.statistical-measures"
+              label="Keyword Analysis"
+              tooltip="Comparative token-level keyness statistics for the two selected data blocks."
+            />
+          </div>
+          {hasCorpusCaption ? (
+            <p className="text-xs text-muted-foreground">
+              <span>Reference corpus: </span>
+              <span
+                className="font-medium"
+                style={{ color: referenceColor || undefined }}
+              >
+                {referenceNodeName ?? '—'}
+              </span>
+              <span>; Study corpus: </span>
+              <span
+                className="font-medium"
+                style={{ color: studyColor || undefined }}
+              >
+                {studyNodeName ?? '—'}
+              </span>
+            </p>
+          ) : null}
         </div>
         <Button
           variant="outline"
