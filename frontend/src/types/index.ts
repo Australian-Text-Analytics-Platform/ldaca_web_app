@@ -63,7 +63,36 @@ export interface WorkspaceNode {
   data_type?: string;
   column_schema?: Record<string, string>;
   dtypes?: Record<string, string>;
+  /**
+   * Phase 2.10 / 4.6: derived analytic column names (e.g.
+   * ``__derived__.tokens.text.jieba``) hidden from the user-facing
+   * schema but surfaced separately for inspector panels. Empty / absent
+   * when no derivation has run on this node.
+   */
+  derived_columns?: string[];
   [key: string]: unknown;
+}
+
+/**
+ * Parsed parts of a Phase 2 derived column name. ``null`` when the name
+ * doesn't follow the ``__derived__.<form>.<source>.<model>`` pattern
+ * (e.g. source / model contained a dot — consult Node.derived metadata
+ * instead). Mirrors the backend ``parse_derived_column`` semantics.
+ */
+export interface ParsedDerivedColumn {
+  form: string;
+  source: string;
+  model: string;
+}
+
+const DERIVED_PREFIX = '__derived__';
+
+export function parseDerivedColumn(name: string): ParsedDerivedColumn | null {
+  const parts = name.split('.');
+  if (parts.length !== 4 || parts[0] !== DERIVED_PREFIX) return null;
+  const [, form, source, model] = parts;
+  if (!form || !source || !model) return null;
+  return { form, source, model };
 }
 
 export interface NodeSchemaResponse {

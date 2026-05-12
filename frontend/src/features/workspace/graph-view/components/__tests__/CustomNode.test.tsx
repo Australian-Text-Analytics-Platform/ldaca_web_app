@@ -155,4 +155,103 @@ describe('CustomNode', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.getByText(/This action cannot be undone/)).toBeInTheDocument();
   });
+
+  it('does not render a derived-columns row when none are present', () => {
+    mockZoom = 1;
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: {
+        node: {
+          node_id: 'node-1',
+          name: 'plain',
+          shape: [3, 2] as [number, number],
+          columns: ['text', 'value'],
+          preview: [],
+          is_text_data: true,
+        },
+        onDelete: vi.fn(),
+      },
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+    expect(screen.queryByText(/tokens columns/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^tokens:/)).not.toBeInTheDocument();
+  });
+
+  it('shows a single-line summary when one derived tokens column is registered', () => {
+    mockZoom = 1;
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: {
+        node: {
+          node_id: 'node-1',
+          name: 'zh-corpus',
+          shape: [3, 2] as [number, number],
+          columns: ['text'],
+          preview: [],
+          is_text_data: true,
+          derived_columns: ['__derived__.tokens.text.jieba'],
+        },
+        onDelete: vi.fn(),
+      },
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+    expect(screen.getByText('tokens: text · jieba')).toBeInTheDocument();
+  });
+
+  it('summarises multiple tokens columns', () => {
+    mockZoom = 1;
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: {
+        node: {
+          node_id: 'node-1',
+          name: 'multi-source',
+          shape: [3, 4] as [number, number],
+          columns: ['text', 'title'],
+          preview: [],
+          is_text_data: true,
+          derived_columns: [
+            '__derived__.tokens.text.jieba',
+            '__derived__.tokens.title.bert-base-uncased',
+          ],
+        },
+        onDelete: vi.fn(),
+      },
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+    expect(screen.getByText('2 tokens columns')).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
-import { Settings2, Copy, Check } from 'lucide-react';
+import { Settings2, Copy, Check, Sparkles } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { type WorkspaceNode } from '@/types';
+import { type WorkspaceNode, parseDerivedColumn } from '@/types';
 
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
@@ -148,6 +148,37 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const shapeLabel = nodeShape
     ? `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`
     : null;
+
+  // Phase 4.6: surface derived analytic columns (tokenisation etc.) so the
+  // user can see whether Tokenise has been run on this node and with which
+  // model. The label is a short summary ("3 tokens columns" or
+  // "tokens · jieba" when there's just one); the title attribute carries
+  // the parsed (form, source, model) details for hover inspection.
+  const derivedSummary = ((): { label: string; tooltip: string } | null => {
+    const derived = node?.derived_columns;
+    if (!Array.isArray(derived) || derived.length === 0) return null;
+    const parsed = derived.map((rawName) => {
+      const p = parseDerivedColumn(rawName);
+      return p
+        ? { ...p, raw: rawName }
+        : { form: 'derived', source: '?', model: '?', raw: rawName };
+    });
+    const allTokens = parsed.every((p) => p.form === 'tokens');
+    const [only] = parsed;
+    if (parsed.length === 1 && only) {
+      return {
+        label: `${only.form}: ${only.source} · ${only.model}`,
+        tooltip: only.raw,
+      };
+    }
+    const summary = allTokens
+      ? `${parsed.length} tokens columns`
+      : `${parsed.length} derived columns`;
+    const tooltip = parsed
+      .map((p) => `${p.form}: ${p.source} · ${p.model}`)
+      .join('\n');
+    return { label: summary, tooltip };
+  })();
 
   const menuButtonClassName = 'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
 
@@ -330,6 +361,15 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         ) : (
           <div className="font-mono text-xs text-gray-400 italic">Shape unavailable</div>
         )}
+        {derivedSummary ? (
+          <div
+            className="flex items-center gap-1 font-mono text-xs text-indigo-700"
+            title={derivedSummary.tooltip}
+          >
+            <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
+            <span className="truncate">{derivedSummary.label}</span>
+          </div>
+        ) : null}
       </div>
 
       {/* Passive handles so backend edges can attach; UI connections remain disabled by parent ReactFlow props */}
