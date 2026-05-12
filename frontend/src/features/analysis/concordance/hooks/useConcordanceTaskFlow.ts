@@ -514,7 +514,13 @@ export function useConcordanceTaskFlow({
         regex,
         whole_word: wholeWord,
         case_sensitive: caseSensitive,
+        // Must match the live search engine — otherwise materialise runs
+        // the regex flow over raw text and silently drops tokens-mode hits.
+        search_mode: searchMode,
       };
+      if (language) {
+        request.language = language;
+      }
       const resp = await materializeConcordance(nodeId, request);
       const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
       if (taskId && setMaterializeTaskIds) {

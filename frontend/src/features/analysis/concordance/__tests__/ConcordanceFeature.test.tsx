@@ -645,7 +645,10 @@ describe('ConcordanceFeature', () => {
     renderWithClient(<ConcordanceFeature />);
 
     expect(screen.getAllByText('Documents per batch').length).toBeGreaterThan(0);
-    expect(screen.getByText('(Found 2 instances in 1 document after processing 20 documents).')).toBeInTheDocument();
+    // total_source_rows from the mock pagination (1) is now preferred over
+    // page_size (20) for the "processed N documents" label — page_size is
+    // a configuration knob, not an actual processed count.
+    expect(screen.getByText('(Found 2 instances in 1 document after processing 1 document).')).toBeInTheDocument();
   });
 
   it('hides the proportional-width control until Dispersion View is enabled', () => {

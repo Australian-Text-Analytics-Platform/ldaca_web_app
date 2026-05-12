@@ -107,6 +107,9 @@ export interface ConcordanceMaterializeRequest extends LanguageHint {
   regex?: boolean;
   whole_word?: boolean;
   case_sensitive?: boolean;
+  /** Mirror the live ``/concordance`` request so the materialised parquet
+   * honours the engine the user actually searched with. */
+  search_mode?: ConcordanceSearchMode;
 }
 
 export interface ConcordanceDetachNodeOption {

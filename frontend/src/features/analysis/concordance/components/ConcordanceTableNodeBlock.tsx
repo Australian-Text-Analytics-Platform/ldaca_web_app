@@ -297,7 +297,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                     totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
                   />
                 : null)
-              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />;
+              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.total_source_rows ?? nodeData.pagination?.page_size} />;
             return summary ? (
               <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
                 {summary}
@@ -430,7 +430,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
             />
           : (nodeData.materialized
             ? null
-            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />);
+            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.total_source_rows ?? nodeData.pagination?.page_size} />);
         return summary ? (
           <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
             {summary}
