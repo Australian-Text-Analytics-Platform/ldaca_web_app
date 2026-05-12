@@ -6,7 +6,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { ConcordanceDetachDialog } from '../ConcordanceDetachDialog';
 
 describe('ConcordanceDetachDialog', () => {
-  it('shows generated concordance columns as mandatory and leaves optional metadata unchecked', () => {
+  it('hides mandatory concordance columns and leaves optional metadata unchecked', () => {
     render(
       <ConcordanceDetachDialog
         open
@@ -28,11 +28,14 @@ describe('ConcordanceDetachDialog', () => {
       />
     );
 
+    // Mandatory generated CONC_* columns are hidden — the backend always
+    // emits them on every detach, so showing them as greyed-out rows is
+    // just visual noise.
     expect(screen.getByRole('checkbox', { name: /^text/i })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: /^text/i })).not.toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: /CONC_left_context/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /CONC_matched_text/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /CONC_right_context/i })).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: /CONC_left_context/i })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: /CONC_matched_text/i })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: /CONC_right_context/i })).toBeNull();
     expect(screen.getByRole('checkbox', { name: /speaker/i })).not.toBeChecked();
     expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeInTheDocument();
   });
