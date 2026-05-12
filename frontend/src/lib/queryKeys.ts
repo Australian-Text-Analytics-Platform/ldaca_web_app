@@ -77,4 +77,10 @@ export const queryKeys = {
     analysisType: string,
     workspaceId: string | null,
   ) => ['analysis', analysisType, 'server-request-lock', workspaceId] as const,
+
+  /** Cached bundled stop-word list for a language (served from
+   *  ``/text/default-stop-words``). ``strict`` is part of the key
+   *  because it changes the unknown-language fallback behaviour. */
+  defaultStopWords: (language: string, strict: boolean) =>
+    ['default-stop-words', language, strict] as const,
 };

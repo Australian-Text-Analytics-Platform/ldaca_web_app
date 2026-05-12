@@ -23,6 +23,7 @@ import {
   getAnalysisActionState,
   executeAnalysisRunOrUpdate,
 } from '../common';
+import { useDefaultStopwords } from '../common/hooks/useDefaultStopwords';
 import { TopicModelingParameterPanel, type CorpusSample } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
@@ -91,6 +92,14 @@ const TopicModelingFeature: React.FC = () => {
   const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
   const [topicSearchQuery, setTopicSearchQuery] = useState('');
+  // Post-fit stopword filtering for non-English topic labels. CJK function
+  // words (的/是/了 etc.) dominate every label because we deliberately
+  // don't pass a CountVectorizer stopword list to the backend — that
+  // would be opinionated and irreversible. The filter is purely
+  // client-side: it drops matching words from each topic's display
+  // representation and hides topics whose representative words all match.
+  // Backend output is unchanged, so toggling off restores the raw labels.
+  const [stopwordFilterEnabled, setStopwordFilterEnabled] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(800);
@@ -470,22 +479,59 @@ const TopicModelingFeature: React.FC = () => {
   });
 
   const rawTopics: TopicModelingTopic[] = result?.data?.topics || [];
+  // Language metadata from the run — drives which stopword list (if any)
+  // the optional post-fit filter fetches. On the multilingual branch
+  // ``meta.language_resolution.language`` carries the resolved code
+  // (en/zh/ja/...). On dev/main this block is absent, so we default to
+  // ``en`` — every run is implicitly English there. The hook itself
+  // hides the toggle when the backend has no list for the resolved
+  // language (``strict: true`` query param).
+  const resolvedTopicLanguage = (() => {
+    const raw = result?.data?.meta?.language_resolution as
+      | { language?: unknown }
+      | undefined;
+    const code = typeof raw?.language === 'string' ? raw.language : 'en';
+    return code.trim().toLowerCase();
+  })();
+  const {
+    stopwords: stopwordSet,
+    available: stopwordFilterAvailable,
+  } = useDefaultStopwords(resolvedTopicLanguage, { strict: true });
   // Rebuild each topic's label from its representative_words sliced to the
   // current "Words per topic" display cap, so changing that input updates
   // the bottom list without a rerun. Falls back to the server-built label
-  // when representative_words is missing.
+  // when representative_words is missing. When the stopword filter is on
+  // and we have a bundled list for the resolved language, drop matching
+  // words before slicing and hide topics that end up empty.
   const topics: TopicModelingTopic[] = useMemo(() => {
     const cap = Math.max(1, Math.floor(representativeWordsCount));
-    return rawTopics.map((topic) => {
+    const filterActive = stopwordFilterEnabled && stopwordFilterAvailable;
+    const filtered: TopicModelingTopic[] = [];
+    for (const topic of rawTopics) {
       const words = Array.isArray(topic.representative_words)
         ? topic.representative_words
         : null;
-      if (!words || words.length === 0) return topic;
-      const sliced = words.slice(0, cap).join(', ');
-      return sliced ? { ...topic, label: sliced } : topic;
-    });
+      if (!words || words.length === 0) {
+        filtered.push(topic);
+        continue;
+      }
+      const kept = filterActive
+        ? words.filter((w) => typeof w === 'string' && !stopwordSet.has(w.trim()))
+        : words;
+      if (filterActive && kept.length === 0) {
+        // Topic was entirely stopwords — hide it per the agreed UX.
+        continue;
+      }
+      const sliced = kept.slice(0, cap).join(', ');
+      filtered.push(
+        sliced
+          ? { ...topic, representative_words: kept, label: sliced }
+          : { ...topic, representative_words: kept },
+      );
+    }
+    return filtered;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, representativeWordsCount]);
+  }, [result, representativeWordsCount, stopwordFilterEnabled, stopwordFilterAvailable, stopwordSet]);
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
   const exactRawTopicCount = (() => {
     const rawValue = result?.data?.meta?.raw_total_topics;
@@ -692,6 +738,10 @@ const TopicModelingFeature: React.FC = () => {
           selectAllDetachColumns={selectAllDetachColumns}
           deselectAllDetachColumns={deselectAllDetachColumns}
           handleDetachConfirm={handleDetachConfirm}
+          stopwordFilterAvailable={stopwordFilterAvailable}
+          stopwordFilterEnabled={stopwordFilterEnabled}
+          onStopwordFilterToggle={setStopwordFilterEnabled}
+          stopwordFilterLanguage={resolvedTopicLanguage || undefined}
         />
       )}
       </div>

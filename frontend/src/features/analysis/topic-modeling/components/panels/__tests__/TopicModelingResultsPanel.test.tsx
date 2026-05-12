@@ -86,6 +86,9 @@ const baseProps = {
   selectAllDetachColumns: vi.fn(),
   deselectAllDetachColumns: vi.fn(),
   handleDetachConfirm: vi.fn(),
+  stopwordFilterAvailable: false,
+  stopwordFilterEnabled: false,
+  onStopwordFilterToggle: vi.fn(),
 };
 
 describe('TopicModelingResultsPanel', () => {
