@@ -172,6 +172,22 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
 
       const position = positions.get(node.id) || { x: index * 320, y: 50 };
 
+      // The backend's ``frontend_node_info`` adds these two fields when the
+      // node has any registered analytic derivations (Phase 2 / decision 7).
+      // Pass them through to ``data.node`` so the CustomNode chip + the
+      // "Manage tokens…" menu entry can render; without this, the mapper
+      // silently drops derived metadata even though it's in the graph
+      // payload.
+      const rawDerivedColumns = (node as { derived_columns?: unknown }).derived_columns;
+      const passthroughDerivedColumns = Array.isArray(rawDerivedColumns)
+        ? rawDerivedColumns.filter((c): c is string => typeof c === 'string')
+        : undefined;
+      const rawDerived = (node as { derived?: unknown }).derived;
+      const passthroughDerived =
+        rawDerived && typeof rawDerived === 'object' && !Array.isArray(rawDerived)
+          ? (rawDerived as Record<string, unknown>)
+          : undefined;
+
       return {
         id: node.id,
         type: 'customNode',
@@ -190,6 +206,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             document: documentColumn,
             document_column: documentColumn,
             column_schema: columnSchema,
+            derived_columns: passthroughDerivedColumns,
+            derived: passthroughDerived,
           },
           isMultiSelected:
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
