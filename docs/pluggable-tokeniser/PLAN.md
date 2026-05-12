@@ -13,7 +13,7 @@
 | 0 — Baseline & fixtures | ✅ done | 502 baseline tests green; EN goldens committed |
 | 1 — Pluggable HF tokenizer in Rust | ✅ done | tokenizer + POS + embedder registries, model= kwarg, prefetch helpers, models.py |
 | 1.9 — Jieba Chinese backend | ✅ done | TokenizerBackend enum (HF + Jieba); `zh = "jieba"` |
-| 2 — Persisted tokens column + Tokenize op | 🔄 in progress | 2.2, 2.4, 2.8, 2.9 done; 2.1 done in code (backend reinstall pending); 2.3, 2.5, 2.6, 2.7 pending |
+| 2 — Derived tokens column on source node | 🔄 in progress, **redesigned per decision 7** | 2.2 ✅; 2.8 ✅; 2.9 ✅; 2.1 v1 / 2.4 v1 landed but need revision to derived-column model; 2.3, 2.5, 2.6, 2.7, 2.10 pending |
 | 3 — Per-tool language routing | ⏳ pending | |
 | 4 — Frontend UI | ⏳ pending | |
 | 5 (opt) — Lindera (Japanese) backend | ⏳ deferred | decision gate after Phase 4 ships |
@@ -71,6 +71,14 @@ These decisions came out of the planning discussion; documenting here so the rat
    - **Why this matters for CJK**: today, when concordance is run on Chinese text, `num_left_tokens=5` silently means "5 characters" because `BertPreTokenizer` falls back to per-character splitting in the absence of whitespace. The text-mode search still works (literal substring match), but the context window is much less semantically useful than the user expects. The tokens-column mode (after Phase 5 with Jieba/Lindera) gives "5 actual words left/right" which is what a corpus linguist actually wants.
    - **English `equ\w*` is not lost**: regex-mode stays the default; CJK users can opt into tokens-mode after running Tokenise on their node.
 
+7. **Derived analytic columns (tokens, POS, NER, etc.) live on the source node as hidden columns, NOT as detached child nodes.** Two designs were considered and rejected:
+   - **(A) A new child Node per tokenisation** — explodes the workspace tree: a user with 5 string columns and 2 tokeniser models would end up with 10 nodes none of which they ever want to view. Tokens aren't new data; they're a representation of an existing column.
+   - **(C) A row-aligned shadow LazyFrame attached to each Node** — conceptually clean (user-facing schema stays pure) but Polars has no native "row-aligned attached frame" abstraction, so the row-alignment invariant would have to be maintained by hand across `filter` / `slice` / `sort` / `dedupe` / `join` / `groupby`, plus persistence becomes two files per node. Substantial ongoing tax for marginal gain.
+   - **Chosen design (B): derived columns on the same Node.** Each derived column lives on the source node's LazyFrame, named `__derived__.<form>.<source_column>.<model>` (e.g. `__derived__.tokens.text.jieba`). Per-column metadata (`source_column`, `form`, `model`, `language`, `generated_at`) lives in `Node.derived: dict[str, DerivedColumnMeta]`. Lazy by default — the derived column is added to the polars plan via `with_columns`, materialised only when a downstream tool reads it. Optional eager `materialise=True` for hot paths.
+   - **Why the user's schema stays clean**: backend strips `__derived__.*` from any frontend-facing schema projection (`node.info()`, data-view payloads, export schemas). The user never sees them in the data view, CSV/Parquet export, or the polars-expression editor. Analytics tools see the full schema and look up the right derived column via `find_tokens_column(node, source_column)`.
+   - **Row-alignment is automatic** because polars maintains it: every row-changing op (`filter`, `slice`, `sort`, `dedupe`) applies to all columns including derived. The one explicit rule: when a source column is mutated or dropped, derived columns referencing it become stale — auto-dropped with a UI notice.
+   - **Multiple tokenisers per column** work out of the box: `__derived__.tokens.text.jieba` and `__derived__.tokens.text.bert-base-chinese` are different columns on the same node; the user can compare without creating new nodes.
+
 ## Scope summary
 
 | Module        | Role                                                                                         | Branch needed |
@@ -124,31 +132,38 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 2 — Persisted tokens column + Tokenize node op (~1.5 weeks) 🔄 IN PROGRESS
+## Phase 2 — Derived tokens column on the source node (~1.5 weeks) 🔄 IN PROGRESS — REDESIGNED PER DECISION 7
 
-**Goal:** make a tokenised representation a first-class, persistent thing. Token-consuming tools auto-detect and use it. **This is the load-bearing phase** — it's what makes Jieba/MeCab integration trivial later, and what makes concordance/frequency consistent.
+**Goal:** make a tokenised representation of any string column on a Node a first-class, persistent thing — **as a hidden derived column on the same Node**, not as a detached child node (see decision 7). Token-consuming tools (concordance tokens-mode, token-frequency tokens-path, future POS) auto-detect and use it. **This is the load-bearing phase** — it's what makes Jieba/MeCab consistency real, and what makes concordance/frequency agree across tools.
+
+> **Redesign note (decision 7).** Earlier drafts of Phase 2 created a child Node per tokenisation. That was rejected: tokens aren't new data, they're a representation of an existing column; a user tokenising N columns × M models would otherwise produce N×M intermediate nodes none of which they'd open. The new design keeps derivatives on the source node as columns named `__derived__.<form>.<source_column>.<model>` (e.g. `__derived__.tokens.text.jieba`), with per-column metadata in `Node.derived`. Frontend strips the prefix from user-facing schema projections.
+>
+> **Already-landed work that needs revision under decision 7:**
+> - **2.1 v1** (`TOKENS_tokens` fixed-string constant in `generated_columns.py`, committed `7b5d5eb`) → revise to `derived_column_name(form, source, model)` naming helper + parser. The `tokens_struct_dtype()` and detector helpers stay (renamed for clarity).
+> - **2.4 v1** (`Node.language` / `Node.tokenizer_model` fields, committed `533cb5a`) → replace with `Node.derived: dict[str, DerivedColumnMeta]` keyed by derived-column name. The single-language fields were too coarse; multi-column corpora need per-column tracking.
 
 | #   | Task | File(s) | Acceptance |
 |-----|------|---------|------------|
-| 2.1 | Define canonical token schema constant `TOKENS_tokens: List[Struct{token, start, end}]` | `backend/src/ldaca_web_app/api/workspaces/analyses/generated_columns.py` | Constant + projection helper |
-| 2.2 | Add Polars expression mode that emits the offset-struct schema | `polars-text/src/expressions.rs:105-135` | New `tokenize_with_offsets` or kwarg flag |
-| 2.3 | Add `worker_tasks_tokenize.py` worker | new in `backend/src/ldaca_web_app/core/` | Produces child node with tokens column persisted to `.plbin` |
-| 2.4 | Add `language` + `tokenizer_model` fields to Node metadata (NOT the dataframe) | `docworkspace/src/docworkspace/node/core.py:48-51`, `node/io.py:44-53` | Round-trips through plbin save/load |
-| 2.5 | Add API endpoint `POST /workspaces/{id}/nodes/{node_id}/tokenize` | new in `backend/src/ldaca_web_app/api/workspaces/analyses/` | Creates child node with lineage |
-| 2.6 | Concordance: keep regex-on-text mode as default; add a `search_mode="tokens"` option that consumes the tokens column (exact-token-match search, N-actual-token context windows). See architectural decision 6. | `polars-text/src/concordance.rs`, `backend/src/ldaca_web_app/core/worker_tasks_concordance.py:93` | Regex mode: identical English KWIC to Phase 0 golden. Tokens mode: `l1`/`r1` and context match upstream tokens column exactly. Both selectable per request. |
-| 2.7 | Modify token frequency to consume tokens column when present | `backend/src/ldaca_web_app/core/worker_tasks_token.py:99` | Counts agree with persisted tokens |
-| 2.8 | Fix `Node.shape` to avoid materialising list columns | `docworkspace/src/docworkspace/node/core.py:88-90` | Tokenised node `shape` query is fast and memory-stable |
-| 2.9 | Source-path rebasing handles the new schema (`rebase_workspace_sources()`) | `docworkspace/src/docworkspace/workspace/io.py:168-184` | Move + reload workspace works |
+| 2.1 v2 | Replace fixed `TOKENS_*` constants with `derived_column_name(form, source, model) -> str` and `parse_derived_column(name) -> (form, source, model) \| None`. Keep `tokens_struct_dtype()` (unchanged) and rename `is_tokens_column` → `is_derived_tokens_column(node, col_name)` reading from `Node.derived`. | `backend/.../generated_columns.py` | Names round-trip; live polars-text dtype still matches; existing 7 schema tests revised |
+| 2.2 ✅ | Polars expression `tokenize_with_offsets` (DONE — design unchanged) | `polars-text/src/expressions.rs` | landed (commit `5e5d025`), 44 polars-text tests green |
+| 2.3 | Synchronous `tokenise_column(node, source_column, model, language) -> str` operation. Mutates the node's LazyFrame plan via `with_columns(pt.tokenize_with_offsets(pl.col(source_column), model=model).alias(derived_column_name(...)))` and updates `Node.derived`. Idempotent: re-call with same (source, model) replaces; different model adds another column. No child node created. Long-running model loads can be wrapped in a worker for progress UX but the result mutates the source node. | `backend/.../core/derived_columns.py` (new) | Calling twice with same args replaces in place; calling with different model adds; undo restores prior state |
+| 2.4 v2 | Replace `Node.language` / `Node.tokenizer_model` with `Node.derived: dict[str, DerivedColumnMeta]` where the meta records source_column, form, model, language, generated_at. Optional `Workspace.default_language` as a hint only. Auto-drop derived columns when their source column is dropped or renamed; emit a UI notice. | `docworkspace/.../node/core.py`, `node/io.py`, `workspace/core.py` | Per-column metadata round-trips through plbin; legacy nodes default `derived={}`; dropping source col cascades |
+| 2.5 | API: `POST /workspaces/{ws_id}/nodes/{node_id}/derived/tokens` body `{ source_column, model, language }`. Returns `{ column, is_new, replaced_column? }`. Symmetric `DELETE /derived/{column_name}`. Both update `Node.derived` and persist. | `backend/.../api/workspaces/analyses/derived_columns.py` (new) | Idempotent POST; DELETE removes; both mutate same node; status returned |
+| 2.6 | Concordance two-mode. Regex-mode (default) unchanged. Tokens-mode (`search_mode="tokens"`) calls `find_tokens_column(node, source_column, prefer_model=...)`; if a hit, walks the list-of-struct column for exact-token matches and N-actual-token context. Phase 0 EN goldens unchanged. See decision 6. | `polars-text/src/concordance.rs` (may not need changes), `backend/.../worker_tasks_concordance.py` | Regex mode byte-identical to Phase 0 golden; tokens-mode on a ZH node with Jieba derived col yields word-level KWIC |
+| 2.7 | Token frequency: if `find_tokens_column(node, source_column)` returns a hit, count from that column (exploding the list, grouping by `token`). Otherwise re-tokenise raw text as today. | `backend/.../worker_tasks_token.py` | Counts on a derived-tokens node equal manual `pl.col(derived).list.explode().value_counts()`; EN goldens unchanged |
+| 2.8 ✅ | `Node.shape` lazy on List[Struct] columns (DONE — even more relevant now that derived columns ARE on the source node) | `docworkspace/.../node/core.py` | landed (commit `533cb5a`), regression test in place |
+| 2.9 ✅ | Workspace rebase schema-agnostic (DONE — trivially works since no new node is created) | `docworkspace/.../workspace/io.py` | landed (commit `ee14f16`); the test stays as a guard |
+| 2.10 | **NEW.** Frontend-facing schema projections strip `__derived__.*` columns from `node.info()`, data-view payloads, export schemas. Analytics tools that consume tokens see the full schema. | `backend/.../api/workspaces/nodes.py` and schema projection layer | Data view, export dialog, and code editor schema panel hide derived columns by default; the `node.derived` dict surfaces them via a separate panel (Phase 4) |
 
 **Tests per task:**
-- 2.1–2.2 (Rust + Python unit): tokenize a known string, assert offsets reconstruct original substrings.
-- 2.3, 2.5 (backend integration): create a doc node, POST tokenize, assert child node exists with right schema and lineage.
-- 2.4 (docworkspace unit): set language/tokenizer_model, save, load, assert preserved.
-- 2.6, 2.7 (cross-package integration): tokenize a node with model X, run concordance and frequency on the *parent*; assert results equal running them directly with model X. Then run on the *child* tokens node; assert identical results. **This is the consistency proof.**
-- 2.8 (docworkspace unit + benchmark): assert `node.shape` on a 100k-row tokenised node uses bounded memory and returns in <100ms.
-- 2.9 (workspace integration): copy workspace dir to a new path, reload, assert lazy plans still resolve.
+- 2.1 v2 (backend unit): naming round-trips; dtype contract holds against live polars-text.
+- 2.3 (backend integration): tokenise the EN literary fixture's `text` column with default model; assert a single new `__derived__.tokens.text.bert-base-uncased` column; re-tokenise with same args → same column; tokenise with `model="jieba"` → second derived column added.
+- 2.4 v2 (docworkspace unit): `Node.derived` round-trip through plbin; cascade auto-drop on source column drop; legacy nodes load with empty derived.
+- 2.5 (backend integration): POST endpoint adds/replaces; DELETE removes; both 200 OK with expected payload.
+- 2.6, 2.7 (cross-package integration): tokenise a node, run concordance / freq with tokens-mode, results match manual computation on the derived column. **This is the consistency proof.**
+- 2.10 (backend integration): `node.info()` response excludes any column with `__derived__` prefix; `node.derived` dict is exposed as a separate field.
 
-**Exit:** Tokenise a Chinese corpus with `bert-base-chinese` from the backend, run frequency + concordance against it, results agree token-for-token. Phase 0 English goldens still match (default path unchanged).
+**Exit:** Tokenise `text` and `title` on a ZH corpus with Jieba in two API calls, both produce derived columns on the **same** node, frequency + concordance in tokens-mode read the right one given a `source_column` argument. Phase 0 EN goldens still match (regex/default paths untouched).
 
 ---
 
