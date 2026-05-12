@@ -15,6 +15,7 @@ import {
 import { type WorkspaceNode, parseDerivedColumn } from '@/types';
 import TokeniseDialog from './TokeniseDialog';
 import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
+import { queryKeys } from '@/lib/queryKeys';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 
 /**
@@ -49,6 +50,15 @@ function TokeniseDialogContainer({
       onSuccess={() => {
         if (currentWorkspaceId && nodeId) {
           invalidateNodeInfoQuery(queryClient, currentWorkspaceId, nodeId);
+          // The graph payload carries `derived` per-node (used by the
+          // concordance tokens-mode auto-pick, language inference, and
+          // the inspector chip). Skipping this invalidation leaves the
+          // graph cache stale until its 30 s staleTime elapses, so the
+          // Tokens radio reads pre-tokenise data even though node-info
+          // is fresh.
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.workspaceGraph(currentWorkspaceId),
+          });
         }
       }}
     />
