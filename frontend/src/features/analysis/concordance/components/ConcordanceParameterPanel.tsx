@@ -40,6 +40,15 @@ export type ConcordanceParameterPanelProps = {
   setWholeWord: Dispatch<SetStateAction<boolean>>;
   caseSensitive: boolean;
   setCaseSensitive: Dispatch<SetStateAction<boolean>>;
+  /**
+   * Phase 4.7: selected concordance engine. ``tokens`` mode walks a
+   * derived tokens column for word-aware CJK context; only meaningful
+   * when ``tokensModeAvailable`` is true (active node has been
+   * tokenised on the selected column).
+   */
+  searchMode: 'regex' | 'tokens';
+  setSearchMode: (next: 'regex' | 'tokens') => void;
+  tokensModeAvailable: boolean;
 
   // Action state
   isSearching: boolean;
@@ -76,6 +85,9 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   setWholeWord,
   caseSensitive,
   setCaseSensitive,
+  searchMode,
+  setSearchMode,
+  tokensModeAvailable,
   isSearching,
   actionState,
   handleRunOrUpdate,
@@ -175,35 +187,108 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            {/* Phase 4.7 — search mode picker. ``tokens`` is auto-selected
+                when the active node carries a derived tokens column for
+                the selected source column; the regex / whole-word / case
+                checkboxes don't apply in tokens mode so they're disabled
+                with a tooltip explaining why. */}
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-medium text-foreground">Search mode:</span>
+              <div
+                role="radiogroup"
+                aria-label="Concordance search mode"
+                className="inline-flex overflow-hidden rounded-md border border-input"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={searchMode === 'regex'}
+                  onClick={() => setSearchMode('regex')}
+                  className={`px-3 py-1 text-xs transition-colors ${
+                    searchMode === 'regex'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-foreground hover:bg-muted'
+                  }`}
+                >
+                  Text
+                </button>
+                <DisabledReasonTooltip
+                  reason={
+                    tokensModeAvailable
+                      ? undefined
+                      : 'Run Tokenise on this column first — tokens-mode walks the derived tokens column for word-aware (CJK-friendly) context.'
+                  }
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={searchMode === 'tokens'}
+                    onClick={() => {
+                      if (tokensModeAvailable) setSearchMode('tokens');
+                    }}
+                    disabled={!tokensModeAvailable}
+                    className={`border-l border-input px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      searchMode === 'tokens'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    Tokens
+                  </button>
+                </DisabledReasonTooltip>
+              </div>
+              <HelpIcon
+                targetKey="analysis.concordance.search-mode"
+                label="Search mode (text vs tokens)"
+              />
+            </div>
+
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={wholeWord}
-                  onChange={(e) => setWholeWord(e.target.checked)}
-                  disabled={regex}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm text-foreground">Whole word</span>
-              </label>
+              <DisabledReasonTooltip
+                reason={
+                  searchMode === 'tokens'
+                    ? 'Whole-word applies to text-mode searches only — tokens-mode matches exact tokens by design.'
+                    : undefined
+                }
+              >
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={wholeWord}
+                    onChange={(e) => setWholeWord(e.target.checked)}
+                    disabled={regex || searchMode === 'tokens'}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm text-foreground">Whole word</span>
+                </label>
+              </DisabledReasonTooltip>
             </div>
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={regex}
-                  onChange={(e) => {
-                    const nextRegex = e.target.checked;
-                    setRegex(nextRegex);
-                    if (nextRegex) {
-                      setWholeWord(false);
-                    }
-                  }}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm text-foreground">Use regular expression</span>
-              </label>
+              <DisabledReasonTooltip
+                reason={
+                  searchMode === 'tokens'
+                    ? 'Regex applies to text-mode only — switch to text-mode to use it.'
+                    : undefined
+                }
+              >
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={regex}
+                    disabled={searchMode === 'tokens'}
+                    onChange={(e) => {
+                      const nextRegex = e.target.checked;
+                      setRegex(nextRegex);
+                      if (nextRegex) {
+                        setWholeWord(false);
+                      }
+                    }}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm text-foreground">Use regular expression</span>
+                </label>
+              </DisabledReasonTooltip>
               <HelpIcon targetKey="analysis.concordance.regex-toggle" label="Regex mode toggle" />
             </div>
             <label className="flex items-center gap-2">

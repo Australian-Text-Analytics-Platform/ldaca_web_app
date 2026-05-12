@@ -30,6 +30,8 @@ import {
   pruneTasksById,
 } from '@/hooks/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
+import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
 import { useConcordanceMaterializedEvents } from './hooks/useConcordanceMaterializedEvents';
 import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
@@ -114,6 +116,13 @@ const ConcordanceFeature: React.FC = () => {
   const [regex, setRegex] = useState(false);
   const [wholeWord, setWholeWord] = useState(true);
   const [caseSensitive, setCaseSensitive] = useState(false);
+  // Phase 4.7: concordance has two engines. ``regex`` walks raw text (the
+  // historical default, preserves ``equ\w*``-style affordances); ``tokens``
+  // walks the active node's derived tokens column for N-actual-token CJK-
+  // aware context (decision 6). Auto-picked below when the active node
+  // has been tokenised AND the user hasn't manually overridden.
+  const [searchMode, setSearchMode] = useState<'regex' | 'tokens'>('regex');
+  const [searchModeUserSet, setSearchModeUserSet] = useState(false);
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   // Metadata visibility derives from the selected columns: any selection
   // shows the corresponding metadata columns in the results table.
@@ -408,6 +417,52 @@ const ConcordanceFeature: React.FC = () => {
     return map;
   }, [panelSelectedNodes, nodeColors, defaultPalette]);
 
+  // Phase 4.7: check whether any selected node has a derived tokens
+  // column matching the column the user picked, so tokens-mode is only
+  // offered when it makes sense. We look at the first node's selection
+  // and its ``derived`` metadata.
+  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
+  const tokensModeAvailable = useMemo(() => {
+    const firstSelection = effectiveNodeColumnSelections[0];
+    if (!firstSelection?.column) return false;
+    const firstNode = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
+      const ids = [n.id, n.node_id];
+      return ids.some(
+        (id) => typeof id === 'string' && id === firstSelection.nodeId,
+      );
+    });
+    const derived = firstNode?.derived;
+    if (!derived || typeof derived !== 'object') return false;
+    return Object.values(derived as Record<string, unknown>).some((meta) => {
+      if (!meta || typeof meta !== 'object') return false;
+      const sourceColumn = (meta as { source_column?: unknown }).source_column;
+      const form = (meta as { form?: unknown }).form;
+      return form === 'tokens' && sourceColumn === firstSelection.column;
+    });
+  }, [effectiveNodeColumnSelections, panelSelectedNodes]);
+
+  // Auto-pick tokens-mode when it becomes available AND the user hasn't
+  // manually overridden. Reverting availability puts us back on regex.
+  useEffect(() => {
+    if (searchModeUserSet) return;
+    setSearchMode(tokensModeAvailable ? 'tokens' : 'regex');
+  }, [tokensModeAvailable, searchModeUserSet]);
+
+  const concordanceLanguage = useMemo(() => {
+    const firstSelection = effectiveNodeColumnSelections[0];
+    const firstNode = firstSelection
+      ? panelSelectedNodes.find((n: WorkspaceNodeLike) =>
+          [n.id, n.node_id].some(
+            (id) => typeof id === 'string' && id === firstSelection.nodeId,
+          ),
+        )
+      : undefined;
+    return effectiveNodeLanguage({
+      node: firstNode ?? null,
+      defaultLanguage,
+    });
+  }, [effectiveNodeColumnSelections, panelSelectedNodes, defaultLanguage]);
+
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<PaginationState>({});
   
@@ -607,6 +662,8 @@ const ConcordanceFeature: React.FC = () => {
       regex,
       wholeWord,
       caseSensitive,
+      searchMode,
+      language: concordanceLanguage,
     },
     actions: {
       setNodePagination,
@@ -1101,6 +1158,12 @@ const ConcordanceFeature: React.FC = () => {
         setWholeWord={setWholeWord}
         caseSensitive={caseSensitive}
         setCaseSensitive={setCaseSensitive}
+        searchMode={searchMode}
+        setSearchMode={(next) => {
+          setSearchMode(next);
+          setSearchModeUserSet(true);
+        }}
+        tokensModeAvailable={tokensModeAvailable}
         isSearching={isSearching}
         actionState={actionState}
         handleRunOrUpdate={handleRunOrUpdate}

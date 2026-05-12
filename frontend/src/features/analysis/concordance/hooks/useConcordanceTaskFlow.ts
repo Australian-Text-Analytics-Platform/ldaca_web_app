@@ -32,6 +32,14 @@ interface ConcordanceState {
   regex: boolean;
   wholeWord: boolean;
   caseSensitive: boolean;
+  /**
+   * Phase 4.7: selected concordance engine. ``"regex"`` (default) walks
+   * raw text; ``"tokens"`` walks the active node's derived tokens
+   * column for N-actual-token CJK-aware context.
+   */
+  searchMode: 'regex' | 'tokens';
+  /** Phase 4.4: optional language hint for the backend gate / resolver. */
+  language?: string;
 }
 
 interface ConcordanceActions {
@@ -84,6 +92,8 @@ export function useConcordanceTaskFlow({
     numRightTokens,
     regex,
     wholeWord,
+    searchMode,
+    language,
     caseSensitive,
   },
   actions: {
@@ -215,7 +225,11 @@ export function useConcordanceTaskFlow({
         regex,
         whole_word: wholeWord,
         case_sensitive: caseSensitive,
+        search_mode: searchMode,
       };
+      if (language) {
+        request.language = language;
+      }
       if (isCombinedQuery) {
         request.combined = true;
       }
