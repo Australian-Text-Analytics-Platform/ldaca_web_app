@@ -1,7 +1,7 @@
 # Pluggable Tokeniser & Multilingual Support — Implementation Plan
 
 **Branch:** `pluggable_tokeniser` (root + `backend/`, `polars-text/`, `docworkspace/`)
-**Status:** In progress — Phase 2 + Phase 3 (6/7 tasks) complete; Phase 3.2 (POS registry) paused awaiting ZH/JA POS model decisions
+**Status:** Phase 4 frontend done — branch ready for user testing. Phase 3.2 (POS registry) and Phase 5 (Lindera) intentionally deferred.
 **Started:** 2026-05-09
 **Last synced from `dev`:** 2026-05-12 (merge `3a94214`); references audited and confirmed current
 **Owner:** chao.sun@sydney.edu.au
@@ -15,7 +15,7 @@
 | 1.9 — Jieba Chinese backend | ✅ done | TokenizerBackend enum (HF + Jieba); `zh = "jieba"` |
 | 2 — Derived tokens column on source node | ✅ done (v2 design — decision 7) | all 7 tasks landed across docworkspace + backend; 431 backend + 91 docworkspace tests green; consistency proof (2.6 tokens-mode + 2.7 freq path) lives |
 | 3 — Per-tool language routing | 🔄 6/7 done | 3.1, 3.5, 3.6, 3.7 (backend) + 3.3, 3.4 (polars-text) landed; 3.2 (POS language registry) paused — POS isn't exposed in the UI yet AND needs ZH/JA POS model selection + validation. 462 backend + 48 polars-text tests green. |
-| 4 — Frontend UI | ⏳ pending | |
+| 4 — Frontend UI | ✅ done | All 7 tasks landed. 4.1 prefs store, 4.2 import-language selector, 4.3 right-click Tokenise dialog, 4.4 language threaded through per-feature API types, 4.5 quotation disabled-with-tooltip, 4.6 derived-columns row on graph card, 4.7 concordance Text/Tokens toggle with auto-pick. 328 frontend + 468 backend tests green. |
 | 5 (opt) — Lindera (Japanese) backend | ⏳ deferred | decision gate after Phase 4 ships |
 
 This is the cross-module plan. Per-module sub-plans (to be added if needed):
@@ -192,7 +192,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 4 — Frontend UI (~3–5 days) ⏳ PENDING
+## Phase 4 — Frontend UI (~3–5 days) ✅ DONE
 
 **Goal:** expose the choice. Default is invisible to existing users.
 
@@ -200,13 +200,13 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 | #   | Task | File(s) | Acceptance |
 |-----|------|---------|------------|
-| 4.1 | Extend `preferencesStore` with `defaultLanguage`, `defaultTokenizerModel` (store now uses typed-slice pattern: `PreferencesState` + `PreferencesActions` with debounced subscribe-sync — add the new fields to `PreferencesState` and a setter to `PreferencesActions`) | `frontend/src/stores/preferencesStore.ts` | Persisted across reloads; round-trips through `UserPreferences` API |
-| 4.2 | Language selector in `AddFilePanel` (insert above the sheet selector / preview block) | `frontend/src/components/panels/AddFilePanel.tsx` (sheet-selector block ~line 74 onward at last check) | New corpus carries language tag |
-| 4.3 | Right-click "Tokenise" action on doc nodes | workspace tree component under `frontend/src/features/workspace/` (graph-view or data-view depending on context-menu location at the time) | Spawns Phase 2 task; shows progress |
-| 4.4 | Add `tokenizer`/`language` to request types in the per-feature API modules | `frontend/src/api/text/` — `tokenFrequency.ts`, `concordance.ts`, `topicModeling.ts`, `aiAnnotation.ts`, `sequential.ts`; shared types in `shared.ts` and re-exports in `index.ts` | Backend receives the values |
-| 4.5 | Disabled-reason tooltip "English-only" on quotation for non-EN nodes | quotation feature panel under `frontend/src/features/workspace/` (locate via `quotation_core` request usage) | Matches existing tooltip pattern from `da55cb8` |
-| 4.6 | Node inspector shows language + tokenizer model | node info panel (whichever panel renders `nodeInfo` from `frontend/src/lib/nodeInfo.ts`) | Visible on selection |
-| 4.7 | Concordance panel: "Search mode" toggle (regex vs. tokens); auto-pick tokens-mode when the active node has a tokens column; tooltip on `num_left/right_tokens` reads "characters in regex-mode on CJK; tokens in tokens-mode" | concordance feature under `frontend/src/features/workspace/` | Toggle visible; tokens-mode disabled when no tokens column present; CJK regex-mode shows the character-vs-token tooltip |
+| 4.1 ✅ | preferencesStore + backend ``UserPreferences`` carry ``defaultLanguage`` + ``defaultTokenizerModel`` (Optional[str]). Setters normalise case/whitespace. Persisted via existing debounced-subscribe sync. Legacy preferences.json files load with ``None`` for both. | `frontend/.../preferencesStore.ts`, `frontend/.../api/preferences.ts`, `backend/.../models/preferences.py`, `backend/.../core/preferences.py` | landed (commit `a6163e8`); 6 backend + 6 frontend tests |
+| 4.2 ✅ | Language dropdown in AddFilePanel above the sheet selector. Curated catalog in `frontend/src/lib/languages.ts` (en/zh/ja/multi with recommended models matching ``RECOMMENDED_TOKENIZERS``). Selecting non-EN sets ``preferences.defaultLanguage`` so subsequent analyses honor it. | `frontend/.../AddFilePanel.tsx`, `frontend/src/lib/languages.ts` | landed (commit `779cfff`); 9 catalog tests |
+| 4.3 ✅ | "Tokenise…" entry in CustomNode settings menu opens ``TokeniseDialog`` (source column + language + model picker). POSTs Phase 2.5 endpoint; invalidates the per-node info query on success so derived columns surface on the next render. | `frontend/.../graph-view/components/CustomNode.tsx`, `frontend/.../TokeniseDialog.tsx`, `frontend/.../api/nodes.ts` | landed (commit `f7c0b49`); 2 CustomNode menu tests |
+| 4.4 ✅ | ``LanguageHint`` mixin + ``buildLanguageHint(explicit, default)`` helper in shared.ts; threaded into every analysis request type via ``extends LanguageHint`` (concordance, quotation, topic, token-freq, AI-annotation). ``ConcordanceAnalysisRequest`` also carries ``search_mode`` for 4.7. | `frontend/.../api/text/` (all per-feature modules + ``shared.ts`` + ``index.ts``) | landed (commit `937687b`); 6 buildLanguageHint tests |
+| 4.5 ✅ | Quotation Run button disabled with explanatory tooltip when the effective language resolves to anything other than EN. Resolver (``effectiveNodeLanguage``) mirrors the backend ``effective_language`` precedence: request > derived metadata > preference > "en". Backend ``schema_filter.frontend_node_info`` now emits the structured ``derived`` dict alongside ``derived_columns`` so the frontend can read per-column language without a second API call. | `frontend/.../QuotationFeature.tsx`, `frontend/src/lib/effectiveNodeLanguage.ts`, `backend/.../api/workspaces/schema_filter.py` | landed (commit `946fc47`); 11 resolver tests + revised schema_filter test |
+| 4.6 ✅ | CustomNode body shows a Sparkles + indigo "tokens: text · jieba" line (or "N tokens columns" summary) when ``derived_columns`` is populated. Tooltip carries the full list. ``parseDerivedColumn`` is a TS port of the backend parser. | `frontend/.../graph-view/components/CustomNode.tsx`, `frontend/src/types/index.ts` | landed (commit `2a1689e`); 3 CustomNode rendering tests |
+| 4.7 ✅ | Concordance "Text / Tokens" radio toggle next to the regex/whole-word/case-sensitive checkboxes. Auto-picks Tokens when the active node has a derived tokens column for the selected source column AND the user hasn't manually overridden. Tokens mode disables regex+whole-word (don't apply); language hint flows through ``useConcordanceTaskFlow`` so the backend gets a matching ``language`` payload. | `frontend/.../concordance/ConcordanceParameterPanel.tsx`, `ConcordanceFeature.tsx`, `useConcordanceTaskFlow.ts` | landed (commit `e737925`) |
 
 **Tests:**
 - Browser dev-server walkthrough: import a small ZH CSV → tokenise → run frequency → see ZH tokens. Try quotation → see disabled tooltip. Save and reload workspace → state preserved.
