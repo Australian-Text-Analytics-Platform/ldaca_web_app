@@ -21,6 +21,7 @@ import type {
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { effectiveNodeLanguage, isEnglish } from '@/lib/effectiveNodeLanguage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -151,6 +152,7 @@ const QuotationFeature: React.FC = () => {
   const lastRemoteUrl = usePreferencesStore((state) => state.quotationLastRemoteUrl);
   const setEngineConfigStore = usePreferencesStore((state) => state.setQuotationEngine);
   const updateRemoteUrl = usePreferencesStore((state) => state.updateQuotationRemoteUrl);
+  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const [engineError, setEngineError] = useState<string | null>(null);
   const engineDialogOpen = useQuotationEngineDialogStore((state) => state.isOpen);
   const setEngineDialogOpen = useQuotationEngineDialogStore((state) => state.setOpen);
@@ -179,6 +181,21 @@ const QuotationFeature: React.FC = () => {
   const activeSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
   const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
+
+  // Phase 4.5 / decision 4: quotation rules are English-only. Mirror the
+  // backend gate at the UI so the Run button surfaces a clear "why is
+  // this disabled" tooltip rather than letting the user submit a request
+  // that's going to come back as HTTP 400. Resolves language from the
+  // active node's derived metadata (Phase 2.4 v2) first, then the
+  // per-user default preference, then "en".
+  const nodeLanguage = effectiveNodeLanguage({
+    node: displayedNodes[0] ?? null,
+    defaultLanguage,
+  });
+  const quotationLanguageUnsupported = !isEnglish(nodeLanguage);
+  const quotationLanguageDisabledReason = quotationLanguageUnsupported
+    ? `Quotation extractor is English-only (this node resolves to ${nodeLanguage}). The vendored rules don't generalise to other languages.`
+    : null;
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
@@ -397,7 +414,12 @@ const QuotationFeature: React.FC = () => {
     return !selection || !selection.column;
   });
 
-  const canRunQuotation = Boolean(currentWorkspaceId) && displayedNodes.length > 0 && !hasIncompleteSelections && engineReady;
+  const canRunQuotation =
+    Boolean(currentWorkspaceId)
+    && displayedNodes.length > 0
+    && !hasIncompleteSelections
+    && engineReady
+    && !quotationLanguageUnsupported;
 
   // Per-node pagination and sorting state
   const [nodeState, setNodeState] = useState<Record<string, NodePaginationState>>({});
@@ -820,6 +842,7 @@ const QuotationFeature: React.FC = () => {
               if (actionState.runDisabledReason) return actionState.runDisabledReason;
               if (hasIncompleteSelections) return 'Select a column for each data block';
               if (!engineReady) return 'Configure the remote engine before running';
+              if (quotationLanguageDisabledReason) return quotationLanguageDisabledReason;
               return undefined;
             })(),
             clearDisabled: actionState.clearDisabled || isClearing,

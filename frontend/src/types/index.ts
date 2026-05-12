@@ -70,7 +70,30 @@ export interface WorkspaceNode {
    * when no derivation has run on this node.
    */
   derived_columns?: string[];
+  /**
+   * Phase 2.10 / 4.5–4.7: per-derived-column metadata (source_column,
+   * form, model, language, generated_at). Lets the frontend drive
+   * language-aware UI (quotation gate, concordance tokens-mode auto-pick)
+   * without having to parse the column name. Empty / absent on legacy
+   * payloads or nodes without derivations.
+   */
+  derived?: Record<string, DerivedColumnMeta>;
   [key: string]: unknown;
+}
+
+/**
+ * Per-derived-column metadata mirrored from the backend
+ * ``DerivedColumnMeta`` TypedDict. ``language`` is the language the
+ * derivation was configured for (e.g. ``"zh"`` for a jieba run) — the
+ * frontend uses it as the canonical signal for "is this node working
+ * in language X".
+ */
+export interface DerivedColumnMeta {
+  source_column: string;
+  form: string;
+  model: string;
+  language: string | null;
+  generated_at: string;
 }
 
 /**
