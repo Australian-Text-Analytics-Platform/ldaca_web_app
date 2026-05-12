@@ -3,7 +3,7 @@
 **Branch:** `pluggable_tokeniser` (root + `backend/`, `polars-text/`, `docworkspace/`)
 **Status:** Planning — no code changes yet
 **Started:** 2026-05-09
-**Last synced from `dev`:** 2026-05-11 (merge `292342e`)
+**Last synced from `dev`:** 2026-05-12 (merge `3a94214`); references audited and confirmed current
 **Owner:** chao.sun@sydney.edu.au
 
 This is the cross-module plan. Per-module sub-plans (to be added if needed):
@@ -117,10 +117,10 @@ These decisions came out of the planning discussion; documenting here so the rat
 | 2.3 | Add `worker_tasks_tokenize.py` worker | new in `backend/src/ldaca_web_app/core/` | Produces child node with tokens column persisted to `.plbin` |
 | 2.4 | Add `language` + `tokenizer_model` fields to Node metadata (NOT the dataframe) | `docworkspace/src/docworkspace/node/core.py:48-51`, `node/io.py:44-53` | Round-trips through plbin save/load |
 | 2.5 | Add API endpoint `POST /workspaces/{id}/nodes/{node_id}/tokenize` | new in `backend/src/ldaca_web_app/api/workspaces/analyses/` | Creates child node with lineage |
-| 2.6 | Modify concordance to detect tokens column and consume it | `polars-text/src/concordance.rs`, `backend/src/ldaca_web_app/core/worker_tasks_concordance.py:79` | KWIC `l1`/`r1` match upstream tokens exactly |
+| 2.6 | Modify concordance to detect tokens column and consume it | `polars-text/src/concordance.rs`, `backend/src/ldaca_web_app/core/worker_tasks_concordance.py:93` | KWIC `l1`/`r1` match upstream tokens exactly |
 | 2.7 | Modify token frequency to consume tokens column when present | `backend/src/ldaca_web_app/core/worker_tasks_token.py:99` | Counts agree with persisted tokens |
 | 2.8 | Fix `Node.shape` to avoid materialising list columns | `docworkspace/src/docworkspace/node/core.py:88-90` | Tokenised node `shape` query is fast and memory-stable |
-| 2.9 | Source-path rebasing handles the new schema | `docworkspace/src/docworkspace/workspace/io.py:161-177` | Move + reload workspace works |
+| 2.9 | Source-path rebasing handles the new schema (`rebase_workspace_sources()`) | `docworkspace/src/docworkspace/workspace/io.py:168-184` | Move + reload workspace works |
 
 **Tests per task:**
 - 2.1–2.2 (Rust + Python unit): tokenize a known string, assert offsets reconstruct original substrings.
@@ -163,12 +163,12 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 **Goal:** expose the choice. Default is invisible to existing users.
 
-> **Note (2026-05-11):** Frontend has been heavily refactored on `dev` since this plan was written. File paths below are current as of the last sync, but line numbers and component locations may drift further before Phase 4 starts. Verify each reference at implementation time. The directories most relevant to this phase — `frontend/src/api/text/`, `frontend/src/stores/`, `frontend/src/features/workspace/`, `frontend/src/components/panels/` — are stable; the per-feature file split inside them is what tends to move.
+> **Note (2026-05-12):** Frontend continues to evolve on `dev`. File paths below are current as of the last sync, but line numbers and component locations may drift further before Phase 4 starts. Verify each reference at implementation time. The directories most relevant to this phase — `frontend/src/api/text/`, `frontend/src/stores/`, `frontend/src/features/workspace/`, `frontend/src/components/panels/` — are stable; the per-feature file split inside them is what tends to move.
 
 | #   | Task | File(s) | Acceptance |
 |-----|------|---------|------------|
 | 4.1 | Extend `preferencesStore` with `defaultLanguage`, `defaultTokenizerModel` (store now uses typed-slice pattern: `PreferencesState` + `PreferencesActions` with debounced subscribe-sync — add the new fields to `PreferencesState` and a setter to `PreferencesActions`) | `frontend/src/stores/preferencesStore.ts` | Persisted across reloads; round-trips through `UserPreferences` API |
-| 4.2 | Language selector in `AddFilePanel` (insert above the sheet selector / preview block) | `frontend/src/components/panels/AddFilePanel.tsx` (sheet-selector block ~line 73 onward at last check) | New corpus carries language tag |
+| 4.2 | Language selector in `AddFilePanel` (insert above the sheet selector / preview block) | `frontend/src/components/panels/AddFilePanel.tsx` (sheet-selector block ~line 74 onward at last check) | New corpus carries language tag |
 | 4.3 | Right-click "Tokenise" action on doc nodes | workspace tree component under `frontend/src/features/workspace/` (graph-view or data-view depending on context-menu location at the time) | Spawns Phase 2 task; shows progress |
 | 4.4 | Add `tokenizer`/`language` to request types in the per-feature API modules | `frontend/src/api/text/` — `tokenFrequency.ts`, `concordance.ts`, `topicModeling.ts`, `aiAnnotation.ts`, `sequential.ts`; shared types in `shared.ts` and re-exports in `index.ts` | Backend receives the values |
 | 4.5 | Disabled-reason tooltip "English-only" on quotation for non-EN nodes | quotation feature panel under `frontend/src/features/workspace/` (locate via `quotation_core` request usage) | Matches existing tooltip pattern from `da55cb8` |
