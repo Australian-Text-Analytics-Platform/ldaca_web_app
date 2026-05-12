@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { type QueryClient, useMutation } from '@tanstack/react-query';
+import { type QueryClient, useMutation, isCancelledError } from '@tanstack/react-query';
 import { workspacesApi } from '@/api/workspaces';
 import {
   nodesApi,
@@ -816,7 +816,19 @@ export const useWorkspaceNodeMutations = ({
           is_text_data: false,
         };
       } catch (error) {
-        console.error('Failed to refresh node schema:', error);
+        // `force: true` in fetchNodeInfo triggers removeQueries, which cancels
+        // any inflight observer-driven query for the same key. TanStack throws
+        // CancelledError in that race — benign noise, downgrade to debug so
+        // the console stays readable. TanStack's CancelledError sets
+        // ``error.message === "CancelledError"`` but leaves ``error.name`` at
+        // ``"Error"``, so use the exported type guard rather than name-sniffing.
+        if (isCancelledError(error)) {
+          if (isGraphDebugEnabled()) {
+            console.debug('Node schema refresh cancelled by concurrent query', nodeId);
+          }
+        } else {
+          console.error('Failed to refresh node schema:', error);
+        }
         return null;
       }
     },

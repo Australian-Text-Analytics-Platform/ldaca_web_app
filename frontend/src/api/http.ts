@@ -40,12 +40,41 @@ function buildQuery(params?: Record<string, unknown>): string {
   return qs ? `?${qs}` : '';
 }
 
+function formatErrorDetail(detail: unknown): string | null {
+  if (detail == null) return null;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail.map((entry) => {
+      if (entry && typeof entry === 'object') {
+        const e = entry as { loc?: unknown; msg?: unknown; type?: unknown };
+        const loc = Array.isArray(e.loc) ? e.loc.filter((v) => v !== 'body').join('.') : '';
+        const msg = typeof e.msg === 'string' ? e.msg : '';
+        if (loc && msg) return `${loc}: ${msg}`;
+        if (msg) return msg;
+      }
+      try { return JSON.stringify(entry); } catch { return String(entry); }
+    });
+    const joined = parts.filter(Boolean).join('; ');
+    return joined || null;
+  }
+  if (typeof detail === 'object') {
+    const obj = detail as Record<string, unknown>;
+    if (typeof obj.message === 'string') return obj.message;
+    try { return JSON.stringify(obj); } catch { return null; }
+  }
+  return String(detail);
+}
+
 async function parseResponse(res: Response, expectBlob?: boolean) {
   if (!res.ok) {
     let detail: unknown = null;
     try { detail = await res.json(); } catch { /* ignore */ }
     const parsed = detail as Record<string, unknown> | null;
-    const message = String(parsed?.message || parsed?.detail || `HTTP ${res.status}`);
+    const message =
+      (typeof parsed?.message === 'string' && parsed.message)
+      || formatErrorDetail(parsed?.detail)
+      || formatErrorDetail(parsed)
+      || `HTTP ${res.status}`;
     throw new ApiError(message, { status: res.status, detail });
   }
   if (expectBlob) return res.blob();

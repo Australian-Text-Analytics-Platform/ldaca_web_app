@@ -171,19 +171,31 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
 
   const panelSelectedNodes: WorkspaceNodeLike[] = (() => {
     if (isLocked && lockedNodesSnapshot.length > 0) {
-      return lockedNodesSnapshot.map((snapshot) => ({
-        id: snapshot.id,
-        name: snapshot.name,
-        shape: snapshot.shape,
-        data: {
+      return lockedNodesSnapshot.map((snapshot) => {
+        // The lock snapshot is intentionally narrow (id/name/columns/shape),
+        // but downstream features (tokens-mode auto-pick, language inference)
+        // need ``derived`` metadata too. Pull it from the live graph node when
+        // the same id still exists in the workspace — falls back to undefined
+        // when the source node has since been removed.
+        const live = selectedNodes.find((n) => n.id === snapshot.id) as
+          | Record<string, unknown>
+          | undefined;
+        return {
           id: snapshot.id,
           name: snapshot.name,
-          nodeName: snapshot.name,
-          label: snapshot.name,
+          shape: snapshot.shape,
+          data: {
+            id: snapshot.id,
+            name: snapshot.name,
+            nodeName: snapshot.name,
+            label: snapshot.name,
+            columns: snapshot.columns,
+          },
           columns: snapshot.columns,
-        },
-        columns: snapshot.columns,
-      }));
+          derived: live?.derived,
+          derived_columns: live?.derived_columns,
+        };
+      });
     }
 
     return selectedNodes as WorkspaceNodeLike[];
