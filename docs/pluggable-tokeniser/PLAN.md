@@ -1,7 +1,7 @@
 # Pluggable Tokeniser & Multilingual Support — Implementation Plan
 
 **Branch:** `pluggable_tokeniser` (root + `backend/`, `polars-text/`, `docworkspace/`)
-**Status:** In progress — Phase 2 complete (all v2 redesign tasks landed); Phase 3 next
+**Status:** In progress — Phase 2 + Phase 3 (6/7 tasks) complete; Phase 3.2 (POS registry) paused awaiting ZH/JA POS model decisions
 **Started:** 2026-05-09
 **Last synced from `dev`:** 2026-05-12 (merge `3a94214`); references audited and confirmed current
 **Owner:** chao.sun@sydney.edu.au
@@ -14,7 +14,7 @@
 | 1 — Pluggable HF tokenizer in Rust | ✅ done | tokenizer + POS + embedder registries, model= kwarg, prefetch helpers, models.py |
 | 1.9 — Jieba Chinese backend | ✅ done | TokenizerBackend enum (HF + Jieba); `zh = "jieba"` |
 | 2 — Derived tokens column on source node | ✅ done (v2 design — decision 7) | all 7 tasks landed across docworkspace + backend; 431 backend + 91 docworkspace tests green; consistency proof (2.6 tokens-mode + 2.7 freq path) lives |
-| 3 — Per-tool language routing | ⏳ pending | |
+| 3 — Per-tool language routing | 🔄 6/7 done | 3.1, 3.5, 3.6, 3.7 (backend) + 3.3, 3.4 (polars-text) landed; 3.2 (POS language registry) paused — POS isn't exposed in the UI yet AND needs ZH/JA POS model selection + validation. 462 backend + 48 polars-text tests green. |
 | 4 — Frontend UI | ⏳ pending | |
 | 5 (opt) — Lindera (Japanese) backend | ⏳ deferred | decision gate after Phase 4 ships |
 
@@ -167,19 +167,19 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 3 — Per-tool language routing (~1.5–2 weeks) ⏳ PENDING
+## Phase 3 — Per-tool language routing (~1.5–2 weeks) 🔄 6/7 DONE
 
 **Goal:** every remaining English assumption is either parameterised by language or explicitly declared English-only.
 
 | #   | Task | File(s) | Acceptance |
 |-----|------|---------|------------|
-| 3.1 | Make embedder model selectable; default English, alt = `paraphrase-multilingual-MiniLM-L12-v2` | `polars-text/src/topic_modeling.rs:22-23`, `backend/src/ldaca_web_app/core/onnx_embedder.py:31`, `worker_tasks_topic.py:24` | Topic modeling on ZH corpus produces non-degenerate clusters |
-| 3.2 | POS tagger language→model registry; en/zh/ja entries | `polars-text/src/pos_tagging.rs:14-16` | POS on ZH/JA returns plausible tags |
-| 3.3 | Replace `'.!?'` sentence splitter with Unicode-aware (`。！？` etc.) | `polars-text/src/expressions.rs:95` | Splits ZH/JA sentences correctly |
-| 3.4 | Replace `split_whitespace` word-count with tokens-column-aware count | `polars-text/src/expressions.rs:66` | Word count on ZH non-zero |
-| 3.5 | Hardwire CountVectorizer `stop_words` choice off `language` (not `"english"`) | `backend/src/ldaca_web_app/core/worker_tasks_topic.py:164` | No English stopword leakage on ZH |
-| 3.6 | Quotation extractor: explicit `language=="en"` gate; raise typed `UnsupportedLanguageError` otherwise | `backend/src/ldaca_web_app/core/quotation_extractor.py:31` | Non-EN node returns clear error, not garbage |
-| 3.7 | AI annotation: pass language hint into prompt | `backend/src/ldaca_web_app/api/workspaces/analyses/ai_annotation_core.py:86` | Prompt includes language label |
+| 3.1 ✅ | Multilingual embedder selectable per resolved language; English keeps pinned MiniLM-L6 (byte-identical) and everything else routes to `paraphrase-multilingual-MiniLM-L12-v2`. Per-embedder cache labels prevent collision on a shared cache dir. | `backend/.../core/worker_tasks_topic.py`, `api/workspaces/analyses/topic_modeling.py` | landed (commit `ed6f06f`); 7 routing tests cover en/zh/ja/unknown/None/normalised case + cache-label collision-safety |
+| 3.2 ⏸ | POS tagger language→model registry; en/zh/ja entries | `polars-text/src/pos_tagging.rs` | **Paused.** POS isn't surfaced in the UI yet AND adding ZH/JA POS needs HF model selection + end-to-end validation (each model is ~400 MB; candle-transformers BertForTokenClassification compatibility check needed). Defer until Phase 4 needs it. |
+| 3.3 ✅ | Sentence splitter recognises ``. ! ? 。！？ ۔؟ ।॥`` (ASCII + CJK + Arabic + Devanagari) via a single `is_sentence_terminator` predicate. | `polars-text/src/expressions.rs` | landed (commit `d3a9022`); 1 test covers ZH/JA/mixed-EN-ZH splits |
+| 3.4 ✅ | Word count is Unicode-aware: pure-CJK runs (Han / Hiragana / Katakana / Hangul) get char-counted, whitespace text falls through to `split_whitespace` (byte-identical EN). Real word-level CJK count is `pl.col(derived_tokens_col).list.len()` after Tokenise. | `polars-text/src/expressions.rs` | landed (commit `d3a9022`); 3 tests cover pure-CJK char count, EN unchanged, mixed CJK + whitespace |
+| 3.5 ✅ | BERTopic label-stage `OnlineCountVectorizer.stop_words` routes by language: `"english"` only for `"en"`, `None` for everything else so Chinese function words 的/是/了 aren't English-filtered (silently kept). Clustering stage is unchanged (language-agnostic). | `backend/.../core/worker_tasks_topic.py`, `api/workspaces/analyses/topic_modeling.py`, `core/worker.py`, `models/__init__.py` | landed (commit `fac81dc`); 5 tests cover en/zh/ja/None/normalised case |
+| 3.6 ✅ | Quotation routes (`get_quotation`, `detach_quotation`, `materialize_quotation`) resolve language via `effective_language(request.language, node)` and raise typed `UnsupportedLanguageError` (HTTP 400 with structured payload) for non-EN. Gate fires before any spaCy / task-manager work. | `backend/.../core/i18n.py` (new), `api/workspaces/analyses/quotation.py`, `models/__init__.py` | landed (commit `ec85a7e`); 12 tests cover resolver precedence + 3 routes + helper return |
+| 3.7 ✅ | AI annotation classification prompt carries a language hint (`Texts to classify are in Chinese.`) for non-default languages. English byte-identical. | `backend/.../api/workspaces/analyses/ai_annotation_core.py`, `ai_annotation.py`, `core/i18n.py`, `models/__init__.py` | landed (commit `567b126`); 7 tests cover EN default + ZH/JA labeled lines + unknown-code fallback + normalised case |
 
 **Tests per task:**
 - 3.1: snapshot test on a small ZH fixture — top topic terms are Chinese, not pinyin/garbage.
