@@ -20,19 +20,19 @@ type TopicModelingResult = {
 } | null;
 
 type ExactTopicCountSliderProps = {
-  topicSizeValue?: number;
+  currentExactTopicCount?: number | null;
   exactTopicCountRange: { min: number; max: number };
   isUpdatingExactTopicCount: boolean;
   onUpdateExactTopicCount: (value: number) => Promise<void> | void;
 };
 
 function ExactTopicCountSlider({
-  topicSizeValue,
+  currentExactTopicCount,
   exactTopicCountRange,
   isUpdatingExactTopicCount,
   onUpdateExactTopicCount,
 }: ExactTopicCountSliderProps) {
-  const initialValue = topicSizeValue ?? exactTopicCountRange.min;
+  const initialValue = currentExactTopicCount ?? exactTopicCountRange.min;
   const [sliderValue, setSliderValue] = useState(initialValue);
   const lastSubmittedValueRef = useRef<number | null>(null);
   const [isSliderTooltipVisible, setIsSliderTooltipVisible] = useState(false);
@@ -54,7 +54,7 @@ function ExactTopicCountSlider({
     if (input) {
       input.value = String(nextValue);
     }
-    if (nextValue === topicSizeValue || nextValue === lastSubmittedValueRef.current) return;
+    if (nextValue === currentExactTopicCount || nextValue === lastSubmittedValueRef.current) return;
     lastSubmittedValueRef.current = nextValue;
     void onUpdateExactTopicCount(nextValue);
   };
@@ -157,6 +157,13 @@ type Props = {
   nodeNames?: string[];
   topicSizeMode?: string;
   topicSizeValue?: number;
+  /**
+   * The exact topic count currently displayed by the post-fit re-aggregation
+   * slider. Derived from `result.data.meta.topic_size_value`; decoupled from
+   * the "Target Topic Number" parameter input (which is the next-rerun
+   * target). `null` when no fit has happened yet.
+   */
+  currentExactTopicCount?: number | null;
   randomSeed?: number;
   exactTopicCountRange?: { min: number; max: number } | null;
   isUpdatingExactTopicCount: boolean;
@@ -198,6 +205,7 @@ export function TopicModelingResultsPanel({
   nodeNames,
   topicSizeMode,
   topicSizeValue,
+  currentExactTopicCount,
   randomSeed,
   exactTopicCountRange,
   isUpdatingExactTopicCount,
@@ -264,8 +272,8 @@ export function TopicModelingResultsPanel({
               <p className="shrink-0 text-sm text-muted-foreground">Topics ({topics.length})</p>
               {showExactTopicCountControl && exactTopicCountRange ? (
                 <ExactTopicCountSlider
-                  key={topicSizeValue ?? exactTopicCountRange.min}
-                  topicSizeValue={topicSizeValue}
+                  key={currentExactTopicCount ?? exactTopicCountRange.min}
+                  currentExactTopicCount={currentExactTopicCount}
                   exactTopicCountRange={exactTopicCountRange}
                   isUpdatingExactTopicCount={isUpdatingExactTopicCount}
                   onUpdateExactTopicCount={onUpdateExactTopicCount}

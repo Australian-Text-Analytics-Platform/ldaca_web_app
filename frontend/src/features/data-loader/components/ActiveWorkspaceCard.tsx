@@ -14,6 +14,7 @@ export type ActiveWorkspaceCardProps = {
   currentWorkspace: WorkspaceListItem | null;
   nodeCount: number;
   busy: boolean;
+  hasActiveTask?: boolean;
   onCreate: (name: string, description: string) => Promise<boolean>;
   onRename: (value: string) => Promise<void> | void;
   onUpdateDescription: (value: string) => Promise<void> | void;
@@ -25,6 +26,7 @@ export const ActiveWorkspaceCard: React.FC<ActiveWorkspaceCardProps> = ({
   currentWorkspace,
   nodeCount,
   busy,
+  hasActiveTask = false,
   onCreate,
   onRename,
   onUpdateDescription,
@@ -159,13 +161,21 @@ export const ActiveWorkspaceCard: React.FC<ActiveWorkspaceCardProps> = ({
                 <RefreshCcw className="mr-2 h-4 w-4" /> Save
               </Button>
               <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  onClick={() => void onUnload()}
-                  disabled={!hasWorkspaceSelected || busy}
+                <DisabledReasonTooltip
+                  reason={
+                    hasActiveTask
+                      ? 'A task is still running on this workspace. Wait for it to finish, or cancel it from the task list, before unloading.'
+                      : undefined
+                  }
                 >
-                  <LogOut className="mr-2 h-4 w-4" /> Unload
-                </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void onUnload()}
+                    disabled={!hasWorkspaceSelected || busy || hasActiveTask}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" /> Unload
+                  </Button>
+                </DisabledReasonTooltip>
                 <HelpIcon targetKey="data-loader.unload.button" label="Unload workspace" />
               </div>
             </div>

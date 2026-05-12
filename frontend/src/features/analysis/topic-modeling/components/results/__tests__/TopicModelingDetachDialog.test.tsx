@@ -6,7 +6,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { TopicModelingDetachDialog } from '../TopicModelingDetachDialog';
 
 describe('TopicModelingDetachDialog', () => {
-  it('shows mandatory generated columns as checked disabled and leaves optional metadata unchecked', () => {
+  it('hides mandatory columns and leaves optional metadata unchecked', () => {
     render(
       <TopicModelingDetachDialog
         open
@@ -28,12 +28,12 @@ describe('TopicModelingDetachDialog', () => {
       />
     );
 
-    const topicCheckbox = screen.getByRole('checkbox', { name: /TOPIC_topic/i });
+    // Mandatory generated columns are hidden — the backend always
+    // includes them, so they don't need a UI surface.
+    expect(screen.queryByRole('checkbox', { name: /TOPIC_topic/i })).toBeNull();
     const documentCheckbox = screen.getByRole('checkbox', { name: /document/i });
     const speakerCheckbox = screen.getByRole('checkbox', { name: /speaker/i });
 
-    expect(topicCheckbox).toBeChecked();
-    expect(topicCheckbox).toBeDisabled();
     expect(documentCheckbox).not.toBeChecked();
     expect(speakerCheckbox).not.toBeChecked();
     expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeInTheDocument();

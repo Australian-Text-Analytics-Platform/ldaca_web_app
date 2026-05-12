@@ -196,7 +196,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   })();
 
   const [expression, setExpression] = useState('');
-  const [columnName, setColumnName] = useState('');
+  const [columnName, setColumnName] = useState('new_column');
   const [applyLoading, setApplyLoading] = useState(false);
   const [lastAppliedExpression, setLastAppliedExpression] = useState<string | null>(null);
   const [expressionFocused, setExpressionFocused] = useState(false);

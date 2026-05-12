@@ -29,7 +29,7 @@ import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 
-const DEFAULT_TOPIC_SIZE_VALUE = 25;
+const DEFAULT_TOPIC_SIZE_VALUE = 20;
 
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
@@ -75,7 +75,11 @@ const TopicModelingFeature: React.FC = () => {
   const [result, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
   
   const [corpusSamples, setCorpusSamples] = useState<CorpusSample[]>([]);
-  const [topicSizeMode, setTopicSizeMode] = useState<'target' | 'min' | 'exact'>('target');
+  // Sample values reset on data-block change (auto-populate) but persist
+  // through Clear Results if the user explicitly touched them, so the user
+  // doesn't lose tuned sampling when re-running on the same corpora.
+  const [corpusSamplesUserSet, setCorpusSamplesUserSet] = useState(false);
+  const [topicSizeMode, setTopicSizeMode] = useState<'min' | 'exact'>('exact');
   const [topicSizeValue, setTopicSizeValue] = useState(DEFAULT_TOPIC_SIZE_VALUE);
   const [topicSizeUserSet, setTopicSizeUserSet] = useState(false);
   const [referenceTopicNo, setReferenceTopicNo] = useState(DEFAULT_TOPIC_SIZE_VALUE);
@@ -144,7 +148,10 @@ const TopicModelingFeature: React.FC = () => {
       setRandomSeedUserSet(true);
       setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
       setRepresentativeWordsCountUserSet(true);
-      setTopicSizeMode((req.topic_size_mode as 'target' | 'min' | 'exact') || 'target');
+      // Legacy 'target' mode was removed from the UI; treat any persisted
+      // 'target' request as the new default 'exact' so historical runs hydrate.
+      const persistedMode = req.topic_size_mode as 'target' | 'min' | 'exact' | undefined;
+      setTopicSizeMode(persistedMode === 'min' ? 'min' : 'exact');
       const hydratedTopicSizeValue = Number(req.topic_size_value ?? DEFAULT_TOPIC_SIZE_VALUE);
       setTopicSizeValue(hydratedTopicSizeValue);
       setReferenceTopicNo(hydratedTopicSizeValue);
@@ -174,13 +181,27 @@ const TopicModelingFeature: React.FC = () => {
     isResultRunning: (r) => r?.state === 'running',
   });
 
+  const computeDefaultCorpusSamples = (): CorpusSample[] =>
+    panelSelectedNodes.slice(0, 2).map((node) => {
+      const nDocs = (node as { shape?: number[] }).shape?.[0] ?? 0;
+      const autoPercent =
+        nDocs > 0 ? Math.min(100, Math.ceil((4000 / nDocs) * 100 / 10) * 10) : 100;
+      return { percent: String(autoPercent), enabled: autoPercent < 100 };
+    });
+
   const handleClear = async () => {
     setIsClearing(true);
     await clearResults();
     setSelectedTopicIds(new Set());
     setTopicSearchQuery('');
-    setCorpusSamples([]);
-    setTopicSizeMode('target');
+    // Only reset sampling defaults when the user hasn't customized them — if
+    // they have, the same corpora deserve the same tuned sampling on the
+    // next run. The node-change effect below still resets these when the
+    // selected blocks differ.
+    if (!corpusSamplesUserSet) {
+      setCorpusSamples(computeDefaultCorpusSamples());
+    }
+    setTopicSizeMode('exact');
     setTopicSizeValue(DEFAULT_TOPIC_SIZE_VALUE);
     setTopicSizeUserSet(false);
     setReferenceTopicNo(DEFAULT_TOPIC_SIZE_VALUE);
@@ -189,7 +210,7 @@ const TopicModelingFeature: React.FC = () => {
     setIsClearing(false);
   };
 
-  const handleTopicSizeModeChange = (mode: 'target' | 'min' | 'exact') => {
+  const handleTopicSizeModeChange = (mode: 'min' | 'exact') => {
     setTopicSizeMode(mode);
     setTopicSizeUserSet(false);
     if (mode !== 'min') {
@@ -274,20 +295,50 @@ const TopicModelingFeature: React.FC = () => {
     return !selection || !selection.column;
   });
 
+  // sample_fractions diff: server stores `null` (or absent) when sampling
+  // is disabled per corpus; mirror that shape so the comparison is stable
+  // across "no sampling specified" vs "explicit 100%".
+  const normalizeSampleFractions = (raw: unknown, nodeCount: number): (number | null)[] => {
+    const list = Array.isArray(raw) ? raw : [];
+    return Array.from({ length: nodeCount }, (_, idx) => {
+      const value = list[idx];
+      if (typeof value === 'number' && value > 0 && value < 1) return value;
+      return null;
+    });
+  };
+
+  const currentSampleFractions = corpusSamples.slice(0, panelNodeIds.length).map((s) => {
+    if (!s?.enabled) return null;
+    const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
+    return pct >= 100 ? null : pct / 100;
+  });
+
   const hasLockedParameterChanges = hasLockedParameterDiff({
     isLocked,
     serverRequest: typedServerRequest,
     currentParams: {
       random_seed: Number(randomSeed),
-      representative_words_count: Number(representativeWordsCount),
       topic_size_mode: topicSizeMode,
+      // Target Topic Number (exact) and Min Topic Size both trip the rerun:
+      // the post-fit slider is decoupled and writes to its own state, so
+      // changes to this parameter always represent a "next-rerun" intent.
       topic_size_value: Number(topicSizeValue),
+      // representative_words_count is a frontend display cap (bounded by
+      // the originally-fitted value); changes within range don't require
+      // a rerun and so are excluded here.
+      sample_fractions: normalizeSampleFractions(
+        currentSampleFractions,
+        panelNodeIds.length,
+      ),
     },
     getServerParams: (request) => ({
       random_seed: Number(request.random_seed),
-      representative_words_count: Number(request.representative_words_count),
-      topic_size_mode: request.topic_size_mode ?? 'target',
+      topic_size_mode: request.topic_size_mode ?? 'exact',
       topic_size_value: Number(request.topic_size_value ?? DEFAULT_TOPIC_SIZE_VALUE),
+      sample_fractions: normalizeSampleFractions(
+        (request as unknown as { sample_fractions?: unknown }).sample_fractions,
+        panelNodeIds.length,
+      ),
     }),
   });
 
@@ -309,16 +360,11 @@ const TopicModelingFeature: React.FC = () => {
     }
   }, [isLocked, panelNodeIdsKey, nodeColumnSelections.length, recomputeAutoColumns, panelNodeIds.length]);
 
-  // Auto-populate sampling fractions when selected nodes change
+  // Auto-populate sampling fractions when selected nodes change, and treat
+  // these auto-values as not-user-set so Clear Results can re-derive them.
   useEffect(() => {
-    setCorpusSamples(
-      panelSelectedNodes.slice(0, 2).map((node) => {
-        const nDocs = (node as { shape?: number[] }).shape?.[0] ?? 0;
-        const autoPercent =
-          nDocs > 0 ? Math.min(100, Math.ceil((4000 / nDocs) * 100 / 10) * 10) : 100;
-        return { percent: String(autoPercent), enabled: autoPercent < 100 };
-      })
-    );
+    setCorpusSamples(computeDefaultCorpusSamples());
+    setCorpusSamplesUserSet(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelNodeIdsKey]);
 
@@ -423,7 +469,23 @@ const TopicModelingFeature: React.FC = () => {
     },
   });
 
-  const topics: TopicModelingTopic[] = result?.data?.topics || [];
+  const rawTopics: TopicModelingTopic[] = result?.data?.topics || [];
+  // Rebuild each topic's label from its representative_words sliced to the
+  // current "Words per topic" display cap, so changing that input updates
+  // the bottom list without a rerun. Falls back to the server-built label
+  // when representative_words is missing.
+  const topics: TopicModelingTopic[] = useMemo(() => {
+    const cap = Math.max(1, Math.floor(representativeWordsCount));
+    return rawTopics.map((topic) => {
+      const words = Array.isArray(topic.representative_words)
+        ? topic.representative_words
+        : null;
+      if (!words || words.length === 0) return topic;
+      const sliced = words.slice(0, cap).join(', ');
+      return sliced ? { ...topic, label: sliced } : topic;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, representativeWordsCount]);
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
   const exactRawTopicCount = (() => {
     const rawValue = result?.data?.meta?.raw_total_topics;
@@ -431,6 +493,13 @@ const TopicModelingFeature: React.FC = () => {
       return null;
     }
     return Math.max(0, Math.trunc(rawValue));
+  })();
+  const currentExactTopicCount = (() => {
+    const metaValue = result?.data?.meta?.topic_size_value;
+    if (typeof metaValue === 'number' && Number.isFinite(metaValue)) {
+      return Math.max(0, Math.trunc(metaValue));
+    }
+    return null;
   })();
   const chartPadding = 40;
   const chartHeight = Math.min(520, Math.max(320, Math.round(chartWidth * 0.55)));
@@ -506,10 +575,12 @@ const TopicModelingFeature: React.FC = () => {
         { topic_size_value: value },
         getAuthHeaders(),
       );
+      // The slider is decoupled from the "Target Topic Number" parameter
+      // input: it represents the post-fit display target only, so we just
+      // swap in the new result and clear transient selection state. The
+      // parameter panel input (`topicSizeValue`) is left alone so the user
+      // can still see / edit the next-rerun target independently.
       setResultSafely(updated);
-      setTopicSizeValue(value);
-      setReferenceTopicNo(value);
-      setTopicSizeUserSet(true);
       setSelectedTopicIds(new Set());
       setHoveredTopicId(null);
       setTopicSearchQuery('');
@@ -540,13 +611,14 @@ const TopicModelingFeature: React.FC = () => {
         actionState={actionState}
         corpusSamples={corpusSamples}
         nodeDocCounts={nodeDocCounts}
-        onCorpusSampleChange={(idx, update) =>
+        onCorpusSampleChange={(idx, update) => {
+          setCorpusSamplesUserSet(true);
           setCorpusSamples((prev) => {
             const next = [...prev];
             next[idx] = { ...(next[idx] ?? { percent: '100', enabled: false }), ...update };
             return next;
-          })
-        }
+          });
+        }}
         topicSizeMode={topicSizeMode}
         onTopicSizeModeChange={handleTopicSizeModeChange}
         topicSizeValue={topicSizeValue}
@@ -559,6 +631,11 @@ const TopicModelingFeature: React.FC = () => {
         onRandomSeedChange={(v) => { setRandomSeed(v); setRandomSeedUserSet(true); }}
         representativeWordsCount={representativeWordsCount}
         representativeWordsCountUserSet={representativeWordsCountUserSet}
+        representativeWordsCountServerMax={
+          isLocked
+            ? Number(typedServerRequest?.representative_words_count) || null
+            : null
+        }
         onRepresentativeWordsCountChange={(v) => { setRepresentativeWordsCount(v); setRepresentativeWordsCountUserSet(true); }}
         isRunning={isRunning}
         isClearing={isClearing}
@@ -598,6 +675,7 @@ const TopicModelingFeature: React.FC = () => {
             .filter(Boolean) as string[]}
           topicSizeMode={topicSizeMode}
           topicSizeValue={topicSizeValue}
+          currentExactTopicCount={currentExactTopicCount}
           randomSeed={randomSeed}
           exactTopicCountRange={
             topicSizeMode === 'exact' && exactRawTopicCount && exactRawTopicCount >= 2

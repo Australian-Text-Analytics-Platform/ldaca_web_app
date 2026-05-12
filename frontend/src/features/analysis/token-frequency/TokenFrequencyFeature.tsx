@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { textApi, type TokenFrequencyResponse } from '@/api/text';
 import { useAuth } from '@/hooks/useAuth';
@@ -69,7 +69,7 @@ const TokenFrequencyFeature = () => {
     setNodeColumnSelections,
     activeNodeIds,
     activeNodeColumnSelections,
-    panelSelectedNodes,
+    panelSelectedNodes: rawPanelSelectedNodes,
   } = useAnalysisLock({
     analysisType: 'token_frequencies',
     workspaceId: currentWorkspace?.id ?? null,
@@ -77,6 +77,16 @@ const TokenFrequencyFeature = () => {
     allowedDataTypes: ['string'],
     maxNodes: 2,
   });
+  // The frequency tool is strictly pairwise (keyness statistics are defined
+  // between exactly one reference and one study corpus). Cap the displayed
+  // selection to the two most-recent blocks regardless of how many the user
+  // has selected workspace-wide, so the third+ are silently dropped from
+  // every downstream consumer: parameter panel, reference radios, task-flow
+  // payload, name maps, etc.
+  const panelSelectedNodes = useMemo(
+    () => takeMostRecent(rawPanelSelectedNodes, 2),
+    [rawPanelSelectedNodes],
+  );
   const { selectedNodes } = useWorkspaceSelection();
   const { selectNodes } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);

@@ -31,6 +31,9 @@ import {
 import { ConcordanceDispersionCell } from './ConcordanceDispersionCell';
 import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
+import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
+
+const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
 
 const dedupeColumns = (cols: string[]): string[] => {
   const seen = new Set<string>();
@@ -42,6 +45,14 @@ const dedupeColumns = (cols: string[]): string[] => {
     return true;
   });
 };
+
+// When metadata columns are visible, lock the dispersion bar column to 85 %
+// of the viewport so the bars retain enough length to read. Metadata columns
+// then claim the remaining 15 % and overflow horizontally — the ScrollArea
+// wrapping the table exposes scrollbars in both directions, signalling the
+// user to scroll right for any extra metadata that didn't fit.
+const DISPERSION_COLUMN_WIDTH_RATIO = 0.85;
+const METADATA_COLUMN_MIN_WIDTH_PX = 200;
 
 const getDispersionColumnStyle = (
   isMetadataVisible: boolean,
@@ -55,13 +66,22 @@ const getDispersionColumnStyle = (
     return undefined;
   }
 
-  const columnWidth = `${Math.floor(visibleWidth / 2)}px`;
+  const columnWidth = `${Math.floor(visibleWidth * DISPERSION_COLUMN_WIDTH_RATIO)}px`;
   return {
     width: columnWidth,
     minWidth: columnWidth,
     maxWidth: columnWidth,
   };
 };
+
+// Force a sensible minimum width on each visible metadata column so the
+// table extends beyond the viewport when needed, enabling horizontal scroll.
+const getMetadataColumnStyle = (
+  isMetadataVisible: boolean,
+): React.CSSProperties | undefined =>
+  isMetadataVisible
+    ? { minWidth: `${METADATA_COLUMN_MIN_WIDTH_PX}px` }
+    : undefined;
 
 export type ConcordanceDispersionNodeBlockProps = {
   nodeKey: string;
@@ -109,11 +129,26 @@ export type ConcordanceDispersionNodeBlockProps = {
   hiddenMatchedTexts: Set<string>;
   setHiddenMatchedTexts: React.Dispatch<React.SetStateAction<Set<string>>>;
   binCount: DispersionDisplayBinCount;
+  onBinCountChange: (value: DispersionDisplayBinCount) => void;
   combinedSourceMode: 'aggregate' | 'split';
+  dispersionChartType: MultiSeriesChartType;
+  onDispersionChartTypeChange: (value: MultiSeriesChartType) => void;
+  selectedBinIndices: Record<string, Set<number>>;
+  onBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
+  onClearBinSelection: (blockKey: string) => void;
   allMatchedTexts: string[];
   matchedTextColorMap: Record<string, string>;
   getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
   isBlockMaterialised: (nodeKey: string) => boolean;
+  onDispersionDetach: (
+    nodes: Array<{ nodeId: string; column: string; nodeLabel: string }>,
+    selectedBins: ReadonlySet<number> | null,
+    binCount: number,
+    options?: {
+      selectedMatchedTexts?: string[] | null;
+      matchCaseInsensitive?: boolean;
+    },
+  ) => Promise<void> | void;
 
   // Handlers
   handlePageChange: (newPage: number, paginationKey: string, requestNodeId: string) => void;
@@ -125,7 +160,6 @@ export type ConcordanceDispersionNodeBlockProps = {
   ) => void;
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
-  openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
 };
 
 export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeBlockProps> = ({
@@ -157,16 +191,22 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
   hiddenMatchedTexts,
   setHiddenMatchedTexts,
   binCount,
+  onBinCountChange,
   combinedSourceMode,
+  dispersionChartType,
+  onDispersionChartTypeChange,
+  selectedBinIndices,
+  onBinSelect,
+  onClearBinSelection,
   allMatchedTexts,
   matchedTextColorMap,
   getMaterializedBinsForKey,
   isBlockMaterialised,
+  onDispersionDetach,
   handlePageChange,
   handleRowClick,
   handleMaterialize,
   setCombinedPage,
-  openDetachDialog,
 }) => {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
@@ -187,6 +227,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
       : [CONCORDANCE_DISPERSION_COLUMN];
     const displayColumns = dedupeColumns(rawDisplayColumns);
     const dispersionColumnStyle = getDispersionColumnStyle(showMetadata, resultsViewportWidth);
+    const metadataColumnStyle = getMetadataColumnStyle(showMetadata);
 
     const combinedNodeIds = takeMostRecent(selectedNodes, 2)
       .map((n) => n.id)
@@ -230,25 +271,73 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 <>Process Both</>
               )}
             </Button>
-            <Button
-              onClick={() => {
-                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                const nodes = combinedNodeIds.map((nid) => {
-                  const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
-                  const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
-                  const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
-                  return { nodeId: nid, column: col, nodeLabel: sourceLabel };
-                }).filter((n) => n.column);
-                openDetachDialog(nodes);
-              }}
-              disabled={combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
-              size="sm"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title="Create new data blocks with concordance results for both sources joined to their original tables"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Both to Workspace
-            </Button>
+            {(() => {
+              const combinedSelection =
+                (selectedBinIndices['__COMBINED__'] as ReadonlySet<number> | undefined) ??
+                EMPTY_BIN_SELECTION;
+              const combinedMaterialisedBins = getMaterializedBinsForKey('__COMBINED__');
+              const combinedHasSelection = combinedSelection.size > 0;
+              const combinedScopeMismatch =
+                combinedHasSelection && !combinedMaterialisedBins;
+              const visibleMatchedTexts = colourMatches
+                ? allMatchedTexts.filter((t) => !hiddenMatchedTexts.has(t))
+                : null;
+              const allLegendHidden =
+                visibleMatchedTexts !== null
+                && allMatchedTexts.length > 0
+                && visibleMatchedTexts.length === 0;
+              const combinedDetachDisabled =
+                combinedLoading
+                || !searchWord.trim()
+                || combinedNodeIds.length === 0
+                || combinedScopeMismatch
+                || allLegendHidden;
+              const combinedDetachTitle = combinedScopeMismatch
+                ? 'Materialise the corpus first (Process Both) to safely apply this bin selection across all source documents.'
+                : allLegendHidden
+                  ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
+                  : combinedHasSelection
+                    ? 'Add a per-document aggregation of the selected bin hits to the workspace'
+                    : 'Add a per-document aggregation of all hits to the workspace';
+              return (
+                <Button
+                  onClick={() => {
+                    if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                    const nodes = combinedNodeIds
+                      .map((nid) => {
+                        const col = effectiveNodeColumnSelections.find(
+                          (s) => s.nodeId === nid,
+                        )?.column;
+                        if (!col) return null;
+                        const sourceNode = panelSelectedNodes.find(
+                          (node, idx) => getNodeIdentifier(node, idx) === nid,
+                        );
+                        const label =
+                          (sourceNode?.name || sourceNode?.id || nid) as string;
+                        return { nodeId: nid, column: col, nodeLabel: label };
+                      })
+                      .filter(
+                        (
+                          n,
+                        ): n is { nodeId: string; column: string; nodeLabel: string } =>
+                          n !== null,
+                      );
+                    void onDispersionDetach(nodes, combinedSelection, binCount, {
+                      selectedMatchedTexts: visibleMatchedTexts,
+                      matchCaseInsensitive: lowercaseMatches,
+                    });
+                  }}
+                  disabled={combinedDetachDisabled}
+                  size="sm"
+                  className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                  title={combinedDetachTitle}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Workspace
+                  {combinedHasSelection ? ` (${combinedSelection.size} bin${combinedSelection.size === 1 ? '' : 's'})` : ''}
+                </Button>
+              );
+            })()}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card">
@@ -260,7 +349,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     <TableHead
                       key={c}
                       className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                      style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}
+                      style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : metadataColumnStyle}
                     >
                       {c}
                     </TableHead>
@@ -327,7 +416,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                         }}
                       >
                         {displayColumns.map((c: string, i: number) => (
-                          <TableCell key={i} style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}>
+                          <TableCell key={i} style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : metadataColumnStyle}>
                             {c === CONCORDANCE_DISPERSION_COLUMN ? (
                               <ConcordanceDispersionCell
                                 hits={getDispersionHits(row)}
@@ -350,14 +439,12 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               </TableBody>
             </Table>
           </AnalysisTableScrollArea>
-          <AnalysisPagination
-            page={combinedPage}
-            pageSize={globalPageSize}
-            hasNext={combinedHasNext}
-            hasPrev={combinedHasPrev}
-            totalPages={nodeData.pagination?.total_source_pages}
-            onPageChange={(newPage) => setCombinedPage(newPage)}
-            pageSizeSummary={nodeData.materialized
+          {(() => {
+            // Page-size summary is rendered ABOVE the pagination row so the
+            // "Found N instances in M documents..." line doesn't have to
+            // compete for horizontal space with the page-size selector and
+            // the page buttons.
+            const summary = nodeData.materialized
               ? (Object.keys(materializeSummaries).length > 0
                 ? <GroupedResultsPageSizeSummary
                     groups={[]}
@@ -365,9 +452,21 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     totalDocuments={Object.values(materializeSummaries).reduce((sum, s) => sum + s.uniqueDocuments, 0)}
                     totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
                   />
-                : undefined)
-              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />
-            }
+                : null)
+              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />;
+            return summary ? (
+              <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+                {summary}
+              </div>
+            ) : null;
+          })()}
+          <AnalysisPagination
+            page={combinedPage}
+            pageSize={globalPageSize}
+            hasNext={combinedHasNext}
+            hasPrev={combinedHasPrev}
+            totalPages={nodeData.pagination?.total_source_pages}
+            onPageChange={(newPage) => setCombinedPage(newPage)}
             loading={combinedLoading}
           />
           {colourMatches && allMatchedTexts.length > 0 && (
@@ -406,6 +505,17 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 materialisedBins={materialisedBins}
                 materialised={materialised}
                 aggregateAll={!colourMatches}
+                chartType={dispersionChartType}
+                onChartTypeChange={onDispersionChartTypeChange}
+                onBinCountChange={onBinCountChange}
+                selection={{
+                  selectedIndices:
+                    (selectedBinIndices['__COMBINED__'] as ReadonlySet<number> | undefined) ??
+                    EMPTY_BIN_SELECTION,
+                  onSelect: (index, shiftHeld) =>
+                    onBinSelect('__COMBINED__', index, shiftHeld),
+                  onClear: () => onClearBinSelection('__COMBINED__'),
+                }}
               />
             );
           })()}
@@ -429,6 +539,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
   const displayColumns = dedupeColumns(rawDisplayColumns);
   const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
   const dispersionColumnStyle = getDispersionColumnStyle(showMetadata, resultsViewportWidth);
+  const metadataColumnStyle = getMetadataColumnStyle(showMetadata);
 
   const currentNodePagination = nodePagination[paginationKey];
   const currentPage = currentNodePagination?.currentPage ?? 1;
@@ -468,7 +579,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                   <TableHead
                     key={key}
                     className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                    style={key === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}
+                    style={key === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : metadataColumnStyle}
                   >
                     {key}
                   </TableHead>
@@ -497,7 +608,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     }}
                   >
                     {tableColumns.map((colKey: string, cellIndex) => (
-                      <TableCell key={cellIndex} style={colKey === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}>
+                      <TableCell key={cellIndex} style={colKey === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : metadataColumnStyle}>
                         {colKey === CONCORDANCE_DISPERSION_COLUMN ? (
                           <ConcordanceDispersionCell
                             hits={getDispersionHits(row)}
@@ -521,14 +632,8 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
         </AnalysisTableScrollArea>
       </div>
 
-      <AnalysisPagination
-        page={currentPage}
-        pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
-        hasNext={hasNext}
-        hasPrev={hasPrev}
-        totalPages={nodeData.pagination?.total_source_pages}
-        onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-        pageSizeSummary={nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
+      {(() => {
+        const summary = nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
           ? <GroupedResultsPageSizeSummary
               groups={[]}
               totalInstances={materializeSummaries[detachNodeId].recordCount}
@@ -536,9 +641,21 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
             />
           : (nodeData.materialized
-            ? undefined
-            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />)
-        }
+            ? null
+            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />);
+        return summary ? (
+          <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+            {summary}
+          </div>
+        ) : null;
+      })()}
+      <AnalysisPagination
+        page={currentPage}
+        pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
+        hasNext={hasNext}
+        hasPrev={hasPrev}
+        totalPages={nodeData.pagination?.total_source_pages}
+        onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
         loading={nodeIsLoading}
       >
         <Button
@@ -568,25 +685,69 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             <>Process All</>
           )}
         </Button>
-        <Button
-          onClick={() => {
-            if (detachNodeId) {
-              const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-              const detachLabel = (detachNode?.name || nodeKey) as string;
-              openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
-            }
-          }}
-          disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
-          size="sm"
-          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title="Create a new data block with concordance results joined to the original table"
-        >
-          {isDetaching ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
-          ) : (
-            <><Plus className="mr-2 h-4 w-4" />Add to Workspace</>
-          )}
-        </Button>
+        {(() => {
+          const nodeSelection =
+            (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
+            EMPTY_BIN_SELECTION;
+          const nodeMaterialisedBins = getMaterializedBinsForKey(nodeKey);
+          const nodeHasSelection = nodeSelection.size > 0;
+          const nodeScopeMismatch =
+            nodeHasSelection && !nodeMaterialisedBins;
+          const visibleMatchedTexts = colourMatches
+            ? allMatchedTexts.filter((t) => !hiddenMatchedTexts.has(t))
+            : null;
+          const allLegendHidden =
+            visibleMatchedTexts !== null
+            && allMatchedTexts.length > 0
+            && visibleMatchedTexts.length === 0;
+          const nodeDetachDisabled =
+            nodeIsLoading
+            || isDetaching
+            || !searchWord.trim()
+            || !canDetach
+            || !detachNodeId
+            || nodeScopeMismatch
+            || allLegendHidden;
+          const nodeDetachTitle = nodeScopeMismatch
+            ? 'Materialise the corpus first (Process All) to safely apply this bin selection across all documents.'
+            : allLegendHidden
+              ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
+              : nodeHasSelection
+                ? 'Add a per-document aggregation of the selected bin hits to the workspace'
+                : 'Add a per-document aggregation of all hits to the workspace';
+          return (
+            <Button
+              onClick={() => {
+                if (!detachNodeId) return;
+                const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
+                const label = (detachNode?.name || nodeKey) as string;
+                void onDispersionDetach(
+                  [{ nodeId: detachNodeId, column, nodeLabel: label }],
+                  nodeSelection,
+                  binCount,
+                  {
+                    selectedMatchedTexts: visibleMatchedTexts,
+                    matchCaseInsensitive: lowercaseMatches,
+                  },
+                );
+              }}
+              disabled={nodeDetachDisabled}
+              size="sm"
+              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+              title={nodeDetachTitle}
+            >
+              {isDetaching ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Workspace
+                  {nodeHasSelection ? ` (${nodeSelection.size} bin${nodeSelection.size === 1 ? '' : 's'})` : ''}
+                </>
+              )}
+            </Button>
+          );
+        })()}
       </AnalysisPagination>
       {colourMatches && allMatchedTexts.length > 0 && (
         <ConcordanceDispersionLegend
@@ -623,6 +784,16 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             materialisedBins={materialisedBins}
             materialised={materialised}
             aggregateAll={!colourMatches}
+            chartType={dispersionChartType}
+            onChartTypeChange={onDispersionChartTypeChange}
+            onBinCountChange={onBinCountChange}
+            selection={{
+              selectedIndices:
+                (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
+                EMPTY_BIN_SELECTION,
+              onSelect: (index, shiftHeld) => onBinSelect(nodeKey, index, shiftHeld),
+              onClear: () => onClearBinSelection(nodeKey),
+            }}
           />
         );
       })()}

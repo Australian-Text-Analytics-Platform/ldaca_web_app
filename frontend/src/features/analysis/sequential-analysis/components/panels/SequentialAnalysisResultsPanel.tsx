@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download } from 'lucide-react';
+import { Download, Info } from 'lucide-react';
 
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { SequentialChart } from '../SequentialChart';
+import { SequentialChart, type SequentialXAxisType } from '../SequentialChart';
 import type { ChartTypeOption } from '../../hooks/useSequentialAnalysisTaskFlow';
 
 interface ResultsSummary {
@@ -42,6 +42,8 @@ export interface SequentialAnalysisResultsPanelProps {
   onMinGroupSizeChange: (value: string) => void;
   chartType: ChartTypeOption;
   onChartTypeChange: (value: ChartTypeOption) => void;
+  xAxisType: SequentialXAxisType;
+  onXAxisTypeChange: (value: SequentialXAxisType) => void;
   onDownloadClick: () => void;
 
   chartData: Array<Record<string, unknown>>;
@@ -76,6 +78,8 @@ export const SequentialAnalysisResultsPanel: React.FC<SequentialAnalysisResultsP
   onMinGroupSizeChange,
   chartType,
   onChartTypeChange,
+  xAxisType,
+  onXAxisTypeChange,
   onDownloadClick,
   chartData,
   chartConfig,
@@ -129,6 +133,32 @@ export const SequentialAnalysisResultsPanel: React.FC<SequentialAnalysisResultsP
             <SelectItem value="line">Line Chart</SelectItem>
             <SelectItem value="bar">Bar Chart</SelectItem>
             <SelectItem value="area">Area Chart</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="flex items-center gap-1 text-sm text-muted-foreground">
+          X-axis
+          <Info
+            className="h-3.5 w-3.5 cursor-help text-muted-foreground/70"
+            aria-hidden="true"
+          />
+        </span>
+        <Select
+          value={xAxisType}
+          onValueChange={(value) => onXAxisTypeChange(value as SequentialXAxisType)}
+        >
+          <SelectTrigger
+            className="w-35 text-sm"
+            title={
+              xAxisType === 'number'
+                ? 'Linear axis: time positions are spaced proportionally. Periods with no data appear as visible gaps — accurate but can look sparse for irregular series.'
+                : 'Categorical axis: every recorded period is given equal width. Missing periods are hidden, which makes dense series easier to read but can mask gaps in time.'
+            }
+          >
+            <SelectValue placeholder="X-axis type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="category">Categorical</SelectItem>
+            <SelectItem value="number">Linear</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -199,6 +229,7 @@ export const SequentialAnalysisResultsPanel: React.FC<SequentialAnalysisResultsP
 
       <SequentialChart
         chartType={chartType}
+        xAxisType={xAxisType}
         chartData={chartData}
         chartConfig={chartConfig}
         groupKeys={groupKeys}

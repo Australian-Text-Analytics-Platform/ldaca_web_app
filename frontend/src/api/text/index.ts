@@ -25,6 +25,7 @@ export type {
   ConcordanceDetachOptionsResponse,
   ConcordanceDetachRequest,
   ConcordanceDispersionBinRow,
+  ConcordanceDispersionDetachRequest,
   ConcordanceDispersionBinsResponse,
   ConcordanceGroupedRow,
   ConcordanceHitRow,

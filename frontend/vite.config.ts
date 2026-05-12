@@ -31,6 +31,15 @@ const gitShortSha = (() => {
 
 process.env.VITE_APP_VERSION ??= packageVersion;
 process.env.VITE_APP_BUILD ??= gitShortSha;
+// Build date in DD/MMM/YYYY form — matches the human-readable footer in
+// the references panel and lets the markdown there reference
+// `{{BUILD_DATE}}` instead of carrying a hand-edited date.
+process.env.VITE_APP_BUILD_DATE ??= (() => {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${day}/${months[now.getMonth()]}/${now.getFullYear()}`;
+})();
 
 const serverConfig = {
   port: Number(process.env.FRONTEND_PORT ?? 3002),

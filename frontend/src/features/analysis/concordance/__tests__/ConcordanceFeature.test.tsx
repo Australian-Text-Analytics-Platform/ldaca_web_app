@@ -473,7 +473,7 @@ describe('ConcordanceFeature', () => {
     unmount();
   });
 
-  it('keeps the dispersion column at half the table width when metadata is shown', async () => {
+  it('keeps the dispersion column at 85% of the table width when metadata is shown', async () => {
     const clientWidthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
     mockInitialResult = {
       state: 'successful',
@@ -534,7 +534,12 @@ describe('ConcordanceFeature', () => {
     await waitFor(() => {
       expect(screen.getByRole('columnheader', { name: /speaker/i })).toBeInTheDocument();
     });
-    expect(screen.getByRole('columnheader', { name: 'CONC_dispersion' })).toHaveStyle({ width: '400px' });
+    // 800 × 0.85 = 680. Metadata columns get a 200 px minimum so the table
+    // can extend beyond the viewport, exposing the ScrollArea's horizontal
+    // scrollbar — the user keeps a long dispersion bar and still discovers
+    // any metadata that wouldn't otherwise fit.
+    expect(screen.getByRole('columnheader', { name: 'CONC_dispersion' })).toHaveStyle({ width: '680px' });
+    expect(screen.getByRole('columnheader', { name: 'speaker' })).toHaveStyle({ minWidth: '200px' });
 
     unmount();
     clientWidthSpy.mockRestore();

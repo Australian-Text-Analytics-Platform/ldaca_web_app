@@ -11,6 +11,7 @@ import { filesApi } from '@/api/files';
 import { workspacesApi } from '@/api/workspaces';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useAnalysisStore, isRunningTaskState, isPendingTaskState } from '@/stores/analysisStore';
 import { type FileTreeDirectory } from '@/types';
 import { AddFilePanel, FilePreviewPanel } from '@/components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -469,6 +470,17 @@ export const DataLoaderFeature: React.FC = () => {
 
   const workspaceFolder = dataFolder || 'data/';
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
+  // Block workspace switching/unloading while a task on the active workspace
+  // is still running — switching while a materialisation is in flight has
+  // corrupted the workspace state in past incidents.
+  const tasks = useAnalysisStore((state) => state.tasks);
+  const hasActiveTask = currentWorkspaceId
+    ? tasks.some(
+        (task) =>
+          task.workspace_id === currentWorkspaceId &&
+          (isRunningTaskState(task.state) || isPendingTaskState(task.state)),
+      )
+    : false;
 
   return (
     <div className="flex h-[calc(100vh-9rem)] min-h-[640px] flex-col gap-4">
@@ -498,6 +510,7 @@ export const DataLoaderFeature: React.FC = () => {
               currentWorkspace={currentWorkspace}
               nodeCount={nodeCount}
               busy={workspaceBusy}
+              hasActiveTask={hasActiveTask}
               onCreate={handleCreateWorkspace}
               onRename={handleRenameWorkspace}
               onUpdateDescription={handleUpdateWorkspaceDescription}
@@ -509,6 +522,7 @@ export const DataLoaderFeature: React.FC = () => {
           workspaces={sortedWorkspaces}
           currentWorkspaceId={currentWorkspaceId}
           busy={workspaceBusy}
+          hasActiveTask={hasActiveTask}
           uploadingZip={uploadingWorkspaceZip}
           refreshing={refreshingWorkspaces}
           downloads={workspaceDownloads}

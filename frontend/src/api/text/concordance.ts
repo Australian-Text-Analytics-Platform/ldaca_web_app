@@ -39,6 +39,52 @@ export interface ConcordanceDetachRequest {
   materialized_path?: string | null;
 }
 
+/**
+ * Detach a per-document aggregation of concordance hits from the dispersion
+ * view. Output rows are one-per-source-document with hits collapsed into
+ * `List<T>` columns and a multi-line `CONC_extraction` string.
+ *
+ * When `selected_bins` is provided, only hits whose position
+ * (`start_idx / doc_length * total_bins`, floored) lands in one of the bins
+ * are included — matches the "in-range hits only" semantic of the chart.
+ */
+export interface ConcordanceDispersionDetachRequest {
+  column: string;
+  search_word: string;
+  num_left_tokens?: number;
+  num_right_tokens?: number;
+  regex?: boolean;
+  whole_word?: boolean;
+  case_sensitive?: boolean;
+  new_node_name?: string;
+  selected_columns?: string[];
+  /**
+   * Parent concordance analysis task id. When set and the slow path runs,
+   * the worker writes the materialised parquet too and publishes the same
+   * `analysis_materialized` event that "Process All" emits — saving the
+   * user from a redundant materialisation when they iterate on bin
+   * selections after a no-selection detach.
+   */
+  parent_task_id?: string;
+  materialized_path?: string | null;
+  selected_bins?: number[];
+  total_bins?: number;
+  /**
+   * Legend-filter projection: when set, only hits whose `CONC_matched_text`
+   * is in this list contribute to the per-document aggregation. Omit (or set
+   * to `undefined`) for "all matches". An empty array means "none" and the
+   * backend returns a zero-row aggregate.
+   */
+  selected_matched_texts?: string[];
+  /**
+   * Mirrors the chart's `lowercaseMatches` toggle. When true, the backend
+   * lowercases both `CONC_matched_text` and `selected_matched_texts` before
+   * the `is_in` check so a single lowercase legend entry matches all original
+   * case variants in the corpus.
+   */
+  match_case_insensitive?: boolean;
+}
+
 export interface ConcordanceMaterializeRequest {
   parent_task_id: string;
   column: string;
@@ -136,6 +182,20 @@ export const concordanceApi = {
     headers: Record<string, string> = {},
   ): Promise<void> => {
     await post(`/workspaces/nodes/${node}/concordance/detach`, req, headers);
+  },
+
+  concordanceDispersionDetach: async (
+    node: string,
+    req: ConcordanceDispersionDetachRequest,
+    headers: Record<string, string> = {},
+  ): Promise<{ task_id?: string }> => {
+    const resp = await post<{
+      state: string;
+      message: string;
+      data: null;
+      metadata?: { task_id?: string };
+    }>(`/workspaces/nodes/${node}/concordance/dispersion-detach`, req, headers);
+    return { task_id: resp?.metadata?.task_id };
   },
 
   concordanceMaterialize: (

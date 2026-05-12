@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import HelpIcon from '@/components/help/HelpIcon';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useShallow } from 'zustand/react/shallow';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { formatBytes, formatTimestamp, getWorkspaceId } from '../utils/format';
@@ -31,6 +32,7 @@ export type WorkspaceManagerCardProps = {
   workspaces: WorkspaceListItem[];
   currentWorkspaceId: string | null;
   busy: boolean;
+  hasActiveTask?: boolean;
   uploadingZip: boolean;
   refreshing: boolean;
   downloads: PendingWorkspaceDownloadsHandle;
@@ -44,6 +46,7 @@ export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
   workspaces,
   currentWorkspaceId,
   busy,
+  hasActiveTask = false,
   uploadingZip,
   refreshing,
   downloads,
@@ -181,13 +184,24 @@ export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant={isActive ? 'outline' : 'secondary'}
-                      onClick={() => onLoadWorkspace(isActive ? null : workspaceId)}
+                    <DisabledReasonTooltip
+                      reason={
+                        hasActiveTask
+                          ? isActive
+                            ? 'A task is still running on this workspace. Wait for it to finish, or cancel it from the task list, before unloading.'
+                            : 'A task is still running on the current workspace. Wait for it to finish, or cancel it from the task list, before switching workspaces.'
+                          : undefined
+                      }
                     >
-                      {isActive ? 'Unload' : 'Load'}
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant={isActive ? 'outline' : 'secondary'}
+                        onClick={() => onLoadWorkspace(isActive ? null : workspaceId)}
+                        disabled={hasActiveTask}
+                      >
+                        {isActive ? 'Unload' : 'Load'}
+                      </Button>
+                    </DisabledReasonTooltip>
                     <Button
                       size="sm"
                       variant="outline"

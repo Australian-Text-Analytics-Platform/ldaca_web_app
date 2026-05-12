@@ -41,6 +41,7 @@ import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach
 import { useSequentialResultSummary } from './hooks/useSequentialResultSummary';
 import { SequentialAnalysisParameterPanel } from './components/panels/SequentialAnalysisParameterPanel';
 import { SequentialAnalysisResultsPanel } from './components/panels/SequentialAnalysisResultsPanel';
+import type { SequentialXAxisType } from './components/SequentialChart';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   downloadChartAs,
@@ -122,6 +123,7 @@ const SequentialAnalysisFeature = () => {
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
   const [frequency, setFrequency] = useState<SequentialFrequency>('daily');
   const [chartType, setChartType] = useState<ChartTypeOption>('line');
+  const [xAxisType, setXAxisType] = useState<SequentialXAxisType>('category');
   const [caseSensitive, setCaseSensitive] = useState(true);
   const [numericOriginInput, setNumericOriginInput] = useState<string>('');
   const [numericIntervalInput, setNumericIntervalInput] = useState<string>('1');
@@ -830,6 +832,8 @@ const SequentialAnalysisFeature = () => {
           onMinGroupSizeChange={setMinGroupSizeInput}
           chartType={chartType}
           onChartTypeChange={handleChartTypeChange}
+          xAxisType={xAxisType}
+          onXAxisTypeChange={setXAxisType}
           onDownloadClick={() => setDownloadDialogOpen(true)}
           chartData={chartData}
           chartConfig={chartConfig}

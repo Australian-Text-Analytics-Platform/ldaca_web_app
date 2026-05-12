@@ -177,7 +177,15 @@ export function useConcordanceMaterializedEvents({
     if (!effectiveTaskId) return;
     for (const event of materializedEvents) {
       if (processedMaterializedEventSeqRef.current.has(event.sequence)) continue;
-      if (event.taskType !== 'concordance_materialize') continue;
+      // Accept events from both standalone "Process All" and the
+      // dispersion-detach side-effect: the latter writes the same flat
+      // parquet, so the materialised-paths cache should pick it up either
+      // way and the dispersion view's scope dropdown then flips to
+      // "whole data block" automatically.
+      if (
+        event.taskType !== 'concordance_materialize'
+        && event.taskType !== 'concordance_dispersion_detach'
+      ) continue;
       if (event.parentTaskId !== effectiveTaskId) continue;
       processedMaterializedEventSeqRef.current.add(event.sequence);
       setMaterializedPaths((prev) => ({ ...prev, [event.parentNodeId]: event.materializedPath }));

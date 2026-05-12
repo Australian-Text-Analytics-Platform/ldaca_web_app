@@ -106,6 +106,17 @@ Three plot modes are available in the **Chart Type** dropdown:
 - **Bar Chart** — best for highlighting contrast between categories at each time step.
 - **Area Chart** — stacks all groups on top of each other. Works best when groups emerge or disappear over time and you want to see total volume alongside composition.
 
+<h3 id="help-sequential-x-axis">X-axis: Categorical vs Linear</h3>
+
+The **X-axis** dropdown next to the chart type selector switches the horizontal axis between two modes:
+
+- **Categorical** *(default)* — every time bucket gets an equal slot on the axis, regardless of the real gap between them. Best when buckets are dense and you want a clean, evenly-spaced view.
+- **Linear** — the axis is a true number/date line and bucket positions are proportional to their values. Gaps in the data become visible as visible gaps on the axis. Useful for spotting unevenly-spaced events or comparing rates of change across long time spans.
+
+In Linear mode with a datetime column, axis ticks render as date labels (e.g. *Apr 2018*) rather than raw epoch numbers. The tool aims for about ten ticks across the visible range, dropping labels automatically if the chart is too narrow.
+
+**Missing buckets are shown as zero.** When a group has no documents in a given bucket, the line stays connected and dips to zero rather than breaking. This matches the analytical intent — "no occurrences" is genuinely zero, not unknown — and is most visible in Linear mode where the gap distance is proportional to time.
+
 <h3 id="help-sequential-download">Download chart</h3>
 
 Click the download button (↓ icon) in the results header to export the chart. A dialog lets you choose the format: PNG, SVG, or PDF. The exported file includes a header block with the data block name, time column, frequency, and document counts, plus a legend.
@@ -161,6 +172,7 @@ Trends and Sequence results are saved in the backend so the tab can reload and r
 | Case Sensitive | Off | Only appears when a group-by column is added |
 | Min Group Size | 10 | Set to 0 to show all groups |
 | Chart Type | Line Chart | — |
+| X-axis | Categorical | Switch to Linear for time-proportional spacing |
 
 ## Practice exercise
 

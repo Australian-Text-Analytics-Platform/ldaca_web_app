@@ -1,14 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -20,13 +11,20 @@ import {
   type ChartExportLegendItem,
   type ChartImageFormat,
 } from '@/lib/chartExport';
+import {
+  MultiSeriesChart,
+  type MultiSeriesChartSeries,
+  type MultiSeriesChartType,
+} from '@/features/analysis/common/components/MultiSeriesChart';
 
 import {
   buildDispersionBins,
   buildDispersionBinsFromBinned,
   DISPERSION_AGGREGATE_KEY,
+  DISPERSION_DISPLAY_BIN_COUNTS,
   DISPERSION_SOURCE_DELIMITER,
   type ConcordanceDispersionRow,
+  type DispersionDisplayBinCount,
   type TaggedBinRow,
 } from '../concordanceViewModels';
 
@@ -60,6 +58,18 @@ type Props = {
    * aggregate line in a default colour, with no per-matched-text breakdown.
    */
   aggregateAll?: boolean;
+  /** Chart primitive. Default 'line'. */
+  chartType?: MultiSeriesChartType;
+  /** Change handler for the chart-type selector in the header. */
+  onChartTypeChange?: (value: MultiSeriesChartType) => void;
+  /** Change handler for the bin-count selector in the header. */
+  onBinCountChange?: (value: DispersionDisplayBinCount) => void;
+  /** Click-to-select bins. Omitted = selection disabled. */
+  selection?: {
+    selectedIndices: ReadonlySet<number>;
+    onSelect: (index: number, shiftHeld: boolean) => void;
+    onClear: () => void;
+  };
 };
 
 const AGGREGATE_DEFAULT_COLOR = '#0284c7';
@@ -116,21 +126,25 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
   materialisedBins,
   materialised = false,
   aggregateAll = false,
+  chartType = 'line',
+  onChartTypeChange,
+  onBinCountChange,
+  selection,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
 
   const materialisedBinsReady = !!materialisedBins;
-  const [showAllProcessed, setShowAllProcessed] = useState<boolean>(materialised);
-  // Auto-enable the toggle the *first* time `materialised` becomes true (so
-  // a fresh materialisation immediately switches the plot to all-processed
-  // mode). After that, respect the user's manual choice — otherwise a
-  // transient false→true flip in `materialised` (e.g. when
-  // `panelSelectedNodes` is momentarily empty during navigation) would
-  // re-tick a checkbox the user had just un-ticked. Implemented via the
-  // React-blessed render-time set-state pattern, gated by a sticky flag.
-  const [hasAutoEnabledShowAll, setHasAutoEnabledShowAll] = useState<boolean>(materialised);
-  if (materialised && !hasAutoEnabledShowAll) {
+  const [showAllProcessed, setShowAllProcessed] = useState<boolean>(materialisedBinsReady);
+  // Auto-enable the scope dropdown the *first* time the corpus bins finish
+  // loading (so a fresh materialisation immediately switches the plot to
+  // whole-data-block mode once the data is actually ready). After that,
+  // respect the user's manual choice — otherwise a transient false→true
+  // flip in `materialisedBins` (e.g. workspace navigation) would re-select
+  // an option the user had just deselected. React-blessed render-time
+  // set-state pattern, gated by a sticky flag.
+  const [hasAutoEnabledShowAll, setHasAutoEnabledShowAll] = useState<boolean>(materialisedBinsReady);
+  if (materialisedBinsReady && !hasAutoEnabledShowAll) {
     setHasAutoEnabledShowAll(true);
     setShowAllProcessed(true);
   }
@@ -155,25 +169,15 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
     });
   }, [useMaterialised, materialisedBins, rows, textColumn, binCount, lowercaseMatches, splitBySource, aggregateAll]);
 
-  const title = useMaterialised
-    ? `Aggregated matches of data block - ${dataBlockLabel}`
-    : 'Aggregated matches of the documents above';
+  const aggregationLabel = useMaterialised ? 'whole data block' : 'page above';
+  const titleText = `${dataBlockLabel}: aggregated matches at relative locations of documents from ${aggregationLabel}`;
 
   const visibleTexts = useMemo(
     () => allMatchedTexts.filter((t) => !hiddenMatchedTexts.has(t)),
     [allMatchedTexts, hiddenMatchedTexts],
   );
 
-  type SeriesConfig = {
-    key: string;
-    color: string;
-    dash: string | undefined;
-    name: string;
-    text: string;
-    source: string | null;
-  };
-
-  const series: SeriesConfig[] = useMemo(() => {
+  const series: MultiSeriesChartSeries[] = useMemo(() => {
     if (aggregateAll) {
       // No matched-text differentiation. If the user wants split-by-source,
       // emit one aggregate line per source (solid/dashed); otherwise a
@@ -183,23 +187,18 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
           key: `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${src}`,
           color: AGGREGATE_DEFAULT_COLOR,
           dash: SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length],
-          name: `${AGGREGATE_LINE_LABEL} (${src})`,
-          text: AGGREGATE_LINE_LABEL,
-          source: src,
+          label: `${AGGREGATE_LINE_LABEL} (${src})`,
         }));
       }
       return [
         {
           key: DISPERSION_AGGREGATE_KEY,
           color: AGGREGATE_DEFAULT_COLOR,
-          dash: undefined,
-          name: AGGREGATE_LINE_LABEL,
-          text: AGGREGATE_LINE_LABEL,
-          source: null,
+          label: AGGREGATE_LINE_LABEL,
         },
       ];
     }
-    const out: SeriesConfig[] = [];
+    const out: MultiSeriesChartSeries[] = [];
     for (const text of visibleTexts) {
       const color = matchedTextColors[text] ?? AGGREGATE_DEFAULT_COLOR;
       if (splitBySource && sources.length > 0) {
@@ -208,13 +207,11 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
             key: `${text}${DISPERSION_SOURCE_DELIMITER}${src}`,
             color,
             dash: SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length],
-            name: `${text} (${src})`,
-            text,
-            source: src,
+            label: `${text} (${src})`,
           });
         });
       } else {
-        out.push({ key: text, color, dash: undefined, name: text, text, source: null });
+        out.push({ key: text, color, label: text });
       }
     }
     return out;
@@ -231,7 +228,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
       return;
     }
     const header: ChartExportHeaderItem[] = [
-      { label: 'Title', value: title },
+      { label: 'Title', value: titleText },
       { label: 'Search', value: searchWord || '—' },
       { label: 'Bins', value: String(binCount) },
       ...(splitBySource && sources.length > 0
@@ -279,16 +276,59 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
 
   return (
     <div className="mt-4 space-y-2">
-      <div className="flex items-center justify-end gap-3">
-        {materialised && (
-          <label className="flex items-center gap-2 text-sm text-foreground" title={materialisedBinsReady ? undefined : 'Loading materialised bins…'}>
-            <input
-              type="checkbox"
-              checked={showAllProcessed}
-              onChange={(e) => setShowAllProcessed(e.target.checked)}
-              className="h-4 w-4"
-            />
-            <span>All processed{showAllProcessed && !materialisedBinsReady ? ' (loading…)' : ''}</span>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {selection && selection.selectedIndices.size > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={selection.onClear}
+          >
+            Clear Selection ({selection.selectedIndices.size})
+          </Button>
+        )}
+        {onBinCountChange && (
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <span>Bin No.</span>
+            <select
+              value={binCount}
+              onChange={(e) => {
+                const parsed = Number.parseInt(
+                  e.target.value,
+                  10,
+                ) as DispersionDisplayBinCount;
+                if (
+                  (DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(
+                    parsed,
+                  )
+                ) {
+                  onBinCountChange(parsed);
+                }
+              }}
+              className="h-7 rounded border border-input bg-background px-2 text-sm"
+            >
+              {DISPERSION_DISPLAY_BIN_COUNTS.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {onChartTypeChange && (
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <span>Chart</span>
+            <select
+              value={chartType}
+              onChange={(e) =>
+                onChartTypeChange(e.target.value as MultiSeriesChartType)
+              }
+              className="h-7 rounded border border-input bg-background px-2 text-sm"
+            >
+              <option value="line">Line</option>
+              <option value="bar">Bar</option>
+              <option value="area">Area</option>
+            </select>
           </label>
         )}
         <Button
@@ -301,46 +341,64 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
           <Download className="h-4 w-4" />
         </Button>
       </div>
-      <div ref={chartContainerRef} className="w-full">
-        <ResponsiveContainer width="100%" height={240} minWidth={0}>
-          <LineChart data={bins} margin={{ top: 10, right: 24, bottom: 10, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="binCenter"
-              type="number"
-              domain={[0, 100]}
-              ticks={X_AXIS_TICKS}
-              tickFormatter={formatTickLabel}
-            />
-            <YAxis allowDecimals={false} />
-            <Tooltip
-              formatter={(value, name) => {
-                const rawName = String(name);
-                const { text, source } = stripSeriesKey(rawName);
-                const displayText = text === DISPERSION_AGGREGATE_KEY ? AGGREGATE_LINE_LABEL : text;
-                return [value as number, source ? `${displayText} (${source})` : displayText];
-              }}
-              labelFormatter={(label) => formatBinRange(Number(label), binCount)}
-            />
-            {series.map((s) => (
-              <Line
-                key={s.key}
-                type="monotone"
-                dataKey={s.key}
-                stroke={s.color}
-                strokeWidth={2}
-                strokeDasharray={s.dash}
-                dot={false}
-                activeDot={{ r: 3 }}
-                name={s.name}
-                isAnimationActive={false}
-                connectNulls
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+      <MultiSeriesChart
+        data={bins}
+        xKey="binCenter"
+        series={series}
+        chartType={chartType}
+        height={240}
+        margin={{ top: 10, right: 24, bottom: 10, left: 0 }}
+        xAxis={{
+          type: 'number',
+          domain: [0, 100],
+          ticks: X_AXIS_TICKS,
+          tickFormatter: formatTickLabel as never,
+        }}
+        yAxis={{ allowDecimals: false }}
+        tooltip={{
+          labelFormatter: ((label: unknown) =>
+            formatBinRange(Number(label), binCount)) as never,
+          valueFormatter: ((value: unknown, name: unknown) => {
+            const rawName = String(name);
+            const { text, source } = stripSeriesKey(rawName);
+            const displayText =
+              text === DISPERSION_AGGREGATE_KEY ? AGGREGATE_LINE_LABEL : text;
+            return [
+              value as number,
+              source ? `${displayText} (${source})` : displayText,
+            ];
+          }) as never,
+        }}
+        selection={
+          selection
+            ? {
+                selectedIndices: selection.selectedIndices,
+                onSelect: selection.onSelect,
+              }
+            : undefined
+        }
+        interactive={!!selection}
+        animate={false}
+        connectNulls
+        containerRef={chartContainerRef}
+      />
+      <div className="flex flex-wrap items-center justify-center gap-2 text-center text-sm font-medium text-foreground">
+        <span>
+          {dataBlockLabel}: aggregated matches at relative locations of documents from
+        </span>
+        <select
+          value={showAllProcessed ? 'whole' : 'page'}
+          disabled={!materialisedBinsReady}
+          onChange={(e) => setShowAllProcessed(e.target.value === 'whole')}
+          className="h-7 rounded border border-input bg-background px-2 text-sm font-medium"
+          aria-label="Aggregation scope"
+        >
+          <option value="page">page above</option>
+          {materialisedBinsReady && (
+            <option value="whole">whole data block</option>
+          )}
+        </select>
       </div>
-      <div className="text-center text-sm font-medium text-foreground">{title}</div>
       {splitBySource && sources.length > 0 && (
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
           {sources.map((src, idx) => {

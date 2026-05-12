@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { QuotationDetachDialog } from '../QuotationDetachDialog';
 
 describe('QuotationDetachDialog', () => {
-  it('shows generated quotation columns as mandatory and leaves optional metadata unchecked', () => {
+  it('hides mandatory columns and shows only optional picks unchecked', () => {
     render(
       <QuotationDetachDialog
         open
@@ -28,10 +28,12 @@ describe('QuotationDetachDialog', () => {
       />
     );
 
+    // Mandatory columns aren't rendered as checkboxes — the backend
+    // always includes them, so showing them as greyed-out rows would be
+    // visual noise.
     expect(screen.getByRole('checkbox', { name: /^text/i })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /QUOTE_quote/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /QUOTE_quote/i })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: /QUOTE_speaker/i })).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: /QUOTE_quote/i })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: /QUOTE_speaker/i })).toBeNull();
     expect(screen.getByRole('checkbox', { name: /speaker_role/i })).not.toBeChecked();
     expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeInTheDocument();
   });

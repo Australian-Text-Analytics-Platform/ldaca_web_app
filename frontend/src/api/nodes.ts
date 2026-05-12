@@ -45,7 +45,7 @@ export interface SliceRequest {
 interface JoinNodesRequest { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string; }
 interface JoinPreviewParams { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string; }
 interface CastNodeRequest { column: string; target_type: string; format?: string; }
-interface ConcatPreviewRequest { node_ids: string[]; }
+interface ConcatPreviewRequest { node_ids: string[]; deduplicate?: boolean; }
 interface ConcatRequest extends ConcatPreviewRequest { new_node_name?: string }
 export interface FilterPreviewResponse {
   data: Record<string, unknown>[];

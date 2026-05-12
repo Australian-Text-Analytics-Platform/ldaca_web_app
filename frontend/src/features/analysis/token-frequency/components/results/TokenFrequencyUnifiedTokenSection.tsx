@@ -261,13 +261,26 @@ export const TokenFrequencyUnifiedTokenSection = ({
 
       {(Array.isArray(statistics) && statistics.length > 0) && (
         <div className={view === 'list' ? undefined : 'hidden'}>
-          <TokenFrequencyStatisticsTable
-            statistics={statistics.filter(
-              (entry) => !appliedStopSet.has(String(entry?.token ?? '').toLowerCase()),
-            )}
-            onDownloadFrequencyCsv={onDownloadFrequencyCsv}
-            tokenFilter={tokenFilter}
-          />
+          {(() => {
+            // lastCompareNodeIds is ordered [reference, study]; the
+            // task-flow request builder puts the reference data block
+            // first via `orderedPanelNodeIds`.
+            const referenceId = lastCompareNodeIds[0] ?? null;
+            const studyId = lastCompareNodeIds[1] ?? null;
+            return (
+              <TokenFrequencyStatisticsTable
+                statistics={statistics.filter(
+                  (entry) => !appliedStopSet.has(String(entry?.token ?? '').toLowerCase()),
+                )}
+                onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+                tokenFilter={tokenFilter}
+                referenceNodeName={referenceId ? computeDisplayName(referenceId) : null}
+                referenceColor={referenceId ? getColorForNode(referenceId, 0) : null}
+                studyNodeName={studyId ? computeDisplayName(studyId) : null}
+                studyColor={studyId ? getColorForNode(studyId, 1) : null}
+              />
+            );
+          })()}
         </div>
       )}
     </div>

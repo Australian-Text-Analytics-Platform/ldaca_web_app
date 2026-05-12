@@ -55,4 +55,4 @@ These contributions have been essential in ensuring that the LDaCA webApp meets 
 
 © Language Data Commons of Australia (LDaCA)
 
-Version 0.3.0 - released on 09/May/2026.
+Version {{VERSION}} - released on {{BUILD_DATE}}.

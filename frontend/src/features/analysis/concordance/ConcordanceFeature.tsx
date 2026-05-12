@@ -12,6 +12,7 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
 import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
+import type { MultiSeriesChartType } from '@/features/analysis/common/components/MultiSeriesChart';
 import {
   hasLockedParameterDiff,
   resetAnalysisSelectionAfterClear,
@@ -40,6 +41,7 @@ import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { highlightMatchInText } from '../common/components/highlightText';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
+import { ConcordanceDispersionDetachDialog } from './components/ConcordanceDispersionDetachDialog';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import {
@@ -66,7 +68,12 @@ const ConcordanceFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
-  const { detachConcordance, materializeConcordance, selectNodes } = useWorkspaceActions();
+  const {
+    detachConcordance,
+    detachConcordanceDispersion,
+    materializeConcordance,
+    selectNodes,
+  } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'concordance';
   const { getColumnInfos } = useNodeColumnInfos({
@@ -119,6 +126,54 @@ const ConcordanceFeature: React.FC = () => {
   const [hiddenMatchedTexts, setHiddenMatchedTexts] = useState<Set<string>>(new Set());
   const [binCount, setBinCount] = useState<DispersionDisplayBinCount>(DISPERSION_DEFAULT_BIN_COUNT);
   const [combinedSourceMode, setCombinedSourceMode] = useState<'aggregate' | 'split'>('aggregate');
+  const [dispersionChartType, setDispersionChartType] =
+    useState<MultiSeriesChartType>('line');
+  const [selectedBinIndices, setSelectedBinIndices] = useState<
+    Record<string, Set<number>>
+  >({});
+  const lastSelectedBinRef = useRef<Record<string, number | null>>({});
+  const handleBinSelect = useCallback(
+    (blockKey: string, index: number, shiftHeld: boolean) => {
+      setSelectedBinIndices((prev) => {
+        const prevSet = prev[blockKey] ?? new Set<number>();
+        const next = new Set(prevSet);
+        const lastIdx = lastSelectedBinRef.current[blockKey];
+        if (shiftHeld && typeof lastIdx === 'number') {
+          const [from, to] = lastIdx < index ? [lastIdx, index] : [index, lastIdx];
+          for (let i = from; i <= to; i++) next.add(i);
+        } else if (next.has(index)) {
+          next.delete(index);
+        } else {
+          next.add(index);
+        }
+        return { ...prev, [blockKey]: next };
+      });
+      lastSelectedBinRef.current[blockKey] = index;
+    },
+    [],
+  );
+  const handleClearBinSelection = useCallback((blockKey: string) => {
+    setSelectedBinIndices((prev) => {
+      if (!prev[blockKey]) return prev;
+      const next: Record<string, Set<number>> = {};
+      for (const [key, value] of Object.entries(prev)) {
+        if (key !== blockKey) next[key] = value;
+      }
+      return next;
+    });
+    lastSelectedBinRef.current[blockKey] = null;
+  }, []);
+  // Bin indices identify ranges (e.g. index 7 = 70–80 % in a 10-bin chart but
+  // 7–8 % in a 100-bin chart). Selections are not portable across bin counts,
+  // so clear every block's selection whenever the bin count changes.
+  const handleBinCountChange = useCallback(
+    (value: DispersionDisplayBinCount) => {
+      setBinCount(value);
+      setSelectedBinIndices((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      lastSelectedBinRef.current = {};
+    },
+    [],
+  );
   const [materializedBins, setMaterializedBins] = useState<Record<string, ConcordanceDispersionBinRow[]>>({});
   // Declared early so the position-fetch effect / lookups can reference it.
   // The setter is also used further below by the materialise-task watcher.
@@ -378,6 +433,25 @@ const ConcordanceFeature: React.FC = () => {
     selectAllDetachColumns,
     deselectAllDetachColumns,
   } = useDetachColumnsState(detachNodeOptions);
+
+  // Dispersion-detach dialog state. Mirrors the per-hit dialog but with
+  // dispersion-specific column semantics: the document column is opt-out
+  // (default checked) and CONC_* columns are hidden (always computed by
+  // the worker, not user-selectable).
+  const [dispersionDetachDialogOpen, setDispersionDetachDialogOpen] = useState(false);
+  const [pendingDispersionDetachNodes, setPendingDispersionDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
+  const [dispersionDetachOptions, setDispersionDetachOptions] = useState<DetachDialogNodeOption[]>([]);
+  const [pendingDispersionBinSelection, setPendingDispersionBinSelection] = useState<number[] | null>(null);
+  const [pendingDispersionBinCount, setPendingDispersionBinCount] = useState<number>(0);
+  const [pendingDispersionMatchedTexts, setPendingDispersionMatchedTexts] = useState<string[] | null>(null);
+  const [pendingDispersionCaseInsensitive, setPendingDispersionCaseInsensitive] = useState<boolean>(false);
+  const {
+    selectedDetachColumns: selectedDispersionColumns,
+    setSelectedDetachColumns: setSelectedDispersionColumns,
+    toggleDetachColumn: toggleDispersionColumn,
+    selectAllDetachColumns: selectAllDispersionColumns,
+    deselectAllDetachColumns: deselectAllDispersionColumns,
+  } = useDetachColumnsState(dispersionDetachOptions);
   
   // Global page size setting
   const [globalPageSize, setGlobalPageSize] = useState(20);
@@ -515,6 +589,7 @@ const ConcordanceFeature: React.FC = () => {
     handlePageChange,
     persistResultPreferences,
     handleDetach,
+    handleDispersionDetach,
     handleMaterialize,
   } = useConcordanceTaskFlow({
     state: {
@@ -550,6 +625,7 @@ const ConcordanceFeature: React.FC = () => {
       lockWithSnapshots,
       resolveTaskId,
       detachConcordance,
+      detachConcordanceDispersion,
       materializeConcordance,
       queryClient,
     },
@@ -903,6 +979,101 @@ const ConcordanceFeature: React.FC = () => {
     setDetachDialogNodeOptions([]);
   };
 
+  // --- Dispersion detach dialog helpers ---
+  const openDispersionDetachDialog = async (
+    nodes: { nodeId: string; column: string; nodeLabel: string }[],
+    selectedBins: ReadonlySet<number> | null,
+    binCount: number,
+    options?: {
+      selectedMatchedTexts?: string[] | null;
+      matchCaseInsensitive?: boolean;
+    },
+  ) => {
+    setPendingDispersionDetachNodes(nodes);
+    setPendingDispersionBinSelection(
+      selectedBins && selectedBins.size > 0 ? Array.from(selectedBins) : null,
+    );
+    setPendingDispersionBinCount(binCount);
+    setPendingDispersionMatchedTexts(options?.selectedMatchedTexts ?? null);
+    setPendingDispersionCaseInsensitive(!!options?.matchCaseInsensitive);
+
+    try {
+      const responses = await Promise.all(
+        nodes.map((node) =>
+          textApi.getConcordanceDetachOptions(node.nodeId, node.column, getAuthHeaders()),
+        ),
+      );
+      // Adapt the per-hit detach-options shape for dispersion: hide the
+      // CONC_* mandatory columns (the worker computes the dispersion-
+      // specific output columns regardless). All optional columns
+      // (including the document/text column) start unticked so the user
+      // opts in to whatever metadata they want preserved. Also hide
+      // `CONC_extraction` — the dispersion-detach worker always emits it
+      // as the per-document joined string, so it would be misleading to
+      // present it as an opt-in pick (and the dispersion endpoint can't
+      // source-select a generated column).
+      const dispersionHiddenColumns = new Set<string>([
+        CONCORDANCE_COLUMN_KEYS.extraction,
+      ]);
+      const options = responses.flatMap((response) => response.data?.nodes ?? []).map((node) => {
+        const disabled = new Set(node.disabled_columns || []);
+        return {
+          ...node,
+          available_columns: node.available_columns.filter(
+            (c) => !disabled.has(c) && !dispersionHiddenColumns.has(c),
+          ),
+          disabled_columns: [],
+        };
+      });
+      const initial: Record<string, string[]> = {};
+      options.forEach((node) => {
+        initial[node.node_id] = [];
+      });
+      setSelectedDispersionColumns(initial);
+      setDispersionDetachOptions(options);
+      setDispersionDetachDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to load dispersion detach options:', error);
+      toast.error(
+        `Failed to load dispersion detach options: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      setPendingDispersionDetachNodes([]);
+      setSelectedDispersionColumns({});
+      setPendingDispersionMatchedTexts(null);
+      setPendingDispersionCaseInsensitive(false);
+    }
+  };
+
+  const handleDispersionDetachConfirm = async () => {
+    const binsSet = pendingDispersionBinSelection
+      ? new Set(pendingDispersionBinSelection)
+      : null;
+    for (const n of pendingDispersionDetachNodes) {
+      const cols = selectedDispersionColumns[n.nodeId] || [];
+      await handleDispersionDetach(n.nodeId, n.column, {
+        nodeLabel: n.nodeLabel,
+        materializedPath: materializedPaths[n.nodeId] ?? null,
+        selectedBins: binsSet,
+        binCount: pendingDispersionBinCount,
+        selectedColumns: cols,
+        selectedMatchedTexts: pendingDispersionMatchedTexts,
+        matchCaseInsensitive: pendingDispersionCaseInsensitive,
+      });
+    }
+    setDispersionDetachDialogOpen(false);
+    setPendingDispersionDetachNodes([]);
+    setSelectedDispersionColumns({});
+    setDispersionDetachOptions([]);
+    setPendingDispersionBinSelection(null);
+    setPendingDispersionBinCount(0);
+    setPendingDispersionMatchedTexts(null);
+    setPendingDispersionCaseInsensitive(false);
+  };
+
+  const anyDispersionNodeDetaching = pendingDispersionDetachNodes.some(
+    (n) => Boolean(nodeDetaching[n.nodeId]),
+  );
+
   const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));
 
 
@@ -972,6 +1143,11 @@ const ConcordanceFeature: React.FC = () => {
           setProportionalDispersionBars={setProportionalDispersionBars}
           combinedSourceMode={combinedSourceMode}
           setCombinedSourceMode={setCombinedSourceMode}
+          dispersionChartType={dispersionChartType}
+          setDispersionChartType={setDispersionChartType}
+          selectedBinIndices={selectedBinIndices}
+          onBinSelect={handleBinSelect}
+          onClearBinSelection={handleClearBinSelection}
           colourMatches={colourMatches}
           setColourMatches={setColourMatches}
           lowercaseMatches={lowercaseMatches}
@@ -979,7 +1155,7 @@ const ConcordanceFeature: React.FC = () => {
           hiddenMatchedTexts={hiddenMatchedTexts}
           setHiddenMatchedTexts={setHiddenMatchedTexts}
           binCount={binCount}
-          setBinCount={setBinCount}
+          setBinCount={handleBinCountChange}
           allMatchedTexts={allMatchedTexts}
           matchedTextColorMap={matchedTextColorMap}
           getMaterializedBinsForKey={getMaterializedBinsForKey}
@@ -1005,6 +1181,7 @@ const ConcordanceFeature: React.FC = () => {
           handleRowClick={handleRowClick}
           handleMaterialize={handleMaterialize}
           openDetachDialog={openDetachDialog}
+          onDispersionDetach={openDispersionDetachDialog}
         />
       )}
 
@@ -1033,6 +1210,19 @@ const ConcordanceFeature: React.FC = () => {
           <p className="text-gray-600 mt-2">Loading workspace...</p>
         </div>
       )}
+
+      {/* Dispersion (per-document aggregated) detach column dialog */}
+      <ConcordanceDispersionDetachDialog
+        open={dispersionDetachDialogOpen}
+        onOpenChange={setDispersionDetachDialogOpen}
+        isDetaching={anyDispersionNodeDetaching}
+        detachNodeOptions={dispersionDetachOptions}
+        selectedDetachColumns={selectedDispersionColumns}
+        toggleDetachColumn={toggleDispersionColumn}
+        selectAllDetachColumns={selectAllDispersionColumns}
+        deselectAllDetachColumns={deselectAllDispersionColumns}
+        handleDetachConfirm={handleDispersionDetachConfirm}
+      />
 
       {/* Detach column selection dialog */}
       <ConcordanceDetachDialog

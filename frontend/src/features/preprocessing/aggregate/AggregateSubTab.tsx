@@ -274,7 +274,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
               autoCorrect="off"
               autoCapitalize="none"
               autoComplete="off"
-              placeholder="Defaults to the expression string"
+              placeholder="new_column"
               disabled={!nodeSelection.effectiveNodes.length || isLoading.operations}
               className="min-w-0 flex-1"
             />
