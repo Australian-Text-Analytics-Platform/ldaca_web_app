@@ -34,7 +34,13 @@ export const CONCORDANCE_COLUMN_KEYS = {
 } as const;
 
 export const QUOTATION_COLUMN_KEYS = {
-  document: 'QUOTE_DOCUMENT',
+  // Canonical name for the per-quote-row raw source-document text.
+  // The backend emits a real `QUOTE_extraction` column in materialised
+  // parquets and (opt-in) in detach output; the live result table renders
+  // it as a virtual column that substitutes the user's text column at
+  // render time so the header stays consistent regardless of the source
+  // column's name.
+  document: 'QUOTE_extraction',
   speaker: 'QUOTE_speaker',
   speakerStartIdx: 'QUOTE_speaker_start_idx',
   speakerEndIdx: 'QUOTE_speaker_end_idx',
