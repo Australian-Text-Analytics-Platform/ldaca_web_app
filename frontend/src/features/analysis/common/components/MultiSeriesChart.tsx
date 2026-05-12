@@ -48,6 +48,12 @@ export interface MultiSeriesChartXAxisConfig {
   domain?: [number | 'auto' | 'dataMin', number | 'auto' | 'dataMax'];
   /** Fixed tick positions (number axis) or labels (category). */
   ticks?: ReadonlyArray<number | string>;
+  /**
+   * Target number of auto-generated ticks (number axis only). Recharts snaps
+   * to round-number positions, so the actual count may differ slightly. Has
+   * no effect when `ticks` is provided. Defaults to Recharts' built-in 5.
+   */
+  tickCount?: number;
   tickFormatter?: (value: never) => string;
   /** Tick rotation in degrees, e.g. -45. */
   angle?: number;
@@ -234,6 +240,7 @@ export const MultiSeriesChart: React.FC<MultiSeriesChartProps> = ({
       type={xAxisType}
       domain={xAxis?.domain as never}
       ticks={xAxis?.ticks as never}
+      tickCount={xAxis?.tickCount}
       tickFormatter={xAxis?.tickFormatter as never}
       angle={xAxis?.angle}
       textAnchor={xAxis?.angle != null ? 'end' : undefined}

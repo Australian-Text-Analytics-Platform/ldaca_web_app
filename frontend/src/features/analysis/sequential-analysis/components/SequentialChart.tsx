@@ -183,6 +183,11 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
     ? {
         type: 'number',
         domain: ['dataMin', 'dataMax'],
+        // Recharts defaults `tickCount` to 5 on a number axis, which is too
+        // sparse for the typical Trends span (multi-year corpora). Aim for
+        // ~10 round-number ticks; `minTickGap=20` still drops ticks on
+        // narrow charts so they can't overlap.
+        tickCount: 10,
         tickFormatter: formatNumericTick as never,
         angle: -45,
         height: 100,
