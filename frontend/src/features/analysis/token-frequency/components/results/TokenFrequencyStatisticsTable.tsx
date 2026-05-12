@@ -312,6 +312,7 @@ export const TokenFrequencyStatisticsTable = ({
               >
                 {studyNodeName ?? '—'}
               </span>
+              <span>; The Overuse column indicates how frequently a token appears in the study corpus compared to the reference corpus.</span>
             </p>
           ) : null}
         </div>
