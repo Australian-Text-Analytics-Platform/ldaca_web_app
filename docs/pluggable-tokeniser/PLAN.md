@@ -53,7 +53,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 4. **Quotation extraction is explicitly English-only.** The upstream rule set is English/French only and won't generalise. Plan calls for a typed `UnsupportedLanguageError` and a UI tooltip, not silent English fallback.
 
-5. **Tokenizer paradigm pluggability is achievable in pure Rust.** `jieba-rs` and `lindera` are mature Rust crates. The polars-text architecture is not bound to HuggingFace's `tokenizers` crate; a small `TokenizerBackend` enum behind a trait keeps everything in one Polars expression.
+5. **Tokenizer paradigm pluggability is achievable in pure Rust.** `jieba-rs` and `lindera` are mature Rust crates. The polars-text architecture is not bound to HuggingFace's `tokenizers` crate; a small `TokenizerBackend` enum keeps everything in one Polars expression. **Jieba landed in Phase 1.9** (pulled forward from Phase 5) because character-level Chinese is not linguistically meaningful in practice — the plan owner is a Chinese speaker and confirmed this directly. Lindera (Japanese) stays in Phase 5, deferred until a Japanese speaker can verify; the same `TokenizerBackend` enum gains a third variant when that lands.
 
 6. **Concordance keeps TWO modes, not one.** The current regex-on-raw-text mode is preserved as the default because partial-word patterns like `equ\w*` are a real linguistic affordance for English users that any DTM-only design would destroy. A second tokens-column-driven mode is added in Phase 2.6 for CJK and any case where exact-token-match + N-actual-token context (with language-appropriate segmentation) is the right semantics.
    - **Why this matters for CJK**: today, when concordance is run on Chinese text, `num_left_tokens=5` silently means "5 characters" because `BertPreTokenizer` falls back to per-character splitting in the absence of whitespace. The text-mode search still works (literal substring match), but the context window is much less semantically useful than the user expects. The tokens-column mode (after Phase 5 with Jieba/Lindera) gives "5 actual words left/right" which is what a corpus linguist actually wants.
@@ -99,14 +99,16 @@ These decisions came out of the planning discussion; documenting here so the rat
 | 1.6 | Update Python namespace: `.text.tokenize(model="bert-base-uncased", ...)` | `polars-text/polars_text/namespace.py:13-16`, `functions.py:10-22` | Type-checked, default = current |
 | 1.7 | Add `polars_text.prefetch_model(model_id)` and `list_loaded_models()` helpers | new in `polars-text/polars_text/` | Round-trip works |
 | 1.8 | Pin a small "known good" model registry in Python (en/zh/ja/multi/fallback) | new `polars_text/models.py` | Lookups return valid HF IDs |
+| 1.9 | **Jieba Chinese backend (pulled forward from Phase 5).** Introduce `TokenizerBackend` enum (`HuggingFace` \| `Jieba`) in `tokenizer.rs`; refactor the registry to cache `Arc<TokenizerBackend>`; route `model_id == "jieba"` to `jieba-rs`. Update `RECOMMENDED_TOKENIZERS["zh"]` from `bert-base-chinese` to `"jieba"` so the two-mode concordance design (decision 6) delivers *word-level* Chinese context as soon as Phase 2 lands. Lindera (Japanese) remains in Phase 5. | `polars-text/Cargo.toml`, `polars-text/src/tokenizer.rs`, `polars-text/polars_text/models.py`, new `polars-text/tests/test_jieba_chinese.py` | `.text.tokenize("今天天气很好", model="jieba")` produces word-level tokens like `["今天", "天气", "很好"]` (not chars). EN goldens unchanged. Jieba's ~5 MB bundled dict ships in-binary; no on-demand download needed. |
 
 **Tests per task:**
 - 1.1–1.3 (Rust unit): same input + two different `model_id`s → different token streams. Same `model_id` twice → cache hit.
 - 1.6 (Python integration): tokenize same English string with `bert-base-uncased` vs `bert-base-multilingual-cased`; outputs differ. Tokenize Chinese with `bert-base-chinese`; non-empty char-level tokens.
 - 1.7 (Python unit): prefetch a model, then call `list_loaded_models()`, assert presence.
+- 1.9 (Python integration): tokenize Chinese with `model="jieba"`; assert tokens are word-level (multi-character tokens present, not pure char-level). Compare against `bert-base-chinese` to show different segmentation.
 - **Regression:** Phase 0 golden files unchanged when `model_id` is omitted.
 
-**Exit:** Python user can switch tokenizer per call, English defaults unchanged, Chinese tokenization works at the polars-text layer (not yet exposed to backend).
+**Exit:** Python user can switch tokenizer per call, English defaults unchanged, Chinese tokenization works at the polars-text layer — char-level via `bert-base-chinese` AND word-level via `"jieba"` (not yet exposed to backend; that's Phase 2/3).
 
 ---
 
@@ -187,21 +189,21 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 5 (optional) — Jieba + Lindera backends (~1 week)
+## Phase 5 (optional) — Lindera (Japanese morphology) backend (~3–5 days)
 
-**Goal:** word-level CJK segmentation as an alternative to char-level mBERT.
+**Goal:** word-level Japanese morpheme segmentation as an alternative to char-level / WordPiece tokenization. Jieba (Chinese) was pulled forward into Phase 1.9; Phase 5 now covers Lindera only.
 
 | #   | Task | Acceptance |
 |-----|------|------------|
-| 5.1 | Define `TokenizerBackend` enum/trait in Rust; refactor existing HF path into one variant | All Phase 1–3 tests still green |
-| 5.2 | Add `jieba-rs` variant; bundled default dict | ZH text segments into words, not chars |
-| 5.3 | Add `lindera` variant; on-demand IPADIC download (mirror HF Hub flow at `tokenizer.rs:17-28`) | JA text segments into morphemes |
-| 5.4 | Surface in frontend selector (zh-jieba, ja-lindera as alternates) | User can pick |
-| 5.5 | Measure install size before/after; document trade-off | Stays within size constraint |
+| 5.1 | Add `lindera` variant to the existing `TokenizerBackend` enum (introduced in Phase 1.9) | All Phase 1–4 tests still green |
+| 5.2 | On-demand IPADIC download (50–200 MB) mirroring the HF Hub flow at `tokenizer.rs:17-28`; cache in user data dir, not bundled | JA text segments into morphemes; install size unchanged before first JA use |
+| 5.3 | Update `RECOMMENDED_TOKENIZERS["ja"]` from `cl-tohoku/bert-base-japanese-v3` to a Lindera identifier | JA tokens are linguistically meaningful morphemes |
+| 5.4 | Surface in frontend selector as `ja-lindera` alternate | User can pick |
+| 5.5 | Measure install size before/after; document trade-off | Stays within size constraint per `project_deployment_targets` |
 
-**Tests:** parametrised fixtures comparing same-input outputs across backends; install-size diff measured in CI.
+**Tests:** parametrised JA fixtures comparing Lindera vs `cl-tohoku/bert-base-japanese-v3` outputs; install-size diff measured in CI.
 
-**Decision gate before starting Phase 5:** ship Phase 1–4 to a few CJK users; ask whether char-level mBERT is good enough. If yes, Phase 5 is deferrable indefinitely.
+**Decision gate before starting Phase 5:** ship Phase 1–4 (with Jieba for Chinese already live), validate the Chinese workflow with real users, then decide whether Japanese needs the same word-level treatment. The plan owner is a Chinese speaker and can verify Chinese end-to-end; Japanese verification requires a separate native-speaker test pass.
 
 ---
 
