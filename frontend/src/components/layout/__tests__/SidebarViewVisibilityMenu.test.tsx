@@ -1,11 +1,12 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
-import { DEFAULT_VISIBLE_VIEWS, useUIStore } from '../../../stores/uiStore';
-import { useHintsStore } from '../../../stores/hintsStore';
+import { DEFAULT_VISIBLE_VIEWS, useUIStore } from '@/stores/uiStore';
+import { useHintsStore } from '@/stores/hintsStore';
 
 const toastMock = vi.fn();
 
@@ -21,27 +22,27 @@ const authState = {
   isMultiUserMode: false,
 };
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     workspaceGraph: { nodes: [] },
     currentWorkspaceId: 'ws-1',
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceSelection', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   useWorkspaceSelection: () => ({
     selectedNodeIds: [],
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceActions', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     toggleNodeSelection: vi.fn(),
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceTaskStream', () => ({
-  useWorkspaceTaskStream: () => ({
+vi.mock('@/features/workspace/task-stream/useWorkspaceTaskInbox', () => ({
+  useWorkspaceTaskInbox: () => ({
     status: 'closed',
     error: null,
     reconnect: vi.fn(),
@@ -66,12 +67,18 @@ vi.mock('@/components/dialogs/DataFolderDialog', () => ({
   DataFolderDialog: () => null,
 }));
 
-const renderSidebar = () =>
-  render(
-    <SidebarProvider>
-      <Sidebar />
-    </SidebarProvider>
+const renderSidebar = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SidebarProvider>
+        <Sidebar />
+      </SidebarProvider>
+    </QueryClientProvider>
   );
+};
 
 describe('Sidebar view visibility menu', () => {
   beforeEach(() => {

@@ -1,14 +1,14 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { nodesApi } from '../../../../api/nodes';
-import { useAuth } from '../../../../hooks/useAuth';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
-import { Checkbox } from '../../../../components/ui/checkbox';
-import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
+import { nodesApi } from '@/api/nodes';
+import { useAuth } from '@/hooks/useAuth';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { DateTimePickerField } from '../../utils/dateTimeUtils';
 import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from '../../utils/typeUtils';
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';
 import { buildFilterAutoNodeName } from '../../utils/autoNodeNames';
-import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
+import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import { buildFilterRequestPayload, isConditionComplete } from '../utils/serializers';
 import { FilterValueChecklist } from '../components/FilterValueChecklist';
 import type { FilterChecklistOption } from '../components/FilterValueChecklist';
@@ -365,52 +365,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
 
   const conditionsComplete = conditions.length > 0 && conditions.every(isConditionComplete);
 
-  const previewRequestSignature = (() => {
-    if (!selectedNodeId || !hasSelection) return '';
-    if (conditionsComplete && previewRequest) {
-      return `${selectedNodeId}::filter::${JSON.stringify(previewRequest)}`;
-    }
-    return `${selectedNodeId}::raw`;
-  })();
-
   const previewReady = hasSelection;
-
-  const filterPreviewRequest: { nodeId: string; payload: FilterRequest | null } | null = (() => {
-    if (!hasSelection || !selectedNodeId) {
-      return null;
-    }
-    return {
-      nodeId: selectedNodeId,
-      payload: conditionsComplete && previewRequest ? previewRequest : null,
-    };
-  })();
-
-  const filterPreviewFetcher = async ({
-    request,
-    page,
-    pageSize,
-    signal: _signal,
-  }: {
-    request: { nodeId: string; payload: FilterRequest | null };
-    page: number;
-    pageSize: number;
-    signal: AbortSignal;
-  }) => {
-    if (request.payload) {
-      const response = await filterPreview(request.nodeId, request.payload, page, pageSize);
-      return {
-        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-        columns: Array.isArray(response?.columns) ? response.columns : [],
-        pagination: response?.pagination ?? null,
-      };
-    }
-    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
-    return {
-      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-      columns: Array.isArray(response?.columns) ? response.columns : [],
-      pagination: response?.pagination ?? null,
-    };
-  };
+  const operationPayload: FilterRequest | null =
+    conditionsComplete && previewRequest ? previewRequest : null;
 
   const {
     data: previewData,
@@ -422,19 +379,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     pageSize: previewPageSize,
     setPage: setPreviewPage,
     setPageSize: setPreviewPageSize,
-  } = usePreprocessingPreview({
-    request: filterPreviewRequest,
-    signature: previewRequestSignature,
-    fetcher: filterPreviewFetcher,
+  } = useNodePreviewWithRawFallback<FilterRequest>({
+    nodeId: selectedNodeId,
+    operationPayload,
+    operationFetch: filterPreview,
+    signaturePrefix: 'filter',
+    enabled: previewReady,
   });
-
-  const previewColumnsToRender = (() => {
-    if (previewColumns.length > 0) return previewColumns;
-    if (previewData.length > 0 && typeof previewData[0] === 'object' && previewData[0] !== null) {
-      return Object.keys(previewData[0]);
-    }
-    return [];
-  })();
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
 
@@ -583,12 +534,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
             <Checkbox
               id={`regex-${condition.id}`}
               checked={Boolean(condition.regex)}
-              onCheckedChange={(checked) => {
-                const nextRegex = checked === true;
-                setConditions((prev) => prev.map((c) =>
-                  c.id !== condition.id ? c : { ...c, regex: nextRegex, caseSensitive: nextRegex ? false : c.caseSensitive }
-                ));
-              }}
+              onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
               disabled={rowDisabled}
             />
             <span>regex</span>
@@ -598,7 +544,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
               id={`case-sensitive-${condition.id}`}
               checked={Boolean(condition.caseSensitive)}
               onCheckedChange={(checked) => handleConditionChange(condition.id, 'caseSensitive', checked === true)}
-              disabled={rowDisabled || Boolean(condition.regex)}
+              disabled={rowDisabled}
             />
             <span>case sensitive</span>
           </label>
@@ -982,7 +928,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     applyButtonDisabled,
     applyButtonDisabledReason,
     preview: {
-      columns: previewColumnsToRender,
+      columns: previewColumns,
       data: previewData,
       pagination: previewPagination,
       loading: previewLoading,

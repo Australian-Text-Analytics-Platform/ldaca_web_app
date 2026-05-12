@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useWorkspaceData } from '../../hooks/useWorkspaceData';
-import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { getInvalidWorkspaceNameMessage } from '../../lib/workspaceName';
+import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import HelpIcon from '@/components/help/HelpIcon';
 
 /**

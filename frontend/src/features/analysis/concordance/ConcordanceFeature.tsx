@@ -1,39 +1,22 @@
-// NodeSelectionPanel now handles color selection UI inline
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { useAuth } from '../../../hooks/useAuth';
-import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, type ConcordanceResultEntry, textApi } from '../../../api/text';
-import { useAnalysisStore } from '../../../stores/analysisStore';
-import { useUIStore } from '../../../stores';
-import { Button } from '../../../components/ui/button';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
-import { Play, Loader2, Trash2, Plus } from 'lucide-react';
-import HelpIcon from '../../../components/help/HelpIcon';
-import InfoIcon from '../../../components/help/InfoIcon';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../components/ui/table';
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useAuth } from '@/hooks/useAuth';
+import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, textApi } from '@/api/text';
+import { useAnalysisStore } from '@/stores/analysisStore';
+import { useUIStore } from '@/stores';
+import { Card, CardContent } from '@/components/ui/card';
+import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
+import type { MultiSeriesChartType } from '@/features/analysis/common/components/MultiSeriesChart';
 import {
   hasLockedParameterDiff,
   resetAnalysisSelectionAfterClear,
   restoreAnalysisLockFromRequest,
-  getNodeIdentifier,
   useAnalysisLock,
   useAnalysisFeature,
   useNodeColorManagement,
@@ -45,82 +28,37 @@ import {
 import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import {
   pruneTasksById,
-} from '../../../hooks/analysisTaskUtils';
-import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
+} from '@/hooks/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
+import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
+import { useConcordanceMaterializedEvents } from './hooks/useConcordanceMaterializedEvents';
+import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
+import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
+import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
+import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { highlightMatchInText } from '../common/components/highlightText';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { AnalysisPagination } from '../../../components/AnalysisPagination';
-import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
-import { takeMostRecent } from '../../../utils/selectionUtils';
-import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
-import { ConcordanceDispersionCell } from './components/ConcordanceDispersionCell';
-import { ConcordanceDispersionLegend } from './components/ConcordanceDispersionLegend';
-import { ConcordanceDispersionSummary } from './components/ConcordanceDispersionSummary';
+import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
+import { ConcordanceDispersionDetachDialog } from './components/ConcordanceDispersionDetachDialog';
+import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
+import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import {
-  buildDispersionRows,
   DISPERSION_DEFAULT_BIN_COUNT,
-  DISPERSION_DISPLAY_BIN_COUNTS,
-  flattenConcordanceGroups,
-  getDispersionBarWidthPercent,
-  getDispersionHits,
-  getDispersionTextLength,
-  type ConcordanceDispersionRow,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
 } from './concordanceViewModels';
 import {
   CONCORDANCE_COLUMN_KEYS,
   CONCORDANCE_CORE_COLUMNS,
-  CONCORDANCE_DISPERSION_COLUMN,
   CONCORDANCE_FREQ_COLUMNS,
 } from '../generatedColumns';
-import {
-  MetadataColumnSelector,
-} from '../common/components/MetadataColumnSelector';
-import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];
 const ALL_CONC_COLS_SET = new Set<string>([...CORE_COLS, ...FREQ_COLS]);
-
-const dedupeColumns = (cols: string[]): string[] => {
-  const seen = new Set<string>();
-  return cols.filter((col) => {
-    if (seen.has(col)) {
-      return false;
-    }
-    seen.add(col);
-    return true;
-  });
-};
-
-const hasSuccessfulConcordanceResults = (result: ConcordanceAnalysisResponse | null): boolean =>
-  Boolean(result && result.state === 'successful');
-
-const getDispersionColumnStyle = (
-  isDispersionVisible: boolean,
-  isMetadataVisible: boolean,
-  visibleWidth: number,
-): React.CSSProperties | undefined => {
-  if (!isDispersionVisible || !isMetadataVisible) {
-    return undefined;
-  }
-
-  if (visibleWidth <= 0) {
-    return undefined;
-  }
-
-  const columnWidth = `${Math.floor(visibleWidth / 2)}px`;
-  return {
-    width: columnWidth,
-    minWidth: columnWidth,
-    maxWidth: columnWidth,
-  };
-};
 
 
 
@@ -130,7 +68,12 @@ const ConcordanceFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
-  const { detachConcordance, materializeConcordance, selectNodes } = useWorkspaceActions();
+  const {
+    detachConcordance,
+    detachConcordanceDispersion,
+    materializeConcordance,
+    selectNodes,
+  } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'concordance';
   const { getColumnInfos } = useNodeColumnInfos({
@@ -139,6 +82,7 @@ const ConcordanceFeature: React.FC = () => {
   });
 
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const {
     isLocked,
     lockWithSnapshots,
@@ -170,8 +114,10 @@ const ConcordanceFeature: React.FC = () => {
   const [regex, setRegex] = useState(false);
   const [wholeWord, setWholeWord] = useState(true);
   const [caseSensitive, setCaseSensitive] = useState(false);
-  const [showMetadata, setShowMetadata] = useState(false);
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
+  // Metadata visibility derives from the selected columns: any selection
+  // shows the corresponding metadata columns in the results table.
+  const showMetadata = selectedMetadataColumns.length > 0;
   const [concordanceView, setConcordanceView] = useState<'table' | 'dispersion'>('table');
   const showDispersion = concordanceView === 'dispersion';
   const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
@@ -180,6 +126,54 @@ const ConcordanceFeature: React.FC = () => {
   const [hiddenMatchedTexts, setHiddenMatchedTexts] = useState<Set<string>>(new Set());
   const [binCount, setBinCount] = useState<DispersionDisplayBinCount>(DISPERSION_DEFAULT_BIN_COUNT);
   const [combinedSourceMode, setCombinedSourceMode] = useState<'aggregate' | 'split'>('aggregate');
+  const [dispersionChartType, setDispersionChartType] =
+    useState<MultiSeriesChartType>('line');
+  const [selectedBinIndices, setSelectedBinIndices] = useState<
+    Record<string, Set<number>>
+  >({});
+  const lastSelectedBinRef = useRef<Record<string, number | null>>({});
+  const handleBinSelect = useCallback(
+    (blockKey: string, index: number, shiftHeld: boolean) => {
+      setSelectedBinIndices((prev) => {
+        const prevSet = prev[blockKey] ?? new Set<number>();
+        const next = new Set(prevSet);
+        const lastIdx = lastSelectedBinRef.current[blockKey];
+        if (shiftHeld && typeof lastIdx === 'number') {
+          const [from, to] = lastIdx < index ? [lastIdx, index] : [index, lastIdx];
+          for (let i = from; i <= to; i++) next.add(i);
+        } else if (next.has(index)) {
+          next.delete(index);
+        } else {
+          next.add(index);
+        }
+        return { ...prev, [blockKey]: next };
+      });
+      lastSelectedBinRef.current[blockKey] = index;
+    },
+    [],
+  );
+  const handleClearBinSelection = useCallback((blockKey: string) => {
+    setSelectedBinIndices((prev) => {
+      if (!prev[blockKey]) return prev;
+      const next: Record<string, Set<number>> = {};
+      for (const [key, value] of Object.entries(prev)) {
+        if (key !== blockKey) next[key] = value;
+      }
+      return next;
+    });
+    lastSelectedBinRef.current[blockKey] = null;
+  }, []);
+  // Bin indices identify ranges (e.g. index 7 = 70–80 % in a 10-bin chart but
+  // 7–8 % in a 100-bin chart). Selections are not portable across bin counts,
+  // so clear every block's selection whenever the bin count changes.
+  const handleBinCountChange = useCallback(
+    (value: DispersionDisplayBinCount) => {
+      setBinCount(value);
+      setSelectedBinIndices((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      lastSelectedBinRef.current = {};
+    },
+    [],
+  );
   const [materializedBins, setMaterializedBins] = useState<Record<string, ConcordanceDispersionBinRow[]>>({});
   // Declared early so the position-fetch effect / lookups can reference it.
   // The setter is also used further below by the materialise-task watcher.
@@ -187,7 +181,7 @@ const ConcordanceFeature: React.FC = () => {
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
   const [results, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
-  const labelToNodeId = (() => {
+  const labelToNodeId = useMemo<Record<string, string> | null>(() => {
     const params = results?.analysis_params;
     const mapping = params?.label_to_node_map;
     if (mapping && typeof mapping === 'object') {
@@ -200,7 +194,7 @@ const ConcordanceFeature: React.FC = () => {
       return normalized;
     }
     return null;
-  })();
+  }, [results]);
 
   // Color management & view mode
   const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
@@ -216,7 +210,7 @@ const ConcordanceFeature: React.FC = () => {
     return typeof value === 'string' ? value : '';
   }, [results]);
 
-  const resolveNodeIdForKey = (nodeKey: string): string | null => {
+  const resolveNodeIdForKey = useCallback((nodeKey: string): string | null => {
     if (nodeKey === '__COMBINED__') return null;
     const direct = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
       const d = n.data as Record<string, unknown> | undefined;
@@ -227,7 +221,7 @@ const ConcordanceFeature: React.FC = () => {
     const mapped = labelToNodeId?.[nodeKey];
     if (mapped) return mapped;
     return null;
-  };
+  }, [panelSelectedNodes, labelToNodeId]);
 
   const relevantNodeIdsForKey = (nodeKey: string): string[] => {
     if (nodeKey === '__COMBINED__') {
@@ -342,7 +336,6 @@ const ConcordanceFeature: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
-  const [combinedLoading, setCombinedLoading] = useState(false);
 
   useEffect(() => {
     const element = resultsViewportRef.current;
@@ -370,95 +363,24 @@ const ConcordanceFeature: React.FC = () => {
     };
   }, [results]);
 
-  // Hoisted up from below so the metadata-column section IIFE can read it
-  // (the IIFE consults each panel node's selected text column to exclude it
-  // from the metadata column list).
+  // Hoisted up so the metadata-column hook can read it (it consults each
+  // panel node's selected text column to exclude it from the metadata list).
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
-  const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } = (() => {
-    const resultEntries = results?.data ?? {};
-    // Per-block columns, preferring `results.data` per-node entries (used by
-    // Separated view; carries the same metadata_columns the per-node table
-    // displays). When only the `__COMBINED__` entry is present (typical of
-    // Combined view), fall back to each node's workspace column list via
-    // `getColumnInfos`, dropping the chosen text column and the synthetic
-    // `__source_node` tag — without this fallback the dropdown would have
-    // nothing to show in Combined view, which is what was making the
-    // checkbox/dropdown look "stuck".
-    const perBlock: { nodeKey: string; columns: string[] }[] = [];
-    for (const [nodeKey, entry] of Object.entries(resultEntries)) {
-      if (nodeKey === '__COMBINED__') continue;
-      const nodeEntry = entry as ConcordanceResultEntry;
-      const cols = nodeEntry.metadata.metadata_columns.filter(
-        (c) => c && c !== '__source_node',
-      );
-      perBlock.push({ nodeKey, columns: cols });
-    }
-    if (perBlock.length === 0 && panelSelectedNodes.length > 0) {
-      panelSelectedNodes.forEach((node, idx) => {
-        const rawId = (node as { id?: string }).id;
-        const rawName = (node as { name?: string }).name;
-        const nodeKey = rawName || rawId || `node-${idx}`;
-        const sel = rawId
-          ? effectiveNodeColumnSelections.find((s) => s.nodeId === rawId)
-          : undefined;
-        const textColumn = sel?.column;
-        const cols = getColumnInfos(node, idx)
-          .map((info) => info.name)
-          .filter((name): name is string =>
-            !!name && name !== textColumn && name !== '__source_node',
-          );
-        if (cols.length > 0) perBlock.push({ nodeKey, columns: cols });
-      });
-    }
-    const allColumns = Array.from(
-      new Set(perBlock.flatMap((b) => b.columns)),
-    );
-    const sections: { columns: string[]; color?: string; disabled?: boolean }[] = [];
-    let disabledReason: string | undefined;
-    const isCombinedView = viewMode === 'combined';
-    if (perBlock.length <= 1) {
-      // Single block (or no blocks): no need for sections.
-      if (allColumns.length > 0) sections.push({ columns: allColumns });
-    } else {
-      const common = perBlock[0]!.columns.filter((c) =>
-        perBlock.every((b) => b.columns.includes(c)),
-      );
-      // In Combined view, columns exclusive to one source can't be rendered
-      // in the merged table — they'd be NULL for the rows from the other
-      // block. So:
-      //  - If there are common columns, show them as selectable and the
-      //    per-block exclusives as visible-but-disabled (preserves discovery
-      //    of what each block has, without letting the user pick something
-      //    that won't render).
-      //  - If there are no common columns, disable Show metadata entirely
-      //    with a tooltip explaining why.
-      if (isCombinedView && common.length === 0 && perBlock.some((b) => b.columns.length > 0)) {
-        disabledReason = 'The selected data blocks share no metadata columns; nothing to display in Combined view.';
-      }
-      if (common.length > 0) sections.push({ columns: common });
-      for (const block of perBlock) {
-        const exclusive = block.columns.filter((c) => !common.includes(c));
-        if (exclusive.length === 0) continue;
-        const nodeId = resolveNodeIdForKey(block.nodeKey);
-        const color = nodeId ? nodeColors?.[nodeId] : undefined;
-        sections.push({
-          columns: exclusive,
-          color,
-          disabled: isCombinedView,
-        });
-      }
-    }
-    return {
-      availableMetadataColumns: allColumns,
-      metadataColumnSections: sections,
-      metadataDisabledReason: disabledReason,
-    };
-  })();
+  const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } =
+    useConcordanceMetadataColumns({
+      results,
+      panelSelectedNodes,
+      effectiveNodeColumnSelections,
+      getColumnInfos,
+      viewMode,
+      nodeColors,
+      resolveNodeIdForKey,
+    });
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
-  // Map any node's id/name variants to its assigned color (used in combined table)
-  const sourceColorMap = (() => {
+  // Map any node's id/name variants to its assigned color (used in combined table).
+  const sourceColorMap = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     panelSelectedNodes.forEach((node, idx) => {
       const candidateIds = [
@@ -484,9 +406,7 @@ const ConcordanceFeature: React.FC = () => {
       });
     });
     return map;
-  })();
-  
-  const lastPendingConcordanceRef = useRef<number | null>(null);
+  }, [panelSelectedNodes, nodeColors, defaultPalette]);
 
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<PaginationState>({});
@@ -505,8 +425,33 @@ const ConcordanceFeature: React.FC = () => {
   // Detach dialog state
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodes, setPendingDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
-  const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
-  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachNodeOption[]>([]);
+  const [detachNodeOptions, setDetachDialogNodeOptions] = useState<DetachDialogNodeOption[]>([]);
+  const {
+    selectedDetachColumns,
+    setSelectedDetachColumns,
+    toggleDetachColumn,
+    selectAllDetachColumns,
+    deselectAllDetachColumns,
+  } = useDetachColumnsState(detachNodeOptions);
+
+  // Dispersion-detach dialog state. Mirrors the per-hit dialog but with
+  // dispersion-specific column semantics: the document column is opt-out
+  // (default checked) and CONC_* columns are hidden (always computed by
+  // the worker, not user-selectable).
+  const [dispersionDetachDialogOpen, setDispersionDetachDialogOpen] = useState(false);
+  const [pendingDispersionDetachNodes, setPendingDispersionDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
+  const [dispersionDetachOptions, setDispersionDetachOptions] = useState<DetachDialogNodeOption[]>([]);
+  const [pendingDispersionBinSelection, setPendingDispersionBinSelection] = useState<number[] | null>(null);
+  const [pendingDispersionBinCount, setPendingDispersionBinCount] = useState<number>(0);
+  const [pendingDispersionMatchedTexts, setPendingDispersionMatchedTexts] = useState<string[] | null>(null);
+  const [pendingDispersionCaseInsensitive, setPendingDispersionCaseInsensitive] = useState<boolean>(false);
+  const {
+    selectedDetachColumns: selectedDispersionColumns,
+    setSelectedDetachColumns: setSelectedDispersionColumns,
+    toggleDetachColumn: toggleDispersionColumn,
+    selectAllDetachColumns: selectAllDispersionColumns,
+    deselectAllDetachColumns: deselectAllDispersionColumns,
+  } = useDetachColumnsState(dispersionDetachOptions);
   
   // Global page size setting
   const [globalPageSize, setGlobalPageSize] = useState(20);
@@ -518,14 +463,6 @@ const ConcordanceFeature: React.FC = () => {
     caseSensitive: boolean;
   } | null>(null);
   
-  // State for auto-triggering search from TokenFrequencyTab
-  const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
-  const [queuedPendingConcordance, setQueuedPendingConcordance] = useState(pendingConcordance);
-  const [handoffConfirmOpen, setHandoffConfirmOpen] = useState(false);
-  const handoffConfirmingRef = useRef(false);
-
-
-
   const {
     resolveTaskId,
     setLocalTaskId: setLocalConcordanceTaskId,
@@ -587,7 +524,7 @@ const ConcordanceFeature: React.FC = () => {
       const nextPaths = (paths && typeof paths === 'object') ? { ...paths } : {};
       setMaterializedPaths(nextPaths);
       setMaterializedBins({});
-      processedMaterializedEventSeqRef.current = new Set();
+      resetProcessedEvents();
       const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
       const nextSummaries: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
       if (summaries && typeof summaries === 'object') {
@@ -606,6 +543,7 @@ const ConcordanceFeature: React.FC = () => {
           requestData: req,
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 2,
         });
       } catch { /* ignore */ }
@@ -651,6 +589,7 @@ const ConcordanceFeature: React.FC = () => {
     handlePageChange,
     persistResultPreferences,
     handleDetach,
+    handleDispersionDetach,
     handleMaterialize,
   } = useConcordanceTaskFlow({
     state: {
@@ -686,7 +625,9 @@ const ConcordanceFeature: React.FC = () => {
       lockWithSnapshots,
       resolveTaskId,
       detachConcordance,
+      detachConcordanceDispersion,
       materializeConcordance,
+      queryClient,
     },
   });
 
@@ -737,14 +678,6 @@ const ConcordanceFeature: React.FC = () => {
     canUpdate: true,
   });
 
-  useEffect(() => {
-    if (viewMode === 'combined' && results && results.combinable === false) {
-      // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
-      const id = requestAnimationFrame(() => setViewMode('separated'));
-      return () => cancelAnimationFrame(id);
-    }
-  }, [viewMode, results]);
-
   // Track whether initial preference hydration from server results has been
   // applied.  After the first sync we stop overwriting globalPageSize from
   // response data to avoid a feedback loop: user changes page size → response
@@ -789,160 +722,25 @@ const ConcordanceFeature: React.FC = () => {
       return () => cancelAnimationFrame(id);
     }
 
-    const nextShowMetadata = preferenceSource?.show_metadata ?? analysisParams?.show_metadata;
-    if (typeof nextShowMetadata === 'boolean' && nextShowMetadata !== showMetadata) {
-      const id = requestAnimationFrame(() => setShowMetadata(nextShowMetadata));
-      return () => cancelAnimationFrame(id);
-    }
-  }, [results, globalPageSize, showMetadata, setNodePagination]);
+  }, [results, globalPageSize, setNodePagination]);
 
-  // Watch materialize task status: when a tracked concordance_materialize task
-  // reaches a terminal state, clear its loading flag, refresh the task request
-  // to pick up new materialized_paths, and (on success) reset page_size to the
-  // default 20 before refetching the current page with the new semantics.
-  const materializeStatus = useAnalysisTaskStatus(['concordance_materialize']);
-  const processedMaterializeTaskIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const trackedEntries = Object.entries(materializeTaskIds);
-    if (trackedEntries.length === 0) return;
-
-    for (const task of materializeStatus.tasks) {
-      const taskId = task?.task_id;
-      if (!taskId) continue;
-      if (processedMaterializeTaskIdsRef.current.has(taskId)) continue;
-      const state = task?.state;
-      if (state !== 'successful' && state !== 'failed' && state !== 'cancelled') continue;
-
-      const nodeEntry = trackedEntries.find(([, trackedId]) => trackedId === taskId);
-      if (!nodeEntry) continue;
-      const [nodeId] = nodeEntry;
-
-      processedMaterializeTaskIdsRef.current.add(taskId);
-      setNodeMaterializing(prev => {
-        if (!prev[nodeId]) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
-      setMaterializeTaskIds(prev => {
-        if (!(nodeId in prev)) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
-
-      if (state !== 'successful') {
-        toast.error(`Process All ${state}`);
-        continue;
-      }
-
-      toast.success('Process All complete.');
-
-      // Refetch parent concordance task request to learn the newly-persisted
-      // materialized_paths map; then reset page_size to 20 and refetch results
-      // so the table re-renders with occurrence-row semantics. Note: the
-      // authoritative path arrives via the `analysis_materialized` SSE event
-      // (handled separately) — this fetch is best-effort additional coverage.
-      void (async () => {
-        try {
-          const headers = getAuthHeaders();
-          const parentTaskId = await resolveTaskId();
-          if (parentTaskId) {
-            const req = await textApi.getConcordanceTaskRequest(parentTaskId, headers);
-            const reqObj = (req as Record<string, unknown>) ?? {};
-            const paths = (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
-            if (paths && typeof paths === 'object') {
-              setMaterializedPaths(prev => ({ ...prev, ...paths }));
-            }
-            const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
-            if (summaries && typeof summaries === 'object') {
-              const parsed: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
-              for (const [nid, s] of Object.entries(summaries)) {
-                parsed[nid] = {
-                  recordCount: Number(s.record_count) || 0,
-                  uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
-                  totalDocuments: Number(s.total_source_documents) || 0,
-                };
-              }
-              setMaterializeSummaries(prev => ({ ...prev, ...parsed }));
-            }
-          }
-        } catch (error) {
-          console.warn('Failed to refresh concordance task request after materialize', error);
-        }
-
-        setGlobalPageSize(20);
-        setNodePagination(prev => {
-          const updated = { ...prev };
-          Object.keys(updated).forEach((key) => {
-            updated[key] = { ...updated[key]!, pageSize: 20, currentPage: 1 };
-          });
-          return updated;
-        });
-
-        try {
-          await persistResultPreferences({ pageSize: 20 });
-        } catch (error) {
-          console.warn('Failed to refetch concordance after materialize', error);
-        }
-      })();
-    }
-  }, [
-    materializeStatus.tasks,
+  // Materialize lifecycle: terminal-state task watcher, task-id ref reset,
+  // and `analysis_materialized` SSE consumer. See hook for details.
+  const { concordanceTaskIdRef, resetProcessedEvents } = useConcordanceMaterializedEvents({
+    concordanceTaskId,
     materializeTaskIds,
+    materializedEvents,
     getAuthHeaders,
     resolveTaskId,
     persistResultPreferences,
-  ]);
-
-  // Apply `analysis_materialized` SSE events for the current concordance task.
-  // The backend pushes these the moment the per-node parquet is persisted, so
-  // they don't race with the parent-task save the way the GET-based fallback
-  // can. Each unique event sequence is processed at most once.
-  // The concordance task id is derived from `results.metadata.task_id`, which
-  // briefly goes empty while results are being refetched after a materialise
-  // (e.g. the page-size reset triggers a results refresh). We hold the last
-  // known value in a ref so events that arrive during the refetch window can
-  // still be matched and applied.
-  //
-  // We also use the ref to detect a real task switch — `taskA` → `taskB`
-  // with both non-empty — which only happens when the user actually clicks
-  // Run/Update and a new analysis task is created. In that case the cached
-  // `materializedPaths` belongs to the previous task and would otherwise
-  // cause "No materialised concordance for node X" 404s on the bin-fetch.
-  // We deliberately skip the clear on the initial `'' → taskA` transition
-  // (mount/remount with hydration), since `onHydratedRequest` is the
-  // authoritative source for that path.
-  const concordanceTaskIdRef = useRef<string>('');
-  const processedMaterializedEventSeqRef = useRef<Set<number>>(new Set());
-  useEffect(() => {
-    if (!concordanceTaskId) return;
-    const prev = concordanceTaskIdRef.current;
-    if (prev && prev !== concordanceTaskId) {
-      setMaterializedPaths({});
-      setMaterializedBins({});
-      setMaterializeSummaries({});
-      processedMaterializedEventSeqRef.current = new Set();
-    }
-    concordanceTaskIdRef.current = concordanceTaskId;
-  }, [concordanceTaskId]);
-
-  // The processed-event ref is declared above (alongside the task-id-change
-  // effect that resets it). Events are never marked processed when the
-  // consumer can't apply them yet, so re-running the effect when the id
-  // comes back picks up any unapplied events for that task.
-  useEffect(() => {
-    if (materializedEvents.length === 0) return;
-    const effectiveTaskId = concordanceTaskId || concordanceTaskIdRef.current;
-    if (!effectiveTaskId) return;
-    for (const event of materializedEvents) {
-      if (processedMaterializedEventSeqRef.current.has(event.sequence)) continue;
-      if (event.taskType !== 'concordance_materialize') continue;
-      if (event.parentTaskId !== effectiveTaskId) continue;
-      processedMaterializedEventSeqRef.current.add(event.sequence);
-      setMaterializedPaths((prev) => ({ ...prev, [event.parentNodeId]: event.materializedPath }));
-    }
-  }, [concordanceTaskId, materializedEvents]);
+    setNodeMaterializing,
+    setMaterializeTaskIds,
+    setMaterializedPaths,
+    setMaterializeSummaries,
+    setMaterializedBins,
+    setGlobalPageSize,
+    setNodePagination,
+  });
 
   // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
   const selectedNodeIds = selectedNodes.map((node) => node.id).sort();
@@ -970,114 +768,25 @@ const ConcordanceFeature: React.FC = () => {
     }
   }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
 
-  // Queue concordance handoffs from TokenFrequencyTab so hydration can settle first.
-  useEffect(() => {
-    if (!pendingConcordance) return;
-    if (lastPendingConcordanceRef.current === pendingConcordance.timestamp) {
-      return;
-    }
-    lastPendingConcordanceRef.current = pendingConcordance.timestamp ?? null;
-    const id = requestAnimationFrame(() => {
-      setQueuedPendingConcordance(pendingConcordance);
-      clearPendingConcordance();
-    });
-    return () => cancelAnimationFrame(id);
-  }, [pendingConcordance, clearPendingConcordance]);
-
-  useEffect(() => {
-    if (!queuedPendingConcordance) {
-      if (handoffConfirmOpen) {
-        const id = requestAnimationFrame(() => setHandoffConfirmOpen(false));
-        return () => cancelAnimationFrame(id);
-      }
-      return;
-    }
-
-    const hydrationSettled =
-      hydrationState.status === 'error' ||
-      (hydrationState.status === 'idle' && typeof hydrationState.lastHydratedAt === 'number');
-    if (!hydrationSettled) {
-      return;
-    }
-
-    if (hasSuccessfulConcordanceResults(results)) {
-      if (!handoffConfirmOpen) {
-        const id = requestAnimationFrame(() => setHandoffConfirmOpen(true));
-        return () => cancelAnimationFrame(id);
-      }
-      return;
-    }
-
-    const rafIds: number[] = [];
-    const word = queuedPendingConcordance.searchWord;
-    if (word) {
-      rafIds.push(requestAnimationFrame(() => setSearchWord(word)));
-    }
-
-    if (Array.isArray(queuedPendingConcordance.selectedNodes) && queuedPendingConcordance.selectedNodes.length > 0) {
-      const targetIds = queuedPendingConcordance.selectedNodes
-        .map((node) => (typeof node?.id === 'string' ? node.id : ''))
-        .filter((id): id is string => id.trim().length > 0);
-      const effectiveTargetIds = takeMostRecent(targetIds, 2);
-      if (effectiveTargetIds.length > 0) {
-        const currentIds = selectedNodes.map((node) => node.id);
-        const needsSync =
-          effectiveTargetIds.length !== currentIds.length ||
-          effectiveTargetIds.some((id, index) => id !== currentIds[index]);
-        if (needsSync) {
-          try {
-            selectNodes(effectiveTargetIds);
-          } catch (error) {
-            console.warn('Failed to sync workspace selection from pending concordance:', error);
-          }
-        }
-      }
-    }
-
-    if (queuedPendingConcordance.nodeColumnSelections?.length) {
-      setNodeColumnSelections(queuedPendingConcordance.nodeColumnSelections, { replace: true });
-    }
-
-    if (queuedPendingConcordance.nodeColors) {
-      Object.entries(queuedPendingConcordance.nodeColors).forEach(([nodeId, color]) => {
-        handleColorChange(nodeId, color as string);
-      });
-    }
-
-    let timeoutId: number | null = null;
-    const hasNodeTargets =
-      selectedNodes.length > 0 ||
-      (queuedPendingConcordance.selectedNodes?.length ?? 0) > 0 ||
-      (queuedPendingConcordance.nodeColumnSelections?.length ?? 0) > 0;
-    if (queuedPendingConcordance.autoRun === true && queuedPendingConcordance.searchWord && hasNodeTargets) {
-      timeoutId = window.setTimeout(() => {
-        setShouldAutoSearch(true);
-      }, 50);
-    }
-
-    const resetId = requestAnimationFrame(() => {
-      setQueuedPendingConcordance(null);
-      setHandoffConfirmOpen(false);
-    });
-
-    return () => {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-      rafIds.forEach(cancelAnimationFrame);
-      cancelAnimationFrame(resetId);
-    };
-  }, [
+  const {
     queuedPendingConcordance,
-    hydrationState.status,
-    hydrationState.lastHydratedAt,
-    results,
+    setQueuedPendingConcordance,
     handoffConfirmOpen,
+    setHandoffConfirmOpen,
+    handoffConfirmingRef,
+    shouldAutoSearch,
+    setShouldAutoSearch,
+  } = useConcordancePendingHandoff({
+    pendingConcordance,
+    clearPendingConcordance,
+    hydrationState,
+    results,
     selectedNodes,
+    setSearchWord,
     setNodeColumnSelections,
     selectNodes,
     handleColorChange,
-  ]);
+  });
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {
@@ -1104,7 +813,7 @@ const ConcordanceFeature: React.FC = () => {
       void handleSearch(true);
     });
     return () => cancelAnimationFrame(id);
-  }, [shouldAutoSearch, handleSearch]);
+  }, [shouldAutoSearch, handleSearch, setShouldAutoSearch]);
 
   const handleClearResults = async () => {
     if (!currentWorkspaceId) return;
@@ -1146,93 +855,15 @@ const ConcordanceFeature: React.FC = () => {
     });
   };
 
-  const handleViewModeChange = (nextMode: 'separated' | 'combined') => {
-    if (nextMode === viewMode) {
-      return;
-    }
-
-    setViewMode(nextMode);
-
-    if (nextMode === 'combined' && results?.combinable) {
-      const prevAnchor = resultsRef.current;
-      if (prevAnchor) {
-        const rect = prevAnchor.getBoundingClientRect();
-        prevAnchor.style.minHeight = `${rect.height}px`;
-      }
-
-      setTimeout(() => {
-        const prevTop =
-          prevAnchor?.getBoundingClientRect().top ??
-          resultsRef.current?.getBoundingClientRect().top ??
-          0;
-        const prevScrollY = window.scrollY;
-
-        setCombinedLoading(true);
-        updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize }).finally(() => {
-          setCombinedLoading(false);
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              const newAnchor = resultsRef.current;
-              if (newAnchor) {
-                const newTop = newAnchor.getBoundingClientRect().top;
-                const delta = newTop - prevTop;
-                if (Math.abs(delta) > 1) {
-                  window.scrollTo({ top: prevScrollY + delta });
-                }
-                newAnchor.style.minHeight = '';
-              } else {
-                window.scrollTo({ top: prevScrollY });
-              }
-            });
-          });
-        });
-      }, 30);
-
-      return;
-    }
-
-    if (nextMode === 'separated') {
-      const prevAnchor = resultsRef.current;
-      const prevTop = prevAnchor?.getBoundingClientRect().top ?? 0;
-      const prevScrollY = window.scrollY;
-
-      updateStoredResult({ combined: false, page: 1, page_size: globalPageSize }).finally(() => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const newAnchor = resultsRef.current;
-            if (newAnchor) {
-              const newTop = newAnchor.getBoundingClientRect().top;
-              const delta = newTop - prevTop;
-              if (Math.abs(delta) > 1) {
-                window.scrollTo({ top: prevScrollY + delta });
-              }
-              newAnchor.style.minHeight = '';
-            } else {
-              window.scrollTo({ top: prevScrollY });
-            }
-          });
-        });
-      });
-    }
-  };
-
-  // Refetch combined results when combined page changes
-  const lastCombinedQueryRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (viewMode !== 'combined' || !results) {
-      return;
-    }
-    const taskId =
-      results?.metadata?.task_id ??
-      (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
-      '';
-    const key = `${taskId}|${combinedPage}|${globalPageSize}`;
-    if (lastCombinedQueryRef.current === key) {
-      return;
-    }
-    lastCombinedQueryRef.current = key;
-    void updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize });
-  }, [viewMode, results, combinedPage, globalPageSize, updateStoredResult]);
+  const { combinedLoading, handleViewModeChange } = useConcordanceViewModeSwap({
+    viewMode,
+    setViewMode,
+    results,
+    combinedPage,
+    globalPageSize,
+    updateStoredResult,
+    resultsRef,
+  });
 
 
   const handleRowClick = (
@@ -1327,7 +958,7 @@ const ConcordanceFeature: React.FC = () => {
         initial[node.node_id] = [];
       });
       setSelectedDetachColumns(initial);
-      setDetachNodeOptions(options);
+      setDetachDialogNodeOptions(options);
       setDetachDialogOpen(true);
     } catch (error) {
       console.error('Failed to load concordance detach options:', error);
@@ -1335,38 +966,6 @@ const ConcordanceFeature: React.FC = () => {
       setPendingDetachNodes([]);
       setSelectedDetachColumns({});
     }
-  };
-
-  const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
-    setSelectedDetachColumns(prev => {
-      const current = prev[nodeId] || [];
-      const next = checked
-        ? [...current, column]
-        : current.filter(c => c !== column);
-      return { ...prev, [nodeId]: next };
-    });
-  };
-
-  const selectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = node.available_columns.filter(
-          (column) => !(node.disabled_columns || []).includes(column)
-        );
-      });
-      return next;
-    });
-  };
-
-  const deselectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = [];
-      });
-      return next;
-    });
   };
 
   const handleDetachConfirm = async () => {
@@ -1377,719 +976,140 @@ const ConcordanceFeature: React.FC = () => {
     setDetachDialogOpen(false);
     setPendingDetachNodes([]);
     setSelectedDetachColumns({});
-    setDetachNodeOptions([]);
+    setDetachDialogNodeOptions([]);
   };
+
+  // --- Dispersion detach dialog helpers ---
+  const openDispersionDetachDialog = async (
+    nodes: { nodeId: string; column: string; nodeLabel: string }[],
+    selectedBins: ReadonlySet<number> | null,
+    binCount: number,
+    options?: {
+      selectedMatchedTexts?: string[] | null;
+      matchCaseInsensitive?: boolean;
+    },
+  ) => {
+    setPendingDispersionDetachNodes(nodes);
+    setPendingDispersionBinSelection(
+      selectedBins && selectedBins.size > 0 ? Array.from(selectedBins) : null,
+    );
+    setPendingDispersionBinCount(binCount);
+    setPendingDispersionMatchedTexts(options?.selectedMatchedTexts ?? null);
+    setPendingDispersionCaseInsensitive(!!options?.matchCaseInsensitive);
+
+    try {
+      const responses = await Promise.all(
+        nodes.map((node) =>
+          textApi.getConcordanceDetachOptions(node.nodeId, node.column, getAuthHeaders()),
+        ),
+      );
+      // Adapt the per-hit detach-options shape for dispersion: hide the
+      // CONC_* mandatory columns (the worker computes the dispersion-
+      // specific output columns regardless). All optional columns
+      // (including the document/text column) start unticked so the user
+      // opts in to whatever metadata they want preserved. Also hide
+      // `CONC_extraction` — the dispersion-detach worker always emits it
+      // as the per-document joined string, so it would be misleading to
+      // present it as an opt-in pick (and the dispersion endpoint can't
+      // source-select a generated column).
+      const dispersionHiddenColumns = new Set<string>([
+        CONCORDANCE_COLUMN_KEYS.extraction,
+      ]);
+      const options = responses.flatMap((response) => response.data?.nodes ?? []).map((node) => {
+        const disabled = new Set(node.disabled_columns || []);
+        return {
+          ...node,
+          available_columns: node.available_columns.filter(
+            (c) => !disabled.has(c) && !dispersionHiddenColumns.has(c),
+          ),
+          disabled_columns: [],
+        };
+      });
+      const initial: Record<string, string[]> = {};
+      options.forEach((node) => {
+        initial[node.node_id] = [];
+      });
+      setSelectedDispersionColumns(initial);
+      setDispersionDetachOptions(options);
+      setDispersionDetachDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to load dispersion detach options:', error);
+      toast.error(
+        `Failed to load dispersion detach options: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      setPendingDispersionDetachNodes([]);
+      setSelectedDispersionColumns({});
+      setPendingDispersionMatchedTexts(null);
+      setPendingDispersionCaseInsensitive(false);
+    }
+  };
+
+  const handleDispersionDetachConfirm = async () => {
+    const binsSet = pendingDispersionBinSelection
+      ? new Set(pendingDispersionBinSelection)
+      : null;
+    for (const n of pendingDispersionDetachNodes) {
+      const cols = selectedDispersionColumns[n.nodeId] || [];
+      await handleDispersionDetach(n.nodeId, n.column, {
+        nodeLabel: n.nodeLabel,
+        materializedPath: materializedPaths[n.nodeId] ?? null,
+        selectedBins: binsSet,
+        binCount: pendingDispersionBinCount,
+        selectedColumns: cols,
+        selectedMatchedTexts: pendingDispersionMatchedTexts,
+        matchCaseInsensitive: pendingDispersionCaseInsensitive,
+      });
+    }
+    setDispersionDetachDialogOpen(false);
+    setPendingDispersionDetachNodes([]);
+    setSelectedDispersionColumns({});
+    setDispersionDetachOptions([]);
+    setPendingDispersionBinSelection(null);
+    setPendingDispersionBinCount(0);
+    setPendingDispersionMatchedTexts(null);
+    setPendingDispersionCaseInsensitive(false);
+  };
+
+  const anyDispersionNodeDetaching = pendingDispersionDetachNodes.some(
+    (n) => Boolean(nodeDetaching[n.nodeId]),
+  );
 
   const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));
 
-  const SortableHeader: React.FC<{ columnKey: string; label: string; paginationKey: string; requestNodeId: string }> = ({ columnKey, label, paginationKey, requestNodeId }) => {
-    const nodeState = nodePagination[paginationKey] || { sortBy: '', descending: false };
-    const isSorted = nodeState.sortBy === columnKey;
-    const sortIcon = isSorted ? (nodeState.descending ? '▼' : '▲') : '▲▼';
-    
-    return (
-      <TableHead 
-        className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${isSorted ? 'text-blue-600' : 'text-gray-500'}`}
-        onClick={() => handleSort(columnKey, paginationKey, requestNodeId)}
-      >
-        <div className="flex items-center space-x-1">
-          <span>{label}</span>
-          <span className={`text-xs ${isSorted ? 'text-blue-600' : 'text-gray-400'}`}>
-            {sortIcon}
-          </span>
-        </div>
-      </TableHead>
-    );
-  };
-
-  const renderConcordanceTable = (
-    nodeKey: string,
-    nodeData: ConcordanceResultEntry,
-    context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string; displayName?: string; nodeColor?: string }
-  ) => {
-    const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
-    const effectiveNodeId = actualNodeId || requestNodeId;
-    const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
-    const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';
-    if (nodeKey === '__COMBINED__') {
-      const groupedRows = nodeData.data;
-      const rows = showDispersion
-        ? buildDispersionRows(groupedRows)
-        : flattenConcordanceGroups(groupedRows);
-      const longestTextLength = showDispersion && proportionalDispersionBars
-        ? rows.reduce((max, row) => Math.max(max, getDispersionTextLength(row, column)), 0)
-        : 0;
-      const columns = nodeData.columns;
-      const combinedHasPrev = Boolean(nodeData.pagination?.has_prev);
-      const combinedHasNext = Boolean(nodeData.pagination?.has_next);
-      const metaCols = nodeData.metadata.metadata_columns;
-      const concCols = (nodeData.metadata.concordance_columns?.length
-        ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
-        : CORE_COLS) as string[];
-      const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
-      const rawDisplayColumns = showDispersion
-        ? (showMetadata ? [CONCORDANCE_DISPERSION_COLUMN, ...visibleMetaCols] : [CONCORDANCE_DISPERSION_COLUMN])
-        : (showMetadata
-          ? [...concCols.filter(c => columns.includes(c)), ...visibleMetaCols]
-          : concCols.filter(c => columns.includes(c)));
-      const displayColumns = dedupeColumns(rawDisplayColumns);
-      const dispersionColumnStyle = getDispersionColumnStyle(showDispersion, showMetadata, resultsViewportWidth);
-
-      const combinedNodeIds = takeMostRecent(selectedNodes, 2)
-        .map((n) => n.id)
-        .filter((id): id is string => Boolean(id));
-      const isAnyCombinedMaterializing = combinedNodeIds.some((id) => Boolean(nodeMaterializing[id]));
-      const allCombinedMaterialized = combinedNodeIds.length > 0
-        && combinedNodeIds.every((id) => Boolean(materializedPaths[id]));
-      return (
-        <div key="__COMBINED__" className="mb-6">
-          <div className="flex items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
-            <div className="ml-auto flex items-center space-x-2">
-              <span className="text-xs text-gray-500">Rows colored by source data block</span>
-              <Button
-                onClick={() => {
-                  if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                  for (const nid of combinedNodeIds) {
-                    if (materializedPaths[nid]) continue;
-                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
-                    if (!col) continue;
-                    void handleMaterialize(nid, col);
-                  }
-                }}
-                // Stays enabled while at least one block still needs
-                // processing — the click handler skips any block already in
-                // `materializedPaths`, so partial re-clicks are safe. The
-                // button does not gate on `combinedLoading` (the combined
-                // table fetch is independent of the materialise operation).
-                disabled={
-                  isAnyCombinedMaterializing
-                  || allCombinedMaterialized
-                  || !searchWord.trim()
-                  || combinedNodeIds.length === 0
-                }
-                size="sm"
-                variant="outline"
-                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                title="Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them"
-              >
-                {isAnyCombinedMaterializing ? (
-                  <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
-                ) : allCombinedMaterialized ? (
-                  <>Processed</>
-                ) : (
-                  <>Process Both</>
-                )}
-              </Button>
-              <Button
-                onClick={() => {
-                  if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                  const nodes = combinedNodeIds.map((nid) => {
-                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
-                    const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
-                    const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
-                    return { nodeId: nid, column: col, nodeLabel: sourceLabel };
-                  }).filter((n) => n.column);
-                  void openDetachDialog(nodes);
-                }}
-                disabled={combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
-                size="sm"
-                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                title="Create new data blocks with concordance results for both sources joined to their original tables"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Both to Workspace
-              </Button>
-            </div>
-          </div>
-          <div className="rounded-lg border border-border bg-card">
-            <AnalysisTableScrollArea maxHeightClass="max-h-100">
-                <Table className={showDispersion ? 'w-full' : 'min-w-180'} disableContainer>
-                <TableHeader className="bg-gray-50 sticky top-0 z-10">
-                  <TableRow>
-                    {displayColumns.map((c: string) => (
-                      <TableHead
-                        key={c}
-                        className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                        style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}
-                      >
-                        {c}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.length === 0 ? (
-                    <TableRow>
-                      <TableCell className="h-24 text-center text-muted-foreground" colSpan={displayColumns.length || 1}>
-                        No matching rows on this page for &quot;{searchWord}&quot;. Source rows without matches are omitted.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    rows.map((row: Record<string, unknown>, idx:number) => {
-                      const rawSrc = row.__source_node;
-                      const normalized = rawSrc ? rawSrc.toString().toLowerCase() : undefined;
-                      let color = normalized ? sourceColorMap[normalized] : undefined;
-                      if (!color && rawSrc && normalized) {
-                        // Fallback: attempt partial / loose match (startsWith) if exact failed
-                        const entry = Object.entries(sourceColorMap).find(([k]) => k.includes(normalized));
-                        color = entry ? entry[1] : undefined;
-                      }
-                      if (!color) {
-                        // Final fallback: deterministic by hashing source string
-                        if (rawSrc) {
-                          const chars = Array.from(rawSrc.toString()) as string[];
-                          const hash = chars.reduce((a, c) => a + c.charCodeAt(0), 0);
-                          color = defaultPalette[hash % defaultPalette.length];
-                        } else {
-                          color = '#ffffff';
-                        }
-                      }
-                      const bg = `${color}20`; // light tint
-                      return (
-                        <TableRow key={idx} className="cursor-pointer" style={{ backgroundColor: bg }} onClick={() => {
-                          if (showDispersion) {
-                            const hits = getDispersionHits(row);
-                            const sourceHit = hits[0];
-                            const sourceLabel = sourceHit?.__source_node ?? rawSrc;
-                            if (sourceLabel) {
-                              const nodesForDetail = panelSelectedNodes;
-                              const nodeObj = nodesForDetail.find((n: WorkspaceNodeLike) => {
-                                const candidates = [n.id, n.name, n.name, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.name : undefined, n.label, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.label : undefined].filter(Boolean).map(v=>String(v).toLowerCase());
-                                return candidates.includes(String(sourceLabel).toLowerCase());
-                              });
-                              const sel = nodeObj && effectiveNodeColumnSelections.find(s => s.nodeId === nodeObj.id);
-                              if (nodeObj && sel?.column) {
-                                handleRowClick(row, String(nodeObj.id ?? ''), sel.column, hits);
-                              }
-                            }
-                            return;
-                          }
-                          if (rawSrc) {
-                    const nodesForDetail = panelSelectedNodes;
-                      const nodeObj = nodesForDetail.find((n: WorkspaceNodeLike) => {
-                              const candidates = [n.id, n.name, n.name, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.name : undefined, n.label, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.label : undefined].filter(Boolean).map(v=>String(v).toLowerCase());
-                              return candidates.includes(rawSrc.toString().toLowerCase());
-                            });
-                            const sel = nodeObj && effectiveNodeColumnSelections.find(s => s.nodeId === nodeObj.id);
-                            if (nodeObj && sel?.column) handleRowClick(row, String(nodeObj.id ?? ''), sel.column);
-                          }
-                        }}>
-                          {displayColumns.map((c: string, i: number) => (
-                            <TableCell key={i} style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}>
-                              {c === CONCORDANCE_DISPERSION_COLUMN ? (
-                                <ConcordanceDispersionCell
-                                  hits={getDispersionHits(row)}
-                                  textLength={getDispersionTextLength(row, column)}
-                                  barWidthPercent={proportionalDispersionBars
-                                    ? getDispersionBarWidthPercent(row, column, longestTextLength)
-                                    : 100}
-                                  colourMatches={colourMatches}
-                                  matchedTextColors={matchedTextColorMap}
-                                  lowercaseMatches={lowercaseMatches}
-                                  hiddenMatchedTexts={hiddenMatchedTexts}
-                                />
-                              ) : row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-                </Table>
-            </AnalysisTableScrollArea>
-            <AnalysisPagination
-              page={combinedPage}
-              pageSize={globalPageSize}
-              hasNext={combinedHasNext}
-              hasPrev={combinedHasPrev}
-              totalPages={nodeData.pagination?.total_source_pages}
-              onPageChange={(newPage) => setCombinedPage(newPage)}
-              pageSizeSummary={nodeData.materialized
-                ? (Object.keys(materializeSummaries).length > 0
-                  ? <GroupedResultsPageSizeSummary
-                      groups={[]}
-                      totalInstances={Object.values(materializeSummaries).reduce((sum, s) => sum + s.recordCount, 0)}
-                      totalDocuments={Object.values(materializeSummaries).reduce((sum, s) => sum + s.uniqueDocuments, 0)}
-                      totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
-                    />
-                  : undefined)
-                : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />
-              }
-              loading={combinedLoading}
-            />
-            {showDispersion && colourMatches && allMatchedTexts.length > 0 && (
-              <ConcordanceDispersionLegend
-                matchedTexts={allMatchedTexts}
-                matchedTextColors={matchedTextColorMap}
-                hiddenMatchedTexts={hiddenMatchedTexts}
-                onToggle={(text) => {
-                  setHiddenMatchedTexts((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(text)) next.delete(text);
-                    else next.add(text);
-                    return next;
-                  });
-                }}
-              />
-            )}
-            {showDispersion && !proportionalDispersionBars && (
-              (() => {
-                const dispersionRows = rows as ConcordanceDispersionRow[];
-                const sourceNames = panelSelectedNodes.map((n) => n.name).filter(Boolean) as string[];
-                const dataBlockLabel = sourceNames.length > 0 ? sourceNames.join(', ') : 'Combined';
-                const materialisedBins = getMaterializedBinsForKey('__COMBINED__');
-                const materialised = isBlockMaterialised('__COMBINED__');
-                return (
-                  <ConcordanceDispersionSummary
-                    rows={dispersionRows}
-                    textColumn={column}
-                    binCount={binCount}
-                    lowercaseMatches={lowercaseMatches}
-                    splitBySource={combinedSourceMode === 'split'}
-                    allMatchedTexts={allMatchedTexts}
-                    matchedTextColors={matchedTextColorMap}
-                    hiddenMatchedTexts={hiddenMatchedTexts}
-                    dataBlockLabel={dataBlockLabel}
-                    searchWord={searchWord}
-                    materialisedBins={materialisedBins}
-                    materialised={materialised}
-                    aggregateAll={!colourMatches}
-                  />
-                );
-              })()
-            )}
-          </div>
-        </div>
-      );
-    }
-    // Build per-node display columns using metadata
-    const groupedRows = nodeData.data;
-    const rows = showDispersion
-      ? buildDispersionRows(groupedRows)
-      : flattenConcordanceGroups(groupedRows);
-    const longestTextLength = showDispersion && proportionalDispersionBars
-      ? rows.reduce((max, row) => Math.max(max, getDispersionTextLength(row, column)), 0)
-      : 0;
-    const allCols = nodeData.columns;
-    const metaCols = nodeData.metadata.metadata_columns;
-    const concCols = (nodeData.metadata.concordance_columns?.length
-      ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
-      : CORE_COLS) as string[];
-    const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
-    const rawDisplayColumns = showDispersion
-      ? (showMetadata ? [CONCORDANCE_DISPERSION_COLUMN, ...visibleMetaCols.filter(c => allCols.includes(c))] : [CONCORDANCE_DISPERSION_COLUMN])
-      : (showMetadata
-        ? [...concCols.filter(c => allCols.includes(c)), ...visibleMetaCols.filter(c => allCols.includes(c))]
-        : concCols.filter(c => allCols.includes(c)));
-    const displayColumns = dedupeColumns(rawDisplayColumns);
-    const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
-    const sortableColumns = new Set(metaCols);
-    const dispersionColumnStyle = getDispersionColumnStyle(showDispersion, showMetadata, resultsViewportWidth);
-
-    const currentNodePagination = nodePagination[paginationKey];
-    const currentPage = currentNodePagination?.currentPage ?? 1;
-    const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
-    const hasPrev = Boolean(nodeData.pagination?.has_prev) || currentPage > 1;
-    const hasNext = Boolean(nodeData.pagination?.has_next);
-
-    const detachingKey = detachNodeId ?? "";
-    const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
-    const isMaterializing = detachingKey ? Boolean(nodeMaterializing[detachingKey]) : false;
-    const hasMaterializedPath = detachingKey ? Boolean(materializedPaths[detachingKey]) : false;
-
-    const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
-
-    return (
-      <div key={nodeKey} className="mb-6">
-        {showNodeIndicator && (
-          <div className="mb-2 flex items-center gap-2">
-            <span
-              className="inline-block h-3 w-3 shrink-0 rounded-full"
-              style={{ backgroundColor: context.nodeColor }}
-            />
-            <h3 className="text-sm font-medium text-foreground">
-              {context.displayName || nodeKey}
-            </h3>
-          </div>
-        )}
-        <div
-          className="rounded-lg border border-border bg-card"
-          style={showNodeIndicator ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor } : undefined}
-        >
-          <AnalysisTableScrollArea maxHeightClass="max-h-100">
-              <Table className={showDispersion ? 'w-full' : 'min-w-180'} disableContainer>
-              <TableHeader className="bg-gray-50 sticky top-0 z-10">
-                <TableRow>
-                  {tableColumns.map(key => {
-                    const isSortable = showMetadata && sortableColumns.has(key);
-                    return isSortable ? (
-                      <SortableHeader key={key} columnKey={key} label={key} paginationKey={paginationKey} requestNodeId={requestNodeId} />
-                    ) : (
-                      <TableHead
-                        key={key}
-                        className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                        style={key === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}
-                      >
-                        {key}
-                      </TableHead>
-                    );
-                  })}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell className="h-24 text-center text-muted-foreground" colSpan={tableColumns.length || 1}>
-                      No matching rows on this page for &quot;{searchWord}&quot;. Source rows without matches are omitted.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((row: Record<string, unknown>, index: number) => (
-                    <TableRow 
-                      key={index} 
-                      className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                      onClick={() => {
-                        handleRowClick(
-                          row,
-                          effectiveNodeId,
-                          column,
-                          showDispersion ? getDispersionHits(row) : undefined,
-                        );
-                      }}
-                    >
-                      {tableColumns.map((colKey: string, cellIndex) => (
-                        <TableCell key={cellIndex} style={colKey === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}>
-                          {colKey === CONCORDANCE_DISPERSION_COLUMN ? (
-                            <ConcordanceDispersionCell
-                              hits={getDispersionHits(row)}
-                              textLength={getDispersionTextLength(row, column)}
-                              barWidthPercent={proportionalDispersionBars
-                                ? getDispersionBarWidthPercent(row, column, longestTextLength)
-                                : 100}
-                              colourMatches={colourMatches}
-                              matchedTextColors={matchedTextColorMap}
-                              lowercaseMatches={lowercaseMatches}
-                              hiddenMatchedTexts={hiddenMatchedTexts}
-                            />
-                          ) : row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-              </Table>
-          </AnalysisTableScrollArea>
-        </div>
-
-        <AnalysisPagination
-          page={currentPage}
-          pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
-          hasNext={hasNext}
-          hasPrev={hasPrev}
-          totalPages={nodeData.pagination?.total_source_pages}
-          onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-          pageSizeSummary={nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
-            ? <GroupedResultsPageSizeSummary
-                groups={[]}
-                totalInstances={materializeSummaries[detachNodeId].recordCount}
-                totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
-                totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
-              />
-            : (nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />)
-          }
-          loading={nodeIsLoading}
-        >
-          {/* Materialize button */}
-          <Button
-            onClick={() => {
-              if (detachNodeId) {
-                void handleMaterialize(detachNodeId, column);
-              }
-            }}
-            disabled={
-              nodeIsLoading
-              || isMaterializing
-              || hasMaterializedPath
-              || !searchWord.trim()
-              || !canDetach
-              || !detachNodeId
-            }
-            size="sm"
-            variant="outline"
-            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
-          >
-            {isMaterializing ? (
-              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
-            ) : hasMaterializedPath ? (
-              <>Processed</>
-            ) : (
-              <>Process All</>
-            )}
-          </Button>
-          {/* Detach button */}
-          <Button
-            onClick={() => {
-              if (detachNodeId) {
-                const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-                const detachLabel = (detachNode?.name || nodeKey) as string;
-                void openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
-              }
-            }}
-            disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
-            size="sm"
-            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title="Create a new data block with concordance results joined to the original table"
-          >
-            {isDetaching ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
-            ) : (
-              <><Plus className="mr-2 h-4 w-4" />Add to Workspace</>
-            )}
-          </Button>
-        </AnalysisPagination>
-        {showDispersion && colourMatches && allMatchedTexts.length > 0 && (
-          <ConcordanceDispersionLegend
-            matchedTexts={allMatchedTexts}
-            matchedTextColors={matchedTextColorMap}
-            hiddenMatchedTexts={hiddenMatchedTexts}
-            onToggle={(text) => {
-              setHiddenMatchedTexts((prev) => {
-                const next = new Set(prev);
-                if (next.has(text)) next.delete(text);
-                else next.add(text);
-                return next;
-              });
-            }}
-          />
-        )}
-        {showDispersion && !proportionalDispersionBars && (
-          (() => {
-            const dispersionRows = rows as ConcordanceDispersionRow[];
-            const dataBlockLabel = context.displayName || nodeKey;
-            const materialisedBins = getMaterializedBinsForKey(nodeKey);
-            const materialised = isBlockMaterialised(nodeKey);
-            return (
-              <ConcordanceDispersionSummary
-                rows={dispersionRows}
-                textColumn={column}
-                binCount={binCount}
-                lowercaseMatches={lowercaseMatches}
-                splitBySource={false}
-                allMatchedTexts={allMatchedTexts}
-                matchedTextColors={matchedTextColorMap}
-                hiddenMatchedTexts={hiddenMatchedTexts}
-                dataBlockLabel={dataBlockLabel}
-                searchWord={searchWord}
-                materialisedBins={materialisedBins}
-                materialised={materialised}
-                aggregateAll={!colourMatches}
-              />
-            );
-          })()
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="space-y-0 pb-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Concordance Search
-                <InfoIcon
-                  targetKey="concordance.overview"
-                  label="About Concordance Search"
-                  tooltip="Learn what concordance search is and how it can help you."
-                />
-                <HelpIcon
-                  targetKey="analysis.concordance.parameters"
-                  label="Concordance parameters"
-                  tooltip="Select data blocks, choose the search term, and set context options before running."
-                />
-              </CardTitle>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0">
-          <NodeSelectionPanel
-            selectedNodes={panelSelectedNodes}
-            nodeColumnSelections={effectiveNodeColumnSelections}
-            onColumnChange={handleColumnChange}
-            nodeColors={nodeColors}
-            onColorChange={handleColorChange}
-            defaultPalette={defaultPalette}
-            maxCompare={2}
-            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-            showShape
-            disabled={!!isLocked}
-            locked={!!isLocked}
-            showColorPicker={true}
-            getNodeColumns={getColumnInfos}
-            allowedDataTypes={['string']}
-            originalCount={displayNodeCount}
-            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
-          />
-
-          <div className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <label className="block text-sm font-medium text-foreground">Search word or phrase</label>
-                  <HelpIcon targetKey="analysis.concordance.search-term" label="Concordance search term" />
-                </div>
-                <input
-                  type="text"
-                  value={searchWord}
-                  onChange={(e) => setSearchWord(e.target.value)}
-                  placeholder="Enter word or phrase to search for"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">Left context (tokens)</label>
-                  <input
-                    type="number"
-                    value={numLeftTokens}
-                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 0)}
-                    min="0"
-                    max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">Right context (tokens)</label>
-                  <input
-                    type="number"
-                    value={numRightTokens}
-                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 0)}
-                    min="0"
-                    max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={wholeWord}
-                    onChange={(e) => setWholeWord(e.target.checked)}
-                    disabled={regex}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-foreground">Whole word</span>
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={regex}
-                    onChange={(e) => {
-                      const nextRegex = e.target.checked;
-                      setRegex(nextRegex);
-                      if (nextRegex) {
-                        setWholeWord(false);
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-foreground">Use regular expression</span>
-                </label>
-                <HelpIcon targetKey="analysis.concordance.regex-toggle" label="Regex mode toggle" />
-              </div>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={caseSensitive}
-                  onChange={(e) => setCaseSensitive(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm text-foreground">Case sensitive</span>
-              </label>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
-          <DisabledReasonTooltip reason={(() => {
-            if (isSearching) return undefined;
-            if (actionState.runDisabledReason) return actionState.runDisabledReason;
-            if (!searchWord.trim()) return 'Enter a search word first';
-            if (effectiveNodeColumnSelections.some(sel => !sel.column)) return 'Select a column for each data block';
-            return undefined;
-          })()}>
-            <Button
-              onClick={() => {
-                void handleRunOrUpdate();
-              }}
-              disabled={
-                actionState.runDisabled ||
-                !searchWord.trim() ||
-                effectiveNodeColumnSelections.some(sel => !sel.column)
-              }
-              className="w-full md:w-auto"
-            >
-              {isSearching ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
-              ) : (
-                <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
-              )}
-            </Button>
-          </DisabledReasonTooltip>
-
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleClearResults}
-              variant="destructive"
-              disabled={actionState.clearDisabled}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Clear Results
-            </Button>
-            <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
-            <Select
-              value={String(globalPageSize)}
-              onValueChange={(val) => {
-                const newSize = Number(val);
-                setGlobalPageSize(newSize);
-                setNodePagination((prev) => {
-                  const updated = { ...prev };
-                  Object.keys(updated).forEach((nid) => {
-                    updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
-                  });
-                  return updated;
-                });
-                void persistResultPreferences({ pageSize: newSize });
-              }}
-            >
-              <SelectTrigger className="h-9 w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent align="start">
-                {[10, 20, 50, 100, 200, 400, 800].map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardFooter>
-      </Card>
+      <ConcordanceParameterPanel
+        panelSelectedNodes={panelSelectedNodes}
+        effectiveNodeColumnSelections={effectiveNodeColumnSelections}
+        handleColumnChange={handleColumnChange}
+        nodeColors={nodeColors}
+        handleColorChange={handleColorChange}
+        defaultPalette={defaultPalette}
+        getColumnInfos={getColumnInfos}
+        displayNodeCount={displayNodeCount}
+        isLocked={!!isLocked}
+        searchWord={searchWord}
+        setSearchWord={setSearchWord}
+        numLeftTokens={numLeftTokens}
+        setNumLeftTokens={setNumLeftTokens}
+        numRightTokens={numRightTokens}
+        setNumRightTokens={setNumRightTokens}
+        regex={regex}
+        setRegex={setRegex}
+        wholeWord={wholeWord}
+        setWholeWord={setWholeWord}
+        caseSensitive={caseSensitive}
+        setCaseSensitive={setCaseSensitive}
+        isSearching={isSearching}
+        actionState={actionState}
+        handleRunOrUpdate={handleRunOrUpdate}
+        handleClearResults={handleClearResults}
+        globalPageSize={globalPageSize}
+        setGlobalPageSize={setGlobalPageSize}
+        setNodePagination={setNodePagination}
+        persistResultPreferences={persistResultPreferences}
+      />
 
       {concordanceWaitingBanner && (
         <AnalysisTaskBanner
@@ -2103,223 +1123,66 @@ const ConcordanceFeature: React.FC = () => {
 
       {/* Results */}
       {results?.state === 'successful' && (
-        <Card ref={resultsRef}>
-          <>
-              <CardHeader className="space-y-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2">
-                      Search Results
-                      <HelpIcon
-                        targetKey="analysis.concordance.results"
-                        label="Concordance results"
-                        tooltip="Browse keyword-in-context hits, switch between separated/combined views, and adjust pagination."
-                      />
-                    </CardTitle>
-                    {results.message && (
-                      <CardDescription className="max-w-2xl text-sm text-muted-foreground">
-                        {results.message}
-                      </CardDescription>
-                    )}
-                  </div>
-                  {panelSelectedNodes.length > 1 && (
-                    <Tabs
-                      value={viewMode}
-                      onValueChange={(mode) => handleViewModeChange(mode as 'separated' | 'combined')}
-                      className="w-full md:w-auto"
-                    >
-                      <TabsList aria-label="Concordance view mode">
-                        <TabsTrigger value="separated">Separated</TabsTrigger>
-                        {results?.combinable && (
-                          <TabsTrigger value="combined">
-                            {combinedLoading ? (
-                              <span className="flex items-center gap-1">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Combined
-                              </span>
-                            ) : (
-                              'Combined'
-                            )}
-                          </TabsTrigger>
-                        )}
-                      </TabsList>
-                    </Tabs>
-                  )}
-                </div>
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <Tabs
-                      value={concordanceView}
-                      onValueChange={(value) => {
-                        const newView = value as 'table' | 'dispersion';
-                        setConcordanceView(newView);
-                        if (newView === 'table') {
-                          setProportionalDispersionBars(false);
-                          setColourMatches(false);
-                          setLowercaseMatches(false);
-                          setHiddenMatchedTexts(new Set());
-                        }
-                      }}
-                    >
-                      <TabsList>
-                        <TabsTrigger value="table">Table View</TabsTrigger>
-                        <TabsTrigger value="dispersion">Dispersion View</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                    <div className="flex flex-wrap items-center gap-4">
-                      {showDispersion && !proportionalDispersionBars && (
-                        <label className="flex items-center gap-2 text-sm text-foreground">
-                          <span>Bin No.</span>
-                          <select
-                            value={binCount}
-                            onChange={(e) => {
-                              const parsed = Number.parseInt(e.target.value, 10) as DispersionDisplayBinCount;
-                              if ((DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(parsed)) {
-                                setBinCount(parsed);
-                              }
-                            }}
-                            className="h-7 rounded border border-input bg-background px-2 text-sm"
-                          >
-                            {DISPERSION_DISPLAY_BIN_COUNTS.map((value) => (
-                              <option key={value} value={value}>
-                                {value}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                      <MetadataColumnSelector
-                        showMetadata={showMetadata}
-                        onShowMetadataChange={(nextValue) => {
-                          const previousValue = showMetadata;
-                          setShowMetadata(nextValue);
-                          void (async () => {
-                            try {
-                              await persistResultPreferences({ showMetadata: nextValue });
-                            } catch (error) {
-                              console.error('Failed to persist concordance metadata preference', error);
-                              setShowMetadata(previousValue);
-                            }
-                          })();
-                        }}
-                        availableColumns={availableMetadataColumns}
-                        selectedColumns={selectedMetadataColumns ?? []}
-                        onSelectedColumnsChange={setSelectedMetadataColumns}
-                        sections={metadataColumnSections}
-                        disabledReason={metadataDisabledReason}
-                      />
-                    </div>
-                  </div>
-                  {showDispersion ? (
-                    <div className="flex flex-wrap items-center gap-4">
-                      <label className="flex items-center gap-2 text-sm text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={proportionalDispersionBars}
-                          onChange={(e) => setProportionalDispersionBars(e.target.checked)}
-                          className="h-4 w-4"
-                        />
-                        <span>Bar length proportional to text length</span>
-                      </label>
-                      {!proportionalDispersionBars && viewMode === 'combined' && (
-                        <label className="flex items-center gap-2 text-sm text-foreground">
-                          <span>Sources:</span>
-                          <select
-                            value={combinedSourceMode}
-                            onChange={(e) => setCombinedSourceMode(e.target.value as 'aggregate' | 'split')}
-                            className="h-7 rounded border border-input bg-background px-2 text-sm"
-                          >
-                            <option value="aggregate">Aggregate</option>
-                            <option value="split">Split (solid/dashed)</option>
-                          </select>
-                        </label>
-                      )}
-                      <label className="flex items-center gap-2 text-sm text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={colourMatches}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setColourMatches(checked);
-                            if (!checked) {
-                              setLowercaseMatches(false);
-                              setHiddenMatchedTexts(new Set());
-                            }
-                          }}
-                          className="h-4 w-4"
-                        />
-                        <span>Colour matches</span>
-                      </label>
-                      {colourMatches && (
-                        <label className="flex items-center gap-2 text-sm text-foreground">
-                          <input
-                            type="checkbox"
-                            checked={lowercaseMatches}
-                            onChange={(e) => {
-                              setLowercaseMatches(e.target.checked);
-                              setHiddenMatchedTexts(new Set());
-                            }}
-                            className="h-4 w-4"
-                          />
-                          <span>Lowercase matches</span>
-                        </label>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div ref={resultsViewportRef} className="space-y-4">
-                {results.data && Object.keys(results.data).length > 0 ? (
-                  <div className={`grid gap-4 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
-                    {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
-                      const nodesForDetail = panelSelectedNodes;
-                      const keyedOrder = Object.keys(results.data);
-                      const approxIndex = keyedOrder.indexOf(nodeName);
-                      let node = nodesForDetail.find((n: WorkspaceNodeLike) => {const d = n.data as Record<string,unknown> | undefined; return ((d?.name as string | undefined) || n.id) === nodeName;});
-                      if (!node) {
-                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.id === nodeName);
-                      }
-                      if (!node) {
-                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.name === nodeName);
-                      }
-                      const mappedNodeId = labelToNodeId?.[nodeName];
-                      if (!node && mappedNodeId) {
-                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.id === mappedNodeId);
-                      }
-                      if (!node) {
-                        node = nodesForDetail[approxIndex];
-                      }
-                      
-                      const resolvedNodeId = node?.id || mappedNodeId || '';
-                      const paginationKey = resolvedNodeId || nodeName;
-                      const requestNodeId = resolvedNodeId || nodeName;
-                      const selection = effectiveNodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
-                      const column = selection?.column || '';
-                      
-                      const nodeDisplayName = (node?.name || nodeName) as string;
-                      const nodeColor = sourceColorMap[nodeName.toLowerCase()]
-                        || sourceColorMap[(node?.id || '').toLowerCase()]
-                        || sourceColorMap[(node?.name || '').toLowerCase()]
-                        || defaultPalette[approxIndex % defaultPalette.length];
-
-                      return renderConcordanceTable(nodeName, nodeData, {
-                        nodeId: node?.id || '',
-                        paginationKey,
-                        requestNodeId,
-                        column,
-                        displayName: nodeDisplayName,
-                        nodeColor,
-                      });
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">No data available</div>
-                )}
-                </div>
-              </CardContent>
-          </>
-        </Card>
+        <ConcordanceResultsPanel
+          results={results}
+          resultsRef={resultsRef}
+          resultsViewportRef={resultsViewportRef}
+          resultsViewportWidth={resultsViewportWidth}
+          viewMode={viewMode}
+          handleViewModeChange={handleViewModeChange}
+          combinedLoading={combinedLoading}
+          concordanceView={concordanceView}
+          setConcordanceView={setConcordanceView}
+          showMetadata={showMetadata}
+          availableMetadataColumns={availableMetadataColumns}
+          metadataColumnSections={metadataColumnSections}
+          metadataDisabledReason={metadataDisabledReason}
+          selectedMetadataColumns={selectedMetadataColumns}
+          setSelectedMetadataColumns={setSelectedMetadataColumns}
+          proportionalDispersionBars={proportionalDispersionBars}
+          setProportionalDispersionBars={setProportionalDispersionBars}
+          combinedSourceMode={combinedSourceMode}
+          setCombinedSourceMode={setCombinedSourceMode}
+          dispersionChartType={dispersionChartType}
+          setDispersionChartType={setDispersionChartType}
+          selectedBinIndices={selectedBinIndices}
+          onBinSelect={handleBinSelect}
+          onClearBinSelection={handleClearBinSelection}
+          colourMatches={colourMatches}
+          setColourMatches={setColourMatches}
+          lowercaseMatches={lowercaseMatches}
+          setLowercaseMatches={setLowercaseMatches}
+          hiddenMatchedTexts={hiddenMatchedTexts}
+          setHiddenMatchedTexts={setHiddenMatchedTexts}
+          binCount={binCount}
+          setBinCount={handleBinCountChange}
+          allMatchedTexts={allMatchedTexts}
+          matchedTextColorMap={matchedTextColorMap}
+          getMaterializedBinsForKey={getMaterializedBinsForKey}
+          isBlockMaterialised={isBlockMaterialised}
+          searchWord={searchWord}
+          selectedNodes={selectedNodes}
+          panelSelectedNodes={panelSelectedNodes}
+          effectiveNodeColumnSelections={effectiveNodeColumnSelections}
+          labelToNodeId={labelToNodeId}
+          sourceColorMap={sourceColorMap}
+          defaultPalette={defaultPalette}
+          nodePagination={nodePagination}
+          globalPageSize={globalPageSize}
+          combinedPage={combinedPage}
+          setCombinedPage={setCombinedPage}
+          nodeLoading={nodeLoading}
+          nodeDetaching={nodeDetaching}
+          nodeMaterializing={nodeMaterializing}
+          materializedPaths={materializedPaths}
+          materializeSummaries={materializeSummaries}
+          handleSort={handleSort}
+          handlePageChange={handlePageChange}
+          handleRowClick={handleRowClick}
+          handleMaterialize={handleMaterialize}
+          openDetachDialog={openDetachDialog}
+          onDispersionDetach={openDispersionDetachDialog}
+        />
       )}
 
       {results?.state === 'failed' && (
@@ -2347,6 +1210,19 @@ const ConcordanceFeature: React.FC = () => {
           <p className="text-gray-600 mt-2">Loading workspace...</p>
         </div>
       )}
+
+      {/* Dispersion (per-document aggregated) detach column dialog */}
+      <ConcordanceDispersionDetachDialog
+        open={dispersionDetachDialogOpen}
+        onOpenChange={setDispersionDetachDialogOpen}
+        isDetaching={anyDispersionNodeDetaching}
+        detachNodeOptions={dispersionDetachOptions}
+        selectedDetachColumns={selectedDispersionColumns}
+        toggleDetachColumn={toggleDispersionColumn}
+        selectAllDetachColumns={selectAllDispersionColumns}
+        deselectAllDetachColumns={deselectAllDispersionColumns}
+        handleDetachConfirm={handleDispersionDetachConfirm}
+      />
 
       {/* Detach column selection dialog */}
       <ConcordanceDetachDialog

@@ -1,23 +1,21 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import type { QueryClient } from '@tanstack/react-query';
 import {
   textApi,
   type TopicModelingRequest,
   type TopicModelingResponse,
   type TopicModelingDetachRequest,
-  type TopicModelingDetachNodeOption,
-} from '../../../../api/text';
-import { queryKeys } from '../../../../lib/queryKeys';
+} from '@/api/text';
+import { queryKeys } from '@/lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
-import { buildSamplingAutoNodeName } from '../../../preprocessing/utils/autoNodeNames';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import { useDetachColumnsState } from '@/features/analysis/common/hooks/useDetachColumnsState';
+import type { DetachDialogNodeOption } from '@/features/analysis/components/DetachColumnsDialog';
+import { buildSamplingAutoNodeName } from '@/features/preprocessing/utils/autoNodeNames';
+import { takeMostRecent } from '@/utils/selectionUtils';
+import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 
-const DEFAULT_TOPIC_SIZE_VALUE = 25;
-
-type NodeColumnSelection = {
-  nodeId: string;
-  column: string;
-};
+const DEFAULT_TOPIC_SIZE_VALUE = 20;
 
 interface TopicModelingState {
   currentWorkspaceId: string | null;
@@ -28,7 +26,7 @@ interface TopicModelingState {
   representativeWordsCount: number;
   selectedTopicIds: Set<number>;
   sampleFractions?: (number | null)[] | null;
-  topicSizeMode?: 'target' | 'min' | 'exact';
+  topicSizeMode?: 'min' | 'exact';
   topicSizeValue?: number;
 }
 
@@ -45,7 +43,7 @@ interface TopicModelingActions {
 interface TopicModelingLock {
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
-  queryClient: { invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown> };
+  queryClient: QueryClient;
 }
 
 type Params = {
@@ -104,8 +102,14 @@ export function useTopicModelingTaskFlow({
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
-  const [detachNodeOptions, setDetachNodeOptions] = useState<TopicModelingDetachNodeOption[]>([]);
-  const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
+  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
+  const {
+    selectedDetachColumns,
+    setSelectedDetachColumns,
+    toggleDetachColumn,
+    selectAllDetachColumns,
+    deselectAllDetachColumns,
+  } = useDetachColumnsState(detachNodeOptions);
 
   const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) return;
@@ -135,7 +139,7 @@ export function useTopicModelingTaskFlow({
         node_columns: nodeColumns,
         random_seed: randomSeed,
         representative_words_count: representativeWordsCount,
-        topic_size_mode: topicSizeMode ?? 'target',
+        topic_size_mode: topicSizeMode ?? 'exact',
         topic_size_value: topicSizeValue ?? DEFAULT_TOPIC_SIZE_VALUE,
         ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
       };
@@ -147,6 +151,7 @@ export function useTopicModelingTaskFlow({
             requestData: req,
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 2,
           });
         }
@@ -197,37 +202,6 @@ export function useTopicModelingTaskFlow({
     } finally {
       setIsDetachLoading(false);
     }
-  };
-
-  const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
-    setSelectedDetachColumns((prev) => {
-      const current = new Set(prev[nodeId] || []);
-      if (checked) current.add(column);
-      else current.delete(column);
-      return { ...prev, [nodeId]: Array.from(current) };
-    });
-  };
-
-  const selectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = node.available_columns.filter(
-          (column) => !(node.disabled_columns || []).includes(column)
-        );
-      });
-      return next;
-    });
-  };
-
-  const deselectAllDetachColumns = () => {
-    setSelectedDetachColumns((prev) => {
-      const next = { ...prev };
-      detachNodeOptions.forEach((node) => {
-        next[node.node_id] = [];
-      });
-      return next;
-    });
   };
 
   const handleDetachConfirm = async () => {

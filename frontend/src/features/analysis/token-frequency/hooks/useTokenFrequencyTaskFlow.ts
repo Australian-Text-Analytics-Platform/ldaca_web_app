@@ -1,7 +1,8 @@
 import { toast } from 'sonner';
+import type { QueryClient } from '@tanstack/react-query';
 import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
-import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/components/tabs/tokenFrequencyHelpers';
+import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/features/analysis/token-frequency/tokenFrequencyHelpers';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
@@ -34,6 +35,7 @@ interface AnalysisActions {
 interface LockActions {
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (nodes: Array<{ id: string; name?: string; columns?: string[] | null }>) => void;
+  queryClient: QueryClient;
 }
 
 interface NavigationActions {
@@ -77,6 +79,7 @@ export const useTokenFrequencyTaskFlow = ({
   lock: {
     getAuthHeaders,
     lockWithSnapshots,
+    queryClient,
   },
   navigation: {
     selectNodes,
@@ -129,6 +132,7 @@ export const useTokenFrequencyTaskFlow = ({
             requestData: request,
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 2,
           });
         }

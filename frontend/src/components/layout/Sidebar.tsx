@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useShallow } from 'zustand/react/shallow';
 import {
   Sidebar as SidebarRoot,
@@ -22,14 +23,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
-import { useWorkspaceTaskStream } from '@/hooks/useWorkspaceTaskStream';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorkspaceTaskInbox';
+import { useTaskCardActions } from '@/features/workspace/task-stream/useTaskCardActions';
 import { useAuth } from '@/hooks/useAuth';
-import { filesApi } from '@/api/files';
-import { textApi } from '@/api/text';
-import { workspacesApi } from '@/api/workspaces';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { useHintsStore } from '@/stores/hintsStore';
@@ -37,17 +36,15 @@ import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
+import { ClearEmbeddingCacheMenuItem } from '@/features/analysis/topic-modeling/components/ClearEmbeddingCacheMenuItem';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
+import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
-import type {
-  SidebarTaskRecord,
-  SidebarWorkspaceNode,
-} from '@/components/layout/sidebar/types';
+import type { SidebarWorkspaceNode } from '@/components/layout/sidebar/types';
 import {
   BookOpen,
   Bot,
@@ -66,7 +63,6 @@ import {
   ChevronDown,
   Pencil,
   RotateCcw,
-  Trash2,
 } from 'lucide-react';
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
@@ -136,24 +132,26 @@ const Sidebar: React.FC = () => {
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNodeSelection, clearSelection } = useWorkspaceActions();
-  const { getAuthHeaders, user, logout, dataFolder, isMultiUserMode } = useAuth();
-  const { tasks, setTasks } = useAnalysisStore(
-    useShallow((state) => ({
-      tasks: state.tasks,
-      setTasks: state.setTasks,
-    }))
-  );
+  const { user, logout, dataFolder, isMultiUserMode } = useAuth();
+  const queryClient = useQueryClient();
+  const handleLogout = React.useCallback(async () => {
+    // Drop all cached query data so the next signed-in user never sees the
+    // previous user's files, workspaces, nodes, or preferences.
+    queryClient.clear();
+    await logout();
+  }, [logout, queryClient]);
+  const tasks = useAnalysisStore((state) => state.tasks);
   const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const {
     status: taskStreamStatus,
     error: taskStreamError,
     reconnect: reconnectTaskStream,
-  } = useWorkspaceTaskStream(currentWorkspaceId ?? null);
+  } = useWorkspaceTaskInbox(currentWorkspaceId ?? null);
 
-  const nodes = (() => {
+  const nodes = React.useMemo<SidebarWorkspaceNode[]>(() => {
     const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
     return Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
-  })();
+  }, [workspaceGraph]);
 
   const openQuotationEngineDialog = () => {
     setCurrentView('quotation');
@@ -164,44 +162,6 @@ const Sidebar: React.FC = () => {
     resetHints();
     resetSessionDismissedHints();
     toast('All hints have been reset. Dismissed hints can appear again.');
-  };
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes <= 0) return '0 bytes';
-    const units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
-    const idx = Math.min(units.length - 1, Math.floor(Math.log10(bytes) / 3));
-    const value = bytes / Math.pow(1000, idx);
-    return `${value < 10 && idx > 0 ? value.toFixed(1) : Math.round(value)} ${units[idx]}`;
-  };
-
-  const [isClearCacheDialogOpen, setIsClearCacheDialogOpen] = React.useState(false);
-  const [embeddingCacheStats, setEmbeddingCacheStats] = React.useState<{ bytes: number; files: number } | null>(null);
-
-  const handleOpenClearCacheDialog = async () => {
-    setEmbeddingCacheStats(null);
-    setIsClearCacheDialogOpen(true);
-    try {
-      const resp = await textApi.getTopicModelingEmbeddingCacheSize(getAuthHeaders());
-      setEmbeddingCacheStats(resp.data ?? null);
-    } catch {
-      // Leave stats null; dialog will show a generic warning without sizes.
-    }
-  };
-
-  const handleConfirmClearCache = async () => {
-    setIsClearCacheDialogOpen(false);
-    try {
-      const resp = await textApi.clearTopicModelingEmbeddingCache(getAuthHeaders());
-      const freed = resp.data?.bytes_freed ?? 0;
-      const files = resp.data?.files_removed ?? 0;
-      if (files === 0) {
-        toast('Embedding cache was already empty.');
-      } else {
-        toast(`Cleared ${files} cached embedding ${files === 1 ? 'file' : 'files'} (${formatBytes(freed)} reclaimed).`);
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to clear embedding cache.');
-    }
   };
 
   const [isDataFolderDialogOpen, setIsDataFolderDialogOpen] = React.useState(false);
@@ -215,64 +175,17 @@ const Sidebar: React.FC = () => {
   const isConnecting = taskStreamStatus === 'connecting';
   const connectionError = taskStreamStatus === 'error' ? taskStreamError : null;
 
-  const [collapsedSections, setCollapsedSections] = React.useState<Record<SectionKey, boolean>>({
-    views: false,
-    nodes: false,
-    tasks: false,
+  const {
+    containerRef: sectionsContainerRef,
+    isCollapsed,
+    toggleSection,
+    getSectionFlexStyle,
+    assignSectionScrollRef,
+    handleResizeStart,
+  } = useStackedSplits<SectionKey>(SECTION_KEYS, {
+    minSectionPx: MIN_SECTION_HEIGHT,
+    initialRatios: { views: 0.34, nodes: 0.33, tasks: 0.33 },
   });
-  const [sectionHeights, setSectionHeights] = React.useState<Record<SectionKey, number>>({
-    views: 0.34,
-    nodes: 0.33,
-    tasks: 0.33,
-  });
-  const sectionsContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const sectionScrollRefs = React.useRef<Record<SectionKey, HTMLDivElement | null>>({
-    views: null,
-    nodes: null,
-    tasks: null,
-  });
-  const [sectionsContainerHeight, setSectionsContainerHeight] = React.useState(0);
-  const assignSectionScrollRef = (key: SectionKey, node: HTMLDivElement | null) => {
-    sectionScrollRefs.current[key] = node;
-  };
-  const scrollSection = (key: SectionKey, deltaPixels: number) => {
-    if (deltaPixels === 0) {
-      return;
-    }
-    const target = sectionScrollRefs.current[key];
-    if (!target) {
-      return;
-    }
-    target.scrollTop += deltaPixels;
-  };
-
-  React.useLayoutEffect(() => {
-    const container = sectionsContainerRef.current;
-    if (!container) return;
-    if (typeof ResizeObserver === 'undefined') {
-      setSectionsContainerHeight(container.getBoundingClientRect().height);
-      return;
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) {
-        setSectionsContainerHeight(entry.contentRect.height);
-      }
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
-
-  const activeSectionTotal = (() => {
-    const total = SECTION_KEYS.reduce((sum, key) => {
-      if (collapsedSections[key]) {
-        return sum;
-      }
-      return sum + (sectionHeights[key] ?? 0);
-    }, 0);
-    return total || 1;
-  })();
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
   const visibleNavItems = NAV_ITEMS.filter(({ id }) => visibleViews.includes(id));
@@ -289,81 +202,6 @@ const Sidebar: React.FC = () => {
       setCurrentView(fallbackVisibleView);
     }
   }, [currentView, fallbackVisibleView, setCurrentView, visibleViews]);
-
-  const getSectionFlexStyle = (key: SectionKey) => {
-    if (collapsedSections[key]) {
-      return { flex: '0 0 auto' } as React.CSSProperties;
-    }
-    const ratio = (sectionHeights[key] ?? 0) / activeSectionTotal;
-    return { flexGrow: ratio, flexShrink: 0, flexBasis: 0 } as React.CSSProperties;
-  };
-
-  const toggleSection = (key: SectionKey) => {
-    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleResizeStart = (upperKey: SectionKey, lowerKey: SectionKey, event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    if (collapsedSections[upperKey] || collapsedSections[lowerKey]) return;
-    const containerHeight = sectionsContainerHeight || 1;
-    if (containerHeight <= 0) return;
-
-    event.preventDefault();
-    const startY = event.clientY;
-    const startUpper = sectionHeights[upperKey] ?? 0;
-    const startLower = sectionHeights[lowerKey] ?? 0;
-    const pairTotal = startUpper + startLower;
-    if (pairTotal <= 0) {
-      return;
-    }
-
-    const rawMinRatio = MIN_SECTION_HEIGHT / containerHeight;
-    const safeMinCandidate = Math.min(Math.max(rawMinRatio, 0.02), pairTotal / 2 - 0.01);
-    if (!Number.isFinite(safeMinCandidate) || safeMinCandidate <= 0 || pairTotal - safeMinCandidate <= safeMinCandidate) {
-      return;
-    }
-
-    const minUpper = safeMinCandidate;
-    const maxUpper = pairTotal - safeMinCandidate;
-
-    const onMove = (moveEvent: MouseEvent) => {
-      const deltaY = moveEvent.clientY - startY;
-      const deltaRatio = deltaY / containerHeight;
-      const candidateUpper = startUpper + deltaRatio;
-      let nextUpper = candidateUpper;
-      let overflowTarget: SectionKey | null = null;
-      let overflowRatio = 0;
-
-      if (candidateUpper < minUpper) {
-        nextUpper = minUpper;
-        overflowTarget = upperKey;
-        overflowRatio = candidateUpper - minUpper;
-      } else if (candidateUpper > maxUpper) {
-        nextUpper = maxUpper;
-        overflowTarget = lowerKey;
-        overflowRatio = candidateUpper - maxUpper;
-      }
-
-      const nextLower = pairTotal - nextUpper;
-      setSectionHeights((prev) => ({
-        ...prev,
-        [upperKey]: nextUpper,
-        [lowerKey]: nextLower,
-      }));
-
-      if (overflowTarget && overflowRatio !== 0) {
-        scrollSection(overflowTarget, overflowRatio * containerHeight);
-      }
-    };
-
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
 
   const renderViewsBody = () => (
     <SidebarMenu>
@@ -412,37 +250,7 @@ const Sidebar: React.FC = () => {
       })}
     </SidebarMenu>
   );
-  const handleClearTask = async (task: SidebarTaskRecord) => {
-    try {
-      const taskType = String(task.task_type ?? '');
-      const isFileImportTask = taskType === 'ldaca_import';
-
-      if (task.state === 'running') {
-        // Stop the running process. The task record stays; the SSE stream will
-        // push a state update to 'cancelled' so the card transitions to the
-        // clearable state without us removing it from local state here.
-        await workspacesApi.cancelTask({ task_id: task.task_id }, getAuthHeaders());
-      } else {
-        // Terminal state — remove the record entirely.
-        if (isFileImportTask) {
-          await filesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
-        } else {
-          await workspacesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
-        }
-        setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
-      }
-    } catch (error) {
-      console.error('Failed to clear task', error);
-    }
-  };
-
-  // Auto-fade dismissal: remove from the local UI list only. We must NOT call
-  // the backend clear API here, because the analysis task record may still be
-  // required by an open feature dialog (e.g. Topic Modelling "Add to
-  // Workspace" detach), which looks up the task by id when the user confirms.
-  const handleAutoDismissTask = (task: SidebarTaskRecord) => {
-    setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
-  };
+  const { handleClearTask, handleAutoDismissTask } = useTaskCardActions();
 
   return (
     <SidebarRoot
@@ -468,7 +276,7 @@ const Sidebar: React.FC = () => {
                 variant="ghost"
                 size="sm"
                 className="text-xs text-red-600 hover:text-red-700 shrink-0 h-auto py-0 px-1"
-                onClick={logout}
+                onClick={handleLogout}
               >
                 Logout
               </Button>
@@ -480,7 +288,7 @@ const Sidebar: React.FC = () => {
         <div ref={sectionsContainerRef} className="flex h-full flex-col gap-2 overflow-hidden">
           {SECTION_KEYS.map((key, index) => {
             const title = SECTION_TITLES[key];
-            const isCollapsed = collapsedSections[key];
+            const collapsed = isCollapsed(key);
             const previousKey = SECTION_KEYS[index - 1];
             return (
               <div
@@ -502,7 +310,7 @@ const Sidebar: React.FC = () => {
                       type="button"
                       className="flex min-w-0 flex-1 items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                       onClick={() => toggleSection(key)}
-                      aria-expanded={!isCollapsed}
+                      aria-expanded={!collapsed}
                     >
                       <span className="flex items-center gap-1">
                         {title}
@@ -526,7 +334,7 @@ const Sidebar: React.FC = () => {
                         <ChevronDown
                           className={cn(
                             'h-3 w-3 transition-transform',
-                            isCollapsed ? '-rotate-90' : 'rotate-0'
+                            collapsed ? '-rotate-90' : 'rotate-0'
                           )}
                         />
                       </div>
@@ -581,16 +389,7 @@ const Sidebar: React.FC = () => {
                             <RotateCcw className="mr-2 h-3.5 w-3.5" />
                             Reset all hints
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={(event) => {
-                              event.preventDefault();
-                              void handleOpenClearCacheDialog();
-                            }}
-                            className="text-xs text-muted-foreground focus:text-foreground"
-                          >
-                            <Trash2 className="mr-2 h-3.5 w-3.5" />
-                            Clear embedding cache
-                          </DropdownMenuItem>
+                          <ClearEmbeddingCacheMenuItem />
                         </DropdownMenuContent>
                       </DropdownMenu>
                       </div>
@@ -600,10 +399,10 @@ const Sidebar: React.FC = () => {
                 <div
                   className={cn(
                     'flex-1 overflow-hidden transition-[max-height] duration-200',
-                    isCollapsed ? 'max-h-0' : 'max-h-full'
+                    collapsed ? 'max-h-0' : 'max-h-full'
                   )}
                 >
-                  {!isCollapsed && (
+                  {!collapsed && (
                     <div className="flex h-full flex-col overflow-hidden">
                       <div
                         ref={(node) => assignSectionScrollRef(key, node)}
@@ -701,23 +500,6 @@ const Sidebar: React.FC = () => {
           onOpenChange={setIsDataFolderDialogOpen}
         />
       )}
-      <ConfirmDialog
-        open={isClearCacheDialogOpen}
-        onOpenChange={setIsClearCacheDialogOpen}
-        title="Clear embedding cache?"
-        description={
-          (embeddingCacheStats === null
-            ? 'Calculating size of cached embeddings…\n\n'
-            : embeddingCacheStats.files === 0
-              ? 'The embedding cache is currently empty — nothing to clear.\n\n'
-              : `${embeddingCacheStats.files} cached embedding ${embeddingCacheStats.files === 1 ? 'file' : 'files'} will be deleted, freeing ${formatBytes(embeddingCacheStats.bytes)} of disk space.\n\n`) +
-          'Topic modelling caches per-document embeddings so re-running on the same texts is fast. Clearing this cache means future topic modelling on those texts will need to recompute every embedding from scratch and may take noticeably longer (especially for large corpora).'
-        }
-        confirmText="Clear cache"
-        cancelText="Cancel"
-        onConfirm={handleConfirmClearCache}
-        variant="destructive"
-      />
     </SidebarRoot>
   );
 };

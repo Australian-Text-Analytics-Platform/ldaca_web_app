@@ -1,19 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
+import { insertItemAt, moveItemTo, removeItemAt } from './tokenIndexMath';
 
-import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import {
-  nodesApi,
   type FilterPreviewResponse,
   type PolarsExpressionRequest,
   type PolarsExpressionApplyResponse,
-} from '../../../../api/nodes';
-import { useAuth } from '../../../../hooks/useAuth';
-import { mapColumnsToInfo, type ColumnInfo } from '../../../../utils/columnTypes';
-import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
+} from '@/api/nodes';
+import { mapColumnsToInfo, type ColumnInfo } from '@/utils/columnTypes';
+import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import type { PreviewPagination, PreviewRow } from '../../types';
 
-const DEFAULT_PALETTE = ['#2563eb'];
+const SINGLE_NODE_PALETTE = ['#2563eb'];
 
 const SMART_CHAR_MAP: Record<string, string> = {
   '\u201C': '"', // "
@@ -99,7 +98,6 @@ export interface BasicBuilderConfig {
   startEditingCustom: (tokenId: string) => void;
   finishCustomEdit: (commit: boolean) => void;
   clearBuilder: () => void;
-  dropZoneRef: React.RefObject<HTMLDivElement | null>;
   handlers: {
     customDraftChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
     customInputKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -146,7 +144,6 @@ export interface UseAggregateSubTabResult {
   basicBuilder: BasicBuilderConfig;
   preview: PreviewConfig;
   apply: ApplyConfig;
-  manualExpressionActive: boolean;
   dropZoneRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -168,7 +165,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     polarsExpressionApply,
     refreshNodeSchema,
   } = props;
-  const { getAuthHeaders } = useAuth();
 
   const effectiveNodes = (() => {
     if (selectedNodes?.length) {
@@ -200,7 +196,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   })();
 
   const [expression, setExpression] = useState('');
-  const [columnName, setColumnName] = useState('');
+  const [columnName, setColumnName] = useState('new_column');
   const [applyLoading, setApplyLoading] = useState(false);
   const [lastAppliedExpression, setLastAppliedExpression] = useState<string | null>(null);
   const [expressionFocused, setExpressionFocused] = useState(false);
@@ -363,57 +359,18 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }, 250);
   };
 
-  interface AggregatePreviewRequest {
-    nodeId: string;
-    payload: PolarsExpressionRequest | null;
-  }
-
-  const aggregatePreviewRequest: AggregatePreviewRequest | null = (() => {
-    if (!hasSelection || !activeNodeId) return null;
-    if (committedExpression.length === 0) return { nodeId: activeNodeId, payload: null };
+  const operationPayload: PolarsExpressionRequest | null = (() => {
+    if (committedExpression.length === 0) return null;
     let code = committedExpression;
     if (committedColumnName.length > 0) {
       const safeName = committedColumnName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       code = `(${code}).alias("${safeName}")`;
     }
-    const payload: PolarsExpressionRequest = {
+    return {
       context: 'with_columns',
       expressions: [{ code }],
     };
-    return { nodeId: activeNodeId, payload };
   })();
-
-  const previewSignature = (() => {
-    if (!aggregatePreviewRequest) return 'aggregate-preview-disabled';
-    if (!aggregatePreviewRequest.payload) return `${aggregatePreviewRequest.nodeId}::raw`;
-    return `${aggregatePreviewRequest.nodeId}::${JSON.stringify(aggregatePreviewRequest.payload)}`;
-  })();
-
-  const previewFetcher = async ({
-    request,
-    page,
-    pageSize,
-  }: {
-    request: AggregatePreviewRequest;
-    page: number;
-    pageSize: number;
-    signal: AbortSignal;
-  }) => {
-    if (request.payload) {
-      const response = await polarsExpressionPreview(request.nodeId, request.payload, page, pageSize);
-      return {
-        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-        columns: Array.isArray(response?.columns) ? response.columns : [],
-        pagination: (response?.pagination as PreviewPagination) ?? null,
-      };
-    }
-    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
-    return {
-      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-      columns: Array.isArray(response?.columns) ? response.columns : [],
-      pagination: (response?.pagination as PreviewPagination) ?? null,
-    };
-  };
 
   const {
     data: previewData,
@@ -426,42 +383,31 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     setPage: setPreviewPage,
     setPageSize: setPreviewPageSize,
     refresh: refreshPreview,
-  } = usePreprocessingPreview({
-    request: aggregatePreviewRequest,
-    signature: previewSignature,
-    fetcher: previewFetcher,
+  } = useNodePreviewWithRawFallback<PolarsExpressionRequest>({
+    nodeId: activeNodeId,
+    operationPayload,
+    operationFetch: polarsExpressionPreview,
+    signaturePrefix: 'aggregate',
+    enabled: hasSelection,
     debounceMs: 100,
   });
 
   const canApply = hasSelection && trimmedExpression.length > 0 && !applyLoading && !isLoading.operations && !previewError;
 
-  const clampIndex = (value: number, max: number) => {
-    if (Number.isNaN(value)) return max;
-    if (value < 0) return 0;
-    if (value > max) return max;
-    return value;
-  };
-
   const addColumnToken = (column: string, dtype: string, index?: number) => {
       if (basicDisabled || !column) return;
-      applyBasicTokenUpdate((prev) => {
-        const next = [...prev];
-        const insertIndex = clampIndex(index ?? next.length, next.length);
-        next.splice(insertIndex, 0, { id: createTokenId(), kind: 'column', column, dtype, operations: [] });
-        return next;
-      });
+      applyBasicTokenUpdate((prev) =>
+        insertItemAt(prev, index, { id: createTokenId(), kind: 'column', column, dtype, operations: [] }),
+      );
       scheduleCommit();
     };
 
   const addCustomToken = (index?: number) => {
       if (basicDisabled) return;
       const tokenId = createTokenId();
-      applyBasicTokenUpdate((prev) => {
-        const next = [...prev];
-        const insertIndex = clampIndex(index ?? next.length, next.length);
-        next.splice(insertIndex, 0, { id: tokenId, kind: 'custom', value: '' });
-        return next;
-      });
+      applyBasicTokenUpdate((prev) =>
+        insertItemAt(prev, index, { id: tokenId, kind: 'custom', value: '' }),
+      );
       setEditingTokenId(tokenId);
       setCustomDraft('');
       customOriginalRef.current = '';
@@ -472,9 +418,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       applyBasicTokenUpdate((prev) => {
         const idx = prev.findIndex((token) => token.id === tokenId);
         if (idx === -1) return prev;
-        const next = [...prev];
-        next.splice(idx, 1);
-        return next;
+        return removeItemAt(prev, idx);
       });
       scheduleCommit();
     };
@@ -484,17 +428,14 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       applyBasicTokenUpdate((prev) => {
         const currentIndex = prev.findIndex((token) => token.id === tokenId);
         if (currentIndex === -1) return prev;
-        const next = [...prev];
-        const [item] = next.splice(currentIndex, 1) as [BasicToken];
-        let targetIndex = clampIndex(index, next.length + 1);
-        if (currentIndex < targetIndex) {
-          targetIndex -= 1;
-        }
-        if (targetIndex === currentIndex) {
-          return prev;
-        }
-        next.splice(targetIndex, 0, item);
-        return next;
+        const moved = moveItemTo(prev, currentIndex, index);
+        // moveItemTo returns a fresh array even on no-op moves; preserve the
+        // hook's prev-reference contract so consumers don't see a spurious
+        // re-render.
+        const isNoOp =
+          moved.length === prev.length
+          && moved.every((token, i) => token === prev[i]);
+        return isNoOp ? prev : moved;
       });
       scheduleCommit();
     };
@@ -797,12 +738,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     };
 
   const basicExpressionPreview = tokensToExpression(basicTokens);
-  const manualExpressionActive = basicTokens.length === 0 && trimmedExpression.length > 0;
   const currentExpressionMatchesApplied = lastAppliedExpression && lastAppliedExpression === trimmedExpression;
 
   const nodeColumnSelections = (limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : []);
 
-  const nodeColors = (limitedNodeId ? { [limitedNodeId]: DEFAULT_PALETTE[0]! } : {}) as Record<string, string>;
+  const nodeColors = (limitedNodeId ? { [limitedNodeId]: SINGLE_NODE_PALETTE[0]! } : {}) as Record<string, string>;
 
   return {
     activeNodeId,
@@ -811,7 +751,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       effectiveNodes: effectiveSelectedNodes,
       nodeColumnSelections,
       nodeColors,
-      defaultPalette: DEFAULT_PALETTE,
+      defaultPalette: SINGLE_NODE_PALETTE,
       originalCount: selectedNodes?.length ?? 0,
     },
     expression: {
@@ -849,7 +789,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       startEditingCustom: startEditingCustomToken,
       finishCustomEdit,
       clearBuilder: clearBasicBuilder,
-      dropZoneRef,
       handlers: {
         customDraftChange: handleCustomDraftChange,
         customInputKeyDown: handleCustomInputKeyDown,
@@ -893,7 +832,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       currentMatchesApplied: !!currentExpressionMatchesApplied,
       handleApply,
     },
-    manualExpressionActive,
     dropZoneRef,
   };
 };

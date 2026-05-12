@@ -63,7 +63,11 @@ The optional metadata columns from the source data block can be shown or hidden 
 
 ![Quotation detach](tutorials/assets/quotation_tool/detach_options.png)
 
-Click **Add to Workspace** to extract the results as a new derived data block. A dialog lets you choose which metadata columns from the parent data block to carry over — include any columns you need for downstream analysis (e.g. date, source, author).
+Click **Add to Workspace** to extract the results as a new derived data block. A dialog lets you choose which optional columns from the parent data block to carry over — pick the metadata you need for downstream analysis (e.g. date, source, author).
+
+The picker also lists **`QUOTE_extraction`** as an opt-in column. When ticked, every detached row carries the raw source document text under this canonical name, regardless of what the source column was originally called. Useful when you want to share or re-analyse the detached block alongside the original text without depending on a project-specific column name.
+
+Mandatory generated columns (`QUOTE_speaker`, `QUOTE_quote`, `QUOTE_verb`, and the various index / type columns) are always included and don't appear in the picker.
 
 The detached data block can then be analysed with other tools. For example, use Trends and Sequence to plot quoted speech over time, or Concordance to inspect how specific speakers or speech verbs are used.
 

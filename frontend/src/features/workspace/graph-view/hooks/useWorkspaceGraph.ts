@@ -11,12 +11,13 @@ import {
   useNodesState,
 } from '@xyflow/react';
 
-import CustomNode from '@/components/CustomNode';
+import CustomNode from '@/features/workspace/graph-view/components/CustomNode';
 import type { GraphNode, GraphEdge } from '@/types/api';
-import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
-import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
+import { isGraphDebugEnabled } from '@/lib/debugFlags';
 import { computeDagreLayout } from '../services/graphLayout';
 
 const EDGE_STROKE = '#0f172a';
@@ -67,9 +68,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     clearSelection,
   } = useWorkspaceActions();
 
-  const DEBUG_GRAPH =
-    typeof window !== 'undefined' &&
-    ((window as Window & { __LDACA_DEBUG_GRAPH?: boolean }).__LDACA_DEBUG_GRAPH || localStorage.getItem('debugGraph') === '1');
+  const DEBUG_GRAPH = isGraphDebugEnabled();
   const dlog = useCallback((...args: unknown[]) => {
     if (DEBUG_GRAPH) {
       console.debug(...args);

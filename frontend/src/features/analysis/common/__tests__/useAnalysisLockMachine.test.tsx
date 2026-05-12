@@ -2,13 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAnalysisLockCore } from '@/features/analysis/common/useAnalysisLockMachine';
 
-vi.mock('@/hooks/useWorkspaceSelection', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   useWorkspaceSelection: () => ({
     selectedNodes: [{ id: 'node-1', data: { columns: ['text'] } }],
   }),
 }));
 
-vi.mock('@/hooks/useWorkspaceData', () => ({
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({ currentWorkspaceId: 'workspace-1' }),
 }));
 

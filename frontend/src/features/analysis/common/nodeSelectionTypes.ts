@@ -1,5 +1,7 @@
 import type { ColumnInfo } from '@/utils/columnTypes';
 
+export type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
+
 export interface WorkspaceNodeLike extends Record<string, unknown> {
   id?: string;
   node_id?: string;
@@ -10,11 +12,6 @@ export interface WorkspaceNodeLike extends Record<string, unknown> {
   schema?: Record<string, unknown>;
   dtypes?: Record<string, unknown>;
   column_schema?: Record<string, unknown>;
-}
-
-export interface NodeColumnSelection {
-  nodeId: string;
-  column: string;
 }
 
 export type NodeColumnSource = string[] | ColumnInfo[];

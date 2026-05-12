@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react';
-import { textApi, type TokenFrequencyResponse } from '../../../api/text';
-import { useAuth } from '../../../hooks/useAuth';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { textApi, type TokenFrequencyResponse } from '@/api/text';
+import { useAuth } from '@/hooks/useAuth';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { takeMostRecent } from '@/utils/selectionUtils';
 
-import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
+import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';
 import {
   DEFAULT_TOKEN_LIMIT,
   parseAnalysisNodeRequest,
@@ -43,11 +44,11 @@ import {
   useSafeResult,
   useNodeColorManagement,
 } from '../common';
-import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
+import { pruneTasksById } from '@/hooks/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
-import { useAnalysisStore } from '../../../stores/analysisStore';
-import { useUIStore } from '../../../stores/uiStore';
+import { useAnalysisStore } from '@/stores/analysisStore';
+import { useUIStore } from '@/stores/uiStore';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
@@ -57,6 +58,7 @@ const TOKEN_FREQUENCY_PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspaceData();
   const {
     isLocked,
@@ -67,7 +69,7 @@ const TokenFrequencyFeature = () => {
     setNodeColumnSelections,
     activeNodeIds,
     activeNodeColumnSelections,
-    panelSelectedNodes,
+    panelSelectedNodes: rawPanelSelectedNodes,
   } = useAnalysisLock({
     analysisType: 'token_frequencies',
     workspaceId: currentWorkspace?.id ?? null,
@@ -75,6 +77,16 @@ const TokenFrequencyFeature = () => {
     allowedDataTypes: ['string'],
     maxNodes: 2,
   });
+  // The frequency tool is strictly pairwise (keyness statistics are defined
+  // between exactly one reference and one study corpus). Cap the displayed
+  // selection to the two most-recent blocks regardless of how many the user
+  // has selected workspace-wide, so the third+ are silently dropped from
+  // every downstream consumer: parameter panel, reference radios, task-flow
+  // payload, name maps, etc.
+  const panelSelectedNodes = useMemo(
+    () => takeMostRecent(rawPanelSelectedNodes, 2),
+    [rawPanelSelectedNodes],
+  );
   const { selectedNodes } = useWorkspaceSelection();
   const { selectNodes } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
@@ -171,6 +183,7 @@ const TokenFrequencyFeature = () => {
             requestData: req,
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 2,
           });
         } catch { /* ignore */ }
@@ -265,6 +278,7 @@ const TokenFrequencyFeature = () => {
     lock: {
       getAuthHeaders,
       lockWithSnapshots,
+      queryClient,
     },
     navigation: {
       selectNodes,

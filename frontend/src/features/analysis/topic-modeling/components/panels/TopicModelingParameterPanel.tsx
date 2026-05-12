@@ -1,22 +1,22 @@
 import { useEffect, useState, type FocusEvent } from 'react';
 import { CircleHelp } from 'lucide-react';
-import { DisabledReasonTooltip } from '../../../../../components/ui/disabled-reason-tooltip';
-import { Input } from '../../../../../components/ui/input';
-import { Label } from '../../../../../components/ui/label';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../../../../components/ui/select';
-import HelpIcon from '../../../../../components/help/HelpIcon';
-import NodeSelectionPanel from '../../../../../components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../../../components/tabs/AnalysisLockedNotice';
-import type { NodeColumnSelection } from '../../../../../hooks/useAutoNodeColumns';
-import type { ColumnInfo } from '../../../../../utils/columnTypes';
-import type { NodeLike } from '../../../../../hooks/useNodeColumnInfos';
-import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
+} from '@/components/ui/select';
+import HelpIcon from '@/components/help/HelpIcon';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
+import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
+import type { ColumnInfo } from '@/utils/columnTypes';
+import type { NodeLike } from '@/hooks/useNodeColumnInfos';
+import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
 
 export type CorpusSample = {
   percent: string;
@@ -36,8 +36,8 @@ type Props = {
   corpusSamples: CorpusSample[];
   nodeDocCounts: number[];
   onCorpusSampleChange: (idx: number, update: Partial<CorpusSample>) => void;
-  topicSizeMode: 'target' | 'min' | 'exact';
-  onTopicSizeModeChange: (mode: 'target' | 'min' | 'exact') => void;
+  topicSizeMode: 'min' | 'exact';
+  onTopicSizeModeChange: (mode: 'min' | 'exact') => void;
   topicSizeValue: number;
   topicSizeUserSet: boolean;
   topicSizeWarning: 'orange' | 'red' | null;
@@ -48,6 +48,12 @@ type Props = {
   onRandomSeedChange: (value: number) => void;
   representativeWordsCount: number;
   representativeWordsCountUserSet: boolean;
+  /**
+   * When locked, the maximum display value the user can pick for "Words per
+   * topic" without re-running — the originally-fitted count. `null` means
+   * unlocked (no server-side cap).
+   */
+  representativeWordsCountServerMax?: number | null;
   onRepresentativeWordsCountChange: (value: number) => void;
   isRunning: boolean;
   isClearing: boolean;
@@ -82,6 +88,7 @@ export function TopicModelingParameterPanel({
   onRandomSeedChange,
   representativeWordsCount,
   representativeWordsCountUserSet,
+  representativeWordsCountServerMax = null,
   onRepresentativeWordsCountChange,
   isRunning,
   isClearing,
@@ -192,26 +199,22 @@ export function TopicModelingParameterPanel({
             return (
               <div key={nodeId || idx} className="flex items-center gap-2">
                 {/* Coloured circle radio toggle */}
-                <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined}>
                 <button
                   type="button"
                   onClick={() =>
-                    !isLocked && onCorpusSampleChange(idx, { enabled: !sample.enabled })
+                    onCorpusSampleChange(idx, { enabled: !sample.enabled })
                   }
-                  disabled={isLocked}
                   aria-label={sample.enabled ? 'Disable sampling' : 'Enable sampling'}
-                  className="h-5 w-5 flex-shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed"
+                  className="h-5 w-5 flex-shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   style={{
                     backgroundColor: sample.enabled ? color : 'transparent',
                     borderColor: color,
                   }}
                 />
-                </DisabledReasonTooltip>
 
                 <span className={`text-sm font-medium${sample.enabled ? '' : ' text-muted-foreground'}`}>Random</span>
 
                 {/* % input — vertically aligned across rows by identical prefix */}
-                <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined}>
                 <Input
                   aria-label={`Sampling percentage for corpus ${idx + 1}`}
                   type="number"
@@ -219,7 +222,7 @@ export function TopicModelingParameterPanel({
                   max={100}
                   step={10}
                   value={displayPercent}
-                  disabled={isLocked || !sample.enabled}
+                  disabled={!sample.enabled}
                   className="h-8 w-14 flex-shrink-0 px-1.5 text-center text-sm"
                   onChange={(e) => onCorpusSampleChange(idx, { percent: e.target.value })}
                   onBlur={(e) => {
@@ -231,7 +234,6 @@ export function TopicModelingParameterPanel({
                     onCorpusSampleChange(idx, { percent: String(clamped) });
                   }}
                 />
-                </DisabledReasonTooltip>
 
                 <span className="text-sm font-medium">%</span>
 
@@ -261,33 +263,28 @@ export function TopicModelingParameterPanel({
           {/* Row 1: mode dropdown + value input */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined} className="flex-1 min-w-0">
               <Select
                 value={topicSizeMode}
-                onValueChange={(v) => onTopicSizeModeChange(v as 'target' | 'min' | 'exact')}
-                disabled={isLocked}
+                onValueChange={(v) => onTopicSizeModeChange(v as 'min' | 'exact')}
               >
                 <SelectTrigger className="h-8 flex-1 text-sm font-medium">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="target" className="text-sm font-medium">Aim Topic No.</SelectItem>
+                  <SelectItem value="exact" className="text-sm font-medium">Target Topic Number</SelectItem>
                   <SelectItem value="min" className="text-sm font-medium">Min Topic Size</SelectItem>
-                  <SelectItem value="exact" className="text-sm font-medium">Exact Topic No.</SelectItem>
                 </SelectContent>
               </Select>
-              </DisabledReasonTooltip>
               {topicSizeMode === 'exact' ? (
                 <span
-                  aria-label="Exact mode may run slower than Aim Topic No."
-                  title="Exact Topic No. may run slower than Aim Topic No. because it fits the model first and then merges topics to your chosen count."
+                  aria-label="Target Topic Number fits the model then merges topics to the chosen count"
+                  title="Target Topic Number fits the model first and then merges topics to your chosen count, so it may run slower than Min Topic Size."
                   className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground"
                 >
                   <CircleHelp className="h-4 w-4" />
                 </span>
               ) : null}
             </div>
-            <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined}>
             <Input
               id="topic-size-value"
               aria-label="Topic size value"
@@ -295,7 +292,6 @@ export function TopicModelingParameterPanel({
               min={2}
               step={1}
               value={topicSizeValueDraft}
-              disabled={isLocked}
               title={
                 topicSizeWarning === 'red'
                   ? 'Fewer than 3 documents per topic — results will likely be unusable'
@@ -315,7 +311,6 @@ export function TopicModelingParameterPanel({
               onChange={(e) => setTopicSizeValueDraft(e.target.value)}
               onBlur={handleTopicSizeValueBlur}
             />
-            </DisabledReasonTooltip>
           </div>
 
           {/* Row 2: random seed */}
@@ -339,19 +334,28 @@ export function TopicModelingParameterPanel({
             <Label htmlFor="representative-words-count" className="whitespace-nowrap pl-3 text-sm">
               Words per topic
             </Label>
-            <DisabledReasonTooltip reason={isLocked ? 'Clear results first to change this parameter' : undefined}>
+            <DisabledReasonTooltip
+              reason={
+                isLocked && representativeWordsCountServerMax
+                  ? `Bounded by the originally-fitted count (${representativeWordsCountServerMax}). Clear Results to raise this above the original.`
+                  : undefined
+              }
+            >
             <Input
               id="representative-words-count"
               type="number"
-              min={1}
-              max={50}
+              min={3}
+              max={isLocked && representativeWordsCountServerMax ? representativeWordsCountServerMax : 50}
               step={1}
               value={representativeWordsCount}
-              disabled={isLocked}
               className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
-              onChange={(e) =>
-                onRepresentativeWordsCountChange(Math.max(1, Number(e.target.value) || 0))
-              }
+              onChange={(e) => {
+                const raw = Math.max(3, Number(e.target.value) || 0);
+                const cap = isLocked && representativeWordsCountServerMax
+                  ? representativeWordsCountServerMax
+                  : 50;
+                onRepresentativeWordsCountChange(Math.min(raw, cap));
+              }}
             />
             </DisabledReasonTooltip>
           </div>

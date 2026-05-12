@@ -1,14 +1,6 @@
 export type DataRow = Record<string, unknown>;
 
-export interface PaginationInfo {
-  page: number;
-  page_size: number;
-  total_rows?: number;
-  total_pages: number;
-  has_next: boolean;
-  has_prev: boolean;
-  [key: string]: unknown;
-}
+export type { NodeDataPagination as PaginationInfo } from '@/types/api';
 
 export interface ServerSortingInfo {
   sort_by: string | null;

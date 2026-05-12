@@ -1,12 +1,12 @@
 import React from 'react';
 
-import type { ConcordanceGroupedRow } from '../../../../api/text';
+import type { ConcordanceGroupedRow } from '@/api/text';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '../../../../components/ui/tooltip';
+} from '@/components/ui/tooltip';
 import { CONCORDANCE_COLUMN_KEYS } from '../../generatedColumns';
 
 type Props = {

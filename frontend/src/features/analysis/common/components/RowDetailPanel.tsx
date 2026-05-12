@@ -5,7 +5,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '../../../../components/ui/dialog';
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../../../../components/ui/table';
+} from '@/components/ui/table';
 
 // ---- Public types ----
 
@@ -150,7 +150,7 @@ export const RowDetailPanel: React.FC<RowDetailPanelProps> = ({
                         <TableRow key={key}>
                           <TableCell className="font-medium">{key}</TableCell>
                           <TableCell>
-                            <div className="max-w-md wrap-break-word">
+                            <div className="max-w-md whitespace-pre-wrap wrap-break-word">
                               {typeof value === 'object' && value !== null ? (
                                 <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
                                   {displayValue}

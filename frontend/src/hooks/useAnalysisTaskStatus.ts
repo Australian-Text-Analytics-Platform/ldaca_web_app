@@ -1,8 +1,6 @@
-import { useAnalysisStore } from '../stores/analysisStore';
+import { useAnalysisStore, isPendingTaskState, isTerminalTaskState } from '../stores/analysisStore';
 import type { TaskItem } from '../stores/analysisStore';
 import { getTaskTypeCandidates } from './analysisTaskUtils';
-
-const PENDING_STATES = new Set(['pending', 'queued', 'submitted']);
 
 const normalizeTimestamp = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -68,25 +66,16 @@ export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTask
 
   const runningTask = sortedTasks.find((task) => task?.state === 'running') ?? null;
   const queuedTask =
-    sortedTasks.find((task) => {
-      const normalized = (task?.state ?? '').toLowerCase();
-      return PENDING_STATES.has(normalized);
-    }) ?? null;
+    sortedTasks.find((task) => isPendingTaskState((task?.state ?? '').toLowerCase())) ?? null;
   const successfulTask = sortedTasks.find((task) => task?.state === 'successful') ?? null;
   const failedTask = sortedTasks.find((task) => task?.state === 'failed') ?? null;
   const cancelledTask = sortedTasks.find((task) => task?.state === 'cancelled') ?? null;
-  const terminalTask =
-    sortedTasks.find(
-      (task) =>
-        task?.state === 'successful' ||
-        task?.state === 'failed' ||
-        task?.state === 'cancelled'
-    ) ?? null;
+  const terminalTask = sortedTasks.find((task) => isTerminalTaskState(task?.state)) ?? null;
 
   const latestTask = sortedTasks[0] ?? null;
   const latestState = (latestTask?.state ?? '').toLowerCase();
   const activeCandidate = latestTask
-    ? latestState === 'running' || PENDING_STATES.has(latestState)
+    ? latestState === 'running' || isPendingTaskState(latestState)
       ? latestTask
       : null
     : null;

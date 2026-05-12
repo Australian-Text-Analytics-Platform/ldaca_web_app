@@ -73,6 +73,7 @@ const baseProps = {
   nodeNames: ['Corpus A'],
   topicSizeMode: 'exact',
   topicSizeValue: 5,
+  currentExactTopicCount: 5,
   randomSeed: 42,
   exactTopicCountRange: { min: 2, max: 12 },
   isUpdatingExactTopicCount: false,

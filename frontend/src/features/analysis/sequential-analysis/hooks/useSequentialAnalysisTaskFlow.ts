@@ -1,11 +1,12 @@
 import { toast } from 'sonner';
+import type { QueryClient } from '@tanstack/react-query';
 import {
   type SequentialAnalysisRequest,
   type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
-} from '../../../../api/text';
-import type { ChartConfig } from '../../../../components/ui/chart';
+} from '@/api/text';
+import type { ChartConfig } from '@/components/ui/chart';
 import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
 
 // Callers may rely on period_start and period_end being present on chart rows.
@@ -47,9 +48,14 @@ const comparePeriodBounds = (left: unknown, right: unknown): number => {
 };
 
 export const formatTimeLabel = (value?: string | number) => {
-  if (!value) return '—';
-  const str = String(value);
-  const parsed = new Date(str);
+  if (value === undefined || value === null || value === '') return '—';
+  // Numeric input is interpreted as epoch-milliseconds (this is what the
+  // linear x-axis passes in for datetime columns). Pass it to Date
+  // directly — stringifying first would yield e.g. `"846764800000"`,
+  // which `Date.parse` doesn't recognise as a date and falls through to
+  // the raw number, putting epoch-ms on the axis ticks.
+  const parsed =
+    typeof value === 'number' ? new Date(value) : new Date(String(value));
   if (!Number.isNaN(parsed.getTime())) {
     const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short' };
     if (!(parsed.getUTCDate() === 1 && parsed.getUTCHours() === 0 && parsed.getUTCMinutes() === 0)) {
@@ -57,7 +63,7 @@ export const formatTimeLabel = (value?: string | number) => {
     }
     return parsed.toLocaleString(undefined, options);
   }
-  return str;
+  return String(value);
 };
 
 interface SequentialAnalysisState {
@@ -93,6 +99,7 @@ interface SequentialAnalysisActions {
 
 interface SequentialAnalysisLock {
   getAuthHeaders: () => Record<string, string>;
+  queryClient: QueryClient;
 }
 
 type Params = {
@@ -131,7 +138,7 @@ export function useSequentialAnalysisTaskFlow({
     resolveTaskId,
     clearResults,
   },
-  lock: { getAuthHeaders },
+  lock: { getAuthHeaders, queryClient },
 }: Params) {
   const handleAnalyze = async () => {
     const nodeIdForAnalysis = activeNodeId;
@@ -232,6 +239,7 @@ export function useSequentialAnalysisTaskFlow({
           requestData: { node_ids: [nodeIdForAnalysis], node_columns: { [nodeIdForAnalysis]: picked } },
           getAuthHeaders,
           lockWithSnapshots,
+          queryClient,
           maxNodes: 1,
         });
         lockCurrentSchema();
@@ -292,6 +300,7 @@ export function useSequentialAnalysisTaskFlow({
     }
 
     const timeMap = new Map<string, SequentialAnalysisDatum>();
+    const allGroupKeys = new Set<string>();
     results.data.forEach((item: Record<string, unknown>) => {
       const timePeriod =
         (item.time_period_formatted as string | undefined) ||
@@ -300,6 +309,7 @@ export function useSequentialAnalysisTaskFlow({
       const groupKey = effectiveGroupColumns
         .map((col: string) => String(item[col] ?? ''))
         .join(' - ');
+      allGroupKeys.add(groupKey);
       if (!timeMap.has(timePeriod)) {
         timeMap.set(timePeriod, {
           time_period: timePeriod,
@@ -317,6 +327,20 @@ export function useSequentialAnalysisTaskFlow({
         }
         timeEntry[groupKey] = item.sequential_count;
       }
+    });
+
+    // Backfill 0 for any (group, time) cell the worker omitted. Sequential
+    // analysis is a count over text events: a group with no occurrences
+    // in a period is genuinely "zero", not "unknown". Without this the
+    // chart renders `undefined` cells as null and breaks lines/areas at
+    // every gap — especially visible in the linear-axis mode where gap
+    // distances are proportional to time.
+    timeMap.forEach((entry) => {
+      allGroupKeys.forEach((key) => {
+        if (entry[key] === undefined) {
+          entry[key] = 0;
+        }
+      });
     });
 
     return Array.from(timeMap.values()).sort((a, b) => {

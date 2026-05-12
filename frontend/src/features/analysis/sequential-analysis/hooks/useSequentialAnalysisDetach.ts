@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { textApi } from '../../../../api/text';
-import { queryKeys } from '../../../../lib/queryKeys';
+import { textApi } from '@/api/text';
+import { queryKeys } from '@/lib/queryKeys';
 import type { SequentialAnalysisDatum } from './useSequentialAnalysisTaskFlow';
 
 interface SequentialAnalysisDetachNode {

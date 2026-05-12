@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
-import { nodesApi, type ColumnOperationsResponse } from '../../../../api/nodes';
-import { useAuth } from '../../../../hooks/useAuth';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../../../components/ui/collapsible';
-import { Popover, PopoverContent, PopoverTrigger } from '../../../../components/ui/popover';
-import { ScrollArea } from '../../../../components/ui/scroll-area';
-import { cn } from '../../../../lib/utils';
+import { nodesApi, type ColumnOperationsResponse } from '@/api/nodes';
+import { useAuth } from '@/hooks/useAuth';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface OperationPopoverProps {
   nodeId: string;

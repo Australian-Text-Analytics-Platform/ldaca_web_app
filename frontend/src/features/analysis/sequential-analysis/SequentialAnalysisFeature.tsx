@@ -1,40 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
-import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
-import { useAuth } from '../../../hooks/useAuth';
-import { useUIStore } from '../../../stores/uiStore';
-import { useSchemaManagement } from '../../../hooks/useSchemaManagement';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
+import { useAuth } from '@/hooks/useAuth';
+import { useUIStore } from '@/stores/uiStore';
+import { useSchemaManagement } from '@/hooks/useSchemaManagement';
 import {
   type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
-} from '../../../api/text';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
+} from '@/api/text';
 
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
-import { normalizeSchemaFromInfo } from '../../../hooks/useSchemaManagement';
-import { getNodeInfo } from '../../../lib/nodeInfoCache';
-import { Button } from '../../../components/ui/button';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import HelpIcon from '../../../components/help/HelpIcon';
-import InfoIcon from '../../../components/help/InfoIcon';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../components/ui/select';
-import { Checkbox } from '../../../components/ui/checkbox';
-import { Download, Loader2, Play, Plus, Trash2 } from 'lucide-react';
-import { normalizeTypeName } from '../../../utils/columnTypes';
-import { takeMostRecent } from '../../../utils/selectionUtils';
+import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
+import { fetchNodeInfo } from '@/lib/nodeInfo';
+import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
+import { normalizeTypeName } from '@/utils/columnTypes';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import {
   hasLockedParameterDiff,
   normalizeStringArray,
@@ -47,6 +30,7 @@ import {
   resetAnalysisSelectionAfterClear,
   executeAnalysisRunOrUpdate,
 } from '../common';
+import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import {
   useSequentialAnalysisTaskFlow,
   isChartTypeOption,
@@ -54,40 +38,26 @@ import {
   type ChartTypeOption,
 } from './hooks/useSequentialAnalysisTaskFlow';
 import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
-import { UniqueValueCount } from './components/UniqueValueCount';
-import { SequentialChart } from './components/SequentialChart';
-import { ChartImageDownloadDialog } from '../../../components/ui/ChartImageDownloadDialog';
+import { useSequentialResultSummary } from './hooks/useSequentialResultSummary';
+import { SequentialAnalysisParameterPanel } from './components/panels/SequentialAnalysisParameterPanel';
+import { SequentialAnalysisResultsPanel } from './components/panels/SequentialAnalysisResultsPanel';
+import type { SequentialXAxisType } from './components/SequentialChart';
+import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   downloadChartAs,
   findSvgInContainer,
   type ChartImageFormat,
   type ChartExportHeaderItem,
   type ChartExportLegendItem,
-} from '../../../lib/chartExport';
+} from '@/lib/chartExport';
 
-const FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
-  { value: 'hourly', label: 'Hourly' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'yearly', label: 'Yearly' },
-  { value: 'custom', label: 'Customised' },
+const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
+  'seconds',
+  'minutes',
+  'hours',
+  'days',
+  'weeks',
 ];
-
-const CUSTOM_INTERVAL_UNIT_OPTIONS: Array<{
-  value: SequentialCustomIntervalUnit;
-  label: string;
-}> = [
-  { value: 'seconds', label: 'seconds' },
-  { value: 'minutes', label: 'minutes' },
-  { value: 'hours', label: 'hours' },
-  { value: 'days', label: 'days' },
-  { value: 'weeks', label: 'weeks' },
-];
-
-const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] =
-  CUSTOM_INTERVAL_UNIT_OPTIONS.map((opt) => opt.value);
 
 const isCustomIntervalUnit = (value: unknown): value is SequentialCustomIntervalUnit =>
   typeof value === 'string' &&
@@ -153,6 +123,7 @@ const SequentialAnalysisFeature = () => {
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
   const [frequency, setFrequency] = useState<SequentialFrequency>('daily');
   const [chartType, setChartType] = useState<ChartTypeOption>('line');
+  const [xAxisType, setXAxisType] = useState<SequentialXAxisType>('category');
   const [caseSensitive, setCaseSensitive] = useState(true);
   const [numericOriginInput, setNumericOriginInput] = useState<string>('');
   const [numericIntervalInput, setNumericIntervalInput] = useState<string>('1');
@@ -337,9 +308,10 @@ const SequentialAnalysisFeature = () => {
             requestData: { node_ids: [nodeIdStr], node_columns: { [nodeIdStr]: reqTimeColumn } },
             getAuthHeaders,
             lockWithSnapshots,
+            queryClient,
             maxNodes: 1,
           });
-          const info = await getNodeInfo({ workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
+          const info = await fetchNodeInfo({ queryClient, workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
           const normalizedSchema = normalizeSchemaFromInfo(info);
           if (Object.keys(normalizedSchema).length > 0) {
             setLockedSchema(normalizedSchema);
@@ -568,7 +540,7 @@ const SequentialAnalysisFeature = () => {
       resolveTaskId,
       clearResults,
     },
-    lock: { getAuthHeaders },
+    lock: { getAuthHeaders, queryClient },
   });
 
   const handlePeriodClick = (index: number, shiftHeld: boolean) => {
@@ -610,35 +582,23 @@ const SequentialAnalysisFeature = () => {
     });
   };
 
-  const summaryTimeColumn = ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as string | undefined) ?? timeColumn;
-  const summaryGroupBy = ((results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns as string[] | undefined) ?? groupByColumns;
-  const summaryColumnType = ((results?.analysis_params as Record<string, unknown> | undefined)?.column_type as 'datetime' | 'numeric' | undefined) ?? derivedColumnType;
-  const summaryNumericOrigin = summaryColumnType === 'numeric'
-    ? ((results?.analysis_params as Record<string, unknown> | undefined)?.numeric_origin as number | null | undefined) ?? numericOriginValue ?? null
-    : null;
-  const summaryNumericInterval = summaryColumnType === 'numeric'
-    ? ((results?.analysis_params as Record<string, unknown> | undefined)?.numeric_interval as number | null | undefined) ?? numericIntervalValue ?? null
-    : null;
-  const rawSummaryFrequency =
-    ((results?.analysis_params as Record<string, unknown> | undefined)?.frequency as SequentialFrequency | undefined) ?? frequency;
-  const summaryCustomIntervalValue =
-    ((results?.analysis_params as Record<string, unknown> | undefined)?.custom_interval_value as number | null | undefined) ??
-    customIntervalValue;
-  const rawSummaryCustomIntervalUnit =
-    ((results?.analysis_params as Record<string, unknown> | undefined)?.custom_interval_unit as unknown) ??
-    customIntervalUnitValue;
-  const summaryCustomIntervalUnit: SequentialCustomIntervalUnit | null = isCustomIntervalUnit(
-    rawSummaryCustomIntervalUnit,
-  )
-    ? rawSummaryCustomIntervalUnit
-    : null;
-  const summaryFrequency = summaryColumnType === 'numeric'
-    ? 'Numeric bins'
-    : rawSummaryFrequency === 'custom'
-      ? summaryCustomIntervalValue && summaryCustomIntervalUnit
-        ? `Every ${summaryCustomIntervalValue} ${summaryCustomIntervalUnit}`
-        : 'Custom interval'
-      : rawSummaryFrequency;
+  const {
+    timeColumn: summaryTimeColumn,
+    groupBy: summaryGroupBy,
+    columnType: summaryColumnType,
+    numericOrigin: summaryNumericOrigin,
+    numericInterval: summaryNumericInterval,
+    frequencyDisplay: summaryFrequency,
+  } = useSequentialResultSummary(results, {
+    timeColumn,
+    groupBy: groupByColumns,
+    columnType: derivedColumnType,
+    numericOrigin: numericOriginValue ?? null,
+    numericInterval: numericIntervalValue ?? null,
+    frequency,
+    customIntervalValue,
+    customIntervalUnit: customIntervalUnitValue,
+  });
   const minGroupSize = parseNonNegativeIntegerInput(minGroupSizeInput) ?? 0;
 
   const rawResultRows = Array.isArray(results?.data)
@@ -768,273 +728,76 @@ const SequentialAnalysisFeature = () => {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="space-y-0 pb-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Trends and Sequence
-                <InfoIcon
-                  targetKey="sequential-analysis.overview"
-                  label="About Sequential Analysis"
-                  tooltip="Learn what sequential analysis is and how it can help you."
-                />
-                <HelpIcon
-                  targetKey="analysis.sequential-analysis.parameters"
-                  label="Sequential analysis parameters"
-                  tooltip="Select a time column, choose frequency, and configure group-by options."
-                />
-              </CardTitle>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0">
-          <NodeSelectionPanel
+      <AnalysisCardLayout
+        title="Trends and Sequence"
+        info={{
+          targetKey: 'sequential-analysis.overview',
+          label: 'About Sequential Analysis',
+          tooltip: 'Learn what sequential analysis is and how it can help you.',
+        }}
+        help={{
+          targetKey: 'analysis.sequential-analysis.parameters',
+          label: 'Sequential analysis parameters',
+          tooltip: 'Select a time column, choose frequency, and configure group-by options.',
+        }}
+        actions={{
+          onRun: () => {
+            void handleRunOrUpdate();
+          },
+          onClear: handleClearResults,
+          runDisabled: actionState.runDisabled || isLoading.operations || !activeTimeColumn,
+          runDisabledReason: (() => {
+            if (isAnalyzing || isLoading.operations) return undefined;
+            if (actionState.runDisabledReason) return actionState.runDisabledReason;
+            if (!activeTimeColumn) return 'Select a time column to run';
+            return undefined;
+          })(),
+          clearDisabled: actionState.clearDisabled,
+          isRunning: isAnalyzing,
+          hasResult: Boolean(results),
+          runLabel: actionState.runLabel,
+          clearHelp: {
+            targetKey: 'analysis.sequential-analysis.clear-results',
+            label: 'Clear results',
+          },
+        }}
+      >
+          <SequentialAnalysisParameterPanel
             selectedNodes={displayedNodes}
             nodeColumnSelections={nodeColumnSelections}
+            timeCompatibleColumns={timeCompatibleColumns}
+            timeCompatibleTypes={Array.from(TIME_COMPATIBLE_TYPES)}
+            isLocked={Boolean(isLocked)}
+            displayNodeCount={displayNodeCount}
             onColumnChange={(nodeId, column) => {
               if (isLocked) return;
               setNodeColumnSelections([{ nodeId, column }]);
               setTimeColumn(column);
             }}
-            nodeColors={{}}
-            onColorChange={() => {}}
-            getNodeColumns={() => timeCompatibleColumns}
-            defaultPalette={[]}
-            maxCompare={1}
-            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-            showShape
-            showColorPicker={false}
-            disabled={!!isLocked}
-            locked={!!isLocked}
-            originalCount={displayNodeCount}
-            columnLabelFn={() => (
-              <span className="inline-flex items-center gap-1">
-                Time/Numeric Column *
-                <HelpIcon targetKey="analysis.sequential-analysis.time-column" label="Time column selector" />
-              </span>
-            )}
-            allowedDataTypes={Array.from(TIME_COMPATIBLE_TYPES)}
-            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+            derivedColumnType={derivedColumnType}
+            inputsDisabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
+            activeNodeId={activeNodeId}
+            selectedNodeId={selectedNodeId}
+            currentWorkspaceId={currentWorkspaceId}
+            frequency={frequency}
+            onFrequencyChange={setFrequency}
+            customIntervalValueInput={customIntervalValueInput}
+            onCustomIntervalValueChange={setCustomIntervalValueInput}
+            customIntervalUnit={customIntervalUnit}
+            onCustomIntervalUnitChange={setCustomIntervalUnit}
+            numericOriginInput={numericOriginInput}
+            onNumericOriginChange={setNumericOriginInput}
+            numericIntervalInput={numericIntervalInput}
+            onNumericIntervalChange={setNumericIntervalInput}
+            availableColumns={availableColumns}
+            groupByColumns={groupByColumns}
+            onAddGroupByColumn={handleAddGroupByColumn}
+            onRemoveGroupByColumn={handleRemoveGroupByColumn}
+            onGroupByColumnChange={handleGroupByColumnChange}
+            caseSensitive={caseSensitive}
+            onCaseSensitiveChange={setCaseSensitive}
           />
-
-          {/* Analysis Configuration */}
-          <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {derivedColumnType === 'datetime' ? (
-              <div className={frequency === 'custom' ? 'md:col-span-2' : 'md:col-span-1'}>
-                <div className="mb-1 flex items-center gap-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Frequency
-                  </label>
-                  <HelpIcon targetKey="analysis.sequential-analysis.frequency" label="Frequency selector" />
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Select
-                    value={frequency}
-                    onValueChange={(value) => setFrequency(value as SequentialFrequency)}
-                    disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
-                  >
-                    <SelectTrigger className={frequency === 'custom' ? 'w-full sm:w-44' : 'w-full'}>
-                      <SelectValue placeholder="Select frequency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FREQUENCY_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {frequency === 'custom' && (
-                    <div className="flex flex-1 items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Every</span>
-                      <Input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={customIntervalValueInput}
-                        onChange={(event) => setCustomIntervalValueInput(event.target.value)}
-                        placeholder="e.g. 30"
-                        className="w-24"
-                        disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
-                      />
-                      <Select
-                        value={customIntervalUnit}
-                        onValueChange={(value) => {
-                          if (isCustomIntervalUnit(value)) setCustomIntervalUnit(value);
-                        }}
-                        disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CUSTOM_INTERVAL_UNIT_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-                {frequency === 'custom' && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Bucket records by a fixed interval. Enter a positive whole number.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Numeric Origin
-                  </label>
-                  <Input
-                    type="number"
-                    value={numericOriginInput}
-                    onChange={(event) => setNumericOriginInput(event.target.value)}
-                    placeholder="Auto-detect"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Optional. Leave blank to auto-detect from the minimum value.
-                  </p>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Numeric Interval *
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={numericIntervalInput}
-                    onChange={(event) => setNumericIntervalInput(event.target.value)}
-                    placeholder="e.g. 10"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Required. Values are bucketed using this interval width.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Group By Columns */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Group By Columns (Optional, max 3)
-              </label>
-              <Button
-                onClick={handleAddGroupByColumn}
-                disabled={groupByColumns.length >= 3}
-                size="sm"
-                className="gap-1"
-              >
-                <Plus className="h-4 w-4" />
-                Add Group
-              </Button>
-            </div>
-            
-            {groupByColumns.map((column, index) => (
-              <div key={index} className="flex items-center space-x-2 mb-2">
-                <Select
-                  value={column || undefined}
-                  onValueChange={(value) => handleGroupByColumnChange(index, value)}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableColumns.map((col) => (
-                      <SelectItem key={col.name} value={col.name}>
-                        {col.name} ({col.dataType})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {column && (
-                  <UniqueValueCount 
-                    workspaceId={currentWorkspaceId || ''} 
-                    nodeId={activeNodeId || selectedNodeId || ''} 
-                    columnName={column} 
-                  />
-                )}
-                <Button
-                  onClick={() => handleRemoveGroupByColumn(index)}
-                  variant="destructive"
-                  size="sm"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remove
-                </Button>
-              </div>
-            ))}
-
-            {groupByColumns.length > 0 && (
-              <div className="flex items-center space-x-2 mt-2">
-                <Checkbox
-                  id="case-sensitive"
-                  checked={caseSensitive}
-                  onCheckedChange={(checked) => setCaseSensitive(checked === true)}
-                />
-                <label
-                  htmlFor="case-sensitive"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Case sensitive
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
-          <DisabledReasonTooltip reason={(() => {
-            if (isAnalyzing || isLoading.operations) return undefined;
-            if (actionState.runDisabledReason) return actionState.runDisabledReason;
-            if (!activeTimeColumn) return 'Select a time column to run';
-            return undefined;
-          })()}>
-            <Button
-              onClick={() => {
-                void handleRunOrUpdate();
-              }}
-              disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
-              className="w-full md:w-auto"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  {actionState.runLabel}
-                </>
-              )}
-            </Button>
-          </DisabledReasonTooltip>
-
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleClearResults}
-              variant="destructive"
-              disabled={actionState.clearDisabled}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Clear Results
-            </Button>
-            <HelpIcon targetKey="analysis.sequential-analysis.clear-results" label="Clear results" />
-          </div>
-        </div>
-        </CardContent>
-      </Card>
+      </AnalysisCardLayout>
 
       {sequentialWaitingBanner && (
         <AnalysisTaskBanner
@@ -1046,134 +809,51 @@ const SequentialAnalysisFeature = () => {
         />
       )}
 
-      {/* Results Display */}
       {results && (
-        <Card className="mt-6">
-          <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Trends and Sequence Results
-                <HelpIcon
-                  targetKey="analysis.sequential-analysis.results"
-                  label="Sequential analysis results"
-                  tooltip={`${resultsSummary}. Review the chart, summaries, and adjust chart type.`}
-                />
-              </CardTitle>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">Min Group Size</span>
-              <Input
-                type="number"
-                min="0"
-                step="1"
-                value={minGroupSizeInput}
-                onChange={(event) => setMinGroupSizeInput(event.target.value)}
-                className="w-24 text-sm"
-                aria-label="Min Group Size"
-              />
-              <span className="text-sm text-muted-foreground">Chart Type</span>
-              <Select
-                value={chartType}
-                onValueChange={(value) => handleChartTypeChange(value as ChartTypeOption)}
-              >
-                <SelectTrigger className="w-35 text-sm">
-                  <SelectValue placeholder="Select chart" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="line">Line Chart</SelectItem>
-                  <SelectItem value="bar">Bar Chart</SelectItem>
-                  <SelectItem value="area">Area Chart</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Download chart"
-                onClick={() => setDownloadDialogOpen(true)}
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 xl:grid-cols-6">
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Time Column
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {summaryTimeColumn || '—'}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {summaryColumnType === 'numeric' ? 'Numeric Interval' : 'Frequency'}
-                </span>
-                <div className="mt-1 text-base font-semibold capitalize text-foreground">
-                  {summaryColumnType === 'numeric'
-                    ? summaryNumericInterval != null
-                      ? `${summaryNumericInterval}${summaryNumericOrigin != null ? ` (origin ${summaryNumericOrigin})` : ''}`
-                      : '—'
-                    : summaryFrequency}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {`${totalPointCount}/${totalDocumentCount}`}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Shown
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {`${shownPointCount}/${shownDocumentCount}`}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Chosen
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {`${chosenPointCount}/${chosenDocumentCount}`}
-                </div>
-              </div>
-              <div className="rounded-md border border-border/60 p-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Groups
-                </span>
-                <div className="mt-1 text-base font-semibold text-foreground">
-                  {summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None'}
-                </div>
-              </div>
-            </div>
-
-            <SequentialChart
-              chartType={chartType}
-              chartData={chartData}
-              chartConfig={chartConfig}
-              groupKeys={filteredGroupKeys}
-              groupPointCounts={groupPointCounts}
-              hiddenKeys={hiddenKeys}
-              selectedPeriodIndices={selectedPeriodIndices}
-              canDetach={canDetach}
-              isDetaching={isDetaching}
-              onToggleKey={handleToggleKey}
-              onPeriodClick={handlePeriodClick}
-              onClearSelection={clearPeriodSelection}
-              detachNodeName={detachNodeName}
-              detachNodeNamePlaceholder={defaultNodeName}
-              onDetachNodeNameChange={setDetachNodeName}
-              onDetach={() => {
-                void handleDetach();
-              }}
-              containerRef={chartContainerRef}
-            />
-          </CardContent>
-        </Card>
+        <SequentialAnalysisResultsPanel
+          resultsSummary={resultsSummary}
+          summary={{
+            timeColumn: summaryTimeColumn,
+            groupBy: summaryGroupBy,
+            columnType: summaryColumnType,
+            numericOrigin: summaryNumericOrigin,
+            numericInterval: summaryNumericInterval,
+            frequencyDisplay: summaryFrequency,
+          }}
+          counts={{
+            total: totalPointCount,
+            totalDocuments: totalDocumentCount,
+            shown: shownPointCount,
+            shownDocuments: shownDocumentCount,
+            chosen: chosenPointCount,
+            chosenDocuments: chosenDocumentCount,
+          }}
+          minGroupSizeInput={minGroupSizeInput}
+          onMinGroupSizeChange={setMinGroupSizeInput}
+          chartType={chartType}
+          onChartTypeChange={handleChartTypeChange}
+          xAxisType={xAxisType}
+          onXAxisTypeChange={setXAxisType}
+          onDownloadClick={() => setDownloadDialogOpen(true)}
+          chartData={chartData}
+          chartConfig={chartConfig}
+          groupKeys={filteredGroupKeys}
+          groupPointCounts={groupPointCounts}
+          hiddenKeys={hiddenKeys}
+          selectedPeriodIndices={selectedPeriodIndices}
+          canDetach={canDetach}
+          isDetaching={isDetaching}
+          onToggleKey={handleToggleKey}
+          onPeriodClick={handlePeriodClick}
+          onClearSelection={clearPeriodSelection}
+          detachNodeName={detachNodeName}
+          detachNodeNamePlaceholder={defaultNodeName}
+          onDetachNodeNameChange={setDetachNodeName}
+          onDetach={() => {
+            void handleDetach();
+          }}
+          containerRef={chartContainerRef}
+        />
       )}
       <ChartImageDownloadDialog
         open={downloadDialogOpen}

@@ -42,11 +42,11 @@ export interface SliceRequest {
   random_seed?: number;
   new_node_name?: string;
 }
-export interface JoinNodesRequest { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string; }
-export interface JoinPreviewParams { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string; }
-export interface CastNodeRequest { column: string; target_type: string; format?: string; }
-export interface ConcatPreviewRequest { node_ids: string[]; }
-export interface ConcatRequest extends ConcatPreviewRequest { new_node_name?: string }
+interface JoinNodesRequest { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string; }
+interface JoinPreviewParams { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string; }
+interface CastNodeRequest { column: string; target_type: string; format?: string; }
+interface ConcatPreviewRequest { node_ids: string[]; deduplicate?: boolean; }
+interface ConcatRequest extends ConcatPreviewRequest { new_node_name?: string }
 export interface FilterPreviewResponse {
   data: Record<string, unknown>[];
   columns: string[];
@@ -60,7 +60,6 @@ export interface FilterPreviewResponse {
     has_prev: boolean;
   };
 }
-export type JoinPreviewResponse = FilterPreviewResponse;
 
 
 
@@ -90,7 +89,7 @@ export interface ReplaceApplyResponse {
 // Column operations registry
 // ---------------------------------------------------------------------------
 
-export interface OperationInfo {
+interface OperationInfo {
   method: string;
   label: string;
 }
@@ -110,7 +109,7 @@ export type PolarsExpressionContext =
   | 'sort'
   | 'group_by_agg';
 
-export interface PolarsExpressionItem {
+interface PolarsExpressionItem {
   /** Python expression string, e.g. "pl.col('text').str.starts_with('RT')" */
   code: string;
   /** Only used in sort context */
@@ -171,7 +170,6 @@ export const nodesApi = {
     }
     return httpRequest<NodeDataResponse>(`/workspaces/nodes/${node}/data`, { method: 'GET', headers, params: query });
   },
-  shape: (node: string, headers: Record<string,string> = {}) => get<Record<string, unknown>>(`/workspaces/nodes/${node}/shape`, headers),
   uniqueValues: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnUniqueValuesResponse>(`/workspaces/nodes/${node}/columns/${col}/unique`, headers),
   describeColumn: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnDescribeResponse>(`/workspaces/nodes/${node}/columns/${col}/describe`, headers),
   delete: (node: string, headers: Record<string,string> = {}) => del<Record<string, unknown>>(`/workspaces/nodes/${node}`, headers),

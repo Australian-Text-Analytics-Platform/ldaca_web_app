@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
+import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   ConcatNodeSummary,
@@ -11,7 +11,7 @@ import type {
 } from '../../types';
 import { MAX_CONCAT_NODES } from '../../types';
 import { buildWorkspaceNodeMap, deriveNodeLabel, extractNodeColumns, extractNodeDtypes, getNodeKey } from '../../utils/nodeMetadata';
-import { takeMostRecent } from '../../../../utils/selectionUtils';
+import { dedupeNodeIds, takeMostRecent } from '@/utils/selectionUtils';
 
 const DEFAULT_CONCAT_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9', '#f59e0b', '#14b8a6'];
 
@@ -19,11 +19,12 @@ export interface ConcatSubTabProps {
   selectedNodeIds: string[];
   currentWorkspaceId: string | null;
   workspaceNodes: WorkspaceNodeLike[];
-  concatNodes: (nodeIds: string[], newNodeName?: string) => Promise<unknown>;
+  concatNodes: (nodeIds: string[], newNodeName?: string, deduplicate?: boolean) => Promise<unknown>;
   concatPreview: (
     nodeIds: string[],
     page: number,
     pageSize: number,
+    deduplicate?: boolean,
   ) => Promise<{
     data: PreviewRow[];
     columns: string[];
@@ -53,6 +54,8 @@ interface ConcatFormControllers {
   value: string;
   setValue: (value: string) => void;
   placeholder: string;
+  deduplicate: boolean;
+  setDeduplicate: (value: boolean) => void;
 }
 
 interface ConcatPreviewConfig {
@@ -199,15 +202,6 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
   return result;
 };
 
-const dedupeNodeIds = (nodeIds: string[]): string[] => {
-  const seen = new Set<string>();
-  return nodeIds.filter((nodeId) => {
-    if (!nodeId || seen.has(nodeId)) return false;
-    seen.add(nodeId);
-    return true;
-  });
-};
-
 export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult => {
   const {
     selectedNodeIds,
@@ -220,6 +214,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   } = props;
 
   const [newNodeName, setNewNodeName] = useState('');
+  const [deduplicate, setDeduplicate] = useState(true);
   const [isConcatenating, setIsConcatenating] = useState(false);
 
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
@@ -260,12 +255,12 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
 
   const concatPreviewRequest = (() => {
     if (!concatAnalysis.ready) return null;
-    return { nodeIds: concatUsedNodeIds } satisfies ConcatPreviewRequestPayload;
+    return { nodeIds: concatUsedNodeIds, deduplicate } satisfies ConcatPreviewRequestPayload;
   })();
 
   const concatPreviewSignature = (() => {
     if (!concatPreviewRequest) return 'concat-preview-disabled';
-    return concatPreviewRequest.nodeIds.join('|');
+    return `${concatPreviewRequest.nodeIds.join('|')}|dedup=${concatPreviewRequest.deduplicate ? '1' : '0'}`;
   })();
 
   const concatPreviewFetcher = async ({
@@ -277,7 +272,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     page: number;
     pageSize: number;
   }) => {
-    const response = await concatPreview(request.nodeIds, page, pageSize);
+    const response = await concatPreview(request.nodeIds, page, pageSize, request.deduplicate);
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -343,7 +338,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     const requestedName = newNodeName.trim() || autoConcatName || undefined;
     try {
       setIsConcatenating(true);
-      await concatNodes(nodeIds, requestedName);
+      await concatNodes(nodeIds, requestedName, deduplicate);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error applying stack';
       onAlert(`Error applying stack: ${message}`);
@@ -379,6 +374,8 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
       value: newNodeName,
       setValue: setNewNodeName,
       placeholder: autoConcatName || 'Concatenated dataset',
+      deduplicate,
+      setDeduplicate,
     },
     statusMessage: concatAnalysis.issues,
     statusVariant,

@@ -2,11 +2,13 @@ import * as React from "react"
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  MoreHorizontal,
   MoreHorizontalIcon,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { type Button, buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
@@ -40,7 +42,139 @@ function PaginationItem({ ...props }: React.ComponentProps<"li">) {
 type PaginationLinkProps = {
   isActive?: boolean
 } & Pick<React.ComponentProps<typeof Button>, "size"> &
-  React.ComponentProps<"a">
+  Omit<React.ComponentProps<"a">, "size">
+
+interface PaginationJumpProps {
+  /** Known total pages. Omit for source-row pagination with unknown totals. */
+  totalPages?: number
+  onPageChange: (page: number) => void
+  /** Override the trigger button's classes (e.g. `size-8` for tighter footers). */
+  triggerClassName?: string
+  /** Whether to render a "Page:" label inside the popover. Defaults to true. */
+  showPageLabel?: boolean
+}
+
+/**
+ * Clickable "…" that becomes a page-number input. Pressing Go jumps to
+ * the entered page; Escape / outside-click closes the popover.
+ */
+export const PaginationJump: React.FC<PaginationJumpProps> = ({
+  totalPages,
+  onPageChange,
+  triggerClassName,
+  showPageLabel = true,
+}) => {
+  const [open, setOpen] = React.useState(false)
+  const [value, setValue] = React.useState("")
+  const [error, setError] = React.useState<string | null>(null)
+  const containerRef = React.useRef<HTMLDivElement | null>(null)
+  const inputRef = React.useRef<HTMLInputElement | null>(null)
+  const inputId = React.useId()
+  const errorId = `${inputId}-error`
+
+  React.useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current || containerRef.current.contains(event.target as Node)) return
+      setOpen(false)
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false)
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleEscape)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleEscape)
+    }
+  }, [open])
+
+  React.useEffect(() => {
+    if (!open) return
+    // rAF defer avoids the react-hooks/set-state-in-effect lint while still
+    // resetting the form and focusing the input the moment the popover opens.
+    const id = requestAnimationFrame(() => {
+      setValue("")
+      setError(null)
+      inputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(id)
+  }, [open])
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const trimmed = value.trim()
+    if (!/^\d+$/.test(trimmed)) {
+      setError(totalPages ? `Enter a number between 1 and ${totalPages}` : "Enter a page number")
+      return
+    }
+
+    const target = Number.parseInt(trimmed, 10)
+    if (Number.isNaN(target) || target < 1 || (totalPages && target > totalPages)) {
+      setError(totalPages ? `Enter a value between 1 and ${totalPages}` : "Enter a valid page number")
+      return
+    }
+
+    onPageChange(target)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((prev) => !prev)}
+        className={cn("size-9 text-muted-foreground hover:text-foreground", triggerClassName)}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+        <span className="sr-only">Jump to page</span>
+      </Button>
+      {open && (
+        <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md border border-border bg-popover px-3 py-2 text-popover-foreground shadow-lg">
+          <form className="flex items-center gap-2" onSubmit={handleSubmit} noValidate>
+            {showPageLabel && (
+              <label className="text-xs font-medium text-muted-foreground" htmlFor={inputId}>
+                Page:
+              </label>
+            )}
+            <Input
+              id={inputId}
+              ref={inputRef}
+              value={value}
+              onChange={(event) => {
+                setValue(event.target.value)
+                if (error) setError(null)
+              }}
+              type="text"
+              inputMode="numeric"
+              placeholder={totalPages ? `${totalPages}` : "…"}
+              aria-invalid={error ? "true" : undefined}
+              aria-describedby={error ? errorId : undefined}
+              className={cn(
+                "h-8 w-16 text-sm",
+                error && "border-destructive focus-visible:ring-destructive",
+              )}
+            />
+            <Button type="submit" size="sm">
+              Go
+            </Button>
+            {error && (
+              <span id={errorId} className="sr-only">
+                {error}
+              </span>
+            )}
+          </form>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function PaginationLink({
   className,
@@ -124,4 +258,6 @@ export {
   PaginationPrevious,
   PaginationNext,
   PaginationEllipsis,
+  // buildPaginationRange and PaginationJump are exported inline above as
+  // top-level `export const` so consumers can import them directly.
 }

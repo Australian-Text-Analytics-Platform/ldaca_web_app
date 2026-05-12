@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 
-import { Button } from '../../../components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,8 +11,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../../components/ui/alert-dialog';
-import { Checkbox } from '../../../components/ui/checkbox';
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export type DetachDialogNodeOption = {
   node_id: string;
@@ -89,27 +89,39 @@ export function DetachColumnsDialog({
         </div>
 
         <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-          {detachNodeOptions.map((node) => (
-            <div key={node.node_id} className="rounded-md border p-3">
-              <div className="mb-2 text-sm font-semibold text-foreground">{node.node_name}</div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {node.available_columns.map((column) => {
-                  const disabled = (node.disabled_columns || []).includes(column);
-                  const checked = disabled || (selectedDetachColumns[node.node_id] || []).includes(column);
-                  return (
-                    <label key={`${node.node_id}-${column}`} className={`flex items-center gap-2 text-sm ${disabled ? 'opacity-60' : ''}`}>
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(value: boolean | 'indeterminate') => toggleDetachColumn(node.node_id, column, value === true)}
-                        disabled={disabled || isDetaching}
-                      />
-                      <span>{column}{disabled ? ' (required)' : ''}</span>
-                    </label>
-                  );
-                })}
+          {detachNodeOptions.map((node) => {
+            // Mandatory columns are hidden from the dialog across every tool:
+            // the backend always includes them in the detach output, so
+            // surfacing them as greyed-out "(required)" checkboxes is just
+            // visual noise. The dispersion-detach dialog already drops them
+            // upstream; this branch handles the per-hit detach dialog the
+            // same way.
+            const disabledSet = new Set(node.disabled_columns || []);
+            const optionalColumns = node.available_columns.filter(
+              (column) => !disabledSet.has(column),
+            );
+            if (optionalColumns.length === 0) return null;
+            return (
+              <div key={node.node_id} className="rounded-md border p-3">
+                <div className="mb-2 text-sm font-semibold text-foreground">{node.node_name}</div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {optionalColumns.map((column) => {
+                    const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
+                    return (
+                      <label key={`${node.node_id}-${column}`} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value: boolean | 'indeterminate') => toggleDetachColumn(node.node_id, column, value === true)}
+                          disabled={isDetaching}
+                        />
+                        <span>{column}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <AlertDialogFooter>

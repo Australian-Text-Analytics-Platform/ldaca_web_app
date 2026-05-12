@@ -1,7 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '@/stores/uiStore';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import type { HintConditionMap, HintResolverContext } from './types';
 
 /**

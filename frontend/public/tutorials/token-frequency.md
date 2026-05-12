@@ -12,7 +12,9 @@ Token Frequency counts how often each word appears in your text data. It is one 
 
 <h3 id="help-token-frequency-data-block">Step 1 — Select your data</h3>
 
-Use the data-block selector to choose which corpus (or corpora) to analyse. You can select up to two data blocks at once. When two are selected, the tool runs in comparison mode and produces the Juxtorpus cloud and statistical measures in addition to the per-block results.
+Use the data-block selector to choose which corpus (or corpora) to analyse. The tool is strictly pairwise — at most two data blocks at a time — because keyword analysis is defined between exactly one reference and one study corpus. If more than two blocks are selected at the workspace level, the tool only shows the **two most recent** picks; any older selections are silently dropped from the panel until you deselect a newer block to make room.
+
+When two are selected, the tool runs in comparison mode and produces the Juxtorpus cloud and statistical measures in addition to the per-block results.
 
 For each selected block, choose the **text column** that contains the documents you want to count. Only columns that hold plain text are available.
 
@@ -93,11 +95,11 @@ A **Filter tokens** input appears at the bottom of the results when List view is
 
 Click **Clear** to remove the filter. The word clouds are not affected by the token filter.
 
-<h3 id="help-token-frequency-statistical-measures">Statistical measures</h3>
+<h3 id="help-token-frequency-statistical-measures">Keyword Analysis</h3>
 
-![Statistical measures screenshot](tutorials/assets/token_frequency/statistical_measures.png)
+![Keyword Analysis table screenshot](tutorials/assets/token_frequency/statistical_measures.png)
 
-The statistical table summarises token-level differences between the two data blocks. Click any column header to sort ascending or descending.
+The **Keyword Analysis** table summarises token-level differences between the two data blocks. A caption directly under the section heading shows *Reference corpus: {name}; Study corpus: {name}* with each name coloured to match the chart palette colour you picked for that block — so it's always clear at a glance which side of the comparison is which. Click any column header to sort ascending or descending.
 
 | Column | What it shows |
 |---|---|
@@ -126,8 +128,9 @@ Token Frequency results are saved in the backend so the tab can reload and retai
 |---|---|---|
 | Results unchanged after removing stop words | Stop words not applied | Click **Apply Stop Words** after editing the list |
 | Word cloud dominated by common words | No stop words applied | Click **Fill Default** then **Apply Stop Words** |
-| Juxtorpus or statistics table are missing | Only one data block selected | Select a second data block to enable comparison mode |
-| Statistical table shows no significant words | Corpora are very similar or one is very small | Try a larger or more distinct pair of data blocks |
+| Juxtorpus or Keyword Analysis table are missing | Only one data block selected | Select a second data block to enable comparison mode |
+| Keyword Analysis table shows no significant words | Corpora are very similar or one is very small | Try a larger or more distinct pair of data blocks |
+| A workspace block I selected isn't showing in the panel | Token Frequency caps the panel to the 2 most-recent selections | Deselect a newer block to make room, or run the comparison on the visible pair |
 | Right-clicked stop word is hard to find | List was already long when the word was added | New words are inserted at the top — scroll to the start, or click **Sort** to alphabetise |
 | Analyze button is disabled | No data block selected, or no text column chosen | Select a data block and pick a text column |
 
@@ -135,7 +138,7 @@ Token Frequency results are saved in the backend so the tab can reload and retai
 
 | Setting | Default | Notes |
 |---|---|---|
-| Data blocks | None | Up to 2; comparison mode activates when 2 are selected |
+| Data blocks | None | Up to 2; comparison mode activates when 2 are selected. If more than 2 are selected workspace-wide, only the 2 most recent show in the panel. |
 | Reference Data Block | First selected block | Changes O1/O2 assignment in the statistics table |
 | Stop words | Empty | Click **Fill Default** for a built-in English list |
 | Cloud display limit | 50 | Range 10–100; mirrors to list limit |

@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampDisplayTokenLimit } from './utils';
 import { textApi } from '@/api/text';
+import { isNetworkError } from '@/api/http';
+
+/**
+ * Hydration is opportunistic — failures leave the feature in its empty
+ * "no prior task to restore" state, which is recoverable. Network errors
+ * (backend restarting, offline) get logged at debug; real server errors
+ * stay at warn so they remain visible without being shouty.
+ */
+const logHydrationFailure = (label: string, error: unknown) => {
+  const fn = isNetworkError(error) ? console.debug : console.warn;
+  fn(`[analysis-hydration] ${label}:`, error);
+};
 
 export type HydrationStatus = 'idle' | 'loading' | 'error';
 
@@ -111,13 +123,13 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
 
         const requestPromise = fetchRequest
           ? Promise.resolve(fetchRequest(taskId)).catch((error) => {
-              console.error('Analysis hydration request fetch failed', error);
+              logHydrationFailure('request fetch failed', error);
               return null;
             })
           : Promise.resolve(null);
         const resultPromise = fetchResult
           ? Promise.resolve(fetchResult(taskId)).catch((error) => {
-              console.error('Analysis hydration result fetch failed', error);
+              logHydrationFailure('result fetch failed', error);
               return null;
             })
           : Promise.resolve(null);
@@ -133,7 +145,7 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
 
         setHydrationState({ status: 'idle', lastHydratedAt: Date.now() });
       } catch (error) {
-        console.error('Analysis hydration failed', error);
+        logHydrationFailure('hydration failed', error);
         setHydrationState({ status: 'error', error: error instanceof Error ? error.message : 'Unknown error' });
         onHydrationError?.(error);
       } finally {

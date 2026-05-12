@@ -1,41 +1,31 @@
-import { useState, useEffect, useRef, useCallback, Suspense, lazy, type ReactNode } from 'react';
-import { useAuth, type AuthPhase, REFRESH_FAILURE_THRESHOLD } from './hooks/useAuth';
+import { useState, useEffect, useRef, Suspense, lazy, type ReactNode } from 'react';
+import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { usePreferencesInit } from './hooks/usePreferences';
 import { QueryProvider } from './providers/QueryProvider';
-import { WorkspaceProvider } from './providers/WorkspaceProvider';
+import { WorkspaceProvider } from '@/features/workspace/common/WorkspaceProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import GoogleLogin from './components/GoogleLogin';
-import CILogonLogin from './components/CILogonLogin';
 import Sidebar from './components/layout/Sidebar';
 import { InsetCard } from './components/layout/InsetCard';
 import BlockingScreen from './components/startup/BlockingScreen';
-import logo from './logo.png';
+import { LoginScreen } from './components/startup/LoginScreen';
+import { RefreshStatusBanner } from './components/startup/RefreshStatusBanner';
+import { getBlockingCopy } from './components/startup/authPhaseCopy';
 import { useUIStore } from './stores';
 import { usePreferencesStore } from './stores/preferencesStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
 import { Toaster } from './components/ui/sonner';
-import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
+import { DocumentModalHost } from './components/dialogs/DocumentModalHost';
+import { ViewRouter } from './components/layout/ViewRouter';
+import { LAG_HINT_DELAY_MS } from './config/timings';
+import { useResizableSplit } from './hooks/useResizableSplit';
 
-// Lazy load components for code splitting
-const TutorialView = lazy(() => import('./components/TutorialView'));
-const DocumentView = lazy(() => import('./components/DocumentView'));
+// Lazy load components for code splitting. Per-view feature components live
+// inside <ViewRouter> so the active feature unmounts cleanly on view switch.
 const FeedbackPanel = lazy(() => import('./components/panels/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('./components/layout/WorkspaceView'));
 const HintsController = lazy(() => import('./features/hints/HintsController'));
-const DataLoaderFeature = lazy(() => import('./features/analysis/data-loader/DataLoaderFeature'));
-const DataPreprocessingFeature = lazy(() => import('./features/analysis/data-preprocessing/DataPreprocessingFeature'));
-const ConcordanceFeature = lazy(() => import('./features/analysis/concordance/ConcordanceFeature'));
-const QuotationFeature = lazy(() => import('./features/analysis/quotation/QuotationFeature'));
-const TopicModelingFeature = lazy(() => import('./features/analysis/topic-modeling/TopicModelingFeature'));
-const SequentialAnalysisFeature = lazy(() => import('./features/analysis/sequential-analysis/SequentialAnalysisFeature'));
-const ExportFeature = lazy(() => import('./features/analysis/export/ExportFeature'));
-const TokenFrequencyFeature = lazy(() => import('./features/analysis/token-frequency/TokenFrequencyFeature'));
-const AiAnnotatorFeature = lazy(() => import('./features/analysis/ai-annotator/AiAnnotatorFeature'));
-
-const REFRESH_CHIP_DELAY_MS = 3000;
-const LAG_HINT_DELAY_MS = 8000;
 
 /**
  * Shell that renders the main workspace experience once the backend is healthy
@@ -43,37 +33,11 @@ const LAG_HINT_DELAY_MS = 8000;
  */
 const WorkspaceShell: React.FC = () => {
   const {
-    currentView,
     closeFeedbackModal,
     feedbackOpen,
-    tutorialModal,
-    tutorialTarget,
-    closeTutorialModal,
-    warningModal,
-    warningTarget,
-    closeWarningModal,
-    infoModal,
-    infoTarget,
-    closeInfoModal,
-    referenceModal,
-    referenceTarget,
-    closeReferenceModal,
   } = useUIStore(useShallow((state) => ({
-    currentView: state.currentView,
     closeFeedbackModal: state.closeFeedbackModal,
     feedbackOpen: state.modals.feedbackModal,
-    tutorialModal: state.modals.tutorialModal,
-    tutorialTarget: state.tutorialTarget,
-    closeTutorialModal: state.closeTutorialModal,
-    warningModal: state.modals.warningModal,
-    warningTarget: state.warningTarget,
-    closeWarningModal: state.closeWarningModal,
-    infoModal: state.modals.infoModal,
-    infoTarget: state.infoTarget,
-    closeInfoModal: state.closeInfoModal,
-    referenceModal: state.modals.referenceModal,
-    referenceTarget: state.referenceTarget,
-    closeReferenceModal: state.closeReferenceModal,
   })));
   const {
     phase,
@@ -93,46 +57,52 @@ const WorkspaceShell: React.FC = () => {
     if (prefsHydrated) syncVisibleViews();
   }, [prefsHydrated, syncVisibleViews]);
   const [laggingHintReady, setLaggingHintReady] = useState(false);
-  const [refreshChipReady, setRefreshChipReady] = useState(false);
   const showLaggingHint = laggingHintReady && phase.status === 'bootstrapping';
-  const refreshChipVisible = refreshChipReady && phase.status === 'refreshing';
 
-  // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
-  const [rightWidth, setRightWidth] = useState<number>(40); // percentage of total width
-  const [lastRightWidth, setLastRightWidth] = useState<number>(40); // remember last width when collapsing
+  // Resize state lives in two useResizableSplit calls below — the sidebar
+  // (vertical+pixel, mutating shadcn's primitive via querySelector) and
+  // the right panel (vertical+percent, DOM-imperative via mainRef/asideRef).
+  // Both must be declared before any early returns (Hooks rule).
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState<number>(208); // px, matches default SIDEBAR_WIDTH (16rem at 13px base)
-  const layoutRef = useRef<HTMLDivElement>(null);
+  const [lastAsidePanelRatio, setLastAsidePanelRatio] = useState<number>(0.4);
   const mainRef = useRef<HTMLDivElement>(null);
   const asideRef = useRef<HTMLElement>(null);
-  const rightWidthLiveRef = useRef<number>(rightWidth);
 
-  const onStartSidebarResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizingSidebar(true);
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-    const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
-    const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
-    // Disable primitive's width transition so the sidebar tracks the cursor exactly (same pattern as other separators)
-    if (gapEl) gapEl.style.transition = 'none';
-    if (containerEl) containerEl.style.transition = 'none';
-    let rafId: number | null = null;
-    let liveWidth = startWidth;
-    const onMove = (ev: MouseEvent) => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        liveWidth = Math.min(400, Math.max(160, startWidth + (ev.clientX - startX)));
-        if (gapEl) gapEl.style.width = `${liveWidth}px`;
-        if (containerEl) containerEl.style.width = `${liveWidth}px`;
-      });
-    };
-    const onUp = () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      setSidebarWidth(liveWidth);
-      setIsResizingSidebar(false);
+  // Sidebar: pixel-based, vertical axis. The shadcn Sidebar primitive
+  // controls its own DOM via `[data-slot="sidebar-gap"]` and
+  // `[data-slot="sidebar-container"]`; we mutate those during drag and
+  // reset them on release so the primitive's width prop takes back over.
+  // `persistKey` holds the EXPANDED width only — if/when shadcn's icon
+  // mode is wired up, that mode keys off `data-state="collapsed"` on the
+  // sidebar root and uses its own `--sidebar-width-icon` var (separate
+  // from this persisted value).
+  const {
+    containerRef: sidebarHostRef,
+    value: sidebarWidth,
+    isDragging: isResizingSidebar,
+    splitterProps: sidebarSplitterProps,
+  } = useResizableSplit({
+    orientation: 'vertical',
+    mode: 'pixel',
+    defaultValue: 208,
+    min: 160,
+    max: 400,
+    persistKey: 'ldaca.layout.sidebarWidth',
+    onDragStart: () => {
+      const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
+      const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
+      if (gapEl) gapEl.style.transition = 'none';
+      if (containerEl) containerEl.style.transition = 'none';
+    },
+    onLiveUpdate: (next) => {
+      const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
+      const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
+      if (gapEl) gapEl.style.width = `${next}px`;
+      if (containerEl) containerEl.style.width = `${next}px`;
+    },
+    onDragEnd: () => {
+      const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
+      const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
       if (gapEl) {
         gapEl.style.transition = '';
         gapEl.style.width = '';
@@ -141,12 +111,39 @@ const WorkspaceShell: React.FC = () => {
         containerEl.style.transition = '';
         containerEl.style.width = '';
       }
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [sidebarWidth]);
+    },
+  });
+
+  // Right panel: percent-based, vertical axis, end-anchored. `value` is
+  // the RIGHT (aside) pane's ratio of the layout container; the main pane
+  // is `1 - value`. End-anchoring lets `maxPixels: 800` cap the aside
+  // pane directly — on a 4K display 80% would be ~3000 px of workspace
+  // view which is wasted whitespace; the cap keeps it sensible while
+  // still letting the pane scale on normal laptops.
+  //
+  // We mutate widths on mainRef/asideRef during drag to keep React Flow
+  // and TanStack tables off the per-frame render path.
+  const {
+    containerRef: layoutRef,
+    value: asidePanelRatio,
+    setValue: setAsidePanelRatio,
+    isDragging: isResizing,
+    splitterProps: rightPanelSplitterProps,
+  } = useResizableSplit({
+    orientation: 'vertical',
+    anchor: 'end',
+    mode: 'percent',
+    defaultValue: 0.4,
+    min: 0.2,
+    max: 0.8,
+    maxPixels: 800,
+    persistKey: 'ldaca.layout.asidePanelRatio',
+    onLiveUpdate: (next) => {
+      if (isRightCollapsed) return;
+      if (mainRef.current) mainRef.current.style.width = `${(1 - next) * 100}%`;
+      if (asideRef.current) asideRef.current.style.width = `${next * 100}%`;
+    },
+  });
 
   useEffect(() => {
     if (phase.status !== 'bootstrapping') return;
@@ -157,78 +154,21 @@ const WorkspaceShell: React.FC = () => {
     };
   }, [phase.status]);
 
-  useEffect(() => {
-    if (phase.status !== 'refreshing') return;
-    const timeoutId = window.setTimeout(() => setRefreshChipReady(true), REFRESH_CHIP_DELAY_MS);
-    return () => {
-      window.clearTimeout(timeoutId);
-      setRefreshChipReady(false);
-    };
-  }, [phase.status]);
-
   const blockingCopy = getBlockingCopy(phase, showLaggingHint);
   const shouldShowLoginCard = isMultiUserMode && !isAuthenticated && phase.status !== 'bootstrapping';
-  const degradedPhase = phase.status === 'degraded' ? phase : null;
-  const showRefreshBanner = Boolean(degradedPhase);
-  const bannerAttemptsLabel = degradedPhase ? formatAttemptLabel(degradedPhase.attempts) : null;
-  const bannerMessage = degradedPhase?.error ?? 'Having trouble refreshing your session.';
-  const bannerTime = degradedPhase ? formatTimestamp(degradedPhase.lastFailureAt) : null;
-  const showRefreshChip = phase.status === 'refreshing' && refreshChipVisible;
-  const onStartResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    if (isRightCollapsed) return; // don't resize when collapsed
-    setIsResizing(true);
-    let rafId: number | null = null;
-    // Capture starting state to compute deltas (prevents jump on first move)
-    const startX = e.clientX;
-    const startPct = rightWidth;
-    const onMove = (ev: MouseEvent) => {
-      if (!layoutRef.current) return;
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        if (!layoutRef.current) return;
-        const rect = layoutRef.current.getBoundingClientRect();
-        // Compute delta from initial drag position to avoid any jump
-        const dx = ev.clientX - startX;
-        const deltaPct = -(dx / rect.width) * 100; // moving right shrinks right panel
-        const pctRight = Math.min(80, Math.max(20, startPct + deltaPct));
-        rightWidthLiveRef.current = pctRight;
-        // Apply widths directly to avoid React rerenders during drag
-        const mainEl = mainRef.current;
-        const asideEl = asideRef.current;
-        if (mainEl && !isRightCollapsed) {
-          mainEl.style.width = `${100 - pctRight}%`;
-        }
-        if (asideEl && !isRightCollapsed) {
-          asideEl.style.width = `${pctRight}%`;
-        }
-      });
-    };
-    const onUp = () => {
-      setIsResizing(false);
-      // flush any pending frame
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      // Commit the final width to state once
-      const finalPct = rightWidthLiveRef.current ?? rightWidth;
-      setRightWidth(finalPct);
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [isRightCollapsed, rightWidth, setIsResizing, setRightWidth, layoutRef]);
 
-  // Collapse/expand the entire right panel (Outlook-like behavior)
+  // Collapse/expand the entire right panel (Outlook-like behavior). We
+  // remember the last drag value so an uncollapse restores it. While
+  // collapsed the splitter doesn't render, so the hook's value sits
+  // unchanged in state.
   const toggleRightPanel = () => {
     setIsRightCollapsed((prev) => {
-      const next = !prev;
-      if (next) {
-        setLastRightWidth(rightWidth);
-      } else {
-        // restore previous width
-        setRightWidth((w) => (w === 0 ? lastRightWidth || 40 : w));
+      if (prev) {
+        setAsidePanelRatio(lastAsidePanelRatio);
+        return false;
       }
-      return next;
+      setLastAsidePanelRatio(asidePanelRatio);
+      return true;
     });
   };
 
@@ -268,95 +208,21 @@ const WorkspaceShell: React.FC = () => {
             className="bg-linear-to-br from-slate-50 to-blue-50"
             style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` } as React.CSSProperties}
           >
-            {/* Tutorial Modal */}
-            <Dialog open={tutorialModal} onOpenChange={(open) => !open && closeTutorialModal()}>
-              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogTitle className="sr-only">Tutorial</DialogTitle>
-                <div className="flex-1 overflow-y-auto">
-                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
-                    <TutorialView onClose={closeTutorialModal} target={tutorialTarget} />
-                  </Suspense>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <DocumentModalHost />
 
-            {/* Warning Modal */}
-            <Dialog open={warningModal} onOpenChange={(open) => !open && closeWarningModal()}>
-              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogTitle className="sr-only">Warning</DialogTitle>
-                <div className="flex-1 overflow-y-auto">
-                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div></div>}>
-                    <DocumentView docType="warning" onClose={closeWarningModal} target={warningTarget} />
-                  </Suspense>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Information Modal */}
-            <Dialog open={infoModal} onOpenChange={(open) => !open && closeInfoModal()}>
-              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogTitle className="sr-only">Information</DialogTitle>
-                <div className="flex-1 overflow-y-auto">
-                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>}>
-                    <DocumentView docType="information" onClose={closeInfoModal} target={infoTarget} />
-                  </Suspense>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Reference Modal */}
-            <Dialog open={referenceModal} onOpenChange={(open) => !open && closeReferenceModal()}>
-              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogTitle className="sr-only">Reference</DialogTitle>
-                <div className="flex-1 overflow-y-auto">
-                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>}>
-                    <DocumentView docType="reference" onClose={closeReferenceModal} target={referenceTarget} />
-                  </Suspense>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {(showRefreshBanner || showRefreshChip) && (
-              <div className="pointer-events-none fixed left-1/2 top-4 z-50 flex -translate-x-1/2 flex-col gap-2">
-                {showRefreshBanner && bannerAttemptsLabel && (
-                  <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-lg">
-                    <span className="font-medium text-amber-900">Connection hiccup</span>
-                    <span className="text-xs text-amber-900/80">{bannerMessage}</span>
-                    <span className="text-xs text-amber-900/70">Attempts {bannerAttemptsLabel}</span>
-                    {bannerTime && (
-                      <span className="text-xs text-amber-900/60">Last failure {bannerTime}</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={refreshAuth}
-                      className="rounded-full border border-amber-400 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
-                    >
-                      Retry now
-                    </button>
-                  </div>
-                )}
-                {showRefreshChip && (
-                  <div className="flex items-center gap-2 self-center rounded-full bg-slate-900/90 px-3 py-1 text-xs font-medium text-white shadow-lg">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" aria-hidden />
-                    Reconnecting…
-                  </div>
-                )}
-              </div>
-            )}
+            <RefreshStatusBanner />
             <Suspense fallback={null}>
               <HintsController />
             </Suspense>
-            <div className="flex h-dvh w-full overflow-hidden">
+            <div className="flex h-dvh w-full overflow-hidden" ref={sidebarHostRef}>
               <ErrorBoundary>
                 <Sidebar />
               </ErrorBoundary>
 
               <div
                 className={`hidden md:flex shrink-0 cursor-col-resize group relative w-2 items-center justify-center ${isResizingSidebar ? 'z-20' : ''}`}
-                onMouseDown={onStartSidebarResize}
-                role="separator"
-                aria-orientation="vertical"
                 aria-label="Resize sidebar"
+                {...sidebarSplitterProps}
               >
                 <div
                   className={`pointer-events-none w-1 h-10 rounded-full transition-colors ${
@@ -368,10 +234,6 @@ const WorkspaceShell: React.FC = () => {
               <SidebarInset className="flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
                 <Suspense fallback={null}>
                   <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
-                </Suspense>
-
-                <Suspense fallback={null}>
-                  <HintsController />
                 </Suspense>
 
                 <header className="border-b border-border/40 bg-white px-4 py-3 md:hidden">
@@ -388,40 +250,23 @@ const WorkspaceShell: React.FC = () => {
                       className={`relative h-full p-2 pl-1 ${
                         isRightCollapsed ? 'pr-2' : 'pr-1'
                       } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
-                      style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
+                      style={{ width: isRightCollapsed ? '100%' : `${(1 - asidePanelRatio) * 100}%`, minWidth: 280 }}
                       innerClassName="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4"
                     >
                       <div className="w-full max-w-none mx-0">
-                        <ErrorBoundary>
-                          <Suspense fallback={
-                            <div className="flex items-center justify-center py-12">
-                              <div className="text-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                                <p className="text-gray-600 text-sm">Loading...</p>
-                              </div>
-                            </div>
-                          }>
-                            {currentView === 'data-loader' && <DataLoaderFeature />}
-                            {currentView === 'filter' && <DataPreprocessingFeature />}
-                            {currentView === 'token-frequency' && <TokenFrequencyFeature />}
-                            {currentView === 'concordance' && <ConcordanceFeature />}
-                            {currentView === 'analysis' && <SequentialAnalysisFeature />}
-                            {currentView === 'topic-modeling' && <TopicModelingFeature />}
-                            {currentView === 'quotation' && <QuotationFeature />}
-                            {currentView === 'ai-annotator' && <AiAnnotatorFeature />}
-                            {currentView === 'export' && <ExportFeature />}
-                          </Suspense>
-                        </ErrorBoundary>
+                        <ViewRouter />
                       </div>
                     </InsetCard>
 
                     {!isRightCollapsed && (
                       <div
-                        className="w-2 shrink-0 cursor-col-resize group relative flex items-center justify-center"
-                        onMouseDown={onStartResize}
-                        role="separator"
-                        aria-orientation="vertical"
+                        // Hide the drag handle on touch viewports — it's
+                        // hard to grab on small screens and the aside
+                        // layout itself collapses to stacked below `md`
+                        // (separate change; tracked in plan §3.6 Phase C).
+                        className="hidden md:flex w-2 shrink-0 cursor-col-resize group relative items-center justify-center"
                         aria-label="Resize right panel"
+                        {...rightPanelSplitterProps}
                       >
                         <div
                           className={`pointer-events-none w-1 h-10 rounded-full transition-colors ${
@@ -436,7 +281,7 @@ const WorkspaceShell: React.FC = () => {
                       className={`relative flex h-full flex-col overflow-hidden bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
                         isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
                       }`}
-                      style={{ width: isRightCollapsed ? 0 : `${rightWidth}%` }}
+                      style={{ width: isRightCollapsed ? 0 : `${asidePanelRatio * 100}%` }}
                     >
                       {!isRightCollapsed && (
                         <button
@@ -492,7 +337,18 @@ const WorkspaceShell: React.FC = () => {
  */
 const App: React.FC = () => {
   const { ready: backendReady, error: backendError } = useBackendHealth();
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Read feedback-modal state from the shared UI store; the pre-auth and
+  // post-auth paths both surface the same Send-feedback button so it'd be
+  // surprising for them to maintain separate visibility state.
+  const {
+    feedbackOpen,
+    openFeedbackModal,
+    closeFeedbackModal,
+  } = useUIStore(useShallow((state) => ({
+    feedbackOpen: state.modals.feedbackModal,
+    openFeedbackModal: state.openFeedbackModal,
+    closeFeedbackModal: state.closeFeedbackModal,
+  })));
   let content: ReactNode;
 
   if (!backendReady) {
@@ -506,7 +362,7 @@ const App: React.FC = () => {
           actions={(
             <button
               type="button"
-              onClick={() => setFeedbackOpen(true)}
+              onClick={openFeedbackModal}
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 font-medium shadow-sm hover:bg-gray-50 focus-visible:outline-offset-2 focus-visible:outline-blue-500 focus-visible:outline-2"
             >
               Send feedback
@@ -514,7 +370,7 @@ const App: React.FC = () => {
           )}
         />
         <Suspense fallback={null}>
-          <FeedbackPanel open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+          <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
         </Suspense>
       </>
     );
@@ -527,91 +383,6 @@ const App: React.FC = () => {
       {content}
       <Toaster />
     </>
-  );
-};
-
-type BlockingCopy = {
-  title: string;
-  description: string;
-  status: string;
-  hint?: string;
-  error?: string;
-};
-
-const formatTimestamp = (value?: number | null) => {
-  if (!value) return null;
-  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-};
-
-const formatAttemptLabel = (attempts: number) => `${Math.min(attempts, REFRESH_FAILURE_THRESHOLD)}/${REFRESH_FAILURE_THRESHOLD}`;
-
-const getBlockingCopy = (phase: AuthPhase, showLaggingHint: boolean): BlockingCopy | null => {
-  if (phase.status === 'bootstrapping') {
-    return {
-      title: 'Signing you in',
-      description: 'The backend is healthy; finishing the authentication handshake.',
-      status: showLaggingHint ? 'Still waiting for auth…' : 'Checking your session…',
-      hint: showLaggingHint
-        ? 'This can happen if backend migrations are still running. You can retry below.'
-        : 'This usually takes just a moment.',
-      error: phase.error,
-    };
-  }
-
-  if (phase.status === 'fatal') {
-    return {
-      title: 'Reconnecting your session',
-      description: 'Multiple background refresh attempts failed, so we paused the workspace until the backend responds again.',
-      status: `Retrying (${formatAttemptLabel(phase.attempts)})…`,
-      hint: formatTimestamp(phase.lastFailureAt)
-        ? `Last failure at ${formatTimestamp(phase.lastFailureAt)}. Check your connection or restart the backend, then retry below.`
-        : 'Check your connection or restart the backend, then retry below.',
-      error: phase.error,
-    };
-  }
-
-  return null;
-};
-
-type LoginScreenProps = {
-  isLoading?: boolean;
-  error?: string | null;
-  authMethods?: Array<{ name: string; display_name: string; enabled: boolean }>;
-};
-
-const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error, authMethods = [] }) => {
-  const hasCILogon = authMethods.some((m) => m.name === 'cilogon' && m.enabled);
-  const hasGoogle = authMethods.some((m) => m.name === 'google' && m.enabled);
-  const providerLabel = hasCILogon ? 'CILogon' : hasGoogle ? 'a Google account' : 'your institutional account';
-
-  return (
-    <div className="min-h-dvh bg-linear-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-xl text-center space-y-4 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
-        <div className="flex justify-center">
-          <img
-            src={logo}
-            alt="LDaCA Logo"
-            className="h-16 w-auto object-contain drop-shadow"
-          />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold text-gray-900">Sign in to continue</h1>
-          <p className="text-base text-gray-600">
-            LDaCA Text Analytics requires you to sign in with {providerLabel}.
-          </p>
-        </div>
-        <ErrorBoundary>
-          <div className="flex justify-center pt-2">
-            {hasCILogon && (
-              <CILogonLogin isLoading={isLoading} error={error} />
-            )}
-            {hasGoogle && !hasCILogon && (
-              <GoogleLogin isLoading={isLoading} error={error} />
-            )}
-          </div>
-        </ErrorBoundary>
-      </div>
-    </div>
   );
 };
 

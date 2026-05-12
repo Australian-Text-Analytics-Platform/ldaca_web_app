@@ -1,15 +1,16 @@
 import React from 'react';
 import { Layers, Loader2, Plus } from 'lucide-react';
 
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import HelpIcon from '../../../components/help/HelpIcon';
-import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { Tag } from '../../../components/ui/tag';
-import { DisabledReasonTooltip } from '../../../components/ui/disabled-reason-tooltip';
+import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import HelpIcon from '@/components/help/HelpIcon';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
+import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useConcatSubTab, type ConcatSubTabProps } from './hooks/useConcatSubTab';
 
@@ -43,12 +44,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
                 />
               </CardTitle>
             </div>
-            {showActivityTag && (
-              <Tag tone="muted">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Concatenating…
-              </Tag>
-            )}
+            <SubTabActivityTag active={showActivityTag} verb="Concatenating" />
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
@@ -111,6 +107,20 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
               {statusMessage}
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              id="concat-deduplicate"
+              checked={form.deduplicate}
+              onCheckedChange={(checked) => form.setDeduplicate(checked === true)}
+            />
+            <span>Drop duplicate rows after stacking</span>
+            <HelpIcon
+              targetKey="preprocessing.concat.deduplicate"
+              label="Deduplicate stacked rows"
+              tooltip="Run polars .unique() across all columns so identical rows from different inputs collapse into one."
+            />
+          </label>
         </CardContent>
         <CardFooter className="flex items-center gap-3 border-t pt-4">
           <div className="flex flex-1 items-center gap-2">

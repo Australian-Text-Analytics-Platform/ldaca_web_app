@@ -9,3 +9,21 @@ export function takeMostRecent<T>(items: T[], max: number): T[] {
   if (items.length <= max) return items;
   return items.slice(-max);
 }
+
+/**
+ * Remove duplicate node ids from a selection while preserving first-seen order.
+ *
+ * Used by multi-node preprocessing sub-tabs (concat/join) where the upstream
+ * selection store can briefly contain repeats during reordering.
+ */
+export const dedupeNodeIds = (nodeIds: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of nodeIds) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+};

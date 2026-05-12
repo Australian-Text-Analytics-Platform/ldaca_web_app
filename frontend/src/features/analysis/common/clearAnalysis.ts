@@ -1,5 +1,5 @@
-import { workspacesApi } from '../../../api/workspaces';
-import { collectTaskIds } from '../../../hooks/analysisTaskUtils';
+import { workspacesApi } from '@/api/workspaces';
+import { collectTaskIds } from '@/hooks/analysisTaskUtils';
 import {
   analysisServerRequestLockQueryKey,
   type ServerLockAnalysisType,
