@@ -29,6 +29,15 @@ type TokenFrequencyParameterPanelProps = {
   onReferenceNodeChange: (nodeId: string) => void;
   getColorForNode: (nodeId: string, index?: number) => string;
   computeDisplayName: (nodeId: string) => string;
+  /**
+   * Available tokeniser models on the active node for the selected source
+   * column. When >1 entry, render a picker so the user can route the
+   * frequency count through a specific tokeniser. Empty / one entry =
+   * picker hidden (auto-pick the single one or none).
+   */
+  tokensModelOptions: string[];
+  tokensModel: string | null;
+  setTokensModel: (next: string | null) => void;
 };
 
 export const TokenFrequencyParameterPanel = ({
@@ -53,6 +62,9 @@ export const TokenFrequencyParameterPanel = ({
   onReferenceNodeChange,
   getColorForNode,
   computeDisplayName,
+  tokensModelOptions,
+  tokensModel,
+  setTokensModel,
 }: TokenFrequencyParameterPanelProps) => {
   const hasMultipleNodes = panelSelectedNodes.length >= 2;
   const nodeOptions = panelSelectedNodes
@@ -99,6 +111,27 @@ export const TokenFrequencyParameterPanel = ({
               <span className="text-xs text-muted-foreground">
                 Active filter: {appliedStopCount} word{appliedStopCount === 1 ? '' : 's'}
               </span>
+            ) : null}
+            {/* Tokens-model picker — only when the active source has been
+                tokenised under >1 model. Frequency counts always read from
+                the derived tokens column when one exists, so picking which
+                model to use matters for users who tokenised the same
+                source twice (e.g. jieba and bert-base-uncased). */}
+            {tokensModelOptions.length > 1 ? (
+              <div className="flex items-center gap-2 text-xs">
+                <Label className="whitespace-nowrap text-xs font-medium">Tokeniser</Label>
+                <select
+                  value={tokensModel ?? ''}
+                  onChange={(e) => setTokensModel(e.target.value || null)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                  title="Pick which tokeniser's column to count from"
+                  disabled={isLocked}
+                >
+                  {tokensModelOptions.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
             ) : null}
             {hasMultipleNodes && nodeOptions.length > 1 ? (
               <div className="ml-auto flex items-center gap-2">

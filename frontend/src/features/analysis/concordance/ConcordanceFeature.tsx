@@ -448,6 +448,53 @@ const ConcordanceFeature: React.FC = () => {
     setSearchMode(tokensModeAvailable ? 'tokens' : 'regex');
   }, [tokensModeAvailable, searchModeUserSet]);
 
+  // All tokens models registered on the first selected node that match the
+  // selected source column. When N>1, a model picker appears next to the
+  // tokens radio so the user can route the search through a specific model
+  // (e.g. compare jieba vs bert-base-uncased on the same column).
+  const tokensModelOptions = useMemo<string[]>(() => {
+    const firstSelection = effectiveNodeColumnSelections[0];
+    if (!firstSelection?.column) return [];
+    const firstNode = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
+      const ids = [n.id, n.node_id];
+      return ids.some(
+        (id) => typeof id === 'string' && id === firstSelection.nodeId,
+      );
+    });
+    const derived = firstNode?.derived;
+    if (!derived || typeof derived !== 'object') return [];
+    const models: string[] = [];
+    for (const meta of Object.values(derived as Record<string, unknown>)) {
+      if (!meta || typeof meta !== 'object') continue;
+      const m = meta as { source_column?: unknown; form?: unknown; model?: unknown };
+      if (m.form !== 'tokens') continue;
+      if (m.source_column !== firstSelection.column) continue;
+      if (typeof m.model === 'string' && !models.includes(m.model)) {
+        models.push(m.model);
+      }
+    }
+    return models;
+  }, [effectiveNodeColumnSelections, panelSelectedNodes]);
+
+  const [tokensModel, setTokensModel] = useState<string | null>(null);
+  // Auto-pick when only one model exists; clear when no models OR when the
+  // current pick is no longer in the option list (the user might have
+  // deleted that derivation via Manage tokens…).
+  useEffect(() => {
+    if (tokensModelOptions.length === 0) {
+      if (tokensModel !== null) setTokensModel(null);
+      return;
+    }
+    if (tokensModelOptions.length === 1) {
+      const only = tokensModelOptions[0]!;
+      if (tokensModel !== only) setTokensModel(only);
+      return;
+    }
+    if (tokensModel === null || !tokensModelOptions.includes(tokensModel)) {
+      setTokensModel(tokensModelOptions[0] ?? null);
+    }
+  }, [tokensModelOptions, tokensModel]);
+
   const concordanceLanguage = useMemo(() => {
     const firstSelection = effectiveNodeColumnSelections[0];
     const firstNode = firstSelection
@@ -664,6 +711,7 @@ const ConcordanceFeature: React.FC = () => {
       caseSensitive,
       searchMode,
       language: concordanceLanguage,
+      model: tokensModel,
     },
     actions: {
       setNodePagination,
@@ -1164,6 +1212,9 @@ const ConcordanceFeature: React.FC = () => {
           setSearchModeUserSet(true);
         }}
         tokensModeAvailable={tokensModeAvailable}
+        tokensModelOptions={tokensModelOptions}
+        tokensModel={tokensModel}
+        setTokensModel={setTokensModel}
         isSearching={isSearching}
         actionState={actionState}
         handleRunOrUpdate={handleRunOrUpdate}

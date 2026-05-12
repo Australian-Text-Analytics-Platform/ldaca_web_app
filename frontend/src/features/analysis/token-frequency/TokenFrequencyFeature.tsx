@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { textApi, type TokenFrequencyResponse } from '@/api/text';
 import { useAuth } from '@/hooks/useAuth';
@@ -204,6 +204,48 @@ const TokenFrequencyFeature = () => {
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
+  // Tokens-model picker state — mirrors the concordance feature. When the
+  // first selected node has >1 derived tokens column for the selected
+  // source, surface a dropdown so the user can pick which one drives
+  // the frequency count. Auto-pick when N=1; clear when N=0.
+  const tokensModelOptions = useMemo<string[]>(() => {
+    const firstSelection = effectiveNodeColumnSelections[0];
+    if (!firstSelection?.column) return [];
+    const firstNode = panelSelectedNodes.find((n) => {
+      const ids = [n.id, n.node_id];
+      return ids.some((id) => typeof id === 'string' && id === firstSelection.nodeId);
+    });
+    const derived = firstNode?.derived;
+    if (!derived || typeof derived !== 'object') return [];
+    const models: string[] = [];
+    for (const meta of Object.values(derived as Record<string, unknown>)) {
+      if (!meta || typeof meta !== 'object') continue;
+      const m = meta as { source_column?: unknown; form?: unknown; model?: unknown };
+      if (m.form !== 'tokens') continue;
+      if (m.source_column !== firstSelection.column) continue;
+      if (typeof m.model === 'string' && !models.includes(m.model)) {
+        models.push(m.model);
+      }
+    }
+    return models;
+  }, [effectiveNodeColumnSelections, panelSelectedNodes]);
+
+  const [tokensModel, setTokensModel] = useState<string | null>(null);
+  useEffect(() => {
+    if (tokensModelOptions.length === 0) {
+      if (tokensModel !== null) setTokensModel(null);
+      return;
+    }
+    if (tokensModelOptions.length === 1) {
+      const only = tokensModelOptions[0]!;
+      if (tokensModel !== only) setTokensModel(only);
+      return;
+    }
+    if (tokensModel === null || !tokensModelOptions.includes(tokensModel)) {
+      setTokensModel(tokensModelOptions[0] ?? null);
+    }
+  }, [tokensModelOptions, tokensModel]);
+
   const getColorForNode = (nodeId: string, index = 0) => {
     return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length] ?? '#000000';
   };
@@ -264,6 +306,7 @@ const TokenFrequencyFeature = () => {
       nodeIdToName,
       nodeColors,
       lastCompareNodeIds,
+      tokensModel,
     },
     actions: {
       setLocalTaskId,
@@ -484,6 +527,9 @@ const TokenFrequencyFeature = () => {
         onReferenceNodeChange={setReferenceNodeId}
         getColorForNode={getColorForNode}
         computeDisplayName={computeDisplayName}
+        tokensModelOptions={tokensModelOptions}
+        tokensModel={tokensModel}
+        setTokensModel={setTokensModel}
       />
 
       <TokenFrequencyResultsPanel

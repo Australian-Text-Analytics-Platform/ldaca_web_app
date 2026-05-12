@@ -49,6 +49,14 @@ export type ConcordanceParameterPanelProps = {
   searchMode: 'regex' | 'tokens';
   setSearchMode: (next: 'regex' | 'tokens') => void;
   tokensModeAvailable: boolean;
+  /**
+   * Available tokeniser models on the active node for the selected source
+   * column. When the array has >1 entry, render a picker so the user can
+   * route the tokens-mode search through a specific model.
+   */
+  tokensModelOptions: string[];
+  tokensModel: string | null;
+  setTokensModel: (next: string | null) => void;
 
   // Action state
   isSearching: boolean;
@@ -88,6 +96,9 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   searchMode,
   setSearchMode,
   tokensModeAvailable,
+  tokensModelOptions,
+  tokensModel,
+  setTokensModel,
   isSearching,
   actionState,
   handleRunOrUpdate,
@@ -238,6 +249,23 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                   </button>
                 </DisabledReasonTooltip>
               </div>
+              {/* Model picker — only surfaced when the active node has
+                  >1 tokens column for the selected source AND the user
+                  is in tokens mode. Single-model nodes auto-pick silently
+                  so the common case stays uncluttered. */}
+              {searchMode === 'tokens' && tokensModelOptions.length > 1 ? (
+                <select
+                  value={tokensModel ?? ''}
+                  onChange={(e) => setTokensModel(e.target.value || null)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Tokens-mode model"
+                  title="Pick which tokeniser's column to walk"
+                >
+                  {tokensModelOptions.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : null}
               <HelpIcon
                 targetKey="analysis.concordance.search-mode"
                 label="Search mode (text vs tokens)"

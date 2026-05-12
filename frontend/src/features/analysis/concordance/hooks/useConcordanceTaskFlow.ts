@@ -40,6 +40,12 @@ interface ConcordanceState {
   searchMode: 'regex' | 'tokens';
   /** Phase 4.4: optional language hint for the backend gate / resolver. */
   language?: string;
+  /**
+   * Tokens-mode model picker — only meaningful in tokens mode and when the
+   * active node has >1 derived tokens column for the same source. ``null``
+   * lets the backend fall back to first-match (single-model nodes).
+   */
+  model?: string | null;
 }
 
 interface ConcordanceActions {
@@ -94,6 +100,7 @@ export function useConcordanceTaskFlow({
     wholeWord,
     searchMode,
     language,
+    model,
     caseSensitive,
   },
   actions: {
@@ -229,6 +236,12 @@ export function useConcordanceTaskFlow({
       };
       if (language) {
         request.language = language;
+      }
+      // Only forward `model` in tokens-mode (regex-mode doesn't use it
+      // and the backend's `find_derived_column(..., model=...)` would
+      // narrow the lookup needlessly otherwise).
+      if (searchMode === 'tokens' && model) {
+        request.model = model;
       }
       if (isCombinedQuery) {
         request.combined = true;
@@ -520,6 +533,11 @@ export function useConcordanceTaskFlow({
       };
       if (language) {
         request.language = language;
+      }
+      // Materialize must match the live page on both engine AND model so
+      // the parquet has the same hits the user saw paginated.
+      if (searchMode === 'tokens' && model) {
+        request.model = model;
       }
       const resp = await materializeConcordance(nodeId, request);
       const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;

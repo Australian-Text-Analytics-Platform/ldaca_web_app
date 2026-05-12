@@ -7,6 +7,13 @@ export interface TokenFrequencyRequest extends LanguageHint {
   node_columns: Record<string, string>;
   stop_words?: string[] | null;
   token_limit?: number | null;
+  /**
+   * Tokens-mode model picker. When the active node has >1 derived tokens
+   * column for the same source (e.g. ``jieba`` + ``bert-base-uncased``),
+   * the frontend sets ``model`` so the backend counts from the exact
+   * column. ``undefined`` keeps first-match for single-model nodes.
+   */
+  model?: string;
 }
 
 export interface TokenFrequencyNodeResult {
