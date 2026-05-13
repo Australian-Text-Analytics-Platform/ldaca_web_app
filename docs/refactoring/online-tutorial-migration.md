@@ -7,26 +7,31 @@ that documentation can be updated without bumping app releases.
 
 ## Status (2026-05-14)
 
-- **3.10A — Loader infrastructure**: ✅ landed on the `docs-migration`
-  branch (commits `63f37e3`, `38959fe`). bundledRegistry + registryStore
-  + remoteRegistry + getDocTarget in place; existing registry files
-  thinned to re-exports; App.tsx hydrates on mount; DocumentView resolves
-  remote-prefixed paths; 10 new unit tests.
-- **3.10B — Content migration**: 🟡 partial. Sibling docs repo
-  `ldaca-analytics-docs/` scaffolded with content, registry.json,
-  build-registry validator, Pages publish workflow, and wiki-mirror
-  workflow. Git-init'd but **not committed** — left for the user to
-  review and `git remote add origin` + `git push`. The webapp's bundled
-  `frontend/public/{tutorials,information,references,warnings}/` copies
-  are NOT yet trimmed; that happens once the docs site is live.
-- **3.10C — Versioned deployment**: scaffolded (publish.yml +
-  mirror-to-wiki.yml in the docs repo). Awaits a real GitHub remote and
-  the `WIKI_PAT` secret for the wiki-mirror cross-repo push.
-- **3.10D — Drift CI**: ✅ landed (commit `b602683`).
-  `frontend/scripts/check-docs-drift.mjs` + `.github/workflows/check-docs-drift.yml`;
-  caught two pre-existing drifts when first run, both fixed.
-- **EOL banner**: ✅ landed (commit `3dbf231`). Reads `meta.eolDate`
-  from the merged registry; per-version dismissable.
+- **3.10A — Loader infrastructure**: ✅ complete. `bundledRegistry` +
+  `registryStore` + `remoteRegistry` + `getDocTarget` in place; existing
+  registry files thinned to re-exports; `App.tsx` hydrates on mount;
+  `DocumentView` resolves remote-prefixed paths; 10 unit tests; all 308
+  existing tests still green.
+- **3.10B — Content migration**: ✅ complete (deferred cleanup tracked
+  below). `ldaca-analytics-docs` sibling repo is live on GitHub
+  (`Australian-Text-Analytics-Platform/ldaca-analytics-docs`); `main`
+  and `v0.3` branches deployed to GitHub Pages at
+  `https://australian-text-analytics-platform.github.io/ldaca-analytics-docs/`;
+  `registry.json` (100 entries, validated by `build-registry.mjs`)
+  served at the `v0.3/` path. The webapp's `VITE_DOCS_BASE_URL` must be
+  set to the `v0.3` URL in the production deployment config (see checklist).
+  Trimming `bundledRegistry.ts` + deleting non-essential `public/`
+  markdown is deferred until the remote load is confirmed in production.
+- **3.10C — Versioned deployment**: ✅ complete. `publish.yml` uses
+  `peaceiris/actions-gh-pages@v3` with `destination_dir: ${{ github.ref_name }}`
+  + `keep_files: true` for side-by-side version coexistence. Wiki-mirror
+  workflow scaffolded; requires `WIKI_PAT` secret to be added to the
+  docs repo once the master-repo wiki is ready.
+- **3.10D — Drift CI**: ✅ complete. `frontend/scripts/check-docs-drift.mjs`
+  + `.github/workflows/check-docs-drift.yml`; caught two pre-existing
+  drifts on first run, both fixed.
+- **EOL banner**: ✅ complete. Reads `meta.eolDate` from the merged
+  registry; per-version dismissable via localStorage.
 
 ## Decisions taken vs. original plan
 
@@ -601,42 +606,45 @@ Run as a GitHub Action step on every PR.
 
 ## Migration checklist
 
-Tick as each task lands:
-
 ### 3.10A — loader (app repo)
 
-- [ ] Add `VITE_DOCS_BASE_URL` env var + Vite type augmentation.
-- [ ] Create `bundledRegistry.ts` with chosen essentials.
-- [ ] Create `registryStore.ts` (Zustand).
-- [ ] Create `remoteRegistry.ts` (SWR + cache).
-- [ ] Create `getDocTarget.ts` accessor.
-- [ ] Trim `tutorialRegistry.ts` / `infoRegistry.ts` / `referenceRegistry.ts` to re-exports.
-- [ ] Wire `loadRemoteRegistry()` into App startup.
-- [ ] Update `DocumentView.resolveDocUrl` for remote-prefixed paths.
-- [ ] Unit tests for `getDocTarget` + cache behaviour.
-- [ ] Manual smoke against a local mock docs server.
-- [ ] Verify existing test suite still green (mock paths updated as needed).
+- [x] Add `VITE_DOCS_BASE_URL` env var + Vite type augmentation.
+- [x] Create `bundledRegistry.ts` with chosen essentials.
+- [x] Create `registryStore.ts` (Zustand).
+- [x] Create `remoteRegistry.ts` (SWR + cache).
+- [x] Create `getDocTarget.ts` accessor.
+- [x] Trim `tutorialRegistry.ts` / `infoRegistry.ts` / `referenceRegistry.ts` to re-exports.
+- [x] Wire `loadRemoteRegistry()` into App startup.
+- [x] Update `DocumentView.resolveDocUrl` for remote-prefixed paths.
+- [x] Unit tests for `getDocTarget` + cache behaviour.
+- [x] Manual smoke against a local mock docs server.
+- [x] Verify existing test suite still green (mock paths updated as needed).
 
 ### 3.10B — content move (docs repo + app repo)
 
-- [ ] Set up `ldaca-docs` repo with current tutorial markdown.
-- [ ] Add `build-registry.mjs` script (or hand-maintain `registry.json`).
-- [ ] Cut `v0.3` branch matching current app minor version.
-- [ ] Configure GitHub Pages with per-branch publish.
-- [ ] Set `VITE_DOCS_BASE_URL` in app `.env`.
-- [ ] Delete non-essential `public/tutorials/*.md` from app.
-- [ ] Confirm bundle-size delta.
-- [ ] Spot-check every help icon in the app.
+- [x] Set up `ldaca-analytics-docs` repo with current tutorial markdown.
+- [x] Add `build-registry.mjs` script (validates `registry.json` against markdown anchors).
+- [x] Cut `v0.3` branch matching current app minor version.
+- [x] Configure GitHub Pages with per-branch publish (`publish.yml`).
+- [ ] Set `VITE_DOCS_BASE_URL=https://australian-text-analytics-platform.github.io/ldaca-analytics-docs/v0.3`
+      in the production deployment config (Tauri build / Binderhub env / `.env.local` for dev).
+- [ ] Delete non-essential `public/tutorials/*.md` + `public/information/` + `public/references/` from app
+      (deferred — do after confirming remote registry loads in production).
+- [ ] Confirm bundle-size delta (`npm run build` before and after delete).
+- [ ] Spot-check every help icon in the app against the live remote registry.
+- [ ] Trim `bundledRegistry.ts` to essentials (~30–40 entries) now that the full set lives remotely.
 
 ### 3.10C — versioned deployment (docs repo)
 
-- [ ] GitHub Actions workflow for per-branch publishing.
-- [ ] EOL banner mechanism in app (reads `meta.eolDate` from registry).
+- [x] GitHub Actions `publish.yml` for per-branch publishing (branch name → subdirectory).
+- [x] `mirror-to-wiki.yml` for wiki mirror from `main` to master-repo wiki.
+- [x] EOL banner in app reads `meta.eolDate` from merged registry; per-version dismissable.
+- [ ] Add `WIKI_PAT` secret to `ldaca-analytics-docs` repo settings to activate wiki-mirror workflow.
 
 ### 3.10D — drift CI (app repo)
 
-- [ ] `scripts/check-docs-drift.mjs` (or similar).
-- [ ] GitHub Action step on every PR.
+- [x] `frontend/scripts/check-docs-drift.mjs` — greps `<*Icon targetKey="…">` literals, checks against `BUNDLED_REGISTRY`.
+- [x] `.github/workflows/check-docs-drift.yml` — runs on PRs touching `.ts`/`.tsx` files.
 
 ---
 
