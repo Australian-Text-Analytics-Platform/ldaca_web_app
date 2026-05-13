@@ -1,34 +1,85 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import HelpIcon from '@/components/help/HelpIcon';
+
+const MIN_BATCH_DELETE_COUNT = 3;
 
 /**
  * Separated controls component focused only on workspace controls
  * Removed view mode toggle since both views are now shown vertically
  */
 export const WorkspaceControls: React.FC = () => {
-  const { currentWorkspace } = useWorkspaceData();
-  const { saveWorkspace, renameWorkspace } = useWorkspaceActions();
+  const { currentWorkspace, workspaceGraph } = useWorkspaceData();
+  const { renameWorkspace, deleteNode, clearSelection } = useWorkspaceActions();
+  const { selectedNodeIds } = useWorkspaceSelection();
 
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState(currentWorkspace?.name || '');
   const [nameAlertOpen, setNameAlertOpen] = useState(false);
   const [nameAlertMessage, setNameAlertMessage] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setNameInput(currentWorkspace?.name || '');
   }, [currentWorkspace?.name]);
+
+  const selectedCount = selectedNodeIds?.length ?? 0;
+  const canBatchDelete = selectedCount >= MIN_BATCH_DELETE_COUNT;
+
+  // Build the "to-be-deleted" list once per selection change. Roots (no
+  // incoming edge in the graph) are bolded and pushed to the bottom of
+  // the list so they sit next to the Cancel/Delete buttons — those are
+  // the highest-impact deletions (orphan everything downstream when
+  // the cascade kicks in) and the user benefits from seeing them last,
+  // right above the action they're about to take.
+  const selectedForDelete = useMemo(() => {
+    if (!workspaceGraph || !selectedNodeIds || selectedNodeIds.length === 0) return [];
+    const idSet = new Set(selectedNodeIds);
+    const incomingTargets = new Set(workspaceGraph.edges.map((edge) => edge.target));
+    const items = workspaceGraph.nodes
+      .filter((node) => idSet.has(node.id))
+      .map((node) => ({
+        id: node.id,
+        name: typeof node.name === 'string' && node.name.trim() ? node.name : node.id,
+        isRoot: !incomingTargets.has(node.id),
+      }));
+    return items.sort((a, b) => {
+      if (a.isRoot !== b.isRoot) return a.isRoot ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [workspaceGraph, selectedNodeIds]);
+
+  const handleBatchDelete = async () => {
+    if (!canBatchDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      // Settled, not all: if the backend cascades on parent removal, a
+      // later child deletion may 404 — that's still the outcome the
+      // user asked for, so don't abort the rest of the batch.
+      await Promise.allSettled(
+        selectedForDelete.map((item) => deleteNode(item.id)),
+      );
+      clearSelection?.();
+      setDeleteConfirmOpen(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleRenameCommit = async () => {
     const trimmed = nameInput.trim();
@@ -90,16 +141,69 @@ export const WorkspaceControls: React.FC = () => {
             Rename
           </button>
 
-          {/* Save */}
+          {/* Batch delete — only enabled with 3+ selected so this stays
+              a deliberate, batch-only action. Per-node delete is still
+              available from each node's context menu in the graph.
+              Same size + shape in both states so the layout stays
+              stable; only colours swap — destructive (red) when
+              actionable, the existing muted/bordered look when not. */}
           <button
-            className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
-            onClick={() => saveWorkspace()}
-            title="Save workspace"
+            className={`text-xs px-2 py-1 border rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              canBatchDelete && !isDeleting
+                ? 'bg-destructive text-destructive-foreground border-destructive shadow-sm hover:bg-destructive/90 hover:border-destructive/90'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+            onClick={() => setDeleteConfirmOpen(true)}
+            disabled={!canBatchDelete || isDeleting}
+            title={
+              canBatchDelete
+                ? 'Delete the selected data blocks'
+                : `Select ${MIN_BATCH_DELETE_COUNT} or more data blocks to batch-delete`
+            }
           >
-            Save
+            Delete ({selectedCount})
           </button>
         </>
       )}
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedForDelete.length} data block{selectedForDelete.length === 1 ? '' : 's'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. The following data blocks will be removed
+              (root blocks — those with no parent — are bolded; deleting a
+              root cascades to any downstream blocks too):
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="max-h-60 overflow-y-auto rounded border bg-muted/40 p-2 text-sm">
+            {selectedForDelete.map((item) => (
+              <li
+                key={item.id}
+                className={item.isRoot ? 'font-semibold' : undefined}
+              >
+                {item.name}
+              </li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button asChild variant="destructive" disabled={isDeleting}>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleBatchDelete();
+                }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting…' : `Delete ${selectedForDelete.length}`}
+              </AlertDialogAction>
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={nameAlertOpen} onOpenChange={setNameAlertOpen}>
         <AlertDialogContent>
