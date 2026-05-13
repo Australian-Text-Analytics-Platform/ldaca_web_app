@@ -45,10 +45,12 @@ import {
   useNodeColorManagement,
 } from '../common';
 import { pruneTasksById } from '@/hooks/analysisTaskUtils';
+import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores/uiStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
@@ -252,6 +254,21 @@ const TokenFrequencyFeature = () => {
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
+  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
+  const defaultStopWordsLanguage = (() => {
+    const firstSelection = effectiveNodeColumnSelections[0];
+    const firstNode = firstSelection
+      ? panelSelectedNodes.find((node) =>
+          [node.id, node.node_id].some(
+            (id) => typeof id === 'string' && id === firstSelection.nodeId,
+          ),
+        )
+      : undefined;
+    return effectiveNodeLanguage({
+      node: firstNode ?? null,
+      defaultLanguage,
+    });
+  })();
 
   const {
     stopWords,
@@ -277,6 +294,7 @@ const TokenFrequencyFeature = () => {
     setResults,
     getAuthHeaders,
     resolveTokenFrequencyTaskId: resolveTaskId,
+    defaultStopWordsLanguage,
     backendTokenLimit,
     backendStopWordsKey,
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,

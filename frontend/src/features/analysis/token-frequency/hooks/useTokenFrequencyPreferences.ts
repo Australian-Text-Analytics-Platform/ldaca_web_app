@@ -9,6 +9,7 @@ type UseTokenFrequencyPreferencesParams = {
   setResults: React.Dispatch<React.SetStateAction<TokenFrequencyResponse | null>>;
   getAuthHeaders: () => Record<string, string>;
   resolveTokenFrequencyTaskId: () => Promise<string | null>;
+  defaultStopWordsLanguage?: string | null;
   backendTokenLimit: number | null;
   backendStopWordsKey: string;
   maxTokenLimitInput: number;
@@ -20,6 +21,7 @@ export const useTokenFrequencyPreferences = ({
   setResults,
   getAuthHeaders,
   resolveTokenFrequencyTaskId,
+  defaultStopWordsLanguage,
   backendTokenLimit,
   backendStopWordsKey,
   maxTokenLimitInput,
@@ -287,7 +289,9 @@ export const useTokenFrequencyPreferences = ({
   const handleFillDefaultStopWords = async () => {
     setIsLoadingStopWords(true);
     try {
-      const response = await textApi.defaultStopWords(getAuthHeaders());
+      const response = await textApi.defaultStopWords(getAuthHeaders(), {
+        language: defaultStopWordsLanguage ?? undefined,
+      });
       const defaultWords = response?.stopwords ?? (response as Record<string, unknown>)?.data;
       if (Array.isArray(defaultWords) && defaultWords.length) {
         const joined = defaultWords.join(', ');
