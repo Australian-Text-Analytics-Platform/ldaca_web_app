@@ -21,6 +21,7 @@ import { ViewRouter } from './components/layout/ViewRouter';
 import { LAG_HINT_DELAY_MS } from './config/timings';
 import { useResizableSplit } from './hooks/useResizableSplit';
 import { loadRemoteRegistry } from './tutorials/remoteRegistry';
+import { DocsEolBanner } from './tutorials/DocsEolBanner';
 
 // Lazy load components for code splitting. Per-view feature components live
 // inside <ViewRouter> so the active feature unmounts cleanly on view switch.
@@ -389,6 +390,7 @@ const App: React.FC = () => {
   return (
     <>
       {content}
+      <DocsEolBanner />
       <Toaster />
     </>
   );
