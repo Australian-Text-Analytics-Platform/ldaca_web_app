@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Settings2, Copy, Check, Sparkles } from 'lucide-react';
 import {
   AlertDialog,
@@ -15,7 +15,9 @@ import {
 import { type WorkspaceNode, parseDerivedColumn } from '@/types';
 import TokeniseDialog from './TokeniseDialog';
 import DerivedColumnsDialog from './DerivedColumnsDialog';
-import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
+import { invalidateNodeInfoQuery, nodeInfoQueryOptions, type NodeInfo } from '@/lib/nodeInfo';
+import { useAuth } from '@/hooks/useAuth';
+import type { DerivedColumnMeta } from '@/types';
 import { queryKeys } from '@/lib/queryKeys';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 
@@ -70,30 +72,59 @@ function TokeniseDialogContainer({
  * Companion container for DerivedColumnsDialog — mirrors the lazy-mount
  * pattern of TokeniseDialogContainer so that CustomNode tests that don't
  * exercise derived-column management can render without a workspace +
- * query provider. Invalidates the same two caches on delete success.
+ * query provider.
+ *
+ * Sources ``derived`` from the ``nodeInfo`` query directly (rather than
+ * relying on the ReactFlow data-prop chain) so that invalidating the
+ * cache after a successful delete reactively updates the dialog. Before
+ * this, the dialog read from ``WorkspaceNode.derived`` passed through
+ * ReactFlow's internal node store, which doesn't always re-sync a
+ * single node's ``data`` immediately when the workspace-graph query
+ * refetches — leaving the deleted row visible until the user closed
+ * and re-opened the dialog. ``initialDerived`` keeps the first paint
+ * snappy while the (likely-cached) ``nodeInfo`` query resolves.
  */
 function DerivedColumnsDialogContainer({
   open,
   onClose,
   nodeId,
   nodeName,
-  derived,
+  initialDerived,
 }: {
   open: boolean;
   onClose: () => void;
   nodeId: string;
   nodeName: string;
-  derived: Record<string, import('@/types').DerivedColumnMeta>;
+  initialDerived: Record<string, DerivedColumnMeta>;
 }) {
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
+  const { getAuthHeaders } = useAuth();
+
+  const nodeInfoQuery = useQuery({
+    ...nodeInfoQueryOptions({
+      workspaceId: currentWorkspaceId ?? '',
+      nodeId,
+      getAuthHeaders,
+    }),
+    enabled: open && Boolean(currentWorkspaceId) && Boolean(nodeId),
+  });
+
+  const liveDerived = (() => {
+    const raw = (nodeInfoQuery.data as NodeInfo | undefined)?.derived;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      return raw as Record<string, DerivedColumnMeta>;
+    }
+    return null;
+  })();
+
   return (
     <DerivedColumnsDialog
       open={open}
       onClose={onClose}
       nodeId={nodeId}
       nodeName={nodeName}
-      derived={derived}
+      derived={liveDerived ?? initialDerived}
       onDeleted={() => {
         if (currentWorkspaceId && nodeId) {
           invalidateNodeInfoQuery(queryClient, currentWorkspaceId, nodeId);
@@ -407,7 +438,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       onClose={() => setShowDerivedDialog(false)}
       nodeId={node.node_id}
       nodeName={nodeName}
-      derived={node.derived}
+      initialDerived={node.derived}
     />
   ) : null;
 
