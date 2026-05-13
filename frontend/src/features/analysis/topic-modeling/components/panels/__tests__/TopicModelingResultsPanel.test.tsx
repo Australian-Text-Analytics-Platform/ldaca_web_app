@@ -138,4 +138,48 @@ describe('TopicModelingResultsPanel', () => {
 
     expect(onUpdateExactTopicCount).toHaveBeenCalledWith(12);
   });
+
+  it('renders a "view list" button next to the stopword toggle when a non-empty filter set is provided', () => {
+    const stopwordFilterSet = new Set(['的', '了', '是']);
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          stopwordFilterAvailable={true}
+          stopwordFilterLanguage="zh"
+          stopwordFilterSet={stopwordFilterSet}
+        />
+      </TooltipProvider>
+    );
+
+    const viewButton = screen.getByRole('button', {
+      name: /view the 3 stopwords being filtered/i,
+    });
+    expect(viewButton).toBeInTheDocument();
+
+    fireEvent.click(viewButton);
+
+    // Dialog opens with the count + words visible.
+    expect(screen.getByRole('heading', { name: /stopwords being filtered/i })).toBeInTheDocument();
+    expect(screen.getByText('的')).toBeInTheDocument();
+    expect(screen.getByText('了')).toBeInTheDocument();
+    expect(screen.getByText('是')).toBeInTheDocument();
+  });
+
+  it('omits the "view list" button when no stopwords are active', () => {
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          stopwordFilterAvailable={true}
+          stopwordFilterLanguage="zh"
+          stopwordFilterSet={new Set()}
+        />
+      </TooltipProvider>
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /view the.+stopwords being filtered/i }),
+    ).not.toBeInTheDocument();
+  });
 });

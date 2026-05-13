@@ -749,6 +749,7 @@ const TopicModelingFeature: React.FC = () => {
           stopwordFilterEnabled={stopwordFilterEnabled}
           onStopwordFilterToggle={setStopwordFilterEnabled}
           stopwordFilterLanguage={resolvedTopicLanguage || undefined}
+          stopwordFilterSet={stopwordSet}
         />
       )}
       </div>

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
+import { AppliedStopwordsDialog } from '../results/AppliedStopwordsDialog';
 import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '@/features/analysis/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
@@ -184,6 +185,11 @@ type Props = {
   stopwordFilterEnabled: boolean;
   onStopwordFilterToggle: (enabled: boolean) => void;
   stopwordFilterLanguage?: string;
+  /** The active stopword set the filter is applying. Surfaced through
+   *  this panel so the "view list" link can open a read-only dialog
+   *  showing the user which words are being hidden. Empty / undefined
+   *  hides the link without disabling the toggle. */
+  stopwordFilterSet?: Set<string>;
 };
 
 export function TopicModelingResultsPanel({
@@ -229,8 +235,11 @@ export function TopicModelingResultsPanel({
   stopwordFilterEnabled,
   onStopwordFilterToggle,
   stopwordFilterLanguage,
+  stopwordFilterSet,
   handleDetachConfirm,
 }: Props) {
+  const [isAppliedStopwordsDialogOpen, setIsAppliedStopwordsDialogOpen] = useState(false);
+  const appliedStopwordsCount = stopwordFilterSet?.size ?? 0;
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
   const runningMessage = runningTask?.message || topicWaitingBanner?.message || result?.message || 'Task running';
   const runningTaskId = runningTask?.task_id || topicWaitingBanner?.taskId;
@@ -305,15 +314,27 @@ export function TopicModelingResultsPanel({
                   <div className="flex shrink-0 items-center gap-3">
                     <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
                     {stopwordFilterAvailable ? (
-                      <label className="inline-flex cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={stopwordFilterEnabled}
-                          onChange={(e) => onStopwordFilterToggle(e.target.checked)}
-                          className="h-3.5 w-3.5 rounded border-input"
-                        />
-                        Hide {stopwordFilterLanguage ? `${stopwordFilterLanguage.toUpperCase()} ` : ''}stopwords
-                      </label>
+                      <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                        <label className="inline-flex cursor-pointer select-none items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={stopwordFilterEnabled}
+                            onChange={(e) => onStopwordFilterToggle(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded border-input"
+                          />
+                          Hide {stopwordFilterLanguage ? `${stopwordFilterLanguage.toUpperCase()} ` : ''}stopwords
+                        </label>
+                        {appliedStopwordsCount > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setIsAppliedStopwordsDialogOpen(true)}
+                            className="cursor-pointer text-xs underline-offset-2 hover:underline"
+                            aria-label={`View the ${appliedStopwordsCount} stopwords being filtered`}
+                          >
+                            (view list)
+                          </button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                   {showExactTopicCountControl && exactTopicCountRange ? (
@@ -369,6 +390,15 @@ export function TopicModelingResultsPanel({
         deselectAllDetachColumns={deselectAllDetachColumns}
         handleDetachConfirm={handleDetachConfirm}
       />
+
+      {stopwordFilterSet && stopwordFilterSet.size > 0 ? (
+        <AppliedStopwordsDialog
+          open={isAppliedStopwordsDialogOpen}
+          onClose={() => setIsAppliedStopwordsDialogOpen(false)}
+          language={stopwordFilterLanguage ?? 'en'}
+          stopwords={stopwordFilterSet}
+        />
+      ) : null}
     </>
   );
 }
