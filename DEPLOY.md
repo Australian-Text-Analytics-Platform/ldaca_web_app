@@ -230,6 +230,13 @@ Update the version number in every location below before touching anything else:
 | `frontend/src-tauri/tauri.conf.json` | `"version": "X.Y.Z"` — controls desktop bundle filenames (DMG/MSI) |
 | `frontend/src-tauri/Cargo.toml` | `version = "X.Y.Z"` — Rust crate metadata |
 | `backend/pyproject.toml` | `version = "X.Y.Z"` |
+| `frontend/.env` | `VITE_DOCS_BASE_URL=https://australian-text-analytics-platform.github.io/ldaca-analytics-docs/vX.Y` — **minor version only** (e.g. `v0.4`), not patch |
+
+> **Why `frontend/.env` is committed:** it contains only the public docs base URL — no
+> secrets. It is tracked so that both the local `npm run build` (step 2) and the Tauri
+> GitHub Actions build pick up the correct docs version automatically via `git checkout`.
+> Secrets and local overrides belong in `frontend/.env.local`, which remains gitignored.
+> If the minor version hasn't changed (patch release), this file does not need updating.
 
 Then refresh the backend lockfile:
 

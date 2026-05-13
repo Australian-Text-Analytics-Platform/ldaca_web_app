@@ -1,24 +1,19 @@
-export type ReferenceTarget = {
-  file: string;
-  anchor: string;
-  label?: string;
-};
+/**
+ * Thin re-export shim. See `tutorialRegistry.ts` for the design.
+ */
 
-const registry = {
-  'general.platform': {
-    file: 'references/general.md',
-    anchor: 'ref-general-platform',
-    label: 'Cite LDaCA Text Analytics',
-  },
-} as const satisfies Record<string, ReferenceTarget>;
+import {
+  REFERENCE_INDEX_TARGET,
+  type BundledReferenceKey,
+  type DocTarget,
+} from './bundledRegistry';
+import { getDocTarget } from './getDocTarget';
 
-export type ReferenceTargetKey = keyof typeof registry;
+export type ReferenceTarget = DocTarget;
+
+export type ReferenceTargetKey = BundledReferenceKey;
 
 export const getReferenceTarget = (key: string): ReferenceTarget | null =>
-  (registry as Record<string, ReferenceTarget>)[key] ?? null;
+  getDocTarget('reference', key);
 
-export const referenceIndexTarget: ReferenceTarget = {
-  file: 'references/index.md',
-  anchor: 'help-references-index',
-  label: 'References index',
-};
+export const referenceIndexTarget: ReferenceTarget = REFERENCE_INDEX_TARGET;
