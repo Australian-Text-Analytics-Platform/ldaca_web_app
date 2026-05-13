@@ -436,48 +436,6 @@ const TopicModelingFeature: React.FC = () => {
   );
   const hasAnySampling = sampleFractionsForRequest.some((f) => f !== null);
 
-  const {
-    handleRun,
-    openDetachDialog,
-    toggleDetachColumn,
-    selectAllDetachColumns,
-    deselectAllDetachColumns,
-    handleDetachConfirm,
-    isDetachLoading,
-    isDetaching,
-    detachDialogOpen,
-    setDetachDialogOpen,
-    detachNodeOptions,
-    selectedDetachColumns,
-  } = useTopicModelingTaskFlow({
-    state: {
-      currentWorkspaceId,
-      panelNodeIds,
-      panelHasMissingColumns,
-      effectiveNodeColumnSelections,
-      randomSeed,
-      representativeWordsCount,
-      selectedTopicIds,
-      sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
-      topicSizeMode,
-      topicSizeValue,
-    },
-    actions: {
-      setIsRunning,
-      runningRef,
-      setError,
-      setResultSafely,
-      lastFetchedRef,
-      resolveTopicModelingTaskId: resolveTaskId,
-      setLocalTaskId,
-    },
-    lock: {
-      getAuthHeaders,
-      lockWithSnapshots,
-      queryClient,
-    },
-  });
-
   const rawTopics: TopicModelingTopic[] = result?.data?.topics || [];
   // Language metadata from the run — drives which stopword list (if any)
   // the optional post-fit filter fetches. On the multilingual branch
@@ -532,6 +490,55 @@ const TopicModelingFeature: React.FC = () => {
     return filtered;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, representativeWordsCount, stopwordFilterEnabled, stopwordFilterAvailable, stopwordSet]);
+
+  // Task-flow hook is intentionally placed after ``topics`` so it can
+  // receive the already-filtered display list as ``displayedTopics`` —
+  // detach builds its ``topic_meanings_override`` from this so the
+  // detached node mirrors what's on screen (post-fit slice + stopword
+  // toggle), not the fit-time artifact.
+  const {
+    handleRun,
+    openDetachDialog,
+    toggleDetachColumn,
+    selectAllDetachColumns,
+    deselectAllDetachColumns,
+    handleDetachConfirm,
+    isDetachLoading,
+    isDetaching,
+    detachDialogOpen,
+    setDetachDialogOpen,
+    detachNodeOptions,
+    selectedDetachColumns,
+  } = useTopicModelingTaskFlow({
+    state: {
+      currentWorkspaceId,
+      panelNodeIds,
+      panelHasMissingColumns,
+      effectiveNodeColumnSelections,
+      randomSeed,
+      representativeWordsCount,
+      selectedTopicIds,
+      sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
+      topicSizeMode,
+      topicSizeValue,
+      displayedTopics: topics,
+    },
+    actions: {
+      setIsRunning,
+      runningRef,
+      setError,
+      setResultSafely,
+      lastFetchedRef,
+      resolveTopicModelingTaskId: resolveTaskId,
+      setLocalTaskId,
+    },
+    lock: {
+      getAuthHeaders,
+      lockWithSnapshots,
+      queryClient,
+    },
+  });
+
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
   const exactRawTopicCount = (() => {
     const rawValue = result?.data?.meta?.raw_total_topics;

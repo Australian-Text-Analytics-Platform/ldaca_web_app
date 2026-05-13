@@ -28,6 +28,13 @@ interface TopicModelingState {
   sampleFractions?: (number | null)[] | null;
   topicSizeMode?: 'min' | 'exact';
   topicSizeValue?: number;
+  /**
+   * Currently-displayed topic list — already filtered by the post-fit
+   * stopword toggle and carrying ``representative_words`` in display order.
+   * Used to build ``topic_meanings_override`` on detach so the detached
+   * meanings node mirrors what's on screen, not the fit-time artifact.
+   */
+  displayedTopics?: ReadonlyArray<{ id: number; representative_words?: string[] }>;
 }
 
 interface TopicModelingActions {
@@ -83,6 +90,7 @@ export function useTopicModelingTaskFlow({
     sampleFractions,
     topicSizeMode,
     topicSizeValue,
+    displayedTopics,
   },
   actions: {
     setIsRunning,
@@ -225,11 +233,29 @@ export function useTopicModelingTaskFlow({
           ];
         })
       );
+      // Build a per-topic words override from what's currently on screen.
+      // ``displayedTopics`` is already filtered by the stopword toggle;
+      // we slice each topic's words to ``representativeWordsCount`` to
+      // match the visual cap. When the user has selected specific
+      // topics, the override (and the assignments filter) narrow to
+      // that selection so meanings and assignments stay in sync.
+      const exportedTopics = (displayedTopics ?? []).filter(
+        (topic) => selectedTopicIds.size === 0 || selectedTopicIds.has(topic.id),
+      );
+      const wordsCap = Math.max(1, Math.floor(representativeWordsCount));
+      const topicMeaningsOverride = exportedTopics.map((topic) => ({
+        topic_id: topic.id,
+        words: (topic.representative_words ?? []).slice(0, wordsCap),
+      }));
+      const exportedTopicIds = exportedTopics.map((topic) => topic.id);
       const payload: TopicModelingDetachRequest = {
         node_ids: nodeIds,
         selected_columns: selectedDetachColumns,
         new_node_names: newNodeNames,
-        ...(selectedTopicIds.size > 0 ? { topic_ids: Array.from(selectedTopicIds) } : {}),
+        ...(exportedTopicIds.length > 0 ? { topic_ids: exportedTopicIds } : {}),
+        ...(topicMeaningsOverride.length > 0
+          ? { topic_meanings_override: topicMeaningsOverride }
+          : {}),
       };
       const resp = await textApi.topicModelingDetach(taskId, payload, getAuthHeaders());
       if (resp?.state !== 'successful') {

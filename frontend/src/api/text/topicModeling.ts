@@ -58,12 +58,24 @@ export interface TopicModelingDetachOptionsResponse {
   metadata?: { task_id?: string; [k: string]: unknown };
 }
 
+/**
+ * Per-topic representative-words override for detach. Ships the words
+ * exactly as displayed (post-fit "Words per topic" slice + post-fit
+ * stopword filter) so the detached meanings node mirrors the visual,
+ * not the fit-time artifact.
+ */
+export interface TopicMeaningOverrideItem {
+  topic_id: number;
+  words: string[];
+}
+
 export interface TopicModelingDetachRequest {
   node_ids?: string[];
   selected_columns: Record<string, string[]>;
   new_node_names?: Record<string, string>;
   topic_column_name?: string;
   topic_ids?: number[];
+  topic_meanings_override?: TopicMeaningOverrideItem[];
 }
 
 export interface TopicModelingDetachResponse {
