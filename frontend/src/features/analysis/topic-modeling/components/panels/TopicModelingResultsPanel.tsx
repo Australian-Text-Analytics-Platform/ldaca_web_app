@@ -184,12 +184,21 @@ type Props = {
   stopwordFilterAvailable: boolean;
   stopwordFilterEnabled: boolean;
   onStopwordFilterToggle: (enabled: boolean) => void;
+  /** Aggregated label for the toggle copy — e.g. ``"ZH"`` for a single
+   *  language, ``"EN + ZH"`` for two. ``undefined`` collapses the
+   *  language suffix entirely so it reads "Hide stopwords". */
   stopwordFilterLanguage?: string;
-  /** The active stopword set the filter is applying. Surfaced through
-   *  this panel so the "view list" link can open a read-only dialog
-   *  showing the user which words are being hidden. Empty / undefined
-   *  hides the link without disabling the toggle. */
+  /** Flat set the filter actually applies. Surfaced so the "view list"
+   *  link can show a count without re-deriving from groups. Empty /
+   *  undefined hides the link without disabling the toggle. */
   stopwordFilterSet?: Set<string>;
+  /** Per-language groups (matching the order requested by
+   *  ``useDefaultStopwords``). The popup renders one chip block per
+   *  group with the language label as a header. */
+  stopwordFilterByLanguage?: ReadonlyArray<{
+    language: string;
+    words: ReadonlyArray<string>;
+  }>;
 };
 
 export function TopicModelingResultsPanel({
@@ -236,6 +245,7 @@ export function TopicModelingResultsPanel({
   onStopwordFilterToggle,
   stopwordFilterLanguage,
   stopwordFilterSet,
+  stopwordFilterByLanguage,
   handleDetachConfirm,
 }: Props) {
   const [isAppliedStopwordsDialogOpen, setIsAppliedStopwordsDialogOpen] = useState(false);
@@ -309,6 +319,8 @@ export function TopicModelingResultsPanel({
               topicSizeMode={topicSizeMode}
               topicSizeValue={topicSizeValue}
               randomSeed={randomSeed}
+              stopwordsByLanguage={stopwordFilterByLanguage}
+              stopwordsFilterEnabled={stopwordFilterEnabled}
               controlRowSlot={
                 <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-x-6">
                   <div className="flex shrink-0 items-center gap-3">
@@ -391,12 +403,12 @@ export function TopicModelingResultsPanel({
         handleDetachConfirm={handleDetachConfirm}
       />
 
-      {stopwordFilterSet && stopwordFilterSet.size > 0 ? (
+      {appliedStopwordsCount > 0 ? (
         <AppliedStopwordsDialog
           open={isAppliedStopwordsDialogOpen}
           onClose={() => setIsAppliedStopwordsDialogOpen(false)}
-          language={stopwordFilterLanguage ?? 'en'}
-          stopwords={stopwordFilterSet}
+          totalCount={appliedStopwordsCount}
+          byLanguage={stopwordFilterByLanguage ?? []}
         />
       ) : null}
     </>

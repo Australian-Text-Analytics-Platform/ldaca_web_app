@@ -24,6 +24,8 @@ import {
   executeAnalysisRunOrUpdate,
 } from '../common';
 import { useDefaultStopwords } from '../common/hooks/useDefaultStopwords';
+import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { TopicModelingParameterPanel, type CorpusSample } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
@@ -72,6 +74,7 @@ const TopicModelingFeature: React.FC = () => {
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
   const setTasks = useAnalysisStore((state) => state.setTasks);
+  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const [error, setError] = useState<string | null>(null);
   const [result, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
   
@@ -437,24 +440,56 @@ const TopicModelingFeature: React.FC = () => {
   const hasAnySampling = sampleFractionsForRequest.some((f) => f !== null);
 
   const rawTopics: TopicModelingTopic[] = result?.data?.topics || [];
-  // Language metadata from the run — drives which stopword list (if any)
-  // the optional post-fit filter fetches. On the multilingual branch
-  // ``meta.language_resolution.language`` carries the resolved code
-  // (en/zh/ja/...). On dev/main this block is absent, so we default to
-  // ``en`` — every run is implicitly English there. The hook itself
-  // hides the toggle when the backend has no list for the resolved
-  // language (``strict: true`` query param).
-  const resolvedTopicLanguage = (() => {
-    const raw = result?.data?.meta?.language_resolution as
-      | { language?: unknown }
-      | undefined;
-    const code = typeof raw?.language === 'string' ? raw.language : 'en';
-    return code.trim().toLowerCase();
+  // All distinct languages across the selected corpora — matches the
+  // pattern token-frequency uses for "Apply Stop Words" so a side-by-
+  // side EN/ZH comparison filters both vocabularies, not just the
+  // first corpus's language.
+  //
+  // Resolution order per node (via ``effectiveNodeLanguage``):
+  // 1. ``node.derived[*].language`` — set by Tokenise; authoritative
+  // 2. user preferences ``defaultLanguage``
+  // 3. ``en`` — global fallback
+  //
+  // We deliberately don't read ``meta.language_resolution.language``
+  // any more — the backend resolver only records the *first node's*
+  // language (Phase 3.5), which is exactly the corner case this change
+  // is fixing. Computing per-node on the frontend keeps the filter
+  // honest regardless of how many corpora the user picked.
+  const topicLanguages = (() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const selection of effectiveNodeColumnSelections) {
+      const node = panelSelectedNodes.find((candidate) =>
+        [candidate.id, candidate.node_id].some(
+          (id) => typeof id === 'string' && id === selection.nodeId,
+        ),
+      );
+      const code = effectiveNodeLanguage({
+        node: node ?? null,
+        defaultLanguage,
+      });
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      ordered.push(code);
+    }
+    if (ordered.length === 0) {
+      const fallback = effectiveNodeLanguage({ defaultLanguage });
+      return fallback ? [fallback] : ['en'];
+    }
+    return ordered;
   })();
   const {
     stopwords: stopwordSet,
+    byLanguage: stopwordByLanguage,
     available: stopwordFilterAvailable,
-  } = useDefaultStopwords(resolvedTopicLanguage, { strict: true });
+  } = useDefaultStopwords(topicLanguages, { strict: true });
+  // Aggregate label for the toggle copy ("Hide EN + ZH stopwords").
+  // Only includes languages that actually returned a non-empty list,
+  // so a ZH-only resolved set won't claim "EN" in the toggle label.
+  const stopwordFilterLanguageLabel = stopwordByLanguage
+    .filter((group) => group.words.length > 0)
+    .map((group) => group.language.toUpperCase())
+    .join(' + ');
   // Rebuild each topic's label from its representative_words sliced to the
   // current "Words per topic" display cap, so changing that input updates
   // the bottom list without a rerun. Falls back to the server-built label
@@ -748,8 +783,9 @@ const TopicModelingFeature: React.FC = () => {
           stopwordFilterAvailable={stopwordFilterAvailable}
           stopwordFilterEnabled={stopwordFilterEnabled}
           onStopwordFilterToggle={setStopwordFilterEnabled}
-          stopwordFilterLanguage={resolvedTopicLanguage || undefined}
+          stopwordFilterLanguage={stopwordFilterLanguageLabel || undefined}
           stopwordFilterSet={stopwordSet}
+          stopwordFilterByLanguage={stopwordByLanguage}
         />
       )}
       </div>

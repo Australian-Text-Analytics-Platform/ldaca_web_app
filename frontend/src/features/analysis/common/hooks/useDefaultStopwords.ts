@@ -1,57 +1,124 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import { textApi } from '@/api/text';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/lib/queryKeys';
 
+export interface DefaultStopwordsLanguageGroup {
+  /** Normalised language code that was actually requested. */
+  language: string;
+  /** Words returned by the backend for this language, in source order
+   *  with surrounding whitespace trimmed. Empty when the backend has
+   *  no list and ``strict`` suppressed the English fallback. */
+  words: string[];
+}
+
 interface UseDefaultStopwordsResult {
-  /** Set keyed by exact stop-word string. Empty until the query resolves
-   *  or when the backend has no list for the language. */
+  /** Flat, deduplicated merge across all requested languages, keyed by
+   *  surface form. The filtering memo only needs membership lookup,
+   *  so this is the primary consumer-facing field. */
   stopwords: Set<string>;
-  /** True once the fetch has resolved successfully and the backend
-   *  returned at least one entry. Drives "is the toggle worth showing". */
+  /** Per-language groups in the order requested. Surfaces multi-lang
+   *  state to UI that wants to label things like "Filtering EN + ZH"
+   *  or render grouped chips. Empty when no languages were resolved. */
+  byLanguage: DefaultStopwordsLanguageGroup[];
+  /** True once at least one fetch has returned a non-empty list. Drives
+   *  "is the toggle worth showing" — when false, callers should hide
+   *  the filter UI entirely rather than greying it out. */
   available: boolean;
   isLoading: boolean;
   isError: boolean;
 }
 
 /**
- * Cached fetch of the bundled stop-word list for a language. Shared
- * across analyses so token-frequency and topic-modelling don't each
- * pay a request when they happen to need the same list.
+ * Cached fetch of the bundled stop-word lists for one or more
+ * languages. Mirrors the multi-language behaviour token-frequency uses
+ * via ``loadMergedStopwords`` but as a React hook so topic-modelling
+ * (and any future analysis) can subscribe reactively.
+ *
+ * The single-language call site that existed before this refactor —
+ * ``useDefaultStopwords('zh', ...)`` — now passes ``['zh']``. Empty /
+ * ``null`` entries in the array are skipped during normalisation, so
+ * placeholder-during-render states stay safe.
  *
  * ``strict`` controls the unknown-language fallback at the backend:
- *  - ``true`` (topic-modelling filter): unknown languages return ``[]``,
- *    ``available`` becomes false, callers can hide the UI cleanly.
- *  - ``false`` (token-frequency "fill defaults"): unknown languages
- *    silently get the English list — legacy behaviour.
+ *  - ``true``: unknown languages return ``[]``, so callers can hide
+ *    the toggle when nothing was actually fetched.
+ *  - ``false``: unknown languages silently substitute the English
+ *    list (legacy "fill defaults" behaviour for token-frequency).
+ *
+ * Caching: each unique ``(language, strict)`` pair gets its own
+ * 1-hour-stale TanStack Query entry keyed via
+ * ``queryKeys.defaultStopWords``, so two analyses asking for ZH at
+ * the same time hit the backend once.
  */
 export const useDefaultStopwords = (
-  language: string | null | undefined,
+  languages: ReadonlyArray<string | null | undefined>,
   { strict = true }: { strict?: boolean } = {},
 ): UseDefaultStopwordsResult => {
   const { getAuthHeaders } = useAuth();
-  const code = (language ?? '').trim().toLowerCase();
-  const enabled = code.length > 0;
 
-  const query = useQuery({
-    queryKey: queryKeys.defaultStopWords(code, strict),
-    enabled,
-    staleTime: 1000 * 60 * 60, // 1h — these lists don't change at runtime
-    queryFn: async () =>
-      textApi.defaultStopWords(getAuthHeaders(), { language: code, strict }),
+  // ``languages`` is a freshly-built array each render in callers that
+  // derive it from selection state; depending on its identity alone
+  // would invalidate the memo every paint. Re-derive uniqueness from
+  // the *contents* via a stable serialised key.
+  const uniqueLanguages = useMemo<string[]>(() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const candidate of languages) {
+      if (typeof candidate !== 'string') continue;
+      const code = candidate.trim().toLowerCase();
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      ordered.push(code);
+    }
+    return ordered;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(languages)]);
+
+  const queryResults = useQueries({
+    queries: uniqueLanguages.map((language) => ({
+      queryKey: queryKeys.defaultStopWords(language, strict),
+      staleTime: 1000 * 60 * 60,
+      queryFn: async () =>
+        textApi.defaultStopWords(getAuthHeaders(), { language, strict }),
+    })),
   });
 
+  const byLanguage = useMemo<DefaultStopwordsLanguageGroup[]>(
+    () =>
+      uniqueLanguages.map((language, index) => {
+        const raw = queryResults[index]?.data?.stopwords;
+        const words = Array.isArray(raw)
+          ? raw.map((w) => String(w).trim()).filter(Boolean)
+          : [];
+        return { language, words };
+      }),
+    // ``queryResults`` is a new array each render; depend on the
+    // per-language data payloads instead so the memo only rebuilds
+    // when the backend returns fresh content.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [uniqueLanguages, ...queryResults.map((q) => q.data)],
+  );
+
   const stopwords = useMemo(() => {
-    const list = query.data?.stopwords;
-    if (!Array.isArray(list)) return new Set<string>();
-    return new Set(list.map((w) => String(w).trim()).filter(Boolean));
-  }, [query.data?.stopwords]);
+    const set = new Set<string>();
+    for (const group of byLanguage) {
+      for (const word of group.words) set.add(word);
+    }
+    return set;
+  }, [byLanguage]);
+
+  const isLoading =
+    uniqueLanguages.length > 0 && queryResults.some((q) => q.isLoading);
+  const isError =
+    uniqueLanguages.length > 0 && queryResults.some((q) => q.isError);
 
   return {
     stopwords,
-    available: enabled && stopwords.size > 0,
-    isLoading: enabled && query.isLoading,
-    isError: enabled && query.isError,
+    byLanguage,
+    available: uniqueLanguages.length > 0 && stopwords.size > 0,
+    isLoading,
+    isError,
   };
 };

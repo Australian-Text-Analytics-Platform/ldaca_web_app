@@ -3,16 +3,20 @@
  *
  * Topic modelling's stopword filter is a binary toggle today — it
  * silently drops any representative word that appears in the bundled
- * list for the resolved language. Users have asked for visibility into
- * *which* words it's hiding, especially on a Chinese corpus where the
- * built-in goto456 list is large (~746 entries) and contains some
+ * list for the resolved language(s). Users have asked for visibility
+ * into *which* words it's hiding, especially on a Chinese corpus where
+ * the built-in goto456 list is large (~746 entries) and contains some
  * domain-sensitive choices (e.g. 的/是/了 are obvious; 上/下 less so).
  *
- * This dialog displays the active set unchanged — no add / remove /
- * sort controls. Customisation is deliberately out of scope until we
- * see how the read-only view performs in real use.
+ * When the run spans multiple languages (e.g. an EN + ZH side-by-side
+ * comparison) the dialog renders one chip block per language with a
+ * heading, mirroring the per-language grouping token-frequency shows
+ * in its textarea.
+ *
+ * This dialog is deliberately read-only — no add / remove / sort
+ * controls. Customisation is out of scope until we see how the
+ * read-only view performs in real use.
  */
-import { useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -28,24 +32,29 @@ import { languageLabel } from '@/lib/languages';
 export interface AppliedStopwordsDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Resolved language code from ``meta.language_resolution.language``
-   *  (multilingual branch) or the implicit ``"en"`` fallback. Drives
-   *  the dialog title's language label. */
-  language: string;
-  /** The active set fed to the topics-filtering memo. Rendered in the
-   *  order it was inserted so the user sees the same shape the backend
-   *  returned (typically alphabetical for EN, frequency-ordered for ZH). */
-  stopwords: Set<string>;
+  /** Total surviving across all groups after backend dedupe. Drives
+   *  the dialog's "X stopwords are hidden" count. */
+  totalCount: number;
+  /** Per-language groups in the order the run resolved them. Single-
+   *  language runs pass a one-element array and the dialog collapses
+   *  the heading. */
+  byLanguage: ReadonlyArray<{
+    language: string;
+    words: ReadonlyArray<string>;
+  }>;
 }
 
 export function AppliedStopwordsDialog({
   open,
   onClose,
-  language,
-  stopwords,
+  totalCount,
+  byLanguage,
 }: AppliedStopwordsDialogProps) {
-  const words = useMemo(() => Array.from(stopwords), [stopwords]);
-  const label = languageLabel(language);
+  const nonEmptyGroups = byLanguage.filter((group) => group.words.length > 0);
+  const isMultiLanguage = nonEmptyGroups.length > 1;
+  const languageSummary = nonEmptyGroups
+    .map((group) => languageLabel(group.language))
+    .join(' + ');
 
   return (
     <Dialog
@@ -58,27 +67,39 @@ export function AppliedStopwordsDialog({
         <DialogHeader>
           <DialogTitle>Stopwords being filtered</DialogTitle>
           <DialogDescription>
-            {words.length} {label} stopword{words.length === 1 ? '' : 's'}{' '}
-            are hidden from each topic&apos;s representative words while
-            the filter is on. The source list comes from the backend
-            bundle for this language.
+            {totalCount} {languageSummary || 'English'} stopword
+            {totalCount === 1 ? '' : 's'} {totalCount === 1 ? 'is' : 'are'}{' '}
+            hidden from each topic&apos;s representative words while the
+            filter is on. The source list comes from the backend bundle
+            {isMultiLanguage ? ' (one per corpus language)' : ''}.
           </DialogDescription>
         </DialogHeader>
 
-        {words.length === 0 ? (
+        {nonEmptyGroups.length === 0 ? (
           <div className="rounded-md border border-border bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
-            No stopwords available for {label}.
+            No stopwords available for the resolved language.
           </div>
         ) : (
           <ScrollArea className="h-64 rounded-md border border-border bg-background">
-            <div className="flex flex-wrap gap-1.5 p-3 font-mono text-xs">
-              {words.map((word) => (
-                <span
-                  key={word}
-                  className="inline-flex items-center rounded bg-muted px-1.5 py-0.5"
-                >
-                  {word}
-                </span>
+            <div className="space-y-3 p-3">
+              {nonEmptyGroups.map((group) => (
+                <div key={group.language} className="space-y-1.5">
+                  {isMultiLanguage ? (
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {languageLabel(group.language)} ({group.words.length})
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-1.5 font-mono text-xs">
+                    {group.words.map((word) => (
+                      <span
+                        key={`${group.language}:${word}`}
+                        className="inline-flex items-center rounded bg-muted px-1.5 py-0.5"
+                      >
+                        {word}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </ScrollArea>

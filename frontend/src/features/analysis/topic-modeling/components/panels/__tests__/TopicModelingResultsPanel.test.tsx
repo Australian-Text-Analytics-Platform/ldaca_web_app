@@ -140,14 +140,15 @@ describe('TopicModelingResultsPanel', () => {
   });
 
   it('renders a "view list" button next to the stopword toggle when a non-empty filter set is provided', () => {
-    const stopwordFilterSet = new Set(['的', '了', '是']);
+    const zhWords = ['的', '了', '是'];
     render(
       <TooltipProvider>
         <TopicModelingResultsPanel
           {...baseProps}
           stopwordFilterAvailable={true}
-          stopwordFilterLanguage="zh"
-          stopwordFilterSet={stopwordFilterSet}
+          stopwordFilterLanguage="ZH"
+          stopwordFilterSet={new Set(zhWords)}
+          stopwordFilterByLanguage={[{ language: 'zh', words: zhWords }]}
         />
       </TooltipProvider>
     );
@@ -166,6 +167,35 @@ describe('TopicModelingResultsPanel', () => {
     expect(screen.getByText('是')).toBeInTheDocument();
   });
 
+  it('renders per-language group headings when multiple languages are filtered', () => {
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          stopwordFilterAvailable={true}
+          stopwordFilterLanguage="EN + ZH"
+          stopwordFilterSet={new Set(['the', 'and', '的', '了'])}
+          stopwordFilterByLanguage={[
+            { language: 'en', words: ['the', 'and'] },
+            { language: 'zh', words: ['的', '了'] },
+          ]}
+        />
+      </TooltipProvider>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /view the 4 stopwords being filtered/i }),
+    );
+
+    // Each group surfaces a heading with its label + count.
+    expect(screen.getByText(/^English \(2\)$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Chinese \(2\)$/)).toBeInTheDocument();
+    // And every word from both groups is rendered.
+    for (const word of ['the', 'and', '的', '了']) {
+      expect(screen.getByText(word)).toBeInTheDocument();
+    }
+  });
+
   it('omits the "view list" button when no stopwords are active', () => {
     render(
       <TooltipProvider>
@@ -174,6 +204,7 @@ describe('TopicModelingResultsPanel', () => {
           stopwordFilterAvailable={true}
           stopwordFilterLanguage="zh"
           stopwordFilterSet={new Set()}
+          stopwordFilterByLanguage={[]}
         />
       </TooltipProvider>
     );
