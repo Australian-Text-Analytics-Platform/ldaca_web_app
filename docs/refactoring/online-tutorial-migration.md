@@ -5,10 +5,46 @@ execution plan for moving tutorial / info / reference content from the
 bundled frontend into an externally-hosted, version-pinned docs site so
 that documentation can be updated without bumping app releases.
 
-This work is **out of scope** for the current `refactoring` branch and
-should land on its own branch/PR(s) when ready. Authored in the
-refactoring session because the design was sketched there, but the
-implementation is independent.
+## Status (2026-05-14)
+
+- **3.10A — Loader infrastructure**: ✅ landed on the `docs-migration`
+  branch (commits `63f37e3`, `38959fe`). bundledRegistry + registryStore
+  + remoteRegistry + getDocTarget in place; existing registry files
+  thinned to re-exports; App.tsx hydrates on mount; DocumentView resolves
+  remote-prefixed paths; 10 new unit tests.
+- **3.10B — Content migration**: 🟡 partial. Sibling docs repo
+  `ldaca-analytics-docs/` scaffolded with content, registry.json,
+  build-registry validator, Pages publish workflow, and wiki-mirror
+  workflow. Git-init'd but **not committed** — left for the user to
+  review and `git remote add origin` + `git push`. The webapp's bundled
+  `frontend/public/{tutorials,information,references,warnings}/` copies
+  are NOT yet trimmed; that happens once the docs site is live.
+- **3.10C — Versioned deployment**: scaffolded (publish.yml +
+  mirror-to-wiki.yml in the docs repo). Awaits a real GitHub remote and
+  the `WIKI_PAT` secret for the wiki-mirror cross-repo push.
+- **3.10D — Drift CI**: ✅ landed (commit `b602683`).
+  `frontend/scripts/check-docs-drift.mjs` + `.github/workflows/check-docs-drift.yml`;
+  caught two pre-existing drifts when first run, both fixed.
+- **EOL banner**: ✅ landed (commit `3dbf231`). Reads `meta.eolDate`
+  from the merged registry; per-version dismissable.
+
+## Decisions taken vs. original plan
+
+| Topic | Plan said | What landed |
+|---|---|---|
+| Docs repo name | `ldaca-docs` | `ldaca-analytics-docs` (scoped to the analytics arm) |
+| Docs repo placement | unstated | **sibling** of `ldaca_web_app` under the master repo (`LDaCA_Text_Analytics_Tools`), not a sub-submodule of the app |
+| Wiki | n/a | The master repo's wiki is mirrored from `ldaca-analytics-docs/main` on push (Option C from the discussion — wiki for human browsing, not the app's load path) |
+| Registry unification | unify on wire, keep 3 accessors | done — `bundledRegistry.ts` is unified `{tutorial,info,reference}`; trimmed registry files re-export typed accessors |
+| Bundled-fallback scope | trim to ~50 essentials | **kept full ~100 entries for 3.10A** to avoid temporarily-broken anchors before the docs site is live. Trim happens in 3.10B-final |
+| LooseAutoComplete | plan referenced it | not needed — `keyof typeof BUNDLED_REGISTRY[kind]` already covers every literal call site because the bundle stays fat |
+| Cache TTL | refresh on every start, no time-based TTL | as designed |
+| Dev base URL | `.env.local` overrides `VITE_DOCS_BASE_URL` | as designed |
+| Drift CI source-of-truth | fetch deployed registry.json | check against BUNDLED_REGISTRY for now; extend to fetch remote once the docs site is live |
+
+This work was originally **out of scope** for the `refactoring` branch.
+It now lives on its own `docs-migration` branch (webapp side) plus the
+yet-to-be-pushed `ldaca-analytics-docs` sibling.
 
 ---
 
