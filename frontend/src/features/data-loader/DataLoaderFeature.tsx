@@ -27,6 +27,7 @@ import { FileTree } from './components/FileTree';
 import { WorkspaceManagerCard } from './components/WorkspaceManagerCard';
 import { ActiveWorkspaceCard } from './components/ActiveWorkspaceCard';
 import { DataLoaderDialogs } from './components/DataLoaderDialogs';
+import { SampleDataPanel } from './components/SampleDataPanel';
 import { countFilesInNode } from './utils/fileTreeHelpers';
 import { getWorkspaceId } from './utils/format';
 
@@ -54,7 +55,6 @@ export const DataLoaderFeature: React.FC = () => {
 
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
-  const [importingSamples, setImportingSamples] = useState(false);
   const [workspaceAlertOpen, setWorkspaceAlertOpen] = useState(false);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<{ id: string; name?: string | null } | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
@@ -199,26 +199,6 @@ export const DataLoaderFeature: React.FC = () => {
     } finally {
       setDeletingWorkspace(false);
       setWorkspaceToDelete(null);
-    }
-  };
-
-  const handleImportSampleData = async () => {
-    setImportingSamples(true);
-    try {
-      await toast.promise(
-        filesApi.importSampleData(authHeaders).then(async () => {
-          await refetchFiles();
-        }),
-        {
-          loading: 'Importing sample data…',
-          success: 'Sample data imported.',
-          error: (error) => (error as Error)?.message || 'Failed to import sample data.',
-        },
-      );
-    } catch (error) {
-      console.error('[DataLoaderFeature] import sample data failed', error);
-    } finally {
-      setImportingSamples(false);
     }
   };
 
@@ -579,9 +559,7 @@ export const DataLoaderFeature: React.FC = () => {
               <HelpIcon targetKey="data-loader.upload.button" label="Upload files" />
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="outline" onClick={handleImportSampleData} disabled={importingSamples}>
-                <FolderPlus className="mr-2 h-4 w-4" /> {importingSamples ? 'Importing…' : 'Import sample data'}
-              </Button>
+              <SampleDataPanel authHeaders={authHeaders} onImportComplete={refetchFiles} />
               <HelpIcon targetKey="data-loader.import-sample.button" label="Import sample data" />
             </div>
             <div className="flex items-center gap-1">

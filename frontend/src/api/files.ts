@@ -51,6 +51,41 @@ export interface LdacaImportStartResponse {
   };
 }
 
+export type SampleDataCollectionStatus = 'bundled' | 'downloaded' | 'partial' | 'not_downloaded';
+
+export interface SampleDataFileEntry {
+  path: string;
+  size: number;
+  sha256: string;
+}
+
+export interface SampleDataCollection {
+  id: string;
+  name: string;
+  description: string;
+  language: string;
+  bundled: boolean;
+  total_size_bytes: number;
+  recommended_for: string[];
+  files: SampleDataFileEntry[];
+  status: SampleDataCollectionStatus;
+}
+
+export interface SampleDataCatalogueResponse {
+  schema_version: number;
+  collections: SampleDataCollection[];
+}
+
+export interface ImportSampleDataResponse {
+  status: string;
+  removed_existing: boolean;
+  file_count: number;
+  bytes_copied: number;
+  message: string;
+  sample_dir: string | null;
+  remote_download_started: boolean;
+}
+
 export const filesApi = {
   list: (headers: Record<string, string> = {}) =>
     get<FileTreeNode[]>('/files/', headers),
@@ -91,8 +126,14 @@ export const filesApi = {
   delete: (fileName: string, headers: Record<string, string> = {}) =>
     del<Record<string, unknown>>(`/files/${encodeURIComponent(fileName)}`, headers),
 
-  importSampleData: (headers: Record<string, string> = {}) =>
-    post<Record<string, unknown>>('/files/import-sample-data', {}, headers),
+  getSampleDataCatalogue: (headers: Record<string, string> = {}) =>
+    get<SampleDataCatalogueResponse>('/files/sample-data/catalogue', headers),
+
+  getSampleDataReadme: (path: string, headers: Record<string, string> = {}) =>
+    get<string>('/files/sample-data/readme', headers, { path }),
+
+  importSampleData: (collectionIds: string[] = [], headers: Record<string, string> = {}) =>
+    post<ImportSampleDataResponse>('/files/import-sample-data', { collection_ids: collectionIds }, headers),
 
   importLdaca: (url: string, headers: Record<string, string> = {}) =>
     post<LdacaImportStartResponse>('/files/import-ldaca', { url }, headers),

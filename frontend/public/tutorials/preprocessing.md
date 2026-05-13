@@ -160,6 +160,10 @@ The Stack sub-tab vertically concatenates two or more data blocks. Use it when y
 
 The schema status panel tells you whether all selected data blocks share the same column structure and highlights any mismatches. Resolve mismatches (e.g. by renaming or removing columns) before stacking.
 
+<h3 id="help-preprocessing-concat-deduplicate">Drop duplicate rows after stacking</h3>
+
+Tick **Drop duplicate rows after stacking** to remove exact duplicate rows from the stacked result. Two rows count as duplicates only when every column matches. Useful when stacking sources that may share overlapping records (e.g. partial dumps of the same dataset).
+
 <h3 id="help-preprocessing-concat-new-node-name">New data block name</h3>
 
 Provide a label for the stacked output. Leave it blank to use the auto-generated suggestion.
