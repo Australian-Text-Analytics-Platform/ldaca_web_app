@@ -110,6 +110,30 @@ export function TopicModelingParameterPanel({
     onTopicSizeValueChange(next); // always call — even unchanged — to solidify grey placeholder
   };
 
+  const [representativeWordsCountDraft, setRepresentativeWordsCountDraft] = useState(
+    () => String(representativeWordsCount),
+  );
+
+  useEffect(() => {
+    setRepresentativeWordsCountDraft(String(representativeWordsCount));
+  }, [representativeWordsCount]);
+
+  // Backend now fits with at least 50 representative words and serves up to
+  // 2× the originally-fitted count, so post-fit we can let the user scale
+  // up without rerunning. Pre-fit cap stays at 50 since there's no fitted
+  // count to double yet.
+  const representativeWordsCountCap = isLocked && representativeWordsCountServerMax
+    ? Math.max(50, 2 * representativeWordsCountServerMax)
+    : 50;
+
+  const handleRepresentativeWordsCountBlur = (event: FocusEvent<HTMLInputElement>) => {
+    const raw = Number(event.currentTarget.value);
+    const rounded = Number.isFinite(raw) ? Math.round(raw) : 3;
+    const clamped = Math.min(representativeWordsCountCap, Math.max(3, rounded));
+    setRepresentativeWordsCountDraft(String(clamped));
+    onRepresentativeWordsCountChange(clamped);
+  };
+
   return (
     <AnalysisCardLayout
       title="Topic Modelling - BERTopic"
@@ -337,7 +361,7 @@ export function TopicModelingParameterPanel({
             <DisabledReasonTooltip
               reason={
                 isLocked && representativeWordsCountServerMax
-                  ? `Bounded by the originally-fitted count (${representativeWordsCountServerMax}). Clear Results to raise this above the original.`
+                  ? `Adjustable up to ${representativeWordsCountCap} after modelling. Clear Results to fit with a higher count.`
                   : undefined
               }
             >
@@ -345,17 +369,12 @@ export function TopicModelingParameterPanel({
               id="representative-words-count"
               type="number"
               min={3}
-              max={isLocked && representativeWordsCountServerMax ? representativeWordsCountServerMax : 50}
+              max={representativeWordsCountCap}
               step={1}
-              value={representativeWordsCount}
+              value={representativeWordsCountDraft}
               className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
-              onChange={(e) => {
-                const raw = Math.max(3, Number(e.target.value) || 0);
-                const cap = isLocked && representativeWordsCountServerMax
-                  ? representativeWordsCountServerMax
-                  : 50;
-                onRepresentativeWordsCountChange(Math.min(raw, cap));
-              }}
+              onChange={(e) => setRepresentativeWordsCountDraft(e.target.value)}
+              onBlur={handleRepresentativeWordsCountBlur}
             />
             </DisabledReasonTooltip>
           </div>

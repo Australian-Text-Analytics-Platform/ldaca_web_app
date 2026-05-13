@@ -6,7 +6,9 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { TopicModelingResultsPanel } from '../TopicModelingResultsPanel';
 
 vi.mock('../results/TopicModelingBubbleChartSection', () => ({
-  TopicModelingBubbleChartSection: () => <div data-testid="topic-bubble-chart-section" />,
+  TopicModelingBubbleChartSection: ({ controlRowSlot }: { controlRowSlot?: React.ReactNode }) => (
+    <div data-testid="topic-bubble-chart-section">{controlRowSlot}</div>
+  ),
 }));
 
 vi.mock('../results/TopicModelingDetachDialog', () => ({

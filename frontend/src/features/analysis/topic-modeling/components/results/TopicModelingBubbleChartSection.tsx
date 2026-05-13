@@ -43,6 +43,10 @@ type Props = {
   topicSizeMode?: string;
   topicSizeValue?: number;
   randomSeed?: number;
+  /** Rendered between the bubble chart and the topic list. Hosts the
+   * post-fit control row (topic count, stopword toggle, re-aggregate
+   * slider, Add to Workspace). */
+  controlRowSlot?: React.ReactNode;
 };
 
 const OVERLAY_BTN =
@@ -116,6 +120,7 @@ export function TopicModelingBubbleChartSection({
   topicSizeMode,
   topicSizeValue,
   randomSeed,
+  controlRowSlot,
 }: Props) {
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
 
@@ -227,6 +232,8 @@ export function TopicModelingBubbleChartSection({
           </div>
         )}
       </div>
+
+      {controlRowSlot ?? null}
 
       <TopicSelectionPanel
         topics={topics}
