@@ -213,6 +213,11 @@ const tutorial = {
     anchor: 'help-preprocessing-concat-new-node-name',
     label: 'Stack output name',
   },
+  'preprocessing.concat.deduplicate': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-concat-deduplicate',
+    label: 'Deduplicate stacked rows',
+  },
   'preprocessing.concat.schema-status': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-concat-schema-status',
