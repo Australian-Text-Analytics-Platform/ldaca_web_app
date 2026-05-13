@@ -255,19 +255,33 @@ const TokenFrequencyFeature = () => {
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
   const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
-  const defaultStopWordsLanguage = (() => {
-    const firstSelection = effectiveNodeColumnSelections[0];
-    const firstNode = firstSelection
-      ? panelSelectedNodes.find((node) =>
-          [node.id, node.node_id].some(
-            (id) => typeof id === 'string' && id === firstSelection.nodeId,
-          ),
-        )
-      : undefined;
-    return effectiveNodeLanguage({
-      node: firstNode ?? null,
-      defaultLanguage,
-    });
+  // All distinct languages across the currently-selected corpora, in
+  // selection order. "Apply Stop Words" merges the bundled lists for
+  // every language present so a side-by-side EN/ZH comparison fills
+  // both stoplists at once; single-language runs still produce a
+  // one-element array and behave identically to the legacy flow.
+  const defaultStopWordsLanguages = (() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const selection of effectiveNodeColumnSelections) {
+      const node = panelSelectedNodes.find((candidate) =>
+        [candidate.id, candidate.node_id].some(
+          (id) => typeof id === 'string' && id === selection.nodeId,
+        ),
+      );
+      const code = effectiveNodeLanguage({
+        node: node ?? null,
+        defaultLanguage,
+      });
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      ordered.push(code);
+    }
+    if (ordered.length === 0) {
+      const fallback = effectiveNodeLanguage({ defaultLanguage });
+      return fallback ? [fallback] : [];
+    }
+    return ordered;
   })();
 
   const {
@@ -294,7 +308,7 @@ const TokenFrequencyFeature = () => {
     setResults,
     getAuthHeaders,
     resolveTokenFrequencyTaskId: resolveTaskId,
-    defaultStopWordsLanguage,
+    defaultStopWordsLanguages,
     backendTokenLimit,
     backendStopWordsKey,
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,

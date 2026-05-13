@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { TokenFrequencyResponse } from '@/api/text';
 import { textApi } from '@/api/text';
+import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
 
 type UseTokenFrequencyPreferencesParams = {
@@ -9,7 +10,14 @@ type UseTokenFrequencyPreferencesParams = {
   setResults: React.Dispatch<React.SetStateAction<TokenFrequencyResponse | null>>;
   getAuthHeaders: () => Record<string, string>;
   resolveTokenFrequencyTaskId: () => Promise<string | null>;
-  defaultStopWordsLanguage?: string | null;
+  /**
+   * Resolved language codes for the currently-selected corpora, one per
+   * unique language. "Apply Stop Words" fetches all of these and merges
+   * them so a multi-language comparison (e.g. EN + ZH) fills both stop
+   * lists at once. Falls back to the legacy English-only request when
+   * empty or undefined.
+   */
+  defaultStopWordsLanguages?: ReadonlyArray<string | null | undefined>;
   backendTokenLimit: number | null;
   backendStopWordsKey: string;
   maxTokenLimitInput: number;
@@ -21,7 +29,7 @@ export const useTokenFrequencyPreferences = ({
   setResults,
   getAuthHeaders,
   resolveTokenFrequencyTaskId,
-  defaultStopWordsLanguage,
+  defaultStopWordsLanguages,
   backendTokenLimit,
   backendStopWordsKey,
   maxTokenLimitInput,
@@ -206,9 +214,16 @@ export const useTokenFrequencyPreferences = ({
     }
   };
 
+  // Multi-language "Apply Stop Words" pours per-language groups into the
+  // textarea separated by blank lines so users can see which words come
+  // from which corpus. The parser accepts both commas and newlines as
+  // separators so that grouped paste / hand edits both survive a round
+  // trip through ``applyStopSetFromText``.
+  const STOPWORD_SEPARATOR_RE = /[,\n\r]+/;
+
   const applyStopSetFromText = (text: string) => {
     const words = text
-      .split(',')
+      .split(STOPWORD_SEPARATOR_RE)
       .map((word) => word.trim().toLowerCase())
       .filter(Boolean);
     setStopWords(words.join(', '));
@@ -218,7 +233,7 @@ export const useTokenFrequencyPreferences = ({
 
   const sortStopWords = () => {
     const words = stopWords
-      .split(',')
+      .split(STOPWORD_SEPARATOR_RE)
       .map((word) => word.trim().toLowerCase())
       .filter(Boolean);
     words.sort((a, b) => a.localeCompare(b));
@@ -289,17 +304,51 @@ export const useTokenFrequencyPreferences = ({
   const handleFillDefaultStopWords = async () => {
     setIsLoadingStopWords(true);
     try {
-      const response = await textApi.defaultStopWords(getAuthHeaders(), {
-        language: defaultStopWordsLanguage ?? undefined,
-      });
-      const defaultWords = response?.stopwords ?? (response as Record<string, unknown>)?.data;
-      if (Array.isArray(defaultWords) && defaultWords.length) {
-        const joined = defaultWords.join(', ');
-        setStopWords(joined);
-        applyStopSetFromText(joined);
+      const hasLanguages =
+        Array.isArray(defaultStopWordsLanguages) &&
+        defaultStopWordsLanguages.length > 0;
+
+      let display: string;
+      if (hasLanguages) {
+        const { byLanguage, merged } = await loadMergedStopwords({
+          languages: defaultStopWordsLanguages!,
+          getAuthHeaders,
+        });
+        if (merged.length === 0) {
+          console.error('Default stop words returned an empty list');
+          return;
+        }
+        // Per-language groups separated by a blank line make the
+        // multi-language case (e.g. EN + ZH) visually obvious in the
+        // textarea. Single-language runs collapse to the same flat
+        // ``"word1, word2, ..."`` shape the user is used to.
+        const grouped = byLanguage
+          .filter((group) => group.words.length > 0)
+          .map((group) => group.words.join(', '))
+          .join('\n\n');
+        display = grouped || merged.join(', ');
       } else {
-        console.error('Failed to get default stop words:', response);
+        // Legacy "no language inferred" fallback: ask the backend for
+        // its default (English under the current bundle). Kept distinct
+        // from the merge path so it's obvious in the wire trace which
+        // codepath fired.
+        const response = await textApi.defaultStopWords(getAuthHeaders(), {
+          language: undefined,
+        });
+        const fallbackWords = Array.isArray(response?.stopwords)
+          ? response.stopwords
+          : Array.isArray((response as Record<string, unknown>)?.data)
+            ? ((response as Record<string, unknown>).data as string[])
+            : [];
+        if (fallbackWords.length === 0) {
+          console.error('Default stop words returned an empty list');
+          return;
+        }
+        display = fallbackWords.join(', ');
       }
+
+      setStopWords(display);
+      applyStopSetFromText(display);
     } catch (error) {
       console.error('Error getting default stop words:', error);
     } finally {
