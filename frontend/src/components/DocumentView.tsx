@@ -7,6 +7,7 @@ import rehypeRaw from 'rehype-raw';
 import logo from '../logo.png';
 import { toast } from 'sonner';
 import 'katex/dist/katex.min.css';
+import { BUNDLED_FILES } from '@/tutorials/bundledRegistry';
 
 export type DocumentTarget = {
   file: string;
@@ -42,7 +43,7 @@ const isExternalLink = (href?: string | null): boolean => {
   return /^(https?:)?\/\//i.test(href) || href.startsWith('mailto:') || href.startsWith('tel:');
 };
 
-const resolveDocUrl = (requestedFile: string): string => {
+const resolveLocalDocUrl = (requestedFile: string): string => {
   if (typeof window === 'undefined') {
     return requestedFile;
   }
@@ -62,6 +63,32 @@ const resolveDocUrl = (requestedFile: string): string => {
   } catch {
     return requestedFile;
   }
+};
+
+/**
+ * Resolve a requested doc file to a fetchable URL.
+ *
+ * - Files in `BUNDLED_FILES` always resolve locally (`public/<file>`), so
+ *   offline / bundled-fallback paths keep working without a network hop.
+ * - When `VITE_DOCS_BASE_URL` is set and the file is NOT bundled, it's
+ *   resolved against the remote base URL.
+ * - When `VITE_DOCS_BASE_URL` is unset, every file resolves locally —
+ *   matches the pre-migration behavior.
+ */
+const resolveDocUrl = (requestedFile: string): string => {
+  if (BUNDLED_FILES.has(requestedFile)) {
+    return resolveLocalDocUrl(requestedFile);
+  }
+  const remoteBase = import.meta.env.VITE_DOCS_BASE_URL?.trim();
+  if (remoteBase) {
+    try {
+      const baseWithSlash = remoteBase.endsWith('/') ? remoteBase : `${remoteBase}/`;
+      return new URL(requestedFile, baseWithSlash).toString();
+    } catch {
+      // fall through to local
+    }
+  }
+  return resolveLocalDocUrl(requestedFile);
 };
 
 const DocumentView: React.FC<{
