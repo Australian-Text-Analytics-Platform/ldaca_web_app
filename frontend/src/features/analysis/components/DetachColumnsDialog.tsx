@@ -13,12 +13,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 
 export type DetachDialogNodeOption = {
   node_id: string;
   node_name: string;
   available_columns: string[];
   disabled_columns?: string[];
+  /** Column the analysis ran on. Bolded in the column list so it
+   * stands out from sibling metadata columns. */
+  text_column?: string | null;
 };
 
 type DetachColumnsDialogProps = {
@@ -33,6 +37,13 @@ type DetachColumnsDialogProps = {
   selectAllDetachColumns: () => void;
   deselectAllDetachColumns: () => void;
   handleDetachConfirm: () => Promise<void> | void;
+  /** When set, the confirm button is disabled and the string is shown
+   * as a hover tooltip explaining why. Callers opt in per analysis
+   * tool — e.g. topic modelling needs a metadata column selected
+   * (its only mandatory output is the topic number), but concordance
+   * and quotation already include useful mandatory columns and can
+   * detach with no optional column ticked. */
+  confirmDisabledReason?: string;
 };
 
 export function DetachColumnsDialog({
@@ -47,6 +58,7 @@ export function DetachColumnsDialog({
   selectAllDetachColumns,
   deselectAllDetachColumns,
   handleDetachConfirm,
+  confirmDisabledReason,
 }: DetachColumnsDialogProps) {
   const canSelectAll = detachNodeOptions.some((node) => {
     const disabled = new Set(node.disabled_columns || []);
@@ -58,6 +70,8 @@ export function DetachColumnsDialog({
     const selected = new Set(selectedDetachColumns[node.node_id] || []);
     return node.available_columns.some((column) => !disabled.has(column) && selected.has(column));
   });
+
+  const isDetachDisabled = isDetaching || Boolean(confirmDisabledReason);
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -107,6 +121,7 @@ export function DetachColumnsDialog({
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {optionalColumns.map((column) => {
                     const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
+                    const isAnalysisColumn = column === node.text_column;
                     return (
                       <label key={`${node.node_id}-${column}`} className="flex items-center gap-2 text-sm">
                         <Checkbox
@@ -114,7 +129,7 @@ export function DetachColumnsDialog({
                           onCheckedChange={(value: boolean | 'indeterminate') => toggleDetachColumn(node.node_id, column, value === true)}
                           disabled={isDetaching}
                         />
-                        <span>{column}</span>
+                        <span className={isAnalysisColumn ? 'font-semibold' : undefined}>{column}</span>
                       </label>
                     );
                   })}
@@ -126,21 +141,23 @@ export function DetachColumnsDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDetaching}>Cancel</AlertDialogCancel>
-          <Button asChild size="sm" disabled={isDetaching}>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                void handleDetachConfirm();
-              }}
-              disabled={isDetaching}
-            >
-              {isDetaching ? (
-                <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Adding to Workspace…</span>
-              ) : (
-                <span className="inline-flex items-center gap-2"><Plus className="h-4 w-4" />Add to Workspace</span>
-              )}
-            </AlertDialogAction>
-          </Button>
+          <DisabledReasonTooltip reason={confirmDisabledReason}>
+            <Button asChild size="sm" disabled={isDetachDisabled}>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleDetachConfirm();
+                }}
+                disabled={isDetachDisabled}
+              >
+                {isDetaching ? (
+                  <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Adding to Workspace…</span>
+                ) : (
+                  <span className="inline-flex items-center gap-2"><Plus className="h-4 w-4" />Add to Workspace</span>
+                )}
+              </AlertDialogAction>
+            </Button>
+          </DisabledReasonTooltip>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
