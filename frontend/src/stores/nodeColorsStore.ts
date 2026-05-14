@@ -41,14 +41,6 @@ interface NodeColorsState {
    * analytics tab passes its own constant — typically the matching
    * ``ViewType``). Inner key is nodeId → tentative colour. */
   temps: Record<string, ColorMap>;
-  /** Per-tab set of nodeIds whose temp was set by an explicit user
-   * pick (via ``setTempColor``) rather than auto-rolled by
-   * ``ensureTempColors``. Drives the manual-pick conflict-avoidance
-   * rule: when the user assigns a colour that clashes with another
-   * node's auto-rolled temp in the same tab, that auto temp gets
-   * re-rolled; an existing **manual** pick on another node is left
-   * untouched so the user's intent never gets stomped on. */
-  manualNodes: Record<string, Record<string, true>>;
 
   /** Idempotent. Direct-to-assigned path for callers that don't have
    * a temp/preview-on-Run notion (Export, the workspace sidebar's
@@ -106,7 +98,6 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
   colors: {},
   assignmentOrder: [],
   temps: {},
-  manualNodes: {},
 
   ensureColors: (nodeIds) => {
     if (nodeIds.length === 0) return;
@@ -168,36 +159,12 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
 
   setTempColor: (tabKey, nodeId, color) => {
     if (!tabKey || !nodeId) return;
-    set((state) => {
-      const tabTemps = { ...(state.temps[tabKey] ?? {}) };
-      const tabManual = { ...(state.manualNodes[tabKey] ?? {}) };
-      // 1. Write the manual pick (always wins for this node).
-      tabTemps[nodeId] = color;
-      tabManual[nodeId] = true;
-      // 2. Re-roll any OTHER node in this tab whose temp now matches
-      //    AND whose temp was auto-rolled (not manually set). Manual
-      //    picks on other nodes are preserved — the user can have
-      //    two nodes intentionally share a colour if they explicitly
-      //    pick the same one. The conflict-avoidance is only an aid
-      //    against accidental collisions with auto-rolls.
-      const visible = new Set<string>(Object.values(tabTemps));
-      for (const [otherId, otherColor] of Object.entries(tabTemps)) {
-        if (otherId === nodeId) continue;
-        if (otherColor !== color) continue;
-        if (tabManual[otherId]) continue; // manual pick — leave it alone.
-        // Re-roll this auto temp avoiding the currently visible set.
-        // Mutate ``visible`` so subsequent re-rolls in the same call
-        // (rare; only fires for >2 nodes) keep the de-dup invariant.
-        visible.delete(otherColor);
-        const rerolled = pickRandomPaletteAvoiding(visible);
-        tabTemps[otherId] = rerolled;
-        visible.add(rerolled);
-      }
-      return {
-        temps: { ...state.temps, [tabKey]: tabTemps },
-        manualNodes: { ...state.manualNodes, [tabKey]: tabManual },
-      };
-    });
+    set((state) => ({
+      temps: {
+        ...state.temps,
+        [tabKey]: { ...(state.temps[tabKey] ?? {}), [nodeId]: color },
+      },
+    }));
   },
 
   clearTempColors: (tabKey, nodeIds) => {
@@ -206,27 +173,19 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
       const tabTemps = state.temps[tabKey];
       if (!tabTemps) return state;
       if (!nodeIds) {
-        const { [tabKey]: _droppedTemps, ...restTemps } = state.temps;
-        const { [tabKey]: _droppedManual, ...restManual } = state.manualNodes;
-        return { temps: restTemps, manualNodes: restManual };
+        const { [tabKey]: _dropped, ...rest } = state.temps;
+        return { temps: rest };
       }
       const next = { ...tabTemps };
-      const nextManual = { ...(state.manualNodes[tabKey] ?? {}) };
       let mutated = false;
       for (const id of nodeIds) {
         if (id in next) {
           delete next[id];
           mutated = true;
         }
-        if (id in nextManual) {
-          delete nextManual[id];
-        }
       }
       if (!mutated) return state;
-      return {
-        temps: { ...state.temps, [tabKey]: next },
-        manualNodes: { ...state.manualNodes, [tabKey]: nextManual },
-      };
+      return { temps: { ...state.temps, [tabKey]: next } };
     });
   },
 
@@ -238,7 +197,6 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
       const nextColors = { ...state.colors };
       const nextOrder = [...state.assignmentOrder];
       const nextTabTemps = { ...tabTemps };
-      const nextTabManual = { ...(state.manualNodes[tabKey] ?? {}) };
       let mutated = false;
       for (const id of nodeIds) {
         const temp = tabTemps[id];
@@ -246,9 +204,6 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
         nextColors[id] = temp;
         if (!nextOrder.includes(id)) nextOrder.push(id);
         delete nextTabTemps[id];
-        // Promoted temps lose their "manual" marker — the colour is
-        // now committed, so the manual/auto distinction collapses.
-        delete nextTabManual[id];
         mutated = true;
       }
       if (!mutated) return state;
@@ -256,10 +211,9 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
         colors: nextColors,
         assignmentOrder: nextOrder,
         temps: { ...state.temps, [tabKey]: nextTabTemps },
-        manualNodes: { ...state.manualNodes, [tabKey]: nextTabManual },
       };
     });
   },
 
-  reset: () => set({ colors: {}, assignmentOrder: [], temps: {}, manualNodes: {} }),
+  reset: () => set({ colors: {}, assignmentOrder: [], temps: {} }),
 }));
