@@ -27,15 +27,19 @@ import {
 
 /** Per-column alignment for the concordance table.
  *
- * The left-context column reads more naturally when its rightmost
- * character lines up with the matched-text column to its right — that
- * way the user's eye scans a vertical "match column" instead of having
- * to skip across the variable-length left contexts. Right-align both
- * the header and the cell so the column visually anchors to its right
- * edge. Other columns stay left-aligned (the default for the table).
+ * Classic KWIC ("key word in context") layout:
+ *   - left-context: right-aligned so its rightmost character anchors to
+ *     the matched-text column;
+ *   - matched-text: centered so the keyword forms a vertical stripe the
+ *     user can scan top-to-bottom;
+ *   - right-context: left-aligned (table default) for the same anchoring
+ *     on the other side.
+ * Other columns stay left-aligned.
  */
 function alignmentClassForColumn(columnKey: string): string {
-  return columnKey === CONCORDANCE_COLUMN_KEYS.leftContext ? 'text-right' : '';
+  if (columnKey === CONCORDANCE_COLUMN_KEYS.leftContext) return 'text-right';
+  if (columnKey === CONCORDANCE_COLUMN_KEYS.matchedText) return 'text-center';
+  return '';
 }
 import { batchProcessedCount, flattenConcordanceGroups } from '../concordanceViewModels';
 
