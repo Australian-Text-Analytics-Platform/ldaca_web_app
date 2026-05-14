@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
 import { useUIStore } from '@/stores/uiStore';
-import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId, restoreAnalysisLockFromRequest, resetAnalysisSelectionAfterClear } from '../common';
+import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId, restoreAnalysisLockFromRequest, resetAnalysisSelectionAfterClear, useNodeColorManagement, EXTENDED_PALETTE } from '../common';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -213,6 +213,14 @@ const AiAnnotatorFeature: React.FC = () => {
   const displayedNodeIds = displayedNodes
     .map((node, idx) => getNodeIdentifier(node, idx))
     .filter((id): id is string => Boolean(id));
+
+  // Shared color-management hook — gives the selected node a stable
+  // picked-colour in NodeSelectionPanel, matching Concordance / Topic
+  // Modelling / Frequency / Quotation / Trends styling.
+  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
+    activeNodeIds: displayedNodeIds,
+    palette: EXTENDED_PALETTE,
+  });
 
   const effectiveSelections = (isLocked ? activeNodeColumnSelections : nodeColumnSelections)
     .filter((selection) => displayedNodeIds.includes(selection.nodeId));
@@ -944,14 +952,14 @@ const AiAnnotatorFeature: React.FC = () => {
                 selectedNodes={displayedNodes}
                 nodeColumnSelections={[]}
                 onColumnChange={() => {}}
-                nodeColors={{}}
-                onColorChange={() => {}}
+                nodeColors={nodeColors}
+                onColorChange={handleColorChange}
                 getNodeColumns={getColumnInfos}
-                defaultPalette={[]}
+                defaultPalette={defaultPalette}
                 maxCompare={1}
                 className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
                 showShape
-                showColorPicker={false}
+                showColorPicker
                 showColumnPicker={false}
                 disabled={isLocked}
                 locked={isLocked}
@@ -1155,14 +1163,14 @@ const AiAnnotatorFeature: React.FC = () => {
                 selectedNodes={displayedNodes}
                 nodeColumnSelections={[]}
                 onColumnChange={() => {}}
-                nodeColors={{}}
-                onColorChange={() => {}}
+                nodeColors={nodeColors}
+                onColorChange={handleColorChange}
                 getNodeColumns={getColumnInfos}
-                defaultPalette={[]}
+                defaultPalette={defaultPalette}
                 maxCompare={1}
                 className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
                 showShape
-                showColorPicker={false}
+                showColorPicker
                 showColumnPicker={false}
                 disabled={isLocked}
                 locked={isLocked}
