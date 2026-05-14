@@ -5,6 +5,25 @@ import { RouterProvider } from '@tanstack/react-router';
 import { router } from './router';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
+// Silence the harmless "ResizeObserver loop completed with undelivered
+// notifications" message before any module-level code (and Vite's HMR
+// overlay) gets a chance to surface it. The browser raises this when a RO
+// callback's work doesn't finish in one animation frame — the spec marks
+// it benign and the next frame redelivers — but it still trips Vite's
+// unhandled-error overlay during dev. Recharts + our own RO consumers in
+// chart/sidebar/hint code legitimately hit it on rapid re-layout.
+if (typeof window !== 'undefined') {
+  const isResizeObserverLoopMessage = (msg: unknown): boolean =>
+    typeof msg === 'string' &&
+    msg.includes('ResizeObserver loop');
+  window.addEventListener('error', (event) => {
+    if (isResizeObserverLoopMessage(event.message)) {
+      event.stopImmediatePropagation();
+      event.preventDefault();
+    }
+  });
+}
+
 // Resolve Google Client ID in priority order:
 //   1. window.__GOOGLE_CLIENT_ID__ (injected by backend at runtime)
 //   2. VITE_GOOGLE_CLIENT_ID (build-time env)

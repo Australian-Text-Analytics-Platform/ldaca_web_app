@@ -81,7 +81,7 @@ export const TokenFrequencySingleTokenSection = ({
 
   const singleNodeLayoutClassName = nodeDisplayResults.length <= 1
     ? 'grid grid-cols-1 gap-4'
-    : 'grid grid-cols-1 gap-4 xl:grid-cols-2';
+    : 'grid grid-cols-1 gap-4 lg:grid-cols-2';
 
   // Width (in ch) of the rank gutter inside each list card. Sized to the
   // largest *original* list length (after stop-word filtering, capped by the
