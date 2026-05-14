@@ -30,6 +30,7 @@ import {
   pruneTasksById,
 } from '@/hooks/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
+import { computeTokensModelIntersection } from './tokensModelIntersection';
 import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
@@ -448,33 +449,19 @@ const ConcordanceFeature: React.FC = () => {
     setSearchMode(tokensModeAvailable ? 'tokens' : 'regex');
   }, [tokensModeAvailable, searchModeUserSet]);
 
-  // All tokens models registered on the first selected node that match the
-  // selected source column. When N>1, a model picker appears next to the
-  // tokens radio so the user can route the search through a specific model
-  // (e.g. compare jieba vs bert-base-uncased on the same column).
-  const tokensModelOptions = useMemo<string[]>(() => {
-    const firstSelection = effectiveNodeColumnSelections[0];
-    if (!firstSelection?.column) return [];
-    const firstNode = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
-      const ids = [n.id, n.node_id];
-      return ids.some(
-        (id) => typeof id === 'string' && id === firstSelection.nodeId,
-      );
-    });
-    const derived = firstNode?.derived;
-    if (!derived || typeof derived !== 'object') return [];
-    const models: string[] = [];
-    for (const meta of Object.values(derived as Record<string, unknown>)) {
-      if (!meta || typeof meta !== 'object') continue;
-      const m = meta as { source_column?: unknown; form?: unknown; model?: unknown };
-      if (m.form !== 'tokens') continue;
-      if (m.source_column !== firstSelection.column) continue;
-      if (typeof m.model === 'string' && !models.includes(m.model)) {
-        models.push(m.model);
-      }
-    }
-    return models;
-  }, [effectiveNodeColumnSelections, panelSelectedNodes]);
+  // Tokens-models the picker can offer for a tokens-mode search across the
+  // current node selection. See ``computeTokensModelIntersection`` for the
+  // intersection rationale (Bug 1: pre-fix the picker was computed off the
+  // first selected node only, which silently mis-routed the JA node to
+  // jieba and made materialize 400 on mixed-language selections).
+  const tokensModelOptions = useMemo<string[]>(
+    () =>
+      computeTokensModelIntersection(
+        effectiveNodeColumnSelections,
+        panelSelectedNodes,
+      ),
+    [effectiveNodeColumnSelections, panelSelectedNodes],
+  );
 
   const [tokensModel, setTokensModel] = useState<string | null>(null);
   // Auto-pick when only one model exists; clear when no models OR when the
