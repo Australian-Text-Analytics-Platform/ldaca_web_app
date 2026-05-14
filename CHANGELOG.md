@@ -3,6 +3,40 @@
 User-facing changes to the LDaCA Text Analytics Web Application since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.5] — 2026-05-14
+
+The first changelog entry on the 0.3 line — consolidates work shipped under intermediate tags v0.3.0, v0.3.1, and v0.3.2 along with the changes that follow them. The headline additions are a sample-data catalogue picker (replacing the single-button import), a runtime docs registry, and a sweep of topic-modelling and concordance polish.
+
+### Added
+
+- **Sample-data catalogue.** The single "Import sample data" button is replaced by a panel listing every curated dataset with checkboxes, size, status chip (bundled / downloaded / partial / not_downloaded), tool-recommendation badges, and a per-collection README viewer. Backend serves the catalogue via a new endpoint and proxies each README.
+- **Sample data is fetched on demand from a remote repo.** The Reddit datasets no longer ship inside the Python wheel — they're pulled from the `ldaca-analytics-sample-data` repo the first time a user selects them. Cuts ~tens of MB off the install size.
+- **Docs registry.** Tool tutorials and reference pages are now loaded at runtime from a versioned remote (`docs/v0.3/...`), with the bundled markdown kept as an offline fallback. Includes a stale-while-revalidate cache + an end-of-life banner that surfaces when a docs version is past its support window.
+- **Auto-substituted version + build date in markdown docs.** The references panel now shows the running version and build date via `{{VERSION}}` / `{{BUILD_DATE}}` placeholders that the React markdown renderer resolves from `import.meta.env`, so the docs always match the deployed build.
+- **Topic modelling: post-fit stopword filter** for representative words. Hides English/Chinese function words from each topic's word list without re-fitting the model.
+- **Topic modelling: post-fit "Words per topic" slider** that can reveal up to `max(50, 2×original_setting)` words per topic. Previously capped at the original setting; the wire payload now carries the full buffer so increasing the slider doesn't require a refit.
+- **Topic modelling: detach exports renamed topic words.** When a user has overridden a topic's meaning, the detached node honours that override (`topic_meanings_override`) so the exported labels match what's on screen.
+- **Concordance: `CONC_extraction` column** added to detached results, holding the extracted context window for each hit (separate from the dispersion frequency column).
+- **Concordance: legend-filtered detach.** When a chart legend filter is active, the detach button now scopes the export to the visible series instead of the full result set.
+- **Workspace graph: batch delete with selection count.** The toolbar's Save button is replaced by Delete (N), enabling multi-select deletion of data blocks.
+- **Quotation: `QUOTE_extraction` column** with a clearer frontend label, matching the new concordance extraction column.
+
+### Changed
+
+- **Workspace graph layout: roots left-aligned** via a virtual super-source node. Multi-root workspaces no longer have one root drifting to the centre while others left-anchor.
+- **Detach dialog: analysis column highlighted + gating.** The column that the analysis was run on is now bolded, and on topic-modelling detach the dialog refuses to proceed until at least one metadata column is picked. Other tools keep the previous "no-gating" behaviour.
+- **Concordance UI:** dispersion-view detach button deduplicated; the page-size summary lifted above the pagination row for a calmer footer; document column no longer auto-ticked on dispersion-detach.
+- **Sequential analysis:** linear-axis ticks are denser; missing time-group buckets are zero-filled so the line isn't visually broken by sparse groups.
+- **Token frequency:** node selector capped at 2 corpora; results pane labelled "Keyword Analysis" to better match what users do with it.
+
+### Fixed
+
+- **Topic modelling: `top_n_words` wire payload was truncated** to the display setting, so the new post-fit Words-per-topic slider couldn't reveal more words even when they existed. The payload now carries the full buffer.
+- **Topic modelling: top-n-words count + Chinese stopwords** — backend now serves Chinese stopwords for the post-fit filter, and the `top_n_words` request value is scaled correctly through the pipeline.
+- **Concordance:** processed-count label now shows `min(page_size, corpus_size)` instead of overstating the count on small corpora.
+- **Concordance:** `CONC_extraction` column is hidden from the dispersion-detach dialog (only meaningful in the table view).
+- **Workspace:** data view no longer overflows when a second tab opens.
+
 ## [0.2.9] — 2026-05-06
 
 ### Added
@@ -67,6 +101,7 @@ The "topic-modelling optimisation" release. Brings the major performance and fea
 
 ---
 
+[0.3.5]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.3.5
 [0.2.9]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.9
 [0.2.8]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.8
 [0.2.7]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.7
