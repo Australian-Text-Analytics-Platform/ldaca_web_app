@@ -214,23 +214,31 @@ Release from `dev`, then promote to `main`.
 > feature branches deployed to Nectar before a release (see
 > [Deploying a feature branch to Nectar](#deploying-a-feature-branch-to-nectar) below).
 
-> **Critical ordering rule:** All version strings that appear in the UI or in metadata files
-> **must be updated before the frontend is built**. The version text in
-> `frontend/public/references/general.md` is baked into `build.tar.gz` at build time —
-> updating it after the build has no effect on what Nectar or uvx users actually see.
+> **Critical ordering rule:** All version strings **must be updated before the frontend is
+> built**. Vite reads `frontend/package.json` at build time and bakes the version into the
+> JS bundle as `import.meta.env.VITE_APP_VERSION` — referenced by `DocumentView.tsx` (which
+> resolves `{{VERSION}}` placeholders in markdown docs at render time) and by
+> `FeedbackPanel.tsx` (which ships the version as feedback context). Updating
+> `package.json` after the build has no effect on what Nectar or uvx users actually see.
+>
+> **Note:** `frontend/public/references/general.md` itself ships with `{{VERSION}}` /
+> `{{BUILD_DATE}}` placeholders verbatim — the React markdown renderer substitutes them at
+> view time. Do **not** hand-edit the version literal in `general.md` (it will be
+> overwritten as soon as the docs registry refreshes).
 
-### 1. Bump all version strings (do this first, before any build)
+### 1. Bump all version strings + write the CHANGELOG entry (do this first, before any build)
 
 Update the version number in every location below before touching anything else:
 
 | File | What to change |
 |---|---|
-| `frontend/public/references/general.md` | Last line: `Version X.Y.Z - released on DD/Mon/YYYY.` |
-| `frontend/package.json` | `"version": "X.Y.Z"` |
+| `pyproject.toml` (root) | `version = "X.Y.Z"` — workspace metadata |
+| `backend/pyproject.toml` | `version = "X.Y.Z"` |
+| `frontend/package.json` | `"version": "X.Y.Z"` — Vite bakes this into the JS bundle |
 | `frontend/src-tauri/tauri.conf.json` | `"version": "X.Y.Z"` — controls desktop bundle filenames (DMG/MSI) |
 | `frontend/src-tauri/Cargo.toml` | `version = "X.Y.Z"` — Rust crate metadata |
-| `backend/pyproject.toml` | `version = "X.Y.Z"` |
 | `frontend/.env` | `VITE_DOCS_BASE_URL=https://australian-text-analytics-platform.github.io/ldaca-analytics-docs/vX.Y` — **minor version only** (e.g. `v0.4`), not patch |
+| `CHANGELOG.md` | Add a new `## [X.Y.Z] — YYYY-MM-DD` section above the previous top entry, plus a matching link reference at the bottom |
 
 > **Why `frontend/.env` is committed:** it contains only the public docs base URL — no
 > secrets. It is tracked so that both the local `npm run build` (step 2) and the Tauri
@@ -238,12 +246,22 @@ Update the version number in every location below before touching anything else:
 > Secrets and local overrides belong in `frontend/.env.local`, which remains gitignored.
 > If the minor version hasn't changed (patch release), this file does not need updating.
 
+> **CHANGELOG content:** follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+> format already used by the file — group changes under `### Added` / `### Changed` /
+> `### Fixed`. Skim `git log v<PREVIOUS-VERSION>..HEAD -- frontend/src backend/src` to
+> remind yourself what shipped; user-facing strings (button labels, panel titles) are
+> usually the easiest entry points into "what changed for the user".
+
 Then refresh the backend lockfile:
 
 ```bash
 cd /path/to/ldaca_web_app/backend
-uv lock
+env -u CONDA_PREFIX uv lock
 ```
+
+> **Conda interop:** `maturin`, `uv build`, and `uv lock` refuse to run if both
+> `VIRTUAL_ENV` and `CONDA_PREFIX` are set ("Please unset one of them"). If you have
+> a conda env active, prefix the affected commands with `env -u CONDA_PREFIX`.
 
 ### 2. Build the frontend from the root repo
 
@@ -264,28 +282,41 @@ This refreshes:
 - `backend/src/ldaca_web_app/resources/frontend/build.tar.gz`
 - `backend/src/ldaca_web_app/resources/frontend/build/`
 
-**Verify the version string was baked in correctly before proceeding:**
+**Verify the version literal was baked in correctly before proceeding.** Vite tree-shakes
+the version string into whichever assets reference `import.meta.env.VITE_APP_VERSION`
+(`DocumentView` for markdown rendering, `FeedbackPanel` for feedback context). Checking
+the main `index-*.js` is not enough — grep across every bundle JS asset:
 
 ```bash
-tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
-    build/references/general.md | tail -3
+for f in $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz | grep -E '\.js$'); do
+  hits=$(tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz "$f" \
+         | grep -cE '"?X\.Y\.Z"?')
+  if [ "$hits" -gt 0 ]; then echo "$hits hits in $f"; fi
+done
 ```
 
-The output must show `Version X.Y.Z`. If it still shows the previous version, the build ran
-before the version strings were updated — delete the build output and repeat steps 1–3.
+Substitute the actual `X.Y.Z` literal. Expect hits in `DocumentView-*.js` and
+`FeedbackPanel-*.js` at minimum. Zero total hits means Vite ran before `package.json` was
+updated — delete the build output and repeat steps 1–3.
 
-**Verify any new feature strings are present in the bundle:**
+> **Don't grep `build/references/general.md`.** That file ships the literal placeholders
+> `{{VERSION}}` / `{{BUILD_DATE}}` — they're resolved at render time by `DocumentView.tsx`,
+> not at build time. The bundle's general.md will always show the placeholders, so the
+> file isn't useful for version verification.
+
+**Verify any new feature strings are present in the bundle.** Pick a distinctive literal
+unique to the new feature (a button label, panel title, or class name) and confirm it
+ended up in the right asset:
 
 ```bash
-tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
-    $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
-      | grep 'assets/index.*\.js' | head -1) \
-  | grep -c "SomeNewFeatureString"
+for f in $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz | grep -E '\.js$'); do
+  hits=$(tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz "$f" \
+         | grep -cE "SomeNewFeatureString")
+  if [ "$hits" -gt 0 ]; then echo "$hits hits in $f"; fi
+done
 ```
 
-Replace `SomeNewFeatureString` with a distinctive identifier from the new feature (e.g. a
-button label, component name, or route). A count of `0` means the source change was not
-included in the build — do not proceed.
+Zero total hits means the source change was not included in the build — do not proceed.
 
 ### 4. Validate the backend release artifact
 
@@ -301,18 +332,40 @@ If `uvx ty check` is already failing on unrelated, pre-existing issues, record t
 
 ### 5. Publish the backend package repo
 
-From the `backend/` repo:
+From the `backend/` repo, commit the release prep on `dev` first, then fast-forward (or
+explicit merge) into `main` and tag from there:
 
 ```bash
 cd /path/to/ldaca_web_app/backend
 git add pyproject.toml uv.lock src/ldaca_web_app/resources/frontend/build.tar.gz
 git commit -m "Release v<VERSION>"
+git push origin dev
+
+git checkout main
+git pull --ff-only origin main
+git merge --ff-only dev   # or --no-ff if main has diverged — see callout below
 git push origin main
 git tag v<VERSION>
 git push origin v<VERSION>
 ```
 
-This triggers the backend repo's PyPI publish workflow.
+The tag push triggers the backend repo's PyPI publish workflow.
+
+> **Backend's `dev` may have diverged from `main`.** Releases historically tag from `main`,
+> but some feature work has been committed to `main` directly without back-merging to
+> `dev`. Before step 5, check:
+>
+> ```bash
+> git log origin/dev..origin/main --oneline   # commits on main that dev doesn't have
+> ```
+>
+> If non-empty, `git merge --ff-only dev` from `main` will fail with "Not possible to
+> fast-forward". Switch to `git merge --no-ff dev -m "Merge dev into main: Release v<VERSION>"`
+> and resolve conflicts. Expect conflicts on `pyproject.toml` (take `dev`'s version),
+> `uv.lock` (take `dev`'s refreshed lock), `build.tar.gz` (take `dev`'s rebuilt bundle),
+> and possibly substantive code files where both sides shipped features in the same area.
+> For substantive conflicts: take both sides where they're additive, and run
+> `env -u CONDA_PREFIX uv run --active pytest -q` before completing the merge commit.
 
 ### 6. Update the root repo to the new backend submodule pointer
 
@@ -320,11 +373,36 @@ From the root repo:
 
 ```bash
 cd /path/to/ldaca_web_app
-git add backend frontend/package.json frontend/public/references/general.md \
+git add CHANGELOG.md pyproject.toml backend \
+    frontend/package.json \
     frontend/src-tauri/tauri.conf.json frontend/src-tauri/Cargo.toml
-git commit -m "Release v<VERSION>: bump versions and sync backend submodule"
+git commit -m "Release v<VERSION>"
 git push origin dev
 ```
+
+> **Submodule pin discipline when a parallel release line is active.** When the
+> `multilingual` branch (or any other long-running line) is checked out locally before
+> you start the `dev` release, your working tree may have the `polars-text` /
+> `docworkspace` submodules pointed at multilingual-only SHAs that are **not** what `dev`
+> should pin. Before staging, run:
+>
+> ```bash
+> git submodule status   # lines starting with `+` differ from the tree's recorded SHA
+> git ls-tree origin/main -- polars-text docworkspace   # what main currently pins
+> ```
+>
+> If `git status` shows `modified: polars-text` or `modified: docworkspace` and they
+> shouldn't ship in this release (e.g. they advance only because of multilingual Phase 5
+> work), revert each submodule HEAD to the right SHA before staging:
+>
+> ```bash
+> git -C polars-text checkout <release-SHA>
+> git -C docworkspace checkout <release-SHA>
+> ```
+>
+> Then `git add <submodule>` to capture the revert in the release commit. The release
+> commit should bump only the submodules that were intentionally advanced for the version
+> being shipped.
 
 ### 7. Verify the published `uvx` package
 
