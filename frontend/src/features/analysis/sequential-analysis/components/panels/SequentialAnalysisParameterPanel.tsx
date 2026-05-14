@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
+import { EXTENDED_PALETTE, getNodeIdentifier, useNodeColorManagement } from '@/features/analysis/common';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -130,20 +131,32 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
   onGroupByColumnChange,
   caseSensitive,
   onCaseSensitiveChange,
-}) => (
+}) => {
+  const activeNodeIds = selectedNodes
+    .map((node, idx) => getNodeIdentifier(node, idx))
+    .filter((id): id is string => Boolean(id));
+  // Same color-management hook used by Concordance / Topic Modelling /
+  // Frequency / Quotation / AI Annotator. Drives the picked-colour name
+  // tinting in NodeSelectionPanel so every analysis tab looks uniform.
+  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
+    activeNodeIds,
+    palette: EXTENDED_PALETTE,
+  });
+
+  return (
   <>
     <NodeSelectionPanel
       selectedNodes={selectedNodes}
       nodeColumnSelections={nodeColumnSelections}
       onColumnChange={onColumnChange}
-      nodeColors={{}}
-      onColorChange={() => {}}
+      nodeColors={nodeColors}
+      onColorChange={handleColorChange}
       getNodeColumns={() => timeCompatibleColumns}
-      defaultPalette={[]}
+      defaultPalette={defaultPalette}
       maxCompare={1}
       className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
       showShape
-      showColorPicker={false}
+      showColorPicker
       disabled={!!isLocked}
       locked={!!isLocked}
       originalCount={displayNodeCount}
@@ -333,4 +346,5 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
       </div>
     </div>
   </>
-);
+  );
+};

@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { saveBlob } from '@/lib/download';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
+import { EXTENDED_PALETTE } from '@/features/analysis/common';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -232,17 +233,26 @@ const ExportFeature: React.FC = () => {
                   Choose data blocks in the graph sidebar to enable exports.
                 </div>
               )}
-              {selectedNodes.map((n: GraphNode) => {
+              {selectedNodes.map((n: GraphNode, idx: number) => {
                 const info = toDisplay(n);
                 const status = downloadingIds[info.id ?? ''] ?? 'idle';
                 const isDownloading = status === 'downloading';
+                // Match the picked-colour name treatment used by every
+                // analysis tab's NodeSelectionPanel — EXTENDED_PALETTE,
+                // cycled by node index so the visual rhythm matches.
+                const nameColor = EXTENDED_PALETTE[idx % EXTENDED_PALETTE.length];
                 return (
                   <div
                     key={info.id}
                     className="border-border/40 bg-card/60 hover:bg-card/80 flex flex-col gap-3 rounded-md border p-3 transition md:flex-row md:items-center md:justify-between"
                   >
                     <div className="space-y-1">
-                      <p className="text-foreground text-sm font-semibold">{info.name}</p>
+                      <p
+                        className="text-sm font-semibold"
+                        style={{ color: nameColor }}
+                      >
+                        {info.name}
+                      </p>
                       {info.shape && (
                         <p className="text-muted-foreground text-xs">Shape: {info.shape}</p>
                       )}

@@ -56,6 +56,8 @@ import {
   restoreAnalysisLockFromRequest,
   useAnalysisLock,
   useAnalysisFeature,
+  useNodeColorManagement,
+  EXTENDED_PALETTE,
   getAnalysisActionState,
   executeAnalysisRunOrUpdate,
   type NodePaginationState,
@@ -179,6 +181,16 @@ const QuotationFeature: React.FC = () => {
   const activeSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
   const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
+  const activeNodeIds = displayedNodes
+    .map((node, idx) => getNodeIdentifier(node, idx))
+    .filter((id): id is string => Boolean(id));
+  // Same color-management hook the other analysis tabs use — gives every
+  // selected node a stable picked-colour for the name display in
+  // NodeSelectionPanel (and downstream charts, if/when added).
+  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
+    activeNodeIds,
+    palette: EXTENDED_PALETTE,
+  });
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
@@ -846,14 +858,14 @@ const QuotationFeature: React.FC = () => {
             selectedNodes={displayedNodes}
             nodeColumnSelections={activeSelections}
             onColumnChange={handleColumnChange}
-            nodeColors={{}}
-            onColorChange={()=>{}}
+            nodeColors={nodeColors}
+            onColorChange={handleColorChange}
             getNodeColumns={getColumnInfos}
-            defaultPalette={[]}
+            defaultPalette={defaultPalette}
             maxCompare={1}
             className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
             showShape
-            showColorPicker={false}
+            showColorPicker
             disabled={!!isLocked}
             locked={!!isLocked}
             originalCount={displayNodeCount}
