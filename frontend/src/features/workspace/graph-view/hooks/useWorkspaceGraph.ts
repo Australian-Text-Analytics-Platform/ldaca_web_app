@@ -18,6 +18,9 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { isGraphDebugEnabled } from '@/lib/debugFlags';
+import { nodeVisualInfo } from '@/lib/nodeVisualState';
+import { useNodeColorsStore } from '@/stores/nodeColorsStore';
+import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
 
 const EDGE_STROKE = '#0f172a';
@@ -125,6 +128,13 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   );
 
 
+  // Per-node visual state (active / focus / unselected + X/Y colour pair)
+  // is computed here once per render so CustomNode is purely presentational
+  // — it just renders what data carries. See the strategy doc for the
+  // active/focus split rules.
+  const assignedColors = useNodeColorsStore((state) => state.colors);
+  const currentView = useUIStore((state) => state.currentView);
+
   const initialNodes = useMemo(() => {
     if (!workspaceGraph?.nodes) {
       return [];
@@ -193,6 +203,11 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           },
           isMultiSelected:
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
+          visualInfo: nodeVisualInfo(node.id, {
+            selectedNodeIds: selectedNodeIds ?? [],
+            currentView,
+            assignedColors,
+          }),
           onDelete: handleDelete,
           onRename: handleRename,
           onCopy: handleCopy,
@@ -205,7 +220,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         connectable: false,
       } as Node;
     });
-  }, [workspaceGraph, selectedNodeIds, handleDelete, handleRename, handleCopy, handleUndo, handleRedo, dlog]);
+  }, [workspaceGraph, selectedNodeIds, currentView, assignedColors, handleDelete, handleRename, handleCopy, handleUndo, handleRedo, dlog]);
 
   const initialEdges = useMemo(() => {
     if (!workspaceGraph?.edges) {

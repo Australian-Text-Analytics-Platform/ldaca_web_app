@@ -1,7 +1,10 @@
 import React from 'react';
-import { X } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { nodeVisualInfo, type NodeVisualState } from '@/lib/nodeVisualState';
+import { useNodeColorsStore } from '@/stores/nodeColorsStore';
+import { useUIStore } from '@/stores';
+import type { ColorPair } from '@/lib/color';
 import type { SidebarWorkspaceNode } from './types';
 
 type SidebarNodesSectionProps = {
@@ -9,6 +12,30 @@ type SidebarNodesSectionProps = {
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
   onClearSelection?: () => void;
+};
+
+/** Sidebar check icon mirroring the node-colour strategy doc:
+ *   - active     → filled dot in pair.X + white tick
+ *   - focus      → filled dot in pair.Y + white tick (same tick, lighter fill)
+ *   - unselected → outline circle in pair.X, no fill, no tick
+ *
+ * Replaces the previous shadcn ``<Checkbox>`` which only knew about
+ * checked/unchecked. The text label next to it stays the standard
+ * foreground colour (not tinted) — the strategy doc is explicit that
+ * the colour rides on the icon only.
+ */
+const NodeCheckIcon: React.FC<{ state: NodeVisualState; pair: ColorPair }> = ({ state, pair }) => {
+  const isUnselected = state === 'unselected';
+  const fill = state === 'active' ? pair.X : state === 'focus' ? pair.Y : 'transparent';
+  return (
+    <span
+      className="pointer-events-none flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2"
+      style={{ borderColor: pair.X, backgroundColor: fill }}
+      aria-hidden="true"
+    >
+      {!isUnselected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+    </span>
+  );
 };
 
 const formatShapeLabel = (node: SidebarWorkspaceNode): string => {
@@ -36,6 +63,17 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
 }) => {
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
+
+  // Per-node visual state (active / focus / unselected) + X/Y colour pair
+  // derived from the global node-colour store and the currently-active
+  // analytics view. See ``lib/nodeVisualState.ts`` + the strategy doc.
+  const assignedColors = useNodeColorsStore((state) => state.colors);
+  const currentView = useUIStore((state) => state.currentView);
+  const selectionContext = {
+    selectedNodeIds: selectedNodeIds ?? [],
+    currentView,
+    assignedColors,
+  };
 
   // Order: selected nodes first in reverse selection order (latest first),
   // followed by unselected nodes sorted alphabetically (case-insensitive) by display name.
@@ -81,6 +119,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
             const shape = formatShapeLabel(node);
             const checked = selectedNodeIds?.includes(node.id) ?? false;
             const tooltip = `${displayName}\nShape: ${shape}`;
+            const { state, pair } = nodeVisualInfo(node.id, selectionContext);
 
             return (
               <div
@@ -105,12 +144,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                     : 'hover:border-border/60 hover:bg-accent/60',
                 )}
               >
-                <Checkbox
-                  checked={checked}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  className="pointer-events-none h-5 w-5 shrink-0 rounded-full border-border/70 text-primary-foreground data-[state=checked]:border-primary data-[state=checked]:bg-primary"
-                />
+                <NodeCheckIcon state={state} pair={pair} />
                 <span className="flex-1 min-w-0 truncate text-sm font-medium text-foreground">
                   {displayName}
                 </span>
