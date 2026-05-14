@@ -3,6 +3,44 @@
 User-facing changes to the LDaCA Text Analytics Web Application since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] — 2026-05-15
+
+The "multilingual" release. Opens the v0.4 line with end-to-end Japanese, Korean, and Chinese support across the analysis tools, plus a from-the-ground-up rework of how the workspace graph communicates node identity through colour. Also folds in the smaller 0.3.x improvements that shipped after 0.2.9 without their own CHANGELOG entries.
+
+### Added
+
+- **Multilingual concordance, token frequency, topic modelling, and AI annotation.** A new **Language** selector on the file-import panel tags each corpus at ingest time, and that tag flows through every downstream analysis tool. Concordance, token frequency, and topic modelling now use language-appropriate tokenisation and stopwords; AI annotation passes the corpus language as a prompt hint. Languages currently supported: English, Japanese, Korean, Simplified/Traditional Chinese, Vietnamese, French, German, Spanish, Portuguese, Italian, Indonesian.
+- **Tokenise action on the workspace graph.** Right-click any node and run *Tokenise* to add a derived `__derived__.tokens` column using Lindera (JA/KO), Jieba (ZH), or whitespace + lowercasing (everything else). Derived columns are first-class graph metadata — they survive clone / filter / slice / concat / join / expression operations and are exposed via the new per-node *Manage derived columns* dialog. The concordance and token-frequency tabs auto-pick the tokens column when present.
+- **Concordance search-mode toggle (text / tokens).** A new toggle in the concordance parameter panel switches between substring matching (the previous behaviour, still the default for English-only corpora) and exact-token matching against the derived tokens column. Required for accurate concordance on CJK languages where character-level substring matching is meaningless. The whole-word toggle is automatically suppressed on nodes whose corpus language is CJK.
+- **Lindera tokeniser model picker.** When tokenising a JA or KO corpus, choose between `ipadic`, `unidic`, `jumandic` (JA), or `ko-dic` (KO). Dictionaries are fetched on demand from the LDaCA-hosted `SIH/lindera-dicts` registry with matching size hints displayed in the picker.
+- **Workspace node colours.** Every node on the workspace graph now carries an X/Y shade pair derived from a 12-colour palette, persisted per workspace in a new `ui_state.json` sidecar so colours survive page reloads and workspace switches. Three visual states (Active / Focus / Unselected) make it clear at a glance which nodes the current analysis tab is operating on. Manual picks via the per-tab colour picker preview before *Run* commits them. Newly-created nodes (from detach / clone / join / stack) get a 3-px black outline until you first interact with them so derivations are easy to find amid many similar grey blocks. See `frontend/docs/developer-guide/node-colour-strategy.md` for the full design.
+- **Workspace UI-state backend** (`GET` / `PUT` `/workspaces/{id}/ui-state`). Free-form JSON sidecar persisted alongside the workspace's `metadata.json`, deliberately separate so the docworkspace data model stays free of UI concerns. The frontend currently writes only the assigned colour map; future presentation prefs (column visibility, layout) can land here without a backend release.
+- **Multi-language stopword support in topic modelling and token frequency.** The stopword pool now merges per-corpus language-specific lists when multiple languages are present in the working set, and exposes a read-only "view list" of the currently-active stopwords so you can see exactly what's being filtered. Stopword archives are now included in the topic-modelling zip download.
+- **Post-fit stopword filter on topic-modelling representative words.** Apply additional stopwords after a topic-modelling run to clean up label words without re-running the embedder. *Words per topic* output now scales up to `max(50, 2 × setting)` so you can inspect a wider tail of representative words after fitting.
+- **Sample-data catalogue.** The *Add Sample Data* panel is now a multi-collection picker driven by a remote catalogue (`/api/sample-data/catalogue`). Datasets are downloaded on demand from `ldaca-analytics-sample-data`, so the install size of the app shrinks substantially and the catalogue can grow without a release.
+- **Per-source model picker for concordance + token frequency.** When more than one tokenisation exists on the same source node (e.g. you tokenised once with `ipadic` and once with `unidic`), a model dropdown lets you pick which derived column to analyse. The intersection of available models across selected nodes drives the dropdown options.
+- **Workspace graph toolbar: batch Delete.** The previous *Save* button — redundant since workspaces autosave — is replaced with a *Delete (n)* action that batch-removes all multi-selected nodes in one call.
+- **Workspace graph layout: virtual super-source.** Multiple roots in the same workspace now left-align uniformly via a virtual super-source node, removing the visual staircasing the previous layout produced.
+
+### Changed
+
+- **Concordance KWIC alignment.** Left-context column is now right-aligned and the matched-text column is centred, so the keyword runs as a clean vertical band down the middle of the table.
+- **Export panel header.** Shows the workspace **name** instead of the internal UUID, and drops the per-data-block UUID line — the human-readable name plus shape is enough context for the export action.
+- **Selected-data-block styling is unified across every analysis tab.** Concordance, token frequency, quotation, sequential analysis, topic modelling, AI annotation, and export now all use the same `NodeSelectionPanel` rendering, with the same colour treatment driven by the global colour store. Previously each tab maintained its own copy and they drifted in font, padding, and palette.
+- **Frontend version is baked into the bundle at build time.** `import.meta.env.VITE_APP_VERSION` is now substituted into in-app markdown docs at render time (`{{VERSION}}` / `{{BUILD_DATE}}` placeholders) and shipped as feedback-form context, so the version a user sees always matches the bundle they're running.
+- **Detach dialog: derived columns hidden.** `__derived__.*` columns no longer appear in the column pickers for detach (concordance, quotation, topic modelling, AI annotation), in row-detail dialogs, or in exported files. The derived registry remains accessible via the per-node *Manage derived columns* dialog.
+
+### Fixed
+
+- **Derived registry propagation.** Derived columns are now correctly carried across `clone`, `filter`, `slice`, `concat`, `join`, and expression-evaluation operations on docworkspace nodes. Previously, derivations registered on a parent node disappeared from any operation result, so re-tokenising was needed after every preprocessing step.
+- **Concordance materialise + page-size probe.** Materialising a concordance result now honours the selected search mode, and the page-size probe tightened so processed-count labels read `min(page_size, corpus_size)` rather than always page_size.
+- **AI annotation detach output is materialised** into the workspace data dir alongside the source, so detached annotation blocks survive the workspace artifact-cleanup pass.
+- **Topic-modelling detach output is materialised** for the same reason.
+- **Topic-modelling re-aggregation slider** no longer overwrites the in-place assignments parquet, so previously-detached blocks remain readable across slider movements.
+- **Filter datetime literals are cast to match the column dtype** so timezone-typed datetime columns can be filtered against naive date literals without raising.
+- **DerivedColumnsDialog reactively reflects deletions** instead of showing the deleted row until the dialog is closed and re-opened.
+- **ResizeObserver overlay suppression** during the analytics tab transitions; the overlay was triggered by a small font remeasure during the token-frequency stacking-breakpoint recalculation.
+
 ## [0.2.9] — 2026-05-06
 
 ### Added
@@ -67,6 +105,7 @@ The "topic-modelling optimisation" release. Brings the major performance and fea
 
 ---
 
+[0.4.0]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.4.0
 [0.2.9]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.9
 [0.2.8]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.8
 [0.2.7]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.7
