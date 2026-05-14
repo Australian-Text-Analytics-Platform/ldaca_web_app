@@ -3,6 +3,14 @@
 User-facing changes to the LDaCA Text Analytics Web Application since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.1] — 2026-05-15
+
+PyPI hot-fix for v0.4.0. The 0.4.0 wheel declared `docworkspace>=0.2.7` but the published 0.2.7 wheel didn't include the derived-column registry that the multilingual stack depends on, so end users installing via `uvx ldaca-web-app==0.4.0` hit `AttributeError` on the tokenise / concordance-tokens-mode / CJK topic-modeling paths. 0.4.1 raises the floor to `docworkspace>=0.2.8` (the just-released docworkspace wheel that ships the registry) and drops the local `tool.uv.sources` path-source override that masked the bug during release validation.
+
+### Fixed
+
+- **`docworkspace>=0.2.8`** — pulls in the derived-column registry that the v0.4 multilingual flows need (`Node.derived` dict + per-column metadata, propagated through clone / filter / slice / concat / join / expression).
+
 ## [0.4.0] — 2026-05-15
 
 The "multilingual" release. Opens the v0.4 line with end-to-end Japanese, Korean, and Chinese support across the analysis tools, plus a from-the-ground-up rework of how the workspace graph communicates node identity through colour. Also folds in the smaller 0.3.x improvements that shipped after 0.2.9 without their own CHANGELOG entries.
@@ -105,6 +113,7 @@ The "topic-modelling optimisation" release. Brings the major performance and fea
 
 ---
 
+[0.4.1]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.4.0
 [0.2.9]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.9
 [0.2.8]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.8
