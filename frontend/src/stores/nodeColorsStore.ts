@@ -79,6 +79,17 @@ interface NodeColorsState {
    * display. Temp entries for the promoted nodes are cleared. */
   promoteTempColors(tabKey: string, nodeIds: string[]): void;
 
+  /** Drop colour entries (assigned + per-tab temps + assignmentOrder)
+   * for nodeIds that are no longer in the live workspace.
+   * ``useWorkspaceGraph`` calls this whenever a fresh graph payload
+   * arrives so deleted nodes don't accumulate stale colour metadata
+   * in the store (and, once persistence lands, in the persisted
+   * sidecar). ``activeNodeIds`` is the authoritative current set;
+   * everything else is swept.
+   *
+   * Idempotent — no-op when nothing needs sweeping. */
+  pruneStaleColors(activeNodeIds: ReadonlyArray<string>): void;
+
   /** Test / future workspace-reset path. */
   reset(): void;
 }
@@ -211,6 +222,45 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
         colors: nextColors,
         assignmentOrder: nextOrder,
         temps: { ...state.temps, [tabKey]: nextTabTemps },
+      };
+    });
+  },
+
+  pruneStaleColors: (activeNodeIds) => {
+    set((state) => {
+      const alive = new Set(activeNodeIds);
+
+      // Sweep assigned colours.
+      const nextColors: ColorMap = {};
+      let colorsMutated = false;
+      for (const [id, color] of Object.entries(state.colors)) {
+        if (alive.has(id)) nextColors[id] = color;
+        else colorsMutated = true;
+      }
+
+      // Sweep assignmentOrder, preserving the surviving order.
+      const nextOrder = state.assignmentOrder.filter((id) => alive.has(id));
+      const orderMutated = nextOrder.length !== state.assignmentOrder.length;
+
+      // Sweep per-tab temps.
+      const nextTemps: Record<string, ColorMap> = {};
+      let tempsMutated = false;
+      for (const [tabKey, tabTemps] of Object.entries(state.temps)) {
+        const cleaned: ColorMap = {};
+        let tabMutated = false;
+        for (const [id, color] of Object.entries(tabTemps)) {
+          if (alive.has(id)) cleaned[id] = color;
+          else tabMutated = true;
+        }
+        nextTemps[tabKey] = cleaned;
+        if (tabMutated) tempsMutated = true;
+      }
+
+      if (!colorsMutated && !orderMutated && !tempsMutated) return state;
+      return {
+        colors: colorsMutated ? nextColors : state.colors,
+        assignmentOrder: orderMutated ? nextOrder : state.assignmentOrder,
+        temps: tempsMutated ? nextTemps : state.temps,
       };
     });
   },

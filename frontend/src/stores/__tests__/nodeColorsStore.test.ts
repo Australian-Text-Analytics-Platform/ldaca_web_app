@@ -116,3 +116,58 @@ describe('useNodeColorsStore — per-tab temp layer', () => {
     expect(useNodeColorsStore.getState().colors.a).toBeUndefined();
   });
 });
+
+describe('useNodeColorsStore — pruneStaleColors', () => {
+  beforeEach(() => {
+    useNodeColorsStore.getState().reset();
+  });
+
+  it('drops assigned colours for nodes not in the active set', () => {
+    useNodeColorsStore.getState().setColor('a', '#2563eb');
+    useNodeColorsStore.getState().setColor('b', '#dc2626');
+    useNodeColorsStore.getState().pruneStaleColors(['a']);
+    expect(useNodeColorsStore.getState().colors).toEqual({ a: '#2563eb' });
+  });
+
+  it('also drops the swept ids from assignmentOrder', () => {
+    useNodeColorsStore.getState().setColor('a', '#2563eb');
+    useNodeColorsStore.getState().setColor('b', '#dc2626');
+    useNodeColorsStore.getState().pruneStaleColors(['a']);
+    expect(useNodeColorsStore.getState().assignmentOrder).toEqual(['a']);
+  });
+
+  it('drops per-tab temp entries for swept nodes', () => {
+    useNodeColorsStore.getState().setTempColor('concordance', 'a', '#2563eb');
+    useNodeColorsStore.getState().setTempColor('concordance', 'b', '#dc2626');
+    useNodeColorsStore.getState().setTempColor('token-frequency', 'b', '#16a34a');
+    useNodeColorsStore.getState().pruneStaleColors(['a']);
+    expect(useNodeColorsStore.getState().temps.concordance?.a).toBe('#2563eb');
+    expect(useNodeColorsStore.getState().temps.concordance?.b).toBeUndefined();
+    expect(useNodeColorsStore.getState().temps['token-frequency']?.b).toBeUndefined();
+  });
+
+  it('is a no-op when every store entry is alive', () => {
+    useNodeColorsStore.getState().setColor('a', '#2563eb');
+    const before = useNodeColorsStore.getState().colors;
+    useNodeColorsStore.getState().pruneStaleColors(['a', 'b']);
+    // Reference equality — no-op should NOT clone the colours object.
+    expect(useNodeColorsStore.getState().colors).toBe(before);
+  });
+
+  it('does not assign a colour to a live nodeId that was missing before', () => {
+    // Sweep is one-way (drops), never seeds. ``ensureColors`` is the
+    // one that hands out new colours; this test guards against
+    // confusion between the two.
+    useNodeColorsStore.getState().pruneStaleColors(['a']);
+    expect(useNodeColorsStore.getState().colors.a).toBeUndefined();
+  });
+
+  it('sweeping with an empty active set drops everything', () => {
+    useNodeColorsStore.getState().setColor('a', '#2563eb');
+    useNodeColorsStore.getState().setTempColor('concordance', 'a', '#dc2626');
+    useNodeColorsStore.getState().pruneStaleColors([]);
+    expect(useNodeColorsStore.getState().colors).toEqual({});
+    expect(useNodeColorsStore.getState().temps.concordance).toEqual({});
+    expect(useNodeColorsStore.getState().assignmentOrder).toEqual([]);
+  });
+});

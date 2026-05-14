@@ -41,7 +41,7 @@ const NodeCheckIcon: React.FC<{
       style={{
         borderColor: pair.X,
         backgroundColor: fill,
-        ...(isFresh ? { outline: '2px solid #000', outlineOffset: '2px' } : {}),
+        ...(isFresh ? { outline: '3px solid #000', outlineOffset: '2px' } : {}),
       }}
       aria-hidden="true"
     >
