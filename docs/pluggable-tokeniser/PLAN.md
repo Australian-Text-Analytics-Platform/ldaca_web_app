@@ -1,7 +1,7 @@
 # Pluggable Tokeniser & Multilingual Support — Implementation Plan
 
 **Branch:** `multilingual` (root + `backend/`, `polars-text/`, `docworkspace/`)
-**Status:** Phase 4 frontend done; Phase 5 (Lindera) code-complete on `multilingual` branches — pending dict-hosting decision (HF dataset `ldaca/lindera-dicts` or equivalent) before the on-demand download path can be exercised end-to-end. Phase 3.2 (POS registry) still intentionally deferred.
+**Status:** Phase 4 frontend done; Phase 5 (Lindera JA + KO) done — dicts hosted at [`SIH/lindera-dicts`](https://huggingface.co/datasets/SIH/lindera-dicts) and verified end-to-end (cold-cache run 2026-05-14: 4 tests / 10.82s covering HF fetch → extract → IPADIC/UniDic/ko-dic tokenize + offset roundtrip). Phase 3.2 (POS registry) still intentionally deferred.
 **Branch history note:** Originally developed on `pluggable_tokeniser` — renamed to `multilingual` after Phase 4 to better reflect the actual scope (i18n resolver, multilingual embedder, language-aware UI all apply to any non-English corpus). The doc directory name (`docs/pluggable-tokeniser/`) is preserved to keep git history continuous.
 **Started:** 2026-05-09
 **Last synced from `dev`:** 2026-05-12 (merge `3a94214`); references audited and confirmed current
@@ -17,7 +17,7 @@
 | 2 — Derived tokens column on source node | ✅ done (v2 design — decision 7) | all 7 tasks landed across docworkspace + backend; 431 backend + 91 docworkspace tests green; consistency proof (2.6 tokens-mode + 2.7 freq path) lives |
 | 3 — Per-tool language routing | 🔄 6/7 done | 3.1, 3.5, 3.6, 3.7 (backend) + 3.3, 3.4 (polars-text) landed; 3.2 (POS language registry) paused — POS isn't exposed in the UI yet AND needs ZH/JA POS model selection + validation. 462 backend + 48 polars-text tests green. |
 | 4 — Frontend UI | ✅ done | All 7 tasks landed. 4.1 prefs store, 4.2 import-language selector, 4.3 right-click Tokenise dialog, 4.4 language threaded through per-feature API types, 4.5 quotation disabled-with-tooltip, 4.6 derived-columns row on graph card, 4.7 concordance Text/Tokens toggle with auto-pick. 328 frontend + 468 backend tests green. |
-| 5 — Lindera (Japanese + Korean) backend | 🔄 code-complete | 7 of 8 sub-tasks landed; 5.8 install-size CI metric deferred; pending dict-hosting account to exercise the on-demand download end-to-end. |
+| 5 — Lindera (Japanese + Korean) backend | ✅ done | All 8 sub-tasks landed; dicts hosted at `SIH/lindera-dicts`; cold-cache integration tests green. Install-size CI metric deferred (wheel itself doesn't grow). |
 
 This is the cross-module plan. Per-module sub-plans (to be added if needed):
 
@@ -218,7 +218,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 5 — Lindera (Japanese + Korean morphology) backend (~2 working sessions) 🔄 CODE-COMPLETE
+## Phase 5 — Lindera (Japanese + Korean morphology) backend (~2 working sessions) ✅ DONE
 
 **Goal:** word-level morpheme segmentation for Japanese **and Korean**, replacing the broken `cl-tohoku/bert-base-japanese-v3` JA recommendation and the working-but-sub-word `klue/bert-base` KO recommendation. Mirrors the Jieba pattern from Phase 1.9 — opaque model IDs (`"lindera-ja-ipadic"`, `"lindera-ja-unidic"`, `"lindera-ko-dic"`) routed through the existing `TokenizerBackend` enum.
 
@@ -235,8 +235,8 @@ These decisions came out of the planning discussion; documenting here so the rat
 | 5.4 | `RECOMMENDED_TOKENIZERS["ja"] = "lindera-ja-ipadic"`, `["ko"] = "lindera-ko-dic"`. New `RECOMMENDED_JA_DICTS` exposes user-facing IPADIC/UniDic labels for the frontend selector. | ✅ polars-text `0fa9337` | `test_models_registry`: 7 tests green including new `test_recommended_ja_dicts_starts_with_default_ja_model`. |
 | 5.5 | Backend i18n: thread the dict choice through the Tokenise worker payload. | ✅ no-op (verified) | The model ID is already a free-form string in the existing endpoint (`POST /workspaces/nodes/{id}/derived/tokens`, `TokeniseColumnRequest.model`). Frontend's new dict selector simply sets `model` to the chosen Lindera ID. No backend code changes required. |
 | 5.6 | Frontend dict selector. | ✅ root `7a711de` | `TokeniseDialog` renders a "Dictionary" select between Language and the free-form model input when the language has `availableDicts`. KO/ZH hide the selector (single canonical dict). LanguageOption gains `availableDicts` + `firstUseHint`. **Deviation:** AddFilePanel intentionally does NOT get a dict selector — cleaner UX is "AddFilePanel picks language only" (matches today's pattern; no model selection at import time). |
-| 5.7 | Tests: Rust offline unit + Python integration. | 🔄 polars-text `b8dde31` | Rust offline: 12/12 green. Python integration in `test_lindera_integration.py` is gated by `@pytest.mark.network` + `skipif(LDACA_LINDERA_DICT_REPO not set)` so 4 tests skip cleanly in CI/offline; run with `LDACA_LINDERA_DICT_REPO=<repo> pytest -m network` once the dict repo is live. **Install-size CI diff deferred** — needs a wheel-build pipeline addition, not a code change. |
-| 5.8 | Docs. | ✅ this commit | This section + `topic-modeling-cjk-fix.md` updated; both docs reflect that JA now works end-to-end **once the dict-hosting decision lands**. |
+| 5.7 | Tests: Rust offline unit + Python integration. | ✅ polars-text `b8dde31` (initial) + `ed01870` (cold-cache fix) | Rust offline: 12/12 green. Python integration: cold-cache run against `SIH/lindera-dicts` 2026-05-14 — 4 tests / 10.82s covering HF fetch → extract → IPADIC/UniDic/ko-dic tokenize + char-offset roundtrip. Gated by `@pytest.mark.network` + `skipif(LDACA_LINDERA_DICT_REPO not set)` so they skip cleanly in CI/offline. **Install-size CI diff deferred** — wheel itself doesn't grow (no embedded dicts); runtime cache-size tracking is the meaningful metric and would need a separate pipeline. |
+| 5.8 | Docs. | ✅ this section + HF README | PLAN.md + `topic-modeling-cjk-fix.md` updated; HF dataset has a README cross-linking the LDaCA tools repo, [Sydney Informatics Hub](https://informatics.sydney.edu.au/), and the [Language Data Commons of Australia](https://www.ldaca.edu.au/). |
 
 **Tests:** Rust offline unit (model-id routing + archive-name uniqueness); Python network-gated integration (real download path, tokenize JA + KO, char-offset roundtrip); frontend Vitest (selector visibility + first-use hint). Install-size diff is a follow-up.
 
@@ -245,8 +245,10 @@ These decisions came out of the planning discussion; documenting here so the rat
 - Cache dir is `<dirs::cache_dir()>/ldaca/lindera/<dict-name>/` — `~/Library/Caches/ldaca/lindera/` on macOS, `~/.cache/ldaca/lindera/` on Linux, `%LOCALAPPDATA%\ldaca\lindera\` on Windows.
 - `RECOMMENDED_TOKENIZERS` flipped: JA + KO now resolve to Lindera IDs out of the box.
 
-**Blockers before shipping end-to-end:**
-- **Dict-hosting decision.** The three tarballs (`ipadic-mecab-2.7.0-bin.tar.gz`, `unidic-mecab-2.1.2-bin.tar.gz`, `ko-dic-2.1.1-bin.tar.gz`) must be uploaded to the HuggingFace dataset at `ldaca/lindera-dicts` (or another repo, overridable via `LDACA_LINDERA_DICT_REPO`). Until then, any actual JA/KO tokenize call returns `Failed to fetch ... from HF dataset ldaca/lindera-dicts`. The integration tests are pre-written and will run as soon as the env var points at a reachable repo.
+**Verified end-to-end (cold-cache, 2026-05-14):**
+- Three tarballs (`ipadic-mecab-2.7.0-bin.tar.gz` ~15 MB, `unidic-mecab-2.1.2-bin.tar.gz` ~50 MB, `ko-dic-2.1.1-bin.tar.gz` ~34 MB) live at [`SIH/lindera-dicts`](https://huggingface.co/datasets/SIH/lindera-dicts).
+- After clearing both the HF blob cache and the ldaca dict cache, integration tests download → extract → tokenize JA(IPADIC) + JA(UniDic) + KO(ko-dic) + verify char-offset roundtrip in 10.82s.
+- Sample outputs: `今日は良い天気です` → `今日/は/良い/天気/です` (IPADIC); `한국어 형태소 분석은 흥미롭다` → `한국어/형태소/분석/은/흥미/롭/다` (ko-dic).
 
 **Open questions still outstanding:**
 - **Tauri offline behaviour.** First JA/KO use needs network. Tauri builds intended for fully-offline kiosks should pre-warm the cache during their install step (out of scope here, but doc the requirement).
