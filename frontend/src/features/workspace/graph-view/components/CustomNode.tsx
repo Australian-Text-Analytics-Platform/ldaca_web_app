@@ -13,6 +13,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { type WorkspaceNode, parseDerivedColumn } from '@/types';
+import { cn } from '@/lib/utils';
+import { DEFAULT_GREY_PAIR } from '@/lib/color';
+import type { NodeVisualInfo } from '@/lib/nodeVisualState';
 import TokeniseDialog from './TokeniseDialog';
 import DerivedColumnsDialog from './DerivedColumnsDialog';
 import { invalidateNodeInfoQuery, nodeInfoQueryOptions, type NodeInfo } from '@/lib/nodeInfo';
@@ -140,6 +143,10 @@ function DerivedColumnsDialogContainer({
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
   isMultiSelected?: boolean;
+  /** Pre-computed node visual state (active / focus / unselected +
+   * X/Y colour pair) from ``useWorkspaceGraph``. See the strategy doc:
+   * ``frontend/docs/developer-guide/node-colour-strategy.md``. */
+  visualInfo?: NodeVisualInfo;
   onDelete: (nodeId: string) => void;
   onRename?: (nodeId: string, newName: string) => void;
   onCopy?: (nodeId: string) => void;
@@ -152,7 +159,14 @@ const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
 /** React Flow node renderer for a workspace node. Shows a compact card when zoomed
  *  out, and a full card with metadata + action menu when zoomed in. */
 function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
-  const { node, isMultiSelected = false, onDelete, onRename, onCopy, onUndo, onRedo } = data;
+  const { node, isMultiSelected = false, visualInfo, onDelete, onRename, onCopy, onUndo, onRedo } = data;
+  // Fall back to the unselected-grey treatment if no visual info was
+  // attached (defensive — useWorkspaceGraph always provides one now,
+  // but CustomNode tests render without it).
+  const nodeVisualState = visualInfo?.state ?? 'unselected';
+  const nodeColorPair = visualInfo?.pair ?? DEFAULT_GREY_PAIR;
+  const isActive = nodeVisualState === 'active';
+  const isFocus = nodeVisualState === 'focus';
   const [showMenu, setShowMenu] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
@@ -259,14 +273,23 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     }
   };
 
-  // Unified highlight style: apply the multi-select (green) style for any selection (single or multi)
-  const isHighlighted = selected || isMultiSelected;
-  const nodeClasses = `
-    w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out
-    ${isHighlighted
-      ? 'border-green-500 bg-green-50 shadow-lg ring-2 ring-green-200'
-      : 'border-border shadow-md'}
-  `;
+  // Visual treatment driven by the node-colour strategy (see strategy
+  // doc). Active = Y fill + X stroke. Focus = Y fill, no stroke ring.
+  // Unselected (but with an assigned colour) = Y stroke, default fill.
+  // Unselected + grey default = the existing flat card look.
+  // ``selected`` from React Flow (single-click highlight) is treated as
+  // Focus visually when the node isn't already in the analysis window.
+  const isHighlighted = isActive || isFocus || selected;
+  const nodeClasses = 'w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out shadow-md';
+  // Stroke and ring follow Active > Focus/selected > Unselected.
+  const nodeBorderColor = isActive
+    ? nodeColorPair.X
+    : isFocus || selected
+      ? 'transparent'
+      : nodeColorPair.Y;
+  const nodeBoxShadow = isActive
+    ? `0 0 0 3px ${nodeColorPair.Y}, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`
+    : undefined;
 
   const formatShapePart = (value: number | null | undefined) =>
     typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
@@ -444,22 +467,28 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
 
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
-    const compactClasses = `
-      flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out
-      ${isHighlighted
-        ? 'border-green-500 bg-green-100 shadow-lg ring-2 ring-green-200'
-        : 'border-border bg-muted shadow-md'}
-    `;
+    const compactClasses = 'flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out shadow-md';
+    const compactBg = isHighlighted ? nodeColorPair.Y : undefined;
     return (
       <div
         className={compactClasses}
-        style={{ minWidth: '180px', maxWidth: '300px', position: 'relative' }}
+        style={{
+          minWidth: '180px',
+          maxWidth: '300px',
+          position: 'relative',
+          borderColor: nodeBorderColor,
+          backgroundColor: compactBg,
+          boxShadow: nodeBoxShadow,
+        }}
       >
         <div className="absolute right-2 top-2 z-10">
           {nodeActionControls}
         </div>
         {isHighlighted && (
-          <div className="w-3 h-3 bg-green-500 rounded-full mr-2.5 mt-2 shrink-0" />
+          <div
+            className="w-3 h-3 rounded-full mr-2.5 mt-2 shrink-0"
+            style={{ backgroundColor: nodeColorPair.X }}
+          />
         )}
         <div
           className="pr-16 font-bold text-3xl leading-snug whitespace-normal"
@@ -478,15 +507,35 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   }
 
   return (
-    <div className={nodeClasses} style={{ minWidth: '256px', minHeight: '120px', position: 'relative' }}>
-      {/* Node Header */}
-      <div className={`flex items-start justify-between p-2 rounded-t-lg border-b-2 min-h-fit relative ${
-        isHighlighted ? 'bg-green-100 border-green-300' : 'bg-muted border-border'
-      }`}>
+    <div
+      className={nodeClasses}
+      style={{
+        minWidth: '256px',
+        minHeight: '120px',
+        position: 'relative',
+        borderColor: nodeBorderColor,
+        boxShadow: nodeBoxShadow,
+      }}
+    >
+      {/* Node Header — top fill uses the Y (lighter) variant when the
+          node has any selection state so the top-strip mirrors the
+          assigned hue per the strategy doc's zoom-in fill pattern.
+          Falls back to the standard muted strip when unselected. */}
+      <div
+        className={cn(
+          'flex items-start justify-between p-2 rounded-t-lg border-b-2 min-h-fit relative',
+          !isHighlighted && 'bg-muted border-border',
+        )}
+        style={{
+          backgroundColor: isHighlighted ? nodeColorPair.Y : undefined,
+          borderColor: isHighlighted ? nodeColorPair.X : undefined,
+        }}
+      >
         <div className="flex items-center flex-1 mr-2">
           {isHighlighted && (
             <div
-              className="w-2 h-2 bg-green-500 rounded-full mr-2 shrink-0"
+              className="w-2 h-2 rounded-full mr-2 shrink-0"
+              style={{ backgroundColor: nodeColorPair.X }}
               title={isMultiSelected ? 'Selected for joining' : 'Selected'}
             ></div>
           )}
