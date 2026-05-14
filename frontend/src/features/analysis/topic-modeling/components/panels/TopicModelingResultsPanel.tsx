@@ -176,6 +176,14 @@ type Props = {
   selectAllDetachColumns: () => void;
   deselectAllDetachColumns: () => void;
   handleDetachConfirm: () => Promise<void> | void;
+  /** Post-fit stopword filter wiring. ``available`` is false when the run's
+   * resolved language doesn't have a bundled stopword list — the toggle
+   * is hidden in that case rather than greyed out, since there's no
+   * meaningful action available. */
+  stopwordFilterAvailable: boolean;
+  stopwordFilterEnabled: boolean;
+  onStopwordFilterToggle: (enabled: boolean) => void;
+  stopwordFilterLanguage?: string;
 };
 
 export function TopicModelingResultsPanel({
@@ -217,6 +225,10 @@ export function TopicModelingResultsPanel({
   toggleDetachColumn,
   selectAllDetachColumns,
   deselectAllDetachColumns,
+  stopwordFilterAvailable,
+  stopwordFilterEnabled,
+  onStopwordFilterToggle,
+  stopwordFilterLanguage,
   handleDetachConfirm,
 }: Props) {
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
@@ -268,44 +280,6 @@ export function TopicModelingResultsPanel({
 
         {isSuccessfulState ? (
           <div className="space-y-4">
-            <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-x-6">
-              <p className="shrink-0 text-sm text-muted-foreground">Topics ({topics.length})</p>
-              {showExactTopicCountControl && exactTopicCountRange ? (
-                <ExactTopicCountSlider
-                  key={currentExactTopicCount ?? exactTopicCountRange.min}
-                  currentExactTopicCount={currentExactTopicCount}
-                  exactTopicCountRange={exactTopicCountRange}
-                  isUpdatingExactTopicCount={isUpdatingExactTopicCount}
-                  onUpdateExactTopicCount={onUpdateExactTopicCount}
-                />
-              ) : (
-                <div className="hidden lg:block" />
-              )}
-              <Button
-                type="button"
-                size="sm"
-                className="w-full shrink-0 lg:w-auto"
-                onClick={() => void openDetachDialog()}
-                disabled={isDetachLoading || isDetaching || isUpdatingExactTopicCount}
-              >
-                {isDetachLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Preparing Add to Workspace…
-                  </>
-                ) : selectedTopicIds.size > 0 ? (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    {`Add to Workspace (${selectedTopicIds.size} topics)`}
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add to Workspace (all)
-                  </>
-                )}
-              </Button>
-            </div>
             <TopicModelingBubbleChartSection
               topics={topics}
               chartRef={chartRef}
@@ -326,6 +300,59 @@ export function TopicModelingResultsPanel({
               topicSizeMode={topicSizeMode}
               topicSizeValue={topicSizeValue}
               randomSeed={randomSeed}
+              controlRowSlot={
+                <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-x-6">
+                  <div className="flex shrink-0 items-center gap-3">
+                    <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
+                    {stopwordFilterAvailable ? (
+                      <label className="inline-flex cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={stopwordFilterEnabled}
+                          onChange={(e) => onStopwordFilterToggle(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input"
+                        />
+                        Hide {stopwordFilterLanguage ? `${stopwordFilterLanguage.toUpperCase()} ` : ''}stopwords
+                      </label>
+                    ) : null}
+                  </div>
+                  {showExactTopicCountControl && exactTopicCountRange ? (
+                    <ExactTopicCountSlider
+                      key={currentExactTopicCount ?? exactTopicCountRange.min}
+                      currentExactTopicCount={currentExactTopicCount}
+                      exactTopicCountRange={exactTopicCountRange}
+                      isUpdatingExactTopicCount={isUpdatingExactTopicCount}
+                      onUpdateExactTopicCount={onUpdateExactTopicCount}
+                    />
+                  ) : (
+                    <div className="hidden lg:block" />
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full shrink-0 lg:w-auto"
+                    onClick={() => void openDetachDialog()}
+                    disabled={isDetachLoading || isDetaching || isUpdatingExactTopicCount}
+                  >
+                    {isDetachLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Preparing Add to Workspace…
+                      </>
+                    ) : selectedTopicIds.size > 0 ? (
+                      <>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {`Add to Workspace (${selectedTopicIds.size} topics)`}
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add to Workspace (all)
+                      </>
+                    )}
+                  </Button>
+                </div>
+              }
             />
           </div>
         ) : null}

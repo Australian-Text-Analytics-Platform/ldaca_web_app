@@ -20,6 +20,8 @@ import { DocumentModalHost } from './components/dialogs/DocumentModalHost';
 import { ViewRouter } from './components/layout/ViewRouter';
 import { LAG_HINT_DELAY_MS } from './config/timings';
 import { useResizableSplit } from './hooks/useResizableSplit';
+import { loadRemoteRegistry } from './tutorials/remoteRegistry';
+import { DocsEolBanner } from './tutorials/DocsEolBanner';
 
 // Lazy load components for code splitting. Per-view feature components live
 // inside <ViewRouter> so the active feature unmounts cleanly on view switch.
@@ -336,6 +338,13 @@ const WorkspaceShell: React.FC = () => {
  * before rendering the main workspace shell.
  */
 const App: React.FC = () => {
+  // Kick off the docs registry hydrate + background refresh once on mount.
+  // Cache is read synchronously inside `loadRemoteRegistry` so the first
+  // modal open never sees an empty merged registry. `loadRemoteRegistry`
+  // is itself idempotent, so StrictMode's double-invoke is harmless.
+  useEffect(() => {
+    void loadRemoteRegistry();
+  }, []);
   const { ready: backendReady, error: backendError } = useBackendHealth();
   // Read feedback-modal state from the shared UI store; the pre-auth and
   // post-auth paths both surface the same Send-feedback button so it'd be
@@ -381,6 +390,7 @@ const App: React.FC = () => {
   return (
     <>
       {content}
+      <DocsEolBanner />
       <Toaster />
     </>
   );

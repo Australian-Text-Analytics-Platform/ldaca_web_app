@@ -5,26 +5,58 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { WorkspaceControls } from '../WorkspaceControls';
 
+const mockGraph = {
+  nodes: [
+    { id: 'a', name: 'Alpha', operation: 'import' },
+    { id: 'b', name: 'Beta', operation: 'filter' },
+    { id: 'c', name: 'Gamma', operation: 'filter' },
+  ],
+  edges: [
+    { source: 'a', target: 'b' },
+    { source: 'b', target: 'c' },
+  ],
+};
+
+const selectionState = { selectedNodeIds: [] as string[] };
+
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     currentWorkspace: { id: 'ws-1', name: 'Main Workspace' },
+    workspaceGraph: mockGraph,
   }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
-    saveWorkspace: vi.fn(),
     renameWorkspace: vi.fn(),
-    setCurrentWorkspace: vi.fn(),
+    deleteNode: vi.fn().mockResolvedValue(undefined),
+    clearSelection: vi.fn(),
+  }),
+}));
+
+vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
+  useWorkspaceSelection: () => ({
+    selectedNodeIds: selectionState.selectedNodeIds,
   }),
 }));
 
 describe('WorkspaceControls', () => {
-  it('renders save without rendering unload or a Save As action', () => {
+  it('replaces Save with a Delete (n) batch button and disables it below the threshold', () => {
+    selectionState.selectedNodeIds = ['a', 'b'];
     render(<TooltipProvider><WorkspaceControls /></TooltipProvider>);
 
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Unload' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();
+    // Save is gone — the batch slot is repurposed for delete.
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    const deleteButton = screen.getByRole('button', { name: /delete \(2\)/i });
+    // Below the 3-node minimum: disabled to keep batch deletion deliberate.
+    expect(deleteButton).toBeDisabled();
+  });
+
+  it('enables the Delete button once 3+ nodes are selected', () => {
+    selectionState.selectedNodeIds = ['a', 'b', 'c'];
+    render(<TooltipProvider><WorkspaceControls /></TooltipProvider>);
+
+    const deleteButton = screen.getByRole('button', { name: /delete \(3\)/i });
+    expect(deleteButton).toBeEnabled();
   });
 });

@@ -901,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "ldaca-web-app"
-version = "0.3.1"
+version = "0.2.8"
 source = { editable = "backend" }
 dependencies = [
     { name = "aiosqlite" },
@@ -962,7 +962,7 @@ dev = [
 
 [[package]]
 name = "ldaca-web-app-workspace"
-version = "0.3.1"
+version = "0.3.2"
 source = { virtual = "." }
 dependencies = [
     { name = "ldaca-loader" },

@@ -113,7 +113,11 @@ pids/
 .yarn-integrity
 
 # dotenv environment variables file
+# frontend/.env is intentionally committed — it holds only the public docs
+# base URL (VITE_DOCS_BASE_URL) baked into the Vite build. Secrets and local
+# overrides go in frontend/.env.local (still ignored).
 .env
+!frontend/.env
 .env.test
 
 # parcel-bundler cache (https://parceljs.org/)
