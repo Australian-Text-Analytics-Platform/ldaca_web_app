@@ -87,8 +87,13 @@ export const RowDetailPanel: React.FC<RowDetailPanelProps> = ({
     return rawText;
   })();
 
+  // Hide hidden derived analytic columns (``__derived__.<form>.<src>.<model>``)
+  // from every consumer of this dialog. The normal data-view path never sees
+  // them because the backend schema_filter strips them server-side, but the
+  // concordance fetch path keeps the full record, so they leak in here. Mirror
+  // the backend's ``is_derived_column_name`` check exactly.
   const metadataEntries = Object.entries(record).filter(
-    ([key]) => !excludeSet.has(key),
+    ([key]) => !excludeSet.has(key) && !key.startsWith('__derived__.'),
   );
 
   return (
