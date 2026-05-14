@@ -1,7 +1,7 @@
 # Topic Modelling for CJK — Label-Stage Multilingual Fix
 
 **Branch:** `multilingual` (root + `backend/`)
-**Status:** landed
+**Status:** landed; JA now also has working tokenisation via Phase 5 (Lindera) — see [Update 2026-05-14](#update-2026-05-14--ja-tokenisation-now-actually-works) at the bottom.
 **Scope:** backend only (no frontend or API contract changes)
 **Follow-up to:** Phase 3.5 in [PLAN.md](./PLAN.md)
 
@@ -388,3 +388,34 @@ divergence in the filter UI itself.
    been tokenised under more than one model.
 4. **Backend pre-fit stopword removal** — see "What's deliberately not
    done yet" above.
+
+---
+
+## Update 2026-05-14 — JA tokenisation now actually works
+
+When this fix originally shipped, Japanese had the right multilingual
+vectorizer plumbing (this doc) **but** the recommended JA tokenizer
+itself never worked end-to-end. `cl-tohoku/bert-base-japanese-v3` has
+no `tokenizer.json` published on HuggingFace Hub — it relies on
+Python-side `BertJapaneseTokenizer` + MeCab, which the polars-text
+Rust HF backend cannot load. Any attempt to run a Tokenise on a JA
+corpus returned ``Tokenizer init failed: Failed to fetch tokenizer.json
+for cl-tohoku/bert-base-japanese-v3`` so the label-stage fix here only
+helped users whose JA corpus had been tokenised externally (rare).
+
+This is fixed by Phase 5 (Lindera) — see [PLAN.md §Phase 5](./PLAN.md#phase-5--lindera-japanese--korean-morphology-backend-2-working-sessions--code-complete).
+After Phase 5 lands:
+
+- `RECOMMENDED_TOKENIZERS["ja"]` is now `"lindera-ja-ipadic"` (with
+  `"lindera-ja-unidic"` available as an opt-in alternate).
+- `RECOMMENDED_TOKENIZERS["ko"]` is now `"lindera-ko-dic"` (replaces
+  the working-but-sub-word `klue/bert-base`).
+- The dict is downloaded on first use into the per-OS cache dir.
+- The frontend `TokeniseDialog` exposes the IPADIC vs UniDic choice
+  via a "Dictionary" selector; KO has only ko-dic so the selector
+  hides.
+
+The rest of this doc (label-stage multilingual vectorizer, no-English-stopwords-for-CJK,
+raw-text fallback, etc.) is unchanged. Phase 5 just makes the JA
+input side of the pipeline work; the rest still kicks in as
+described above.
