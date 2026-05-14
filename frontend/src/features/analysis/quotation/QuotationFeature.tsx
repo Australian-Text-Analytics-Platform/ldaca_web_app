@@ -184,12 +184,14 @@ const QuotationFeature: React.FC = () => {
   const activeNodeIds = displayedNodes
     .map((node, idx) => getNodeIdentifier(node, idx))
     .filter((id): id is string => Boolean(id));
-  // Same color-management hook the other analysis tabs use — gives every
-  // selected node a stable picked-colour for the name display in
-  // NodeSelectionPanel (and downstream charts, if/when added).
-  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
-    activeNodeIds,
-    palette: EXTENDED_PALETTE,
+  // ``tabKey`` routes colour changes through this tab's temp layer —
+  // see the node-colour strategy doc. ``promoteTempColors`` is called
+  // from ``handleRunOrUpdate`` below to commit the preview on Run.
+  const { nodeColors, handleColorChange, defaultPalette, promoteTempColors } =
+    useNodeColorManagement({
+      activeNodeIds,
+      palette: EXTENDED_PALETTE,
+      tabKey: 'quotation',
   });
 
   const originalColumnsByNode = (() => {
@@ -672,6 +674,9 @@ const QuotationFeature: React.FC = () => {
   };
 
   const handleRunOrUpdate = async () => {
+    // Promote pending per-tab temp colours to assigned — Run is the
+    // commit trigger per the node-colour strategy doc.
+    promoteTempColors(activeNodeIds);
     await executeAnalysisRunOrUpdate({
       hasLockedParameterChanges: hasParamsChanged,
       clearResults,

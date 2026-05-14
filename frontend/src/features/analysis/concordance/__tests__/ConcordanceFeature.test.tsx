@@ -249,6 +249,7 @@ vi.mock('../../common', async () => {
       nodeColors: {},
       handleColorChange: vi.fn(),
       defaultPalette: ['#000000'],
+      promoteTempColors: vi.fn(),
     }),
     useSafeResult: () => {
       const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(mockInitialResult);

@@ -1,62 +1,135 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import { EXTENDED_PALETTE } from './palette';
 
 export interface UseNodeColorManagementConfig {
   activeNodeIds: string[];
-  /** Informational only — kept for backwards compatibility with call sites
-   * that still pass a palette. The actual stored colours are always drawn
-   * from EXTENDED_PALETTE so per-node colour identity is consistent across
-   * every analysis tab + Export. The picker swatches return the unified
-   * palette regardless of what's passed here. */
+  /** Informational only — kept for backwards compatibility. The store
+   * always uses ``EXTENDED_PALETTE`` so picker swatches and auto-assigned
+   * colours are consistent across every tab + Export. */
   palette?: string[];
+  /** Pass an analytics-tab identifier (typically the matching
+   * ``ViewType``) to route this hook through the per-tab **temp** layer
+   * instead of writing directly to the global assigned store. With
+   * ``tabKey`` set:
+   *   - active nodeIds get a tentative temp colour on selection
+   *     (``ensureTempColors``);
+   *   - manual picks via ``handleColorChange`` write to the temp;
+   *   - the returned ``nodeColors`` overlays temps on top of assigned
+   *     so the tab's UI shows the preview;
+   *   - leaving a node off the active list clears its temp so a
+   *     reselection rolls a fresh one;
+   *   - ``promoteTempColors`` is the action the tab's Run handler
+   *     calls to commit the pending temps to the assigned store.
+   * Omit for non-analytics callers (Export, sidebar / graph) which
+   * should reflect only the assigned colours. */
+  tabKey?: string;
 }
 
 export interface UseNodeColorManagementReturn {
-  /** Full nodeId → colour map from the global store. Subscribed reactively
-   * — any tab calling ``setColor`` triggers a re-render in every other tab
-   * showing the same node. */
   nodeColors: Record<string, string>;
-  /** Pin a manual colour override to a node. Surfaces in every tab. */
   handleColorChange: (nodeId: string, color: string) => void;
-  /** Palette exposed to the picker swatches. Always EXTENDED_PALETTE so
-   * picker UI is consistent across tabs. */
   defaultPalette: string[];
+  /** No-op for non-analytics callers; commits the current tab's temp
+   * colours to the assigned store for the given nodeIds. Call from
+   * the tab's Run / Apply / Search handler. */
+  promoteTempColors: (nodeIds: string[]) => void;
 }
 
 /**
- * Subscribes a tab to the global node-colour store and ensures that every
- * active node has a stable picked-colour.
+ * Subscribes a tab to the global node-colour store.
  *
- * Returns the same API as before, so call sites don't need to change. The
- * difference: there is no per-tab useState anymore — every tab + Export
- * shares one ``Record<nodeId, color>`` map. Selecting the same node in two
- * tabs produces the same colour; reselecting a previously-seen node
- * restores its prior colour rather than re-rolling.
+ * Without ``tabKey``: reads + writes the assigned store directly. Used
+ * by Export and any caller that wants the colour to take effect
+ * immediately.
+ *
+ * With ``tabKey``: routes through the per-tab temp layer. The user's
+ * picker changes become previews that the graph/sidebar do not yet
+ * see; on Run the temp promotes to assigned and the rest of the UI
+ * catches up.
  */
 export function useNodeColorManagement(
   config: UseNodeColorManagementConfig,
 ): UseNodeColorManagementReturn {
-  const { activeNodeIds } = config;
-  const colors = useNodeColorsStore((state) => state.colors);
+  const { activeNodeIds, tabKey } = config;
+  const assignedColors = useNodeColorsStore((state) => state.colors);
   const ensureColors = useNodeColorsStore((state) => state.ensureColors);
   const setColor = useNodeColorsStore((state) => state.setColor);
+  const tabTemps = useNodeColorsStore((state) =>
+    tabKey ? (state.temps[tabKey] ?? null) : null,
+  );
+  const ensureTempColors = useNodeColorsStore((state) => state.ensureTempColors);
+  const setTempColor = useNodeColorsStore((state) => state.setTempColor);
+  const clearTempColors = useNodeColorsStore((state) => state.clearTempColors);
+  const promoteTempColorsAction = useNodeColorsStore(
+    (state) => state.promoteTempColors,
+  );
 
-  // Stable key so we don't re-fire ensureColors on every render when the
-  // caller hands us a freshly-built array of the same ids.
+  // Stable key so we don't re-fire the ensure/clear effects on every
+  // render when the caller hands us a freshly-built array of the same
+  // ids.
   const idsKey = useMemo(() => activeNodeIds.join('|'), [activeNodeIds]);
 
+  // Ensure colours / temps for the active IDs whenever the active set
+  // changes. Two paths:
+  //   - tabKey set    → ensure per-tab temps
+  //   - tabKey unset  → ensure direct-assigned (legacy non-analytics path)
   useEffect(() => {
-    ensureColors(activeNodeIds);
-    // ``ensureColors`` is a stable reference from zustand; ``idsKey`` is
-    // the deduped fingerprint — re-running on activeNodeIds object identity
-    // would cause unnecessary churn.
+    if (tabKey) {
+      ensureTempColors(tabKey, activeNodeIds);
+    } else {
+      ensureColors(activeNodeIds);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey, ensureColors]);
+  }, [idsKey, tabKey, ensureColors, ensureTempColors]);
+
+  // Track the previous activeNodeIds set for tabKey'd callers so we
+  // can clear temps for nodes that left the active window. The fade
+  // semantic per the strategy doc: "When a temp fades — when the node
+  // is deselected within the tab."
+  const prevIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (!tabKey) {
+      prevIdsRef.current = [...activeNodeIds];
+      return;
+    }
+    const prev = prevIdsRef.current;
+    const dropped = prev.filter((id) => !activeNodeIds.includes(id));
+    if (dropped.length > 0) clearTempColors(tabKey, dropped);
+    prevIdsRef.current = [...activeNodeIds];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey, tabKey, clearTempColors]);
+
+  // Tab view: temps overlay assigned. Non-tab callers see just
+  // assigned (existing behaviour).
+  const nodeColors = useMemo<Record<string, string>>(() => {
+    if (!tabKey || !tabTemps) return assignedColors;
+    return { ...assignedColors, ...tabTemps };
+  }, [tabKey, assignedColors, tabTemps]);
+
+  const handleColorChange = useCallback(
+    (nodeId: string, color: string) => {
+      if (tabKey) {
+        setTempColor(tabKey, nodeId, color);
+      } else {
+        setColor(nodeId, color);
+      }
+    },
+    [tabKey, setColor, setTempColor],
+  );
+
+  const promoteTempColors = useCallback(
+    (nodeIds: string[]) => {
+      if (!tabKey || nodeIds.length === 0) return;
+      promoteTempColorsAction(tabKey, nodeIds);
+    },
+    [tabKey, promoteTempColorsAction],
+  );
 
   return {
-    nodeColors: colors,
-    handleColorChange: setColor,
+    nodeColors,
+    handleColorChange,
     defaultPalette: EXTENDED_PALETTE,
+    promoteTempColors,
   };
 }

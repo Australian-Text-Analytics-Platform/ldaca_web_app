@@ -4,7 +4,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
-import { EXTENDED_PALETTE, getNodeIdentifier, useNodeColorManagement } from '@/features/analysis/common';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -92,6 +91,13 @@ export interface SequentialAnalysisParameterPanelProps {
   onGroupByColumnChange: (index: number, value: string) => void;
   caseSensitive: boolean;
   onCaseSensitiveChange: (value: boolean) => void;
+
+  // Node-colour management (lifted from the panel to the feature
+  // parent so the same hook instance can expose ``promoteTempColors``
+  // to the Run handler). See node-colour strategy doc.
+  nodeColors: Record<string, string>;
+  defaultPalette: string[];
+  onColorChange: (nodeId: string, color: string) => void;
 }
 
 /**
@@ -131,18 +137,10 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
   onGroupByColumnChange,
   caseSensitive,
   onCaseSensitiveChange,
+  nodeColors,
+  defaultPalette,
+  onColorChange,
 }) => {
-  const activeNodeIds = selectedNodes
-    .map((node, idx) => getNodeIdentifier(node, idx))
-    .filter((id): id is string => Boolean(id));
-  // Same color-management hook used by Concordance / Topic Modelling /
-  // Frequency / Quotation / AI Annotator. Drives the picked-colour name
-  // tinting in NodeSelectionPanel so every analysis tab looks uniform.
-  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
-    activeNodeIds,
-    palette: EXTENDED_PALETTE,
-  });
-
   return (
   <>
     <NodeSelectionPanel
@@ -150,7 +148,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
       nodeColumnSelections={nodeColumnSelections}
       onColumnChange={onColumnChange}
       nodeColors={nodeColors}
-      onColorChange={handleColorChange}
+      onColorChange={onColorChange}
       getNodeColumns={() => timeCompatibleColumns}
       defaultPalette={defaultPalette}
       maxCompare={1}
