@@ -134,6 +134,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   // — it just renders what data carries. See the strategy doc for the
   // active/focus split rules.
   const assignedColors = useNodeColorsStore((state) => state.colors);
+  const pruneStaleColors = useNodeColorsStore((state) => state.pruneStaleColors);
   const currentView = useUIStore((state) => state.currentView);
   // "Fresh" = nodes that appeared mid-session (detach / join / stack /
   // clone / etc. outputs) and haven't been interacted with yet. The
@@ -149,7 +150,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   );
   useEffect(() => {
     observeNodeIds(currentGraphNodeIds);
-  }, [currentGraphNodeIds, observeNodeIds]);
+    // Drop colour entries for nodes that are no longer in the
+    // workspace (deleted via the graph or the API). Keeps the store
+    // — and the persisted sidecar, once that lands — free of stale
+    // colour metadata that would otherwise grow unbounded.
+    pruneStaleColors(currentGraphNodeIds);
+  }, [currentGraphNodeIds, observeNodeIds, pruneStaleColors]);
 
   const initialNodes = useMemo(() => {
     if (!workspaceGraph?.nodes) {

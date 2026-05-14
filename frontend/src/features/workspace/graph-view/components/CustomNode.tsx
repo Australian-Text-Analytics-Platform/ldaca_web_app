@@ -284,7 +284,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
           // ``isFresh`` overlay: black outline around newly-created
           // nodes that the user hasn't acknowledged yet. Renders
           // outside the border-box, doesn't shift layout.
-          ...(isFresh ? { outline: '2px solid #000', outlineOffset: '2px' } : {}),
+          ...(isFresh ? { outline: '3px solid #000', outlineOffset: '2px' } : {}),
         }}
       >
         <div className="absolute right-2 top-2 z-10">
@@ -327,7 +327,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         // ``isFresh`` overlay: black outline around newly-created
         // nodes that the user hasn't acknowledged yet. Renders
         // outside the border-box, doesn't shift layout.
-        ...(isFresh ? { outline: '2px solid #000', outlineOffset: '2px' } : {}),
+        ...(isFresh ? { outline: '3px solid #000', outlineOffset: '2px' } : {}),
       }}
     >
       {/* Node Header — top fill uses the Y (lighter) variant when the
