@@ -1,7 +1,7 @@
 # Pluggable Tokeniser & Multilingual Support — Implementation Plan
 
 **Branch:** `multilingual` (root + `backend/`, `polars-text/`, `docworkspace/`)
-**Status:** Phase 4 frontend done — branch ready for user testing. Phase 3.2 (POS registry) and Phase 5 (Lindera) intentionally deferred.
+**Status:** Phase 4 frontend done; Phase 5 (Lindera) planned and scoped — kicked off after JA user testing showed `cl-tohoku/bert-base-japanese-v3` cannot load via the Rust HF backend (no `tokenizer.json` on the Hub; depends on `BertJapaneseTokenizer` + MeCab). Phase 3.2 (POS registry) still intentionally deferred.
 **Branch history note:** Originally developed on `pluggable_tokeniser` — renamed to `multilingual` after Phase 4 to better reflect the actual scope (i18n resolver, multilingual embedder, language-aware UI all apply to any non-English corpus). The doc directory name (`docs/pluggable-tokeniser/`) is preserved to keep git history continuous.
 **Started:** 2026-05-09
 **Last synced from `dev`:** 2026-05-12 (merge `3a94214`); references audited and confirmed current
@@ -17,7 +17,7 @@
 | 2 — Derived tokens column on source node | ✅ done (v2 design — decision 7) | all 7 tasks landed across docworkspace + backend; 431 backend + 91 docworkspace tests green; consistency proof (2.6 tokens-mode + 2.7 freq path) lives |
 | 3 — Per-tool language routing | 🔄 6/7 done | 3.1, 3.5, 3.6, 3.7 (backend) + 3.3, 3.4 (polars-text) landed; 3.2 (POS language registry) paused — POS isn't exposed in the UI yet AND needs ZH/JA POS model selection + validation. 462 backend + 48 polars-text tests green. |
 | 4 — Frontend UI | ✅ done | All 7 tasks landed. 4.1 prefs store, 4.2 import-language selector, 4.3 right-click Tokenise dialog, 4.4 language threaded through per-feature API types, 4.5 quotation disabled-with-tooltip, 4.6 derived-columns row on graph card, 4.7 concordance Text/Tokens toggle with auto-pick. 328 frontend + 468 backend tests green. |
-| 5 (opt) — Lindera (Japanese) backend | ⏳ deferred | decision gate after Phase 4 ships |
+| 5 — Lindera (Japanese + Korean) backend | 📋 planned | scoped 2026-05-14; JA user testing surfaced that cl-tohoku cannot load via the Rust HF backend, so Phase 5 is no longer optional. Now covers both JA and KO morpheme segmentation. |
 
 This is the cross-module plan. Per-module sub-plans (to be added if needed):
 
@@ -66,7 +66,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 4. **Quotation extraction is explicitly English-only.** The upstream rule set is English/French only and won't generalise. Plan calls for a typed `UnsupportedLanguageError` and a UI tooltip, not silent English fallback.
 
-5. **Tokenizer paradigm pluggability is achievable in pure Rust.** `jieba-rs` and `lindera` are mature Rust crates. The polars-text architecture is not bound to HuggingFace's `tokenizers` crate; a small `TokenizerBackend` enum keeps everything in one Polars expression. **Jieba landed in Phase 1.9** (pulled forward from Phase 5) because character-level Chinese is not linguistically meaningful in practice — the plan owner is a Chinese speaker and confirmed this directly. Lindera (Japanese) stays in Phase 5, deferred until a Japanese speaker can verify; the same `TokenizerBackend` enum gains a third variant when that lands.
+5. **Tokenizer paradigm pluggability is achievable in pure Rust.** `jieba-rs` and `lindera` are mature Rust crates. The polars-text architecture is not bound to HuggingFace's `tokenizers` crate; a small `TokenizerBackend` enum keeps everything in one Polars expression. **Jieba landed in Phase 1.9** (pulled forward from Phase 5) because character-level Chinese is not linguistically meaningful in practice — the plan owner is a Chinese speaker and confirmed this directly. **Lindera follows in Phase 5** (no longer optional): JA user testing on 2026-05-14 showed `cl-tohoku/bert-base-japanese-v3` cannot load via the Rust HF backend (no `tokenizer.json` published; relies on Python `BertJapaneseTokenizer` + MeCab), and Korean's `klue/bert-base` works but is still sub-word, not morpheme. The same `TokenizerBackend` enum gains a third variant (`Lindera`) covering both languages.
 
 6. **Concordance keeps TWO modes, not one.** The current regex-on-raw-text mode is preserved as the default because partial-word patterns like `equ\w*` are a real linguistic affordance for English users that any DTM-only design would destroy. A second tokens-column-driven mode is added in Phase 2.6 for CJK and any case where exact-token-match + N-actual-token context (with language-appropriate segmentation) is the right semantics.
    - **Why this matters for CJK**: today, when concordance is run on Chinese text, `num_left_tokens=5` silently means "5 characters" because `BertPreTokenizer` falls back to per-character splitting in the absence of whitespace. The text-mode search still works (literal substring match), but the context window is much less semantically useful than the user expects. The tokens-column mode (after Phase 5 with Jieba/Lindera) gives "5 actual words left/right" which is what a corpus linguist actually wants.
@@ -218,21 +218,34 @@ These decisions came out of the planning discussion; documenting here so the rat
 
 ---
 
-## Phase 5 (optional) — Lindera (Japanese morphology) backend (~3–5 days) ⏳ DEFERRED
+## Phase 5 — Lindera (Japanese + Korean morphology) backend (~2 working sessions) 📋 PLANNED
 
-**Goal:** word-level Japanese morpheme segmentation as an alternative to char-level / WordPiece tokenization. Jieba (Chinese) was pulled forward into Phase 1.9; Phase 5 now covers Lindera only.
+**Goal:** word-level morpheme segmentation for Japanese **and Korean**, replacing the broken `cl-tohoku/bert-base-japanese-v3` JA recommendation and the working-but-sub-word `klue/bert-base` KO recommendation. Mirrors the Jieba pattern from Phase 1.9 — opaque model IDs (`"lindera-ja-ipadic"`, `"lindera-ja-unidic"`, `"lindera-ko-dic"`) routed through the existing `TokenizerBackend` enum.
 
-| #   | Task | Acceptance |
-|-----|------|------------|
-| 5.1 | Add `lindera` variant to the existing `TokenizerBackend` enum (introduced in Phase 1.9) | All Phase 1–4 tests still green |
-| 5.2 | On-demand IPADIC download (50–200 MB) mirroring the HF Hub flow at `tokenizer.rs:17-28`; cache in user data dir, not bundled | JA text segments into morphemes; install size unchanged before first JA use |
-| 5.3 | Update `RECOMMENDED_TOKENIZERS["ja"]` from `cl-tohoku/bert-base-japanese-v3` to a Lindera identifier | JA tokens are linguistically meaningful morphemes |
-| 5.4 | Surface in frontend selector as `ja-lindera` alternate | User can pick |
-| 5.5 | Measure install size before/after; document trade-off | Stays within size constraint per `project_deployment_targets` |
+**What changed since the original Phase 5 sketch:**
+1. **Scope expanded to KO.** Phase-4 Korean wiring landed with `klue/bert-base` (BertWordPiece sub-word) as a stopgap, but morpheme-level Korean needs ko-dic via Lindera — same crate, same enum variant, marginal extra work compared to JA-only.
+2. **User-selectable JA dict.** IPADIC and UniDic produce different morpheme granularity (UniDic is more accurate for modern text but ~4× the size). Frontend exposes the choice with brief explanations rather than picking one default for every discipline.
+3. **Dictionary loading is on-demand via HF Hub.** Per discussion 2026-05-14, the install-size hard constraint from `project_deployment_targets` wins over the Tauri-offline-first nicety — first JA/KO tokenize call downloads the binary dict (~12–100 MB depending on choice) to `~/.cache/ldaca/lindera/<dict>/` and caches it. Reuses the existing `hf-hub` Rust crate by hosting prebuilt dict binaries on a HuggingFace repo we control.
 
-**Tests:** parametrised JA fixtures comparing Lindera vs `cl-tohoku/bert-base-japanese-v3` outputs; install-size diff measured in CI.
+| #   | Task | Files / locations | Acceptance |
+|-----|------|--------------------|------------|
+| 5.1 | Add `lindera` crate dep (no embedded-dict feature flags — wheel stays slim) and introduce `TokenizerBackend::Lindera(LinderaTokenizer)` variant alongside `HuggingFace + Jieba`. Implement `tokenize_text` and `tokenize_text_with_offsets` for the new variant; Lindera emits `(surface, byte_start, byte_end)` per token, so the offsets API slots in the same way Jieba does. | `polars-text/Cargo.toml`, `polars-text/src/tokenizer.rs` | All Phase 1–4 tests still green; new Rust unit test tokenizes a known JA sentence via a synthetic mini-dict and reconstructs the source string from offsets (no network) |
+| 5.2 | New `polars-text/src/lindera_dict.rs` module: cache dir at `~/.cache/ldaca/lindera/<dict-name>/`, fetch tarball via `hf-hub`, extract, memoize the loaded `LinderaTokenizer` in the existing `REGISTRY` (`OnceCell<RwLock<HashMap<String, Arc<TokenizerBackend>>>>`). Three artifacts on a HuggingFace repo (`ldaca/lindera-dicts` — pending account confirmation): `ipadic-mecab-2.7.0-bin.tar.gz` (~25 MB), `unidic-mecab-2.1.2-bin.tar.gz` (~100+ MB), `ko-dic-2.1.1-bin.tar.gz` (~12 MB). | `polars-text/src/lindera_dict.rs` (new), `polars-text/src/tokenizer.rs` | Cache miss + hit code paths both unit-tested with a temp dir; SHA verification on the downloaded archive |
+| 5.3 | Route opaque model IDs in `load_backend`: `"lindera-ja-ipadic"`, `"lindera-ja-unidic"`, `"lindera-ko-dic"` all map to `TokenizerBackend::Lindera` with the matching dict path. Same shape as how `"jieba"` is routed today. | `polars-text/src/tokenizer.rs:load_backend` (around line 136) | Calling `ensure_tokenizer_for_model("lindera-ja-ipadic")` on a clean cache downloads → loads → memoizes; second call hits the in-memory registry |
+| 5.4 | Update `RECOMMENDED_TOKENIZERS` to point JA/KO at Lindera defaults; expose a separate `RECOMMENDED_JA_DICTS` mapping user-facing labels (`"IPADIC (recommended, ~25 MB)"`, `"UniDic (more accurate, ~100 MB)"`) to model IDs for the frontend selector. | `polars-text/polars_text/models.py`, `polars-text/tests/test_models_registry.py` | `RECOMMENDED_TOKENIZERS["ja"] == "lindera-ja-ipadic"`, `["ko"] == "lindera-ko-dic"`; existing tests still pass after extension |
+| 5.5 | Backend i18n: thread the dict choice (`lindera_ja_dict: "ipadic" \| "unidic"`) through the Tokenise worker payload + per-tool language routing where applicable. English/Chinese paths unchanged. | `backend/src/ldaca_web_app/core/i18n.py`, `backend/src/ldaca_web_app/core/worker_tasks_tokenize.py`, `backend/src/ldaca_web_app/api/workspaces/analyses/*.py` | A Tokenise request with `language=ja, dict=unidic` ends up calling the Rust side with `model="lindera-ja-unidic"`; `dict` is ignored for languages where it doesn't apply |
+| 5.6 | Frontend: when language=ja is picked in AddFilePanel / Tokenise dialog, show a secondary dropdown with the two JA dict options (labels + brief size hints). KO has no secondary selector (only ko-dic) — same pattern as ZH today (only jieba). First-use download triggers a toast: "Downloading IPADIC dictionary (~25 MB)…". | `frontend/src/features/files/import/AddFilePanel.tsx`, the Tokenise dialog, `frontend/src/lib/languages.ts` (add `availableDicts` field to `LanguageOption`) | Vitest covers the selector visibility logic; manual smoke test of the toast on a fresh cache |
+| 5.7 | Tests: Rust unit tests use a synthetic mini-dict (no network); Python integration tests (`@pytest.mark.network`) tokenize a small JA + KO fixture and assert known morpheme outputs; install-size diff measured before/after on a fresh wheel build. | `polars-text/tests/test_lindera_*.py` (new), CI install-size check | Tests green offline (network ones skip), wheel size unchanged before first JA/KO use |
+| 5.8 | Docs: update this PLAN.md to mark Phase 5 done, update `docs/pluggable-tokeniser/topic-modeling-cjk-fix.md` to note JA now actually works end-to-end. | `docs/pluggable-tokeniser/PLAN.md`, `docs/pluggable-tokeniser/topic-modeling-cjk-fix.md` | Status table reflects completion |
 
-**Decision gate before starting Phase 5:** ship Phase 1–4 (with Jieba for Chinese already live), validate the Chinese workflow with real users, then decide whether Japanese needs the same word-level treatment. The plan owner is a Chinese speaker and can verify Chinese end-to-end; Japanese verification requires a separate native-speaker test pass.
+**Tests:** Rust unit tests offline (synthetic mini-dict + offset reconstruction); Python integration tests marked `@pytest.mark.network` for the real download paths; frontend Vitest for the dict-selector visibility logic; install-size diff measured on a fresh wheel build.
+
+**Open questions to resolve while building:**
+- **Dict hosting account.** Default plan is `ldaca/lindera-dicts` on HuggingFace; if that org doesn't exist or you prefer a different one, swap before pushing the dict binaries. Mily can use a personal HF account as a stopgap.
+- **Tauri offline behaviour.** First JA/KO use needs network. Tauri builds intended for fully-offline kiosks should pre-warm the cache during their install step (out of scope here, but doc the requirement).
+- **POS routing.** Lindera also emits POS tags as a side effect. Phase 3.2 stays paused — Phase 5 lands tokens only, not POS. Whenever 3.2 resumes, Lindera's POS output is the natural source for JA/KO.
+
+**Decision gate met (2026-05-14):** Original gate was "JA native-speaker verification before pulling Phase 5 forward". The gate has shifted in practice — JA verification surfaced that `cl-tohoku/bert-base-japanese-v3` is unusable via the Rust HF backend, so the choice is "do Phase 5" or "ship a non-functional JA path". Phase 5 it is.
 
 ---
 
@@ -257,7 +270,7 @@ Phase-to-module map:
 - Phase 2: `polars-text` + `backend` + `docworkspace` (use one phase branch per submodule, coordinate the pin bump as a single root commit)
 - Phase 3: `polars-text` + `backend`
 - Phase 4: root only (frontend lives here)
-- Phase 5: `polars-text` + frontend (root)
+- Phase 5: `polars-text` + `backend` (worker payload threading) + frontend (root)
 
 **Periodic sync from `dev`:**
 Merge `dev` into each `multilingual` branch at minimum at every phase boundary, ideally every 1–2 weeks. The longer the divergence, the more painful the eventual reconciliation — particularly in `polars-text/src/expressions.rs`, `backend/.../worker_tasks_*.py`, and the docworkspace Node code, all of which see active bug-fix traffic.
@@ -302,4 +315,4 @@ The original plan called for a final merge to `dev` once Phase 4 stabilised. Tha
 
 - Do we want `xlm-roberta-base` as the multilingual default, or `bert-base-multilingual-cased`? XLM-R is generally better but has different vocabulary and slightly different speed profile.
 - Should the tokens column be persisted as a child node (separate `.plbin`) or as an additional column on the parent node? The plan above assumes a child node; revisit if join cost becomes the bottleneck.
-- Phase 5 sequencing: ship Phase 1–4 first and gather user feedback, or pull Phase 5 forward if the CJK testing reveals char-level segmentation is unusable for frequency analysis?
+- ~~Phase 5 sequencing: ship Phase 1–4 first and gather user feedback, or pull Phase 5 forward if the CJK testing reveals char-level segmentation is unusable for frequency analysis?~~ **Resolved 2026-05-14:** Phase 1–4 shipped on `multilingual`; JA testing showed `cl-tohoku/bert-base-japanese-v3` is unloadable via the Rust HF backend, so Phase 5 is no longer optional. Scoped expanded to cover KO morpheme segmentation as well — see [Phase 5](#phase-5--lindera-japanese--korean-morphology-backend-2-working-sessions--planned) for the implementation plan.
