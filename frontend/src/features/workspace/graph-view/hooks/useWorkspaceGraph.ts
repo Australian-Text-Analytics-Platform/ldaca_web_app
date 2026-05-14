@@ -267,29 +267,36 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const newNodeIds = initialNodes.map((node: Node) => node.id).join(',');
   const newEdgeIds = initialEdges.map((edge: Edge) => `${edge.source}-${edge.target}`).join(',');
 
-  const currentNodesSignature = nodes
-    .map((node: Node) => {
-      const nd = node.data as { node?: { data_type?: string; document_column?: string; name?: string; can_undo?: boolean; can_redo?: boolean } };
-      const dt = nd?.node?.data_type ?? 'unknown';
-      const docc = nd?.node?.document_column || '';
-      const name = nd?.node?.name || '';
-      const canUndo = nd?.node?.can_undo ? '1' : '0';
-      const canRedo = nd?.node?.can_redo ? '1' : '0';
-      return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}`;
-    })
-    .join(',');
+  /** Pull the fields the signature tracks. Colour state lives at
+   * ``data.visualInfo`` — pre-fix it was excluded, so when a node's
+   * assigned colour or active/focus state changed, the signature was
+   * identical and ``setNodes`` was skipped, leaving CustomNode rendered
+   * with stale data. Encode ``state:X`` (state + the bold colour) so
+   * any visible-colour change drives a re-render. */
+  type NodeDataSignatureShape = {
+    node?: {
+      data_type?: string;
+      document_column?: string;
+      name?: string;
+      can_undo?: boolean;
+      can_redo?: boolean;
+    };
+    visualInfo?: { state?: string; pair?: { X?: string } };
+  };
+  const nodeSignatureFor = (node: Node): string => {
+    const nd = node.data as NodeDataSignatureShape;
+    const dt = nd?.node?.data_type ?? 'unknown';
+    const docc = nd?.node?.document_column || '';
+    const name = nd?.node?.name || '';
+    const canUndo = nd?.node?.can_undo ? '1' : '0';
+    const canRedo = nd?.node?.can_redo ? '1' : '0';
+    const vis = nd?.visualInfo;
+    const visToken = `${vis?.state ?? '-'}:${vis?.pair?.X ?? '-'}`;
+    return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}:${visToken}`;
+  };
 
-  const newNodesSignature = initialNodes
-    .map((node: Node) => {
-      const nd = node.data as { node?: { data_type?: string; document_column?: string; name?: string; can_undo?: boolean; can_redo?: boolean } };
-      const dt = nd?.node?.data_type ?? 'unknown';
-      const docc = nd?.node?.document_column || '';
-      const name = nd?.node?.name || '';
-      const canUndo = nd?.node?.can_undo ? '1' : '0';
-      const canRedo = nd?.node?.can_redo ? '1' : '0';
-      return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}`;
-    })
-    .join(',');
+  const currentNodesSignature = nodes.map(nodeSignatureFor).join(',');
+  const newNodesSignature = initialNodes.map(nodeSignatureFor).join(',');
 
   const updateRafRef = useRef<number | null>(null);
   useEffect(() => {
