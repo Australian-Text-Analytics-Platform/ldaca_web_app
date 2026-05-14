@@ -14,7 +14,7 @@ const buildPath = join(projectRoot, 'build');
 const frontendPort = process.env.FRONTEND_PORT || '3000';
 const backendPort = process.env.VITE_BACKEND_PORT || '8001';
 
-console.log('Starting LDaCA Web App Frontend (Production)');
+console.log('Starting LDaCA Wordflow Frontend (Production)');
 console.log(`Frontend server: http://localhost:${frontendPort}`);
 console.log(`Backend API: http://localhost:${backendPort}`);
 console.log();
@@ -22,12 +22,12 @@ console.log();
 // Check if build folder exists
 if (!existsSync(buildPath)) {
   console.error('Build directory not found. This package may be corrupted.');
-  console.error('Try reinstalling: npx ldaca_web_app_frontend@latest');
+  console.error('Try reinstalling: npx ldaca_wordflow_frontend@latest');
   process.exit(1);
 }
 
 console.log('Tip: Customize ports with environment variables:');
-console.log(`  FRONTEND_PORT=${frontendPort} VITE_BACKEND_PORT=${backendPort} npx ldaca_web_app_frontend`);
+console.log(`  FRONTEND_PORT=${frontendPort} VITE_BACKEND_PORT=${backendPort} npx ldaca_wordflow_frontend`);
 console.log();
 console.log('Running optimized production build');
 console.log();

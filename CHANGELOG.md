@@ -1,7 +1,20 @@
 # Changelog
 
-User-facing changes to the LDaCA Text Analytics Web Application since v0.2.5.
+User-facing changes to the LDaCA Wordflow (previously "LDaCA Text Analytics Web Application") since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [0.4.2] — 2026-05-15
+
+The rename release. PyPI package, Python module, GitHub repo, and Tauri product name all flip from `ldaca-web-app` / `LDaCA Text Analytics` to `ldaca-wordflow` / `LDaCA Wordflow`. The behaviour of the app is unchanged from v0.4.1 — this release exists solely to land the rename in a single tagged commit.
+
+### Changed
+
+- **PyPI primary name is now `ldaca-wordflow`.** `pip install ldaca-wordflow` is the new install path. A one-shot legacy shim `ldaca-web-app==0.4.2` is also published; it pulls in `ldaca-wordflow==0.4.2` as its sole dependency, so existing `pip install ldaca-web-app` invocations keep working transparently. Future releases (0.5.0+) ship only to `ldaca-wordflow`.
+- **Python module: `ldaca_web_app` → `ldaca_wordflow`.** Update any downstream code that does `from ldaca_web_app import ...` to `from ldaca_wordflow import ...`.
+- **Console script: `ldaca-wordflow` is the canonical command.** The previous `ldaca-web-app` command remains as a back-compat alias on the same entry point, so existing systemd units and scripts keep working without edits.
+- **Docs URL.** The runtime documentation panel now resolves against `australian-text-analytics-platform.github.io/ldaca-wordflow-docs/v0.4/` (renamed from `ldaca-analytics-docs`). GitHub Pages does NOT auto-redirect for the docs site, so anyone deep-linking the old URLs will hit 404s — update bookmarks.
+- **Tauri productName.** Desktop builds now bundle as "LDaCA Wordflow" instead of "LDaCA Text Analytics". The Tauri bundle identifier (`au.edu.ldaca.text-analytics`) is **unchanged** to preserve in-place app updates on installed machines.
+- **GitHub repo names.** `Australian-Text-Analytics-Platform/ldaca_web_app` → `ldaca-wordflow`; `…/ldaca-analytics-docs` → `…/ldaca-wordflow-docs`. GitHub auto-redirects keep cloned working trees and existing PR / issue links functional.
 
 ## [0.4.1] — 2026-05-15
 
@@ -113,9 +126,10 @@ The "topic-modelling optimisation" release. Brings the major performance and fea
 
 ---
 
-[0.4.1]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.4.1
-[0.4.0]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.4.0
-[0.2.9]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.9
-[0.2.8]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.8
-[0.2.7]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.7
-[0.2.6]: https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/tag/v0.2.6
+[0.4.2]: https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/releases/tag/v0.4.2
+[0.4.1]: https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/releases/tag/v0.4.1
+[0.4.0]: https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/releases/tag/v0.4.0
+[0.2.9]: https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/releases/tag/v0.2.9
+[0.2.8]: https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/releases/tag/v0.2.8
+[0.2.7]: https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/releases/tag/v0.2.7
+[0.2.6]: https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/releases/tag/v0.2.6

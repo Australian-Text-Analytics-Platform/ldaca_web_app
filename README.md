@@ -1,11 +1,11 @@
-# LDaCA Web App Monorepo
+# LDaCA Wordflow Monorepo
 
-This repository contains the LDaCA web app and desktop app, plus the shared Python and Rust packages they depend on. The main product is a multi-platform text analytics application with a FastAPI backend, a React frontend, and a Tauri desktop shell.
+This repository (previously `ldaca_web_app`) contains the LDaCA Wordflow web app and desktop app, plus the shared Python and Rust packages they depend on. The main product is a multi-platform text analytics application with a FastAPI backend, a React frontend, and a Tauri desktop shell.
 
 ## Repository Overview
 
 - `frontend/`: React 19 + Vite frontend, shared UI, and Tauri desktop shell in `src-tauri/`
-- `backend/`: FastAPI backend (PyPI: `ldaca-web-app`, import: `ldaca_web_app`) and workspace/task APIs
+- `backend/`: FastAPI backend (PyPI: `ldaca-wordflow`, import: `ldaca_wordflow`) and workspace/task APIs
 - `docworkspace/`: lazy workspace graph library built around `Workspace` and `Node`
 - `polars-text/`: Rust/PyO3 Polars plugin package for concordance, quotation, tokenization, and related text analysis
 - `ldaca-tabulator/`: RO-Crate and tabular import/export utilities
@@ -14,7 +14,7 @@ This repository contains the LDaCA web app and desktop app, plus the shared Pyth
 
 ### Backend
 
-The backend lives under `backend/src/ldaca_web_app/` and is organized around:
+The backend lives under `backend/src/ldaca_wordflow/` and is organized around:
 
 - `api/`: FastAPI routers, mounted under `/api`
 - `analysis/`: in-memory task storage and request schemas
@@ -41,7 +41,7 @@ Heavy analyses such as topic modeling and `polars-text`-backed tasks run out of 
 
 `API Router -> Task Manager -> ProcessPoolExecutor -> worker task -> Parquet artifacts -> API result retrieval`
 
-Worker functions are registered in `backend/src/ldaca_web_app/core/worker.py`.
+Worker functions are registered in `backend/src/ldaca_wordflow/core/worker.py`.
 
 ### Frontend Commands
 
@@ -94,7 +94,7 @@ npm run test -w frontend -- --run
 ### Backend Commands
 
 ```sh
-cd backend && uv run uvicorn ldaca_web_app.main:app --reload --port 8001
+cd backend && uv run uvicorn ldaca_wordflow.main:app --reload --port 8001
 cd backend && uv run pytest -q
 cd backend && uvx ty check
 ```

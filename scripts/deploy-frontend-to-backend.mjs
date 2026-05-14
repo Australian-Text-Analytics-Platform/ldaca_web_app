@@ -10,7 +10,7 @@ const targetDir = resolve(
     repoRoot,
     'backend',
     'src',
-    'ldaca_web_app',
+    'ldaca_wordflow',
     'resources',
     'frontend',
 )

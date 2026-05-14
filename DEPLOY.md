@@ -31,14 +31,14 @@ Internet → Nginx (80/443) → FastAPI app (localhost:8001)
 ### 1. Clone / update the app
 
 ```bash
-cd /home/ubuntu/src/ldaca_web_app
+cd /home/ubuntu/src/ldaca_wordflow
 git pull
 git submodule sync --recursive
 git submodule update --init --recursive --checkout --force
 ```
 
 > The `git submodule update --init --recursive` step is mandatory: this
-> repo embeds the `ldaca_web_app_backend` package (along with
+> repo embeds the `ldaca_wordflow_backend` package (along with
 > `docworkspace` and `polars-text`) as git submodules, and a plain
 > `git pull` only advances the *submodule pointer* in the parent tree
 > without checking out the new submodule content. Skipping this leaves
@@ -91,14 +91,14 @@ Certificates are renewed automatically via a systemd timer — no manual renewal
 
 ### 4. Install the systemd Service
 
-The service file is located at `/etc/systemd/system/ldaca-web-app.service`.
+The service file is located at `/etc/systemd/system/ldaca-wordflow.service`.
 To install it from scratch:
 
 ```bash
-sudo cp /home/ubuntu/ldaca-web-app.service /etc/systemd/system/ldaca-web-app.service
+sudo cp /home/ubuntu/ldaca-wordflow.service /etc/systemd/system/ldaca-wordflow.service
 sudo systemctl daemon-reload
-sudo systemctl enable ldaca-web-app
-sudo systemctl start ldaca-web-app
+sudo systemctl enable ldaca-wordflow
+sudo systemctl start ldaca-wordflow
 ```
 
 The service file content:
@@ -111,15 +111,15 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/src/ldaca_web_app/backend
+WorkingDirectory=/home/ubuntu/src/ldaca_wordflow/backend
 Environment="MULTI_USER=true"
 Environment="CILOGON_CLIENT_ID=cilogon:/client_id/3f6c0af973d3cc270a404823d3bbf122"
 Environment="CILOGON_CLIENT_SECRET=_ooOmovo-g0vTwtVSziDNBuT0_mWjCmNTWN1SgeeukMQsdHUWvfHDxcJag2kb2cvJyGLV7l6ZjC--GUw-ftb2g"
 Environment="CILOGON_DISCOVERY_URL=https://test.cilogon.aaf.edu.au/.well-known/openid-configuration"
 Environment="CILOGON_REDIRECT_URI=https://analytics.ldaca.edu.au/api/auth/cilogon/callback"
-ExecStartPre=/bin/rm -rf /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend/build
-ExecStartPre=/bin/tar -xzf /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend/build.tar.gz -C /home/ubuntu/src/ldaca_web_app/backend/src/ldaca_web_app/resources/frontend
-ExecStart=/home/ubuntu/.local/bin/uv run ldaca-web-app --port 8001
+ExecStartPre=/bin/rm -rf /home/ubuntu/src/ldaca_wordflow/backend/src/ldaca_wordflow/resources/frontend/build
+ExecStartPre=/bin/tar -xzf /home/ubuntu/src/ldaca_wordflow/backend/src/ldaca_wordflow/resources/frontend/build.tar.gz -C /home/ubuntu/src/ldaca_wordflow/backend/src/ldaca_wordflow/resources/frontend
+ExecStart=/home/ubuntu/.local/bin/uv run ldaca-wordflow --port 8001
 Restart=on-failure
 RestartSec=5
 
@@ -155,18 +155,18 @@ are needed — the login button is served dynamically based on which provider is
 
 ```bash
 # Check status
-sudo systemctl status ldaca-web-app
+sudo systemctl status ldaca-wordflow
 
 # Start / stop / restart
-sudo systemctl start ldaca-web-app
-sudo systemctl stop ldaca-web-app
-sudo systemctl restart ldaca-web-app
+sudo systemctl start ldaca-wordflow
+sudo systemctl stop ldaca-wordflow
+sudo systemctl restart ldaca-wordflow
 
 # View live logs
-sudo journalctl -u ldaca-web-app -f
+sudo journalctl -u ldaca-wordflow -f
 
 # View recent logs (last 100 lines)
-sudo journalctl -u ldaca-web-app -n 100 --no-pager
+sudo journalctl -u ldaca-wordflow -n 100 --no-pager
 ```
 
 ### Nginx
@@ -255,7 +255,7 @@ Update the version number in every location below before touching anything else:
 Then refresh the backend lockfile:
 
 ```bash
-cd /path/to/ldaca_web_app/backend
+cd /path/to/ldaca_wordflow/backend
 env -u CONDA_PREFIX uv lock
 ```
 
@@ -266,21 +266,21 @@ env -u CONDA_PREFIX uv lock
 ### 2. Build the frontend from the root repo
 
 ```bash
-cd /path/to/ldaca_web_app
+cd /path/to/ldaca_wordflow
 npm run build -w frontend
 ```
 
 ### 3. Sync the built frontend into the backend package bundle
 
 ```bash
-cd /path/to/ldaca_web_app
+cd /path/to/ldaca_wordflow
 node scripts/deploy-frontend-to-backend.mjs
 ```
 
 This refreshes:
 
-- `backend/src/ldaca_web_app/resources/frontend/build.tar.gz`
-- `backend/src/ldaca_web_app/resources/frontend/build/`
+- `backend/src/ldaca_wordflow/resources/frontend/build.tar.gz`
+- `backend/src/ldaca_wordflow/resources/frontend/build/`
 
 **Verify the version literal was baked in correctly before proceeding.** Vite tree-shakes
 the version string into whichever assets reference `import.meta.env.VITE_APP_VERSION`
@@ -288,8 +288,8 @@ the version string into whichever assets reference `import.meta.env.VITE_APP_VER
 the main `index-*.js` is not enough — grep across every bundle JS asset:
 
 ```bash
-for f in $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz | grep -E '\.js$'); do
-  hits=$(tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz "$f" \
+for f in $(tar -tf backend/src/ldaca_wordflow/resources/frontend/build.tar.gz | grep -E '\.js$'); do
+  hits=$(tar -xOf backend/src/ldaca_wordflow/resources/frontend/build.tar.gz "$f" \
          | grep -cE '"?X\.Y\.Z"?')
   if [ "$hits" -gt 0 ]; then echo "$hits hits in $f"; fi
 done
@@ -309,8 +309,8 @@ unique to the new feature (a button label, panel title, or class name) and confi
 ended up in the right asset:
 
 ```bash
-for f in $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz | grep -E '\.js$'); do
-  hits=$(tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz "$f" \
+for f in $(tar -tf backend/src/ldaca_wordflow/resources/frontend/build.tar.gz | grep -E '\.js$'); do
+  hits=$(tar -xOf backend/src/ldaca_wordflow/resources/frontend/build.tar.gz "$f" \
          | grep -cE "SomeNewFeatureString")
   if [ "$hits" -gt 0 ]; then echo "$hits hits in $f"; fi
 done
@@ -321,11 +321,11 @@ Zero total hits means the source change was not included in the build — do not
 ### 4. Validate the backend release artifact
 
 ```bash
-cd /path/to/ldaca_web_app/backend
+cd /path/to/ldaca_wordflow/backend
 uv build
 uv run pytest -q
 uvx ty check
-uvx --from dist/ldaca_web_app-<VERSION>-py3-none-any.whl ldaca-web-app --help
+uvx --from dist/ldaca_wordflow-<VERSION>-py3-none-any.whl ldaca-wordflow --help
 ```
 
 If `uvx ty check` is already failing on unrelated, pre-existing issues, record that explicitly before releasing.
@@ -336,8 +336,8 @@ From the `backend/` repo, commit the release prep on `dev` first, then fast-forw
 explicit merge) into `main` and tag from there:
 
 ```bash
-cd /path/to/ldaca_web_app/backend
-git add pyproject.toml uv.lock src/ldaca_web_app/resources/frontend/build.tar.gz
+cd /path/to/ldaca_wordflow/backend
+git add pyproject.toml uv.lock src/ldaca_wordflow/resources/frontend/build.tar.gz
 git commit -m "Release v<VERSION>"
 git push origin dev
 
@@ -372,7 +372,7 @@ The tag push triggers the backend repo's PyPI publish workflow.
 From the root repo:
 
 ```bash
-cd /path/to/ldaca_web_app
+cd /path/to/ldaca_wordflow
 git add CHANGELOG.md pyproject.toml backend \
     frontend/package.json \
     frontend/src-tauri/tauri.conf.json frontend/src-tauri/Cargo.toml
@@ -409,20 +409,20 @@ git push origin dev
 After the backend release workflow finishes:
 
 ```bash
-uvx --refresh ldaca-web-app@<VERSION> --help
-uvx --from ldaca-web-app==<VERSION> ldaca-web-app --help
+uvx --refresh ldaca-wordflow@<VERSION> --help
+uvx --from ldaca-wordflow==<VERSION> ldaca-wordflow --help
 ```
 
 For a full smoke test:
 
 ```bash
-uvx --from ldaca-web-app==<VERSION> ldaca-web-app --host 127.0.0.1 --port 8016
+uvx --from ldaca-wordflow==<VERSION> ldaca-wordflow --host 127.0.0.1 --port 8016
 ```
 
 ### 8. Merge `dev` into `main` in the root repo
 
 ```bash
-cd /path/to/ldaca_web_app
+cd /path/to/ldaca_wordflow
 git checkout main
 git pull --ff-only origin main
 git merge --no-ff dev -m "Merge dev into main"
@@ -438,11 +438,11 @@ the GitHub release page for that tag.
 ### 9. Deploy Nectar from the root repo checkout
 
 ```bash
-cd /home/ubuntu/src/ldaca_web_app
+cd /home/ubuntu/src/ldaca_wordflow
 git pull
 git submodule sync --recursive
 git submodule update --init --recursive --checkout --force
-sudo systemctl restart ldaca-web-app
+sudo systemctl restart ldaca-wordflow
 ```
 
 ### 10. Verify the Nectar deployment
@@ -450,7 +450,7 @@ sudo systemctl restart ldaca-web-app
 Check git state:
 
 ```bash
-cd /home/ubuntu/src/ldaca_web_app && \
+cd /home/ubuntu/src/ldaca_wordflow && \
 echo "root branch: $(git branch --show-current)" && \
 echo "root commit: $(git rev-parse --short HEAD)" && \
 echo "backend submodule: $(git submodule status backend)" && \
@@ -466,8 +466,8 @@ curl -s http://127.0.0.1:8001/ | grep -Eo 'assets/[A-Za-z0-9._-]+' | head -20
 For UI regressions, also verify the bundled build contains the expected strings:
 
 ```bash
-cd /home/ubuntu/src/ldaca_web_app/backend
-rg -n "Reset all hints|Topic Modelling - BERTopic|All hints have been reset" src/ldaca_web_app/resources/frontend/build
+cd /home/ubuntu/src/ldaca_wordflow/backend
+rg -n "Reset all hints|Topic Modelling - BERTopic|All hints have been reset" src/ldaca_wordflow/resources/frontend/build
 ```
 
 ---
@@ -482,7 +482,7 @@ regardless of whether versions are bumped.
 ### 1. Rebuild the frontend bundle on the feature branch
 
 ```bash
-cd /path/to/ldaca_web_app
+cd /path/to/ldaca_wordflow
 npm run build -w frontend
 node scripts/deploy-frontend-to-backend.mjs
 ```
@@ -490,8 +490,8 @@ node scripts/deploy-frontend-to-backend.mjs
 ### 2. Verify the new feature is in the bundle
 
 ```bash
-tar -xOf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
-    $(tar -tf backend/src/ldaca_web_app/resources/frontend/build.tar.gz \
+tar -xOf backend/src/ldaca_wordflow/resources/frontend/build.tar.gz \
+    $(tar -tf backend/src/ldaca_wordflow/resources/frontend/build.tar.gz \
       | grep 'assets/index.*\.js' | head -1) \
   | grep -c "SomeNewFeatureString"
 ```
@@ -501,8 +501,8 @@ A count of `0` means the build did not include your change — stop and investig
 ### 3. Commit the updated bundle to the backend submodule branch
 
 ```bash
-cd /path/to/ldaca_web_app/backend
-git add src/ldaca_web_app/resources/frontend/build.tar.gz
+cd /path/to/ldaca_wordflow/backend
+git add src/ldaca_wordflow/resources/frontend/build.tar.gz
 git commit -m "build: rebuild frontend bundle with <feature name>"
 git push origin <feature-branch>
 ```
@@ -510,7 +510,7 @@ git push origin <feature-branch>
 ### 4. Update the root repo submodule pointer
 
 ```bash
-cd /path/to/ldaca_web_app
+cd /path/to/ldaca_wordflow
 git add backend
 git commit -m "build: point backend submodule to rebuilt <feature name> bundle"
 git push origin <feature-branch>
@@ -519,11 +519,11 @@ git push origin <feature-branch>
 ### 5. Deploy to Nectar
 
 ```bash
-cd /home/ubuntu/src/ldaca_web_app
+cd /home/ubuntu/src/ldaca_wordflow
 git fetch origin
 git checkout <feature-branch>
 git submodule update --init --recursive --checkout --force
-sudo systemctl restart ldaca-web-app
+sudo systemctl restart ldaca-wordflow
 ```
 
 ---
@@ -531,11 +531,11 @@ sudo systemctl restart ldaca-web-app
 ## Updating the App
 
 ```bash
-cd /home/ubuntu/src/ldaca_web_app
+cd /home/ubuntu/src/ldaca_wordflow
 git pull
 git submodule sync --recursive
 git submodule update --init --recursive --checkout --force
-sudo systemctl restart ldaca-web-app
+sudo systemctl restart ldaca-wordflow
 ```
 
 If the service still serves stale frontend assets after a restart, confirm the backend submodule matches the root repo's recorded commit. A leading `+` in `git submodule status backend` means the deployed backend checkout does not match the root repo pointer.
@@ -549,13 +549,13 @@ If you need to update environment variables (e.g. `GOOGLE_CLIENT_ID`) or startup
 1. Edit the service file:
 
    ```bash
-   sudo nano /etc/systemd/system/ldaca-web-app.service
+   sudo nano /etc/systemd/system/ldaca-wordflow.service
    ```
 
 2. Reload systemd and restart the service:
    ```bash
    sudo systemctl daemon-reload
-   sudo systemctl restart ldaca-web-app
+   sudo systemctl restart ldaca-wordflow
    ```
 
 ---
@@ -564,8 +564,8 @@ If you need to update environment variables (e.g. `GOOGLE_CLIENT_ID`) or startup
 
 | Symptom                        | Check                                                                              |
 | ------------------------------ | ---------------------------------------------------------------------------------- |
-| App not responding             | `sudo systemctl status ldaca-web-app` and `sudo journalctl -u ldaca-web-app -n 50` |
-| 502 Bad Gateway from Nginx     | App may be down — restart with `sudo systemctl restart ldaca-web-app`              |
+| App not responding             | `sudo systemctl status ldaca-wordflow` and `sudo journalctl -u ldaca-wordflow -n 50` |
+| 502 Bad Gateway from Nginx     | App may be down — restart with `sudo systemctl restart ldaca-wordflow`              |
 | Certificate expired            | `sudo certbot renew`                                                               |
 | Port 8001 already in use       | `sudo fuser -k 8001/tcp` then start the service                                    |
 | Old UI served after deploy     | Frontend source changed but `build.tar.gz` was not rebuilt — follow [Deploying a feature branch to Nectar](#deploying-a-feature-branch-to-nectar) steps 1–4, then redeploy |

@@ -1,7 +1,7 @@
 [package]
-name = "ldaca-web-app"
-version = "0.4.1"
-description = "LDaCA Text Analytics Desktop Application"
+name = "ldaca-wordflow"
+version = "0.4.2"
+description = "LDaCA Wordflow Desktop Application"
 authors = ["Australian Text Analytics Platform"]
 edition = "2021"
 

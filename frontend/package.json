@@ -1,14 +1,14 @@
 {
-  "name": "ldaca_web_app_frontend",
-  "version": "0.4.1",
-  "description": "LDaCA Web App Frontend - React application for text analytics and corpus analysis",
+  "name": "ldaca_wordflow_frontend",
+  "version": "0.4.2",
+  "description": "LDaCA Wordflow Frontend - React application for text analytics and corpus analysis",
   "type": "module",
   "private": true,
   "homepage": ".",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app.git",
-    "directory": "ldaca_web_app/frontend"
+    "url": "https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow.git",
+    "directory": "ldaca_wordflow/frontend"
   },
   "keywords": [
     "ldaca",
@@ -21,6 +21,7 @@
   "author": "Australian Text Analytics Platform",
   "license": "MIT",
   "bin": {
+    "ldaca_wordflow_frontend": "./bin/cli.js",
     "ldaca_web_app_frontend": "./bin/cli.js",
     "ldaca-frontend": "./bin/cli.js"
   },

@@ -1,11 +1,11 @@
 # AGENTS.md
 
-Start here before exploring. This monorepo contains the LDaCA web app and desktop app: a React 19 + Vite + Tauri frontend in `frontend/`, a FastAPI backend in `backend/`, and supporting Python/Rust packages in `docworkspace/` and `polars-text/`. Treat package manifests, CI workflows, and build scripts as the source of truth when docs disagree.
+Start here before exploring. This monorepo (renamed from `ldaca_web_app`; PyPI now `ldaca-wordflow`) contains the LDaCA Wordflow web app and desktop app: a React 19 + Vite + Tauri frontend in `frontend/`, a FastAPI backend in `backend/`, and supporting Python/Rust packages in `docworkspace/` and `polars-text/`. Treat package manifests, CI workflows, and build scripts as the source of truth when docs disagree.
 
 ## Repo Map
 
 - `frontend/`: React 19, Vite 8, TypeScript, Vitest, ESLint, Tauri desktop shell in `src-tauri/`
-- `backend/`: FastAPI backend (PyPI: `ldaca-web-app`, import: `ldaca_web_app`), uv-managed, Python `>=3.14`
+- `backend/`: FastAPI backend (PyPI: `ldaca-wordflow`, import: `ldaca_wordflow`), uv-managed, Python `>=3.14`
 - `docworkspace/`: Python package for lazy Polars workspace/node graphs
 - `polars-text/`: Rust/PyO3 + Python package for text-analysis primitives
 - Root `package.json`: npm workspace wrapper for `frontend`

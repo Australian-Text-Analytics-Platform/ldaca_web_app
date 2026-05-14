@@ -1,8 +1,8 @@
 {
-  "name": "ldaca-web-app-root",
+  "name": "ldaca-wordflow-root",
   "version": "0.0.1",
   "private": true,
-  "description": "Root workspace for LDaCA Web App",
+  "description": "Root workspace for LDaCA Wordflow",
   "workspaces": [
     "frontend"
   ],
