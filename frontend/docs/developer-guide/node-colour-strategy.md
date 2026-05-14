@@ -87,16 +87,22 @@ fires, no temp promotion happens.
 
 ### Graph view
 
-| State | Fill | Stroke |
-| --- | --- | --- |
-| Active | `Y` | `X` |
-| Focus / Selected | `Y` | (none) |
-| Unselected | (default) | `Y` |
+| State                                | Header / fill | Outer stroke | Node name text |
+| ------------------------------------ | ------------- | ------------ | -------------- |
+| Active                               | `Y`           | `X`          | default        |
+| Focus / Selected                     | `Y`           | (none)       | default        |
+| Unselected — has an assigned colour  | (default)     | `Y`          | `X`            |
+| Unselected — default grey            | (default)     | (none, default Tailwind ``border-border``) | default |
 
-The active node has the strongest visual weight (both fill and stroke);
-focus has a softer fill only; unselected just hints at the assigned
-colour via a stroke. Zoomed-in graph mode keeps its existing
-top-bar-fill pattern but uses the same `X` / `Y` pair.
+The active node has the strongest visual weight (Y-filled header strip
+plus an X-coloured outer stroke). Focus has a softer fill only — the
+stroke drops so the user can tell at a glance which selected node will
+actually run. Unselected nodes that have an assigned colour get a soft
+Y-coloured stroke plus an X-tinted name text so the assigned identity
+is recognisable at rest; never-analysed grey nodes stay flat and quiet.
+
+Zoomed-in graph mode keeps its existing top-bar-fill pattern but uses
+the same `X` / `Y` pair.
 
 ### Sidebar data-block list
 
