@@ -76,11 +76,11 @@ export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
     recommendedModel: 'lindera-ja-ipadic',
     quotationSupported: false,
     availableDicts: [
-      { model: 'lindera-ja-ipadic', label: 'IPADIC (recommended, ~25 MB)' },
-      { model: 'lindera-ja-unidic', label: 'UniDic (more accurate, ~100 MB)' },
+      { model: 'lindera-ja-ipadic', label: 'IPADIC (recommended, ~15 MB)' },
+      { model: 'lindera-ja-unidic', label: 'UniDic (more accurate, ~50 MB)' },
     ],
     firstUseHint:
-      'First use downloads the morpheme dictionary (~25 MB for IPADIC, ~100 MB for UniDic) into the local cache.',
+      'First use downloads the morpheme dictionary (~15 MB for IPADIC, ~50 MB for UniDic) into the local cache.',
   },
   {
     code: 'ko',
@@ -88,7 +88,7 @@ export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
     recommendedModel: 'lindera-ko-dic',
     quotationSupported: false,
     firstUseHint:
-      'First use downloads the ko-dic morpheme dictionary (~12 MB) into the local cache.',
+      'First use downloads the ko-dic morpheme dictionary (~34 MB) into the local cache.',
   },
   {
     code: 'multi',

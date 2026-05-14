@@ -225,7 +225,7 @@ These decisions came out of the planning discussion; documenting here so the rat
 **What changed since the original Phase 5 sketch:**
 1. **Scope expanded to KO.** Phase-4 Korean wiring landed with `klue/bert-base` (BertWordPiece sub-word) as a stopgap, but morpheme-level Korean needs ko-dic via Lindera — same crate, same enum variant, marginal extra work compared to JA-only.
 2. **User-selectable JA dict.** IPADIC and UniDic produce different morpheme granularity (UniDic is more accurate for modern text but ~4× the size). Frontend exposes the choice with brief explanations rather than picking one default for every discipline.
-3. **Dictionary loading is on-demand via HF Hub.** Per discussion 2026-05-14, the install-size hard constraint from `project_deployment_targets` wins over the Tauri-offline-first nicety — first JA/KO tokenize call downloads the binary dict (~12–100 MB depending on choice) to `~/.cache/ldaca/lindera/<dict>/` and caches it. Reuses the existing `hf-hub` Rust crate by hosting prebuilt dict binaries on a HuggingFace repo we control.
+3. **Dictionary loading is on-demand via HF Hub.** Per discussion 2026-05-14, the install-size hard constraint from `project_deployment_targets` wins over the Tauri-offline-first nicety — first JA/KO tokenize call downloads the binary dict (~15 MB IPADIC, ~34 MB ko-dic, ~50 MB UniDic; gzipped sizes from the actual lindera-cli build) to the per-OS cache dir and caches it. Reuses the existing `hf-hub` Rust crate by hosting prebuilt dict binaries on the HuggingFace dataset [`SIH/lindera-dicts`](https://huggingface.co/datasets/SIH/lindera-dicts).
 
 | #   | Task | Status / commit | Acceptance |
 |-----|------|------------------|------------|
