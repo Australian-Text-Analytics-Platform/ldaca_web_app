@@ -120,9 +120,15 @@ const TokenFrequencyFeature = () => {
     ];
   })();
 
-  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
-    activeNodeIds: takeMostRecent(panelNodeIds, 2),
-  });
+  // ``tabKey`` routes colour changes through this tab's temp layer;
+  // ``promoteTempColors`` is called from ``handleAnalyzeWithPromote``
+  // below so a Run commits the preview to the global assigned store.
+  const tokenActiveNodeIds = takeMostRecent(panelNodeIds, 2);
+  const { nodeColors, handleColorChange, defaultPalette, promoteTempColors } =
+    useNodeColorManagement({
+      activeNodeIds: tokenActiveNodeIds,
+      tabKey: 'token-frequency',
+    });
 
   const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
   const unifiedCloudContainerRef = useRef<HTMLDivElement | null>(null);
@@ -552,7 +558,13 @@ const TokenFrequencyFeature = () => {
         displayNodeCount={displayNodeCount}
         actionState={actionState}
         isAnalyzing={isRunning}
-        onAnalyze={handleAnalyze}
+        onAnalyze={() => {
+          // Promote pending per-tab temp colours to assigned before
+          // the analysis runs; the strategy doc treats Run as the
+          // commit trigger.
+          promoteTempColors(tokenActiveNodeIds);
+          return handleAnalyze();
+        }}
         onClearResults={clearResults}
         hasIncompleteSelections={hasIncompleteSelections}
         appliedStopCount={appliedStopSet.size}

@@ -291,9 +291,14 @@ const TopicModelingFeature: React.FC = () => {
 
   const defaultPalette = DEFAULT_PALETTE;
 
-  const { nodeColors, handleColorChange, defaultPalette: _dp } = useNodeColorManagement({
-    activeNodeIds: takeMostRecent(panelNodeIds, 2),
-  });
+  // ``tabKey`` routes colour changes through the per-tab temp layer
+  // (commit on Run via ``promoteTempColors`` below).
+  const topicActiveNodeIds = takeMostRecent(panelNodeIds, 2);
+  const { nodeColors, handleColorChange, defaultPalette: _dp, promoteTempColors } =
+    useNodeColorManagement({
+      activeNodeIds: topicActiveNodeIds,
+      tabKey: 'topic-modeling',
+    });
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
@@ -640,6 +645,9 @@ const TopicModelingFeature: React.FC = () => {
   });
 
   const handleRunOrUpdate = async () => {
+    // Promote this tab's pending temp colours to assigned — Run is the
+    // commit trigger per the node-colour strategy doc.
+    promoteTempColors(topicActiveNodeIds);
     await executeAnalysisRunOrUpdate({
       hasLockedParameterChanges,
       clearResults,

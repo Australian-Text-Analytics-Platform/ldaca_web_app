@@ -24,7 +24,9 @@ import {
   normalizeUnknownStringArray,
   useAnalysisLock,
   useAnalysisFeature,
+  useNodeColorManagement,
   getAnalysisActionState,
+  getNodeIdentifier,
   useSafeResult,
   restoreAnalysisLockFromRequest,
   resetAnalysisSelectionAfterClear,
@@ -118,6 +120,21 @@ const SequentialAnalysisFeature = () => {
   });
 
   const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
+  // Lifted from the panel so promoteTempColors is accessible to the
+  // Run handler below. ``tabKey`` routes picker changes through the
+  // per-tab temp layer (see node-colour strategy doc).
+  const trendsActiveNodeIds = displayedNodes
+    .map((node, idx) => getNodeIdentifier(node, idx))
+    .filter((id): id is string => Boolean(id));
+  const {
+    nodeColors: trendsNodeColors,
+    handleColorChange: trendsHandleColorChange,
+    defaultPalette: trendsDefaultPalette,
+    promoteTempColors: trendsPromoteTempColors,
+  } = useNodeColorManagement({
+    activeNodeIds: trendsActiveNodeIds,
+    tabKey: 'analysis',
+  });
 
   const [timeColumn, setTimeColumn] = useState('');
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
@@ -574,6 +591,9 @@ const SequentialAnalysisFeature = () => {
   };
 
   const handleRunOrUpdate = async () => {
+    // Promote pending per-tab temp colours to assigned (Run is the
+    // commit trigger per the node-colour strategy doc).
+    trendsPromoteTempColors(trendsActiveNodeIds);
     await executeAnalysisRunOrUpdate({
       hasLockedParameterChanges: hasParamsChanged,
       clearResults,
@@ -796,6 +816,9 @@ const SequentialAnalysisFeature = () => {
             onGroupByColumnChange={handleGroupByColumnChange}
             caseSensitive={caseSensitive}
             onCaseSensitiveChange={setCaseSensitive}
+            nodeColors={trendsNodeColors}
+            defaultPalette={trendsDefaultPalette}
+            onColorChange={trendsHandleColorChange}
           />
       </AnalysisCardLayout>
 

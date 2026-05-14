@@ -214,13 +214,15 @@ const AiAnnotatorFeature: React.FC = () => {
     .map((node, idx) => getNodeIdentifier(node, idx))
     .filter((id): id is string => Boolean(id));
 
-  // Shared color-management hook — gives the selected node a stable
-  // picked-colour in NodeSelectionPanel, matching Concordance / Topic
-  // Modelling / Frequency / Quotation / Trends styling.
-  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
-    activeNodeIds: displayedNodeIds,
-    palette: EXTENDED_PALETTE,
-  });
+  // ``tabKey`` routes colour changes through this tab's temp layer.
+  // ``promoteTempColors`` is called from ``handleRun`` below so a
+  // successful Run commits the preview to the global assigned store.
+  const { nodeColors, handleColorChange, defaultPalette, promoteTempColors } =
+    useNodeColorManagement({
+      activeNodeIds: displayedNodeIds,
+      palette: EXTENDED_PALETTE,
+      tabKey: 'ai-annotator',
+    });
 
   const effectiveSelections = (isLocked ? activeNodeColumnSelections : nodeColumnSelections)
     .filter((selection) => displayedNodeIds.includes(selection.nodeId));
@@ -456,6 +458,9 @@ const AiAnnotatorFeature: React.FC = () => {
       setStatusMessage('Select one data block and text column before running.');
       return;
     }
+    // Promote pending temp colours to assigned — see node-colour
+    // strategy doc.
+    promoteTempColors(displayedNodeIds);
 
     setIsRunning(true);
     try {

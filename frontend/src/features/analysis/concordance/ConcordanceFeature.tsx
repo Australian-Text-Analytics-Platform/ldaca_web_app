@@ -206,11 +206,18 @@ const ConcordanceFeature: React.FC = () => {
     return null;
   }, [results]);
 
-  // Color management & view mode
-  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
-    activeNodeIds,
-    palette: EXTENDED_PALETTE,
-  });
+  // Color management & view mode. ``tabKey`` routes the colour
+  // changes through the per-tab temp layer so the picker preview
+  // doesn't immediately rewrite the assigned colours other tabs +
+  // graph + sidebar are showing. ``promoteTempColors`` is fired
+  // below in ``handleRunOrUpdate`` to commit the pending temps to
+  // assigned when the user actually runs the analysis.
+  const { nodeColors, handleColorChange, defaultPalette, promoteTempColors } =
+    useNodeColorManagement({
+      activeNodeIds,
+      palette: EXTENDED_PALETTE,
+      tabKey: 'concordance',
+    });
 
   const concordanceTaskId = useMemo(() => {
     const md = (results as ConcordanceAnalysisResponse | null)?.metadata as
@@ -932,6 +939,11 @@ const ConcordanceFeature: React.FC = () => {
   };
 
   const handleRunOrUpdate = async () => {
+    // Commit the per-tab temp colours to the global assigned store so
+    // graph + sidebar reflect the colours the user just chose to run
+    // with. See the node-colour strategy doc — Run is the promotion
+    // trigger.
+    promoteTempColors(activeNodeIds);
     await executeAnalysisRunOrUpdate({
       hasLockedParameterChanges,
       clearResults: handleClearResults,
