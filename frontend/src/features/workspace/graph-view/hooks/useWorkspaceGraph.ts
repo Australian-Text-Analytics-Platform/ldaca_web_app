@@ -20,6 +20,7 @@ import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspa
 import { isGraphDebugEnabled } from '@/lib/debugFlags';
 import { nodeVisualInfo } from '@/lib/nodeVisualState';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
 
@@ -134,6 +135,21 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   // active/focus split rules.
   const assignedColors = useNodeColorsStore((state) => state.colors);
   const currentView = useUIStore((state) => state.currentView);
+  // "Fresh" = nodes that appeared mid-session (detach / join / stack /
+  // clone / etc. outputs) and haven't been interacted with yet. The
+  // graph paints them with a black outline overlay so the user can
+  // find them in a busy workspace. ``observeNodeIds`` is called from
+  // a useEffect below so the side-effect doesn't fire inside useMemo.
+  const freshIds = useFreshNodesStore((state) => state.freshIds);
+  const observeNodeIds = useFreshNodesStore((state) => state.observeNodeIds);
+  const markInteracted = useFreshNodesStore((state) => state.markInteracted);
+  const currentGraphNodeIds = useMemo(
+    () => (workspaceGraph?.nodes ?? []).map((n: GraphNode) => n.id),
+    [workspaceGraph],
+  );
+  useEffect(() => {
+    observeNodeIds(currentGraphNodeIds);
+  }, [currentGraphNodeIds, observeNodeIds]);
 
   const initialNodes = useMemo(() => {
     if (!workspaceGraph?.nodes) {
@@ -226,6 +242,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             currentView,
             assignedColors,
           }),
+          isFresh: freshIds.has(node.id),
           onDelete: handleDelete,
           onRename: handleRename,
           onCopy: handleCopy,
@@ -238,7 +255,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         connectable: false,
       } as Node;
     });
-  }, [workspaceGraph, selectedNodeIds, currentView, assignedColors, handleDelete, handleRename, handleCopy, handleUndo, handleRedo, dlog]);
+  }, [workspaceGraph, selectedNodeIds, currentView, assignedColors, freshIds, handleDelete, handleRename, handleCopy, handleUndo, handleRedo, dlog]);
 
   const initialEdges = useMemo(() => {
     if (!workspaceGraph?.edges) {
@@ -282,6 +299,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       can_redo?: boolean;
     };
     visualInfo?: { state?: string; pair?: { X?: string } };
+    isFresh?: boolean;
   };
   const nodeSignatureFor = (node: Node): string => {
     const nd = node.data as NodeDataSignatureShape;
@@ -292,7 +310,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     const canRedo = nd?.node?.can_redo ? '1' : '0';
     const vis = nd?.visualInfo;
     const visToken = `${vis?.state ?? '-'}:${vis?.pair?.X ?? '-'}`;
-    return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}:${visToken}`;
+    const freshToken = nd?.isFresh ? '1' : '0';
+    return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}:${visToken}:${freshToken}`;
   };
 
   const currentNodesSignature = nodes.map(nodeSignatureFor).join(',');
@@ -389,9 +408,13 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       event.stopPropagation();
       if (node && node.id) {
         toggleNodeSelection?.(node.id);
+        // A click counts as "I've seen this" — clear the fresh-node
+        // highlight even if the resulting selection toggle didn't
+        // actually fire (e.g. parent disabled clicks).
+        markInteracted([node.id]);
       }
     },
-    [toggleNodeSelection]
+    [toggleNodeSelection, markInteracted]
   );
 
   const handleConnect = useCallback(

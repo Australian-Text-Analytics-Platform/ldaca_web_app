@@ -3,6 +3,7 @@ import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { nodeVisualInfo, type NodeVisualState } from '@/lib/nodeVisualState';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { useUIStore } from '@/stores';
 import type { ColorPair } from '@/lib/color';
 import type { SidebarWorkspaceNode } from './types';
@@ -19,18 +20,29 @@ type SidebarNodesSectionProps = {
  *   - focus      → filled dot in pair.Y + white tick (same tick, lighter fill)
  *   - unselected → outline circle in pair.X, no fill, no tick
  *
- * Replaces the previous shadcn ``<Checkbox>`` which only knew about
- * checked/unchecked. The text label next to it stays the standard
- * foreground colour (not tinted) — the strategy doc is explicit that
- * the colour rides on the icon only.
+ * When ``isFresh`` is set (newly-created node that hasn't been
+ * acknowledged), a black outline wraps the icon as a "find me" cue —
+ * cleared on first click / select.
+ *
+ * The text label next to it stays the standard foreground colour
+ * (not tinted) — the strategy doc is explicit that the colour rides
+ * on the icon only.
  */
-const NodeCheckIcon: React.FC<{ state: NodeVisualState; pair: ColorPair }> = ({ state, pair }) => {
+const NodeCheckIcon: React.FC<{
+  state: NodeVisualState;
+  pair: ColorPair;
+  isFresh: boolean;
+}> = ({ state, pair, isFresh }) => {
   const isUnselected = state === 'unselected';
   const fill = state === 'active' ? pair.X : state === 'focus' ? pair.Y : 'transparent';
   return (
     <span
       className="pointer-events-none flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2"
-      style={{ borderColor: pair.X, backgroundColor: fill }}
+      style={{
+        borderColor: pair.X,
+        backgroundColor: fill,
+        ...(isFresh ? { outline: '2px solid #000', outlineOffset: '2px' } : {}),
+      }}
       aria-hidden="true"
     >
       {!isUnselected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
@@ -69,10 +81,19 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
   // analytics view. See ``lib/nodeVisualState.ts`` + the strategy doc.
   const assignedColors = useNodeColorsStore((state) => state.colors);
   const currentView = useUIStore((state) => state.currentView);
+  const freshIds = useFreshNodesStore((state) => state.freshIds);
+  const markInteracted = useFreshNodesStore((state) => state.markInteracted);
   const selectionContext = {
     selectedNodeIds: selectedNodeIds ?? [],
     currentView,
     assignedColors,
+  };
+
+  // Wrap the parent's toggle so a sidebar click counts as "I've
+  // acknowledged this node" and clears the black-outline highlight.
+  const handleToggle = (nodeId: string) => {
+    markInteracted([nodeId]);
+    onToggleNodeSelection(nodeId);
   };
 
   // Order: selected nodes first in reverse selection order (latest first),
@@ -120,17 +141,18 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
             const checked = selectedNodeIds?.includes(node.id) ?? false;
             const tooltip = `${displayName}\nShape: ${shape}`;
             const { state, pair } = nodeVisualInfo(node.id, selectionContext);
+            const isFresh = freshIds.has(node.id);
 
             return (
               <div
                 key={node.id}
-                onClick={() => onToggleNodeSelection(node.id)}
+                onClick={() => handleToggle(node.id)}
                 onKeyDown={(event) => {
                   if (!isActivationKey(event)) {
                     return;
                   }
                   event.preventDefault();
-                  onToggleNodeSelection(node.id);
+                  handleToggle(node.id);
                 }}
                 title={tooltip}
                 role="button"
@@ -144,7 +166,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                     : 'hover:border-border/60 hover:bg-accent/60',
                 )}
               >
-                <NodeCheckIcon state={state} pair={pair} />
+                <NodeCheckIcon state={state} pair={pair} isFresh={isFresh} />
                 <span className="flex-1 min-w-0 truncate text-sm font-medium text-foreground">
                   {displayName}
                 </span>
