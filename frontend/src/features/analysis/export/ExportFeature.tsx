@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { saveBlob } from '@/lib/download';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
-import { EXTENDED_PALETTE } from '@/features/analysis/common';
+import { useNodeColorManagement } from '@/features/analysis/common';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -61,6 +61,12 @@ const ExportFeature: React.FC = () => {
     const data = n.data as Record<string, unknown> | undefined;
     return n.id || String(n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? `node-${idx}`);
   });
+
+  // Subscribe to the global node-colour store. Reuses whatever colour was
+  // assigned to each node by Concordance / Topic Modelling / Frequency /
+  // etc., so Export's listing visually matches the rest of the analysis
+  // surface for the same node.
+  const { nodeColors } = useNodeColorManagement({ activeNodeIds: nodeIds });
 
   // Best-effort helpers for node display
   const toDisplay = (n: GraphNode) => {
@@ -233,14 +239,13 @@ const ExportFeature: React.FC = () => {
                   Choose data blocks in the graph sidebar to enable exports.
                 </div>
               )}
-              {selectedNodes.map((n: GraphNode, idx: number) => {
+              {selectedNodes.map((n: GraphNode) => {
                 const info = toDisplay(n);
                 const status = downloadingIds[info.id ?? ''] ?? 'idle';
                 const isDownloading = status === 'downloading';
-                // Match the picked-colour name treatment used by every
-                // analysis tab's NodeSelectionPanel — EXTENDED_PALETTE,
-                // cycled by node index so the visual rhythm matches.
-                const nameColor = EXTENDED_PALETTE[idx % EXTENDED_PALETTE.length];
+                // Reuse the colour the analysis tabs have already assigned
+                // to this node. Same node ⇒ same colour everywhere.
+                const nameColor = nodeColors[info.id ?? ''];
                 return (
                   <div
                     key={info.id}
@@ -248,8 +253,8 @@ const ExportFeature: React.FC = () => {
                   >
                     <div className="space-y-1">
                       <p
-                        className="text-sm font-semibold"
-                        style={{ color: nameColor }}
+                        className="text-sm font-semibold text-foreground"
+                        style={nameColor ? { color: nameColor } : undefined}
                       >
                         {info.name}
                       </p>

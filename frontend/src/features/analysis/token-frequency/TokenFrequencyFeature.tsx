@@ -54,7 +54,11 @@ const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
 const UNIFIED_WORDCLOUD_HEIGHT = 340;
 
-const TOKEN_FREQUENCY_PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f59e0b'];
+// Pre-fix this tab passed a bespoke ``TOKEN_FREQUENCY_PALETTE`` (Tailwind
+// 500 shades, intentionally lighter) into useNodeColorManagement. After
+// the global colour store landed, the palette argument is informational
+// only — the store always uses ``EXTENDED_PALETTE`` so every tab agrees
+// on the picked colour for a given node. Kept this comment as a tombstone.
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
@@ -116,7 +120,6 @@ const TokenFrequencyFeature = () => {
 
   const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
     activeNodeIds: takeMostRecent(panelNodeIds, 2),
-    palette: TOKEN_FREQUENCY_PALETTE,
   });
 
   const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
