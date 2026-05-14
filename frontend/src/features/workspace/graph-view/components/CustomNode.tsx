@@ -23,6 +23,12 @@ interface CustomNodeData extends Record<string, unknown> {
    * X/Y colour pair) from ``useWorkspaceGraph``. See the strategy doc:
    * ``frontend/docs/developer-guide/node-colour-strategy.md``. */
   visualInfo?: NodeVisualInfo;
+  /** True for nodes that appeared mid-session (detach / join / stack /
+   * clone outputs etc.) and haven't been interacted with yet. Triggers
+   * the "find me" black outline overlay in the graph + sidebar.
+   * Cleared by ``markInteracted`` in useFreshNodesStore on first
+   * click / selection. */
+  isFresh?: boolean;
   onDelete: (nodeId: string) => void;
   onRename?: (nodeId: string, newName: string) => void;
   onCopy?: (nodeId: string) => void;
@@ -35,7 +41,7 @@ const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
 /** React Flow node renderer for a workspace node. Shows a compact card when zoomed
  *  out, and a full card with metadata + action menu when zoomed in. */
 function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
-  const { node, isMultiSelected = false, visualInfo, onDelete, onRename, onCopy, onUndo, onRedo } = data;
+  const { node, isMultiSelected = false, visualInfo, isFresh = false, onDelete, onRename, onCopy, onUndo, onRedo } = data;
   // Fall back to the unselected-grey treatment if no visual info was
   // attached (defensive — useWorkspaceGraph always provides one now,
   // but CustomNode tests render without it).
@@ -275,6 +281,10 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
           borderColor: nodeBorderColor,
           backgroundColor: compactBg,
           boxShadow: nodeBoxShadow,
+          // ``isFresh`` overlay: black outline around newly-created
+          // nodes that the user hasn't acknowledged yet. Renders
+          // outside the border-box, doesn't shift layout.
+          ...(isFresh ? { outline: '2px solid #000', outlineOffset: '2px' } : {}),
         }}
       >
         <div className="absolute right-2 top-2 z-10">
@@ -314,6 +324,10 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         position: 'relative',
         borderColor: nodeBorderColor,
         boxShadow: nodeBoxShadow,
+        // ``isFresh`` overlay: black outline around newly-created
+        // nodes that the user hasn't acknowledged yet. Renders
+        // outside the border-box, doesn't shift layout.
+        ...(isFresh ? { outline: '2px solid #000', outlineOffset: '2px' } : {}),
       }}
     >
       {/* Node Header — top fill uses the Y (lighter) variant when the
