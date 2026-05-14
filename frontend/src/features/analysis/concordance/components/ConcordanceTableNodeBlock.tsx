@@ -19,7 +19,24 @@ import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { SortableHeader } from './SortableHeader';
-import { CONCORDANCE_CORE_COLUMNS, CONCORDANCE_FREQ_COLUMNS } from '../../generatedColumns';
+import {
+  CONCORDANCE_COLUMN_KEYS,
+  CONCORDANCE_CORE_COLUMNS,
+  CONCORDANCE_FREQ_COLUMNS,
+} from '../../generatedColumns';
+
+/** Per-column alignment for the concordance table.
+ *
+ * The left-context column reads more naturally when its rightmost
+ * character lines up with the matched-text column to its right — that
+ * way the user's eye scans a vertical "match column" instead of having
+ * to skip across the variable-length left contexts. Right-align both
+ * the header and the cell so the column visually anchors to its right
+ * edge. Other columns stay left-aligned (the default for the table).
+ */
+function alignmentClassForColumn(columnKey: string): string {
+  return columnKey === CONCORDANCE_COLUMN_KEYS.leftContext ? 'text-right' : '';
+}
 import { batchProcessedCount, flattenConcordanceGroups } from '../concordanceViewModels';
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
@@ -210,7 +227,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                   {displayColumns.map((c: string) => (
                     <TableHead
                       key={c}
-                      className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                      className={`px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 ${alignmentClassForColumn(c) || 'text-left'}`}
                     >
                       {c}
                     </TableHead>
@@ -276,7 +293,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                         }}
                       >
                         {displayColumns.map((c: string, i: number) => (
-                          <TableCell key={i}>
+                          <TableCell key={i} className={alignmentClassForColumn(c)}>
                             {row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}
                           </TableCell>
                         ))}
@@ -383,7 +400,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                   ) : (
                     <TableHead
                       key={key}
-                      className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                      className={`px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 ${alignmentClassForColumn(key) || 'text-left'}`}
                     >
                       {key}
                     </TableHead>
@@ -408,7 +425,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                     }}
                   >
                     {tableColumns.map((colKey: string, cellIndex) => (
-                      <TableCell key={cellIndex}>
+                      <TableCell key={cellIndex} className={alignmentClassForColumn(colKey)}>
                         {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
                       </TableCell>
                     ))}
