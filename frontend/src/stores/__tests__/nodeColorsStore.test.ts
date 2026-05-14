@@ -117,6 +117,37 @@ describe('useNodeColorsStore — per-tab temp layer', () => {
   });
 });
 
+describe('useNodeColorsStore — hydrateColors', () => {
+  beforeEach(() => {
+    useNodeColorsStore.getState().reset();
+  });
+
+  it('replaces the existing colour map wholesale', () => {
+    useNodeColorsStore.getState().setColor('stale', '#000000');
+    useNodeColorsStore.getState().hydrateColors({ fresh: '#2563eb' });
+    expect(useNodeColorsStore.getState().colors).toEqual({ fresh: '#2563eb' });
+  });
+
+  it('resets assignmentOrder to the keys of the hydrated payload', () => {
+    useNodeColorsStore.getState().setColor('stale', '#000000');
+    useNodeColorsStore.getState().hydrateColors({ a: '#2563eb', b: '#dc2626' });
+    expect(useNodeColorsStore.getState().assignmentOrder.sort()).toEqual(['a', 'b']);
+  });
+
+  it('does not touch the per-tab temp layer', () => {
+    useNodeColorsStore.getState().setTempColor('concordance', 'x', '#16a34a');
+    useNodeColorsStore.getState().hydrateColors({ x: '#2563eb' });
+    expect(useNodeColorsStore.getState().temps.concordance?.x).toBe('#16a34a');
+  });
+
+  it('an empty hydration clears the assigned map', () => {
+    useNodeColorsStore.getState().setColor('a', '#2563eb');
+    useNodeColorsStore.getState().hydrateColors({});
+    expect(useNodeColorsStore.getState().colors).toEqual({});
+    expect(useNodeColorsStore.getState().assignmentOrder).toEqual([]);
+  });
+});
+
 describe('useNodeColorsStore — pruneStaleColors', () => {
   beforeEach(() => {
     useNodeColorsStore.getState().reset();

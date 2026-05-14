@@ -79,6 +79,13 @@ interface NodeColorsState {
    * display. Temp entries for the promoted nodes are cleared. */
   promoteTempColors(tabKey: string, nodeIds: string[]): void;
 
+  /** Bulk-hydrate the assigned colour map. Replaces ``colors`` and
+   * resets ``assignmentOrder`` to ``Object.keys(next)``. Used by the
+   * persistence layer to seed the store from the workspace's
+   * ``ui_state.json`` sidecar on load. Does NOT touch the per-tab
+   * temps — those are session-only and never persisted. */
+  hydrateColors(next: Readonly<Record<string, string>>): void;
+
   /** Drop colour entries (assigned + per-tab temps + assignmentOrder)
    * for nodeIds that are no longer in the live workspace.
    * ``useWorkspaceGraph`` calls this whenever a fresh graph payload
@@ -223,6 +230,13 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
         assignmentOrder: nextOrder,
         temps: { ...state.temps, [tabKey]: nextTabTemps },
       };
+    });
+  },
+
+  hydrateColors: (next) => {
+    set({
+      colors: { ...next },
+      assignmentOrder: Object.keys(next),
     });
   },
 
