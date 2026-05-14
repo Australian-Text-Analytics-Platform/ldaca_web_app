@@ -212,8 +212,10 @@ const ExportFeature: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="border-border/50 bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
             <div className="text-muted-foreground text-sm">
-              Workspace ID:{' '}
-              <span className="text-foreground font-mono">{currentWorkspaceId ?? '—'}</span>
+              Workspace:{' '}
+              <span className="text-foreground font-medium">
+                {currentWorkspace?.name ?? '—'}
+              </span>
             </div>
             <Badge variant={selectedNodes.length ? 'default' : 'outline'}>
               {selectedNodes.length
@@ -241,7 +243,6 @@ const ExportFeature: React.FC = () => {
                   >
                     <div className="space-y-1">
                       <p className="text-foreground text-sm font-semibold">{info.name}</p>
-                      <p className="text-muted-foreground font-mono text-[11px]">{info.id}</p>
                       {info.shape && (
                         <p className="text-muted-foreground text-xs">Shape: {info.shape}</p>
                       )}
