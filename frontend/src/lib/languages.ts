@@ -47,6 +47,12 @@ export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
     quotationSupported: false,
   },
   {
+    code: 'ko',
+    label: 'Korean',
+    recommendedModel: 'klue/bert-base',
+    quotationSupported: false,
+  },
+  {
     code: 'multi',
     label: 'Other / Multilingual',
     recommendedModel: 'xlm-roberta-base',

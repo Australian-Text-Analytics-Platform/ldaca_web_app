@@ -60,6 +60,7 @@ describe('languageLabel', () => {
     expect(languageLabel('en')).toBe('English');
     expect(languageLabel('zh')).toBe('Chinese');
     expect(languageLabel('ja')).toBe('Japanese');
+    expect(languageLabel('ko')).toBe('Korean');
     expect(languageLabel('multi')).toBe('Other / Multilingual');
   });
 
