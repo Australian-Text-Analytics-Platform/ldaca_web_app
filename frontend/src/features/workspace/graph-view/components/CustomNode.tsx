@@ -290,6 +290,15 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const nodeBoxShadow = isActive
     ? `0 0 0 3px ${nodeColorPair.Y}, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`
     : undefined;
+  // For unselected nodes that carry an assigned colour, tint the
+  // displayed name with X so the node's identity is recognisable at
+  // rest. Default-grey unselected nodes keep the standard foreground
+  // so never-analysed blocks stay visually quiet.
+  const hasAssignedColour = visualInfo
+    ? visualInfo.pair.X !== DEFAULT_GREY_PAIR.X
+    : false;
+  const nameColour =
+    !isHighlighted && hasAssignedColour ? nodeColorPair.X : undefined;
 
   const formatShapePart = (value: number | null | undefined) =>
     typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
@@ -492,7 +501,12 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         )}
         <div
           className="pr-16 font-bold text-3xl leading-snug whitespace-normal"
-          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', hyphens: 'auto' }}
+          style={{
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere',
+            hyphens: 'auto',
+            ...(nameColour ? { color: nameColour } : {}),
+          }}
           title={nodeName}
         >
           {nodeName}
@@ -559,12 +573,13 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
               />
             </form>
           ) : (
-            <div 
+            <div
               className="font-bold text-sm leading-tight overflow-hidden"
-              style={{ 
+              style={{
                 wordBreak: 'break-all',
                 overflowWrap: 'anywhere',
-                hyphens: 'auto'
+                hyphens: 'auto',
+                ...(nameColour ? { color: nameColour } : {}),
               }}
               title={nodeName}
             >
