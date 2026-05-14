@@ -109,9 +109,25 @@ export function TokeniseDialog({
     setSubmitting(false);
   }, [open, initialColumn, columns, defaultLanguage, defaultTokenizerModel]);
 
+  const languageOption = useMemo(() => findLanguage(language), [language]);
   const recommendedModelForLanguage = useMemo(
-    () => findLanguage(language)?.recommendedModel ?? 'bert-base-uncased',
-    [language],
+    () => languageOption?.recommendedModel ?? 'bert-base-uncased',
+    [languageOption],
+  );
+  // Phase 5: a dict picker is only meaningful when the language has
+  // multiple choices (JA: IPADIC vs UniDic). KO + ZH + EN don't render it.
+  const dictOptions = useMemo(
+    () => (languageOption?.availableDicts && languageOption.availableDicts.length > 1
+      ? languageOption.availableDicts
+      : null),
+    [languageOption],
+  );
+  // The currently-selected dict matches whichever entry's model id equals
+  // the current model. If the user typed a custom model that isn't in the
+  // dict list, the selector still renders but with no item highlighted.
+  const selectedDictModel = useMemo(
+    () => dictOptions?.find((d) => d.model === model.trim())?.model ?? null,
+    [dictOptions, model],
   );
 
   const handleLanguageChange = (next: string) => {
@@ -120,6 +136,13 @@ export function TokeniseDialog({
       const recommended = findLanguage(next)?.recommendedModel;
       if (recommended) setModel(recommended);
     }
+  };
+
+  const handleDictChange = (nextModel: string) => {
+    setModel(nextModel);
+    // Dict picks aren't a "user-set custom model" — they're still a
+    // recommended default for the language. Keep modelUserSet=false so a
+    // subsequent language change re-applies the new language's default.
   };
 
   const canSubmit =
@@ -213,6 +236,27 @@ export function TokeniseDialog({
             </Select>
           </div>
 
+          {dictOptions && (
+            <div className="space-y-1">
+              <Label htmlFor="tokenise-dict">Dictionary</Label>
+              <Select
+                value={selectedDictModel ?? ''}
+                onValueChange={handleDictChange}
+              >
+                <SelectTrigger id="tokenise-dict" aria-label="Morpheme dictionary">
+                  <SelectValue placeholder="Pick a dictionary" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dictOptions.map((dict) => (
+                    <SelectItem key={dict.model} value={dict.model}>
+                      {dict.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-1">
             <Label htmlFor="tokenise-model">Tokenizer model</Label>
             <Input
@@ -227,8 +271,16 @@ export function TokeniseDialog({
             <p className="text-xs text-muted-foreground">
               Defaults to the recommended model for the chosen language
               (currently <code>{recommendedModelForLanguage}</code>). HuggingFace
-              model IDs or the special <code>jieba</code> backend are accepted.
+              model IDs, the special <code>jieba</code> backend, or
+              {' '}
+              <code>lindera-ja-ipadic</code>/<code>lindera-ja-unidic</code>/
+              <code>lindera-ko-dic</code> are accepted.
             </p>
+            {languageOption?.firstUseHint && (
+              <p className="text-xs text-muted-foreground italic">
+                {languageOption.firstUseHint}
+              </p>
+            )}
           </div>
         </div>
 

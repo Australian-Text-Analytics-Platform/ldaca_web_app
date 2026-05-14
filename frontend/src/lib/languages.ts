@@ -9,6 +9,20 @@
  * languages here at a single point so AddFilePanel (Phase 4.2),
  * Tokenise dialog (Phase 4.3), and any future selector stay consistent.
  */
+/**
+ * Optional dict choice surfaced for languages where multiple morpheme
+ * dictionaries are available (Japanese: IPADIC vs UniDic). The Tokenise
+ * dialog renders a secondary selector when ``availableDicts`` is set and
+ * has more than one entry; the first entry should match
+ * ``recommendedModel`` so opening the dialog preselects the default.
+ */
+export interface LanguageDictOption {
+  /** Tokenizer model ID — what gets sent to the backend. */
+  model: string;
+  /** Human label (with size hint) shown in the dict dropdown. */
+  label: string;
+}
+
 export interface LanguageOption {
   code: string;
   label: string;
@@ -16,7 +30,9 @@ export interface LanguageOption {
    * Tokenizer model recommended for this language. Matches the backend's
    * ``recommended_tokenizer_for(language)``; the Tokenise dialog (Phase
    * 4.3) seeds the model field from this so a CJK user doesn't have to
-   * know the model ID.
+   * know the model ID. JA + KO now point at Lindera model IDs
+   * (``lindera-ja-ipadic`` / ``lindera-ko-dic``) — the matching dict is
+   * downloaded on first use into ``~/.cache/ldaca/lindera/``.
    */
   recommendedModel: string;
   /**
@@ -25,6 +41,20 @@ export interface LanguageOption {
    * indicator in tool menus.
    */
   quotationSupported: boolean;
+  /**
+   * Phase 5: per-language dictionary choices. Only Japanese has more
+   * than one practical option (IPADIC vs UniDic). When set + length>1,
+   * the Tokenise dialog shows a "Dictionary" selector and the chosen
+   * dict's model becomes the request payload.
+   */
+  availableDicts?: ReadonlyArray<LanguageDictOption>;
+  /**
+   * Phase 5: when the recommended tokenizer triggers a first-use
+   * download (Lindera dicts), the Tokenise dialog surfaces this hint
+   * next to the model input. Empty for fast-loading defaults (HF
+   * tokenizers cached by hf-hub, Jieba bundled in the wheel).
+   */
+  firstUseHint?: string;
 }
 
 export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
@@ -43,14 +73,22 @@ export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
   {
     code: 'ja',
     label: 'Japanese',
-    recommendedModel: 'cl-tohoku/bert-base-japanese-v3',
+    recommendedModel: 'lindera-ja-ipadic',
     quotationSupported: false,
+    availableDicts: [
+      { model: 'lindera-ja-ipadic', label: 'IPADIC (recommended, ~25 MB)' },
+      { model: 'lindera-ja-unidic', label: 'UniDic (more accurate, ~100 MB)' },
+    ],
+    firstUseHint:
+      'First use downloads the morpheme dictionary (~25 MB for IPADIC, ~100 MB for UniDic) into the local cache.',
   },
   {
     code: 'ko',
     label: 'Korean',
-    recommendedModel: 'klue/bert-base',
+    recommendedModel: 'lindera-ko-dic',
     quotationSupported: false,
+    firstUseHint:
+      'First use downloads the ko-dic morpheme dictionary (~12 MB) into the local cache.',
   },
   {
     code: 'multi',

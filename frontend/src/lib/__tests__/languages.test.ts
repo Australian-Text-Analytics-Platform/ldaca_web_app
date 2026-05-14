@@ -31,6 +31,35 @@ describe('SUPPORTED_LANGUAGES', () => {
     expect(nonEn.every((l) => !l.quotationSupported)).toBe(true);
   });
 
+  it('points Japanese + Korean at Lindera defaults (Phase 5)', () => {
+    expect(findLanguage('ja')?.recommendedModel).toBe('lindera-ja-ipadic');
+    expect(findLanguage('ko')?.recommendedModel).toBe('lindera-ko-dic');
+  });
+
+  it('exposes JA dict choices so the Tokenise dialog can render a picker', () => {
+    const ja = findLanguage('ja');
+    expect(ja?.availableDicts?.length).toBeGreaterThan(1);
+    // First entry must match the recommended model so the dialog opens
+    // with the default preselected.
+    expect(ja?.availableDicts?.[0]?.model).toBe(ja?.recommendedModel);
+  });
+
+  it('keeps Korean as a single-dict language (only ko-dic)', () => {
+    // KO has no UniDic-style alternate; the dict selector should hide
+    // itself, not render a one-option dropdown.
+    const ko = findLanguage('ko');
+    expect(ko?.availableDicts).toBeUndefined();
+  });
+
+  it('surfaces a first-use download hint for Lindera languages', () => {
+    expect(findLanguage('ja')?.firstUseHint).toBeTruthy();
+    expect(findLanguage('ko')?.firstUseHint).toBeTruthy();
+    // Non-Lindera languages don't carry the hint — Jieba dict is bundled
+    // in the wheel and HF tokenizers are tiny.
+    expect(findLanguage('en')?.firstUseHint).toBeUndefined();
+    expect(findLanguage('zh')?.firstUseHint).toBeUndefined();
+  });
+
   it('uses ISO-style lowercase language codes', () => {
     for (const lang of SUPPORTED_LANGUAGES) {
       expect(lang.code).toBe(lang.code.toLowerCase());
