@@ -116,3 +116,77 @@ describe('useNodeColorsStore — per-tab temp layer', () => {
     expect(useNodeColorsStore.getState().colors.a).toBeUndefined();
   });
 });
+
+describe('useNodeColorsStore — Phase D manual-pick conflict avoidance', () => {
+  beforeEach(() => {
+    useNodeColorsStore.getState().reset();
+  });
+
+  it('a manual pick that clashes with another node\'s AUTO temp re-rolls the auto temp', () => {
+    // Seed: both nodes get auto-rolled temps (distinct by design).
+    useNodeColorsStore.getState().ensureTempColors('concordance', ['a', 'b']);
+    const tabBefore = useNodeColorsStore.getState().temps.concordance ?? {};
+    const colorB = tabBefore.b!;
+    // User manually picks the same colour as B for A.
+    useNodeColorsStore.getState().setTempColor('concordance', 'a', colorB);
+    const tabAfter = useNodeColorsStore.getState().temps.concordance ?? {};
+    expect(tabAfter.a).toBe(colorB);
+    // B was auto-rolled → got re-rolled to something else.
+    expect(tabAfter.b).not.toBe(colorB);
+  });
+
+  it('a manual pick that clashes with another node\'s MANUAL temp leaves it alone', () => {
+    // User explicitly sets B to a specific colour first.
+    useNodeColorsStore.getState().setTempColor('concordance', 'b', '#2563eb');
+    // Then sets A to the same colour. Both stay (user wins, no re-roll
+    // on top of an already-manual pick).
+    useNodeColorsStore.getState().setTempColor('concordance', 'a', '#2563eb');
+    const tab = useNodeColorsStore.getState().temps.concordance ?? {};
+    expect(tab.a).toBe('#2563eb');
+    expect(tab.b).toBe('#2563eb');
+  });
+
+  it('a manual pick on the same node re-writes that node\'s temp without re-rolling others', () => {
+    useNodeColorsStore.getState().ensureTempColors('concordance', ['a', 'b']);
+    const tabBefore = useNodeColorsStore.getState().temps.concordance ?? {};
+    const originalB = tabBefore.b!;
+    // User picks a brand-new colour for A that doesn't conflict.
+    useNodeColorsStore.getState().setTempColor('concordance', 'a', '#92400e');
+    expect(useNodeColorsStore.getState().temps.concordance?.b).toBe(originalB);
+  });
+
+  it('clearTempColors drops the manual flag along with the temp', () => {
+    useNodeColorsStore.getState().setTempColor('concordance', 'a', '#2563eb');
+    useNodeColorsStore.getState().clearTempColors('concordance', ['a']);
+    // Re-seed an auto temp for A — it should be eligible for re-rolling
+    // again (i.e. NOT treated as manual any more).
+    useNodeColorsStore.getState().ensureTempColors('concordance', ['a']);
+    useNodeColorsStore.getState().setTempColor('concordance', 'b', useNodeColorsStore.getState().temps.concordance?.a ?? '');
+    // B's manual write should have re-rolled A's now-auto temp.
+    const tab = useNodeColorsStore.getState().temps.concordance ?? {};
+    expect(tab.a).not.toBe(tab.b);
+  });
+
+  it('promoteTempColors clears the manual flag (committed colours have no manual/auto distinction)', () => {
+    useNodeColorsStore.getState().setTempColor('concordance', 'a', '#2563eb');
+    useNodeColorsStore.getState().promoteTempColors('concordance', ['a']);
+    expect(useNodeColorsStore.getState().colors.a).toBe('#2563eb');
+    // After promotion, an auto-re-roll attempt on another node should
+    // treat A as a normal assigned colour (visible in conflict-avoidance,
+    // not flagged as manual). The presence/absence of A's manual flag
+    // matters only for *temp-layer* conflict avoidance, which is empty
+    // after promotion — sanity-check the post-state directly.
+    const manual = useNodeColorsStore.getState().manualNodes.concordance ?? {};
+    expect(manual.a).toBeUndefined();
+  });
+
+  it('manual-pick conflict avoidance is scoped to one tab — does not touch other tabs', () => {
+    useNodeColorsStore.getState().ensureTempColors('concordance', ['a', 'b']);
+    useNodeColorsStore.getState().ensureTempColors('token-frequency', ['a', 'b']);
+    const freqB = useNodeColorsStore.getState().temps['token-frequency']?.b ?? '';
+    // Manually pick freqB's colour for ``a`` in concordance — should
+    // affect concordance only, leave token-frequency intact.
+    useNodeColorsStore.getState().setTempColor('concordance', 'a', freqB);
+    expect(useNodeColorsStore.getState().temps['token-frequency']?.b).toBe(freqB);
+  });
+});
