@@ -16,6 +16,7 @@ import {
   type MultiSeriesChartSeries,
   type MultiSeriesChartType,
 } from '@/features/analysis/common/components/MultiSeriesChart';
+import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
 
 import {
   buildDispersionBins,
@@ -70,6 +71,13 @@ type Props = {
     onSelect: (index: number, shiftHeld: boolean) => void;
     onClear: () => void;
   };
+  /**
+   * Toggle a matched-text in/out of the legend. When omitted, the
+   * in-chart legend isn't rendered — the caller is expected to mount
+   * their own ``ConcordanceDispersionLegend`` (the proportional-bars
+   * branch in :file:`ConcordanceDispersionNodeBlock` still does this).
+   */
+  onToggleMatchedText?: (text: string) => void;
 };
 
 const AGGREGATE_DEFAULT_COLOR = '#0284c7';
@@ -130,6 +138,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
   onChartTypeChange,
   onBinCountChange,
   selection,
+  onToggleMatchedText,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
@@ -154,7 +163,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
   // the current page.
   const useMaterialised = materialised && showAllProcessed && materialisedBinsReady;
 
-  const { bins, sources } = useMemo(() => {
+  const { bins, sources, totalsByKey } = useMemo(() => {
     if (useMaterialised && materialisedBins) {
       return buildDispersionBinsFromBinned(materialisedBins, binCount, {
         lowercaseMatches,
@@ -168,6 +177,53 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
       aggregateAll,
     });
   }, [useMaterialised, materialisedBins, rows, textColumn, binCount, lowercaseMatches, splitBySource, aggregateAll]);
+
+  /**
+   * Per-matched-text totals across every bin in the displayed graph.
+   * Folds the per-source split-key form back to per-text by stripping
+   * the source delimiter, so users always see one number per legend
+   * row regardless of whether ``splitBySource`` is on. Hidden items are
+   * still included — toggling visibility doesn't recompute the total
+   * (the user wants to see the weight of the filter they just turned
+   * off).
+   */
+  const totalsByText = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const [key, value] of Object.entries(totalsByKey)) {
+      if (key === DISPERSION_AGGREGATE_KEY) continue;
+      const { text } = stripSeriesKey(key);
+      if (!text) continue;
+      out.set(text, (out.get(text) ?? 0) + value);
+    }
+    return out;
+  }, [totalsByKey]);
+
+  /**
+   * Per-matched-text totals across only the user-selected bins. ``null``
+   * when no selection is active so the legend renders the plain
+   * ``(n)`` form instead of ``(m/n)``. When a selection exists but a
+   * given matched-text has zero hits inside it, the value is 0 (the
+   * legend displays it as ``(0/n)`` so the user sees which items are
+   * absent from their selected window).
+   */
+  const selectedTotalsByText = useMemo<Map<string, number> | null>(() => {
+    if (!selection || selection.selectedIndices.size === 0) return null;
+    const out = new Map<string, number>();
+    // Seed every known text with 0 so missing-from-selection items
+    // surface as ``0`` instead of being undefined.
+    for (const text of totalsByText.keys()) out.set(text, 0);
+    for (const idx of selection.selectedIndices) {
+      const bin = bins[idx];
+      if (!bin) continue;
+      for (const [key, val] of Object.entries(bin)) {
+        if (key === 'binCenter' || key === DISPERSION_AGGREGATE_KEY) continue;
+        const { text } = stripSeriesKey(key);
+        if (!text) continue;
+        out.set(text, (out.get(text) ?? 0) + (Number(val) || 0));
+      }
+    }
+    return out;
+  }, [selection, bins, totalsByText]);
 
   const aggregationLabel = useMaterialised ? 'whole data block' : 'page above';
   const titleText = `${dataBlockLabel}: aggregated matches at relative locations of documents from ${aggregationLabel}`;
@@ -341,6 +397,16 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
           <Download className="h-4 w-4" />
         </Button>
       </div>
+      {!aggregateAll && onToggleMatchedText && allMatchedTexts.length > 0 ? (
+        <ConcordanceDispersionLegend
+          matchedTexts={allMatchedTexts}
+          matchedTextColors={matchedTextColors}
+          hiddenMatchedTexts={hiddenMatchedTexts}
+          onToggle={onToggleMatchedText}
+          totals={totalsByText}
+          selectedTotals={selectedTotalsByText}
+        />
+      ) : null}
       <MultiSeriesChart
         data={bins}
         xKey="binCenter"

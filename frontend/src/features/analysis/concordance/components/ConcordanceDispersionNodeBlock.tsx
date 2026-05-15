@@ -470,7 +470,11 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             onPageChange={(newPage) => setCombinedPage(newPage)}
             loading={combinedLoading}
           />
-          {colourMatches && allMatchedTexts.length > 0 && (
+          {proportionalDispersionBars && colourMatches && allMatchedTexts.length > 0 && (
+            // Standalone legend only in proportional-bars mode — there's no
+            // ``Summary`` chart in that branch so the legend has to live
+            // here. In summary mode the chart renders its own legend with
+            // per-text counts.
             <ConcordanceDispersionLegend
               matchedTexts={allMatchedTexts}
               matchedTextColors={matchedTextColorMap}
@@ -516,6 +520,14 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                   onSelect: (index, shiftHeld) =>
                     onBinSelect('__COMBINED__', index, shiftHeld),
                   onClear: () => onClearBinSelection('__COMBINED__'),
+                }}
+                onToggleMatchedText={(text) => {
+                  setHiddenMatchedTexts((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(text)) next.delete(text);
+                    else next.add(text);
+                    return next;
+                  });
                 }}
               />
             );
@@ -750,7 +762,9 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
           );
         })()}
       </AnalysisPagination>
-      {colourMatches && allMatchedTexts.length > 0 && (
+      {proportionalDispersionBars && colourMatches && allMatchedTexts.length > 0 && (
+        // Standalone legend only in proportional-bars mode — summary mode
+        // renders its own legend inside the chart with per-text counts.
         <ConcordanceDispersionLegend
           matchedTexts={allMatchedTexts}
           matchedTextColors={matchedTextColorMap}
@@ -794,6 +808,14 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 EMPTY_BIN_SELECTION,
               onSelect: (index, shiftHeld) => onBinSelect(nodeKey, index, shiftHeld),
               onClear: () => onClearBinSelection(nodeKey),
+            }}
+            onToggleMatchedText={(text) => {
+              setHiddenMatchedTexts((prev) => {
+                const next = new Set(prev);
+                if (next.has(text)) next.delete(text);
+                else next.add(text);
+                return next;
+              });
             }}
           />
         );

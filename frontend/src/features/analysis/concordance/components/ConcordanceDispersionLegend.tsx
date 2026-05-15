@@ -5,6 +5,24 @@ type Props = {
   matchedTextColors: Record<string, string>;
   hiddenMatchedTexts: Set<string>;
   onToggle: (text: string) => void;
+  /**
+   * Per-matched-text total count across the *full* displayed graph.
+   * Pre-computed by the caller — when supplied, the legend renders
+   * ``(n)`` after each label in the same colour/style.
+   *
+   * Hidden items keep their number; toggling visibility doesn't
+   * recompute to zero so the user always sees the underlying weight of
+   * the filter they just turned off.
+   */
+  totals?: ReadonlyMap<string, number>;
+  /**
+   * Per-matched-text count across just the user-selected bins, when a
+   * selection is active. ``null`` / undefined → no selection, render
+   * the plain ``(n)`` form. When non-null, render ``(m/n)`` where
+   * ``m`` is the per-text selected count (0 is rendered as ``0``,
+   * never collapsed) and ``n`` is the full-graph total.
+   */
+  selectedTotals?: ReadonlyMap<string, number> | null;
 };
 
 const DEFAULT_COLOR = '#0284c7';
@@ -14,13 +32,25 @@ export const ConcordanceDispersionLegend: React.FC<Props> = ({
   matchedTextColors,
   hiddenMatchedTexts,
   onToggle,
+  totals,
+  selectedTotals,
 }) => {
   if (matchedTexts.length === 0) return null;
+  const hasSelection = !!selectedTotals;
   return (
     <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 py-2">
       {matchedTexts.map((text) => {
         const color = matchedTextColors[text] ?? DEFAULT_COLOR;
         const isHidden = hiddenMatchedTexts.has(text);
+        const total = totals?.get(text);
+        const selected = selectedTotals?.get(text) ?? 0;
+        // ``(m/n)`` when a selection is active; ``(n)`` otherwise.
+        // ``totals`` may be undefined for callers that haven't
+        // upgraded — in which case render the legacy no-count form.
+        let countSuffix = '';
+        if (typeof total === 'number') {
+          countSuffix = hasSelection ? ` (${selected}/${total})` : ` (${total})`;
+        }
         return (
           <button
             key={text}
@@ -37,6 +67,7 @@ export const ConcordanceDispersionLegend: React.FC<Props> = ({
               style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
             >
               {text}
+              {countSuffix}
             </span>
           </button>
         );
