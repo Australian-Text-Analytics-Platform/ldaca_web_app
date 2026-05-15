@@ -3,6 +3,29 @@
 User-facing changes to the LDaCA Wordflow (previously "LDaCA Text Analytics Web Application") since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.3] — 2026-05-15
+
+CJK performance + multilingual UX polish. Driven by a hands-on Japanese-corpus test pass on top of v0.4.2: every change closes a friction point that showed up while running real Lindera-tokenised data through the concordance, token-frequency, and dispersion tools. The headline is the per-user tokens cache — re-tokenising a column you already processed is now near-instant, even after a backend restart.
+
+### Added
+
+- **Tokens cache (per user).** Tokenisation results are now persisted in a content-addressed parquet cache at `<user_root>/user_cache/tokens/` and looked up by `(text, tokeniser, model)` hash. Re-running *Tokenise* on the same column — or running it across sub-corpora that share rows — completes in a fraction of the time of the first run. The cache survives backend restarts, and is swept on workspace delete, node delete, derived-column delete, and at backend startup so it never leaks orphans.
+- **Concordance tokens-mode: multi-keyword search.** Tokens-mode now accepts multiple alternatives separated by space, comma, or `|` — e.g. `猫|犬|魚` or `cat dog fish` — and returns hits for any of them, in token order. Each alternative is still an exact-token match (not substring), so CJK results stay clean. The placeholder in the search box and the toggle tooltip both explain the new syntax.
+- **Mismatch nudge when the wrong column was tokenised.** When the column you've picked for analysis has no derived tokens but a *different* column on the same node does, the analysis panel now shows an amber notice listing the existing tokens columns. Prevents the common "I tokenised ID instead of context" foot-gun that quietly forces the analysis tools back onto whitespace tokenisation against tens of thousands of non-language values.
+- **Dispersion summary legend: per-text counts.** Legend items in the concordance dispersion summary now carry `(n)` after each label — the total hits contributed by that source across the whole displayed graph. When you brush-select a region of the plot, every label switches to `(m/n)` where `m` is the per-source count inside the selection. Hidden items keep their number frozen instead of recomputing to zero, so the count reflects the underlying weight of the filter you just turned off.
+
+### Changed
+
+- **Concordance dispersion view groups hits by document.** Previously each hit drew its own bar, so a document with twenty hits became twenty rows. The dispersion view now collapses consecutive same-document hits into a single bar per document, matching what users expect for cross-document distribution analysis. The grouping runs at materialise time on the document column carried through the source node.
+- **Word cloud sizing is responsive.** The single-token and unified-token word clouds now measure their container with `ResizeObserver` and feed the live width into the d3-cloud layout. Font envelopes scale as a fraction of canvas width (clamped on both ends), so the cloud fills wide panels without overflowing on narrow ones — the "too much white margin" and "cuts off the longest word" cases both go away.
+- **Token-frequency Tokenise / Stopwords panels are React.memo'd.** Typing in the stopword textbox no longer triggers a re-layout of the d3-cloud spiral on every keystroke; the heavy section components only re-render when their inputs actually change.
+
+### Fixed
+
+- **`token_frequencies_task() got an unexpected keyword argument 'node_token_streams'`.** The worker wrapper now forwards the kwarg through to the run function, so token frequencies across two tokenised corpora no longer regress to an error.
+- **Tokens-cache race on rapid delete + recreate.** Previously the cache rewrote a single parquet file with `os.replace`, which could race with a concurrent `scan_parquet` re-opening the file for page reads and surface as `parquet: File out of specification: The page header reported the wrong page size`. The cache now writes append-only delta files (LSM level-0 style) with opportunistic compaction; deltas are immutable so the read path can never observe a half-written file.
+- **Dispersion detach button surfaces its own gate.** The "Add to workspace" / detach button in the dispersion view is disabled until the corpus is materialised (Process All) when a bin selection is active. The reason was previously hidden because native HTML `title` attributes don't fire on disabled buttons in macOS Safari/Chromium; the button is now wrapped in `DisabledReasonTooltip` so hover reveals "Materialise the corpus first (Process All) to safely apply this bin selection across all documents."
+
 ## [0.4.2] — 2026-05-15
 
 The rename release. PyPI package, Python module, GitHub repo, and Tauri product name all flip from `ldaca-web-app` / `LDaCA Text Analytics` to `ldaca-wordflow` / `LDaCA Wordflow`. The behaviour of the app is unchanged from v0.4.1 — this release exists solely to land the rename in a single tagged commit.
