@@ -181,11 +181,6 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 }
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
               />
-              {searchMode === 'tokens' ? (
-                <p className="text-xs text-muted-foreground">
-                  Each alternative is an exact-token match. Example: <code>{`猫|犬|魚`}</code> or <code>cat dog fish</code> finds every hit of any of them.
-                </p>
-              ) : null}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -242,7 +237,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 <DisabledReasonTooltip
                   reason={
                     tokensModeAvailable
-                      ? undefined
+                      ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
                       : 'Run Tokenise on this column first — tokens-mode walks the derived tokens column for word-aware (CJK-friendly) context.'
                   }
                 >
