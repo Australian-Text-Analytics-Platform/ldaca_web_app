@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -212,6 +212,28 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
   const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';
+
+  // Per-matched-text totals + selection-scoped sub-totals, published up
+  // from the active ``ConcordanceDispersionSummary`` so the standalone
+  // legend (kept above the chart for visual continuity with the
+  // proportional-bars table) can show ``(n)`` or ``(m/n)`` next to each
+  // label. A single state slot is enough because only one branch
+  // (combined vs per-node) mounts a Summary per render.
+  const [legendCounts, setLegendCounts] = useState<{
+    totals: ReadonlyMap<string, number>;
+    selectedTotals: ReadonlyMap<string, number> | null;
+  }>(() => ({ totals: new Map<string, number>(), selectedTotals: null }));
+  // Stable callback so React.memo'd children (and the publishing
+  // useEffect inside Summary) don't re-fire on unrelated re-renders.
+  const handleLegendCountsChange = useCallback(
+    (counts: {
+      totals: ReadonlyMap<string, number>;
+      selectedTotals: ReadonlyMap<string, number> | null;
+    }) => {
+      setLegendCounts(counts);
+    },
+    [],
+  );
 
   if (nodeKey === '__COMBINED__') {
     const groupedRows = nodeData.data;
@@ -470,11 +492,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             onPageChange={(newPage) => setCombinedPage(newPage)}
             loading={combinedLoading}
           />
-          {proportionalDispersionBars && colourMatches && allMatchedTexts.length > 0 && (
-            // Standalone legend only in proportional-bars mode — there's no
-            // ``Summary`` chart in that branch so the legend has to live
-            // here. In summary mode the chart renders its own legend with
-            // per-text counts.
+          {colourMatches && allMatchedTexts.length > 0 && (
             <ConcordanceDispersionLegend
               matchedTexts={allMatchedTexts}
               matchedTextColors={matchedTextColorMap}
@@ -487,6 +505,8 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                   return next;
                 });
               }}
+              totals={legendCounts.totals}
+              selectedTotals={legendCounts.selectedTotals}
             />
           )}
           {!proportionalDispersionBars && (() => {
@@ -521,14 +541,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     onBinSelect('__COMBINED__', index, shiftHeld),
                   onClear: () => onClearBinSelection('__COMBINED__'),
                 }}
-                onToggleMatchedText={(text) => {
-                  setHiddenMatchedTexts((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(text)) next.delete(text);
-                    else next.add(text);
-                    return next;
-                  });
-                }}
+                onLegendCountsChange={handleLegendCountsChange}
               />
             );
           })()}
@@ -762,9 +775,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
           );
         })()}
       </AnalysisPagination>
-      {proportionalDispersionBars && colourMatches && allMatchedTexts.length > 0 && (
-        // Standalone legend only in proportional-bars mode — summary mode
-        // renders its own legend inside the chart with per-text counts.
+      {colourMatches && allMatchedTexts.length > 0 && (
         <ConcordanceDispersionLegend
           matchedTexts={allMatchedTexts}
           matchedTextColors={matchedTextColorMap}
@@ -777,6 +788,8 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               return next;
             });
           }}
+          totals={legendCounts.totals}
+          selectedTotals={legendCounts.selectedTotals}
         />
       )}
       {!proportionalDispersionBars && (() => {
@@ -809,14 +822,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               onSelect: (index, shiftHeld) => onBinSelect(nodeKey, index, shiftHeld),
               onClear: () => onClearBinSelection(nodeKey),
             }}
-            onToggleMatchedText={(text) => {
-              setHiddenMatchedTexts((prev) => {
-                const next = new Set(prev);
-                if (next.has(text)) next.delete(text);
-                else next.add(text);
-                return next;
-              });
-            }}
+            onLegendCountsChange={handleLegendCountsChange}
           />
         );
       })()}

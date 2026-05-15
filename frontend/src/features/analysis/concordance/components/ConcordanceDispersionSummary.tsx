@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,8 +16,6 @@ import {
   type MultiSeriesChartSeries,
   type MultiSeriesChartType,
 } from '@/features/analysis/common/components/MultiSeriesChart';
-import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
-
 import {
   buildDispersionBins,
   buildDispersionBinsFromBinned,
@@ -72,12 +70,18 @@ type Props = {
     onClear: () => void;
   };
   /**
-   * Toggle a matched-text in/out of the legend. When omitted, the
-   * in-chart legend isn't rendered — the caller is expected to mount
-   * their own ``ConcordanceDispersionLegend`` (the proportional-bars
-   * branch in :file:`ConcordanceDispersionNodeBlock` still does this).
+   * Published whenever the bins / selection / source switch change. The
+   * caller (``ConcordanceDispersionNodeBlock``) feeds these to its
+   * standalone ``ConcordanceDispersionLegend`` so each legend row can
+   * show ``(n)`` — or ``(m/n)`` when a bin selection is active — in the
+   * same colour as the line. Owning the legend up there (instead of
+   * inside this component) preserves the existing visual anchoring
+   * between the legend row and the proportional-bars list above it.
    */
-  onToggleMatchedText?: (text: string) => void;
+  onLegendCountsChange?: (counts: {
+    totals: ReadonlyMap<string, number>;
+    selectedTotals: ReadonlyMap<string, number> | null;
+  }) => void;
 };
 
 const AGGREGATE_DEFAULT_COLOR = '#0284c7';
@@ -138,7 +142,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
   onChartTypeChange,
   onBinCountChange,
   selection,
-  onToggleMatchedText,
+  onLegendCountsChange,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
@@ -224,6 +228,19 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
     }
     return out;
   }, [selection, bins, totalsByText]);
+
+  // Publish the per-text counts up to the parent so its standalone
+  // legend (kept above the chart for visual continuity with the
+  // proportional-bars table) can show ``(n)`` / ``(m/n)`` next to each
+  // label. One-frame lag is acceptable — the legend mounts before the
+  // first chart paint and just re-renders once the totals land.
+  useEffect(() => {
+    if (!onLegendCountsChange) return;
+    onLegendCountsChange({
+      totals: totalsByText,
+      selectedTotals: selectedTotalsByText,
+    });
+  }, [onLegendCountsChange, totalsByText, selectedTotalsByText]);
 
   const aggregationLabel = useMaterialised ? 'whole data block' : 'page above';
   const titleText = `${dataBlockLabel}: aggregated matches at relative locations of documents from ${aggregationLabel}`;
@@ -397,16 +414,6 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
           <Download className="h-4 w-4" />
         </Button>
       </div>
-      {!aggregateAll && onToggleMatchedText && allMatchedTexts.length > 0 ? (
-        <ConcordanceDispersionLegend
-          matchedTexts={allMatchedTexts}
-          matchedTextColors={matchedTextColors}
-          hiddenMatchedTexts={hiddenMatchedTexts}
-          onToggle={onToggleMatchedText}
-          totals={totalsByText}
-          selectedTotals={selectedTotalsByText}
-        />
-      ) : null}
       <MultiSeriesChart
         data={bins}
         xKey="binCenter"
