@@ -1,5 +1,6 @@
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
+import { TokensColumnMismatchNotice } from '@/features/analysis/common/components/TokensColumnMismatchNotice';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
@@ -199,6 +200,11 @@ export const TokenFrequencyParameterPanel = ({
         allowedDataTypes={['string']}
         originalCount={displayNodeCount}
         lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+      />
+      <TokensColumnMismatchNotice
+        nodes={panelSelectedNodes}
+        selections={effectiveNodeColumnSelections}
+        className="mt-3"
       />
     </AnalysisCardLayout>
   );

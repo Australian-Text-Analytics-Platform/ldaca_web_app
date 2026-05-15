@@ -7,6 +7,7 @@ import InfoIcon from '@/components/help/InfoIcon';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
+import { TokensColumnMismatchNotice } from '@/features/analysis/common/components/TokensColumnMismatchNotice';
 import type { AnalysisActionState, NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import type { ColumnInfo } from '@/utils/columnTypes';
@@ -155,6 +156,11 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
           allowedDataTypes={['string']}
           originalCount={displayNodeCount}
           lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+        />
+
+        <TokensColumnMismatchNotice
+          nodes={panelSelectedNodes}
+          selections={effectiveNodeColumnSelections}
         />
 
         <div className="space-y-4">
