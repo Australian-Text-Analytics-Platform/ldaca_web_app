@@ -3,6 +3,18 @@
 User-facing changes to the LDaCA Wordflow (previously "LDaCA Text Analytics Web Application") since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.4] — 2026-05-15
+
+Re-stamps v0.4.3. The code is byte-identical to v0.4.3, but three version sources were missed in the v0.4.3 bump (`frontend/package.json`, `frontend/src-tauri/tauri.conf.json`, `frontend/src-tauri/Cargo.toml`), with the result that:
+
+- Desktop MSI / DMG filenames on the v0.4.3 GitHub release said `0.4.2`.
+- The desktop binary's "About" / "Installed apps" `productVersion` field said `0.4.2`.
+- The in-app version display (`VITE_APP_VERSION` baked into the FE bundle, surfaced in the in-app docs and on feedback-form submissions) said `0.4.2`.
+
+`pip show ldaca-wordflow` correctly reported `0.4.3`, so users hitting the `pip` path got a self-contradictory pair of version strings. v0.4.4 ships the same code with all five version sources aligned. **If you installed v0.4.3 desktop builds, please re-download v0.4.4 to get correctly-labelled bundles**; if you `pip install`'d v0.4.3, upgrading is cosmetic only (no code differences).
+
+A follow-up task is tracked to consolidate the five version sources behind a single source of truth so this drift can't recur.
+
 ## [0.4.3] — 2026-05-15
 
 CJK performance + multilingual UX polish. Driven by a hands-on Japanese-corpus test pass on top of v0.4.2: every change closes a friction point that showed up while running real Lindera-tokenised data through the concordance, token-frequency, and dispersion tools. The headline is the per-user tokens cache — re-tokenising a column you already processed is now near-instant, even after a backend restart.
