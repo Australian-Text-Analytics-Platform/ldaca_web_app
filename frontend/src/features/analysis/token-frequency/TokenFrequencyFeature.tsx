@@ -265,9 +265,16 @@ const TokenFrequencyFeature = () => {
     }
   }, [tokensModelOptions, tokensModel]);
 
-  const getColorForNode = (nodeId: string, index = 0) => {
-    return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length] ?? '#000000';
-  };
+  // useCallback so the section components below stay React.memo-stable
+  // across stopword-keystroke re-renders of this feature. Without it,
+  // every render hands a fresh function ref to the sections, busting
+  // memoisation and re-running d3-cloud layout per keystroke.
+  const getColorForNode = useCallback(
+    (nodeId: string, index = 0) => {
+      return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length] ?? '#000000';
+    },
+    [nodeColors, defaultPalette],
+  );
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
@@ -438,13 +445,16 @@ const TokenFrequencyFeature = () => {
     [normalizedNodeResults, appliedStopSet, effectiveTokenLimit],
   );
 
-  const registerWordCloudRef = (nodeKey: string, element: SVGSVGElement | null) => {
-    if (!element) {
-      Reflect.deleteProperty(wordCloudRefs.current, nodeKey);
-      return;
-    }
-    wordCloudRefs.current[nodeKey] = element;
-  };
+  const registerWordCloudRef = useCallback(
+    (nodeKey: string, element: SVGSVGElement | null) => {
+      if (!element) {
+        Reflect.deleteProperty(wordCloudRefs.current, nodeKey);
+        return;
+      }
+      wordCloudRefs.current[nodeKey] = element;
+    },
+    [],
+  );
 
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [downloadDialogMode, setDownloadDialogMode] = useState<DownloadDialogMode>('wordcloud');
@@ -456,11 +466,14 @@ const TokenFrequencyFeature = () => {
     label?: string;
   } | null>(null);
 
-  const handleDownloadWordCloud = (nodeKey: string, displayName: string) => {
-    pendingDownloadRef.current = { mode: 'wordcloud', nodeKey, displayName };
-    setDownloadDialogMode('wordcloud');
-    setDownloadDialogOpen(true);
-  };
+  const handleDownloadWordCloud = useCallback(
+    (nodeKey: string, displayName: string) => {
+      pendingDownloadRef.current = { mode: 'wordcloud', nodeKey, displayName };
+      setDownloadDialogMode('wordcloud');
+      setDownloadDialogOpen(true);
+    },
+    [],
+  );
 
   const renameStatisticsKeysForExport = (rows: unknown[]): unknown[] => {
     if (analysisNodeIds.length !== 2) return rows;
@@ -489,12 +502,18 @@ const TokenFrequencyFeature = () => {
     });
   };
 
-  const handleDownloadFrequencyCsv = (label: string, rows: unknown[]) => {
-    const exportRows = label === 'token-keyness' ? renameStatisticsKeysForExport(rows) : rows;
-    pendingDownloadRef.current = { mode: 'frequencies', label, rows: exportRows };
-    setDownloadDialogMode('frequencies');
-    setDownloadDialogOpen(true);
-  };
+  const handleDownloadFrequencyCsv = useCallback(
+    (label: string, rows: unknown[]) => {
+      const exportRows = label === 'token-keyness' ? renameStatisticsKeysForExport(rows) : rows;
+      pendingDownloadRef.current = { mode: 'frequencies', label, rows: exportRows };
+      setDownloadDialogMode('frequencies');
+      setDownloadDialogOpen(true);
+    },
+    // ``renameStatisticsKeysForExport`` closes over ``analysisNodeIds`` and
+    // ``computeDisplayName``; both are memoised in this component so this
+    // callback only changes when the analysis selection actually changes.
+    [analysisNodeIds, computeDisplayName],
+  );
 
   const handleDownloadConfirm = async ({ format, includeStopWords }: { format: string; includeStopWords: boolean }) => {
     const ctx = pendingDownloadRef.current;

@@ -1,6 +1,6 @@
 import type { NodeResultView } from '../../tokenFrequencyAdapters';
 import { wildcardToRegExp } from '../../tokenFrequencyAdapters';
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
@@ -71,7 +71,7 @@ type SingleNodeWordCloudProps = {
  * ResizeObserver. Extracted from the map body so the hook (which can't be
  * called inside a loop) sits at the top level of a component.
  */
-const SingleNodeWordCloud = ({
+const SingleNodeWordCloud = memo(({
   nodeKey,
   words,
   color,
@@ -156,7 +156,7 @@ const SingleNodeWordCloud = ({
   );
 };
 
-export const TokenFrequencySingleTokenSection = ({
+const TokenFrequencySingleTokenSectionInner = ({
   nodeDisplayResults,
   getColorForNode,
   onTokenClick,
@@ -340,3 +340,15 @@ export const TokenFrequencySingleTokenSection = ({
     </div>
   );
 };
+
+/**
+ * ``React.memo`` wrap. Like the unified section, this is one of the hot
+ * paths on a stop-word keystroke — d3-cloud's spiral runs inside every
+ * per-card ``<Wordcloud>``. With every prop now referentially stable
+ * across keystrokes the default shallow compare is enough to skip the
+ * re-render entirely when only ``stopWords`` (which this component
+ * doesn't take) changed.
+ */
+export const TokenFrequencySingleTokenSection = memo(
+  TokenFrequencySingleTokenSectionInner,
+);

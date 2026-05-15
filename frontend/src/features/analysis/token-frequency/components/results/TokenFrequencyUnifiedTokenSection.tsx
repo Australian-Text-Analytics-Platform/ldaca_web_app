@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { NodeResultView, NormalizedNodeResult, TokenFrequencyStatisticsEntry } from '../../tokenFrequencyAdapters';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
@@ -62,7 +63,7 @@ const parseStatisticsNumericValue = (value: unknown): number => {
   return Number(value);
 };
 
-export const TokenFrequencyUnifiedTokenSection = ({
+const TokenFrequencyUnifiedTokenSectionInner = ({
   normalizedNodeResults,
   nodeDisplayResults,
   lastCompareNodeIds,
@@ -336,3 +337,17 @@ export const TokenFrequencyUnifiedTokenSection = ({
     </div>
   );
 };
+
+/**
+ * ``React.memo`` wrap. The unified-cloud section is one of the two hot
+ * paths on a stop-word keystroke — d3-cloud's spiral layout runs inside
+ * ``<Wordcloud>`` on every render, which is 50-200 ms for 50-100 words.
+ * With every prop now referentially stable across keystrokes
+ * (``useCallback`` on the handlers in ``TokenFrequencyFeature``,
+ * ``useMemo`` on the derived collections), the default shallow compare
+ * is enough to skip the re-render entirely when only ``stopWords``
+ * (which this component doesn't take) changed.
+ */
+export const TokenFrequencyUnifiedTokenSection = memo(
+  TokenFrequencyUnifiedTokenSectionInner,
+);
