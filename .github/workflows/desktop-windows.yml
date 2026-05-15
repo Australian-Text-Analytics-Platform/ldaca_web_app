@@ -145,7 +145,7 @@ jobs:
             exit 1
           }
 
-          & $pythonExe -c "import encodings, ldaca_web_app, polars_text, sys; print(sys.version)"
+          & $pythonExe -c "import encodings, ldaca_wordflow, polars_text, sys; print(sys.version)"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7

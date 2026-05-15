@@ -119,7 +119,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           repo_root="$(cd .. && pwd -P)"
-          app_path="$repo_root/frontend/src-tauri/target/release/bundle/macos/LDaCA Text Analytics.app"
+          app_path="$repo_root/frontend/src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
           runtime_path="$app_path/Contents/Resources/backend-runtime"
 
           test -d "$runtime_path"
@@ -127,7 +127,7 @@ jobs:
           test -f "$runtime_path/python/lib/libpython3.14.dylib"
 
           # Ensure embedded Python can initialize stdlib and import bundled packages.
-          "$runtime_path/python/bin/python3" -c "import encodings, ldaca_web_app, polars_text, sys; print(sys.version)"
+          "$runtime_path/python/bin/python3" -c "import encodings, ldaca_wordflow, polars_text, sys; print(sys.version)"
 
           echo "Bundled runtime validation succeeded: $runtime_path"
 
