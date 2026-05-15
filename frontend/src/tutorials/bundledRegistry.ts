@@ -489,7 +489,7 @@ const info = {
   'general.overview': {
     file: 'information/general.md',
     anchor: 'info-general-overview',
-    label: 'About LDaCA Text Analytics',
+    label: 'About Wordflow',
   },
   'data-loader.overview': {
     file: 'information/data-loader.md',
@@ -542,7 +542,7 @@ const reference = {
   'general.platform': {
     file: 'references/general.md',
     anchor: 'ref-general-platform',
-    label: 'Cite LDaCA Text Analytics',
+    label: 'Cite LDaCA Wordflow',
   },
 } as const satisfies Record<string, DocTarget>;
 

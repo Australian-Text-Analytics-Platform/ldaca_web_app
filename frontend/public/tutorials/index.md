@@ -1,18 +1,18 @@
 <!-- markdownlint-disable MD033 -->
 
-<h1 id="help-tutorial-index">LDaCA Text Analytic webApp Tutorial</h1>
+<h1 id="help-tutorial-index">LDaCA Wordflow Tutorial</h1>
 
 <p align="center">
   <img src="/LDaCA_logo_Dark.png" alt="LDaCA" width="360" />
 </p>
 
-Welcome to the LDaCA WebApp, your innovative solution for text analysis in research projects. This guide is designed to support new users as they begin their journey with the LDaCA text analytic tools, providing clear instructions, practical examples, and inspiration for leveraging the app’s powerful tools. Whether you are new to text analysis or an experienced researcher, this document will help you understand the installation process, the user interface, the core concepts behind the LDaCA’s interoperable tools, and how to achieve meaningful outcomes from your analysis.
+Welcome to LDaCA Wordflow, your innovative solution for text analysis in research projects. This guide is designed to support new users as they begin their journey with Wordflow, providing clear instructions, practical examples, and inspiration for leveraging its powerful analysis features. Whether you are new to text analysis or an experienced researcher, this document will help you understand the installation process, the user interface, the core concepts behind Wordflow's interoperable analyses, and how to achieve meaningful outcomes from your analysis.
 
 ## Overview
 
-The LDaCA WebApp offers an interface that prioritizes ease of use and efficient navigation. The main user interface includes the following main sections, systematically presented in three primary columns.
+Wordflow offers an interface that prioritizes ease of use and efficient navigation. The main user interface includes the following main sections, systematically presented in three primary columns.
 
-![LDaCA main webApp](tutorials/assets/ldaca_main.png)
+![Wordflow main view](tutorials/assets/ldaca_main.png)
 
 1.	Tool Choice: Choose and customise which tool module to use.
 2.	Data Selection: Select the data block to be analysed.
@@ -26,13 +26,13 @@ The LDaCA WebApp offers an interface that prioritizes ease of use and efficient 
 For detailed explanation of how each of the above sections work, please refer to [User Interface Overview](./ui.md).
 
 
-## Concept: How the Tools Interoperate
-The LDaCA suite of tools is designed to work together seamlessly, allowing you to conduct comprehensive text analyses. Here’s how the components interact:
+## Concept: How the Analyses Interoperate
+Wordflow's analyses are designed to work together seamlessly, allowing you to conduct comprehensive text analyses. Here’s how the components interact:
 - **Data block**: Tabular data consists of at least one column of analysable textual contents. Each row represents a unit of text (document, post, comment, speech etc.) and its associated metadata in columns. A data block can be viewed as a collection of texts with various types of metadata.
 - **Workspace**: A set of data blocks that can be processed, analysed and derived from each other. The workspace is a virtual space where the user uploads, processes and manipulates all relevant data blocks to a project or task. The workspace is visualised as a graph of interconnecting data blocks, where the links indicates how new data blocks are derived from their parent data blocks through various operations. The user can select, rename, delete or clone the data blocks from the workspace manager.
 
-The data block is the fundamental analytic unit for all LDaCA tools, serves as both input and output so that the result of one tool can be processed by any other tool seamlessly. 
-The text corpus and metadata can be uploaded to the webApp then loaded as a data block to an active workspace.
+The data block is the fundamental analytic unit across Wordflow, serves as both input and output so that the result of one analysis can be processed by any other seamlessly. 
+The text corpus and metadata can be uploaded to Wordflow then loaded as a data block to an active workspace.
 Most operations (filtering, sampling, joining, stacking, detaching etc.) on a data block derives a new data block in the workspace, and 
 
 - Data Loader: Upload your text files and load  the text corpus (e.g., interview transcripts, articles) into a project workspace.

@@ -263,9 +263,9 @@ const Sidebar: React.FC = () => {
             <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
           </div>
               <div className="flex items-center w-full">
-            <p className="text-xl font-semibold flex-1">Text Analytics</p>
-                <InfoIcon targetKey="general.overview" label="About this platform" className="h-5 w-5 text-blue-500" />
-                <ReferenceIcon targetKey="general.platform" label="Cite this platform" className="h-5 w-5 text-emerald-600" />
+            <p className="text-xl font-semibold flex-1">Wordflow</p>
+                <InfoIcon targetKey="general.overview" label="About Wordflow" className="h-5 w-5 text-blue-500" />
+                <ReferenceIcon targetKey="general.platform" label="Cite LDaCA Wordflow" className="h-5 w-5 text-emerald-600" />
               </div>
           {isMultiUserMode && (
             <div className="flex items-center justify-between w-full">

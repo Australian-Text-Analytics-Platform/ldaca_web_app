@@ -33,7 +33,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error, auth
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold text-gray-900">Sign in to continue</h1>
           <p className="text-base text-gray-600">
-            LDaCA Text Analytics requires you to sign in with {providerLabel}.
+            LDaCA Wordflow requires you to sign in with {providerLabel}.
           </p>
         </div>
         <ErrorBoundary>
