@@ -154,7 +154,8 @@ const SingleNodeWordCloud = memo(({
       </svg>
     </div>
   );
-};
+});
+SingleNodeWordCloud.displayName = 'SingleNodeWordCloud';
 
 const TokenFrequencySingleTokenSectionInner = ({
   nodeDisplayResults,

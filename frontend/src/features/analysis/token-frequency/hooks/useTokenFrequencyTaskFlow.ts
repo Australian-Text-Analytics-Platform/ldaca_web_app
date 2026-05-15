@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
 import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
@@ -184,80 +185,111 @@ export const useTokenFrequencyTaskFlow = ({
     }
   };
 
-  const handleTokenClick = (token: string) => {
-    const trimmedToken = token?.toString() ?? '';
-    const analysisParams = (results?.analysis_params ?? null) as TokenFrequencyAnalysisParams | null;
+  // Ref-pattern so the right-click handler can read the *current* stopWords
+  // without re-binding its closure (and re-creating its function reference)
+  // every time the user types in the stopwords textarea. Without this,
+  // ``handleTokenRightClick`` would have ``stopWords`` in its useCallback
+  // deps — making it unstable per keystroke — which would in turn defeat
+  // the React.memo on the word-cloud sections that take it as a prop,
+  // causing d3-cloud's layout to re-run on every keypress.
+  const stopWordsRef = useRef(stopWords);
+  useEffect(() => {
+    stopWordsRef.current = stopWords;
+  }, [stopWords]);
 
-    const resolvedContext = resolveTokenFrequencyNodeContext({
+  const handleTokenClick = useCallback(
+    (token: string) => {
+      const trimmedToken = token?.toString() ?? '';
+      const analysisParams = (results?.analysis_params ?? null) as TokenFrequencyAnalysisParams | null;
+
+      const resolvedContext = resolveTokenFrequencyNodeContext({
+        lastCompareNodeIds,
+        analysisParams,
+        selectedNodes: panelSelectedNodes.map((node) => ({ id: node.id })),
+        nodeColumnSelections: effectiveNodeColumnSelections,
+        maxNodes: 2,
+      });
+
+      const fallbackNodeIds: string[] =
+        resolvedContext.nodeIds.length > 0
+          ? resolvedContext.nodeIds
+          : panelNodeIds
+              .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+
+      const fallbackSelections: NodeColumnSelection[] =
+        resolvedContext.nodeIds.length > 0
+          ? resolvedContext.selections
+          : effectiveNodeColumnSelections.filter((selection) => fallbackNodeIds.includes(selection.nodeId) && selection.column);
+
+      const uniqueNodeIds: string[] = fallbackNodeIds
+        .filter((id, index, all) => all.indexOf(id) === index);
+
+      const effectiveSelections = fallbackSelections.filter((selection) => uniqueNodeIds.includes(selection.nodeId));
+
+      if (uniqueNodeIds.length > 0) {
+        try {
+          selectNodes(uniqueNodeIds);
+        } catch (error) {
+          console.warn('Failed to sync workspace selection for concordance handoff:', error);
+        }
+      }
+
+      const nodeDetails = uniqueNodeIds.map((id) => ({
+        id,
+        name: lockedNodeNameMap[id] || nodeIdToName[id] || id,
+      }));
+
+      const pendingNodeColors: Record<string, string> = { ...nodeColors };
+      uniqueNodeIds.forEach((id, index) => {
+        if (!pendingNodeColors[id]) {
+          pendingNodeColors[id] = getColorForNode(id, index);
+        }
+      });
+
+      setPendingConcordance({
+        searchWord: trimmedToken,
+        nodeColumnSelections: effectiveSelections.map((selection) => ({ ...selection })),
+        selectedNodes: nodeDetails,
+        nodeColors: pendingNodeColors,
+        autoRun: false,
+        timestamp: Date.now(),
+      });
+
+      setCurrentView('concordance');
+    },
+    [
+      results,
       lastCompareNodeIds,
-      analysisParams,
-      selectedNodes: panelSelectedNodes.map((node) => ({ id: node.id })),
-      nodeColumnSelections: effectiveNodeColumnSelections,
-      maxNodes: 2,
-    });
+      panelSelectedNodes,
+      effectiveNodeColumnSelections,
+      panelNodeIds,
+      lockedNodeNameMap,
+      nodeIdToName,
+      nodeColors,
+      getColorForNode,
+      selectNodes,
+      setPendingConcordance,
+      setCurrentView,
+    ],
+  );
 
-    const fallbackNodeIds: string[] =
-      resolvedContext.nodeIds.length > 0
-        ? resolvedContext.nodeIds
-        : panelNodeIds
-            .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+  const handleTokenRightClick = useCallback(
+    (token: string, event?: React.MouseEvent) => {
+      if (event) event.preventDefault();
+      const tokenNormalized = token.trim().toLowerCase();
+      const current = stopWordsRef.current
+        .split(',')
+        .map((word) => word.trim())
+        .filter(Boolean);
 
-    const fallbackSelections: NodeColumnSelection[] =
-      resolvedContext.nodeIds.length > 0
-        ? resolvedContext.selections
-        : effectiveNodeColumnSelections.filter((selection) => fallbackNodeIds.includes(selection.nodeId) && selection.column);
-
-    const uniqueNodeIds: string[] = fallbackNodeIds
-      .filter((id, index, all) => all.indexOf(id) === index);
-
-    const effectiveSelections = fallbackSelections.filter((selection) => uniqueNodeIds.includes(selection.nodeId));
-
-    if (uniqueNodeIds.length > 0) {
-      try {
-        selectNodes(uniqueNodeIds);
-      } catch (error) {
-        console.warn('Failed to sync workspace selection for concordance handoff:', error);
+      if (!current.map((word) => word.toLowerCase()).includes(tokenNormalized)) {
+        const updated = [token, ...current].join(', ');
+        setStopWords(updated);
+        applyStopSetFromText(updated);
       }
-    }
-
-    const nodeDetails = uniqueNodeIds.map((id) => ({
-      id,
-      name: lockedNodeNameMap[id] || nodeIdToName[id] || id,
-    }));
-
-    const pendingNodeColors: Record<string, string> = { ...nodeColors };
-    uniqueNodeIds.forEach((id, index) => {
-      if (!pendingNodeColors[id]) {
-        pendingNodeColors[id] = getColorForNode(id, index);
-      }
-    });
-
-    setPendingConcordance({
-      searchWord: trimmedToken,
-      nodeColumnSelections: effectiveSelections.map((selection) => ({ ...selection })),
-      selectedNodes: nodeDetails,
-      nodeColors: pendingNodeColors,
-      autoRun: false,
-      timestamp: Date.now(),
-    });
-
-    setCurrentView('concordance');
-  };
-
-  const handleTokenRightClick = (token: string, event?: React.MouseEvent) => {
-    if (event) event.preventDefault();
-    const tokenNormalized = token.trim().toLowerCase();
-    const current = stopWords
-      .split(',')
-      .map((word) => word.trim())
-      .filter(Boolean);
-
-    if (!current.map((word) => word.toLowerCase()).includes(tokenNormalized)) {
-      const updated = [token, ...current].join(', ');
-      setStopWords(updated);
-      applyStopSetFromText(updated);
-    }
-  };
+    },
+    [setStopWords, applyStopSetFromText],
+  );
 
   return {
     handleAnalyze,

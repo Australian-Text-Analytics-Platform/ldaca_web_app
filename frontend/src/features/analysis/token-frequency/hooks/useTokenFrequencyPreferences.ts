@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TokenFrequencyResponse } from '@/api/text';
 import { textApi } from '@/api/text';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
@@ -221,15 +221,27 @@ export const useTokenFrequencyPreferences = ({
   // trip through ``applyStopSetFromText``.
   const STOPWORD_SEPARATOR_RE = /[,\n\r]+/;
 
-  const applyStopSetFromText = (text: string) => {
+  // Ref-pattern so this callback can read the *current* saveStopWordsToBackend
+  // (which closes over auth headers + persistence helpers that aren't
+  // themselves useCallback'd) without becoming unstable. Keeping the
+  // returned callback stable across renders matters because it propagates
+  // through the task-flow hook's right-click handler down to React.memo'd
+  // word-cloud sections; if it churned per render the cloud would re-run
+  // d3-cloud layout on every stopword-textarea keystroke.
+  const saveStopWordsToBackendRef = useRef(saveStopWordsToBackend);
+  useEffect(() => {
+    saveStopWordsToBackendRef.current = saveStopWordsToBackend;
+  }, [saveStopWordsToBackend]);
+
+  const applyStopSetFromText = useCallback((text: string) => {
     const words = text
       .split(STOPWORD_SEPARATOR_RE)
       .map((word) => word.trim().toLowerCase())
       .filter(Boolean);
     setStopWords(words.join(', '));
     setAppliedStopSet(new Set(words));
-    void saveStopWordsToBackend(words);
-  };
+    void saveStopWordsToBackendRef.current(words);
+  }, [setStopWords, setAppliedStopSet]);
 
   const sortStopWords = () => {
     const words = stopWords
