@@ -16,6 +16,15 @@ const UNIFIED_CLOUD_ASPECT_RATIO = 0.55;
 // before d3-cloud falls back to truncating big words.
 const UNIFIED_CLOUD_MIN_WIDTH = 320;
 
+// Font envelope scaled with width — see the matching constants in
+// ``TokenFrequencySingleTokenSection`` for the rationale. A hardcoded
+// 12-54 px range (the original) clustered words in the centre of a
+// 1500-wide canvas and left a huge margin of white space around them.
+const UNIFIED_CLOUD_MAX_FONT_FRACTION = 0.11;
+const UNIFIED_CLOUD_MIN_FONT_PX = 12;
+const UNIFIED_CLOUD_MAX_FONT_FLOOR = 40;
+const UNIFIED_CLOUD_MAX_FONT_CEILING = 170;
+
 type TokenFrequencyUnifiedTokenSectionProps = {
   normalizedNodeResults: NormalizedNodeResult[];
   nodeDisplayResults: NodeResultView[];
@@ -138,20 +147,6 @@ export const TokenFrequencyUnifiedTokenSection = ({
 
   const maxCloudTotal = Math.max(1, ...selectedCloudStats.map((s) => Number(s.total) || 0));
 
-  // Measure the card body so the SVG fills the actual available width
-  // instead of a hardcoded 640 px. Falls back to the prop value before the
-  // first ResizeObserver tick lands so SSR / pre-mount renders still get a
-  // usable size.
-  const measuredCardWidth = useElementWidth(unifiedCloudContainerRef);
-  const effectiveCloudWidth = Math.max(
-    UNIFIED_CLOUD_MIN_WIDTH,
-    measuredCardWidth > 0 ? measuredCardWidth - /* padding */ 24 : unifiedCloudWidth,
-  );
-  const effectiveCloudHeight = Math.max(
-    240,
-    Math.round(effectiveCloudWidth * UNIFIED_CLOUD_ASPECT_RATIO),
-  );
-
   const hexToRgb = (hex: string) => {
     const h = hex.replace('#', '');
     return {
@@ -182,7 +177,39 @@ export const TokenFrequencyUnifiedTokenSection = ({
   const proportionByToken = new Map<string, number>(
     words.map((word) => [word.text, Number(word.proportion) || 0.5])
   );
-  const fontSizeSetter = (datum: { value: number }) => Math.max(12, Math.min(54, (datum.value / maxCloudTotal) * 42 + 12));
+
+  // Measure the card body so the SVG fills the actual available width
+  // instead of a hardcoded 640 px. Falls back to the prop value before the
+  // first ResizeObserver tick lands so SSR / pre-mount renders still get a
+  // usable size.
+  const measuredCardWidth = useElementWidth(unifiedCloudContainerRef);
+  const effectiveCloudWidth = Math.max(
+    UNIFIED_CLOUD_MIN_WIDTH,
+    measuredCardWidth > 0 ? measuredCardWidth - /* padding */ 24 : unifiedCloudWidth,
+  );
+  const effectiveCloudHeight = Math.max(
+    240,
+    Math.round(effectiveCloudWidth * UNIFIED_CLOUD_ASPECT_RATIO),
+  );
+  // Tie the font envelope to the measured width so d3-cloud's spiral
+  // actually fills the SVG. Hardcoded 12-54 px clustered words in the
+  // centre on wide panels and left a large white margin around them.
+  const maxFontSize = Math.max(
+    UNIFIED_CLOUD_MAX_FONT_FLOOR,
+    Math.min(
+      UNIFIED_CLOUD_MAX_FONT_CEILING,
+      Math.round(effectiveCloudWidth * UNIFIED_CLOUD_MAX_FONT_FRACTION),
+    ),
+  );
+  const minFontSize = Math.max(UNIFIED_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
+  const fontSizeSetter = (datum: { value: number }) =>
+    Math.max(
+      minFontSize,
+      Math.min(
+        maxFontSize,
+        (datum.value / maxCloudTotal) * (maxFontSize - minFontSize) + minFontSize,
+      ),
+    );
 
   return (
     <div className="space-y-3">

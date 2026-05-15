@@ -47,6 +47,15 @@ const BAR_LIST_MAX_HEIGHT_REM = VISIBLE_BAR_ROWS * BAR_ROW_HEIGHT_REM + (VISIBLE
 const SINGLE_CLOUD_ASPECT_RATIO = 0.6;
 // Floor on the SVG width so the cloud stays legible in a narrow column.
 const SINGLE_CLOUD_MIN_WIDTH = 280;
+// Largest font size as a fraction of the cloud width. d3-cloud's spiral
+// starts from the centre — if the max word is small relative to the canvas
+// you end up with a tight cluster of words and a wide margin of white space
+// around it. Setting the cap as a fraction of width lets the cloud fill its
+// container as the panel resizes.
+const SINGLE_CLOUD_MAX_FONT_FRACTION = 0.14;
+const SINGLE_CLOUD_MIN_FONT_PX = 11;
+const SINGLE_CLOUD_MAX_FONT_FLOOR = 36;
+const SINGLE_CLOUD_MAX_FONT_CEILING = 160;
 
 type SingleNodeWordCloudProps = {
   nodeKey: string;
@@ -75,10 +84,19 @@ const SingleNodeWordCloud = ({
   const cloudWidth = Math.max(SINGLE_CLOUD_MIN_WIDTH, measuredWidth || SINGLE_CLOUD_MIN_WIDTH);
   const cloudHeight = Math.round(cloudWidth * SINGLE_CLOUD_ASPECT_RATIO);
   const wordCount = words.length;
-  // Font-size envelope scales with cloud area so a wider card gets bigger
-  // type. Bounded by a sensible min so the smallest tokens stay readable.
-  const maxFontSize = Math.max(28, Math.min(64, Math.round(cloudWidth / 12)));
-  const minFontSize = Math.max(8, Math.round(maxFontSize / 5));
+  // Font-size envelope tied to the cloud width: the biggest word claims
+  // ~14 % of the canvas width, which gives the spiral algorithm enough room
+  // to spread its placements out across the SVG rather than clustering in
+  // the centre. The floor and ceiling stop the cap from collapsing in tiny
+  // panels or going absurd in ultrawide layouts.
+  const maxFontSize = Math.max(
+    SINGLE_CLOUD_MAX_FONT_FLOOR,
+    Math.min(
+      SINGLE_CLOUD_MAX_FONT_CEILING,
+      Math.round(cloudWidth * SINGLE_CLOUD_MAX_FONT_FRACTION),
+    ),
+  );
+  const minFontSize = Math.max(SINGLE_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
   const maxFrequency = Math.max(1, ...words.map((w) => w.value));
   const fontSizeSetter = (datum: { value: number }) =>
     Math.max(
