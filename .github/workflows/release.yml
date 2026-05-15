@@ -29,8 +29,21 @@ permissions:
   contents: write
 
 jobs:
+  verify-versions:
+    name: Verify version consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+
+      - name: Check that all 5 version-bearing files agree
+        run: node scripts/check-versions.mjs
+
   build-windows:
     name: Build Windows MSI
+    needs: verify-versions
     uses: ./.github/workflows/desktop-windows.yml
     with:
       build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop build for {0}', inputs.ref) || format('Automated desktop release build for {0}', github.ref_name) }}
@@ -39,6 +52,7 @@ jobs:
 
   build-macos:
     name: Build macOS DMG
+    needs: verify-versions
     uses: ./.github/workflows/desktop-macos.yml
     with:
       build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop build for {0}', inputs.ref) || format('Automated desktop release build for {0}', github.ref_name) }}

@@ -54,6 +54,15 @@ These were validated in this workspace and are the fastest reliable entry points
 - For worker tasks, follow the existing worker pattern: call `configure_worker_environment()` first, import heavy dependencies inside the worker function, and write large outputs to artifacts.
 - In frontend code, do not add `useMemo`, `useCallback`, or `React.memo` for routine optimization. The repo uses React Compiler.
 
+## Cutting A Release
+
+Five files carry an independently-stamped version and **must** agree before tagging — pip wheel metadata, npm package, Tauri bundler, Rust crate, and the workspace pyproject. Drift between them is what shipped the v0.4.3 "desktop says 0.4.2 / pip says 0.4.3" bug.
+
+1. `npm run bump-version <semver>` from repo root rewrites all five in one pass. Don't edit version strings by hand.
+2. `npm run check-versions` confirms they match; it's also wired as a pre-build gate in `.github/workflows/release.yml` so a tag push with drift never reaches the desktop builders.
+3. `npm run deploy_frontend_to_backend` after the bump — `VITE_APP_VERSION` is baked into the FE bundle at build time, so the bundle inside `backend/src/ldaca_wordflow/resources/frontend/build/` needs refreshing too.
+4. Commit, tag `vX.Y.Z` on `v0.4`, push the tag → release.yml fires → desktop assets + PyPI publish.
+
 ## CI-Relevant Checks
 
 For typical frontend changes, run:

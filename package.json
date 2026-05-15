@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "npm run dev -w frontend",
     "build": "npm run build -w frontend",
+    "bump-version": "node scripts/bump-version.mjs",
+    "check-versions": "node scripts/check-versions.mjs",
     "deploy_frontend_to_backend": "npm run build -w frontend && node scripts/deploy-frontend-to-backend.mjs",
     "desktop:dev": "npm run desktop:dev -w frontend",
     "desktop:build:mac": "npm run desktop:build:mac -w frontend",
