@@ -6,6 +6,15 @@ import HelpIcon from '@/components/help/HelpIcon';
 import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
 import { TokenFrequencyStatisticsTable } from './TokenFrequencyStatisticsTable';
+import { useElementWidth } from '@/lib/useElementWidth';
+
+// Aspect ratio for the cloud SVG when sized from the container width. Keeps
+// the cloud "landscape-ish" without dominating tall corpora layouts.
+const UNIFIED_CLOUD_ASPECT_RATIO = 0.55;
+
+// Floor on the SVG width so the cloud is still legible in a narrow panel
+// before d3-cloud falls back to truncating big words.
+const UNIFIED_CLOUD_MIN_WIDTH = 320;
 
 type TokenFrequencyUnifiedTokenSectionProps = {
   normalizedNodeResults: NormalizedNodeResult[];
@@ -129,6 +138,20 @@ export const TokenFrequencyUnifiedTokenSection = ({
 
   const maxCloudTotal = Math.max(1, ...selectedCloudStats.map((s) => Number(s.total) || 0));
 
+  // Measure the card body so the SVG fills the actual available width
+  // instead of a hardcoded 640 px. Falls back to the prop value before the
+  // first ResizeObserver tick lands so SSR / pre-mount renders still get a
+  // usable size.
+  const measuredCardWidth = useElementWidth(unifiedCloudContainerRef);
+  const effectiveCloudWidth = Math.max(
+    UNIFIED_CLOUD_MIN_WIDTH,
+    measuredCardWidth > 0 ? measuredCardWidth - /* padding */ 24 : unifiedCloudWidth,
+  );
+  const effectiveCloudHeight = Math.max(
+    240,
+    Math.round(effectiveCloudWidth * UNIFIED_CLOUD_ASPECT_RATIO),
+  );
+
   const hexToRgb = (hex: string) => {
     const h = hex.replace('#', '');
     return {
@@ -188,7 +211,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
         </CardHeader>
 
         <CardContent>
-          <div ref={unifiedCloudContainerRef} className="rounded-lg border p-3" style={{ minHeight: Math.max(240, unifiedCloudHeight) }}>
+          <div ref={unifiedCloudContainerRef} className="rounded-lg border p-3" style={{ minHeight: effectiveCloudHeight }}>
             {isComparative && selectedCloudStats.length > 0 ? (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -204,16 +227,16 @@ export const TokenFrequencyUnifiedTokenSection = ({
                 <div className="flex w-full justify-center overflow-visible">
                   <svg
                     ref={(element) => registerWordCloudRef('unified', element)}
-                    width={unifiedCloudWidth}
-                    height={unifiedCloudHeight}
+                    width={effectiveCloudWidth}
+                    height={effectiveCloudHeight}
                     xmlns="http://www.w3.org/2000/svg"
                     className="overflow-visible"
                     style={{ overflow: 'visible' }}
                   >
                     <Wordcloud
                       words={words}
-                      width={unifiedCloudWidth}
-                      height={unifiedCloudHeight}
+                      width={effectiveCloudWidth}
+                      height={effectiveCloudHeight}
                       fontSize={fontSizeSetter}
                       font="Segoe UI, Roboto, sans-serif"
                       padding={2}

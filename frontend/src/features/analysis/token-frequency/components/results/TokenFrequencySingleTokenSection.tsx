@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
+import { useElementWidth } from '@/lib/useElementWidth';
 
 type TokenFrequencySingleTokenSectionProps = {
   nodeDisplayResults: NodeResultView[];
@@ -40,6 +41,102 @@ const VISIBLE_BAR_ROWS = 10;
 const BAR_ROW_HEIGHT_REM = 2;
 const BAR_ROW_GAP_REM = 0.5;
 const BAR_LIST_MAX_HEIGHT_REM = VISIBLE_BAR_ROWS * BAR_ROW_HEIGHT_REM + (VISIBLE_BAR_ROWS - 1) * BAR_ROW_GAP_REM;
+
+// Aspect ratio applied when the per-card cloud is sized from the container
+// width — keeps the cloud landscape-ish without dominating tall layouts.
+const SINGLE_CLOUD_ASPECT_RATIO = 0.6;
+// Floor on the SVG width so the cloud stays legible in a narrow column.
+const SINGLE_CLOUD_MIN_WIDTH = 280;
+
+type SingleNodeWordCloudProps = {
+  nodeKey: string;
+  words: Array<{ text: string; value: number }>;
+  color: string;
+  registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
+  onTokenClick: (token: string) => void;
+  onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
+};
+
+/**
+ * Per-node word-cloud SVG that sizes itself to its parent container via
+ * ResizeObserver. Extracted from the map body so the hook (which can't be
+ * called inside a loop) sits at the top level of a component.
+ */
+const SingleNodeWordCloud = ({
+  nodeKey,
+  words,
+  color,
+  registerWordCloudRef,
+  onTokenClick,
+  onTokenRightClick,
+}: SingleNodeWordCloudProps) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const measuredWidth = useElementWidth(containerRef);
+  const cloudWidth = Math.max(SINGLE_CLOUD_MIN_WIDTH, measuredWidth || SINGLE_CLOUD_MIN_WIDTH);
+  const cloudHeight = Math.round(cloudWidth * SINGLE_CLOUD_ASPECT_RATIO);
+  const wordCount = words.length;
+  // Font-size envelope scales with cloud area so a wider card gets bigger
+  // type. Bounded by a sensible min so the smallest tokens stay readable.
+  const maxFontSize = Math.max(28, Math.min(64, Math.round(cloudWidth / 12)));
+  const minFontSize = Math.max(8, Math.round(maxFontSize / 5));
+  const maxFrequency = Math.max(1, ...words.map((w) => w.value));
+  const fontSizeSetter = (datum: { value: number }) =>
+    Math.max(
+      minFontSize,
+      Math.min(
+        maxFontSize,
+        (datum.value / maxFrequency) * (maxFontSize - minFontSize) + minFontSize,
+      ),
+    );
+  return (
+    <div ref={containerRef} className="w-full">
+      <svg
+        ref={(element) => registerWordCloudRef(nodeKey, element)}
+        width={cloudWidth}
+        height={cloudHeight}
+        className="overflow-visible"
+        style={{ overflow: 'visible' }}
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <Wordcloud
+          words={words}
+          width={cloudWidth}
+          height={cloudHeight}
+          fontSize={fontSizeSetter}
+          font="Segoe UI, Roboto, sans-serif"
+          padding={wordCount > 60 ? 1 : 2}
+          spiral="archimedean"
+          rotate={0}
+          random={() => 0.5}
+        >
+          {(cloudWords) =>
+            cloudWords.map((word) => (
+              <Text
+                key={word.text}
+                fill={color}
+                textAnchor="middle"
+                transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
+                fontSize={word.size}
+                fontFamily={word.font}
+                className="cursor-pointer transition-colors"
+                onClick={() => word.text && onTokenClick(word.text)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  if (word.text) {
+                    onTokenRightClick(word.text, event);
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {word.text || ''}
+              </Text>
+            ))
+          }
+        </Wordcloud>
+      </svg>
+    </div>
+  );
+};
 
 export const TokenFrequencySingleTokenSection = ({
   nodeDisplayResults,
@@ -125,20 +222,11 @@ export const TokenFrequencySingleTokenSection = ({
         const filteredListRows: Array<{ row: typeof listSourceRows[number]; rank: number }> = listSourceRows
           .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
           .filter(({ row }) => matchesTokenFilter(String(row?.token ?? '')));
-        const maxFrequency = Math.max(1, ...displayRows.map((row) => Number(row.frequency) || 0));
         const listMaxFrequency = Math.max(1, ...filteredListRows.map(({ row }) => Number(row.frequency) || 0));
         const words = displayRows.map((item) => ({
           text: String(item?.token ?? ''),
           value: Number(item?.frequency) || 0,
         }));
-
-        const wordCount = words.length;
-        const cloudWidth = wordCount > 60 ? 600 : wordCount > 30 ? 500 : 400;
-        const cloudHeight = wordCount > 60 ? 400 : wordCount > 30 ? 300 : 200;
-        const maxFontSize = wordCount > 60 ? 32 : wordCount > 30 ? 40 : 48;
-        const minFontSize = wordCount > 60 ? 8 : wordCount > 30 ? 10 : 12;
-        const fontSizeSetter = (datum: { value: number }) =>
-          Math.max(minFontSize, Math.min(maxFontSize, (datum.value / maxFrequency) * (maxFontSize - minFontSize) + minFontSize));
 
         return (
           <Card key={`${result.nodeId || result.displayName}-${index}`} className="h-full">
@@ -176,50 +264,14 @@ export const TokenFrequencySingleTokenSection = ({
 
             <CardContent className="space-y-2">
               <div className={view === 'cloud' ? 'mb-4 flex w-full justify-center overflow-visible' : 'hidden'}>
-                <svg
-                  ref={(element) => registerWordCloudRef(nodeKey, element)}
-                  width={cloudWidth}
-                  height={cloudHeight}
-                  className="overflow-visible"
-                  style={{ overflow: 'visible' }}
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <Wordcloud
-                    words={words}
-                    width={cloudWidth}
-                    height={cloudHeight}
-                    fontSize={fontSizeSetter}
-                    font="Segoe UI, Roboto, sans-serif"
-                    padding={wordCount > 60 ? 1 : 2}
-                    spiral="archimedean"
-                    rotate={0}
-                    random={() => 0.5}
-                  >
-                    {(cloudWords) =>
-                      cloudWords.map((word) => (
-                        <Text
-                          key={word.text}
-                          fill={color}
-                          textAnchor="middle"
-                          transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
-                          fontSize={word.size}
-                          fontFamily={word.font}
-                          className="cursor-pointer transition-colors"
-                          onClick={() => word.text && onTokenClick(word.text)}
-                          onContextMenu={(event) => {
-                            event.preventDefault();
-                            if (word.text) {
-                              onTokenRightClick(word.text, event);
-                            }
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          {word.text || ''}
-                        </Text>
-                      ))
-                    }
-                  </Wordcloud>
-                </svg>
+                <SingleNodeWordCloud
+                  nodeKey={nodeKey}
+                  words={words}
+                  color={color}
+                  registerWordCloudRef={registerWordCloudRef}
+                  onTokenClick={onTokenClick}
+                  onTokenRightClick={onTokenRightClick}
+                />
               </div>
 
               <div
