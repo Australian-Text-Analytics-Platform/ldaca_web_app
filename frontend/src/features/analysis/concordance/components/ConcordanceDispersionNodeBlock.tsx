@@ -8,6 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceGroupedRow, ConcordanceResultEntry } from '@/api/text';
 import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
@@ -323,42 +324,46 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                     ? 'Add a per-document aggregation of the selected bin hits to the workspace'
                     : 'Add a per-document aggregation of all hits to the workspace';
               return (
-                <Button
-                  onClick={() => {
-                    if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                    const nodes = combinedNodeIds
-                      .map((nid) => {
-                        const col = effectiveNodeColumnSelections.find(
-                          (s) => s.nodeId === nid,
-                        )?.column;
-                        if (!col) return null;
-                        const sourceNode = panelSelectedNodes.find(
-                          (node, idx) => getNodeIdentifier(node, idx) === nid,
-                        );
-                        const label =
-                          (sourceNode?.name || sourceNode?.id || nid) as string;
-                        return { nodeId: nid, column: col, nodeLabel: label };
-                      })
-                      .filter(
-                        (
-                          n,
-                        ): n is { nodeId: string; column: string; nodeLabel: string } =>
-                          n !== null,
-                      );
-                    void onDispersionDetach(nodes, combinedSelection, binCount, {
-                      selectedMatchedTexts: visibleMatchedTexts,
-                      matchCaseInsensitive: lowercaseMatches,
-                    });
-                  }}
-                  disabled={combinedDetachDisabled}
-                  size="sm"
-                  className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                  title={combinedDetachTitle}
+                <DisabledReasonTooltip
+                  reason={combinedDetachDisabled ? combinedDetachTitle : undefined}
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add to Workspace
-                  {combinedHasSelection ? ` (${combinedSelection.size} bin${combinedSelection.size === 1 ? '' : 's'})` : ''}
-                </Button>
+                  <Button
+                    onClick={() => {
+                      if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                      const nodes = combinedNodeIds
+                        .map((nid) => {
+                          const col = effectiveNodeColumnSelections.find(
+                            (s) => s.nodeId === nid,
+                          )?.column;
+                          if (!col) return null;
+                          const sourceNode = panelSelectedNodes.find(
+                            (node, idx) => getNodeIdentifier(node, idx) === nid,
+                          );
+                          const label =
+                            (sourceNode?.name || sourceNode?.id || nid) as string;
+                          return { nodeId: nid, column: col, nodeLabel: label };
+                        })
+                        .filter(
+                          (
+                            n,
+                          ): n is { nodeId: string; column: string; nodeLabel: string } =>
+                            n !== null,
+                        );
+                      void onDispersionDetach(nodes, combinedSelection, binCount, {
+                        selectedMatchedTexts: visibleMatchedTexts,
+                        matchCaseInsensitive: lowercaseMatches,
+                      });
+                    }}
+                    disabled={combinedDetachDisabled}
+                    size="sm"
+                    className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                    title={combinedDetachDisabled ? undefined : combinedDetachTitle}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace
+                    {combinedHasSelection ? ` (${combinedSelection.size} bin${combinedSelection.size === 1 ? '' : 's'})` : ''}
+                  </Button>
+                </DisabledReasonTooltip>
               );
             })()}
           </div>
@@ -742,36 +747,40 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 ? 'Add a per-document aggregation of the selected bin hits to the workspace'
                 : 'Add a per-document aggregation of all hits to the workspace';
           return (
-            <Button
-              onClick={() => {
-                if (!detachNodeId) return;
-                const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-                const label = (detachNode?.name || nodeKey) as string;
-                void onDispersionDetach(
-                  [{ nodeId: detachNodeId, column, nodeLabel: label }],
-                  nodeSelection,
-                  binCount,
-                  {
-                    selectedMatchedTexts: visibleMatchedTexts,
-                    matchCaseInsensitive: lowercaseMatches,
-                  },
-                );
-              }}
-              disabled={nodeDetachDisabled}
-              size="sm"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title={nodeDetachTitle}
+            <DisabledReasonTooltip
+              reason={nodeDetachDisabled ? nodeDetachTitle : undefined}
             >
-              {isDetaching ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
-              ) : (
-                <>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add to Workspace
-                  {nodeHasSelection ? ` (${nodeSelection.size} bin${nodeSelection.size === 1 ? '' : 's'})` : ''}
-                </>
-              )}
-            </Button>
+              <Button
+                onClick={() => {
+                  if (!detachNodeId) return;
+                  const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
+                  const label = (detachNode?.name || nodeKey) as string;
+                  void onDispersionDetach(
+                    [{ nodeId: detachNodeId, column, nodeLabel: label }],
+                    nodeSelection,
+                    binCount,
+                    {
+                      selectedMatchedTexts: visibleMatchedTexts,
+                      matchCaseInsensitive: lowercaseMatches,
+                    },
+                  );
+                }}
+                disabled={nodeDetachDisabled}
+                size="sm"
+                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                title={nodeDetachDisabled ? undefined : nodeDetachTitle}
+              >
+                {isDetaching ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace
+                    {nodeHasSelection ? ` (${nodeSelection.size} bin${nodeSelection.size === 1 ? '' : 's'})` : ''}
+                  </>
+                )}
+              </Button>
+            </DisabledReasonTooltip>
           );
         })()}
       </AnalysisPagination>
