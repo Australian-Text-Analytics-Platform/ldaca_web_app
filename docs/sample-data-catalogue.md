@@ -237,12 +237,12 @@ expandable panel. Design sketch:
 ### Data repo (`ldaca-analytics-sample-data`)
 - [ ] Replace `manifest.json` with `catalogue.json` (full SHA-256 values, `recommended_for` populated).
 
-### Backend (`ldaca_web_app_backend`)
+### Backend (`ldaca-wordflow-backend`)
 - [ ] `download_remote_sample_data`: accept optional `collection_ids`; read `catalogue.json`.
 - [ ] `GET /files/sample-data/catalogue` endpoint + `SampleDataCatalogueResponse` model.
 - [ ] `POST /files/import-sample-data`: accept optional `ImportSampleDataRequest` body.
 
-### Frontend (`ldaca_web_app`)
+### Frontend (`ldaca-wordflow`)
 - [ ] `GET /files/sample-data/catalogue` API call + TypeScript types.
 - [ ] Sample Data panel component (collection list + checkbox + status chip + size).
 - [ ] Wire "Import selected" button to updated `POST /files/import-sample-data`.

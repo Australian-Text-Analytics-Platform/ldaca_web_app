@@ -7,6 +7,6 @@
 [submodule "docworkspace"]
 	path = docworkspace
 	url = https://github.com/Australian-Text-Analytics-Platform/docworkspace
-[submodule "ldaca_web_app_backend"]
+[submodule "ldaca_wordflow_backend"]
 	path = backend
-	url = https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app_backend.git
+	url = https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow-backend.git
