@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { textApi, type TokenFrequencyResponse } from '@/api/text';
 import { useAuth } from '@/hooks/useAuth';
@@ -104,21 +104,29 @@ const TokenFrequencyFeature = () => {
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
   const [referenceNodeId, setReferenceNodeId] = useState<string | null>(null);
 
-  const panelNodeIds = takeMostRecent(panelSelectedNodes, 2)
-    .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
-    .filter((id): id is string => Boolean(id));
+  const panelNodeIds = useMemo(
+    () =>
+      takeMostRecent(panelSelectedNodes, 2)
+        .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
+        .filter((id): id is string => Boolean(id)),
+    [panelSelectedNodes, activeNodeIds],
+  );
 
-  const effectiveReferenceNodeId = referenceNodeId && panelNodeIds.includes(referenceNodeId)
-    ? referenceNodeId
-    : panelNodeIds[0] ?? null;
+  const effectiveReferenceNodeId = useMemo(
+    () =>
+      referenceNodeId && panelNodeIds.includes(referenceNodeId)
+        ? referenceNodeId
+        : panelNodeIds[0] ?? null,
+    [referenceNodeId, panelNodeIds],
+  );
 
-  const orderedPanelNodeIds = (() => {
+  const orderedPanelNodeIds = useMemo(() => {
     if (!effectiveReferenceNodeId) return panelNodeIds;
     return [
       effectiveReferenceNodeId,
       ...panelNodeIds.filter((nodeId) => nodeId !== effectiveReferenceNodeId),
     ];
-  })();
+  }, [effectiveReferenceNodeId, panelNodeIds]);
 
   // ``tabKey`` routes colour changes through this tab's temp layer;
   // ``promoteTempColors`` is called from ``handleAnalyzeWithPromote``
@@ -269,7 +277,7 @@ const TokenFrequencyFeature = () => {
   // every language present so a side-by-side EN/ZH comparison fills
   // both stoplists at once; single-language runs still produce a
   // one-element array and behave identically to the legacy flow.
-  const defaultStopWordsLanguages = (() => {
+  const defaultStopWordsLanguages = useMemo(() => {
     const seen = new Set<string>();
     const ordered: string[] = [];
     for (const selection of effectiveNodeColumnSelections) {
@@ -291,7 +299,7 @@ const TokenFrequencyFeature = () => {
       return fallback ? [fallback] : [];
     }
     return ordered;
-  })();
+  }, [effectiveNodeColumnSelections, panelSelectedNodes, defaultLanguage]);
 
   const {
     stopWords,
@@ -323,9 +331,18 @@ const TokenFrequencyFeature = () => {
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,
   });
 
-  const lockedNodeNameMap = isLocked ? buildSelectionNameById(panelSelectedNodes as NodeNameEntry[], panelSelectedNodes as NodeNameEntry[]) : {};
+  const lockedNodeNameMap = useMemo(
+    () =>
+      isLocked
+        ? buildSelectionNameById(
+            panelSelectedNodes as NodeNameEntry[],
+            panelSelectedNodes as NodeNameEntry[],
+          )
+        : {},
+    [isLocked, panelSelectedNodes],
+  );
 
-  const nodeIdToName = (() => {
+  const nodeIdToName = useMemo(() => {
     const map: Record<string, string> = {};
     panelSelectedNodes.forEach((node) => {
       const nodeId = typeof node.id === 'string' ? node.id : '';
@@ -333,7 +350,7 @@ const TokenFrequencyFeature = () => {
       map[nodeId] = (node.name || node.label || nodeId) as string;
     });
     return map;
-  })();
+  }, [panelSelectedNodes]);
 
   const { handleAnalyze, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
     state: {
@@ -373,26 +390,53 @@ const TokenFrequencyFeature = () => {
     },
   });
 
-  const responseDisplayNameHints = buildResponseDisplayNameHints(results);
-  const displayNameMap = {
-    ...responseDisplayNameHints,
-    ...lockedNodeNameMap,
-  };
-
-  const computeDisplayName = (nodeId: string, fallbackKey?: string) => {
-    if (displayNameMap[nodeId]) return displayNameMap[nodeId];
-    if (nodeIdToName[nodeId]) return nodeIdToName[nodeId];
-    return fallbackKey || nodeId || 'Unknown node';
-  };
-
-  const analysisNodeIds = computeAnalysisNodeIds(
-    (results?.analysis_params as Record<string, unknown> | null | undefined)?.node_ids,
-    lastCompareNodeIds,
-    effectiveNodeColumnSelections
+  const responseDisplayNameHints = useMemo(
+    () => buildResponseDisplayNameHints(results),
+    [results],
   );
 
-  const normalizedNodeResults = normalizeNodeResults(results?.data, analysisNodeIds, computeDisplayName);
-  const nodeDisplayResults = deriveNodeDisplayResults(normalizedNodeResults, appliedStopSet, effectiveTokenLimit);
+  const displayNameMap = useMemo(
+    () => ({
+      ...responseDisplayNameHints,
+      ...lockedNodeNameMap,
+    }),
+    [responseDisplayNameHints, lockedNodeNameMap],
+  );
+
+  // ``useCallback`` keeps this referentially stable across keystrokes so the
+  // ``normalizeNodeResults`` memo below doesn't bust on every render of the
+  // parent (e.g. typing in the stop-words textarea). Without it, the heavy
+  // ``normalizeNodeResults`` + ``deriveNodeDisplayResults`` adapters re-run
+  // on every character — both walk every row in every node.
+  const computeDisplayName = useCallback(
+    (nodeId: string, fallbackKey?: string) => {
+      if (displayNameMap[nodeId]) return displayNameMap[nodeId];
+      if (nodeIdToName[nodeId]) return nodeIdToName[nodeId];
+      return fallbackKey || nodeId || 'Unknown node';
+    },
+    [displayNameMap, nodeIdToName],
+  );
+
+  const analysisNodeIds = useMemo(
+    () =>
+      computeAnalysisNodeIds(
+        (results?.analysis_params as Record<string, unknown> | null | undefined)?.node_ids,
+        lastCompareNodeIds,
+        effectiveNodeColumnSelections,
+      ),
+    [results, lastCompareNodeIds, effectiveNodeColumnSelections],
+  );
+
+  const normalizedNodeResults = useMemo(
+    () => normalizeNodeResults(results?.data, analysisNodeIds, computeDisplayName),
+    [results, analysisNodeIds, computeDisplayName],
+  );
+
+  const nodeDisplayResults = useMemo(
+    () =>
+      deriveNodeDisplayResults(normalizedNodeResults, appliedStopSet, effectiveTokenLimit),
+    [normalizedNodeResults, appliedStopSet, effectiveTokenLimit],
+  );
 
   const registerWordCloudRef = (nodeKey: string, element: SVGSVGElement | null) => {
     if (!element) {
