@@ -174,9 +174,18 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 type="text"
                 value={searchWord}
                 onChange={(e) => setSearchWord(e.target.value)}
-                placeholder="Enter word or phrase to search for"
+                placeholder={
+                  searchMode === 'tokens'
+                    ? 'One or more tokens, separated by space, comma, or |'
+                    : 'Enter word or phrase to search for'
+                }
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
               />
+              {searchMode === 'tokens' ? (
+                <p className="text-xs text-muted-foreground">
+                  Each alternative is an exact-token match. Example: <code>{`猫|犬|魚`}</code> or <code>cat dog fish</code> finds every hit of any of them.
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
