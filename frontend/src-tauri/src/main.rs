@@ -588,7 +588,7 @@ fn spawn_backend_process(
     let mut command = Command::new(runtime_python);
     command
         .arg("-m")
-        .arg("ldaca_web_app.cli")
+        .arg("ldaca_wordflow.cli")
         .arg("--backend")
         .current_dir(runtime_root)
         .stdout(Stdio::piped())
