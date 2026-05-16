@@ -25,7 +25,7 @@ export {
   type SnapshotWarning,
 } from './caps';
 
-export { useSnapshotViewStore } from './store';
+export { useSnapshotViewStore, useToolSnapshotMode } from './store';
 
 export {
   V1_BUILD_SUPPORT,

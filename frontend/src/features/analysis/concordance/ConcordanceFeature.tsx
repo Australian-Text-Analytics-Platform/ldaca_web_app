@@ -37,6 +37,7 @@ import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataCol
 import { useConcordanceMaterializedEvents } from './hooks/useConcordanceMaterializedEvents';
 import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
 import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
+import { isSnapshotMode, useToolSnapshotMode } from '@/features/snapshot-view';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
@@ -353,6 +354,13 @@ const ConcordanceFeature: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
+
+  // Snapshot view mode for this tool. ``live`` in every code path
+  // today; populated by the Phase 1 capture/load flow. Mutation
+  // handlers early-return when isSnapshotMode is true so a stale
+  // event source can't fire a server write against the host
+  // workspace while the user thinks they're viewing a snapshot.
+  const snapshotMode = useToolSnapshotMode('concordance');
 
   useEffect(() => {
     const element = resultsViewportRef.current;
@@ -939,6 +947,7 @@ const ConcordanceFeature: React.FC = () => {
   };
 
   const handleRunOrUpdate = async () => {
+    if (isSnapshotMode(snapshotMode)) return;
     // Commit the per-tab temp colours to the global assigned store so
     // graph + sidebar reflect the colours the user just chose to run
     // with. See the node-colour strategy doc — Run is the promotion

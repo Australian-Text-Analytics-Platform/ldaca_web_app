@@ -88,3 +88,11 @@ export const useSnapshotViewStore = create<SnapshotViewState>((set, get) => ({
 
   reset: () => set({ mode: {}, snapshots: {} }),
 }));
+
+/** Selector hook — read a tool's current view mode. Defaults to live
+ * when the store has no entry for the tool. Recommended over inline
+ * ``useSnapshotViewStore(s => s.mode[tool])`` so call sites don't
+ * have to import ``LIVE_MODE`` separately. */
+export function useToolSnapshotMode(tool: SnapshotToolKey) {
+  return useSnapshotViewStore((s) => s.mode[tool] ?? LIVE_MODE);
+}
