@@ -162,7 +162,10 @@ export interface ConcordanceResultQuery {
   combined?: boolean;
   page?: number;
   page_number?: number;
-  page_size?: number;
+  /** Accepts the literal ``'all'`` for the snapshot capture path —
+   * server caps at 500 000 rows (see backend
+   * ``SNAPSHOT_ALL_PAGE_SIZE_CAP`` in api/workspaces/analyses/concordance.py). */
+  page_size?: number | 'all';
   sort_by?: string;
   descending?: boolean;
   show_metadata?: boolean;

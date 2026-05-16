@@ -54,6 +54,46 @@ export type SnapshotPayloadEntry =
   | { kind: 'dispersion-bins'; path: string }
   | { kind: 'source-projection'; path: string; columns: string[] };
 
+/** Per-tool preview block (plan §2.3.1). Discriminated by ``tool``
+ * so adding a new analytic tool means adding one arm here plus a
+ * corresponding ``formatPreview()`` entry — the load dialog
+ * inherits support automatically. */
+export type SnapshotPreview =
+  | {
+      tool: 'concordance';
+      searchTerm: string;
+      totalHits: number;
+      materialised: boolean;
+      displayColumns: string[];
+    }
+  | {
+      tool: 'quotation';
+      openPattern: string;
+      closePattern: string;
+      totalHits: number;
+      displayColumns: string[];
+    }
+  | {
+      tool: 'token_frequencies';
+      vocabSize: number;
+      topToken: string;
+      topTokenCount: number;
+      tokeniserId: string;
+    }
+  | {
+      tool: 'sequential_analysis';
+      seriesCount: number;
+      bucketCount: number;
+      chartType: string;
+    }
+  | {
+      tool: 'topic_modeling';
+      numTopics: number;
+      vocabSize: number;
+      embedder: string;
+      wordsPerTopic: number;
+    };
+
 /** Manifest written into ``manifest.json`` inside the bundle zip. */
 export interface SnapshotManifest {
   /** Bundle-format version. Bumped on layout changes, not on
@@ -78,6 +118,10 @@ export interface SnapshotManifest {
     total_source_rows: number;
   };
   capabilities: SnapshotCapabilities;
+  /** Tool-specific preview stats — populated at capture so the load
+   * dialog can render summary rows without decoding parquet
+   * payloads. See ``SnapshotPreview`` for the per-tool shapes. */
+  preview: SnapshotPreview;
   payloads: SnapshotPayloadEntry[];
   /** Frozen node-id → colour map. Captured from ``useNodeColorsStore``
    * at snapshot time; the loader hydrates this into the snapshot's

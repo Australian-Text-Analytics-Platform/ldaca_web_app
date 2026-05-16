@@ -8,6 +8,7 @@ export type {
   SnapshotManifest,
   SnapshotMode,
   SnapshotPayloadEntry,
+  SnapshotPreview,
   SnapshotToolKey,
   SourceProjectionTable,
   ViewMode,

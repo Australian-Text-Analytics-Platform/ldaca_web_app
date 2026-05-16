@@ -70,6 +70,9 @@ export type ConcordanceParameterPanelProps = {
   setGlobalPageSize: Dispatch<SetStateAction<number>>;
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
   persistResultPreferences: (partial: { pageSize?: number }) => Promise<unknown>;
+  /** Forwarded to <AnalysisFeatureHeader> — wires the Save snapshot
+   * button in the header's right slot. See plan §3.7 + §5.7. */
+  onSaveSnapshot?: (filename: string, description: string) => Promise<void>;
 };
 
 export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps> = ({
@@ -108,6 +111,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   setGlobalPageSize,
   setNodePagination,
   persistResultPreferences,
+  onSaveSnapshot,
 }) => {
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
@@ -128,6 +132,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
         helpKey="analysis.concordance.parameters"
         helpLabel="Concordance parameters"
         helpTooltip="Select data blocks, choose the search term, and set context options before running."
+        onSaveSnapshot={onSaveSnapshot}
       />
       <CardContent className="space-y-4 pt-0">
         <NodeSelectionPanel

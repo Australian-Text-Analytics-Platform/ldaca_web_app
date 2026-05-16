@@ -35,6 +35,13 @@ function demoManifest(
       canFilterSourceRows: false,
       canCrossJump: false,
     },
+    preview: {
+      tool: 'concordance',
+      searchTerm: 'love',
+      totalHits: 42,
+      materialised: true,
+      displayColumns: ['doc_id', 'matched_text'],
+    },
     payloads: [
       { kind: 'result', path: 'tables/result.parquet' },
       { kind: 'dispersion-bins', path: 'tables/dispersion-bins.json' },

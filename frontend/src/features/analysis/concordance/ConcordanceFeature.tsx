@@ -38,6 +38,7 @@ import { useConcordanceMaterializedEvents } from './hooks/useConcordanceMaterial
 import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
 import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
 import { isSnapshotMode, useToolSnapshotMode } from '@/features/snapshot-view';
+import { useConcordanceSnapshotCapture } from './hooks/useConcordanceSnapshotCapture';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
@@ -361,6 +362,25 @@ const ConcordanceFeature: React.FC = () => {
   // event source can't fire a server write against the host
   // workspace while the user thinks they're viewing a snapshot.
   const snapshotMode = useToolSnapshotMode('concordance');
+
+  // Build the per-tool snapshot capture handler. The result-side data
+  // is fetched on demand via the Phase-0g page_size: "all" path, so
+  // we just need to thread the request settings + selected nodes +
+  // workspace id through to the hook. The Save button in the header
+  // wires this handler into <SnapshotActions>.
+  const handleSaveSnapshot = useConcordanceSnapshotCapture({
+    workspaceId: currentWorkspaceId ?? null,
+    workspaceName: currentWorkspaceId ?? '(workspace)',
+    taskId: concordanceTaskId,
+    request: (results?.metadata as Record<string, unknown> | undefined) ?? null,
+    selectedNodes: panelSelectedNodes,
+    getNodeRowCount: (node) => {
+      const shape = node.shape as unknown;
+      if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
+      return 0;
+    },
+    getAuthHeaders,
+  });
 
   useEffect(() => {
     const element = resultsViewportRef.current;
@@ -1231,6 +1251,7 @@ const ConcordanceFeature: React.FC = () => {
         setGlobalPageSize={setGlobalPageSize}
         setNodePagination={setNodePagination}
         persistResultPreferences={persistResultPreferences}
+        onSaveSnapshot={handleSaveSnapshot}
       />
 
       {concordanceWaitingBanner && (

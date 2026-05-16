@@ -17,6 +17,7 @@ import type {
   SnapshotManifest,
   SnapshotMode,
   SnapshotPayloadEntry,
+  SnapshotPreview,
   SnapshotToolKey,
 } from './types';
 
@@ -139,6 +140,19 @@ export function parseManifest(raw: unknown): ParseResult {
   const capsErr = validateCapabilities(obj.capabilities);
   if (capsErr) return { ok: false, error: capsErr };
 
+  const preview = obj.preview;
+  if (
+    typeof preview !== 'object' ||
+    preview === null ||
+    Array.isArray(preview) ||
+    typeof (preview as Record<string, unknown>).tool !== 'string'
+  ) {
+    return {
+      ok: false,
+      error: { kind: 'invalid-field-type', field: 'preview', expected: 'object with tool' },
+    };
+  }
+
   const nodeColors = obj.node_colors;
   if (
     typeof nodeColors !== 'object' ||
@@ -203,6 +217,7 @@ export function parseManifest(raw: unknown): ParseResult {
     title: obj.title as string,
     source: obj.source as SnapshotManifest['source'],
     capabilities: obj.capabilities as SnapshotCapabilities,
+    preview: preview as SnapshotPreview,
     payloads,
     node_colors: nodeColors as Record<string, string>,
   };

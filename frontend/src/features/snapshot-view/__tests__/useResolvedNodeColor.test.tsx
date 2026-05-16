@@ -30,6 +30,13 @@ function snapshotWithColors(
       canFilterSourceRows: false,
       canCrossJump: false,
     },
+    preview: {
+      tool: 'concordance',
+      searchTerm: 'love',
+      totalHits: 42,
+      materialised: true,
+      displayColumns: ['doc_id', 'matched_text'],
+    },
     payloads: [{ kind: 'result', path: 'tables/result.parquet' }],
     node_colors: colors,
   };
