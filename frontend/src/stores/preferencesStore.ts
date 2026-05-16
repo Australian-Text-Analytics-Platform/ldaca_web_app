@@ -38,6 +38,11 @@ interface PreferencesState {
    */
   defaultLanguage: string | null;
   defaultTokenizerModel: string | null;
+  /** Master switch for the demo-snapshot feature. When false, every
+   * tool's Save/Load button is unmounted via the shared
+   * ``<AnalysisFeatureHeader>``. Default false; persisted to backend
+   * preferences. See ``features/snapshot-view`` / plan §3.6. */
+  demoSnapshotsEnabled: boolean;
   /** True once the first backend fetch completes */
   hydrated: boolean;
   /** True while a backend sync is in-flight */
@@ -64,6 +69,7 @@ interface PreferencesActions {
    */
   setDefaultLanguage: (language: string | null) => void;
   setDefaultTokenizerModel: (model: string | null) => void;
+  setDemoSnapshotsEnabled: (enabled: boolean) => void;
   /** Fetch preferences from backend and hydrate the store */
   loadFromBackend: (headers?: Record<string, string>) => Promise<void>;
   /** Push current state to backend */
@@ -79,6 +85,7 @@ function applyServerState(state: PreferencesState, data: UserPreferences) {
   state.quotationLastRemoteUrl = data.quotation.last_remote_url;
   state.defaultLanguage = data.default_language;
   state.defaultTokenizerModel = data.default_tokenizer_model;
+  state.demoSnapshotsEnabled = data.demo_snapshots_enabled;
   state.hydrated = true;
 }
 
@@ -120,6 +127,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
         quotationLastRemoteUrl: '',
         defaultLanguage: null,
         defaultTokenizerModel: null,
+        demoSnapshotsEnabled: false,
         hydrated: false,
         syncing: false,
 
@@ -193,6 +201,12 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        setDemoSnapshotsEnabled: (enabled) => {
+          set((state) => {
+            state.demoSnapshotsEnabled = !!enabled;
+          });
+        },
+
         loadFromBackend: async (headers) => {
           try {
             const data = await preferencesApi.get(headers);
@@ -228,6 +242,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
             ...(state.defaultTokenizerModel !== null
               ? { default_tokenizer_model: state.defaultTokenizerModel }
               : {}),
+            demo_snapshots_enabled: state.demoSnapshotsEnabled,
           };
           try {
             await preferencesApi.update(body, headers);
@@ -248,6 +263,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
           quotationLastRemoteUrl: state.quotationLastRemoteUrl,
           defaultLanguage: state.defaultLanguage,
           defaultTokenizerModel: state.defaultTokenizerModel,
+          demoSnapshotsEnabled: state.demoSnapshotsEnabled,
         }),
       }
     ),

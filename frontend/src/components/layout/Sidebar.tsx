@@ -38,6 +38,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { toast } from 'sonner';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
 import { ClearEmbeddingCacheMenuItem } from '@/features/analysis/topic-modeling/components/ClearEmbeddingCacheMenuItem';
+import { DemoSnapshotsToggleItem } from '@/features/snapshot-view/components/DemoSnapshotsToggleItem';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
@@ -382,6 +383,7 @@ const Sidebar: React.FC = () => {
                             );
                           })}
                           <DropdownMenuSeparator />
+                          <DemoSnapshotsToggleItem />
                           <DropdownMenuItem
                             onSelect={handleResetHints}
                             className="text-xs text-muted-foreground focus:text-foreground"
