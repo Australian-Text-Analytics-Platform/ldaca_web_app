@@ -68,4 +68,5 @@ export {
 } from './compat';
 
 export { SnapshotActions } from './components/SnapshotActions';
+export { SaveSnapshotDialog } from './components/SaveSnapshotDialog';
 export { DemoSnapshotsToggleItem } from './components/DemoSnapshotsToggleItem';

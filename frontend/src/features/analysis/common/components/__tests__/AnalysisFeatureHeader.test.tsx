@@ -1,21 +1,29 @@
 import { act, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisFeatureHeader } from '../AnalysisFeatureHeader';
 
 function renderHeader() {
+  // SnapshotActions uses useQuery to fetch the snapshot list for
+  // collision-checking; it needs a QueryClient even when the demo
+  // mode is off (component still renders the SnapshotActions tree,
+  // which uses the hook unconditionally before its early return).
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <TooltipProvider>
-      <AnalysisFeatureHeader
-        tool="concordance"
-        title="Concordance Search"
-        infoKey="concordance.overview"
-        infoLabel="About Concordance Search"
-        helpKey="analysis.concordance.parameters"
-        helpLabel="Concordance parameters"
-      />
-    </TooltipProvider>,
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AnalysisFeatureHeader
+          tool="concordance"
+          title="Concordance Search"
+          infoKey="concordance.overview"
+          infoLabel="About Concordance Search"
+          helpKey="analysis.concordance.parameters"
+          helpLabel="Concordance parameters"
+        />
+      </TooltipProvider>
+    </QueryClientProvider>,
   );
 }
 

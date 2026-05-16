@@ -21,6 +21,11 @@ export interface AnalysisFeatureHeaderProps {
   helpKey: TutorialTargetKey | (string & {});
   helpLabel: string;
   helpTooltip?: string;
+  /** Snapshot save handler. The host feature wires its own capture
+   * logic in via this prop — see ``SnapshotActions.onSave``. Optional
+   * because most tools haven't wired snapshot capture yet (Phase 1
+   * lights it up tool-by-tool). */
+  onSaveSnapshot?: (filename: string, description: string) => Promise<void>;
 }
 
 /**
@@ -42,6 +47,7 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
   helpKey,
   helpLabel,
   helpTooltip,
+  onSaveSnapshot,
 }) => {
   return (
     <CardHeader className="space-y-0 pb-4">
@@ -55,7 +61,7 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
           className="flex items-center gap-2"
           data-testid="analysis-feature-header-actions"
         >
-          <SnapshotActions tool={tool} />
+          <SnapshotActions tool={tool} onSave={onSaveSnapshot} />
         </div>
       </div>
     </CardHeader>
