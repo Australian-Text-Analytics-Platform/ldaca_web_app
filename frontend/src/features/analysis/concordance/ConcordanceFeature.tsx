@@ -45,6 +45,10 @@ import {
 import { useConcordanceSnapshotCapture } from './hooks/useConcordanceSnapshotCapture';
 import { useConcordanceSnapshotLoad } from './hooks/useConcordanceSnapshotLoad';
 import { ConcordanceSnapshotBanner } from './components/ConcordanceSnapshotBanner';
+import { ConcordanceSnapshotResults } from './components/ConcordanceSnapshotResults';
+import { ConcordanceSnapshotSearchSummary } from './components/ConcordanceSnapshotSearchSummary';
+import { useSnapshotViewStore } from '@/features/snapshot-view';
+import type { ConcordanceSnapshotPayload } from './hooks/useConcordanceSnapshotLoad';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
@@ -1280,9 +1284,30 @@ const ConcordanceFeature: React.FC = () => {
   const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));
 
 
+  // Snapshot view: when the concordance tool is in snapshot mode,
+  // render the read-only view in place of the live UI. The live
+  // state (search inputs, selected nodes, results, materialised
+  // bins, etc.) is preserved untouched — Exit returns the user to
+  // exactly where they were. Mutation guards on Run / Process All
+  // are belt-and-suspenders here since those controls aren't even
+  // rendered in this code path.
+  const loadedSnapshot = useSnapshotViewStore((s) => s.snapshots.concordance);
+  if (isSnapshotMode(snapshotMode) && loadedSnapshot) {
+    const snapshotPayload = loadedSnapshot.payload as ConcordanceSnapshotPayload;
+    return (
+      <div className="space-y-4">
+        <ConcordanceSnapshotBanner />
+        <ConcordanceSnapshotSearchSummary manifest={loadedSnapshot.manifest} />
+        <ConcordanceSnapshotResults
+          manifest={loadedSnapshot.manifest}
+          payload={snapshotPayload}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {isSnapshotMode(snapshotMode) && <ConcordanceSnapshotBanner />}
       <ConcordanceParameterPanel
         panelSelectedNodes={panelSelectedNodes}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}
