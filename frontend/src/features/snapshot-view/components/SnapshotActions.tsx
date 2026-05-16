@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Camera } from 'lucide-react';
+import { Camera, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { snapshotsApi } from '@/api/snapshots';
 import { useAuth } from '@/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { LoadSnapshotDialog } from './LoadSnapshotDialog';
 import { SaveSnapshotDialog } from './SaveSnapshotDialog';
 import type { SnapshotToolKey } from '../types';
 
@@ -24,51 +25,74 @@ export interface SnapshotActionsProps {
    * reason synchronously (e.g. "Largest selected data block has X
    * rows; demo cap is 2 000.") and pass it in. */
   disabledReason?: string | null;
+  /** Called when the user clicks Open on a snapshot row. The host
+   * decodes the bundle and engages snapshot view. If absent, the
+   * Open buttons in the load dialog show "view coming soon" — Phase
+   * 1b-2 wires the host side. */
+  onOpenSnapshot?: (filename: string) => Promise<void>;
 }
 
 /**
- * Right-side action slot in <AnalysisFeatureHeader>. Renders Save
- * (always, when demo mode is on + onSave is provided) and Load
- * (Phase 1b — only when the snapshot list for this tool is
- * non-empty).
+ * Right-side action slot in <AnalysisFeatureHeader>. Renders Save +
+ * Load buttons for the demo-snapshot feature. The render is gated on
+ * the demo-snapshot master switch — when off, returns null so no DOM
+ * is added.
  *
- * Plan §3.7 + §5.7. The render is gated on the demo-snapshot
- * master switch — when off, returns null so no DOM is added.
+ * Plan §3.7 + §5.7. Load is further gated on the snapshot list for
+ * this tool being non-empty — "no snapshots saved yet" is conveyed
+ * by absence, not by an empty dialog.
  */
 export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   tool,
   onSave,
   disabledReason,
+  onOpenSnapshot,
 }) => {
   const enabled = usePreferencesStore((s) => s.demoSnapshotsEnabled);
   const { getAuthHeaders } = useAuth();
   const [saveOpen, setSaveOpen] = useState(false);
+  const [loadOpen, setLoadOpen] = useState(false);
 
-  // Fetch the existing snapshot list for this tool so the Save
-  // dialog can inline-validate name collisions. Cached briefly so
-  // re-opening the dialog doesn't re-fetch on every keystroke.
+  // Fetch the existing snapshot list for this tool. Always-on when
+  // demo mode is enabled so:
+  //   - the Save dialog can inline-validate name collisions
+  //   - the Load button mounts only when ≥1 snapshot exists
   const { data: listData } = useQuery({
     queryKey: ['snapshots-list', tool],
     queryFn: () => snapshotsApi.list(tool, getAuthHeaders()),
-    enabled: enabled && saveOpen,
+    enabled,
     staleTime: 10_000,
   });
 
   if (!enabled) return null;
 
   const existingFilenames = listData?.items.map((it) => it.filename) ?? [];
+  const hasSnapshots = existingFilenames.length > 0;
   const defaultName = `demo-${new Date().toISOString().slice(0, 10)}`;
-  const isDisabled = Boolean(disabledReason);
+  const isSaveDisabled = Boolean(disabledReason);
 
   return (
     <>
+      {hasSnapshots && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => setLoadOpen(true)}
+          aria-label="Load saved snapshot"
+        >
+          <FolderOpen className="mr-1.5 h-4 w-4" />
+          Load
+        </Button>
+      )}
+
       {onSave && (
         <DisabledReasonTooltip reason={disabledReason ?? undefined}>
           <Button
             type="button"
             size="sm"
             variant="outline"
-            disabled={isDisabled}
+            disabled={isSaveDisabled}
             onClick={() => setSaveOpen(true)}
             aria-label="Save snapshot"
           >
@@ -88,6 +112,13 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
           onSave={onSave}
         />
       )}
+
+      <LoadSnapshotDialog
+        open={loadOpen}
+        onOpenChange={setLoadOpen}
+        tool={tool}
+        onOpenSnapshot={onOpenSnapshot}
+      />
     </>
   );
 };

@@ -70,4 +70,6 @@ export {
 
 export { SnapshotActions } from './components/SnapshotActions';
 export { SaveSnapshotDialog } from './components/SaveSnapshotDialog';
+export { LoadSnapshotDialog } from './components/LoadSnapshotDialog';
+export { SnapshotDescriptionDialog } from './components/SnapshotDescriptionDialog';
 export { DemoSnapshotsToggleItem } from './components/DemoSnapshotsToggleItem';

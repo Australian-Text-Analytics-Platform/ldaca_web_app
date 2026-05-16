@@ -13,6 +13,9 @@ import type { SnapshotManifest, SnapshotToolKey } from '@/features/snapshot-view
 export interface SnapshotListItem {
   filename: string;
   manifest: SnapshotManifest;
+  /** On-disk bundle size in bytes. Used by the load dialog's size
+   * pill alongside the version chip (plan §5.7.2). */
+  size_bytes: number;
 }
 
 export interface SnapshotListResponse {
