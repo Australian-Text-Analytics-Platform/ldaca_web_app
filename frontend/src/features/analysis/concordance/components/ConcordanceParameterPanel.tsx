@@ -76,6 +76,9 @@ export type ConcordanceParameterPanelProps = {
   /** Forwarded to <AnalysisFeatureHeader>. When set, the Save button
    * is rendered disabled with this string as a hover tooltip. */
   saveSnapshotDisabledReason?: string | null;
+  /** Forwarded to <AnalysisFeatureHeader> — wires the Open click in
+   * the load dialog to the host's load pipeline. */
+  onOpenSnapshot?: (filename: string) => Promise<void>;
 };
 
 export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps> = ({
@@ -116,6 +119,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   persistResultPreferences,
   onSaveSnapshot,
   saveSnapshotDisabledReason,
+  onOpenSnapshot,
 }) => {
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
@@ -138,6 +142,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
         helpTooltip="Select data blocks, choose the search term, and set context options before running."
         onSaveSnapshot={onSaveSnapshot}
         saveSnapshotDisabledReason={saveSnapshotDisabledReason}
+        onOpenSnapshot={onOpenSnapshot}
       />
       <CardContent className="space-y-4 pt-0">
         <NodeSelectionPanel

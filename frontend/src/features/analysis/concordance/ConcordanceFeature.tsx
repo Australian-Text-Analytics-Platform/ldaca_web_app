@@ -43,6 +43,8 @@ import {
   useToolSnapshotMode,
 } from '@/features/snapshot-view';
 import { useConcordanceSnapshotCapture } from './hooks/useConcordanceSnapshotCapture';
+import { useConcordanceSnapshotLoad } from './hooks/useConcordanceSnapshotLoad';
+import { ConcordanceSnapshotBanner } from './components/ConcordanceSnapshotBanner';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
@@ -705,6 +707,12 @@ const ConcordanceFeature: React.FC = () => {
     return 0;
   }, []);
 
+  // Snapshot load handler. Wired through the LoadSnapshotDialog →
+  // SnapshotActions → AnalysisFeatureHeader chain. Phase 1b-2a
+  // populates the snapshot store + shows the banner; the dual-source
+  // result rendering ships in Phase 1b-2b.
+  const handleOpenSnapshot = useConcordanceSnapshotLoad();
+
   const handleSaveSnapshot = useConcordanceSnapshotCapture({
     workspaceId: currentWorkspaceId ?? null,
     workspaceName: currentWorkspaceId ?? '(workspace)',
@@ -1274,6 +1282,7 @@ const ConcordanceFeature: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {isSnapshotMode(snapshotMode) && <ConcordanceSnapshotBanner />}
       <ConcordanceParameterPanel
         panelSelectedNodes={panelSelectedNodes}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}
@@ -1315,6 +1324,7 @@ const ConcordanceFeature: React.FC = () => {
         persistResultPreferences={persistResultPreferences}
         onSaveSnapshot={handleSaveSnapshot}
         saveSnapshotDisabledReason={saveSnapshotDisabledReason}
+        onOpenSnapshot={handleOpenSnapshot}
       />
 
       {concordanceWaitingBanner && (

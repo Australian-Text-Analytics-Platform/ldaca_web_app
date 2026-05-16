@@ -30,6 +30,10 @@ export interface AnalysisFeatureHeaderProps {
    * a hover tooltip — same UX as the Run-disabled pattern elsewhere
    * in the analytic feature panels. Falsy = enabled. */
   saveSnapshotDisabledReason?: string | null;
+  /** Snapshot load handler. The host feature decodes the bundle and
+   * engages snapshot view. Optional; when absent, Open buttons in the
+   * load dialog show "view coming soon". */
+  onOpenSnapshot?: (filename: string) => Promise<void>;
 }
 
 /**
@@ -53,6 +57,7 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
   helpTooltip,
   onSaveSnapshot,
   saveSnapshotDisabledReason,
+  onOpenSnapshot,
 }) => {
   return (
     <CardHeader className="space-y-0 pb-4">
@@ -70,6 +75,7 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
             tool={tool}
             onSave={onSaveSnapshot}
             disabledReason={saveSnapshotDisabledReason}
+            onOpenSnapshot={onOpenSnapshot}
           />
         </div>
       </div>
