@@ -63,6 +63,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dagre": "^0.8.5",
+    "hyparquet": "^1.25.8",
     "immer": "^11.1.4",
     "jszip": "^3.10.1",
     "katex": "^0.16.38",

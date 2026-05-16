@@ -38,3 +38,15 @@ export {
   type ParseError,
   type ParseResult,
 } from './manifest';
+
+export {
+  MANIFEST_FILE_NAME,
+  decodeResultParquet,
+  findResultPayload,
+  readBundle,
+  writeBundle,
+  type BundleReadError,
+  type BundleReadResult,
+  type BundleWriteInput,
+  type LoadedBundle,
+} from './bundle';
