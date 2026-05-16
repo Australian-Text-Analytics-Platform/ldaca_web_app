@@ -26,3 +26,15 @@ export {
 } from './caps';
 
 export { useSnapshotViewStore } from './store';
+
+export {
+  V1_BUILD_SUPPORT,
+  applyBuildCapabilityGating,
+  emitManifestJson,
+  parseManifest,
+  parseManifestJson,
+  type BuildSupport,
+  type ParseDegradation,
+  type ParseError,
+  type ParseResult,
+} from './manifest';
