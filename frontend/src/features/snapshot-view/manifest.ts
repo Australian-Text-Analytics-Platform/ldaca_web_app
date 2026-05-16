@@ -33,6 +33,7 @@ const KNOWN_PAYLOAD_KINDS = new Set<SnapshotPayloadEntry['kind']>([
   'result',
   'dispersion-bins',
   'source-projection',
+  'settings',
 ]);
 
 /** Build-side capability advertisement. v1 declares which optional
@@ -200,7 +201,10 @@ export function parseManifest(raw: unknown): ParseResult {
         columns: e.columns as string[],
       });
     } else {
-      payloads.push({ kind: kind as 'result' | 'dispersion-bins', path: e.path });
+      payloads.push({
+        kind: kind as 'result' | 'dispersion-bins' | 'settings',
+        path: e.path,
+      });
     }
   }
 

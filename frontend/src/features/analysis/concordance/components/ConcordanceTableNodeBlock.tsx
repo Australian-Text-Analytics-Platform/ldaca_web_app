@@ -108,6 +108,10 @@ export type ConcordanceTableNodeBlockProps = {
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
   openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
+  /** Snapshot-view flag — disables Process All / Add to Workspace
+   * buttons (both per-node and combined-view variants). Pagination,
+   * sort, and row-click row-detail still work. */
+  readOnly?: boolean;
 };
 
 export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps> = ({
@@ -138,6 +142,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
   handleMaterialize,
   setCombinedPage,
   openDetachDialog,
+  readOnly = false,
 }) => {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const effectiveNodeId = actualNodeId || requestNodeId;
@@ -184,7 +189,8 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                 }
               }}
               disabled={
-                isAnyCombinedMaterializing
+                readOnly
+                || isAnyCombinedMaterializing
                 || allCombinedMaterialized
                 || !searchWord.trim()
                 || combinedNodeIds.length === 0
@@ -192,7 +198,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
               size="sm"
               variant="outline"
               className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title="Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them"
+              title={readOnly ? 'Disabled in snapshot view' : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'}
             >
               {isAnyCombinedMaterializing ? (
                 <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
@@ -213,10 +219,10 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                 }).filter((n) => n.column);
                 openDetachDialog(nodes);
               }}
-              disabled={combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
+              disabled={readOnly || combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
               size="sm"
               className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title="Create new data blocks with concordance results for both sources joined to their original tables"
+              title={readOnly ? 'Disabled in snapshot view' : 'Create new data blocks with concordance results for both sources joined to their original tables'}
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Both to Workspace
@@ -353,7 +359,6 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
     : concCols.filter((c) => allCols.includes(c));
   const displayColumns = dedupeColumns(rawDisplayColumns);
   const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
-  const sortableColumns = new Set(metaCols);
 
   const currentNodePagination = nodePagination[paginationKey];
   const currentPage = currentNodePagination?.currentPage ?? 1;
@@ -390,8 +395,15 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
             <TableHeader className="bg-gray-50 sticky top-0 z-10">
               <TableRow>
                 {tableColumns.map((key) => {
-                  const isSortable = showMetadata && sortableColumns.has(key);
-                  return isSortable ? (
+                  // Every displayed column is sortable: the backend's
+                  // materialised path honours sort_by for any column in
+                  // the parquet schema (including CONC_*). The
+                  // non-materialised path silently drops CONC_* sorts
+                  // (those columns are computed post-slice), but the
+                  // metadata-column sorts still apply — and pre-
+                  // materialise the user typically only sees metadata
+                  // values to sort by anyway.
+                  return (
                     <SortableHeader
                       key={key}
                       columnKey={key}
@@ -401,13 +413,6 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                       nodePagination={nodePagination}
                       onSort={handleSort}
                     />
-                  ) : (
-                    <TableHead
-                      key={key}
-                      className={`px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 ${alignmentClassForColumn(key) || 'text-left'}`}
-                    >
-                      {key}
-                    </TableHead>
                   );
                 })}
               </TableRow>
@@ -474,7 +479,8 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
             }
           }}
           disabled={
-            nodeIsLoading
+            readOnly
+            || nodeIsLoading
             || isMaterializing
             || hasMaterializedPath
             || !searchWord.trim()
@@ -484,7 +490,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
           size="sm"
           variant="outline"
           className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
+          title={readOnly ? 'Disabled in snapshot view' : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
         >
           {isMaterializing ? (
             <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
@@ -502,10 +508,10 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
               openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
             }
           }}
-          disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
+          disabled={readOnly || nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
           size="sm"
           className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title="Create a new data block with concordance results joined to the original table"
+          title={readOnly ? 'Disabled in snapshot view' : 'Create a new data block with concordance results joined to the original table'}
         >
           {isDetaching ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>

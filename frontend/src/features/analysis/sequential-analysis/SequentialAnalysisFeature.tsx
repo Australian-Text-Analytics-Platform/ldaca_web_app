@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -8,10 +8,22 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import { useSchemaManagement } from '@/hooks/useSchemaManagement';
 import {
+  type SequentialAnalysisRequest,
   type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
 } from '@/api/text';
+import {
+  isSnapshotMode,
+  useSnapshotViewStore,
+  useToolSnapshotMode,
+  type LoadedSnapshot,
+} from '@/features/snapshot-view';
+import { useSequentialAnalysisSnapshotCapture } from './hooks/useSequentialAnalysisSnapshotCapture';
+import { useSequentialAnalysisSnapshotLoad } from './hooks/useSequentialAnalysisSnapshotLoad';
+import type { SequentialAnalysisSnapshotPayload } from './hooks/useSequentialAnalysisSnapshotLoad';
+import { SequentialAnalysisSnapshotBanner } from './components/SequentialAnalysisSnapshotBanner';
+import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
 
 import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
 import { fetchNodeInfo } from '@/lib/nodeInfo';
@@ -93,7 +105,7 @@ const parseNonNegativeIntegerInput = (value: string): number | null => {
 const SequentialAnalysisFeature = () => {
   const queryClient = useQueryClient();
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
-  const { nodeData, currentWorkspaceId } = useWorkspaceData();
+  const { nodeData, currentWorkspaceId, currentWorkspace } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'analysis';
@@ -108,7 +120,7 @@ const SequentialAnalysisFeature = () => {
     setNodeColumnSelections,
     displayNodeCount,
     serverRequest,
-    panelSelectedNodes,
+    panelSelectedNodes: livePanelSelectedNodes,
   } = useAnalysisLock({
     analysisType: 'sequential_analysis',
     workspaceId: currentWorkspaceId,
@@ -119,6 +131,35 @@ const SequentialAnalysisFeature = () => {
     storageScope: 'sequential-analysis',
   });
 
+  // Snapshot view state hooks. Hoisted early so the effective-value
+  // dispatch below can shadow ``panelSelectedNodes`` / ``results`` /
+  // parameter state in one place. The rest of the component reads
+  // the shadowed names and naturally picks up snapshot data when in
+  // snapshot mode.
+  const snapshotMode = useToolSnapshotMode('sequential_analysis');
+  const loadedSnapshot = useSnapshotViewStore(
+    (s) => s.snapshots.sequential_analysis,
+  ) as LoadedSnapshot<SequentialAnalysisSnapshotPayload> | null;
+  const inSnapshotMode = isSnapshotMode(snapshotMode) && loadedSnapshot != null;
+
+  const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
+    const {
+      node_ids,
+      node_labels,
+      per_block_rows,
+      total_source_rows,
+    } = loadedSnapshot.manifest.source;
+    const evenSplit =
+      node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
+    return node_ids.map((id, idx) => ({
+      id,
+      node_id: id,
+      name: node_labels[idx] ?? id,
+      shape: [per_block_rows?.[idx] ?? evenSplit, 0] as [number, number],
+    }));
+  }, [inSnapshotMode, loadedSnapshot, livePanelSelectedNodes]);
+
   const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
   // Lifted from the panel so promoteTempColors is accessible to the
   // Run handler below. ``tabKey`` routes picker changes through the
@@ -127,7 +168,7 @@ const SequentialAnalysisFeature = () => {
     .map((node, idx) => getNodeIdentifier(node, idx))
     .filter((id): id is string => Boolean(id));
   const {
-    nodeColors: trendsNodeColors,
+    nodeColors: liveTrendsNodeColors,
     handleColorChange: trendsHandleColorChange,
     defaultPalette: trendsDefaultPalette,
     promoteTempColors: trendsPromoteTempColors,
@@ -135,6 +176,13 @@ const SequentialAnalysisFeature = () => {
     activeNodeIds: trendsActiveNodeIds,
     tabKey: 'analysis',
   });
+  // In snapshot mode the live colour store has no entries for the
+  // captured node IDs. Shadow with the frozen ``manifest.node_colors``
+  // so the swatch + chart series read the captured colour.
+  const trendsNodeColors: Record<string, string> =
+    inSnapshotMode && loadedSnapshot
+      ? loadedSnapshot.manifest.node_colors
+      : liveTrendsNodeColors;
 
   const [timeColumn, setTimeColumn] = useState('');
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
@@ -170,7 +218,7 @@ const SequentialAnalysisFeature = () => {
     selectedNode: selectedNode ?? undefined,
   });
 
-  const [results, resultRef, setResultSafely, setResults] = useSafeResult<Record<string, unknown>>();
+  const [liveResults, resultRef, setResultSafely, setResults] = useSafeResult<Record<string, unknown>>();
   const [hydratingSelection, setHydratingSelection] = useState(false);
   const hydratedParamsRef = useRef<{
     timeColumn: string;
@@ -364,6 +412,80 @@ const SequentialAnalysisFeature = () => {
     isResultRunning: (r: Record<string, unknown> | null) => Boolean(r) && r?.state === 'running',
   });
 
+  // Shadow ``results`` so all downstream derivations (chartData,
+  // summary, counts) pick up snapshot data without per-call site
+  // dispatch. ``setResults`` / ``setResultSafely`` still target the
+  // live state — the snapshot store owns its own slice. Plain
+  // expression (not useMemo) so the React Compiler can decide
+  // memoization without conflicting with manual hints on a
+  // refinement-style dispatch.
+  const results: Record<string, unknown> | null =
+    inSnapshotMode && loadedSnapshot ? loadedSnapshot.payload.result : liveResults;
+
+  // Hydrate the parameter-panel state from the loaded snapshot when
+  // entering snapshot mode. The parameter inputs are disabled in
+  // snapshot mode (via ``isLocked`` + ``inputsDisabled``), so once
+  // synced the values stay frozen for the duration of the view.
+  // Mirrors the live ``onHydratedRequest`` path, but reads from the
+  // captured settings/result rather than the live task store.
+  /* eslint-disable react-hooks/set-state-in-effect -- Snapshot load
+     is a one-shot sync from the store; refactoring to render-time
+     would duplicate dispatch logic across every render. */
+  useEffect(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return;
+    const settings = loadedSnapshot.payload.settings;
+    const result = loadedSnapshot.payload.result;
+    const analysisParams =
+      (result?.analysis_params as Record<string, unknown> | undefined) ?? {};
+    const tc =
+      settings?.time_column ??
+      (analysisParams.time_column as string | undefined) ??
+      '';
+    setTimeColumn(tc);
+    const groups: string[] = Array.isArray(settings?.group_by_columns)
+      ? (settings!.group_by_columns as string[])
+      : Array.isArray(analysisParams.group_by_columns)
+        ? (analysisParams.group_by_columns as string[])
+        : [];
+    setGroupByColumns([...groups]);
+    const freq: SequentialFrequency =
+      (settings?.frequency as SequentialFrequency | undefined) ??
+      (analysisParams.frequency as SequentialFrequency | undefined) ??
+      'daily';
+    setFrequency(freq);
+    const ct = isChartTypeOption(result?.chart_type) ? (result.chart_type as ChartTypeOption) : 'line';
+    setChartType(ct);
+    setCaseSensitive(
+      typeof settings?.case_sensitive === 'boolean'
+        ? settings.case_sensitive
+        : typeof analysisParams.case_sensitive === 'boolean'
+          ? (analysisParams.case_sensitive as boolean)
+          : true,
+    );
+    const numericOrigin =
+      settings?.numeric_origin ?? (analysisParams.numeric_origin as number | null | undefined);
+    setNumericOriginInput(
+      numericOrigin != null && Number.isFinite(numericOrigin) ? String(numericOrigin) : '',
+    );
+    const numericInterval =
+      settings?.numeric_interval ?? (analysisParams.numeric_interval as number | null | undefined);
+    setNumericIntervalInput(
+      numericInterval != null && Number.isFinite(numericInterval) ? String(numericInterval) : '1',
+    );
+    const civ =
+      settings?.custom_interval_value ??
+      (analysisParams.custom_interval_value as number | null | undefined);
+    setCustomIntervalValueInput(civ != null && Number.isFinite(civ) ? String(civ) : '1');
+    const ciu =
+      settings?.custom_interval_unit ??
+      (analysisParams.custom_interval_unit as SequentialCustomIntervalUnit | null | undefined);
+    setCustomIntervalUnit(isCustomIntervalUnit(ciu) ? ciu : 'minutes');
+    setHiddenKeys(new Set());
+    setSelectedPeriodIndices(new Set());
+    setDetachNodeName('');
+  }, [inSnapshotMode, loadedSnapshot]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const timeCompatibleColumns = availableColumns
         .map((column) => ({
           ...column,
@@ -377,7 +499,30 @@ const SequentialAnalysisFeature = () => {
 
   const timeColumnOptions = timeCompatibleColumns.map((column) => column.name);
 
+  // ``effectiveNodeColumnSelections`` mirrors the snapshot-mode
+  // settings so the parameter panel's column dropdown renders the
+  // captured time column even when the live workspace doesn't carry
+  // it. In live mode it falls through to the actual workspace
+  // selections from useAnalysisLock.
+  const effectiveNodeColumnSelections = useMemo(() => {
+    if (inSnapshotMode && loadedSnapshot) {
+      const settings = loadedSnapshot.payload.settings;
+      const nodeId = loadedSnapshot.manifest.source.node_ids[0];
+      if (nodeId && settings?.time_column) {
+        return [{ nodeId, column: settings.time_column }];
+      }
+      return [];
+    }
+    return nodeColumnSelections;
+  }, [inSnapshotMode, loadedSnapshot, nodeColumnSelections]);
+
   const activeTimeColumn = (() => {
+    if (inSnapshotMode && loadedSnapshot) {
+      const settings = loadedSnapshot.payload.settings;
+      if (settings?.time_column) return settings.time_column;
+      const fromParams = (loadedSnapshot.payload.result?.analysis_params as Record<string, unknown> | undefined)?.time_column;
+      return typeof fromParams === 'string' ? fromParams : '';
+    }
     if (!activeNodeId) return '';
     const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
     if (selection?.column) return selection.column;
@@ -388,7 +533,12 @@ const SequentialAnalysisFeature = () => {
 
   const activeColumnInfo = timeCompatibleColumns.find((column) => column.name === activeTimeColumn);
   const activeColumnType = normalizeTypeName(activeColumnInfo?.dataType || (timeCompatibleColumns[0]?.dataType ?? 'datetime'));
-  const derivedColumnType: 'datetime' | 'numeric' = NUMERIC_TYPE_SET.has(activeColumnType) ? 'numeric' : 'datetime';
+  const derivedColumnType: 'datetime' | 'numeric' = inSnapshotMode && loadedSnapshot
+    ? (((loadedSnapshot.payload.settings?.column_type ??
+        (loadedSnapshot.payload.result?.analysis_params as Record<string, unknown> | undefined)?.column_type) === 'numeric')
+      ? 'numeric'
+      : 'datetime')
+    : (NUMERIC_TYPE_SET.has(activeColumnType) ? 'numeric' : 'datetime');
   const numericOriginValue = derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null;
   const numericIntervalValue = derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null;
   const isCustomDatetime = derivedColumnType === 'datetime' && frequency === 'custom';
@@ -455,6 +605,7 @@ const SequentialAnalysisFeature = () => {
 
   /* eslint-disable react-hooks/set-state-in-effect -- Complex sync logic with guards to prevent infinite loops; refactoring to render-time would duplicate guard logic */
   useEffect(() => {
+    if (inSnapshotMode) return;
     if (isLocked || hydratingSelection) return;
     if (!selectedNodeId) {
       if (nodeColumnSelections.length > 0) {
@@ -488,7 +639,7 @@ const SequentialAnalysisFeature = () => {
     if (!currentSelection || currentSelection.column !== desired) {
       setNodeColumnSelections([{ nodeId: selectedNodeId, column: desired }]);
     }
-  }, [isLocked, hydratingSelection, selectedNodeId, timeColumnOptions, setNodeColumnSelections, nodeColumnSelections, timeColumn]);
+  }, [inSnapshotMode, isLocked, hydratingSelection, selectedNodeId, timeColumnOptions, setNodeColumnSelections, nodeColumnSelections, timeColumn]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleAddGroupByColumn = () => {
@@ -591,6 +742,7 @@ const SequentialAnalysisFeature = () => {
   };
 
   const handleRunOrUpdate = async () => {
+    if (inSnapshotMode) return;
     // Promote pending per-tab temp colours to assigned (Run is the
     // commit trigger per the node-colour strategy doc).
     trendsPromoteTempColors(trendsActiveNodeIds);
@@ -601,6 +753,75 @@ const SequentialAnalysisFeature = () => {
       clearOptionsOnUpdate: { preserveLocalState: true },
     });
   };
+
+  // ----- Snapshot capture + load wiring -----
+  const handleOpenSnapshot = useSequentialAnalysisSnapshotLoad();
+
+  const liveCaptureNode: WorkspaceNodeLike | null = livePanelSelectedNodes[0] ?? null;
+  const getSequentialNodeRowCount = (node: WorkspaceNodeLike) => {
+    const shape = node.shape as unknown;
+    if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
+    return 0;
+  };
+
+  // Build the live ``SequentialAnalysisRequest`` from current state
+  // for the capture-side ``settings.json`` payload. Returns null in
+  // snapshot mode (the Save button is disabled there anyway). Plain
+  // expression — the React Compiler memoizes per-render automatically.
+  const captureRequest: (SequentialAnalysisRequest & { node_id?: string }) | null = (() => {
+    if (inSnapshotMode) return null;
+    if (!activeNodeId || !activeTimeColumn) return null;
+    const validGroupBy = groupByColumns.filter((col) => col.trim() !== '');
+    const isCustomDt = derivedColumnType === 'datetime' && frequency === 'custom';
+    return {
+      node_id: activeNodeId,
+      time_column: activeTimeColumn,
+      group_by_columns: validGroupBy.length ? validGroupBy : null,
+      frequency,
+      sort_by_time: true,
+      column_type: derivedColumnType,
+      numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : null,
+      numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
+      custom_interval_value: isCustomDt ? customIntervalValue : null,
+      custom_interval_unit: isCustomDt ? customIntervalUnitValue : null,
+      case_sensitive: caseSensitive,
+    };
+  })();
+
+  const handleSaveSnapshot = useSequentialAnalysisSnapshotCapture({
+    workspaceId: currentWorkspaceId ?? null,
+    workspaceName: currentWorkspace?.name ?? currentWorkspaceId ?? '(workspace)',
+    request: captureRequest,
+    results: liveResults,
+    selectedNode: liveCaptureNode,
+    getNodeRowCount: getSequentialNodeRowCount,
+    getAuthHeaders,
+  });
+
+  const saveSnapshotDisabledReason = (() => {
+    if (inSnapshotMode) {
+      return 'Exit snapshot view first to capture a new snapshot from live results.';
+    }
+    if (!liveCaptureNode) {
+      return 'Select a data block first.';
+    }
+    const rowCount = getSequentialNodeRowCount(liveCaptureNode);
+    if (rowCount > 2_000) {
+      return `Demo snapshots cap each selected data block at 2,000 rows; selected block has ${rowCount.toLocaleString()}.`;
+    }
+    if (!liveResults) {
+      return 'Run the trends analysis (and let it finish) before saving a snapshot.';
+    }
+    return undefined;
+  })();
+
+  // Snapshot-aware chart-type change. The live handler also persists
+  // to the backend via ``postSequentialAnalysisTaskResult``; in
+  // snapshot mode we keep the change client-side only — the displayed
+  // chart updates, the captured bundle stays immutable.
+  const effHandleChartTypeChange = inSnapshotMode
+    ? (value: ChartTypeOption) => { setChartType(value); }
+    : handleChartTypeChange;
 
   const {
     timeColumn: summaryTimeColumn,
@@ -748,6 +969,7 @@ const SequentialAnalysisFeature = () => {
 
   return (
     <div className="space-y-4">
+      {inSnapshotMode && <SequentialAnalysisSnapshotBanner />}
       <AnalysisCardLayout
         title="Trends and Sequence"
         info={{
@@ -760,19 +982,33 @@ const SequentialAnalysisFeature = () => {
           label: 'Sequential analysis parameters',
           tooltip: 'Select a time column, choose frequency, and configure group-by options.',
         }}
+        snapshot={{
+          tool: 'sequential_analysis',
+          onSave: handleSaveSnapshot,
+          saveDisabledReason: saveSnapshotDisabledReason,
+          onOpen: handleOpenSnapshot,
+          nodeLabels: livePanelSelectedNodes
+            .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
+            .filter((s) => s.length > 0),
+        }}
         actions={{
           onRun: () => {
+            if (inSnapshotMode) return;
             void handleRunOrUpdate();
           },
-          onClear: handleClearResults,
-          runDisabled: actionState.runDisabled || isLoading.operations || !activeTimeColumn,
+          onClear: () => {
+            if (inSnapshotMode) return;
+            void handleClearResults();
+          },
+          runDisabled: inSnapshotMode || actionState.runDisabled || isLoading.operations || !activeTimeColumn,
           runDisabledReason: (() => {
+            if (inSnapshotMode) return 'Disabled in snapshot view';
             if (isAnalyzing || isLoading.operations) return undefined;
             if (actionState.runDisabledReason) return actionState.runDisabledReason;
             if (!activeTimeColumn) return 'Select a time column to run';
             return undefined;
           })(),
-          clearDisabled: actionState.clearDisabled,
+          clearDisabled: inSnapshotMode || actionState.clearDisabled,
           isRunning: isAnalyzing,
           hasResult: Boolean(results),
           runLabel: actionState.runLabel,
@@ -784,18 +1020,23 @@ const SequentialAnalysisFeature = () => {
       >
           <SequentialAnalysisParameterPanel
             selectedNodes={displayedNodes}
-            nodeColumnSelections={nodeColumnSelections}
+            nodeColumnSelections={effectiveNodeColumnSelections}
             timeCompatibleColumns={timeCompatibleColumns}
             timeCompatibleTypes={Array.from(TIME_COMPATIBLE_TYPES)}
-            isLocked={Boolean(isLocked)}
+            isLocked={Boolean(isLocked) || inSnapshotMode}
+            lockedMessage={
+              inSnapshotMode
+                ? 'Viewing a saved snapshot — selection is frozen.'
+                : undefined
+            }
             displayNodeCount={displayNodeCount}
             onColumnChange={(nodeId, column) => {
-              if (isLocked) return;
+              if (isLocked || inSnapshotMode) return;
               setNodeColumnSelections([{ nodeId, column }]);
               setTimeColumn(column);
             }}
             derivedColumnType={derivedColumnType}
-            inputsDisabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
+            inputsDisabled={inSnapshotMode || (!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId))}
             activeNodeId={activeNodeId}
             selectedNodeId={selectedNodeId}
             currentWorkspaceId={currentWorkspaceId}
@@ -854,7 +1095,7 @@ const SequentialAnalysisFeature = () => {
           minGroupSizeInput={minGroupSizeInput}
           onMinGroupSizeChange={setMinGroupSizeInput}
           chartType={chartType}
-          onChartTypeChange={handleChartTypeChange}
+          onChartTypeChange={effHandleChartTypeChange}
           xAxisType={xAxisType}
           onXAxisTypeChange={setXAxisType}
           onDownloadClick={() => setDownloadDialogOpen(true)}
@@ -873,9 +1114,11 @@ const SequentialAnalysisFeature = () => {
           detachNodeNamePlaceholder={defaultNodeName}
           onDetachNodeNameChange={setDetachNodeName}
           onDetach={() => {
+            if (inSnapshotMode) return;
             void handleDetach();
           }}
           containerRef={chartContainerRef}
+          readOnly={inSnapshotMode}
         />
       )}
       <ChartImageDownloadDialog

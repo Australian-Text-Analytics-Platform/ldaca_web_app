@@ -61,6 +61,10 @@ export interface SequentialAnalysisParameterPanelProps {
   isLocked: boolean;
   displayNodeCount: number;
   onColumnChange: (nodeId: string, column: string) => void;
+  /** Displayed when the panel is locked. Defaults to the standard
+   * "locked while results loaded" message; snapshot mode passes a
+   * tailored "viewing saved snapshot" string. */
+  lockedMessage?: string;
 
   // Configuration shared
   derivedColumnType: 'datetime' | 'numeric';
@@ -140,6 +144,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
   nodeColors,
   defaultPalette,
   onColorChange,
+  lockedMessage = ANALYSIS_LOCKED_MESSAGE,
 }) => {
   return (
   <>
@@ -168,7 +173,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
         </span>
       )}
       allowedDataTypes={timeCompatibleTypes}
-      lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+      lockedMessage={lockedMessage}
     />
 
     <div className="space-y-4">
@@ -250,6 +255,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
                 value={numericOriginInput}
                 onChange={(event) => onNumericOriginChange(event.target.value)}
                 placeholder="Auto-detect"
+                disabled={inputsDisabled}
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Optional. Leave blank to auto-detect from the minimum value.
@@ -266,6 +272,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
                 value={numericIntervalInput}
                 onChange={(event) => onNumericIntervalChange(event.target.value)}
                 placeholder="e.g. 10"
+                disabled={inputsDisabled}
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Required. Values are bucketed using this interval width.
@@ -282,7 +289,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
           </label>
           <Button
             onClick={onAddGroupByColumn}
-            disabled={groupByColumns.length >= 3}
+            disabled={inputsDisabled || groupByColumns.length >= 3}
             size="sm"
             className="gap-1"
           >
@@ -296,6 +303,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
             <Select
               value={column || undefined}
               onValueChange={(value) => onGroupByColumnChange(index, value)}
+              disabled={inputsDisabled}
             >
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder="Select column" />
@@ -319,6 +327,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
               onClick={() => onRemoveGroupByColumn(index)}
               variant="destructive"
               size="sm"
+              disabled={inputsDisabled}
             >
               <Trash2 className="h-4 w-4" />
               Remove
@@ -332,6 +341,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
               id="case-sensitive"
               checked={caseSensitive}
               onCheckedChange={(checked) => onCaseSensitiveChange(checked === true)}
+              disabled={inputsDisabled}
             />
             <label
               htmlFor="case-sensitive"

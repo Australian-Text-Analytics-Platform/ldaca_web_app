@@ -67,6 +67,13 @@ interface SequentialChartProps {
   onDetachNodeNameChange: (value: string) => void;
   onDetach: () => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
+  /** Snapshot view: disables the "Add to Workspace" detach button and
+   * the new-node-name input (both create a backend node from the
+   * captured selection, which doesn't make sense for a frozen
+   * snapshot). Legend toggling and period selection stay enabled —
+   * those are purely visual and help users explore the captured
+   * data. */
+  readOnly?: boolean;
 }
 
 const CHART_HEIGHT_PX = 400;
@@ -90,6 +97,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
   onDetachNodeNameChange,
   onDetach,
   containerRef,
+  readOnly = false,
 }) => {
   const toggleKey = onToggleKey;
   const visibleKeys = groupKeys.filter((key) => !hiddenKeys.has(key));
@@ -136,12 +144,12 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                   })
                 }
                 placeholder={detachNodeNamePlaceholder}
-                disabled={isDetaching}
+                disabled={isDetaching || readOnly}
                 aria-label="New data block name"
                 className="min-w-0 flex-1"
               />
             </div>
-            <DisabledReasonTooltip reason="No groups meet the current minimum group size — adjust the filter to enable selecting periods.">
+            <DisabledReasonTooltip reason={readOnly ? 'Disabled in snapshot view.' : 'No groups meet the current minimum group size — adjust the filter to enable selecting periods.'}>
               <Button
                 type="button"
                 size="sm"
@@ -281,7 +289,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 })
               }
               placeholder={detachNodeNamePlaceholder}
-              disabled={isDetaching}
+              disabled={isDetaching || readOnly}
               aria-label="New data block name"
               className="min-w-0 flex-1"
             />
@@ -290,16 +298,18 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
             reason={
               isDetaching
                 ? undefined
-                : !canDetach
-                  ? 'Click periods on the chart (shift-click to extend) to pick a subset to add as a new data block.'
-                  : undefined
+                : readOnly
+                  ? 'Disabled in snapshot view.'
+                  : !canDetach
+                    ? 'Click periods on the chart (shift-click to extend) to pick a subset to add as a new data block.'
+                    : undefined
             }
           >
             <Button
               type="button"
               size="sm"
               className="w-full sm:w-auto"
-              disabled={!canDetach || isDetaching}
+              disabled={!canDetach || isDetaching || readOnly}
               onClick={onDetach}
             >
               {isDetaching ? (

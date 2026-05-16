@@ -45,10 +45,10 @@ import {
 import { useConcordanceSnapshotCapture } from './hooks/useConcordanceSnapshotCapture';
 import { useConcordanceSnapshotLoad } from './hooks/useConcordanceSnapshotLoad';
 import { ConcordanceSnapshotBanner } from './components/ConcordanceSnapshotBanner';
-import { ConcordanceSnapshotResults } from './components/ConcordanceSnapshotResults';
-import { ConcordanceSnapshotSearchSummary } from './components/ConcordanceSnapshotSearchSummary';
 import { useSnapshotViewStore } from '@/features/snapshot-view';
+import type { LoadedSnapshot } from '@/features/snapshot-view';
 import type { ConcordanceSnapshotPayload } from './hooks/useConcordanceSnapshotLoad';
+import type { ConcordanceAnalysisRequest, ConcordanceResultEntry } from '@/api/text/concordance';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
@@ -82,7 +82,7 @@ const ConcordanceFeature: React.FC = () => {
   const resultsRef = useRef<HTMLDivElement | null>(null);
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
-  const { currentWorkspaceId } = useWorkspaceData();
+  const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
   const {
     detachConcordance,
     detachConcordanceDispersion,
@@ -108,7 +108,7 @@ const ConcordanceFeature: React.FC = () => {
     recomputeAutoColumns,
     activeNodeColumnSelections,
     activeNodeIds,
-    panelSelectedNodes,
+    panelSelectedNodes: livePanelSelectedNodes,
     displayNodeCount,
     serverRequest,
   } = useAnalysisLock({
@@ -196,15 +196,89 @@ const ConcordanceFeature: React.FC = () => {
     },
     [],
   );
-  const [materializedBins, setMaterializedBins] = useState<Record<string, ConcordanceDispersionBinRow[]>>({});
+  const [liveMaterializedBins, setMaterializedBins] = useState<Record<string, ConcordanceDispersionBinRow[]>>({});
   // Declared early so the position-fetch effect / lookups can reference it.
   // The setter is also used further below by the materialise-task watcher.
-  const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
+  const [liveMaterializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
-  const [results, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
+  const [liveResults, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
+
+  // Snapshot view mode for this tool. ``live`` in every code path
+  // until the user opens a snapshot from the Load dialog. Hoisted
+  // up here (above all useMemos that depend on panelSelectedNodes /
+  // results / materializedPaths / materializedBins) so the effective
+  // dispatch can shadow those names at one site, propagating the
+  // captured data through the rest of the component verbatim.
+  const snapshotMode = useToolSnapshotMode('concordance');
+  const loadedSnapshot = useSnapshotViewStore(
+    (s) => s.snapshots.concordance,
+  ) as LoadedSnapshot<ConcordanceSnapshotPayload> | null;
+  const inSnapshotMode = isSnapshotMode(snapshotMode) && loadedSnapshot != null;
+
+  // Effective-value dispatch: when in snapshot mode, every downstream
+  // useMemo / hook / JSX prop reads from the captured snapshot instead
+  // of live state. Live state stays untouched so Exit returns the user
+  // to exactly where they were. The shadowed names (panelSelectedNodes,
+  // results, materializedPaths, materializedBins) are read by the rest
+  // of the component as-is — making this a single dispatch point
+  // rather than a sprawl of conditionals across every reference site.
+  // See plan §10 (Snapshot view) for the architecture rationale: a
+  // snapshot is "the live UI with frozen data + mutation guards", not
+  // a parallel viewer.
+  const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
+    const {
+      node_ids,
+      node_labels,
+      per_block_rows,
+      total_source_rows,
+    } = loadedSnapshot.manifest.source;
+    const evenSplit =
+      node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
+    return node_ids.map((id, idx) => ({
+      id,
+      node_id: id,
+      name: node_labels[idx] ?? id,
+      shape: [per_block_rows?.[idx] ?? evenSplit, 0] as [number, number],
+    }));
+  }, [inSnapshotMode, loadedSnapshot, livePanelSelectedNodes]);
+
+  const results = useMemo<ConcordanceAnalysisResponse | null>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return liveResults;
+    const captured = loadedSnapshot.payload.resultByNodeId;
+    return {
+      state: 'successful',
+      message: '',
+      data: captured,
+      metadata: {},
+      // ``__COMBINED__`` entry only present in the bundle if the
+      // original analysis was run with ``combined: true``. Surfacing
+      // ``combinable`` from that drives the Separated/Combined tab
+      // toggle in <ConcordanceResultsPanel>.
+      combinable: '__COMBINED__' in captured,
+    };
+  }, [inSnapshotMode, loadedSnapshot, liveResults]);
+
+  const materializedPaths = useMemo<Record<string, string>>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return liveMaterializedPaths;
+    const out: Record<string, string> = {};
+    for (const [id, entry] of Object.entries(loadedSnapshot.payload.resultByNodeId)) {
+      if (entry.materialized) out[id] = `snapshot:${id}`;
+    }
+    return out;
+  }, [inSnapshotMode, loadedSnapshot, liveMaterializedPaths]);
+
+  const materializedBins = useMemo<Record<string, ConcordanceDispersionBinRow[]>>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return liveMaterializedBins;
+    const out: Record<string, ConcordanceDispersionBinRow[]> = {};
+    for (const [id, resp] of Object.entries(loadedSnapshot.payload.binsByNodeId)) {
+      out[id] = resp.rows;
+    }
+    return out;
+  }, [inSnapshotMode, loadedSnapshot, liveMaterializedBins]);
   const labelToNodeId = useMemo<Record<string, string> | null>(() => {
-    const params = results?.analysis_params;
+    const params = liveResults?.analysis_params;
     const mapping = params?.label_to_node_map;
     if (mapping && typeof mapping === 'object') {
       const normalized: Record<string, string> = {};
@@ -216,7 +290,7 @@ const ConcordanceFeature: React.FC = () => {
       return normalized;
     }
     return null;
-  }, [results]);
+  }, [liveResults]);
 
   // Color management & view mode. ``tabKey`` routes the colour
   // changes through the per-tab temp layer so the picker preview
@@ -224,20 +298,25 @@ const ConcordanceFeature: React.FC = () => {
   // graph + sidebar are showing. ``promoteTempColors`` is fired
   // below in ``handleRunOrUpdate`` to commit the pending temps to
   // assigned when the user actually runs the analysis.
-  const { nodeColors, handleColorChange, defaultPalette, promoteTempColors } =
+  const { nodeColors: liveNodeColors, handleColorChange, defaultPalette, promoteTempColors } =
     useNodeColorManagement({
       activeNodeIds,
       palette: EXTENDED_PALETTE,
       tabKey: 'concordance',
     });
+  // In snapshot mode the live colour store has no entries for the
+  // captured node IDs. Shadow with the frozen ``manifest.node_colors``
+  // so swatches, legends, and chart series read the captured colour.
+  const nodeColors: Record<string, string> =
+    inSnapshotMode && loadedSnapshot ? loadedSnapshot.manifest.node_colors : liveNodeColors;
 
   const concordanceTaskId = useMemo(() => {
-    const md = (results as ConcordanceAnalysisResponse | null)?.metadata as
+    const md = (liveResults as ConcordanceAnalysisResponse | null)?.metadata as
       | Record<string, unknown>
       | undefined;
     const value = md?.task_id ?? md?.taskId;
     return typeof value === 'string' ? value : '';
-  }, [results]);
+  }, [liveResults]);
 
   const resolveNodeIdForKey = useCallback((nodeKey: string): string | null => {
     if (nodeKey === '__COMBINED__') return null;
@@ -365,13 +444,11 @@ const ConcordanceFeature: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
-
-  // Snapshot view mode for this tool. ``live`` in every code path
-  // today; populated by the Phase 1 capture/load flow. Mutation
-  // handlers early-return when isSnapshotMode is true so a stale
-  // event source can't fire a server write against the host
-  // workspace while the user thinks they're viewing a snapshot.
-  const snapshotMode = useToolSnapshotMode('concordance');
+  // Separate snapshot-mode viewMode so toggling Separated/Combined
+  // while viewing a snapshot doesn't pollute live state on Exit.
+  // Initialised below from the captured ``settings.combined`` flag.
+  const [snapshotViewMode, setSnapshotViewMode] =
+    useState<'separated'|'combined'>('separated');
 
   useEffect(() => {
     const element = resultsViewportRef.current;
@@ -401,7 +478,17 @@ const ConcordanceFeature: React.FC = () => {
 
   // Hoisted up so the metadata-column hook can read it (it consults each
   // panel node's selected text column to exclude it from the metadata list).
-  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+  // In snapshot mode the selections come from the captured
+  // ConcordanceAnalysisRequest's ``node_columns`` so the live UI's
+  // column dropdowns render the captured column without re-fetching it.
+  const effectiveNodeColumnSelections = useMemo(() => {
+    if (inSnapshotMode && loadedSnapshot?.payload.settings?.node_columns) {
+      return Object.entries(loadedSnapshot.payload.settings.node_columns).map(
+        ([nodeId, column]) => ({ nodeId, column }),
+      );
+    }
+    return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+  }, [inSnapshotMode, loadedSnapshot, isLocked, activeNodeColumnSelections, nodeColumnSelections]);
 
   const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } =
     useConcordanceMetadataColumns({
@@ -717,11 +804,57 @@ const ConcordanceFeature: React.FC = () => {
   // result rendering ships in Phase 1b-2b.
   const handleOpenSnapshot = useConcordanceSnapshotLoad();
 
+  // Build the actual ConcordanceAnalysisRequest from the live form
+  // state so the captured ``settings.json`` reconstructs the search
+  // params exactly. Live results.metadata carries the task id but
+  // not the request shape — using it here is what produced the
+  // "Search term: unknown" bug in v0.4.4 snapshots.
+  const captureRequest = useMemo<ConcordanceAnalysisRequest | null>(() => {
+    if (panelSelectedNodes.length === 0) return null;
+    const nodeIds: string[] = [];
+    const nodeColumns: Record<string, string> = {};
+    for (const node of panelSelectedNodes) {
+      const id = node.id ?? (node.node_id as string | undefined);
+      if (!id) continue;
+      nodeIds.push(id);
+      const sel = effectiveNodeColumnSelections.find((s) => s.nodeId === id);
+      if (sel?.column) nodeColumns[id] = sel.column;
+    }
+    if (nodeIds.length === 0) return null;
+    return {
+      node_ids: nodeIds,
+      node_columns: nodeColumns,
+      search_word: searchWord,
+      num_left_tokens: numLeftTokens,
+      num_right_tokens: numRightTokens,
+      regex,
+      whole_word: wholeWord,
+      case_sensitive: caseSensitive,
+      combined: viewMode === 'combined',
+      search_mode: searchMode,
+      ...(tokensModel ? { model: tokensModel } : {}),
+      ...(concordanceLanguage ? { language: concordanceLanguage } : {}),
+    };
+  }, [
+    panelSelectedNodes,
+    effectiveNodeColumnSelections,
+    searchWord,
+    numLeftTokens,
+    numRightTokens,
+    regex,
+    wholeWord,
+    caseSensitive,
+    viewMode,
+    searchMode,
+    tokensModel,
+    concordanceLanguage,
+  ]);
+
   const handleSaveSnapshot = useConcordanceSnapshotCapture({
     workspaceId: currentWorkspaceId ?? null,
-    workspaceName: currentWorkspaceId ?? '(workspace)',
+    workspaceName: currentWorkspace?.name ?? currentWorkspaceId ?? '(workspace)',
     taskId: captureTaskId,
-    request: (results?.metadata as Record<string, unknown> | undefined) ?? null,
+    request: captureRequest,
     selectedNodes: panelSelectedNodes,
     getNodeRowCount: getConcordanceNodeRowCount,
     getAuthHeaders,
@@ -733,6 +866,9 @@ const ConcordanceFeature: React.FC = () => {
   // pattern used by the Run button). Returned as ``undefined`` when
   // Save should be enabled.
   const saveSnapshotDisabledReason = (() => {
+    if (inSnapshotMode) {
+      return 'Exit snapshot view first to capture a new snapshot from live results.';
+    }
     if (panelSelectedNodes.length === 0) {
       return 'Select at least one data block first.';
     }
@@ -756,8 +892,14 @@ const ConcordanceFeature: React.FC = () => {
     const selectedIds = panelSelectedNodes
       .map((n) => n.id ?? (n.node_id as string | undefined))
       .filter((id): id is string => Boolean(id));
+    // Check ``materializedPaths`` (the SSE-tracked per-node state)
+    // rather than ``results.data[id].materialized``: in combined-view
+    // mode the response only carries the ``__COMBINED__`` entry, so
+    // the per-node ``materialized`` flags don't exist there at all,
+    // which would incorrectly disable Save even after Process Both
+    // successfully materialised both nodes.
     const unmaterialised = selectedIds.filter(
-      (id) => !results.data?.[id]?.materialized,
+      (id) => !materializedPaths[id],
     );
     if (unmaterialised.length > 0) {
       return `Click Process All to materialise ${unmaterialised.length === 1 ? 'the result' : 'all selected data blocks'} before saving — keeps the snapshot compact and enables re-binning of the dispersion chart.`;
@@ -890,6 +1032,14 @@ const ConcordanceFeature: React.FC = () => {
       prefsSyncedRef.current = false;
       return;
     }
+    // Snapshot mode: the captured result's pagination.page_size reflects
+    // the ``page_size: 'all'`` capture path (500 000 cap), NOT the user's
+    // viewing preference. Pulling that into globalPageSize would put
+    // every captured row on one mega-page. Skip the sync entirely —
+    // snapshot rendering uses globalPageSize as the client-side slice
+    // window (default 20), and the user can still change it via the
+    // PageSizeSelect dropdown in the parameter panel.
+    if (inSnapshotMode) return;
     // Only sync preferences on the first result load (hydration).
     if (prefsSyncedRef.current) return;
     prefsSyncedRef.current = true;
@@ -923,7 +1073,7 @@ const ConcordanceFeature: React.FC = () => {
       return () => cancelAnimationFrame(id);
     }
 
-  }, [results, globalPageSize, setNodePagination]);
+  }, [results, globalPageSize, setNodePagination, inSnapshotMode]);
 
   // Materialize lifecycle: terminal-state task watcher, task-id ref reset,
   // and `analysis_materialized` SSE consumer. See hook for details.
@@ -1284,30 +1434,218 @@ const ConcordanceFeature: React.FC = () => {
   const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));
 
 
-  // Snapshot view: when the concordance tool is in snapshot mode,
-  // render the read-only view in place of the live UI. The live
-  // state (search inputs, selected nodes, results, materialised
-  // bins, etc.) is preserved untouched — Exit returns the user to
-  // exactly where they were. Mutation guards on Run / Process All
-  // are belt-and-suspenders here since those controls aren't even
-  // rendered in this code path.
-  const loadedSnapshot = useSnapshotViewStore((s) => s.snapshots.concordance);
-  if (isSnapshotMode(snapshotMode) && loadedSnapshot) {
-    const snapshotPayload = loadedSnapshot.payload as ConcordanceSnapshotPayload;
-    return (
-      <div className="space-y-4">
-        <ConcordanceSnapshotBanner />
-        <ConcordanceSnapshotSearchSummary manifest={loadedSnapshot.manifest} />
-        <ConcordanceSnapshotResults
-          manifest={loadedSnapshot.manifest}
-          payload={snapshotPayload}
-        />
-      </div>
-    );
-  }
+  // Snapshot-mode client-side pagination + sort, matching the backend
+  // materialised-path semantics:
+  //   * When ``sortBy`` is set, flatten the captured groups into hits,
+  //     sort the hits by the column, then slice ``pageSize`` hits per
+  //     page. Each sliced hit becomes a singleton group so the table
+  //     renderer (which flattens groups again to build its rows) sees
+  //     the hits in the exact sort order the user expects. This is the
+  //     identical control flow the live materialised path runs in
+  //     compute_materialized_page → _serialize_materialized_rows.
+  //   * When ``sortBy`` is unset, keep the document-grouped shape so
+  //     the dispersion view's proportional bars still render one bar
+  //     per document. We still paginate at the hit level (matching
+  //     ``total_source_rows`` semantics of the live response, which is
+  //     "total hits in the parquet"); groups are re-formed by walking
+  //     consecutive hits that share the same ``__source_node`` /
+  //     document key.
+  // Sort comparator falls back to a string compare when values aren't
+  // both numeric, mirroring Polars' ``sort`` behaviour closely enough
+  // that the user can't tell the difference without a sharp eye.
+  const pagedResults = useMemo<ConcordanceAnalysisResponse | null>(() => {
+    if (!inSnapshotMode || !results) return results;
+    const sliced: Record<string, ConcordanceResultEntry> = {};
+    for (const [id, entry] of Object.entries(results.data)) {
+      const groups = entry.data ?? [];
+      const isCombined = id === '__COMBINED__';
+      const np = isCombined ? undefined : nodePagination[id];
+      const pageSize = isCombined
+        ? globalPageSize
+        : (np?.pageSize ?? globalPageSize);
+      const currentPage = isCombined
+        ? combinedPage
+        : (np?.currentPage ?? 1);
+      const sortBy = isCombined ? '' : (np?.sortBy ?? '');
+      const descending = isCombined ? false : (np?.descending ?? false);
+
+      // Flatten all groups into a flat hits array — pagination is
+      // hit-based in the live materialised path so we match that.
+      const allHits: Record<string, unknown>[] = [];
+      for (const group of groups) {
+        for (const hit of group) allHits.push(hit);
+      }
+
+      // Optional client-side sort by the user-clicked column. Applied
+      // at the hit level so ascending CONC_start_idx yields a strict
+      // global ascending sequence, not a per-document ascending
+      // sequence (which was the bug in the previous group-level sort).
+      let workingHits = allHits;
+      if (sortBy && allHits.length > 1) {
+        const dir = descending ? -1 : 1;
+        workingHits = [...allHits].sort((a, b) => {
+          const av = a[sortBy];
+          const bv = b[sortBy];
+          if (av == null && bv == null) return 0;
+          if (av == null) return 1;
+          if (bv == null) return -1;
+          if (typeof av === 'number' && typeof bv === 'number') {
+            return dir * (av - bv);
+          }
+          return dir * String(av).localeCompare(String(bv));
+        });
+      }
+
+      const totalHits = workingHits.length;
+      const totalPages = Math.max(1, Math.ceil(totalHits / pageSize));
+      const startIdx = (currentPage - 1) * pageSize;
+      const pagedHits = workingHits.slice(startIdx, startIdx + pageSize);
+
+      // Re-form groups for the sliced page. When sortBy is set the
+      // hits aren't in document order any more, so we emit each hit as
+      // a singleton group — the table view doesn't care (it flattens
+      // anyway) and the dispersion view doesn't expose a sortable
+      // header so it never sees this branch. When sortBy is empty we
+      // re-group consecutive same-document hits to preserve the
+      // proportional-bars layout in dispersion view.
+      let pagedGroups: Record<string, unknown>[][];
+      if (sortBy) {
+        pagedGroups = pagedHits.map((h) => [h]);
+      } else {
+        pagedGroups = [];
+        let currentGroup: Record<string, unknown>[] | null = null;
+        let currentKey: unknown = Symbol('init');
+        // Prefer the captured ConcordanceAnalysisRequest's document
+        // column for this node, falling back to ``__source_node``
+        // which is always present in materialised rows.
+        const docCol = loadedSnapshot?.payload.settings?.node_columns?.[id];
+        for (const hit of pagedHits) {
+          const key = docCol ? hit[docCol] : hit.__source_node;
+          if (currentGroup && key === currentKey) {
+            currentGroup.push(hit);
+          } else {
+            currentGroup = [hit];
+            currentKey = key;
+            pagedGroups.push(currentGroup);
+          }
+        }
+      }
+
+      sliced[id] = {
+        ...entry,
+        data: pagedGroups as ConcordanceResultEntry['data'],
+        pagination: {
+          page: currentPage,
+          page_size: pageSize,
+          total_source_rows: totalHits,
+          total_source_pages: totalPages,
+          result_count: pagedHits.length,
+          has_next: currentPage < totalPages,
+          has_prev: currentPage > 1,
+        },
+        sorting: { sort_by: sortBy || undefined, descending },
+      };
+    }
+    return { ...results, data: sliced };
+  }, [inSnapshotMode, results, loadedSnapshot, nodePagination, globalPageSize, combinedPage]);
+
+  // Snapshot-mode handlePageChange: server doesn't need to be called
+  // because all captured rows are already in-memory. We just bump
+  // ``nodePagination`` (or combinedPage for the combined view) and let
+  // ``pagedResults`` re-slice on the next render.
+  const effHandlePageChange = useMemo(() => {
+    if (!inSnapshotMode) return handlePageChange;
+    return (newPage: number, paginationKey: string, _requestNodeId: string) => {
+      if (paginationKey === '__COMBINED__') {
+        setCombinedPage(newPage);
+        return;
+      }
+      setNodePagination((prev) => ({
+        ...prev,
+        [paginationKey]: {
+          currentPage: newPage,
+          pageSize: prev[paginationKey]?.pageSize ?? globalPageSize,
+          sortBy: prev[paginationKey]?.sortBy ?? '',
+          descending: prev[paginationKey]?.descending ?? false,
+        },
+      }));
+    };
+  }, [inSnapshotMode, handlePageChange, setNodePagination, setCombinedPage, globalPageSize]);
+
+  // Snapshot-mode handleSort: the live ``handleSort`` calls
+  // ``resolveTaskId`` → empty ``task_ids`` (no server task exists for
+  // a snapshot) → no-op. Instead, we just toggle ``sortBy`` /
+  // ``descending`` on the per-node pagination slot and let
+  // ``pagedResults`` re-sort the captured groups client-side. Combined
+  // view doesn't support sort (its block doesn't render SortableHeader).
+  const effHandleSort = useMemo(() => {
+    if (!inSnapshotMode) return handleSort;
+    return (columnName: string, paginationKey: string, _requestNodeId?: string) => {
+      setNodePagination((prev) => {
+        const current = prev[paginationKey] ?? {
+          currentPage: 1,
+          pageSize: globalPageSize,
+          sortBy: '',
+          descending: false,
+        };
+        const isSameColumn = current.sortBy === columnName;
+        const nextDescending = isSameColumn ? !current.descending : false;
+        return {
+          ...prev,
+          [paginationKey]: {
+            ...current,
+            currentPage: 1,
+            sortBy: columnName,
+            descending: nextDescending,
+          },
+        };
+      });
+    };
+  }, [inSnapshotMode, handleSort, setNodePagination, globalPageSize]);
+
+  // Effective search-param dispatch — when in snapshot mode, the
+  // captured request's values drive the read-only ParameterPanel
+  // display; otherwise live React state. Computed inline here so
+  // the live setters (setSearchWord, etc.) stay correctly bound to
+  // live state for when the user exits snapshot view.
+  const effSettings = inSnapshotMode ? loadedSnapshot?.payload.settings : undefined;
+  const effSearchWord = effSettings?.search_word ?? searchWord;
+  const effNumLeftTokens = effSettings?.num_left_tokens ?? numLeftTokens;
+  const effNumRightTokens = effSettings?.num_right_tokens ?? numRightTokens;
+  const effRegex = effSettings?.regex ?? regex;
+  const effWholeWord = effSettings?.whole_word ?? wholeWord;
+  const effCaseSensitive = effSettings?.case_sensitive ?? caseSensitive;
+  const effSearchMode = effSettings?.search_mode ?? searchMode;
+  const effTokensModel = effSettings?.model ?? tokensModel;
+  // View-mode dispatch. In snapshot mode the dedicated
+  // ``snapshotViewMode`` state drives the Separated/Combined toggle
+  // (so Exit returns to the live ``viewMode`` untouched). The
+  // Combined tab appears only when ``results.combinable`` is true,
+  // which we set above based on whether the captured payload carries
+  // the ``__COMBINED__`` entry.
+  const effViewMode: 'separated' | 'combined' = inSnapshotMode
+    ? snapshotViewMode
+    : viewMode;
+
+  // Sync snapshotViewMode with the captured ``settings.combined``
+  // flag whenever a new snapshot loads (or when the snapshot's
+  // settings reference changes). Keeps the initial render on the
+  // mode the snapshot was captured in.
+  useEffect(() => {
+    if (inSnapshotMode && loadedSnapshot) {
+      const cap = loadedSnapshot.payload.settings?.combined ?? false;
+      setSnapshotViewMode(cap ? 'combined' : 'separated');
+    }
+  }, [inSnapshotMode, loadedSnapshot]);
+
+  const effHandleViewModeChange = useMemo(() => {
+    if (!inSnapshotMode) return handleViewModeChange;
+    return (mode: 'separated' | 'combined') => setSnapshotViewMode(mode);
+  }, [inSnapshotMode, handleViewModeChange]);
 
   return (
     <div className="space-y-4">
+      {inSnapshotMode && <ConcordanceSnapshotBanner />}
       <ConcordanceParameterPanel
         panelSelectedNodes={panelSelectedNodes}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}
@@ -1318,26 +1656,26 @@ const ConcordanceFeature: React.FC = () => {
         getColumnInfos={getColumnInfos}
         displayNodeCount={displayNodeCount}
         isLocked={!!isLocked}
-        searchWord={searchWord}
+        searchWord={effSearchWord}
         setSearchWord={setSearchWord}
-        numLeftTokens={numLeftTokens}
+        numLeftTokens={effNumLeftTokens}
         setNumLeftTokens={setNumLeftTokens}
-        numRightTokens={numRightTokens}
+        numRightTokens={effNumRightTokens}
         setNumRightTokens={setNumRightTokens}
-        regex={regex}
+        regex={effRegex}
         setRegex={setRegex}
-        wholeWord={wholeWord}
+        wholeWord={effWholeWord}
         setWholeWord={setWholeWord}
-        caseSensitive={caseSensitive}
+        caseSensitive={effCaseSensitive}
         setCaseSensitive={setCaseSensitive}
-        searchMode={searchMode}
+        searchMode={effSearchMode}
         setSearchMode={(next) => {
           setSearchMode(next);
           setSearchModeUserSet(true);
         }}
-        tokensModeAvailable={tokensModeAvailable}
+        tokensModeAvailable={tokensModeAvailable || inSnapshotMode}
         tokensModelOptions={tokensModelOptions}
-        tokensModel={tokensModel}
+        tokensModel={effTokensModel}
         setTokensModel={setTokensModel}
         isSearching={isSearching}
         actionState={actionState}
@@ -1350,6 +1688,10 @@ const ConcordanceFeature: React.FC = () => {
         onSaveSnapshot={handleSaveSnapshot}
         saveSnapshotDisabledReason={saveSnapshotDisabledReason}
         onOpenSnapshot={handleOpenSnapshot}
+        snapshotNodeLabels={livePanelSelectedNodes
+          .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
+          .filter((s) => s.length > 0)}
+        readOnly={inSnapshotMode}
       />
 
       {concordanceWaitingBanner && (
@@ -1365,12 +1707,12 @@ const ConcordanceFeature: React.FC = () => {
       {/* Results */}
       {results?.state === 'successful' && (
         <ConcordanceResultsPanel
-          results={results}
+          results={pagedResults ?? results}
           resultsRef={resultsRef}
           resultsViewportRef={resultsViewportRef}
           resultsViewportWidth={resultsViewportWidth}
-          viewMode={viewMode}
-          handleViewModeChange={handleViewModeChange}
+          viewMode={effViewMode}
+          handleViewModeChange={effHandleViewModeChange}
           combinedLoading={combinedLoading}
           concordanceView={concordanceView}
           setConcordanceView={setConcordanceView}
@@ -1401,8 +1743,8 @@ const ConcordanceFeature: React.FC = () => {
           matchedTextColorMap={matchedTextColorMap}
           getMaterializedBinsForKey={getMaterializedBinsForKey}
           isBlockMaterialised={isBlockMaterialised}
-          searchWord={searchWord}
-          selectedNodes={selectedNodes}
+          searchWord={effSearchWord}
+          selectedNodes={inSnapshotMode ? panelSelectedNodes : selectedNodes}
           panelSelectedNodes={panelSelectedNodes}
           effectiveNodeColumnSelections={effectiveNodeColumnSelections}
           labelToNodeId={labelToNodeId}
@@ -1417,12 +1759,13 @@ const ConcordanceFeature: React.FC = () => {
           nodeMaterializing={nodeMaterializing}
           materializedPaths={materializedPaths}
           materializeSummaries={materializeSummaries}
-          handleSort={handleSort}
-          handlePageChange={handlePageChange}
+          handleSort={effHandleSort}
+          handlePageChange={effHandlePageChange}
           handleRowClick={handleRowClick}
           handleMaterialize={handleMaterialize}
           openDetachDialog={openDetachDialog}
           onDispersionDetach={openDispersionDetachDialog}
+          readOnly={inSnapshotMode}
         />
       )}
 

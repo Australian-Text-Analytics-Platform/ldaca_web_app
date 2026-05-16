@@ -79,6 +79,17 @@ export type ConcordanceParameterPanelProps = {
   /** Forwarded to <AnalysisFeatureHeader> — wires the Open click in
    * the load dialog to the host's load pipeline. */
   onOpenSnapshot?: (filename: string) => Promise<void>;
+  /** Forwarded to <AnalysisFeatureHeader>. Data-block labels used to
+   * pre-populate the Save dialog's filename input. */
+  snapshotNodeLabels?: string[];
+  /** When true, the panel renders the captured search params for
+   * display only — every input is disabled, Run + Clear footer is
+   * hidden, and the Save/Open snapshot buttons in the header stay
+   * available (the host gates Save with ``saveSnapshotDisabledReason``
+   * which it sets to a fixed string in snapshot mode). Used by the
+   * snapshot view to reuse the live ParameterPanel chrome verbatim
+   * — see plan §10 (Snapshot-view design). */
+  readOnly?: boolean;
 };
 
 export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps> = ({
@@ -120,6 +131,8 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   onSaveSnapshot,
   saveSnapshotDisabledReason,
   onOpenSnapshot,
+  snapshotNodeLabels,
+  readOnly = false,
 }) => {
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
@@ -143,6 +156,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
         onSaveSnapshot={onSaveSnapshot}
         saveSnapshotDisabledReason={saveSnapshotDisabledReason}
         onOpenSnapshot={onOpenSnapshot}
+        snapshotNodeLabels={snapshotNodeLabels}
       />
       <CardContent className="space-y-4 pt-0">
         <NodeSelectionPanel
@@ -155,13 +169,13 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
           maxCompare={2}
           className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
           showShape
-          disabled={!!isLocked}
-          locked={!!isLocked}
+          disabled={!!isLocked || readOnly}
+          locked={!!isLocked || readOnly}
           showColorPicker={true}
           getNodeColumns={getColumnInfos}
           allowedDataTypes={['string']}
           originalCount={displayNodeCount}
-          lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+          lockedMessage={readOnly ? 'Viewing a saved snapshot — selection is frozen.' : ANALYSIS_LOCKED_MESSAGE}
         />
 
         <TokensColumnMismatchNotice
@@ -180,6 +194,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 type="text"
                 value={searchWord}
                 onChange={(e) => setSearchWord(e.target.value)}
+                disabled={readOnly}
                 placeholder={
                   searchMode === 'tokens'
                     ? 'One or more tokens, separated by space, comma, or |'
@@ -195,6 +210,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                   type="number"
                   value={numLeftTokens}
                   onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 0)}
+                  disabled={readOnly}
                   min="0"
                   max="50"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
@@ -206,6 +222,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                   type="number"
                   value={numRightTokens}
                   onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 0)}
+                  disabled={readOnly}
                   min="0"
                   max="50"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
@@ -232,7 +249,8 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                   role="radio"
                   aria-checked={searchMode === 'regex'}
                   onClick={() => setSearchMode('regex')}
-                  className={`px-3 py-1 text-xs transition-colors ${
+                  disabled={readOnly}
+                  className={`px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                     searchMode === 'regex'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-background text-foreground hover:bg-muted'
@@ -254,7 +272,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                     onClick={() => {
                       if (tokensModeAvailable) setSearchMode('tokens');
                     }}
-                    disabled={!tokensModeAvailable}
+                    disabled={!tokensModeAvailable || readOnly}
                     className={`border-l border-input px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                       searchMode === 'tokens'
                         ? 'bg-primary text-primary-foreground'
@@ -273,7 +291,8 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 <select
                   value={tokensModel ?? ''}
                   onChange={(e) => setTokensModel(e.target.value || null)}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                  disabled={readOnly}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   aria-label="Tokens-mode model"
                   title="Pick which tokeniser's column to walk"
                 >
@@ -301,7 +320,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                     type="checkbox"
                     checked={wholeWord}
                     onChange={(e) => setWholeWord(e.target.checked)}
-                    disabled={regex || searchMode === 'tokens'}
+                    disabled={regex || searchMode === 'tokens' || readOnly}
                     className="h-4 w-4"
                   />
                   <span className="text-sm text-foreground">Whole word</span>
@@ -320,7 +339,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                   <input
                     type="checkbox"
                     checked={regex}
-                    disabled={searchMode === 'tokens'}
+                    disabled={searchMode === 'tokens' || readOnly}
                     onChange={(e) => {
                       const nextRegex = e.target.checked;
                       setRegex(nextRegex);
@@ -340,6 +359,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 type="checkbox"
                 checked={caseSensitive}
                 onChange={(e) => setCaseSensitive(e.target.checked)}
+                disabled={readOnly}
                 className="h-4 w-4"
               />
               <span className="text-sm text-foreground">Case sensitive</span>
@@ -348,37 +368,41 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
         </div>
       </CardContent>
       <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
-        <DisabledReasonTooltip reason={runDisabledReason}>
-          <Button
-            onClick={() => {
-              void handleRunOrUpdate();
-            }}
-            disabled={
-              actionState.runDisabled
-              || !searchWord.trim()
-              || effectiveNodeColumnSelections.some((sel) => !sel.column)
-            }
-            className="w-full md:w-auto"
-          >
-            {isSearching ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
-            ) : (
-              <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
-            )}
-          </Button>
-        </DisabledReasonTooltip>
+        {!readOnly && (
+          <>
+            <DisabledReasonTooltip reason={runDisabledReason}>
+              <Button
+                onClick={() => {
+                  void handleRunOrUpdate();
+                }}
+                disabled={
+                  actionState.runDisabled
+                  || !searchWord.trim()
+                  || effectiveNodeColumnSelections.some((sel) => !sel.column)
+                }
+                className="w-full md:w-auto"
+              >
+                {isSearching ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
+                ) : (
+                  <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
+                )}
+              </Button>
+            </DisabledReasonTooltip>
 
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={handleClearResults}
-            variant="destructive"
-            disabled={actionState.clearDisabled}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Clear Results
-          </Button>
-          <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
-        </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleClearResults}
+                variant="destructive"
+                disabled={actionState.clearDisabled}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Clear Results
+              </Button>
+              <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
+            </div>
+          </>
+        )}
         <PageSizeSelect
           value={globalPageSize}
           onChange={(newSize) => {
@@ -390,7 +414,13 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
               });
               return updated;
             });
-            void persistResultPreferences({ pageSize: newSize });
+            // Snapshot mode: pagination is client-side over the
+            // captured rows, so we don't push the new size to the
+            // server. ``persistResultPreferences`` would 404 against
+            // a workspace the snapshot's task no longer lives in.
+            if (!readOnly) {
+              void persistResultPreferences({ pageSize: newSize });
+            }
           }}
         />
       </CardFooter>

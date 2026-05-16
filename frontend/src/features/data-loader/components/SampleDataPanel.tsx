@@ -17,7 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { DemoSnapshotsTab } from './DemoSnapshotsTab';
 
 const TOOL_LABELS: Record<string, string> = {
   'concordance': 'Concordance',
@@ -174,84 +176,102 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Import sample data</DialogTitle>
+            <DialogTitle>Import sample content</DialogTitle>
             <DialogDescription>
-              Select the datasets you want to import. Bundled datasets are copied instantly; larger remote datasets download in the background.
+              Datasets are raw corpora; demo snapshots are pre-built analyses you can open in any tool.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-2">
-            {isLoading && (
-              <div className="space-y-2">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            )}
+          <Tabs defaultValue="datasets" className="py-2">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="datasets">Datasets</TabsTrigger>
+              <TabsTrigger value="snapshots">Demo snapshots</TabsTrigger>
+            </TabsList>
 
-            {!isLoading && catalogue && (
-              <div className="rounded-md border divide-y">
-                {catalogue.collections.map((col) => {
-                  const readme = readmePath(col);
-                  return (
-                    <div key={col.id} className="flex flex-col gap-1.5 px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id={`sdc-${col.id}`}
-                          checked={getChecked(col)}
-                          disabled={col.bundled}
-                          onCheckedChange={() => toggle(col.id)}
-                        />
-                        <label
-                          htmlFor={`sdc-${col.id}`}
-                          className="flex-1 text-sm font-medium leading-none cursor-pointer select-none"
-                        >
-                          {col.name}
-                        </label>
-                        {readme && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
-                            aria-label={`View README for ${col.name}`}
-                            title="View README"
-                            onClick={() => setViewingReadme({ path: readme, name: col.name })}
+            <TabsContent value="datasets" className="space-y-3">
+              {isLoading && (
+                <div className="space-y-2">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              )}
+
+              {!isLoading && catalogue && (
+                <div className="rounded-md border divide-y">
+                  {catalogue.collections.map((col) => {
+                    const readme = readmePath(col);
+                    return (
+                      <div key={col.id} className="flex flex-col gap-1.5 px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id={`sdc-${col.id}`}
+                            checked={getChecked(col)}
+                            disabled={col.bundled}
+                            onCheckedChange={() => toggle(col.id)}
+                          />
+                          <label
+                            htmlFor={`sdc-${col.id}`}
+                            className="flex-1 text-sm font-medium leading-none cursor-pointer select-none"
                           >
-                            <Quote className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        <span className="text-xs text-muted-foreground">{formatBytes(col.total_size_bytes)}</span>
-                        <StatusChip status={col.status} />
-                      </div>
-                      {col.recommended_for.length > 0 && (
-                        <div className="flex flex-wrap gap-1 pl-6">
-                          {col.recommended_for.map((tool) => (
-                            <Badge key={tool} variant="secondary" className="text-xs">
-                              {TOOL_LABELS[tool] ?? tool}
-                            </Badge>
-                          ))}
+                            {col.name}
+                          </label>
+                          {readme && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                              aria-label={`View README for ${col.name}`}
+                              title="View README"
+                              onClick={() => setViewingReadme({ path: readme, name: col.name })}
+                            >
+                              <Quote className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <span className="text-xs text-muted-foreground">{formatBytes(col.total_size_bytes)}</span>
+                          <StatusChip status={col.status} />
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                        {col.recommended_for.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pl-6">
+                            {col.recommended_for.map((tool) => (
+                              <Badge key={tool} variant="secondary" className="text-xs">
+                                {TOOL_LABELS[tool] ?? tool}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-            {!isLoading && isError && (
-              <p className="text-sm text-muted-foreground">
-                Could not load catalogue. All bundled datasets will be imported.
-              </p>
-            )}
-          </div>
+              {!isLoading && isError && (
+                <p className="text-sm text-muted-foreground">
+                  Could not load catalogue. All bundled datasets will be imported.
+                </p>
+              )}
+
+              <div className="flex justify-end">
+                <Button onClick={handleImport} disabled={importing || (!isError && !anyChecked)}>
+                  <FolderPlus className="mr-2 h-4 w-4" />
+                  {importing ? 'Importing…' : 'Import selected'}
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="snapshots">
+              <DemoSnapshotsTab
+                authHeaders={authHeaders}
+                onImportComplete={() => { /* keep dialog open; the toast confirms */ }}
+                enabled={open}
+              />
+            </TabsContent>
+          </Tabs>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={importing}>
-              Cancel
-            </Button>
-            <Button onClick={handleImport} disabled={importing || (!isError && !anyChecked)}>
-              <FolderPlus className="mr-2 h-4 w-4" />
-              {importing ? 'Importing…' : 'Import selected'}
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

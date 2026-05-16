@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Play, Trash2 } from 'lucide-react';
+import { SnapshotActions } from '@/features/snapshot-view/components/SnapshotActions';
+import type { SnapshotToolKey } from '@/features/snapshot-view';
 
 type HelpConfig = {
   targetKey: string;
@@ -18,6 +20,22 @@ type AnalysisCardLayoutProps = {
   help?: HelpConfig;
   tone?: 'default' | 'error';
   headerActions?: React.ReactNode;
+  /** Snapshot-feature wiring. When ``tool`` is set, the layout renders
+   * the shared <SnapshotActions> Save/Load buttons next to
+   * ``headerActions`` (or in their place when no other header actions
+   * exist). Same prop surface as <AnalysisFeatureHeader>; pulled here
+   * so quotation / token-freq / sequential / topic-modelling can adopt
+   * snapshots without restructuring their existing card layout. */
+  snapshot?: {
+    tool: SnapshotToolKey;
+    onSave?: (filename: string, description: string) => Promise<void>;
+    saveDisabledReason?: string | null;
+    onOpen?: (filename: string) => Promise<void>;
+    /** Display labels of the currently-selected data blocks. Forwarded
+     * to <SnapshotActions> so the Save dialog pre-populates the
+     * filename with something more useful than ``demo-{date}``. */
+    nodeLabels?: string[];
+  };
   actions?: {
     onRun: () => void | Promise<void>;
     onClear: () => void | Promise<void>;
@@ -43,6 +61,7 @@ export function AnalysisCardLayout({
   help,
   tone = 'default',
   headerActions,
+  snapshot,
   actions,
   children,
   footer,
@@ -74,7 +93,25 @@ export function AnalysisCardLayout({
               />
             ) : null}
           </CardTitle>
-          {headerActions ? <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">{headerActions}</div> : null}
+          {(headerActions || snapshot) ? (
+            <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
+              {headerActions}
+              {snapshot ? (
+                <div
+                  className="flex items-center gap-2"
+                  data-testid="analysis-card-snapshot-actions"
+                >
+                  <SnapshotActions
+                    tool={snapshot.tool}
+                    onSave={snapshot.onSave}
+                    disabledReason={snapshot.saveDisabledReason}
+                    onOpenSnapshot={snapshot.onOpen}
+                    nodeLabels={snapshot.nodeLabels}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </CardHeader>
 

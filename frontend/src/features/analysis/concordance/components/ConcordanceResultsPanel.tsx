@@ -109,6 +109,12 @@ export type ConcordanceResultsPanelProps = {
       matchCaseInsensitive?: boolean;
     },
   ) => Promise<void> | void;
+  /** Snapshot-view flag: when true, the node blocks render the
+   * captured rows + bins but every mutation surface (Process All,
+   * Add to Workspace, Dispersion Detach) is disabled. Pagination,
+   * sort, dispersion re-binning, and exports still work because
+   * they operate on the in-memory captured data. */
+  readOnly?: boolean;
 };
 
 export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = ({
@@ -170,6 +176,7 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
   handleMaterialize,
   openDetachDialog,
   onDispersionDetach,
+  readOnly = false,
 }) => {
   const showDispersion = concordanceView === 'dispersion';
 
@@ -378,6 +385,7 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
                     handleMaterialize,
                     setCombinedPage,
                     openDetachDialog,
+                    readOnly,
                   };
                   return concordanceView === 'dispersion' ? (
                     <ConcordanceDispersionNodeBlock

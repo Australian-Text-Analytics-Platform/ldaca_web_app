@@ -19,6 +19,7 @@ import { useCallback } from 'react';
 import JSZip from 'jszip';
 import { concordanceApi } from '@/api/text/concordance';
 import type {
+  ConcordanceAnalysisRequest,
   ConcordanceAnalysisResponse,
   ConcordanceDispersionBinsResponse,
 } from '@/api/text/concordance';
@@ -35,15 +36,19 @@ import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelection
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
 const DISPERSION_BINS_PAYLOAD_PATH = 'tables/dispersion-bins.json';
+const SETTINGS_PAYLOAD_PATH = 'settings.json';
 
 export interface UseConcordanceSnapshotCaptureInput {
   workspaceId: string | null;
   workspaceName: string;
   taskId: string;
-  /** Snapshot of the in-memory request that produced the current
-   * result. Embedded verbatim in the bundle under ``settings.json``
-   * so the load flow can reconstruct the exact form values. */
-  request: Record<string, unknown> | null;
+  /** The actual ``ConcordanceAnalysisRequest`` that produced the
+   * current result. Embedded verbatim in the bundle under
+   * ``settings.json`` so the load flow can reconstruct the exact
+   * form values (search word, regex flag, context widths, node
+   * column mapping, etc.) and feed them back into the live
+   * <ConcordanceParameterPanel> in read-only mode. */
+  request: ConcordanceAnalysisRequest | null;
   selectedNodes: readonly WorkspaceNodeLike[];
   /** Returns total rows for a selected node. Each block is checked
    * independently against ``SNAPSHOT_CAPS.demo.maxSourceRowsPerBlock``
@@ -72,9 +77,9 @@ function perBlockRowCounts(
 
 function buildConcordancePreview(
   resp: ConcordanceAnalysisResponse,
-  request: Record<string, unknown> | null,
+  request: ConcordanceAnalysisRequest | null,
 ): SnapshotManifest['preview'] {
-  const searchTerm = (request?.search_word as string | undefined) ?? '';
+  const searchTerm = request?.search_word ?? '';
   let totalHits = 0;
   let displayColumns: string[] = [];
   let materialised = false;
@@ -151,16 +156,41 @@ export function useConcordanceSnapshotCapture(
       // DISPERSION_DISPLAY_BIN_COUNTS = [4, 5, 10, 20, 25, 50, 100]
       // so the bin-count selector in the snapshot UI works without
       // re-engaging the backend (concordanceViewModels.ts:182-189).
+      //
+      // Always force ``combined: false`` here so the response carries
+      // per-node entries with their ``materialized: true`` flag,
+      // independently of which view mode the user is currently in. If
+      // the user was in combined view, we fire a second request with
+      // ``combined: true`` below to also capture the ``__COMBINED__``
+      // entry — the snapshot then ships both, and the Snapshot view
+      // can toggle Separated/Combined locally without re-engaging the
+      // backend.
       const validNodeIds = selectedNodes
         .map((n) => n.id ?? (n.node_id as string | undefined))
         .filter((id): id is string => Boolean(id));
 
-      const [fullResult, ...binResults] = await Promise.all([
+      const wasCombined = request?.combined === true;
+
+      const [perNodeResult, combinedResult, ...binResults] = await Promise.all([
         concordanceApi.postConcordanceTaskResult(
           taskId,
-          { page_size: 'all', update_only: false },
+          { page_size: 'all', update_only: false, combined: false },
           headers,
         ),
+        wasCombined
+          ? concordanceApi
+              .postConcordanceTaskResult(
+                taskId,
+                { page_size: 'all', update_only: false, combined: true },
+                headers,
+              )
+              .catch((err: unknown) => {
+                // Combined fetch is best-effort — if it fails, the
+                // snapshot still ships per-node entries.
+                console.warn('Snapshot capture: combined fetch failed', err);
+                return null;
+              })
+          : Promise.resolve(null),
         ...validNodeIds.map((id) =>
           concordanceApi
             .getConcordanceTaskDispersionBins(taskId, id, headers)
@@ -187,7 +217,7 @@ export function useConcordanceSnapshotCapture(
       // result payload must be the flat materialised shape, otherwise
       // the load-side viewer can't render it.
       const unmaterialised = validNodeIds.filter(
-        (id) => !fullResult.data?.[id]?.materialized,
+        (id) => !perNodeResult.data?.[id]?.materialized,
       );
       if (unmaterialised.length > 0) {
         throw captureError(
@@ -198,16 +228,28 @@ export function useConcordanceSnapshotCapture(
         );
       }
 
+      // Merge per-node + __COMBINED__ entries into a single data map
+      // so the snapshot's Separated/Combined tab toggle has both views
+      // pre-rendered. ``combinedResult`` only contains __COMBINED__
+      // when the user was originally in combined mode.
+      const mergedData = { ...perNodeResult.data };
+      const combinedEntry = combinedResult?.data?.__COMBINED__;
+      if (combinedEntry) mergedData.__COMBINED__ = combinedEntry;
+      const fullResult = { ...perNodeResult, data: mergedData };
+
       // Compose the manifest.
       const nodeColours = useNodeColorsStore.getState().colors;
       const nodeColorsForSnapshot: Record<string, string> = {};
       const nodeIds: string[] = [];
       const nodeLabels: string[] = [];
+      const perBlockRows: number[] = [];
       for (const node of selectedNodes) {
         const id = node.id ?? node.node_id;
         if (!id) continue;
         nodeIds.push(id);
         nodeLabels.push(node.name ?? id);
+        const rows = getNodeRowCount(node);
+        perBlockRows.push(Number.isFinite(rows) ? rows : 0);
         const colour = nodeColours[id];
         if (colour) nodeColorsForSnapshot[id] = colour;
       }
@@ -226,6 +268,7 @@ export function useConcordanceSnapshotCapture(
           workspace_name: workspaceName,
           node_ids: nodeIds,
           node_labels: nodeLabels,
+          per_block_rows: perBlockRows,
           total_source_rows: totalSourceRows,
         },
         capabilities: {
@@ -239,6 +282,9 @@ export function useConcordanceSnapshotCapture(
         payloads: [
           { kind: 'result', path: RESULT_PAYLOAD_PATH },
           { kind: 'dispersion-bins', path: DISPERSION_BINS_PAYLOAD_PATH },
+          ...(request
+            ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const)
+            : []),
         ],
         node_colors: nodeColorsForSnapshot,
       };
@@ -255,7 +301,7 @@ export function useConcordanceSnapshotCapture(
       zip.file(RESULT_PAYLOAD_PATH, JSON.stringify(fullResult.data ?? {}));
       zip.file(DISPERSION_BINS_PAYLOAD_PATH, JSON.stringify(binsPayload));
       if (request) {
-        zip.file('settings.json', JSON.stringify(request, null, 2));
+        zip.file(SETTINGS_PAYLOAD_PATH, JSON.stringify(request, null, 2));
       }
       if (description.trim()) {
         zip.file('description.md', description);

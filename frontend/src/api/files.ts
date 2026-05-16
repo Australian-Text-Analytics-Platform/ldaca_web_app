@@ -86,6 +86,54 @@ export interface ImportSampleDataResponse {
   remote_download_started: boolean;
 }
 
+// ── Demo-snapshot catalogue ─────────────────────────────────────────────
+//
+// Parallel to the sample-data catalogue. Each entry is a single
+// ``.ldaca-snapshot`` bundle hosted under ``demo_snapshots/`` in the
+// sample-data repo. The frontend renders these as a second tab in the
+// import dialog; importing writes the bundle into the user's snapshot
+// folder so each tool's Load dialog discovers it automatically.
+
+export type DemoSnapshotStatus = 'downloaded' | 'not_downloaded' | 'conflict';
+
+export interface DemoSnapshotEntry {
+  id: string;
+  filename: string;
+  path: string;
+  tool: string;
+  name: string;
+  description: string;
+  size: number;
+  sha256: string;
+  tool_version?: string | null;
+  recommended_dataset?: string | null;
+  status: DemoSnapshotStatus;
+}
+
+export interface DemoSnapshotsCatalogueResponse {
+  schema_version: number;
+  snapshots: DemoSnapshotEntry[];
+}
+
+export type DemoSnapshotImportStatus =
+  | 'imported'
+  | 'replaced'
+  | 'skipped_existing'
+  | 'skipped_conflict'
+  | 'failed';
+
+export interface DemoSnapshotImportResult {
+  id: string;
+  filename: string;
+  status: DemoSnapshotImportStatus;
+  message?: string | null;
+}
+
+export interface ImportDemoSnapshotsResponse {
+  results: DemoSnapshotImportResult[];
+  snapshot_dir: string;
+}
+
 export const filesApi = {
   list: (headers: Record<string, string> = {}) =>
     get<FileTreeNode[]>('/files/', headers),
@@ -134,6 +182,20 @@ export const filesApi = {
 
   importSampleData: (collectionIds: string[] = [], headers: Record<string, string> = {}) =>
     post<ImportSampleDataResponse>('/files/import-sample-data', { collection_ids: collectionIds }, headers),
+
+  getDemoSnapshotsCatalogue: (headers: Record<string, string> = {}) =>
+    get<DemoSnapshotsCatalogueResponse>('/files/demo-snapshots/catalogue', headers),
+
+  importDemoSnapshots: (
+    snapshotIds: string[] = [],
+    replaceIds: string[] = [],
+    headers: Record<string, string> = {},
+  ) =>
+    post<ImportDemoSnapshotsResponse>(
+      '/files/import-demo-snapshots',
+      { snapshot_ids: snapshotIds, replace_ids: replaceIds },
+      headers,
+    ),
 
   importLdaca: (url: string, headers: Record<string, string> = {}) =>
     post<LdacaImportStartResponse>('/files/import-ldaca', { url }, headers),

@@ -5,7 +5,18 @@ import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWork
 import { useAuth } from '@/hooks/useAuth';
 import { takeMostRecent } from '@/utils/selectionUtils';
 // Updated to use modular API object pattern
-import { textApi, type TopicModelingResponse, type TopicModelingTopic } from '@/api/text';
+import { textApi, type TopicModelingRequest, type TopicModelingResponse, type TopicModelingTopic } from '@/api/text';
+import {
+  isSnapshotMode,
+  useSnapshotViewStore,
+  useToolSnapshotMode,
+  type LoadedSnapshot,
+} from '@/features/snapshot-view';
+import { useTopicModelingSnapshotCapture } from './hooks/useTopicModelingSnapshotCapture';
+import { useTopicModelingSnapshotLoad } from './hooks/useTopicModelingSnapshotLoad';
+import type { TopicModelingSnapshotPayload } from './hooks/useTopicModelingSnapshotLoad';
+import { TopicModelingSnapshotBanner } from './components/TopicModelingSnapshotBanner';
+import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
@@ -36,7 +47,7 @@ const DEFAULT_TOPIC_SIZE_VALUE = 20;
 
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
-  const { currentWorkspaceId } = useWorkspaceData();
+  const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
   const {
@@ -49,7 +60,7 @@ const TopicModelingFeature: React.FC = () => {
     recomputeAutoColumns,
     activeNodeIds,
     activeNodeColumnSelections,
-    panelSelectedNodes,
+    panelSelectedNodes: livePanelSelectedNodes,
     serverRequest,
   } = useAnalysisLock({
     analysisType: 'topic_modeling',
@@ -59,6 +70,35 @@ const TopicModelingFeature: React.FC = () => {
     maxNodes: 2,
     docTypeOnly: true,
   });
+
+  // Snapshot view state hooks. Hoisted early so the effective-value
+  // dispatch can shadow ``panelSelectedNodes`` / ``result`` /
+  // parameter state in one place. The rest of the component reads
+  // the shadowed names and naturally picks up snapshot data when in
+  // snapshot mode.
+  const snapshotMode = useToolSnapshotMode('topic_modeling');
+  const loadedSnapshot = useSnapshotViewStore(
+    (s) => s.snapshots.topic_modeling,
+  ) as LoadedSnapshot<TopicModelingSnapshotPayload> | null;
+  const inSnapshotMode = isSnapshotMode(snapshotMode) && loadedSnapshot != null;
+
+  const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
+    const {
+      node_ids,
+      node_labels,
+      per_block_rows,
+      total_source_rows,
+    } = loadedSnapshot.manifest.source;
+    const evenSplit =
+      node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
+    return node_ids.map((id, idx) => ({
+      id,
+      node_id: id,
+      name: node_labels[idx] ?? id,
+      shape: [per_block_rows?.[idx] ?? evenSplit, 0] as [number, number],
+    }));
+  }, [inSnapshotMode, loadedSnapshot, livePanelSelectedNodes]);
 
   const typedServerRequest = serverRequest as
     | {
@@ -76,7 +116,16 @@ const TopicModelingFeature: React.FC = () => {
   const setTasks = useAnalysisStore((state) => state.setTasks);
   const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const [error, setError] = useState<string | null>(null);
-  const [result, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
+  const [liveResult, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
+
+  // Shadow ``result`` so all downstream derivations (topics list,
+  // bubble chart, summary panels) pick up snapshot data without
+  // per-call-site dispatch. ``setResultSafely`` still targets the
+  // live state — the snapshot store owns its own slice. Plain
+  // expression so the React Compiler can decide memoization without
+  // a manual hint on a refinement-style dispatch.
+  const result: TopicModelingResponse | null =
+    inSnapshotMode && loadedSnapshot ? loadedSnapshot.payload.result : liveResult;
   
   const [corpusSamples, setCorpusSamples] = useState<CorpusSample[]>([]);
   // Sample values reset on data-block change (auto-populate) but persist
@@ -202,6 +251,7 @@ const TopicModelingFeature: React.FC = () => {
     });
 
   const handleClear = async () => {
+    if (inSnapshotMode) return;
     setIsClearing(true);
     await clearResults();
     setSelectedTopicIds(new Set());
@@ -294,13 +344,27 @@ const TopicModelingFeature: React.FC = () => {
   // ``tabKey`` routes colour changes through the per-tab temp layer
   // (commit on Run via ``promoteTempColors`` below).
   const topicActiveNodeIds = takeMostRecent(panelNodeIds, 2);
-  const { nodeColors, handleColorChange, defaultPalette: _dp, promoteTempColors } =
+  const { nodeColors: liveNodeColors, handleColorChange, defaultPalette: _dp, promoteTempColors } =
     useNodeColorManagement({
       activeNodeIds: topicActiveNodeIds,
       tabKey: 'topic-modeling',
     });
+  // In snapshot mode the live colour store has no entries for the
+  // captured node IDs. Shadow with the frozen ``manifest.node_colors``
+  // so the parameter-panel swatch and the bubble-chart corpus colours
+  // honour the captured values.
+  const nodeColors: Record<string, string> =
+    inSnapshotMode && loadedSnapshot ? loadedSnapshot.manifest.node_colors : liveNodeColors;
 
-  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+  const effectiveNodeColumnSelections = useMemo(() => {
+    if (inSnapshotMode && loadedSnapshot?.payload.settings) {
+      const settings = loadedSnapshot.payload.settings;
+      const nodeIds = Array.isArray(settings.node_ids) ? settings.node_ids : [];
+      const cols = settings.node_columns ?? {};
+      return nodeIds.map((id) => ({ nodeId: id, column: cols[id] ?? '' }));
+    }
+    return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+  }, [inSnapshotMode, loadedSnapshot, isLocked, activeNodeColumnSelections, nodeColumnSelections]);
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -372,21 +436,69 @@ const TopicModelingFeature: React.FC = () => {
   // Color assignment now handled by stack allocator - no auto-fill effect needed
 
   useEffect(() => {
+    if (inSnapshotMode) return;
     if (!isLocked && panelNodeIds.length > 0 && nodeColumnSelections.length === 0) {
       recomputeAutoColumns();
     }
-  }, [isLocked, panelNodeIdsKey, nodeColumnSelections.length, recomputeAutoColumns, panelNodeIds.length]);
+  }, [inSnapshotMode, isLocked, panelNodeIdsKey, nodeColumnSelections.length, recomputeAutoColumns, panelNodeIds.length]);
 
   // Auto-populate sampling fractions when selected nodes change, and treat
   // these auto-values as not-user-set so Clear Results can re-derive them.
+  // Skipped in snapshot mode — the snapshot-load sync below hydrates these
+  // from the captured request instead.
   useEffect(() => {
+    if (inSnapshotMode) return;
     setCorpusSamples(computeDefaultCorpusSamples());
     setCorpusSamplesUserSet(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelNodeIdsKey]);
+  }, [inSnapshotMode, panelNodeIdsKey]);
+
+  // Hydrate the parameter-panel state from the loaded snapshot when
+  // entering snapshot mode. Inputs are disabled in snapshot mode
+  // (via ``inputsDisabled`` on the panel), so once synced the values
+  // stay frozen for the duration of the view.
+  useEffect(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return;
+    const settings = loadedSnapshot.payload.settings;
+    if (!settings) return;
+    if (typeof settings.random_seed === 'number') {
+      setRandomSeed(settings.random_seed);
+      setRandomSeedUserSet(true);
+    }
+    if (typeof settings.representative_words_count === 'number') {
+      setRepresentativeWordsCount(settings.representative_words_count);
+      setRepresentativeWordsCountUserSet(true);
+    }
+    if (settings.topic_size_mode === 'min') {
+      setTopicSizeMode('min');
+    } else {
+      setTopicSizeMode('exact');
+    }
+    if (typeof settings.topic_size_value === 'number') {
+      setTopicSizeValue(settings.topic_size_value);
+      setReferenceTopicNo(settings.topic_size_value);
+      setTopicSizeUserSet(true);
+    }
+    // Rehydrate sampling fractions: capture ships ``sample_fractions``
+    // aligned with the captured ``node_ids``. ``null`` entries mean
+    // "no sampling" for that block → enabled=false, percent=100.
+    const nodeIds = Array.isArray(settings.node_ids) ? settings.node_ids : [];
+    const sf = Array.isArray(settings.sample_fractions) ? settings.sample_fractions : [];
+    const samples: CorpusSample[] = nodeIds.slice(0, 2).map((_, idx) => {
+      const v = sf[idx];
+      if (typeof v === 'number' && v > 0 && v < 1) {
+        return { percent: String(Math.round(v * 100)), enabled: true };
+      }
+      return { percent: '100', enabled: false };
+    });
+    setCorpusSamples(samples);
+    setCorpusSamplesUserSet(true);
+    setSelectedTopicIds(new Set());
+    setTopicSearchQuery('');
+  }, [inSnapshotMode, loadedSnapshot]);
 
   const handleColumnChange = (nodeId: string, column: string) => {
-    if (isLocked) return;
+    if (isLocked || inSnapshotMode) return;
     setNodeColumnSelection(nodeId, column);
   };
 
@@ -645,6 +757,7 @@ const TopicModelingFeature: React.FC = () => {
   });
 
   const handleRunOrUpdate = async () => {
+    if (inSnapshotMode) return;
     // Promote this tab's pending temp colours to assigned — Run is the
     // commit trigger per the node-colour strategy doc.
     promoteTempColors(topicActiveNodeIds);
@@ -656,6 +769,7 @@ const TopicModelingFeature: React.FC = () => {
   };
 
   const handleUpdateExactTopicCount = async (value: number) => {
+    if (inSnapshotMode) return;
     if (topicSizeMode !== 'exact') return;
     const taskId = await resolveTaskId();
     if (!taskId) {
@@ -693,8 +807,68 @@ const TopicModelingFeature: React.FC = () => {
 
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
 
+  // ----- Snapshot capture + load wiring -----
+  const handleOpenSnapshot = useTopicModelingSnapshotLoad();
+
+  const getTopicNodeRowCount = (node: WorkspaceNodeLike) => {
+    const shape = node.shape as unknown;
+    if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
+    return 0;
+  };
+
+  // Build the live ``TopicModelingRequest`` from current state for the
+  // capture-side ``settings.json`` payload. Returns null in snapshot
+  // mode (the Save button is disabled there anyway).
+  const captureRequest: TopicModelingRequest | null = (() => {
+    if (inSnapshotMode) return null;
+    if (panelNodeIds.length === 0) return null;
+    const nodeColumns: Record<string, string> = {};
+    for (const sel of effectiveNodeColumnSelections) {
+      if (sel.column) nodeColumns[sel.nodeId] = sel.column;
+    }
+    return {
+      node_ids: panelNodeIds,
+      node_columns: nodeColumns,
+      random_seed: randomSeed,
+      representative_words_count: representativeWordsCount,
+      sample_fractions: hasAnySampling ? sampleFractionsForRequest : null,
+      topic_size_mode: topicSizeMode,
+      topic_size_value: topicSizeValue,
+    };
+  })();
+
+  const handleSaveSnapshot = useTopicModelingSnapshotCapture({
+    workspaceId: currentWorkspaceId,
+    workspaceName: currentWorkspace?.name ?? currentWorkspaceId ?? '(workspace)',
+    request: captureRequest,
+    results: liveResult,
+    selectedNodes: livePanelSelectedNodes,
+    getNodeRowCount: getTopicNodeRowCount,
+    getAuthHeaders,
+  });
+
+  const saveSnapshotDisabledReason = (() => {
+    if (inSnapshotMode) {
+      return 'Exit snapshot view first to capture a new snapshot from live results.';
+    }
+    if (livePanelSelectedNodes.length === 0) {
+      return 'Select a data block first.';
+    }
+    const largestBlock = livePanelSelectedNodes
+      .map(getTopicNodeRowCount)
+      .reduce((max, n) => (Number.isFinite(n) && n > max ? n : max), 0);
+    if (largestBlock > 2_000) {
+      return `Demo snapshots cap each selected data block at 2,000 rows; largest selected block has ${largestBlock.toLocaleString()}.`;
+    }
+    if (!liveResult || liveResult.state !== 'successful') {
+      return 'Run the topic modelling analysis (and let it finish) before saving a snapshot.';
+    }
+    return undefined;
+  })();
+
   return (
     <div className="space-y-4">
+      {inSnapshotMode && <TopicModelingSnapshotBanner />}
       <TopicModelingParameterPanel
         selectedNodes={panelSelectedNodes}
         nodeColumnSelections={effectiveNodeColumnSelections}
@@ -702,7 +876,22 @@ const TopicModelingFeature: React.FC = () => {
         nodeColors={nodeColors}
         onNodeColorChange={handleColorChange}
         defaultPalette={defaultPalette}
-        isLocked={!!isLocked}
+        isLocked={!!isLocked || inSnapshotMode}
+        lockedMessage={
+          inSnapshotMode
+            ? 'Viewing a saved snapshot — selection is frozen.'
+            : undefined
+        }
+        snapshot={{
+          tool: 'topic_modeling',
+          onSave: handleSaveSnapshot,
+          saveDisabledReason: saveSnapshotDisabledReason,
+          onOpen: handleOpenSnapshot,
+          nodeLabels: livePanelSelectedNodes
+            .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
+            .filter((s) => s.length > 0),
+        }}
+        inputsDisabled={inSnapshotMode}
         getNodeColumns={getColumnInfos}
         actionState={actionState}
         corpusSamples={corpusSamples}
@@ -728,9 +917,16 @@ const TopicModelingFeature: React.FC = () => {
         representativeWordsCount={representativeWordsCount}
         representativeWordsCountUserSet={representativeWordsCountUserSet}
         representativeWordsCountServerMax={
-          isLocked
-            ? Number(typedServerRequest?.representative_words_count) || null
-            : null
+          inSnapshotMode
+            ? Number(loadedSnapshot?.payload.settings?.representative_words_count) || null
+            : isLocked
+              ? Number(typedServerRequest?.representative_words_count) || null
+              : null
+        }
+        representativeWordsCountLockedReason={
+          inSnapshotMode
+            ? `Adjustable up to the ${Number(loadedSnapshot?.payload.settings?.representative_words_count) || '?'} words fitted in this snapshot.`
+            : undefined
         }
         onRepresentativeWordsCountChange={(v) => { setRepresentativeWordsCount(v); setRepresentativeWordsCountUserSet(true); }}
         isRunning={isRunning}
@@ -794,6 +990,7 @@ const TopicModelingFeature: React.FC = () => {
           stopwordFilterLanguage={stopwordFilterLanguageLabel || undefined}
           stopwordFilterSet={stopwordSet}
           stopwordFilterByLanguage={stopwordByLanguage}
+          readOnly={inSnapshotMode}
         />
       )}
       </div>

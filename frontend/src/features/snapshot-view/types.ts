@@ -52,7 +52,14 @@ export interface SnapshotCapabilities {
 export type SnapshotPayloadEntry =
   | { kind: 'result'; path: string }
   | { kind: 'dispersion-bins'; path: string }
-  | { kind: 'source-projection'; path: string; columns: string[] };
+  | { kind: 'source-projection'; path: string; columns: string[] }
+  /** The captured tool-specific request blob (e.g. the
+   * ``ConcordanceAnalysisRequest`` that produced the result). JSON.
+   * Loaders parse it back into the tool's request type so the live
+   * ParameterPanel renders the captured search term / regex flag /
+   * context widths in read-only mode without inventing a parallel
+   * "frozen settings" data path. */
+  | { kind: 'settings'; path: string };
 
 /** Per-tool preview block (plan §2.3.1). Discriminated by ``tool``
  * so adding a new analytic tool means adding one arm here plus a
@@ -113,6 +120,12 @@ export interface SnapshotManifest {
     workspace_name: string;
     node_ids: string[];
     node_labels: string[];
+    /** Per-node row counts at capture time, positionally aligned with
+     * ``node_ids``. Optional for back-compat with bundles captured
+     * before this field landed — loaders that need a per-node figure
+     * fall back to splitting ``total_source_rows`` evenly across the
+     * nodes when this is missing. */
+    per_block_rows?: number[];
     /** Sum of rows across the source nodes at capture. Recorded so
      * loaders can cross-check against the mode's row cap. */
     total_source_rows: number;

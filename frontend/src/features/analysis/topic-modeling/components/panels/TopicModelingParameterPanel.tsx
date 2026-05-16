@@ -17,6 +17,7 @@ import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import type { ColumnInfo } from '@/utils/columnTypes';
 import type { NodeLike } from '@/hooks/useNodeColumnInfos';
 import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
+import type { SnapshotToolKey } from '@/features/snapshot-view';
 
 export type CorpusSample = {
   percent: string;
@@ -54,6 +55,11 @@ type Props = {
    * unlocked (no server-side cap).
    */
   representativeWordsCountServerMax?: number | null;
+  /** Override for the tooltip on the locked "Words per topic" input.
+   * Live mode tells the user how to lift the cap ("Clear Results to
+   * fit with a higher count"); snapshot mode passes its own copy
+   * because Clear Results doesn't apply there. */
+  representativeWordsCountLockedReason?: string;
   onRepresentativeWordsCountChange: (value: number) => void;
   isRunning: boolean;
   isClearing: boolean;
@@ -61,6 +67,29 @@ type Props = {
   onClear: () => void | Promise<void>;
   hasMissingColumns: boolean;
   resultState?: string;
+  /** When true, disables every parameter input on the card (sampling
+   * toggles + %, topic-size mode/value, random seed, words-per-topic).
+   * Snapshot mode passes ``true`` — the captured run's parameters are
+   * displayed read-only, and live Run/Update is gated separately at
+   * the feature level. ``isLocked`` controls only the NodeSelectionPanel
+   * lock; the parameter inputs stay live-editable on lock by design
+   * (the live UI uses them to stage the next Update). */
+  inputsDisabled?: boolean;
+  /** Displayed when the panel is locked. Defaults to the standard
+   * "locked while results loaded" message; snapshot mode passes a
+   * tailored "viewing saved snapshot" string. */
+  lockedMessage?: string;
+  /** Snapshot Save/Load slot. Forwarded straight to the underlying
+   * AnalysisCardLayout, which renders <SnapshotActions> alongside any
+   * other header actions. Mirrors the per-tool wiring used by the
+   * other parameter cards. */
+  snapshot?: {
+    tool: SnapshotToolKey;
+    onSave?: (filename: string, description: string) => Promise<void>;
+    saveDisabledReason?: string | null;
+    onOpen?: (filename: string) => Promise<void>;
+    nodeLabels?: string[];
+  };
 };
 
 export function TopicModelingParameterPanel({
@@ -89,6 +118,7 @@ export function TopicModelingParameterPanel({
   representativeWordsCount,
   representativeWordsCountUserSet,
   representativeWordsCountServerMax = null,
+  representativeWordsCountLockedReason,
   onRepresentativeWordsCountChange,
   isRunning,
   isClearing,
@@ -96,6 +126,9 @@ export function TopicModelingParameterPanel({
   onClear,
   hasMissingColumns,
   resultState,
+  inputsDisabled = false,
+  lockedMessage = ANALYSIS_LOCKED_MESSAGE,
+  snapshot,
 }: Props) {
   const [topicSizeValueDraft, setTopicSizeValueDraft] = useState(() => String(topicSizeValue));
 
@@ -142,6 +175,7 @@ export function TopicModelingParameterPanel({
         label: 'About Topic Modeling',
         tooltip: 'Learn what topic modeling is and how it can help you.',
       }}
+      snapshot={snapshot}
       actions={{
         onRun,
         onClear,
@@ -169,7 +203,7 @@ export function TopicModelingParameterPanel({
         disabled={isLocked}
         locked={isLocked}
         allowedDataTypes={['string']}
-        lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+        lockedMessage={lockedMessage}
         originalCount={selectedNodes.length}
       />
 
@@ -229,7 +263,8 @@ export function TopicModelingParameterPanel({
                     onCorpusSampleChange(idx, { enabled: !sample.enabled })
                   }
                   aria-label={sample.enabled ? 'Disable sampling' : 'Enable sampling'}
-                  className="h-5 w-5 flex-shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  disabled={inputsDisabled}
+                  className="h-5 w-5 flex-shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
                     backgroundColor: sample.enabled ? color : 'transparent',
                     borderColor: color,
@@ -246,7 +281,7 @@ export function TopicModelingParameterPanel({
                   max={100}
                   step={10}
                   value={displayPercent}
-                  disabled={!sample.enabled}
+                  disabled={!sample.enabled || inputsDisabled}
                   className="h-8 w-14 flex-shrink-0 px-1.5 text-center text-sm"
                   onChange={(e) => onCorpusSampleChange(idx, { percent: e.target.value })}
                   onBlur={(e) => {
@@ -290,6 +325,7 @@ export function TopicModelingParameterPanel({
               <Select
                 value={topicSizeMode}
                 onValueChange={(v) => onTopicSizeModeChange(v as 'min' | 'exact')}
+                disabled={inputsDisabled}
               >
                 <SelectTrigger className="h-8 flex-1 text-sm font-medium">
                   <SelectValue />
@@ -316,6 +352,7 @@ export function TopicModelingParameterPanel({
               min={2}
               step={1}
               value={topicSizeValueDraft}
+              disabled={inputsDisabled}
               title={
                 topicSizeWarning === 'red'
                   ? 'Fewer than 3 documents per topic — results will likely be unusable'
@@ -348,6 +385,7 @@ export function TopicModelingParameterPanel({
               min={0}
               step={1}
               value={randomSeed}
+              disabled={inputsDisabled}
               className={`h-8 w-24 text-right text-sm${!randomSeedUserSet ? ' text-muted-foreground' : ''}`}
               onChange={(e) => onRandomSeedChange(Math.max(0, Number(e.target.value) || 0))}
             />
@@ -361,7 +399,8 @@ export function TopicModelingParameterPanel({
             <DisabledReasonTooltip
               reason={
                 isLocked && representativeWordsCountServerMax
-                  ? `Adjustable up to ${representativeWordsCountCap} after modelling. Clear Results to fit with a higher count.`
+                  ? (representativeWordsCountLockedReason
+                    ?? `Adjustable up to ${representativeWordsCountCap} after modelling. Clear Results to fit with a higher count.`)
                   : undefined
               }
             >

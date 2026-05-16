@@ -70,7 +70,10 @@ export interface QuotationDetachOptionsResponse {
 
 export interface QuotationResultQuery {
   page?: number;
-  page_size?: number;
+  /** Accepts the literal ``'all'`` for the snapshot capture path —
+   * server caps at 500 000 rows (see backend
+   * ``SNAPSHOT_ALL_PAGE_SIZE_CAP`` in api/workspaces/analyses/quotation.py). */
+  page_size?: number | 'all';
   sort_by?: string | null;
   descending?: boolean;
   context_length?: number;

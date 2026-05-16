@@ -1,5 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  isSnapshotMode,
+  useSnapshotViewStore,
+  useToolSnapshotMode,
+  type LoadedSnapshot,
+} from '@/features/snapshot-view';
+import { useQuotationSnapshotCapture } from './hooks/useQuotationSnapshotCapture';
+import { useQuotationSnapshotLoad } from './hooks/useQuotationSnapshotLoad';
+import type { QuotationSnapshotPayload } from './hooks/useQuotationSnapshotLoad';
+import { QuotationSnapshotBanner } from './components/QuotationSnapshotBanner';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
@@ -120,9 +130,52 @@ type QuotationDisplayRow = QuotationHitRow & {
   __spans: { start: number; end: number; type: string }[];
 };
 
+/** Normalize a ``QuotationAnalysisResponse`` into the result-state
+ * shape the table view consumes. Hoisted to module scope because the
+ * snapshot-mode dispatch (a ``useMemo`` declared near the top of the
+ * component) needs to call this before the component's own helper
+ * declarations would be in scope. No closure deps — just shape
+ * massaging plus the ``QUOTATION_COLUMN_KEYS`` constants. */
+function buildQuotationResultState(
+  result: QuotationAnalysisResponse,
+  column: string,
+): QuotationResultState {
+  const groupedRows = result.data;
+  const rows = flattenQuotationGroups(groupedRows).map((row) => {
+    const spans: { start: number; end: number; type: string }[] = [];
+    const addSpan = (start?: unknown, end?: unknown, type?: string) => {
+      if (!type) return;
+      const s = Number(start);
+      const e = Number(end);
+      if (Number.isFinite(s) && Number.isFinite(e) && s < e) {
+        spans.push({ start: s, end: e, type });
+      }
+    };
+    addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
+    addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
+    addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
+    return { ...row, __spans: spans };
+  }) as QuotationDisplayRow[];
+
+  const metadata = result.metadata;
+  const columns = metadata.all_columns.slice();
+  const pagination = result.pagination;
+  const sorting = result.sorting;
+
+  return {
+    groupedRows,
+    rows,
+    columns,
+    metadata,
+    pagination,
+    sorting,
+    column,
+  };
+}
+
 const QuotationFeature: React.FC = () => {
   const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
-  const { currentWorkspaceId } = useWorkspaceData();
+  const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
@@ -138,7 +191,7 @@ const QuotationFeature: React.FC = () => {
     setNodeColumnSelections,
     recomputeAutoColumns,
     activeNodeColumnSelections,
-    panelSelectedNodes,
+    panelSelectedNodes: livePanelSelectedNodes,
     displayNodeCount,
     serverRequest,
   } = useAnalysisLock({
@@ -164,7 +217,7 @@ const QuotationFeature: React.FC = () => {
   // Metadata visibility derives from the selected columns: any selection
   // shows the corresponding metadata columns in the results table.
   const showMetadata = selectedMetadataColumns.length > 0;
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [liveHasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [contextLengthInput, setContextLengthInput] = useState(String(DEFAULT_CONTEXT_LENGTH));
@@ -175,12 +228,57 @@ const QuotationFeature: React.FC = () => {
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
   const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
 
+  // Snapshot view state hooks. Hoisted here so the effective-value
+  // dispatch can shadow ``panelSelectedNodes`` / ``displayedNodes`` /
+  // result state in one place; the rest of the component reads the
+  // shadowed names and picks up snapshot data when in snapshot mode.
+  const snapshotMode = useToolSnapshotMode('quotation');
+  const loadedSnapshot = useSnapshotViewStore(
+    (s) => s.snapshots.quotation,
+  ) as LoadedSnapshot<QuotationSnapshotPayload> | null;
+  const inSnapshotMode = isSnapshotMode(snapshotMode) && loadedSnapshot != null;
+
+  // ``panelSelectedNodes`` in snapshot mode is reconstructed from the
+  // captured manifest (the live workspace may not even contain those
+  // nodes any more). Live state is preserved untouched so Exit restores
+  // exactly what the user had on screen before they hit Open.
+  const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
+    const {
+      node_ids,
+      node_labels,
+      per_block_rows,
+      total_source_rows,
+    } = loadedSnapshot.manifest.source;
+    const evenSplit =
+      node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
+    return node_ids.map((id, idx) => ({
+      id,
+      node_id: id,
+      name: node_labels[idx] ?? id,
+      shape: [per_block_rows?.[idx] ?? evenSplit, 0] as [number, number],
+    }));
+  }, [inSnapshotMode, loadedSnapshot, livePanelSelectedNodes]);
+
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
     nodes: panelSelectedNodes,
   });
 
-  const activeSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+  // ``activeSelections`` dispatches to the captured node_columns when
+  // in snapshot mode so the NodeSelectionPanel renders the captured
+  // column even if the live workspace doesn't have it.
+  const activeSelections = useMemo(() => {
+    if (inSnapshotMode && loadedSnapshot?.payload.settings) {
+      const settings = loadedSnapshot.payload.settings;
+      const nodeId = settings.node_id;
+      const column = settings.column;
+      if (nodeId && column) {
+        return [{ nodeId, column }];
+      }
+    }
+    return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+  }, [inSnapshotMode, loadedSnapshot, isLocked, activeNodeColumnSelections, nodeColumnSelections]);
 
   const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
   const activeNodeIds = displayedNodes
@@ -189,12 +287,18 @@ const QuotationFeature: React.FC = () => {
   // ``tabKey`` routes colour changes through this tab's temp layer —
   // see the node-colour strategy doc. ``promoteTempColors`` is called
   // from ``handleRunOrUpdate`` below to commit the preview on Run.
-  const { nodeColors, handleColorChange, defaultPalette, promoteTempColors } =
+  const { nodeColors: liveNodeColors, handleColorChange, defaultPalette, promoteTempColors } =
     useNodeColorManagement({
       activeNodeIds,
       palette: EXTENDED_PALETTE,
       tabKey: 'quotation',
   });
+  // In snapshot mode the live colour store has no entries for the
+  // captured node IDs. Shadow with the frozen ``manifest.node_colors``
+  // so the parameter-panel swatch and downstream lookups read the
+  // captured colour.
+  const nodeColors: Record<string, string> =
+    inSnapshotMode && loadedSnapshot ? loadedSnapshot.manifest.node_colors : liveNodeColors;
 
   // Phase 4.5 / decision 4: quotation rules are English-only. Mirror the
   // backend gate at the UI so the Run button surfaces a clear "why is
@@ -395,7 +499,12 @@ const QuotationFeature: React.FC = () => {
     setContextLengthInput(String(normalized));
     setContextLengthError(null);
 
-    const shouldPersist = Boolean(hasLoaded && currentWorkspaceId && normalized !== contextLength);
+    // In snapshot mode there is no live task to persist to — the
+    // context length still updates locally so the display rebuilds,
+    // but we skip the server roundtrip.
+    const shouldPersist = Boolean(
+      !inSnapshotMode && liveHasLoaded && currentWorkspaceId && normalized !== contextLength,
+    );
     if (!shouldPersist) {
       return;
     }
@@ -436,13 +545,17 @@ const QuotationFeature: React.FC = () => {
     && !quotationLanguageUnsupported;
 
   // Per-node pagination and sorting state
-  const [nodeState, setNodeState] = useState<Record<string, NodePaginationState>>({});
+  const [liveNodeState, setNodeState] = useState<Record<string, NodePaginationState>>({});
+  // Snapshot-mode local pagination/sort state — separate from live so
+  // that toggling page/sort in a snapshot doesn't pollute the live
+  // session. Keyed by node id (same as ``liveNodeState``).
+  const [snapshotNodeState, setSnapshotNodeState] = useState<Record<string, NodePaginationState>>({});
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
-  const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
-  const [materializeSummary, setMaterializeSummary] = useState<{ recordCount: number; uniqueDocuments: number; totalDocuments: number } | null>(null);
+  const [liveMaterializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
+  const [liveMaterializeSummary, setMaterializeSummary] = useState<{ recordCount: number; uniqueDocuments: number; totalDocuments: number } | null>(null);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
   const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
@@ -453,7 +566,116 @@ const QuotationFeature: React.FC = () => {
     selectAllDetachColumns,
     deselectAllDetachColumns,
   } = useDetachColumnsState(detachNodeOptions);
-  const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
+  const [liveResultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
+
+  // Effective-value dispatch. In snapshot mode the captured result
+  // drives ``resultsByNode`` for the single captured node, with
+  // client-side pagination + sort applied below in ``pagedResultsByNode``.
+  // ``materializedPaths`` is hard-coded "present" for the captured node
+  // (we hard-require materialise before save). ``nodeState`` reads the
+  // dedicated snapshot pagination/sort state. Live state stays untouched
+  // so Exit returns the user to where they were.
+  const nodeState = inSnapshotMode ? snapshotNodeState : liveNodeState;
+  const hasLoaded = inSnapshotMode ? true : liveHasLoaded;
+  const materializedPaths = useMemo<Record<string, string>>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return liveMaterializedPaths;
+    const out: Record<string, string> = {};
+    for (const id of loadedSnapshot.manifest.source.node_ids) {
+      out[id] = `snapshot:${id}`;
+    }
+    return out;
+  }, [inSnapshotMode, loadedSnapshot, liveMaterializedPaths]);
+
+  // Effective materialise summary — live state in normal mode, the
+  // captured ``settings.materialize_summary`` block in snapshot mode.
+  // Snake-cased fields from settings.json get re-cased here so the
+  // JSX downstream uses the same camelCase property names regardless
+  // of source.
+  const materializeSummary = useMemo(() => {
+    if (!inSnapshotMode) return liveMaterializeSummary;
+    const captured = loadedSnapshot?.payload.settings?.materialize_summary;
+    if (!captured) return null;
+    return {
+      recordCount: captured.record_count,
+      uniqueDocuments: captured.unique_documents_with_hits,
+      totalDocuments: captured.total_source_documents,
+    };
+  }, [inSnapshotMode, loadedSnapshot, liveMaterializeSummary]);
+
+  // Build the snapshot-mode QuotationResultState from the captured
+  // response, applying client-side pagination + sort the same way
+  // the concordance snapshot loader does. The shape produced here is
+  // what the live JSX reads via ``resultsByNode[nodeId]``.
+  const resultsByNode = useMemo<Record<string, QuotationResultState>>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return liveResultsByNode;
+    const settings = loadedSnapshot.payload.settings;
+    const nodeId = settings?.node_id ?? loadedSnapshot.manifest.source.node_ids[0];
+    const column = settings?.column ?? '';
+    if (!nodeId) return liveResultsByNode;
+
+    const captured = loadedSnapshot.payload.result;
+    const allGroups = captured.data ?? [];
+
+    // Flatten → optional sort by user-clicked column → slice. Matches
+    // the backend materialised path's "sort hits then slice" semantic
+    // so the snapshot view paginates by *hits*, not by source-row
+    // groups, exactly like live mode does after Process All.
+    const allHits: Record<string, unknown>[] = [];
+    for (const group of allGroups) {
+      for (const hit of group) allHits.push(hit);
+    }
+
+    const np = snapshotNodeState[nodeId];
+    const pageSize = np?.pageSize ?? DEFAULT_PAGE_SIZE;
+    const currentPage = np?.currentPage ?? 1;
+    const sortBy = np?.sortBy ?? '';
+    const descending = np?.descending ?? false;
+
+    let workingHits = allHits;
+    if (sortBy && allHits.length > 1) {
+      const dir = descending ? -1 : 1;
+      workingHits = [...allHits].sort((a, b) => {
+        const av = a[sortBy];
+        const bv = b[sortBy];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (typeof av === 'number' && typeof bv === 'number') {
+          return dir * (av - bv);
+        }
+        return dir * String(av).localeCompare(String(bv));
+      });
+    }
+
+    const totalHits = workingHits.length;
+    const totalPages = Math.max(1, Math.ceil(totalHits / pageSize));
+    const startIdx = (currentPage - 1) * pageSize;
+    const pagedHits = workingHits.slice(startIdx, startIdx + pageSize);
+    // Emit each hit as a singleton group — the table renderer flattens
+    // groups via flattenQuotationGroups anyway, so single-hit groups
+    // produce the same rendered output as the original document-grouped
+    // shape (and the proportional dispersion view doesn't apply here).
+    const pagedGroups = pagedHits.map((h) => [h] as typeof allGroups[number]);
+
+    const slicedResponse: QuotationAnalysisResponse = {
+      ...captured,
+      data: pagedGroups,
+      pagination: {
+        page: currentPage,
+        page_size: pageSize,
+        total_source_rows: totalHits,
+        total_source_pages: totalPages,
+        result_count: pagedHits.length,
+        has_next: currentPage < totalPages,
+        has_prev: currentPage > 1,
+      },
+      sorting: { sort_by: sortBy || null, descending },
+    };
+
+    return {
+      [nodeId]: buildQuotationResultState(slicedResponse, column),
+    };
+  }, [inSnapshotMode, loadedSnapshot, snapshotNodeState, liveResultsByNode]);
 
   const hasParamsChanged = hasLockedParameterDiff({
     isLocked,
@@ -507,40 +729,6 @@ const QuotationFeature: React.FC = () => {
   };
 
   const [hoverState, setHoverState] = useState<QuotationHoverState | null>(null);
-
-  const buildQuotationResultState = (result: QuotationAnalysisResponse, column: string): QuotationResultState => {
-    const groupedRows = result.data;
-    const rows = flattenQuotationGroups(groupedRows).map((row) => {
-      const spans: { start: number; end: number; type: string }[] = [];
-      const addSpan = (start?: unknown, end?: unknown, type?: string) => {
-        if (!type) return;
-        const s = Number(start);
-        const e = Number(end);
-        if (Number.isFinite(s) && Number.isFinite(e) && s < e) {
-          spans.push({ start: s, end: e, type });
-        }
-      };
-      addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
-      addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
-      addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
-      return { ...row, __spans: spans };
-    }) as QuotationDisplayRow[];
-
-    const metadata = result.metadata;
-    const columns = metadata.all_columns.slice();
-    const pagination = result.pagination;
-    const sorting = result.sorting;
-
-    return {
-      groupedRows,
-      rows,
-      columns,
-      metadata,
-      pagination,
-      sorting,
-      column,
-    };
-  };
 
   const updateResultState = (nodeId: string, column: string, result: QuotationAnalysisResponse): QuotationResultState => {
     const normalized = buildQuotationResultState(result, column);
@@ -706,6 +894,171 @@ const QuotationFeature: React.FC = () => {
     });
   };
 
+  // ----- Snapshot capture + load wiring -----
+  const getQuotationNodeRowCount = useCallback((node: WorkspaceNodeLike) => {
+    const shape = node.shape as unknown;
+    if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
+    return 0;
+  }, []);
+
+  const handleOpenSnapshot = useQuotationSnapshotLoad();
+
+  // Pull a stable task id for the capture hook (latches the most-recent
+  // non-empty value so the brief refresh window after Process All
+  // doesn't drop the capture's reference). Mirrors the concordance
+  // ``captureTaskId`` pattern.
+  const liveQuotationTaskId = useRef<string>('');
+  useEffect(() => {
+    void (async () => {
+      const id = await resolveTaskId();
+      if (id) liveQuotationTaskId.current = id;
+    })();
+  }, [resolveTaskId, hasLoaded]);
+
+  // Build the typed ``QuotationRequest`` from live form state for the
+  // capture-side ``settings.json`` payload.
+  const captureRequest = useMemo(() => {
+    if (inSnapshotMode) return null;
+    const node = livePanelSelectedNodes[0];
+    const nodeId = node ? getNodeIdentifier(node, 0) : '';
+    const selection = activeSelections.find((s) => s.nodeId === nodeId);
+    const column = selection?.column ?? '';
+    if (!nodeId || !column) return null;
+    return {
+      node_id: nodeId,
+      column,
+      engine:
+        resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid
+          ? { type: 'remote' as const, url: resolvedEnginePayload.normalizedUrl }
+          : { type: 'local' as const },
+      language: nodeLanguage,
+    };
+  }, [
+    inSnapshotMode,
+    livePanelSelectedNodes,
+    activeSelections,
+    resolvedEnginePayload,
+    nodeLanguage,
+  ]);
+
+  // Pick the live node for the capture hook to read row count from.
+  const liveCaptureNode: WorkspaceNodeLike | null =
+    livePanelSelectedNodes[0] ?? null;
+  const liveCaptureNodeId = liveCaptureNode
+    ? getNodeIdentifier(liveCaptureNode, 0)
+    : '';
+  const liveMaterialized = liveCaptureNodeId
+    ? Boolean(liveMaterializedPaths[liveCaptureNodeId])
+    : false;
+
+  const handleSaveSnapshot = useQuotationSnapshotCapture({
+    workspaceId: currentWorkspaceId ?? null,
+    workspaceName: currentWorkspace?.name ?? currentWorkspaceId ?? '(workspace)',
+    taskId: liveQuotationTaskId.current,
+    request: captureRequest,
+    materializeSummary: liveMaterializeSummary,
+    selectedNode: liveCaptureNode,
+    getNodeRowCount: getQuotationNodeRowCount,
+    getAuthHeaders,
+    materialized: liveMaterialized,
+  });
+
+  // Synchronous Save-button disable reason — matches the
+  // DisabledReasonTooltip pattern used by Run.
+  const saveSnapshotDisabledReason = (() => {
+    if (inSnapshotMode) {
+      return 'Exit snapshot view first to capture a new snapshot from live results.';
+    }
+    if (!liveCaptureNode) {
+      return 'Select a data block first.';
+    }
+    const rowCount = getQuotationNodeRowCount(liveCaptureNode);
+    if (rowCount > 2_000) {
+      return `Demo snapshots cap each selected data block at 2,000 rows; selected block has ${rowCount.toLocaleString()}.`;
+    }
+    if (!liveQuotationTaskId.current) {
+      return 'Run the quotation extractor (and let it finish) before saving a snapshot.';
+    }
+    if (!liveHasLoaded) {
+      return 'Wait for the quotation extractor to finish before saving a snapshot.';
+    }
+    if (!liveMaterialized) {
+      return 'Click Process All to materialise the result before saving — keeps the snapshot compact.';
+    }
+    return undefined;
+  })();
+
+  // Snapshot-mode wrappers for page / sort: bump the dedicated
+  // ``snapshotNodeState`` slot so ``resultsByNode`` re-slices on the
+  // next render. No backend roundtrip.
+  const effHandlePageChange = (newPage: number) => {
+    if (!inSnapshotMode) {
+      handlePageChange(newPage);
+      return;
+    }
+    const nodeId =
+      loadedSnapshot?.payload.settings?.node_id ??
+      loadedSnapshot?.manifest.source.node_ids[0] ??
+      '';
+    if (!nodeId) return;
+    setSnapshotNodeState((prev) => ({
+      ...prev,
+      [nodeId]: {
+        currentPage: newPage,
+        pageSize: prev[nodeId]?.pageSize ?? DEFAULT_PAGE_SIZE,
+        sortBy: prev[nodeId]?.sortBy,
+        descending: prev[nodeId]?.descending ?? false,
+      },
+    }));
+  };
+
+  const effHandlePageSizeChange = (newSize: number) => {
+    if (!inSnapshotMode) {
+      handlePageSizeChange(newSize);
+      return;
+    }
+    const nodeId =
+      loadedSnapshot?.payload.settings?.node_id ??
+      loadedSnapshot?.manifest.source.node_ids[0] ??
+      '';
+    if (!nodeId) return;
+    setSnapshotNodeState((prev) => ({
+      ...prev,
+      [nodeId]: {
+        currentPage: 1,
+        pageSize: newSize,
+        sortBy: prev[nodeId]?.sortBy,
+        descending: prev[nodeId]?.descending ?? false,
+      },
+    }));
+  };
+
+  const effHandleSort = (nodeId: string, columnName: string) => {
+    if (!inSnapshotMode) {
+      handleSort(nodeId, columnName);
+      return;
+    }
+    setSnapshotNodeState((prev) => {
+      const current = prev[nodeId] ?? {
+        currentPage: 1,
+        pageSize: DEFAULT_PAGE_SIZE,
+        sortBy: undefined,
+        descending: false,
+      };
+      const isSameColumn = current.sortBy === columnName;
+      const nextDescending = isSameColumn ? !current.descending : false;
+      return {
+        ...prev,
+        [nodeId]: {
+          ...current,
+          currentPage: 1,
+          sortBy: columnName,
+          descending: nextDescending,
+        },
+      };
+    });
+  };
+
   const quotationMetadataColumns = (() => {
     const nodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '';
     if (!nodeId) {
@@ -812,6 +1165,7 @@ const QuotationFeature: React.FC = () => {
         </DialogContent>
       </Dialog>
       <div className="space-y-4">
+        {inSnapshotMode && <QuotationSnapshotBanner />}
         <AnalysisCardLayout
           title="Quotation Extraction"
           info={{
@@ -843,18 +1197,30 @@ const QuotationFeature: React.FC = () => {
               ) : null}
             </div>
           }
+          snapshot={{
+            tool: 'quotation',
+            onSave: handleSaveSnapshot,
+            saveDisabledReason: saveSnapshotDisabledReason,
+            onOpen: handleOpenSnapshot,
+            nodeLabels: livePanelSelectedNodes
+              .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
+              .filter((s) => s.length > 0),
+          }}
           actions={{
             onRun: () => {
+              if (inSnapshotMode) return;
               void handleRunOrUpdate();
             },
             onClear: async () => {
+              if (inSnapshotMode) return;
               if (!currentWorkspaceId) return;
               setIsClearing(true);
               await clearResults();
               setIsClearing(false);
             },
-            runDisabled: actionState.runDisabled || !canRunQuotation,
+            runDisabled: inSnapshotMode || actionState.runDisabled || !canRunQuotation,
             runDisabledReason: (() => {
+              if (inSnapshotMode) return 'Disabled in snapshot view';
               if (isLoadingQuotations) return undefined;
               if (actionState.runDisabledReason) return actionState.runDisabledReason;
               if (hasIncompleteSelections) return 'Select a column for each data block';
@@ -862,7 +1228,7 @@ const QuotationFeature: React.FC = () => {
               if (quotationLanguageDisabledReason) return quotationLanguageDisabledReason;
               return undefined;
             })(),
-            clearDisabled: actionState.clearDisabled || isClearing,
+            clearDisabled: inSnapshotMode || actionState.clearDisabled || isClearing,
             isRunning: isLoadingQuotations,
             isClearing,
             hasResult: hasLoaded,
@@ -877,7 +1243,7 @@ const QuotationFeature: React.FC = () => {
                   nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']?.pageSize
                   ?? DEFAULT_PAGE_SIZE
                 }
-                onChange={handlePageSizeChange}
+                onChange={effHandlePageSizeChange}
               />
             ),
           }}
@@ -894,11 +1260,11 @@ const QuotationFeature: React.FC = () => {
             className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
             showShape
             showColorPicker
-            disabled={!!isLocked}
-            locked={!!isLocked}
+            disabled={!!isLocked || inSnapshotMode}
+            locked={!!isLocked || inSnapshotMode}
             originalCount={displayNodeCount}
             allowedDataTypes={['string']}
-            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+            lockedMessage={inSnapshotMode ? 'Viewing a saved snapshot — selection is frozen.' : ANALYSIS_LOCKED_MESSAGE}
           />
         </AnalysisCardLayout>
         {quotationWaitingBanner && (
@@ -1007,13 +1373,17 @@ const QuotationFeature: React.FC = () => {
                             <TableHeader className="bg-muted sticky top-0 z-10">
                               <TableRow className="border-b border-border/60">
                                 {cols.map((c: string) => {
-                                  const sortable = Boolean(resultState?.metadata.metadata_columns.includes(c));
+                                  // Every column is sortable — in snapshot mode the client-side
+                                  // comparator handles any column; in live mode the backend
+                                  // materialised path sorts any column in schema (CONC_* columns
+                                  // for concordance had the same treatment).
+                                  const sortable = true;
                                   const active = resultState?.sorting?.sort_by === c;
                                   return (
                                     <TableHead
                                       key={c}
                                       className={`h-10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/90 select-none whitespace-nowrap ${sortable ? 'cursor-pointer' : 'cursor-default opacity-75'}`}
-                                      onClick={sortable ? () => handleSort(nodeId, c) : undefined}
+                                      onClick={sortable ? () => effHandleSort(nodeId, c) : undefined}
                                     >
                                       <div className="flex items-center gap-1.5">
                                         <span>{c}</span>
@@ -1092,9 +1462,27 @@ const QuotationFeature: React.FC = () => {
                       hasNext={resultState?.pagination?.has_next ?? false}
                       hasPrev={resultState?.pagination?.has_prev ?? ((resultState?.pagination?.page ?? 1) > 1)}
                       totalPages={resultState?.pagination?.total_source_pages}
-                      onPageChange={(newPage) => handlePageChange(newPage)}
-                      pageSizeSummary={materializedPaths[nodeId] && materializeSummary
-                        ? <GroupedResultsPageSizeSummary groups={[]} totalInstances={materializeSummary.recordCount} totalDocuments={materializeSummary.uniqueDocuments} totalProcessed={materializeSummary.totalDocuments} />
+                      onPageChange={(newPage) => effHandlePageChange(newPage)}
+                      pageSizeSummary={materializedPaths[nodeId]
+                        ? (materializeSummary
+                          ? <GroupedResultsPageSizeSummary
+                              groups={[]}
+                              totalInstances={materializeSummary.recordCount}
+                              totalDocuments={materializeSummary.uniqueDocuments}
+                              totalProcessed={materializeSummary.totalDocuments}
+                            />
+                          : (
+                            // Materialise summary not yet hydrated (e.g. the
+                            // task-request fetch is mid-flight after Process All).
+                            // Fall back to the pagination total — it's the same
+                            // total hit count the summary's ``recordCount`` would
+                            // report, so the line is correct, just missing the
+                            // document breakdown until the summary lands.
+                            <>
+                              (Found {(resultState?.pagination?.total_source_rows ?? 0).toLocaleString()} {(resultState?.pagination?.total_source_rows ?? 0) === 1 ? 'quotation' : 'quotations'} across the materialised corpus.)
+                            </>
+                          )
+                        )
                         : <GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} totalProcessed={resultState?.pagination?.page_size} />
                       }
                     >
@@ -1104,12 +1492,13 @@ const QuotationFeature: React.FC = () => {
                         variant="outline"
                         onClick={() => void handleMaterialize(nodeId)}
                         disabled={
-                          Boolean(nodeMaterializing[nodeId])
+                          inSnapshotMode
+                          || Boolean(nodeMaterializing[nodeId])
                           || Boolean(materializedPaths[nodeId])
                           || Boolean(nodeDetaching[nodeId])
                         }
                         className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                        title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
+                        title={inSnapshotMode ? 'Disabled in snapshot view' : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
                       >
                         {nodeMaterializing[nodeId] ? (
                           <>
@@ -1126,8 +1515,9 @@ const QuotationFeature: React.FC = () => {
                         type="button"
                         size="sm"
                         onClick={() => void openDetachDialog(nodeId)}
-                        disabled={Boolean(nodeDetaching[nodeId])}
+                        disabled={inSnapshotMode || Boolean(nodeDetaching[nodeId])}
                         className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                        title={inSnapshotMode ? 'Disabled in snapshot view' : undefined}
                       >
                         {nodeDetaching[nodeId] ? (
                           <>

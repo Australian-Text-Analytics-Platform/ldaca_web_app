@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
@@ -30,6 +30,34 @@ export interface SnapshotActionsProps {
    * Open buttons in the load dialog show "view coming soon" — Phase
    * 1b-2 wires the host side. */
   onOpenSnapshot?: (filename: string) => Promise<void>;
+  /** Display labels of the currently-selected data blocks. Used to
+   * pre-populate the Save dialog's filename input with something
+   * meaningful (e.g. ``Honi-Soit-2026-05-16`` instead of a generic
+   * ``demo-2026-05-16``). When empty or omitted, falls back to
+   * ``demo-{date}``. The tool prefix is added by the dialog, so
+   * callers only need to supply the data-block-derived portion. */
+  nodeLabels?: string[];
+}
+
+/** Slugify a single data-block label for inclusion in the default
+ * filename: trim, drop filename-invalid characters, collapse
+ * whitespace runs to hyphens. The Save dialog re-runs its own
+ * sanitisation when it computes the on-disk filename, so this is
+ * just for the readable pre-populated string. */
+function slugifyLabel(label: string): string {
+  return label
+    .trim()
+    .replace(/[/\\:*?"<>|]/g, '_')
+    .replace(/\s+/g, '-');
+}
+
+function buildDefaultName(nodeLabels: string[] | undefined): string {
+  const date = new Date().toISOString().slice(0, 10);
+  const cleaned = (nodeLabels ?? [])
+    .map(slugifyLabel)
+    .filter((s) => s.length > 0);
+  if (cleaned.length === 0) return `demo-${date}`;
+  return `${cleaned.join('_')}-${date}`;
 }
 
 /**
@@ -47,9 +75,11 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   onSave,
   disabledReason,
   onOpenSnapshot,
+  nodeLabels,
 }) => {
   const enabled = usePreferencesStore((s) => s.demoSnapshotsEnabled);
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const [saveOpen, setSaveOpen] = useState(false);
   const [loadOpen, setLoadOpen] = useState(false);
 
@@ -64,11 +94,23 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
     staleTime: 10_000,
   });
 
+  // Wrap the host's onSave so the snapshot list refetches as soon as
+  // the upload succeeds. Without this, the Load button stays hidden
+  // until the 10-second staleTime expires or the user switches tabs.
+  const handleSave = useCallback(
+    async (filename: string, description: string) => {
+      if (!onSave) return;
+      await onSave(filename, description);
+      await queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
+    },
+    [onSave, queryClient, tool],
+  );
+
   if (!enabled) return null;
 
   const existingFilenames = listData?.items.map((it) => it.filename) ?? [];
   const hasSnapshots = existingFilenames.length > 0;
-  const defaultName = `demo-${new Date().toISOString().slice(0, 10)}`;
+  const defaultName = buildDefaultName(nodeLabels);
   const isSaveDisabled = Boolean(disabledReason);
 
   return (
@@ -111,7 +153,7 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
           tool={tool}
           existingFilenames={existingFilenames}
           defaultName={defaultName}
-          onSave={onSave}
+          onSave={handleSave}
         />
       )}
 

@@ -199,6 +199,13 @@ type Props = {
     language: string;
     words: ReadonlyArray<string>;
   }>;
+  /** Snapshot view: disables the Add-to-Workspace (detach) button and
+   * the Exact Topic No. re-aggregation slider — both make backend
+   * calls that create new state or refit topics, which don't make
+   * sense for a frozen captured result. The bubble chart, zoom,
+   * legend/topic selection, search, and stopword filter all stay
+   * active (purely client-side display logic). */
+  readOnly?: boolean;
 };
 
 export function TopicModelingResultsPanel({
@@ -247,6 +254,7 @@ export function TopicModelingResultsPanel({
   stopwordFilterSet,
   stopwordFilterByLanguage,
   handleDetachConfirm,
+  readOnly = false,
 }: Props) {
   const [isAppliedStopwordsDialogOpen, setIsAppliedStopwordsDialogOpen] = useState(false);
   const appliedStopwordsCount = stopwordFilterSet?.size ?? 0;
@@ -349,7 +357,7 @@ export function TopicModelingResultsPanel({
                       </div>
                     ) : null}
                   </div>
-                  {showExactTopicCountControl && exactTopicCountRange ? (
+                  {showExactTopicCountControl && exactTopicCountRange && !readOnly ? (
                     <ExactTopicCountSlider
                       key={currentExactTopicCount ?? exactTopicCountRange.min}
                       currentExactTopicCount={currentExactTopicCount}
@@ -365,7 +373,8 @@ export function TopicModelingResultsPanel({
                     size="sm"
                     className="w-full shrink-0 lg:w-auto"
                     onClick={() => void openDetachDialog()}
-                    disabled={isDetachLoading || isDetaching || isUpdatingExactTopicCount}
+                    disabled={isDetachLoading || isDetaching || isUpdatingExactTopicCount || readOnly}
+                    title={readOnly ? 'Disabled in snapshot view.' : undefined}
                   >
                     {isDetachLoading ? (
                       <>

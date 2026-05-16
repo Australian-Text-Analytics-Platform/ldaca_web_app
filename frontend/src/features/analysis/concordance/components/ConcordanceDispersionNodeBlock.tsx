@@ -162,6 +162,12 @@ export type ConcordanceDispersionNodeBlockProps = {
   ) => void;
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
+  /** Snapshot-view flag — disables Process All / Process Both /
+   * Dispersion Detach (Add to Workspace) buttons. The chart itself
+   * (bin selection, colour matches, re-binning) keeps working
+   * because those operate entirely on the captured 100-bucket bins
+   * via ``buildDispersionBinsFromBinned``. */
+  readOnly?: boolean;
 };
 
 export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeBlockProps> = ({
@@ -209,6 +215,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
   handleRowClick,
   handleMaterialize,
   setCombinedPage,
+  readOnly = false,
 }) => {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
@@ -277,7 +284,8 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 }
               }}
               disabled={
-                isAnyCombinedMaterializing
+                readOnly
+                || isAnyCombinedMaterializing
                 || allCombinedMaterialized
                 || !searchWord.trim()
                 || combinedNodeIds.length === 0
@@ -285,7 +293,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               size="sm"
               variant="outline"
               className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title="Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them"
+              title={readOnly ? 'Disabled in snapshot view' : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'}
             >
               {isAnyCombinedMaterializing ? (
                 <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
@@ -311,12 +319,15 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 && allMatchedTexts.length > 0
                 && visibleMatchedTexts.length === 0;
               const combinedDetachDisabled =
-                combinedLoading
+                readOnly
+                || combinedLoading
                 || !searchWord.trim()
                 || combinedNodeIds.length === 0
                 || combinedScopeMismatch
                 || allLegendHidden;
-              const combinedDetachTitle = combinedScopeMismatch
+              const combinedDetachTitle = readOnly
+                ? 'Disabled in snapshot view'
+                : combinedScopeMismatch
                 ? 'Materialise the corpus first (Process Both) to safely apply this bin selection across all source documents.'
                 : allLegendHidden
                   ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
@@ -696,7 +707,8 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             }
           }}
           disabled={
-            nodeIsLoading
+            readOnly
+            || nodeIsLoading
             || isMaterializing
             || hasMaterializedPath
             || !searchWord.trim()
@@ -706,7 +718,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
           size="sm"
           variant="outline"
           className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
+          title={readOnly ? 'Disabled in snapshot view' : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
         >
           {isMaterializing ? (
             <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
@@ -732,14 +744,17 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             && allMatchedTexts.length > 0
             && visibleMatchedTexts.length === 0;
           const nodeDetachDisabled =
-            nodeIsLoading
+            readOnly
+            || nodeIsLoading
             || isDetaching
             || !searchWord.trim()
             || !canDetach
             || !detachNodeId
             || nodeScopeMismatch
             || allLegendHidden;
-          const nodeDetachTitle = nodeScopeMismatch
+          const nodeDetachTitle = readOnly
+            ? 'Disabled in snapshot view'
+            : nodeScopeMismatch
             ? 'Materialise the corpus first (Process All) to safely apply this bin selection across all documents.'
             : allLegendHidden
               ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'

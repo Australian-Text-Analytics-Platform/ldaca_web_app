@@ -24,23 +24,30 @@ import {
   type LoadedSnapshot,
 } from '@/features/snapshot-view';
 import type {
+  ConcordanceAnalysisRequest,
   ConcordanceDispersionBinsResponse,
   ConcordanceResultEntry,
 } from '@/api/text/concordance';
 
 /** Concordance-specific payload held by ``LoadedSnapshot.payload``.
- * Mirrors the live UI's data shape so the dual-source readers in
- * Phase 1b-2b can plug it in with minimal adaptation:
+ * Mirrors the live UI's data shape so the live ParameterPanel +
+ * ResultsPanel can render the snapshot data with effective-value
+ * dispatching driven entirely off this object:
  *
  * - ``resultByNodeId`` is exactly what
  *   ``ConcordanceAnalysisResponse.data`` is in live mode — a
  *   per-node ``ConcordanceResultEntry`` map.
  * - ``binsByNodeId`` is the per-node bin response captured at save
  *   time. Empty entries when the per-node bins fetch failed at
- *   capture (chart degrades to no-data for that node). */
+ *   capture (chart degrades to no-data for that node).
+ * - ``settings`` is the captured ``ConcordanceAnalysisRequest`` so
+ *   the live ParameterPanel can render the search-term, regex
+ *   toggle, context-width values, etc. exactly as they were at
+ *   capture time. Optional: pre-v0.4.5 bundles didn't carry it. */
 export interface ConcordanceSnapshotPayload {
   resultByNodeId: Record<string, ConcordanceResultEntry>;
   binsByNodeId: Record<string, ConcordanceDispersionBinsResponse>;
+  settings?: ConcordanceAnalysisRequest;
 }
 
 export class ConcordanceSnapshotLoadError extends Error {
@@ -137,12 +144,31 @@ export function useConcordanceSnapshotLoad(): (filename: string) => Promise<void
         }
       }
 
+      // Settings are optional — pre-v0.4.5 bundles didn't carry them,
+      // and the live ParameterPanel falls back to "(captured)" labels
+      // when the field is absent. Parse defensively.
+      let settings: ConcordanceSnapshotPayload['settings'];
+      const settingsPath = findPath('settings');
+      if (settingsPath) {
+        const settingsRaw = payloadBytes.get(settingsPath);
+        if (settingsRaw) {
+          try {
+            settings = JSON.parse(new TextDecoder().decode(settingsRaw));
+          } catch (err) {
+            console.warn(
+              `Snapshot settings payload at ${settingsPath} is not valid JSON; ParameterPanel will show captured values as blanks.`,
+              err,
+            );
+          }
+        }
+      }
+
       // Build the LoadedSnapshot and populate the store atomically
       // with the mode flip — see useSnapshotViewStore.loadSnapshot.
       const loaded: LoadedSnapshot<ConcordanceSnapshotPayload> = {
         manifest,
         capabilities: manifest.capabilities,
-        payload: { resultByNodeId, binsByNodeId },
+        payload: { resultByNodeId, binsByNodeId, settings },
         sourceProjection: null,
       };
       loadSnapshotIntoStore('concordance', loaded, DEMO_SNAPSHOT_MODE);

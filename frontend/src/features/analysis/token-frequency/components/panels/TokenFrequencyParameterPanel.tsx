@@ -4,6 +4,7 @@ import { TokensColumnMismatchNotice } from '@/features/analysis/common/component
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
+import type { SnapshotToolKey } from '@/features/snapshot-view';
 import type { WorkspaceNodeLike, NodeColumnSource } from '@/features/analysis/common/nodeSelectionTypes';
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
@@ -39,6 +40,21 @@ type TokenFrequencyParameterPanelProps = {
   tokensModelOptions: string[];
   tokensModel: string | null;
   setTokensModel: (next: string | null) => void;
+  /** Displayed when the panel is locked. Defaults to the standard
+   * "locked while results loaded" message; snapshot mode overrides it
+   * so users see "viewing a saved snapshot" instead. */
+  lockedMessage?: string;
+  /** Snapshot Save/Load slot. Forwarded straight to the underlying
+   * AnalysisCardLayout, which renders <SnapshotActions> alongside any
+   * other header actions. Mirrors the per-tool wiring used by the
+   * concordance / quotation parameter cards. */
+  snapshot?: {
+    tool: SnapshotToolKey;
+    onSave?: (filename: string, description: string) => Promise<void>;
+    saveDisabledReason?: string | null;
+    onOpen?: (filename: string) => Promise<void>;
+    nodeLabels?: string[];
+  };
 };
 
 export const TokenFrequencyParameterPanel = ({
@@ -66,6 +82,8 @@ export const TokenFrequencyParameterPanel = ({
   tokensModelOptions,
   tokensModel,
   setTokensModel,
+  lockedMessage = ANALYSIS_LOCKED_MESSAGE,
+  snapshot,
 }: TokenFrequencyParameterPanelProps) => {
   const hasMultipleNodes = panelSelectedNodes.length >= 2;
   const nodeOptions = panelSelectedNodes
@@ -93,6 +111,7 @@ export const TokenFrequencyParameterPanel = ({
         label: 'Token frequency parameters',
         tooltip: 'Choose up to two data blocks and the text columns to analyze. After the run, use the results panel to adjust stop words and displayed token limits.',
       }}
+      snapshot={snapshot}
       actions={{
         onRun: onAnalyze,
         onClear: onClearResults,
@@ -199,7 +218,7 @@ export const TokenFrequencyParameterPanel = ({
         getNodeColumns={getNodeColumns}
         allowedDataTypes={['string']}
         originalCount={displayNodeCount}
-        lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+        lockedMessage={lockedMessage}
       />
       <TokensColumnMismatchNotice
         nodes={panelSelectedNodes}

@@ -62,6 +62,11 @@ export interface SequentialAnalysisResultsPanelProps {
   onDetachNodeNameChange: (value: string) => void;
   onDetach: () => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** Snapshot view: forwarded straight to <SequentialChart> to gate
+   * the detach-to-workspace control. Everything else on the results
+   * panel (chart type, x-axis, min group size, download) is purely
+   * client-side and stays active. */
+  readOnly?: boolean;
 }
 
 /**
@@ -97,6 +102,7 @@ export const SequentialAnalysisResultsPanel: React.FC<SequentialAnalysisResultsP
   onDetachNodeNameChange,
   onDetach,
   containerRef,
+  readOnly = false,
 }) => (
   <Card className="mt-6">
     <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -246,6 +252,7 @@ export const SequentialAnalysisResultsPanel: React.FC<SequentialAnalysisResultsP
         onDetachNodeNameChange={onDetachNodeNameChange}
         onDetach={onDetach}
         containerRef={containerRef}
+        readOnly={readOnly}
       />
     </CardContent>
   </Card>

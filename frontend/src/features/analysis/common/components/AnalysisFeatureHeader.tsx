@@ -34,6 +34,10 @@ export interface AnalysisFeatureHeaderProps {
    * engages snapshot view. Optional; when absent, Open buttons in the
    * load dialog show "view coming soon". */
   onOpenSnapshot?: (filename: string) => Promise<void>;
+  /** Display labels of the currently-selected data blocks. Forwarded
+   * to <SnapshotActions> so the Save dialog pre-populates the
+   * filename input with something more useful than ``demo-{date}``. */
+  snapshotNodeLabels?: string[];
 }
 
 /**
@@ -58,6 +62,7 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
   onSaveSnapshot,
   saveSnapshotDisabledReason,
   onOpenSnapshot,
+  snapshotNodeLabels,
 }) => {
   return (
     <CardHeader className="space-y-0 pb-4">
@@ -76,6 +81,7 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
             onSave={onSaveSnapshot}
             disabledReason={saveSnapshotDisabledReason}
             onOpenSnapshot={onOpenSnapshot}
+            nodeLabels={snapshotNodeLabels}
           />
         </div>
       </div>
