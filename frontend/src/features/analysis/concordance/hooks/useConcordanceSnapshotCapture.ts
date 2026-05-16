@@ -18,7 +18,10 @@
 import { useCallback } from 'react';
 import JSZip from 'jszip';
 import { concordanceApi } from '@/api/text/concordance';
-import type { ConcordanceAnalysisResponse } from '@/api/text/concordance';
+import type {
+  ConcordanceAnalysisResponse,
+  ConcordanceDispersionBinsResponse,
+} from '@/api/text/concordance';
 import { snapshotsApi } from '@/api/snapshots';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
@@ -31,6 +34,7 @@ import {
 import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
+const DISPERSION_BINS_PAYLOAD_PATH = 'tables/dispersion-bins.json';
 
 export interface UseConcordanceSnapshotCaptureInput {
   workspaceId: string | null;
@@ -140,14 +144,59 @@ export function useConcordanceSnapshotCapture(
 
       const headers = getAuthHeaders();
 
-      // Fetch the full result via the Phase-0g page_size: 'all' path.
-      // The backend caps at 500k, so for valid demo captures this is
-      // the entire result table in one round-trip.
-      const fullResult = await concordanceApi.postConcordanceTaskResult(
-        taskId,
-        { page_size: 'all', update_only: false },
-        headers,
+      // Fetch the full result via the Phase-0g page_size: 'all' path,
+      // and per-node dispersion bins in parallel. The bins endpoint
+      // always returns 100 server-side buckets; the snapshot viewer
+      // re-aggregates them client-side onto any of
+      // DISPERSION_DISPLAY_BIN_COUNTS = [4, 5, 10, 20, 25, 50, 100]
+      // so the bin-count selector in the snapshot UI works without
+      // re-engaging the backend (concordanceViewModels.ts:182-189).
+      const validNodeIds = selectedNodes
+        .map((n) => n.id ?? (n.node_id as string | undefined))
+        .filter((id): id is string => Boolean(id));
+
+      const [fullResult, ...binResults] = await Promise.all([
+        concordanceApi.postConcordanceTaskResult(
+          taskId,
+          { page_size: 'all', update_only: false },
+          headers,
+        ),
+        ...validNodeIds.map((id) =>
+          concordanceApi
+            .getConcordanceTaskDispersionBins(taskId, id, headers)
+            .then(
+              (bins) => ({ id, bins }) as { id: string; bins: ConcordanceDispersionBinsResponse },
+              (err: unknown) => {
+                // Bins are optional — chart degrades gracefully when
+                // missing. Log the failure but don't sink the capture.
+                console.warn(`Snapshot capture: failed to fetch bins for node ${id}`, err);
+                return null;
+              },
+            ),
+        ),
+      ]);
+
+      const binsPayload: Record<string, ConcordanceDispersionBinsResponse> = {};
+      for (const result of binResults) {
+        if (result) binsPayload[result.id] = result.bins;
+      }
+
+      // Hard-require materialise (plan §4): the host's disable-reason
+      // check already gates the Save button on this, but assert here
+      // too so the hook stays self-contained — a captured bundle's
+      // result payload must be the flat materialised shape, otherwise
+      // the load-side viewer can't render it.
+      const unmaterialised = validNodeIds.filter(
+        (id) => !fullResult.data?.[id]?.materialized,
       );
+      if (unmaterialised.length > 0) {
+        throw captureError(
+          'not-materialised',
+          `Process All before saving — ${unmaterialised.length} selected ` +
+            `data block${unmaterialised.length === 1 ? '' : 's'} ` +
+            `${unmaterialised.length === 1 ? 'has' : 'have'} not been materialised yet.`,
+        );
+      }
 
       // Compose the manifest.
       const nodeColours = useNodeColorsStore.getState().colors;
@@ -187,24 +236,24 @@ export function useConcordanceSnapshotCapture(
           canCrossJump: false,
         },
         preview: buildConcordancePreview(fullResult, request),
-        payloads: [{ kind: 'result', path: RESULT_PAYLOAD_PATH }],
+        payloads: [
+          { kind: 'result', path: RESULT_PAYLOAD_PATH },
+          { kind: 'dispersion-bins', path: DISPERSION_BINS_PAYLOAD_PATH },
+        ],
         node_colors: nodeColorsForSnapshot,
       };
 
-      // Assemble the zip bundle directly here. JSON is fine for v1
-      // result rows — demo caps source at 2 000 rows so result tables
-      // are typically a few thousand entries at most. Switching to
-      // parquet bytes (already supported by the manifest's `kind:
-      // result` entry) is a Phase-2 size optimisation.
+      // Trim the bundle: ship only what the snapshot viewer renders.
+      // ``fullResult.data`` is the per-node ``ConcordanceResultEntry``
+      // map — rows + columns + pagination summary + materialised flag,
+      // already in the flat shape the viewer expects (we hard-require
+      // materialise before save, so every entry is materialised).
+      // The wrapper fields (analysis_params, preferences, etc.) are
+      // backend metadata the viewer never inspects.
       const zip = new JSZip();
       zip.file(MANIFEST_FILE_NAME, emitManifestJson(manifest));
-      // Store the entire result payload — captured exactly as the
-      // backend served it. ``settings.json`` mirrors the in-flight
-      // request so the load flow can re-hydrate the form.
-      zip.file(
-        RESULT_PAYLOAD_PATH,
-        JSON.stringify({ analysis_response: fullResult }),
-      );
+      zip.file(RESULT_PAYLOAD_PATH, JSON.stringify(fullResult.data ?? {}));
+      zip.file(DISPERSION_BINS_PAYLOAD_PATH, JSON.stringify(binsPayload));
       if (request) {
         zip.file('settings.json', JSON.stringify(request, null, 2));
       }

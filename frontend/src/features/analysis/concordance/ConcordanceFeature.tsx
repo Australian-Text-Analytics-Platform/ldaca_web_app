@@ -733,6 +733,23 @@ const ConcordanceFeature: React.FC = () => {
     if (!captureTaskId) {
       return 'Run the concordance analysis (and let it finish) before saving a snapshot.';
     }
+    // Hard-require materialise: the snapshot ships the flat
+    // materialised shape so re-binning + the full hit list render
+    // identically at load time. An unmaterialised result would ship
+    // the rich paginated shape (~4× larger) and the load-side
+    // viewer would need a separate code path to render it.
+    if (!results || results.state !== 'successful') {
+      return 'Wait for the concordance analysis to finish before saving a snapshot.';
+    }
+    const selectedIds = panelSelectedNodes
+      .map((n) => n.id ?? (n.node_id as string | undefined))
+      .filter((id): id is string => Boolean(id));
+    const unmaterialised = selectedIds.filter(
+      (id) => !results.data?.[id]?.materialized,
+    );
+    if (unmaterialised.length > 0) {
+      return `Click Process All to materialise ${unmaterialised.length === 1 ? 'the result' : 'all selected data blocks'} before saving — keeps the snapshot compact and enables re-binning of the dispersion chart.`;
+    }
     return undefined;
   })();
 
