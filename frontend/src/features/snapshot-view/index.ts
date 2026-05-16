@@ -57,3 +57,5 @@ export {
   type PaginationState,
   type PaginationView,
 } from './pagination';
+
+export { useResolvedNodeColor } from './useResolvedNodeColor';
