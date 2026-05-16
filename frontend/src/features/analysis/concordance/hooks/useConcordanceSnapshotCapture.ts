@@ -41,8 +41,10 @@ export interface UseConcordanceSnapshotCaptureInput {
    * so the load flow can reconstruct the exact form values. */
   request: Record<string, unknown> | null;
   selectedNodes: readonly WorkspaceNodeLike[];
-  /** Returns total rows for a selected node. Hook uses the sum to
-   * gate against ``SNAPSHOT_CAPS.demo.maxSourceRows`` (2 000). */
+  /** Returns total rows for a selected node. Each block is checked
+   * independently against ``SNAPSHOT_CAPS.demo.maxSourceRowsPerBlock``
+   * (2 000) — multi-block captures are fine as long as each block is
+   * teaching-sized. */
   getNodeRowCount: (node: WorkspaceNodeLike) => number;
   getAuthHeaders: () => Record<string, string>;
 }
@@ -57,11 +59,11 @@ function captureError(reason: string, message: string): CaptureError {
   return err;
 }
 
-function totalRowsAcross(
+function perBlockRowCounts(
   nodes: readonly WorkspaceNodeLike[],
   getCount: (n: WorkspaceNodeLike) => number,
-): number {
-  return nodes.reduce((sum, n) => sum + (Number.isFinite(getCount(n)) ? getCount(n) : 0), 0);
+): number[] {
+  return nodes.map((n) => (Number.isFinite(getCount(n)) ? getCount(n) : 0));
 }
 
 function buildConcordancePreview(
@@ -104,25 +106,25 @@ export function useConcordanceSnapshotCapture(
   return useCallback(
     async (filename: string, description: string): Promise<void> => {
       // Eligibility check FIRST so users see the right reason when
-      // multiple guards would reject. The 2 000-row cap is the most
-      // common rejection; the task-id / workspace checks below catch
-      // edge cases the user can't directly act on.
-      const totalSourceRows = totalRowsAcross(selectedNodes, getNodeRowCount);
+      // multiple guards would reject. The 2 000-row per-block cap is
+      // the most common rejection; the task-id / workspace checks
+      // below catch edge cases the user can't directly act on.
+      const blockRowCounts = perBlockRowCounts(selectedNodes, getNodeRowCount);
+      const totalSourceRows = blockRowCounts.reduce((s, n) => s + n, 0);
       const eligibility = checkSnapshotEligibility({
         mode: 'demo',
-        totalSourceRows,
+        perBlockSourceRows: blockRowCounts,
         // Result-row cap can't be known until we fetch; rely on the
         // server-side hard cap. ``checkSnapshotEligibility`` here only
-        // gates the source-row side (2 000).
+        // gates the per-block source-row side (2 000).
         resultRows: 0,
       });
-      if (!eligibility.ok && eligibility.reason.kind === 'source-too-large-for-demo') {
+      if (!eligibility.ok && eligibility.reason.kind === 'block-too-large-for-demo') {
         throw captureError(
-          'source-too-large',
-          `Demo snapshots are limited to ${eligibility.reason.cap.toLocaleString()} ` +
-            `source rows total. Your selection has ` +
-            `${eligibility.reason.rows.toLocaleString()} rows across ${selectedNodes.length} ` +
-            `data block${selectedNodes.length === 1 ? '' : 's'}. Pick fewer / smaller blocks.`,
+          'block-too-large',
+          `Demo snapshots cap each selected data block at ${eligibility.reason.cap.toLocaleString()} ` +
+            `rows. The largest selected block has ${eligibility.reason.rows.toLocaleString()} rows — ` +
+            `pick a smaller block or trim it first.`,
         );
       }
 

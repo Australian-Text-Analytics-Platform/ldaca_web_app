@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { snapshotsApi } from '@/api/snapshots';
 import { useAuth } from '@/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -17,6 +18,12 @@ export interface SnapshotActionsProps {
    * doesn't render — the tool hasn't wired itself up yet (a useful
    * Phase 1 staging signal). */
   onSave?: (filename: string, description: string) => Promise<void>;
+  /** When set, the Save button is rendered disabled with this string
+   * as a hover tooltip. Mirrors the ``runDisabledReason`` pattern
+   * elsewhere in the analytic panels — host features compute the
+   * reason synchronously (e.g. "Largest selected data block has X
+   * rows; demo cap is 2 000.") and pass it in. */
+  disabledReason?: string | null;
 }
 
 /**
@@ -28,7 +35,11 @@ export interface SnapshotActionsProps {
  * Plan §3.7 + §5.7. The render is gated on the demo-snapshot
  * master switch — when off, returns null so no DOM is added.
  */
-export const SnapshotActions: React.FC<SnapshotActionsProps> = ({ tool, onSave }) => {
+export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
+  tool,
+  onSave,
+  disabledReason,
+}) => {
   const enabled = usePreferencesStore((s) => s.demoSnapshotsEnabled);
   const { getAuthHeaders } = useAuth();
   const [saveOpen, setSaveOpen] = useState(false);
@@ -46,24 +57,25 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({ tool, onSave }
   if (!enabled) return null;
 
   const existingFilenames = listData?.items.map((it) => it.filename) ?? [];
-
-  // A timestamp-suggested default name keeps the dialog one-keystroke-
-  // friendly while leaving the user free to type something better.
   const defaultName = `demo-${new Date().toISOString().slice(0, 10)}`;
+  const isDisabled = Boolean(disabledReason);
 
   return (
     <>
       {onSave && (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => setSaveOpen(true)}
-          aria-label="Save snapshot"
-        >
-          <Camera className="mr-1.5 h-4 w-4" />
-          Save
-        </Button>
+        <DisabledReasonTooltip reason={disabledReason ?? undefined}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isDisabled}
+            onClick={() => setSaveOpen(true)}
+            aria-label="Save snapshot"
+          >
+            <Camera className="mr-1.5 h-4 w-4" />
+            Save
+          </Button>
+        </DisabledReasonTooltip>
       )}
 
       {onSave && (

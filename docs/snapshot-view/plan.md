@@ -390,15 +390,15 @@ Bundles can grow if we're careless. Caps live in one constant table keyed by mod
 ```ts
 const SNAPSHOT_CAPS: Record<SnapshotMode, SnapshotCaps> = {
   demo: {
-    maxSourceRows: 2_000,        // hard — refuse capture if exceeded
-    maxResultRows: 500_000,      // hard — refuse capture
-    softWarnResultRows: 50_000,  // toast "snapshot will be large"
+    maxSourceRowsPerBlock: 2_000,  // hard — per-block cap, NOT summed
+    maxResultRows: 500_000,        // hard — refuse capture
+    softWarnResultRows: 50_000,    // toast "snapshot will be large"
   },
   share: {
-    maxSourceRows: null,         // no hard cap (subject to bundle-size warnings)
+    maxSourceRowsPerBlock: null,   // no hard cap (subject to bundle-size warnings)
     maxResultRows: 500_000,
     softWarnResultRows: 50_000,
-    softWarnSourceRows: 50_000,
+    softWarnSourceRowsPerBlock: 50_000,
     softWarnBundleBytes: 100_000_000, // 100 MB
   },
 };
@@ -406,12 +406,13 @@ const SNAPSHOT_CAPS: Record<SnapshotMode, SnapshotCaps> = {
 
 Rules:
 
-- **Demo: hard-refuse capture if the sum of rows across selected/processed data blocks exceeds `maxSourceRows`** (2 000). User-visible message: *"Demo Snapshot is for small teaching-sized data (≤ 2 000 source rows). To share this result with collaborators, use Share Snapshot instead (coming soon)."* — telegraphs the future second mode without promising a date.
-- **Demo: do not include source rows in the bundle** regardless of size. (`maxSourceRows` is a *gate on capture eligibility*, not a payload sizing.)
-- **Share (future): no source-row hard cap**, but a soft warning at 50k rows and a 100 MB bundle ceiling.
+- **Demo: hard-refuse capture if ANY selected source block exceeds `maxSourceRowsPerBlock`** (2 000). Cap is **per-block, not summed** — a multi-block capture (e.g. comparing two 1 100-row corpora) is fine as long as each block is teaching-sized. User-visible message: *"Demo snapshots cap each selected data block at 2 000 rows. The largest selected block has N rows — pick a smaller block or trim it first."*
+- **Demo: do not include source rows in the bundle** regardless of size. (`maxSourceRowsPerBlock` is a *gate on capture eligibility*, not a payload sizing.)
+- **Share (future): no source-row hard cap**, but a soft warning at 50k rows per block and a 100 MB bundle ceiling.
 - **Hard cap on result rows is the same in both modes** (500k). 500k concordance rows ≈ 80 MB parquet, which is at the upper bound of practical browser handling.
 - **No materialised result-cache parquet in either bundle.** Re-stated: the materialised result cache is a backend acceleration artifact. Snapshots ship the already-aggregated bins JSON, not the cache. Share-mode's `source.parquet` is a *separate* artifact — a column-projected slice of the source corpus, not the result cache.
 - **No images.** Charts are re-rendered from data, not captured as PNGs. Keeps the bundle a *data* artifact, not a screenshot.
+- **Eligibility surfaces as grey-out + `<DisabledReasonTooltip>`** on the Save button — same UX pattern as the Run-button disabled tooltips elsewhere in the analytic panels. The host feature computes the reason synchronously (largest block's row count, missing task, etc.) and threads it through the shared `<AnalysisFeatureHeader>`. Users see the explanation on hover *before* opening the Save dialog.
 
 ## 5. Per-tool capture/load specs
 
@@ -571,7 +572,7 @@ Split into atomic sub-phases. **0a–0g have landed** (commits b52d0e1 … 6db28
 ### Phase 1 — Concordance snapshot capture + load UI
 
 #### Phase 1a — Save (capture) dialog
-- [ ] **Eligibility gate**: before showing the Save button, check `sum(rows across selected/processed nodes) <= SNAPSHOT_CAPS.demo.maxSourceRows` (2 000). If over, render a disabled Save button with tooltip explaining the limit (and naming Mode 2a as the future answer).
+- [ ] **Eligibility gate**: before showing the Save button as enabled, check `max(rows across selected/processed nodes) <= SNAPSHOT_CAPS.demo.maxSourceRowsPerBlock` (2 000). When the largest block exceeds the cap, render the Save button disabled with `<DisabledReasonTooltip>` explaining which block is over and by how much. Multi-block selections are allowed as long as each block is under the cap individually.
 - [ ] Save dialog: name input with inline validation against the loaded snapshot list (no overwrite confirm); optional description textarea; Save / Cancel.
 - [ ] Capture flow: fetch full result via the Phase-0g `page_size: "all"` path; assemble the bundle in-memory using the Phase-0b/0c codec (including the `preview` block built from the in-hand result data); POST to `/users/me/snapshots`.
 - [ ] Toast on success / failure. The Load button then becomes visible (or its count refreshes) because the list endpoint will now return ≥1 snapshot.

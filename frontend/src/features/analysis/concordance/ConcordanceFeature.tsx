@@ -37,7 +37,11 @@ import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataCol
 import { useConcordanceMaterializedEvents } from './hooks/useConcordanceMaterializedEvents';
 import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
 import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
-import { isSnapshotMode, useToolSnapshotMode } from '@/features/snapshot-view';
+import {
+  SNAPSHOT_CAPS,
+  isSnapshotMode,
+  useToolSnapshotMode,
+} from '@/features/snapshot-view';
 import { useConcordanceSnapshotCapture } from './hooks/useConcordanceSnapshotCapture';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
@@ -682,19 +686,42 @@ const ConcordanceFeature: React.FC = () => {
     concordanceTaskStatus.terminalTask?.task_id ??
     concordanceTaskId;
 
+  const getConcordanceNodeRowCount = useCallback((node: WorkspaceNodeLike) => {
+    const shape = node.shape as unknown;
+    if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
+    return 0;
+  }, []);
+
   const handleSaveSnapshot = useConcordanceSnapshotCapture({
     workspaceId: currentWorkspaceId ?? null,
     workspaceName: currentWorkspaceId ?? '(workspace)',
     taskId: captureTaskId,
     request: (results?.metadata as Record<string, unknown> | undefined) ?? null,
     selectedNodes: panelSelectedNodes,
-    getNodeRowCount: (node) => {
-      const shape = node.shape as unknown;
-      if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
-      return 0;
-    },
+    getNodeRowCount: getConcordanceNodeRowCount,
     getAuthHeaders,
   });
+
+  // Synchronous Save-button disable reason. Mirrors the capture
+  // hook's guards so the user sees the explanation BEFORE opening
+  // the dialog (matches the runDisabledReason / DisabledReasonTooltip
+  // pattern used by the Run button). Returned as ``undefined`` when
+  // Save should be enabled.
+  const saveSnapshotDisabledReason = (() => {
+    if (panelSelectedNodes.length === 0) {
+      return 'Select at least one data block first.';
+    }
+    const counts = panelSelectedNodes.map(getConcordanceNodeRowCount);
+    const largest = counts.reduce((m, n) => (n > m ? n : m), 0);
+    const cap = SNAPSHOT_CAPS.demo.maxSourceRowsPerBlock;
+    if (cap !== null && largest > cap) {
+      return `Largest selected data block has ${largest.toLocaleString()} rows; demo snapshots cap each block at ${cap.toLocaleString()}.`;
+    }
+    if (!captureTaskId) {
+      return 'Run the concordance analysis (and let it finish) before saving a snapshot.';
+    }
+    return undefined;
+  })();
 
   // (effectiveNodeColumnSelections is declared above so it can be referenced
   // by the metadata-column section IIFE.)
@@ -1257,6 +1284,7 @@ const ConcordanceFeature: React.FC = () => {
         setNodePagination={setNodePagination}
         persistResultPreferences={persistResultPreferences}
         onSaveSnapshot={handleSaveSnapshot}
+        saveSnapshotDisabledReason={saveSnapshotDisabledReason}
       />
 
       {concordanceWaitingBanner && (

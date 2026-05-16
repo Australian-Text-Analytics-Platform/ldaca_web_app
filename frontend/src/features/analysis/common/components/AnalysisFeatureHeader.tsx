@@ -26,6 +26,10 @@ export interface AnalysisFeatureHeaderProps {
    * because most tools haven't wired snapshot capture yet (Phase 1
    * lights it up tool-by-tool). */
   onSaveSnapshot?: (filename: string, description: string) => Promise<void>;
+  /** When set, the Save button renders disabled with this string as
+   * a hover tooltip — same UX as the Run-disabled pattern elsewhere
+   * in the analytic feature panels. Falsy = enabled. */
+  saveSnapshotDisabledReason?: string | null;
 }
 
 /**
@@ -48,6 +52,7 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
   helpLabel,
   helpTooltip,
   onSaveSnapshot,
+  saveSnapshotDisabledReason,
 }) => {
   return (
     <CardHeader className="space-y-0 pb-4">
@@ -61,7 +66,11 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
           className="flex items-center gap-2"
           data-testid="analysis-feature-header-actions"
         >
-          <SnapshotActions tool={tool} onSave={onSaveSnapshot} />
+          <SnapshotActions
+            tool={tool}
+            onSave={onSaveSnapshot}
+            disabledReason={saveSnapshotDisabledReason}
+          />
         </div>
       </div>
     </CardHeader>

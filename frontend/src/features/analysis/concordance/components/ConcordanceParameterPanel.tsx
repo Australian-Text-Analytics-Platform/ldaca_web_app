@@ -73,6 +73,9 @@ export type ConcordanceParameterPanelProps = {
   /** Forwarded to <AnalysisFeatureHeader> — wires the Save snapshot
    * button in the header's right slot. See plan §3.7 + §5.7. */
   onSaveSnapshot?: (filename: string, description: string) => Promise<void>;
+  /** Forwarded to <AnalysisFeatureHeader>. When set, the Save button
+   * is rendered disabled with this string as a hover tooltip. */
+  saveSnapshotDisabledReason?: string | null;
 };
 
 export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps> = ({
@@ -112,6 +115,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   setNodePagination,
   persistResultPreferences,
   onSaveSnapshot,
+  saveSnapshotDisabledReason,
 }) => {
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
@@ -133,6 +137,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
         helpLabel="Concordance parameters"
         helpTooltip="Select data blocks, choose the search term, and set context options before running."
         onSaveSnapshot={onSaveSnapshot}
+        saveSnapshotDisabledReason={saveSnapshotDisabledReason}
       />
       <CardContent className="space-y-4 pt-0">
         <NodeSelectionPanel
