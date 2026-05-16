@@ -59,3 +59,10 @@ export {
 } from './pagination';
 
 export { useResolvedNodeColor } from './useResolvedNodeColor';
+
+export {
+  TOOL_COMPATIBILITY,
+  getCurrentAppVersion,
+  isCompatibleSnapshot,
+  parseMajorMinor,
+} from './compat';
