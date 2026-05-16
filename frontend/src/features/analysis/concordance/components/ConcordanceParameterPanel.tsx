@@ -1,9 +1,9 @@
 import React, { type Dispatch, type SetStateAction } from 'react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play, Trash2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
-import InfoIcon from '@/components/help/InfoIcon';
+import { AnalysisFeatureHeader } from '@/features/analysis/common/components/AnalysisFeatureHeader';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
@@ -119,25 +119,16 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
 
   return (
     <Card>
-      <CardHeader className="space-y-0 pb-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              Concordance Search
-              <InfoIcon
-                targetKey="concordance.overview"
-                label="About Concordance Search"
-                tooltip="Learn what concordance search is and how it can help you."
-              />
-              <HelpIcon
-                targetKey="analysis.concordance.parameters"
-                label="Concordance parameters"
-                tooltip="Select data blocks, choose the search term, and set context options before running."
-              />
-            </CardTitle>
-          </div>
-        </div>
-      </CardHeader>
+      <AnalysisFeatureHeader
+        tool="concordance"
+        title="Concordance Search"
+        infoKey="concordance.overview"
+        infoLabel="About Concordance Search"
+        infoTooltip="Learn what concordance search is and how it can help you."
+        helpKey="analysis.concordance.parameters"
+        helpLabel="Concordance parameters"
+        helpTooltip="Select data blocks, choose the search term, and set context options before running."
+      />
       <CardContent className="space-y-4 pt-0">
         <NodeSelectionPanel
           selectedNodes={panelSelectedNodes}

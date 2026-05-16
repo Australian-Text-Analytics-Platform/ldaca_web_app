@@ -66,3 +66,6 @@ export {
   isCompatibleSnapshot,
   parseMajorMinor,
 } from './compat';
+
+export { SnapshotActions } from './components/SnapshotActions';
+export { DemoSnapshotsToggleItem } from './components/DemoSnapshotsToggleItem';
