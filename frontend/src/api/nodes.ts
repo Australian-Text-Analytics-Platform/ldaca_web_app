@@ -128,6 +128,13 @@ export interface PolarsExpressionApplyResponse {
   node_name: string;
 }
 
+export interface DtypeNormalizationChange {
+  column: string;
+  from_dtype: string;
+  to_dtype: string;
+  reason: string;
+}
+
 export interface NodeInfoResponse {
   id: string;
   name: string;
@@ -140,6 +147,7 @@ export interface NodeInfoResponse {
   columns: string[];
   can_undo?: boolean;
   can_redo?: boolean;
+  dtype_normalization?: DtypeNormalizationChange[];
 }
 
 export interface NodeDataParams {
@@ -193,7 +201,7 @@ export const nodesApi = {
       headers,
     }),
   createFromFile: (filename: string, nodeName?: string, headers: Record<string,string> = {}, sheetName?: string) =>
-    httpRequest<Record<string, unknown>>(`/workspaces/nodes`, {
+    httpRequest<NodeInfoResponse>(`/workspaces/nodes`, {
       method: 'POST',
       headers,
       params: {
