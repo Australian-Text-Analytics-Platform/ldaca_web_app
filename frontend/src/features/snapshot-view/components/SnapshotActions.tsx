@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, FolderOpen } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { snapshotsApi } from '@/api/snapshots';
@@ -81,7 +81,9 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
           onClick={() => setLoadOpen(true)}
           aria-label="Load saved snapshot"
         >
-          <FolderOpen className="mr-1.5 h-4 w-4" />
+          {/* Same Camera icon as Save — both buttons act on snapshots,
+              the labels Save / Load disambiguate. */}
+          <Camera className="mr-1.5 h-4 w-4" />
           Load
         </Button>
       )}
