@@ -4,6 +4,7 @@
 **Drafted**: 2026-05-12
 **Revised**: 2026-05-16 — refinements applied for naming collision with the analysis-lock machine, node-colour store migration, runtime-resolved stopwords, the `TokensColumnMismatchNotice`, dispersion-bins shape changes, full-result fetch path, dual-mode table pagination, and Tauri / Binder host verification. Branch: `feat/demo-snapshot` off `v0.4`.
 **Revised**: 2026-05-16 (later same day) — introduced a two-mode design: Mode 1 (demo, implemented in v1) and Mode 2a (share, design-only, hooks left in v1). See §0.5.
+**Revised**: 2026-05-16 (third pass) — switched to backend-mediated storage (sibling of `user_cache/embeddings`), added sidecar `.manifest.json` + `.md` files for fast listing, introduced master-switch UX in `preferencesStore` + sidebar dropdown (§3.6), shared `<AnalysisFeatureHeader>` template (§3.7), MAJOR.MINOR version compatibility predicate with per-tool override registry (§2.3), and the per-snapshot + adaptive-batch delete UX (§5.7). Phase 0a–0g are now landed; Phase 0h–0k spec the remaining infrastructure. See changelog at bottom of file.
 **Scope**: analytic tools only — concordance, quotation, token-frequency, sequential-analysis, topic-modeling. AI-Annotator is deferred until the feature stabilises (mirroring the refactor plan's exclusion).
 **Out of scope**: data loader, data preprocessing, export. A snapshot is a *read-only view of an analysis result*, not a serialised workspace; users should never be invited to trust snapshot data as a workspace input.
 
@@ -49,16 +50,52 @@ The feature splits into two snapshot flavours that share most of their plumbing:
 
 Both Mode 1 and Mode 2a's hard requirement is **isolation from the live backend during view**. Any path that reads or writes server state *while a snapshot is open* risks: (a) leaking stale results into a different workspace, (b) reactivating GC'd parquet caches, (c) coupling snapshot lifetime to task lifetime, (d) creating cross-user attack surface.
 
-The clean answer: the snapshot is a portable artifact the browser produces from data it already has, and the browser also consumes it. **Backend involvement during view: none, in either mode.** Backend involvement during *capture* is minimal but not zero — we need a one-shot full-result fetch (see §5 and §8), and Mode 2a adds a column-projected source-rows fetch on top. After the bundle is written to disk the backend is no longer in the loop.
+The clean answer: the snapshot is a portable artifact the browser produces from data it already has, and the browser also consumes it. **Backend involvement during view: none, in either mode.** Backend involvement during *capture and storage* is necessary but narrow:
+
+- **Capture** needs a one-shot full-result fetch (the existing `POST /result` extended with `page_size: "all"`, landed in Phase 0g for concordance). Mode 2a adds a column-projected source-rows fetch on top (deferred).
+- **Storage** uses per-user backend file ops to write the bundle into `user_cache/snapshots/` (sibling of `user_cache/embeddings/`). No analysis logic — the backend is purely a storage clerk. See §2.4 for endpoints.
+- **Once a bundle is in the frontend's memory**, the backend is no longer engaged. Pagination, sort, filter, chart re-render — all pure-frontend.
+
+This is a deliberate scope expansion from the original "no backend" framing: it buys a real user_cache-based list-and-load UX that works identically in web, Tauri, and Binder hosts, without per-platform code paths. The view-time isolation property — the actual safety guarantee that made this feature frontend-first — is unchanged.
 
 **Consequences of this choice** — accept up front:
-- No server-side snapshot library. Users keep their files (download / re-upload, or local IndexedDB if we want a "My Snapshots" drawer later — but disk file is the v1).
+- Snapshots live on the server, per-authenticated-user. A user logged in as A on laptop and on workstation sees the same snapshot list. A different user (B) doesn't see A's snapshots.
 - Snapshot format is versioned (`schema_version` field in manifest) so we can evolve it without breaking old files.
+- Per-version compatibility is checked at list time via the `tool_version` field (§2.3). Incompatible snapshots show in the list but the Open button is disabled with a tooltip; they remain present until the user (or a future cleanup pass) deletes them.
 - Pagination of result tables is **client-side** in snapshot mode (the full table ships in the bundle). Bundle size is the practical cap; see §4 for size discipline. The existing tables paginate server-side via `page_index`/`page_size` overrides — they need a dual-mode pagination contract (see §3.4).
 
-## 2. Bundle format
+## 2. Bundle format and storage
 
-A zip file with the extension `.ldaca-snapshot` (or `.zip` for portability). Contents (Mode 1 ships a subset; Mode 2a adds source-projection):
+### 2.0 On-disk layout (per user)
+
+Snapshots are stored under each user's `user_cache/snapshots/` folder — sibling of `user_cache/embeddings/`, using the existing [`get_user_cache_folder(user_id)`](../../backend/src/ldaca_wordflow/core/utils.py#L73) helper. Each snapshot writes **three sibling files** with a common basename:
+
+```
+<data_root>/<user_data_folder>/{user_root|user_<id>}/user_cache/snapshots/
+  concordance-pride-prejudice.ldaca-snapshot      ← the zip bundle (canonical artifact)
+  concordance-pride-prejudice.manifest.json       ← sidecar: parsed manifest for fast listing
+  concordance-pride-prejudice.md                  ← sidecar: human-readable description
+```
+
+- **Bundle** (`.ldaca-snapshot`) is the canonical artifact: a self-contained zip the user could in principle download and share manually. The frontend never decompresses a bundle just to list snapshots.
+- **Sidecar `.manifest.json`** is extracted from the bundle on save. The list endpoint returns these manifests verbatim so the load dialog renders previews without unzipping every file. If a sidecar is missing (snapshot dropped in manually, or sidecar accidentally deleted), the backend lazily extracts it from the zip on first list and re-writes it. The zip's internal `manifest.json` remains the canonical source of truth on load — the sidecar is purely a listing optimisation.
+- **Sidecar `.md`** is a short human-readable description, auto-generated at save from manifest data (similar to sample-data READMEs). Rendered by the load dialog via the existing `react-markdown` + `remark-gfm` stack — same components `SampleDataPanel` uses for its READMEs. Users can leave the description blank at save (we render a default summary); future capture flows may let them edit it before save.
+
+### 2.1 Filename convention
+
+`<tool>-<user_defined_name>.ldaca-snapshot` (and matching sidecar names). The user-defined name is a label the user types at save time — *not* the system user id (per-user scoping is provided by the folder path).
+
+Sanitisation rules:
+- Replace `[/\\:*?"<>|]` with `_`.
+- Reject empty after sanitisation.
+- Trim to 80 chars max.
+- Reject if `<tool>-<sanitised>` already exists in the current snapshot list (frontend-side check against the in-memory list — no overwrite confirm modal; the save dialog inline-validates the name input and disables Save until valid + unique).
+
+Original (un-sanitised) user input is preserved in `manifest.title` for display in the load dialog and the snapshot view banner.
+
+### 2.2 Bundle internal contents
+
+A zip with the extension `.ldaca-snapshot`. Contents:
 
 ```
 manifest.json                  required, schema_version + mode + tool + capture metadata
@@ -72,21 +109,21 @@ tables/
 ```
 
 Why this layout:
-- **Parquet for tabular**: concordance/quotation hit rows can be tens of thousands. Parquet is ~10× smaller than JSON and decodes via `parquet-wasm` in the browser at ~5 MB/s.
+- **Parquet for tabular**: concordance/quotation hit rows can be tens of thousands. Parquet is ~10× smaller than JSON and decodes via `hyparquet` (pure JS — see Phase 0c decision) in the browser.
 - **JSON for everything else**: settings, bins, summaries. Inspectable, diffable, no decoder dependency.
 - **Folder layout, not flat**: lets us add per-tool payloads without renaming.
 - **Mode is a manifest field, not a layout split**: a Mode 2a bundle differs from a Mode 1 bundle only by the presence of a `source-projection` payload entry plus `mode: "share"`. A loader that hands Mode 2a to a recipient who's running an older v1 build degrades gracefully — it can load result/bins, ignore the unknown source-projection payload, and inform the user "this snapshot has share-mode data your build can't open yet".
 
-### 2.1 `manifest.json` shape
+### 2.3 `manifest.json` shape
 
 ```jsonc
 {
   "schema_version": 1,
   "mode": "demo",                              // "demo" | "share" — see §0.5
   "tool": "concordance",                       // one of the analysis-tool keys
-  "tool_version": "v0.4.4",                    // app version at capture
+  "tool_version": "v0.4.4",                    // app version at capture — drives compatibility check (§2.4)
   "captured_at": "2026-05-16T07:30:00Z",
-  "title": "user-chosen label",
+  "title": "user-chosen label",                // un-sanitised; filename uses a sanitised form (§2.1)
   "source": {
     "workspace_id": "uuid-at-capture-time",    // for traceability only, never re-engaged
     "workspace_name": "...",
@@ -100,6 +137,13 @@ Why this layout:
     "canExport": true,
     "canFilterSourceRows": false,              // true only in share mode
     "canCrossJump": false                      // future — multi-tool snapshots
+  },
+  "preview": {                                 // tool-specific summary populated at capture (§2.3.1)
+    "tool": "concordance",
+    "searchTerm": "love",
+    "totalHits": 14823,
+    "materialised": true,
+    "displayColumns": ["doc_id", "left_context", "matched_text", "right_context"]
   },
   "payloads": [
     { "kind": "result",            "path": "tables/result.parquet" },
@@ -117,6 +161,73 @@ Loader rules:
 - The `capabilities` block is the source of truth for UI enablement. Components must read capabilities, **not** test `mode === "demo"`. This is the central hook that makes Mode 2a a flip-the-bits exercise.
 
 `source` is for human reference and audit. Loaders **never** look up these IDs against the live backend.
+
+#### 2.3.1 `preview` block — typed per tool
+
+The `preview` block is a discriminated union over `tool`, populated at capture time from in-hand data so the load dialog renders summary stats without decoding parquet payloads. Each tool defines its own preview schema in code:
+
+```ts
+type SnapshotPreview =
+  | { tool: 'concordance'; searchTerm: string; totalHits: number; materialised: boolean; displayColumns: string[] }
+  | { tool: 'quotation'; openPattern: string; closePattern: string; totalHits: number; displayColumns: string[] }
+  | { tool: 'token_frequencies'; vocabSize: number; topToken: string; topTokenCount: number; tokeniserId: string }
+  | { tool: 'sequential_analysis'; seriesCount: number; bucketCount: number; chartType: string }
+  | { tool: 'topic_modeling'; numTopics: number; vocabSize: number; embedder: string; wordsPerTopic: number };
+```
+
+The load dialog maps each preview to a list of label/value rows via a per-tool `formatPreview()` helper — so the dialog renders identically across tools, but the *content* of the preview is tool-specific without hardcoding tool keys into the dialog. Adding a new analytic tool means: define its `SnapshotPreview` arm + a `formatPreview()` entry; the dialog inherits support automatically.
+
+### 2.4 Version compatibility
+
+Each manifest carries `tool_version` (the running app version at capture, e.g. `"v0.4.4"`). Load-side compatibility is decided by a single predicate, with per-tool overrides:
+
+```ts
+// features/snapshot-view/compat.ts
+const TOOL_COMPATIBILITY: Partial<Record<SnapshotToolKey, {
+  compatibleMinorVersions: string[];   // e.g., ['0.4', '0.5']
+}>> = {
+  // Empty for now — every tool falls back to "same MAJOR.MINOR".
+  // Populate as tools stabilise:
+  //   concordance: { compatibleMinorVersions: ['0.4', '0.5'] },
+};
+
+function isCompatibleSnapshot(
+  snapshotVersion: string,
+  tool: SnapshotToolKey,
+  currentVersion: string,
+): boolean {
+  const override = TOOL_COMPATIBILITY[tool];
+  if (override) {
+    return override.compatibleMinorVersions.includes(parseMajorMinor(snapshotVersion));
+  }
+  return parseMajorMinor(snapshotVersion) === parseMajorMinor(currentVersion);  // default
+}
+```
+
+Rules:
+- Default predicate: same `MAJOR.MINOR` (so `0.4.x` is compatible with any `0.4.x` build; `0.3.x` and `0.5.x` are not).
+- The override registry holds explicit allowlists for tools known to be cross-version safe (typically: backend-only changes, or tools that have stabilised). Empty in v1 — every tool uses the default.
+- Incompatible snapshots **show in the list** with an "Incompatible (saved in v0.3.5)" badge and the Open button disabled with a tooltip explanation. They are not silently hidden — same graceful-degrade philosophy as Mode-2a capability gating.
+- The **batch-delete predicate** (§5.7) is the same as this load predicate. Anything the current build can't open IS what "stale" means. This avoids the orphan-middle-zone where a snapshot can neither be opened nor batch-deleted.
+- When the allowlist grows beyond a trivial list for a given tool, promote it to a predicate function (e.g. "any 0.4.x or 0.5.x but not 0.4.0"). v1 keeps it a string list; the API surface lets us replace with a function without changing callers.
+
+### 2.5 Backend storage endpoints
+
+All endpoints are user-scoped via the existing auth (`Depends(get_current_user)`), routed under `/users/me/snapshots`. The backend is a storage clerk — no analysis logic.
+
+| Method | Path | Returns | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/users/me/snapshots` | `{ items: SnapshotManifest[] }` | List all snapshot manifests for the current user. Reads sidecar `.manifest.json` files; lazily extracts from zip if a sidecar is missing. Optional `?tool=concordance` query filters by `manifest.tool`. |
+| `POST` | `/users/me/snapshots` | `{ manifest: SnapshotManifest }` | Multipart upload: `file` part is the bundle bytes, `filename` form field carries the user-chosen filename (server validates against the sanitisation rules in §2.1). Server extracts the bundle's `manifest.json` to write the sidecar `.manifest.json`, generates the `.md` from manifest data. Rejects with 409 if the filename collides (frontend should already have prevented this; the server check is defence-in-depth). |
+| `GET` | `/users/me/snapshots/{filename}` | bundle bytes (`application/zip`) | Download a bundle by its on-disk filename. 404 if absent. |
+| `GET` | `/users/me/snapshots/{filename}/description` | rendered markdown (`text/markdown`) | Read the human description sidecar. Convenience for the load dialog's README pane. Optional — the dialog can also derive a default from manifest data when the file is absent. |
+| `DELETE` | `/users/me/snapshots/{filename}` | `{ deleted: true }` | Remove all three files (bundle + manifest sidecar + .md sidecar) atomically. 404 if absent. |
+| `DELETE` | `/users/me/snapshots?tool=concordance&incompatible_with=v0.4.4` | `{ deleted: string[] }` | Batch delete. Without the `incompatible_with` parameter, deletes every snapshot matching the `tool` filter. With it, deletes only those whose `manifest.tool_version` is incompatible per the same predicate the frontend uses (§2.4). The frontend evaluates the predicate to know what label to show on the button; the server re-evaluates so it's the source of truth on what actually gets deleted. |
+
+Implementation notes:
+- All filename arguments are sanitised + path-confined to `user_cache/snapshots/` before touching disk. Reject `..` and absolute paths.
+- The list endpoint caches the parsed sidecar manifests in memory per-user with a short TTL (~30 s) to avoid re-reading on every load-dialog open. Save/delete invalidate the cache.
+- Sidecar lazy-extract: if a `.ldaca-snapshot` is found without a matching `.manifest.json`, the list endpoint opens the zip, reads `manifest.json`, writes the sidecar, and adds it to the response. This makes the system resilient to manual file drops without forcing the frontend to ever decode bundles itself.
 
 ## 3. Snapshot mode flags and mutation guards
 
@@ -225,6 +336,53 @@ Two rules for the snapshot:
 
 The same "frozen at capture, never written back" rule applies to anything else read from `nodeColorsStore` (palette index, manually-assigned vs auto-assigned distinction, etc.).
 
+### 3.6 Master switch — enable/disable demo snapshots
+
+Demo snapshots are an **off-by-default** feature surfaced via a master switch. When off, every Save/Load button across every analytic tool is unmounted (not just disabled — fully gone), keeping the analytic UI uncluttered for users who aren't demoing.
+
+Placement and state:
+
+- **State**: a boolean `demoSnapshotsEnabled` on [`usePreferencesStore`](../../frontend/src/stores/preferencesStore.ts), persisted via the existing preferences sync. Default `false`.
+- **UI location**: a `DropdownMenuCheckboxItem` labelled **"Enable demo snapshots"** in the sidebar's existing dropdown menu — same menu that already houses *Reset all hints* and the *Clear embedding cache* item ([Sidebar.tsx:349-394](../../frontend/src/components/layout/Sidebar.tsx#L349-L394)). Below the visible-views checkboxes, alongside the existing "settings-ish" actions.
+- **Lifecycle of `user_cache/snapshots/`**: the folder is created lazily on first save (the first time the user actually captures a snapshot with demo mode enabled). Disabling demo mode does **not** delete the folder or its contents — the user's saved snapshots persist across enable/disable cycles. Folder removal is explicit, via the per-tool batch-delete UX (§5.7).
+
+What flipping the switch does (and does NOT do):
+
+- ON → analytic tools render their `<AnalysisFeatureHeader>` Save/Load slot (§3.7). Snapshot view machinery becomes user-reachable.
+- OFF → Save/Load buttons unmount tool-wide. **In-progress snapshot views remain** — if the user is currently viewing a loaded snapshot when they flip the switch off, that view stays active until they exit it via the snapshot banner's "Exit snapshot view" control. We do not force-exit, because that would discard a state the user is actively looking at.
+- The switch does **not** gate the infrastructure (store, codec, helpers, mutation guards). Those stay always-on so a currently-loaded snapshot continues to render correctly even with the switch toggled off.
+
+### 3.7 Shared `<AnalysisFeatureHeader>` template
+
+Each analytic tool currently builds its own `<CardHeader><CardTitle>...</CardTitle></CardHeader>` block inside its `*ParameterPanel.tsx` (e.g. [ConcordanceParameterPanel.tsx:121](../../frontend/src/features/analysis/concordance/components/ConcordanceParameterPanel.tsx#L121)). The header already uses `flex md:flex-row md:justify-between` — there's a right-side slot sitting empty. Rather than duplicate Save/Load wiring per tool, introduce a shared header component:
+
+```tsx
+// frontend/src/features/analysis/common/components/AnalysisFeatureHeader.tsx
+interface AnalysisFeatureHeaderProps {
+  tool: SnapshotToolKey;             // drives snapshot save/load wiring
+  title: string | React.ReactNode;
+  infoKey: string;                   // for <InfoIcon>
+  infoTooltip: string;
+  helpKey: string;                   // for <HelpIcon>
+  helpTooltip: string;
+}
+
+// Renders: CardHeader > flex row >
+//   left:  CardTitle + InfoIcon + HelpIcon  (today's pattern)
+//   right: <SnapshotActions tool={tool} />   (Save + Load buttons, gated by
+//           preferencesStore.demoSnapshotsEnabled; Load further gated by
+//           "list returned ≥1 compatible snapshot for this tool")
+```
+
+Each tool's `*ParameterPanel.tsx` imports `<AnalysisFeatureHeader>` and replaces its `<CardHeader>` block with one line. The Save/Load logic lives once.
+
+Phasing for the refactor:
+
+- **Phase 0j**: build `<AnalysisFeatureHeader>` and migrate concordance as the pattern proof. Other tools keep their current per-tool headers.
+- **Phase 2 (per tool)**: migrate quotation, token-frequency, sequential, topic-modeling alongside their respective save/load Phase-2 commits.
+
+The migration is mechanical — each tool's header has the same structure, just different title text + info/help keys.
+
 ## 4. Size discipline
 
 Bundles can grow if we're careless. Caps live in one constant table keyed by mode, so adding a new mode is adding one entry:
@@ -326,36 +484,110 @@ Captured by Mode 2a, never by Mode 1. Reserved here so the v1 type system and lo
 
 Loader behaviour when the v1 (demo-only) build encounters a Mode 2a bundle: load result + bins as usual, set `capabilities.canFilterSourceRows = false` even if the manifest says true, show a notice "this snapshot includes shareable source rows your build version doesn't yet support — update to the latest Wordflow to use them". This is the graceful-degrade path that the typed payload list enables.
 
+### 5.7 Save / Load / Delete UI
+
+#### 5.7.1 Save (capture) button
+
+- **Location**: right-side slot of `<AnalysisFeatureHeader>` (§3.7), top-right of each tool's title row.
+- **Visibility**: rendered only when `preferencesStore.demoSnapshotsEnabled` is true. Otherwise the slot is empty / unmounted.
+- **Enablement**: disabled with tooltip when no result is present yet, when the eligibility cap (§4) is exceeded, or while a save request is in flight.
+- **Behaviour**: opens a small modal dialog with a name input (placeholder: tool + timestamp suggestion) and an optional description textarea. Inline-validates the name against the loaded snapshot list — shows "Name already exists" until the typed name is unique. Save POSTs the bundle; on success, dialog closes with a toast.
+
+#### 5.7.2 Load button + dialog
+
+- **Location**: right-side slot of `<AnalysisFeatureHeader>`, next to Save.
+- **Visibility**: rendered only when `preferencesStore.demoSnapshotsEnabled` AND the snapshot list (for this tool) has ≥1 entry. Otherwise unmounted — no "empty load" state to confuse the user.
+- **Dialog layout** (modelled on [`SampleDataPanel`](../../frontend/src/features/data-loader/components/SampleDataPanel.tsx)):
+  - Per-row layout: `[ <title>  (flex-1) ]  [ Quote icon → README viewer ]  [ red Trash icon → per-snapshot delete ]  [ <size> ]  [ <version chip / "Incompatible" badge> ]  [ Open button ]`.
+  - Per-row metadata block underneath (collapsed by default, expanded on click): capture date, source workspace + node names + total source rows, tool-specific `formatPreview()` rows (vocab size, num topics, search term + total hits — whatever the `preview` block declared).
+  - README viewer: same `react-markdown` + `remark-gfm` stack as `SampleDataPanel`, pointed at the snapshot's `.md` sidecar via `GET /users/me/snapshots/{filename}/description`.
+- **Footer**: Cancel + adaptive batch-delete button (§5.7.4).
+
+#### 5.7.3 Per-snapshot delete (red bin icon)
+
+- Confirmation modal lists: snapshot name, capture date, `tool_version`.
+- Single Delete (destructive variant) + Cancel buttons.
+- On success: list refreshes; if the deleted snapshot was the one currently loaded into `useSnapshotViewStore`, auto-exit to live mode and toast "Snapshot deleted — returned to live view".
+- On failure (network, 404, permission): red toast; list refreshes so any externally-removed file disappears.
+
+#### 5.7.4 Adaptive batch-delete button
+
+Button label flips based on the live snapshot list state:
+
+| List state for this tool | Button label | What it deletes |
+| --- | --- | --- |
+| ≥1 incompatible snapshot present | **"Delete stale snapshots"** | Only snapshots failing the compatibility predicate (§2.4). |
+| 0 incompatible, ≥1 compatible | **"Delete all snapshots"** | Every snapshot for this tool. |
+| 0 snapshots total | (button hidden — same as the Load button) | n/a |
+
+Click → confirmation modal (lists count + version range affected for the stale variant; lists count + names for the all variant) → DELETE endpoint → list refresh.
+
+Click-cost summary (matches the original ask):
+- Delete one snapshot: 2 clicks (bin icon + confirm).
+- Delete all incompatible: 2 clicks (button + confirm).
+- Clear everything for a tool when a mix exists: 4 clicks max (stale-pass + all-pass).
+
 ## 6. Implementation phasing
 
 **v1 ships Mode 1 only.** Every phase below is scoped to demo mode; share-mode hooks (types, manifest fields, capability bits, dispatching loader) are landed alongside as zero-cost forward-compat, but no share-mode capture path is implemented.
 
 Designed so each phase is shippable on its own; you can stop after any phase and the app still works.
 
-### Phase 0 — Infrastructure (~1–2 days, slightly longer than originally scoped due to dual-mode pagination + host verification)
-- [ ] Pick a parquet decoder. `parquet-wasm` is the most-used; benchmark on a 50k-row concordance result. Acceptance: decode + render < 2 s on a mid-spec laptop.
-- [ ] **Verify parquet-wasm + JSZip load under all three runtime hosts**: web (current Vite dev/build), Tauri desktop (custom `tauri://` scheme, may need MIME registration for `.wasm`), and Binder (proxied via JupyterServerProxy under a non-root path). A wasm-asset load that works in `vite dev` can silently break on Tauri or behind the Jupyter proxy. Fix any host-specific asset path issues in Phase 0, not after Phase 1.
-- [ ] Pick a zip library. `JSZip` is the obvious default; verify the same host-host compatibility.
-- [ ] Add `useSnapshotViewStore` (zustand) with the three-arm `ViewMode` discriminated union and per-tool `LoadedSnapshot` slices defined in §3.1. **Wire the `sourceProjection` field on every slice from day one**, hard-coded to `null` in demo mode — the field's presence is the central forward-compat hook.
-- [ ] Add the `SNAPSHOT_CAPS` constant table from §4 and the `isSnapshotMode(viewMode)` helper. Reference these everywhere instead of inline strings.
-- [ ] **Land the dual-mode pagination contract** (§3.4) — pick adapter vs. hook and apply to one table (concordance) so Phase 1 has a working pattern to copy. This is the single most reused piece of infrastructure; don't punt it to Phase 1.
-- [ ] Implement the `useResolvedNodeColor(nodeId)` helper that dispatches between `nodeColorsStore` and the snapshot's frozen colour map (§3.5). Swap one call site in concordance to use it; assert behaviour unchanged in live mode.
-- [ ] **Manifest + payloads loader/writer**: parse and emit the §2.1 manifest shape with the `mode`, `capabilities`, and typed `payloads` array. The loader must dispatch by `kind`, ignore unknown kinds with a console warn, and fail fatal on missing `kind: "result"`. Add a unit test that loads a hand-crafted Mode-2a manifest (mode: "share", payload kind: "source-projection") into the v1 build and asserts:
-  - capabilities are gated down (`canFilterSourceRows` forced to false),
-  - the user-facing notice ("update Wordflow to use shareable source rows") appears,
-  - no source-projection-dependent UI surface is wired up.
-  - This locks in the graceful-degrade contract before any share-mode capture code exists.
-- [ ] Wire the flag into one tool's UI (concordance) to prove the mutation-guard pattern works end-to-end — no actual snapshot file yet; just a manual `setMode('concordance', { kind: 'demoSnapshot' })` from devtools to verify all mutation entry points (including `TokensColumnMismatchNotice`, tokens-mode model picker, multi-keyword input, lock indicators) are properly gated, and that `isSnapshotMode` is what's consulted, not raw string compares.
-- [ ] Extend the POST `/result` body-override schema on at least the concordance endpoint to accept `page_size: "all"` (server-side capped at 500k). Add a backend test asserting the cap is enforced. Other tools' endpoints get the same extension in their phase.
+### Phase 0 — Infrastructure
 
-### Phase 1 — Concordance snapshot (~2-3 days)
-- [ ] **Eligibility gate**: before exposing the "Save view" button, check `sum(rows across selected/processed nodes) <= SNAPSHOT_CAPS.demo.maxSourceRows` (2 000). If over, replace the button with a disabled-tooltip surface explaining the limit (referencing the share-mode future).
-- [ ] Capture flow: a "Save view" button in the result panel. Reads the live state, fetches full result (with hard-cap check), serialises to bundle (manifest with `mode: "demo"`, `capabilities.canFilterSourceRows: false`, no source-projection payload), triggers browser download.
-- [ ] Load flow: a "Load view" button at tool entry (also accept drag-drop of `.ldaca-snapshot` files anywhere on the tool). Decodes the bundle, populates the snapshot slice, sets `viewMode = { kind: 'demoSnapshot' }`.
-- [ ] Exit flow: "Exit snapshot view" button. Clears the snapshot slice, sets `viewMode = { kind: 'live' }`. The original live state was never touched, so the user returns to whatever was there before.
-- [ ] Mutation guards verified for every entry point listed in §3.2.
-- [ ] Cross-tool jump from frequency → concordance loaded in snapshot mode: shows toast, no jump (Concordance ignores the pending payload while in snapshot mode).
-- [ ] Tests: capture → save → reload → identical view. Round-trip parity. Also: a fixture file with `mode: "share"` loads cleanly with capabilities gated down (proves the forward-compat contract from Phase 0 still holds with real data).
+Split into atomic sub-phases. **0a–0g have landed** (commits b52d0e1 … 6db28c1); **0h–0k remain** for the backend-mediated storage + master switch + shared header + compat predicate added in the third design pass.
+
+#### Phase 0a–0g — landed
+- [x] **0a** — Types, ViewMode union, SNAPSHOT_CAPS, `useSnapshotViewStore`, `isSnapshotMode` helper.
+- [x] **0b** — Manifest codec (parse/emit) with Mode-2a graceful-degrade contract.
+- [x] **0c** — Bundle codec on JSZip + hyparquet (no wasm, sidesteps Tauri/Binder host concerns).
+- [x] **0d** — Dual-mode pagination contract (`PaginationSource` adapter).
+- [x] **0e** — `useResolvedNodeColor` helper.
+- [x] **0f** — `useToolSnapshotMode` selector + first mutation guard on Concordance's `handleRunOrUpdate`.
+- [x] **0g** — Backend `page_size: "all"` override on POST `/concordance/.../result` with 500k cap.
+
+#### Phase 0h — Backend snapshot storage + frontend API client
+- [ ] Backend: add `get_user_snapshots_folder(user_id)` helper alongside `get_user_cache_folder` in [`utils.py`](../../backend/src/ldaca_wordflow/core/utils.py). Folder is `user_cache/snapshots/`, created lazily.
+- [ ] Backend: new router `/users/me/snapshots` with the five endpoints in §2.5 (list, upload, download, description, single-delete, batch-delete). Save extracts the bundle's internal `manifest.json` to write the sidecar `.manifest.json`; auto-generates `.md` from manifest data. Lazy sidecar extraction on list when missing.
+- [ ] Backend tests: per-user isolation (user A's snapshots invisible to user B), filename sanitisation rejection, lazy sidecar extract from a hand-built fixture zip, batch delete with and without the `incompatible_with` filter.
+- [ ] Frontend: `snapshotsApi` client in `api/snapshots.ts` mirroring `filesApi` patterns (auth header passthrough, JSON-typed responses).
+- [ ] Frontend tests: API client unit tests against a mocked fetch, covering each endpoint + error paths.
+
+#### Phase 0i — Master switch
+- [ ] Add `demoSnapshotsEnabled: boolean` to [`usePreferencesStore`](../../frontend/src/stores/preferencesStore.ts), default `false`. Persist via existing backend preferences sync.
+- [ ] Add a `DropdownMenuCheckboxItem` "Enable demo snapshots" to the sidebar dropdown menu after the visible-views section (§3.6), between `DropdownMenuSeparator` and the existing `Reset all hints` item.
+- [ ] Tests: store default, store persistence sync, sidebar menu renders the checkbox and toggles the store.
+
+#### Phase 0j — `<AnalysisFeatureHeader>` shared component
+- [ ] Build `frontend/src/features/analysis/common/components/AnalysisFeatureHeader.tsx` (§3.7). Accepts `tool`, `title`, `infoKey`, `helpKey`, tooltips. Renders the existing CardHeader pattern on the left, a `<SnapshotActions tool={tool} />` slot on the right. The slot returns `null` when `demoSnapshotsEnabled` is off — no DOM at all in that case.
+- [ ] Refactor `ConcordanceParameterPanel.tsx` to use `<AnalysisFeatureHeader>` in place of its current `<CardHeader>` block. No behaviour change in live mode; just consolidates the header source. Snapshot Save/Load wires sit empty in this phase (Phase 1 fills them).
+- [ ] Tests: header renders with title/info/help in live mode (no snapshot actions); slot mounts when `demoSnapshotsEnabled` flips on; concordance regression-tests still pass.
+
+#### Phase 0k — Compatibility predicate
+- [ ] Add `features/snapshot-view/compat.ts` with `TOOL_COMPATIBILITY` registry, `parseMajorMinor`, `isCompatibleSnapshot(snapshotVersion, tool, currentVersion)` (§2.4). The registry is empty in v1.
+- [ ] Wire the current build's version through `import.meta.env` (Vite injects the package version at build time) into a single `getCurrentAppVersion()` helper, so all callers consult one source of truth.
+- [ ] Tests: default predicate, override-allowlist predicate, edge cases (malformed version strings, missing patch component, leading `v`).
+
+### Phase 1 — Concordance snapshot capture + load UI
+
+#### Phase 1a — Save (capture) dialog
+- [ ] **Eligibility gate**: before showing the Save button, check `sum(rows across selected/processed nodes) <= SNAPSHOT_CAPS.demo.maxSourceRows` (2 000). If over, render a disabled Save button with tooltip explaining the limit (and naming Mode 2a as the future answer).
+- [ ] Save dialog: name input with inline validation against the loaded snapshot list (no overwrite confirm); optional description textarea; Save / Cancel.
+- [ ] Capture flow: fetch full result via the Phase-0g `page_size: "all"` path; assemble the bundle in-memory using the Phase-0b/0c codec (including the `preview` block built from the in-hand result data); POST to `/users/me/snapshots`.
+- [ ] Toast on success / failure. The Load button then becomes visible (or its count refreshes) because the list endpoint will now return ≥1 snapshot.
+- [ ] Tests: name validation, eligibility gate, end-to-end capture against a mocked API.
+
+#### Phase 1b — Load dialog (sample-data-style)
+- [ ] Load dialog modelled on [`SampleDataPanel`](../../frontend/src/features/data-loader/components/SampleDataPanel.tsx): a `<Dialog>` listing each snapshot as a row. Per row: title + Quote-icon README viewer + **red Trash bin icon** + size + version chip / "Incompatible" badge.
+- [ ] Per-snapshot delete: bin icon → confirmation modal with name + capture date + `tool_version` → DELETE endpoint → list refresh.
+- [ ] Adaptive batch-delete button at dialog footer:
+  - If any incompatible snapshots exist for this tool: label **"Delete stale snapshots"** — confirmation modal lists count + versions affected, calls DELETE with `?tool=concordance&incompatible_with=<current>`.
+  - Otherwise: label **"Delete all snapshots"** — confirmation modal lists count, calls DELETE with `?tool=concordance` (no `incompatible_with`).
+- [ ] If the currently-loaded snapshot is among those deleted, exit to live mode automatically.
+- [ ] Load flow: clicking an Open button on a compatible snapshot → GET bundle bytes → decode via Phase-0c bundle codec → populate `useSnapshotViewStore.concordance` → set `viewMode = { kind: 'demoSnapshot' }`. Snapshot banner replaces the header's Save/Load slot, with an "Exit snapshot view" button.
+- [ ] Mutation guards verified for every entry point listed in §3.2 (Phase-0f covers Run; this commit extends to Process All, Detach, Add to Workspace, tokens-mode controls).
+- [ ] Cross-tool jump from frequency → concordance loaded in snapshot mode: toast, no jump.
+- [ ] Tests: list dialog rendering with compatible + incompatible mix, per-row delete, both batch-delete variants, load → identical view round-trip, deleting currently-loaded snapshot exits the view.
 
 ### Phase 2 — Quotation, Frequency, Sequential (~1 day each)
 Repeat the Phase-1 pattern. The factoring done in Phase 1 should make each subsequent tool a copy-paste of the capture/load skeleton with tool-specific field mapping.
