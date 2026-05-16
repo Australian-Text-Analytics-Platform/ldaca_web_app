@@ -22,7 +22,6 @@ import type { ConcordanceAnalysisResponse } from '@/api/text/concordance';
 import { snapshotsApi } from '@/api/snapshots';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
-  SNAPSHOT_CAPS,
   checkSnapshotEligibility,
   emitManifestJson,
   getCurrentAppVersion,
@@ -104,13 +103,10 @@ export function useConcordanceSnapshotCapture(
 
   return useCallback(
     async (filename: string, description: string): Promise<void> => {
-      if (!taskId) {
-        throw captureError('no-task', 'No completed concordance task to snapshot. Run an analysis first.');
-      }
-      if (!workspaceId) {
-        throw captureError('no-workspace', 'Cannot snapshot without an active workspace.');
-      }
-
+      // Eligibility check FIRST so users see the right reason when
+      // multiple guards would reject. The 2 000-row cap is the most
+      // common rejection; the task-id / workspace checks below catch
+      // edge cases the user can't directly act on.
       const totalSourceRows = totalRowsAcross(selectedNodes, getNodeRowCount);
       const eligibility = checkSnapshotEligibility({
         mode: 'demo',
@@ -120,14 +116,24 @@ export function useConcordanceSnapshotCapture(
         // gates the source-row side (2 000).
         resultRows: 0,
       });
-      if (!eligibility.ok) {
-        if (eligibility.reason.kind === 'source-too-large-for-demo') {
-          throw captureError(
-            'source-too-large',
-            `Demo snapshots are for ≤ ${SNAPSHOT_CAPS.demo.maxSourceRows} source rows. ` +
-              `Selected data blocks have ${eligibility.reason.rows.toLocaleString()} rows.`,
-          );
-        }
+      if (!eligibility.ok && eligibility.reason.kind === 'source-too-large-for-demo') {
+        throw captureError(
+          'source-too-large',
+          `Demo snapshots are limited to ${eligibility.reason.cap.toLocaleString()} ` +
+            `source rows total. Your selection has ` +
+            `${eligibility.reason.rows.toLocaleString()} rows across ${selectedNodes.length} ` +
+            `data block${selectedNodes.length === 1 ? '' : 's'}. Pick fewer / smaller blocks.`,
+        );
+      }
+
+      if (!taskId) {
+        throw captureError(
+          'no-task',
+          'No saved concordance result available yet. Run the analysis (and let it finish) before saving a snapshot.',
+        );
+      }
+      if (!workspaceId) {
+        throw captureError('no-workspace', 'Cannot snapshot without an active workspace.');
       }
 
       const headers = getAuthHeaders();

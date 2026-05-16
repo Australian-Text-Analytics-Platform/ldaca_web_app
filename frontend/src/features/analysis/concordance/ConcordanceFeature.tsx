@@ -363,25 +363,6 @@ const ConcordanceFeature: React.FC = () => {
   // workspace while the user thinks they're viewing a snapshot.
   const snapshotMode = useToolSnapshotMode('concordance');
 
-  // Build the per-tool snapshot capture handler. The result-side data
-  // is fetched on demand via the Phase-0g page_size: "all" path, so
-  // we just need to thread the request settings + selected nodes +
-  // workspace id through to the hook. The Save button in the header
-  // wires this handler into <SnapshotActions>.
-  const handleSaveSnapshot = useConcordanceSnapshotCapture({
-    workspaceId: currentWorkspaceId ?? null,
-    workspaceName: currentWorkspaceId ?? '(workspace)',
-    taskId: concordanceTaskId,
-    request: (results?.metadata as Record<string, unknown> | undefined) ?? null,
-    selectedNodes: panelSelectedNodes,
-    getNodeRowCount: (node) => {
-      const shape = node.shape as unknown;
-      if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
-      return 0;
-    },
-    getAuthHeaders,
-  });
-
   useEffect(() => {
     const element = resultsViewportRef.current;
     if (!element) {
@@ -689,6 +670,30 @@ const ConcordanceFeature: React.FC = () => {
       });
     },
     isResultRunning: (r) => r?.state === 'running',
+  });
+
+  // Snapshot capture handler. Lives below useAnalysisFeature so we
+  // can consult ``concordanceTaskStatus.successfulTask?.task_id`` —
+  // the most-recent successful task ID, which stays stable across
+  // Process All / materialise (when ``results.metadata.task_id``
+  // can drop to null).
+  const captureTaskId =
+    concordanceTaskStatus.successfulTask?.task_id ??
+    concordanceTaskStatus.terminalTask?.task_id ??
+    concordanceTaskId;
+
+  const handleSaveSnapshot = useConcordanceSnapshotCapture({
+    workspaceId: currentWorkspaceId ?? null,
+    workspaceName: currentWorkspaceId ?? '(workspace)',
+    taskId: captureTaskId,
+    request: (results?.metadata as Record<string, unknown> | undefined) ?? null,
+    selectedNodes: panelSelectedNodes,
+    getNodeRowCount: (node) => {
+      const shape = node.shape as unknown;
+      if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
+      return 0;
+    },
+    getAuthHeaders,
   });
 
   // (effectiveNodeColumnSelections is declared above so it can be referenced
