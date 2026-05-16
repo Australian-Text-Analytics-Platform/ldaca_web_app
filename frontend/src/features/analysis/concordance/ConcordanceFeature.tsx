@@ -681,10 +681,23 @@ const ConcordanceFeature: React.FC = () => {
   // the most-recent successful task ID, which stays stable across
   // Process All / materialise (when ``results.metadata.task_id``
   // can drop to null).
-  const captureTaskId =
-    concordanceTaskStatus.successfulTask?.task_id ??
-    concordanceTaskStatus.terminalTask?.task_id ??
-    concordanceTaskId;
+  //
+  // Materialise also triggers a refetch that briefly nukes every
+  // live source (taskStatus.successfulTask, terminalTask, and
+  // results.metadata.task_id all empty for the same render).
+  // Latch the latest non-empty value into a ref — same pattern
+  // ``concordanceTaskIdRef`` already uses for the bin fetcher
+  // (see useConcordanceMaterializedEvents).
+  const liveCaptureTaskId =
+    concordanceTaskStatus.successfulTask?.task_id ||
+    concordanceTaskStatus.terminalTask?.task_id ||
+    concordanceTaskId ||
+    '';
+  const latestCaptureTaskIdRef = useRef<string>('');
+  useEffect(() => {
+    if (liveCaptureTaskId) latestCaptureTaskIdRef.current = liveCaptureTaskId;
+  }, [liveCaptureTaskId]);
+  const captureTaskId = liveCaptureTaskId || latestCaptureTaskIdRef.current;
 
   const getConcordanceNodeRowCount = useCallback((node: WorkspaceNodeLike) => {
     const shape = node.shape as unknown;
