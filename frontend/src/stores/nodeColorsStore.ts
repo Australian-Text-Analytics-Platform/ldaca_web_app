@@ -198,7 +198,7 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
       let mutated = false;
       for (const id of nodeIds) {
         if (id in next) {
-          delete next[id];
+          Reflect.deleteProperty(next, id);
           mutated = true;
         }
       }
@@ -221,7 +221,7 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
         if (!temp) continue;
         nextColors[id] = temp;
         if (!nextOrder.includes(id)) nextOrder.push(id);
-        delete nextTabTemps[id];
+        Reflect.deleteProperty(nextTabTemps, id);
         mutated = true;
       }
       if (!mutated) return state;

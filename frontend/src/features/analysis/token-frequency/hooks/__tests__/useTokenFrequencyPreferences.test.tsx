@@ -114,11 +114,11 @@ describe('useTokenFrequencyPreferences', () => {
         { Authorization: 'Bearer test' },
         { language: 'en' },
       );
-      expect(defaultStopWordsMock).toHaveBeenCalledWith(
-        { Authorization: 'Bearer test' },
-        { language: 'zh' },
-      );
     });
+    expect(defaultStopWordsMock).toHaveBeenCalledWith(
+      { Authorization: 'Bearer test' },
+      { language: 'zh' },
+    );
 
     // The hook builds groups separated by ``\n\n`` for visual clarity,
     // then ``applyStopSetFromText`` normalises through the new

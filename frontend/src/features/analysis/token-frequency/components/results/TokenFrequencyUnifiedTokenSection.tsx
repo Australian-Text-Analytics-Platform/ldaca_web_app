@@ -84,6 +84,10 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   view = 'cloud',
   tokenFilter = '',
 }: TokenFrequencyUnifiedTokenSectionProps) => {
+  // Hook must come before any early return so React sees a stable call order
+  // across renders, regardless of whether the comparative panel is showing.
+  const measuredCardWidth = useElementWidth(unifiedCloudContainerRef);
+
   const hasMultipleNodes = normalizedNodeResults.length >= 2 || nodeDisplayResults.length >= 2 || lastCompareNodeIds.length >= 2;
 
   if (!hasMultipleNodes) {
@@ -182,14 +186,13 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   // Measure the card body so the SVG fills the actual available width
   // instead of a hardcoded 640 px. Falls back to the prop value before the
   // first ResizeObserver tick lands so SSR / pre-mount renders still get a
-  // usable size.
-  const measuredCardWidth = useElementWidth(unifiedCloudContainerRef);
+  // usable size. (useElementWidth is hoisted above the early return.)
   const effectiveCloudWidth = Math.max(
     UNIFIED_CLOUD_MIN_WIDTH,
     measuredCardWidth > 0 ? measuredCardWidth - /* padding */ 24 : unifiedCloudWidth,
   );
   const effectiveCloudHeight = Math.max(
-    240,
+    unifiedCloudHeight,
     Math.round(effectiveCloudWidth * UNIFIED_CLOUD_ASPECT_RATIO),
   );
   // Tie the font envelope to the measured width so d3-cloud's spiral

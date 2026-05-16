@@ -563,32 +563,35 @@ const TokenFrequencyFeature = () => {
     [],
   );
 
-  const renameStatisticsKeysForExport = (rows: unknown[]): unknown[] => {
-    if (analysisNodeIds.length !== 2) return rows;
-    const referenceName = computeDisplayName(analysisNodeIds[0]!, 'reference');
-    const studyName = computeDisplayName(analysisNodeIds[1]!, 'study');
-    const keyMap: Record<string, string> = {
-      freq_reference: `OR_${referenceName}`,
-      freq_study: `OS_${studyName}`,
-      percent_reference: `%R_${referenceName}`,
-      percent_study: `%S_${studyName}`,
-      expected_reference: `E_${referenceName}`,
-      expected_study: `E_${studyName}`,
-      reference_total: `Total_${referenceName}`,
-      study_total: `Total_${studyName}`,
-      overuse: 'Overuse',
-      signed_ll: 'Signed_LL',
-    };
-    return rows.map((row) => {
-      if (!row || typeof row !== 'object') return row;
-      const source = row as Record<string, unknown>;
-      const renamed: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(source)) {
-        renamed[keyMap[key] ?? key] = value;
-      }
-      return renamed;
-    });
-  };
+  const renameStatisticsKeysForExport = useCallback(
+    (rows: unknown[]): unknown[] => {
+      if (analysisNodeIds.length !== 2) return rows;
+      const referenceName = computeDisplayName(analysisNodeIds[0]!, 'reference');
+      const studyName = computeDisplayName(analysisNodeIds[1]!, 'study');
+      const keyMap: Record<string, string> = {
+        freq_reference: `OR_${referenceName}`,
+        freq_study: `OS_${studyName}`,
+        percent_reference: `%R_${referenceName}`,
+        percent_study: `%S_${studyName}`,
+        expected_reference: `E_${referenceName}`,
+        expected_study: `E_${studyName}`,
+        reference_total: `Total_${referenceName}`,
+        study_total: `Total_${studyName}`,
+        overuse: 'Overuse',
+        signed_ll: 'Signed_LL',
+      };
+      return rows.map((row) => {
+        if (!row || typeof row !== 'object') return row;
+        const source = row as Record<string, unknown>;
+        const renamed: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(source)) {
+          renamed[keyMap[key] ?? key] = value;
+        }
+        return renamed;
+      });
+    },
+    [analysisNodeIds, computeDisplayName],
+  );
 
   const handleDownloadFrequencyCsv = useCallback(
     (label: string, rows: unknown[]) => {
@@ -597,10 +600,7 @@ const TokenFrequencyFeature = () => {
       setDownloadDialogMode('frequencies');
       setDownloadDialogOpen(true);
     },
-    // ``renameStatisticsKeysForExport`` closes over ``analysisNodeIds`` and
-    // ``computeDisplayName``; both are memoised in this component so this
-    // callback only changes when the analysis selection actually changes.
-    [analysisNodeIds, computeDisplayName],
+    [renameStatisticsKeysForExport],
   );
 
   const handleDownloadConfirm = async ({ format, includeStopWords }: { format: string; includeStopWords: boolean }) => {

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Toaster } from 'sonner';
@@ -130,9 +130,7 @@ describe('SaveSnapshotDialog', () => {
   it('Cancel button calls onOpenChange(false)', () => {
     const onOpenChange = vi.fn();
     setup({ onOpenChange });
-    act(() => {
-      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-    });
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

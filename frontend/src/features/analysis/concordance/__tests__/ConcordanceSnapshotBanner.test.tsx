@@ -71,7 +71,7 @@ describe('ConcordanceSnapshotBanner', () => {
 
   it('renders nothing when no snapshot is loaded for concordance', () => {
     const { container } = render(<ConcordanceSnapshotBanner />);
-    expect(container.firstChild).toBeNull();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('shows the snapshot title, version, and workspace name when loaded', () => {

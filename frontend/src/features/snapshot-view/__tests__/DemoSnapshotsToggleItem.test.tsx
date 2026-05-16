@@ -47,9 +47,7 @@ describe('DemoSnapshotsToggleItem', () => {
       name: /enable demo snapshots/i,
     });
 
-    act(() => {
-      fireEvent.click(item);
-    });
+    fireEvent.click(item);
     expect(usePreferencesStore.getState().demoSnapshotsEnabled).toBe(true);
   });
 

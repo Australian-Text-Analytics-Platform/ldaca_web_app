@@ -4,6 +4,14 @@ import { textApi } from '@/api/text';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
 
+// Multi-language "Apply Stop Words" pours per-language groups into the
+// textarea separated by blank lines so users can see which words come
+// from which corpus. The parser accepts both commas and newlines as
+// separators so that grouped paste / hand edits both survive a round
+// trip through ``applyStopSetFromText``. Module-scoped so the regex
+// identity is stable across renders.
+const STOPWORD_SEPARATOR_RE = /[,\n\r]+/;
+
 type UseTokenFrequencyPreferencesParams = {
   currentWorkspaceId: string | null;
   results: TokenFrequencyResponse | null;
@@ -92,27 +100,30 @@ export const useTokenFrequencyPreferences = ({
     return DEFAULT_TOKEN_LIMIT;
   })();
 
-  const persistTokenPreferences = async (prefs: { token_limit?: number; stop_words?: string[] }) => {
-    if (!currentWorkspaceId) return;
-    const taskId = await resolveTokenFrequencyTaskId();
-    if (!taskId) return;
+  const persistTokenPreferences = useCallback(
+    async (prefs: { token_limit?: number; stop_words?: string[] }) => {
+      if (!currentWorkspaceId) return;
+      const taskId = await resolveTokenFrequencyTaskId();
+      if (!taskId) return;
 
-    const payload: Record<string, unknown> = {};
-    if (prefs.token_limit !== undefined) {
-      payload.token_limit = Math.min(
-        clampDisplayTokenLimit(prefs.token_limit).limit,
-        maxTokenLimitInput
-      );
-    }
-    if (prefs.stop_words !== undefined) {
-      payload.stop_words = prefs.stop_words;
-    }
-    if (Object.keys(payload).length === 0) return;
+      const payload: Record<string, unknown> = {};
+      if (prefs.token_limit !== undefined) {
+        payload.token_limit = Math.min(
+          clampDisplayTokenLimit(prefs.token_limit).limit,
+          maxTokenLimitInput
+        );
+      }
+      if (prefs.stop_words !== undefined) {
+        payload.stop_words = prefs.stop_words;
+      }
+      if (Object.keys(payload).length === 0) return;
 
-    await textApi.postTokenFrequenciesTaskResult(taskId, payload, getAuthHeaders());
-  };
+      await textApi.postTokenFrequenciesTaskResult(taskId, payload, getAuthHeaders());
+    },
+    [currentWorkspaceId, resolveTokenFrequencyTaskId, maxTokenLimitInput, getAuthHeaders],
+  );
 
-  const updateResultsPreferencesLocally = (prefs: { tokenLimit?: number; stopWords?: string[] }) => {
+  const updateResultsPreferencesLocally = useCallback((prefs: { tokenLimit?: number; stopWords?: string[] }) => {
     setResults((prev) => {
       if (!prev) return prev;
 
@@ -163,7 +174,7 @@ export const useTokenFrequencyPreferences = ({
         state: prev.state,
       } as TokenFrequencyResponse;
     });
-  };
+  }, [setResults, maxTokenLimitInput]);
 
   const applyTokenLimitWithValidation = async () => {
     const parsed = toFiniteNumber(tokenLimitInput);
@@ -205,29 +216,24 @@ export const useTokenFrequencyPreferences = ({
     }
   };
 
-  const saveStopWordsToBackend = async (words: string[]) => {
-    try {
-      await persistTokenPreferences({ stop_words: words });
-      updateResultsPreferencesLocally({ stopWords: words });
-    } catch (error) {
-      console.warn('Failed to save stop words', error);
-    }
-  };
-
-  // Multi-language "Apply Stop Words" pours per-language groups into the
-  // textarea separated by blank lines so users can see which words come
-  // from which corpus. The parser accepts both commas and newlines as
-  // separators so that grouped paste / hand edits both survive a round
-  // trip through ``applyStopSetFromText``.
-  const STOPWORD_SEPARATOR_RE = /[,\n\r]+/;
+  const saveStopWordsToBackend = useCallback(
+    async (words: string[]) => {
+      try {
+        await persistTokenPreferences({ stop_words: words });
+        updateResultsPreferencesLocally({ stopWords: words });
+      } catch (error) {
+        console.warn('Failed to save stop words', error);
+      }
+    },
+    [persistTokenPreferences, updateResultsPreferencesLocally],
+  );
 
   // Ref-pattern so this callback can read the *current* saveStopWordsToBackend
-  // (which closes over auth headers + persistence helpers that aren't
-  // themselves useCallback'd) without becoming unstable. Keeping the
-  // returned callback stable across renders matters because it propagates
-  // through the task-flow hook's right-click handler down to React.memo'd
-  // word-cloud sections; if it churned per render the cloud would re-run
-  // d3-cloud layout on every stopword-textarea keystroke.
+  // without becoming unstable itself. Keeping the returned callback stable
+  // across renders matters because it propagates through the task-flow hook's
+  // right-click handler down to React.memo'd word-cloud sections; if it
+  // churned per render the cloud would re-run d3-cloud layout on every
+  // stopword-textarea keystroke.
   const saveStopWordsToBackendRef = useRef(saveStopWordsToBackend);
   useEffect(() => {
     saveStopWordsToBackendRef.current = saveStopWordsToBackend;

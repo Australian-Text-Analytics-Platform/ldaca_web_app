@@ -57,7 +57,7 @@ describe('AnalysisFeatureHeader', () => {
   it('the snapshot actions slot is empty when demo mode is off', () => {
     renderHeader();
     const slot = screen.getByTestId('analysis-feature-header-actions');
-    expect(slot.children.length).toBe(0);
+    expect(slot).toBeEmptyDOMElement();
   });
 
   it('the slot is still present (and empty in Phase 0j) once demo mode flips on', () => {

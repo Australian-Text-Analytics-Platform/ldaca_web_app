@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { useRegistryStore } from './registryStore';
 
@@ -22,11 +22,19 @@ export const DocsEolBanner: React.FC = () => {
 
   const eolDate = meta?.eolDate;
   const version = meta?.version ?? null;
-  if (!eolDate) return null;
 
-  const parsed = Date.parse(eolDate);
-  if (Number.isNaN(parsed) || parsed > Date.now()) return null;
+  // Snapshot the wall clock once at mount so subsequent renders are pure.
+  // The user keeping the app open across an EOL boundary won't see the
+  // banner appear until they reload — acceptable for a "docs version
+  // retired" nudge that's already informational rather than time-critical.
+  const [evaluatedAt] = useState(() => Date.now());
+  const isPastEol = useMemo(() => {
+    if (!eolDate) return false;
+    const parsed = Date.parse(eolDate);
+    return !Number.isNaN(parsed) && parsed <= evaluatedAt;
+  }, [eolDate, evaluatedAt]);
 
+  if (!isPastEol || !eolDate) return null;
   if (version && dismissedFor === version) return null;
 
   const dismiss = () => {

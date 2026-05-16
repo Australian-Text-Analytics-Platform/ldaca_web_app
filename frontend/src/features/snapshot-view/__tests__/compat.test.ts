@@ -59,7 +59,7 @@ describe('isCompatibleSnapshot — per-tool override registry', () => {
   const TOOL: SnapshotToolKey = 'concordance';
 
   afterEach(() => {
-    delete TOOL_COMPATIBILITY[TOOL];
+    Reflect.deleteProperty(TOOL_COMPATIBILITY, TOOL);
   });
 
   it('honours an override allowlist for the named tool', () => {

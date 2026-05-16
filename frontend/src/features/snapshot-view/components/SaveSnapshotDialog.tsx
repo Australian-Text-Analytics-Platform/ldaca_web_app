@@ -91,6 +91,7 @@ export const SaveSnapshotDialog: React.FC<SaveSnapshotDialogProps> = ({
   // Reset state every time the dialog opens, prefilled with the
   // default name suggestion. The reset on close is important so a
   // failed save followed by re-open starts clean.
+  /* eslint-disable react-hooks/set-state-in-effect -- intentional reset on open; cascade is the desired behavior, not a perf bug */
   useEffect(() => {
     if (open) {
       setName(defaultName ?? '');
@@ -98,6 +99,7 @@ export const SaveSnapshotDialog: React.FC<SaveSnapshotDialogProps> = ({
       setIsSaving(false);
     }
   }, [open, defaultName]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const validation = useMemo(
     () => validateName(name, tool, existingFilenames),
