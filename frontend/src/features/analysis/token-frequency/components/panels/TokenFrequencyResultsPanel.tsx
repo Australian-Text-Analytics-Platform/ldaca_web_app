@@ -66,10 +66,6 @@ type TokenFrequencyResultsPanelProps = {
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
 
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
-  /** Snapshot view: locks the stopword / token-limit inputs and disables
-   * token click handlers. Captured state stays visible — only mutations
-   * that depend on the live backend or the live workspace are gated. */
-  readOnly?: boolean;
 };
 
 export const TokenFrequencyResultsPanel = ({
@@ -105,7 +101,6 @@ export const TokenFrequencyResultsPanel = ({
   unifiedCloudContainerRef,
   registerWordCloudRef,
   onDownloadFrequencyCsv,
-  readOnly = false,
 }: TokenFrequencyResultsPanelProps) => {
   const isRunningState = isRunning;
   const isFailedState = results?.state === 'failed' && !isRunningState;
@@ -235,9 +230,9 @@ export const TokenFrequencyResultsPanel = ({
                 rows={4}
                 value={stopWords}
                 onChange={(event) => onStopWordsChange(event.target.value)}
-                onBlur={readOnly ? undefined : onStopWordsApply}
+                onBlur={onStopWordsApply}
                 placeholder="the, and, of"
-                disabled={isLoadingStopWords || readOnly}
+                disabled={isLoadingStopWords}
                 className="w-full resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
               />
               <div className="flex items-center gap-2">
@@ -246,7 +241,7 @@ export const TokenFrequencyResultsPanel = ({
                   variant="outline"
                   size="sm"
                   onClick={onStopWordsApply}
-                  disabled={isLoadingStopWords || readOnly}
+                  disabled={isLoadingStopWords}
                 >
                   Apply Stop Words
                 </Button>
@@ -255,7 +250,7 @@ export const TokenFrequencyResultsPanel = ({
                   variant="outline"
                   size="sm"
                   onClick={onFillDefaultStopWords}
-                  disabled={isLoadingStopWords || readOnly}
+                  disabled={isLoadingStopWords}
                 >
                   Fill Default
                 </Button>
@@ -264,7 +259,7 @@ export const TokenFrequencyResultsPanel = ({
                   variant="outline"
                   size="sm"
                   onClick={onSortStopWords}
-                  disabled={isLoadingStopWords || readOnly || !stopWords.trim()}
+                  disabled={isLoadingStopWords || !stopWords.trim()}
                 >
                   Sort
                 </Button>
@@ -295,17 +290,15 @@ export const TokenFrequencyResultsPanel = ({
                     max={100}
                     value={tokenLimitInput}
                     onChange={onTokenLimitInputChange}
-                    onBlur={readOnly ? undefined : handleApplyCloudLimit}
+                    onBlur={handleApplyCloudLimit}
                     onKeyDown={(event) => {
-                      if (readOnly) return;
                       if (event.key === 'Enter') {
                         event.preventDefault();
                         handleApplyCloudLimit();
                       }
                     }}
-                    disabled={readOnly}
                   />
-                  <Button type="button" variant="outline" size="sm" onClick={handleApplyCloudLimit} disabled={isApplyingTokenLimit || readOnly}>
+                  <Button type="button" variant="outline" size="sm" onClick={handleApplyCloudLimit} disabled={isApplyingTokenLimit}>
                     <Wand2 className="mr-1 h-3.5 w-3.5" />
                     Apply
                   </Button>
@@ -332,17 +325,15 @@ export const TokenFrequencyResultsPanel = ({
                     max={globalMaxVocab}
                     value={listLimitInput}
                     onChange={handleListLimitInputChange}
-                    onBlur={readOnly ? undefined : handleApplyListLimit}
+                    onBlur={handleApplyListLimit}
                     onKeyDown={(event) => {
-                      if (readOnly) return;
                       if (event.key === 'Enter') {
                         event.preventDefault();
                         handleApplyListLimit();
                       }
                     }}
-                    disabled={readOnly}
                   />
-                  <Button type="button" variant="outline" size="sm" onClick={handleApplyListLimit} disabled={readOnly}>
+                  <Button type="button" variant="outline" size="sm" onClick={handleApplyListLimit}>
                     <Wand2 className="mr-1 h-3.5 w-3.5" />
                     Apply
                   </Button>

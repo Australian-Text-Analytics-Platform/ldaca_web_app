@@ -424,6 +424,7 @@ const TokenFrequencyFeature = () => {
     backendTokenLimit,
     backendStopWordsKey,
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,
+    persistEnabled: !inSnapshotMode,
   });
 
   const lockedNodeNameMap = useMemo(
@@ -904,7 +905,6 @@ const TokenFrequencyFeature = () => {
         unifiedCloudContainerRef={unifiedCloudContainerRef}
         registerWordCloudRef={registerWordCloudRef}
         onDownloadFrequencyCsv={handleDownloadFrequencyCsv}
-        readOnly={inSnapshotMode}
       />
 
       <TokenFrequencyDownloadDialog

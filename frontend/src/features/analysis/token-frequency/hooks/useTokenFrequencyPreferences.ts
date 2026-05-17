@@ -29,6 +29,14 @@ type UseTokenFrequencyPreferencesParams = {
   backendTokenLimit: number | null;
   backendStopWordsKey: string;
   maxTokenLimitInput: number;
+  /** When false, the stopwords / token-limit handlers update local
+   * client state only and skip the backend persist roundtrip. Used by
+   * the snapshot view: the captured display cap + stopword filter are
+   * pure client-side derivations on the captured ``data`` (see
+   * ``deriveNodeDisplayResults``), so the user can still interact
+   * with these controls in snapshot mode — they just must not mutate
+   * the underlying live task's preferences. Defaults to ``true``. */
+  persistEnabled?: boolean;
 };
 
 export const useTokenFrequencyPreferences = ({
@@ -41,6 +49,7 @@ export const useTokenFrequencyPreferences = ({
   backendTokenLimit,
   backendStopWordsKey,
   maxTokenLimitInput,
+  persistEnabled = true,
 }: UseTokenFrequencyPreferencesParams) => {
   const [stopWords, setStopWords] = useState<string>('');
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
@@ -102,6 +111,10 @@ export const useTokenFrequencyPreferences = ({
 
   const persistTokenPreferences = useCallback(
     async (prefs: { token_limit?: number; stop_words?: string[] }) => {
+      // Snapshot mode: local state already updated by the caller;
+      // skip the backend roundtrip so we don't mutate the live task's
+      // saved preferences (or 404 against a nonexistent task).
+      if (!persistEnabled) return;
       if (!currentWorkspaceId) return;
       const taskId = await resolveTokenFrequencyTaskId();
       if (!taskId) return;
@@ -120,7 +133,7 @@ export const useTokenFrequencyPreferences = ({
 
       await textApi.postTokenFrequenciesTaskResult(taskId, payload, getAuthHeaders());
     },
-    [currentWorkspaceId, resolveTokenFrequencyTaskId, maxTokenLimitInput, getAuthHeaders],
+    [persistEnabled, currentWorkspaceId, resolveTokenFrequencyTaskId, maxTokenLimitInput, getAuthHeaders],
   );
 
   const updateResultsPreferencesLocally = useCallback((prefs: { tokenLimit?: number; stopWords?: string[] }) => {

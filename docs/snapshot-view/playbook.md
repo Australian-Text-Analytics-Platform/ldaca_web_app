@@ -198,9 +198,12 @@ Both `<Tool>ParameterPanel` and `<Tool>ResultsPanel` need a `readOnly?: boolean`
 - Results panel: client-side display controls (legend toggle, sort, pagination, period selection, chart-type select, stopword filter) **stay active**; backend-touching controls (detach, re-aggregation slider, post-fit persistence) get gated.
 
 Some panel inputs are post-fit display caps that work entirely client-side on the captured payload. **Don't gate these.** Examples:
-- Token-frequency stopword textarea — filters `appliedStopSet` which drives client-side `deriveNodeDisplayResults`.
+- Token-frequency stopword textarea + Apply/Fill/Sort buttons — drive client-side `appliedStopSet` which feeds `deriveNodeDisplayResults`.
+- Token-frequency Cloud display limit + List display limit — drive client-side slicing via `effectiveTokenLimit`.
 - Topic-modelling "Words per topic" — slices each topic's `representative_words` array.
 - Concordance dispersion lowercase matches — re-merges series keys client-side from per-bin counts.
+
+**Caveat:** some of these post-fit controls *also* call a backend persist as a side-effect in live mode (token-freq stopwords + display limits go through `persistTokenPreferences` to remember the user's choice on the saved task). Leaving the control active in snapshot mode without gating the persist mutates the live task's preferences (or 404s if there's no live task). Use the **`persistEnabled` flag pattern** — see caveat §3.11 — to short-circuit the backend write while keeping the local state update path.
 
 For the topic-modelling words-per-topic input specifically, the locked-reason tooltip needs a snapshot-aware override — the default "Clear Results to fit with a higher count" is misleading because the user can't clear/re-fit in snapshot mode. Pass `representativeWordsCountLockedReason` to the panel with a snapshot-friendly string.
 
@@ -276,6 +279,42 @@ If the manifest's `node_ids` is order-A and the captured request's `node_ids` is
 ### 3.10 The `<SaveSnapshotDialog>` runs its own `sanitiseName` after pre-population
 
 The pre-populated default name from `nodeLabels` is human-readable; the dialog re-runs `sanitiseName(name)` before composing the on-disk filename. Don't double-sanitise — the slugifier in `SnapshotActions.buildDefaultName` only needs to produce something readable (trim, replace path separators, collapse whitespace). The dialog's stricter regex handles the rest.
+
+### 3.11 The `persistEnabled` flag pattern for hooks that own a "set local state + persist to backend" idiom
+
+Some preferences hooks expose handlers like `applyStopSetFromText`, `applyTokenLimit`, `sortStopWords` that do two things in one call: update local client state (driving a re-render of derived display data) **and** post the new preference to the backend so the live task remembers it. Token-frequency's `useTokenFrequencyPreferences` is the canonical example — every public handler ends with a `persistTokenPreferences(...)` roundtrip.
+
+Naive snapshot mode either:
+- Disables the control entirely (loses the client-side re-render benefit — and these controls are pure post-fit display caps, so locking them is hostile UX), or
+- Leaves the control active and silently mutates the live task's preferences (or 404s when no live task exists). Equally bad.
+
+The clean fix is to thread a `persistEnabled?: boolean` flag through the hook's params, default it to `true`, and early-return inside the persist helper when it's false. The control's onClick/onBlur handlers still run their local state updates; only the backend write is skipped:
+
+```ts
+// Inside the preferences hook
+const persistTokenPreferences = useCallback(
+  async (prefs) => {
+    if (!persistEnabled) return;           // ← snapshot mode short-circuit
+    if (!currentWorkspaceId) return;
+    const taskId = await resolveTaskId();
+    if (!taskId) return;
+    // … existing persist body
+  },
+  [persistEnabled, currentWorkspaceId, resolveTaskId, …],
+);
+```
+
+```tsx
+// Inside the feature
+const prefs = useTokenFrequencyPreferences({
+  …,
+  persistEnabled: !inSnapshotMode,
+});
+```
+
+After this fix, you can drop `readOnly` gating on those specific controls in the results panel — the hook handles the snapshot semantics correctly without per-control if-statements.
+
+Apply this pattern to any future tool that has a "client-state + backend-persist" hook. If the tool's preferences hook doesn't yet take a flag like this, plumbing it in is much cleaner than per-call-site `if (inSnapshotMode) return` wrappers.
 
 ---
 
