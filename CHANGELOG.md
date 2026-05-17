@@ -3,6 +3,41 @@
 User-facing changes to the LDaCA Wordflow (previously "LDaCA Text Analytics Web Application") since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] — 2026-05-17
+
+Demo snapshots: save a frozen view of any analysis to a small `.ldaca-snapshot` bundle, then re-open it later (or share with a collaborator) without re-running the analysis. Snapshots ship with the dataset rows, parameters, and chart state required to re-render exactly what was on screen. Every one of the five analysis tools — Concordance, Quotation, Trends, Token Frequency, Topic Modelling — now has Save / Open buttons in its header and a banner-flagged read-only viewer for loaded snapshots.
+
+Trends snapshots are the headline: they're saved as **data-rich captures** so the viewer can re-aggregate locally. Pick the finest time bin and up to 3 group-by columns at save time; the viewer then coarsens frequency, drops group dimensions, and case-folds legends — all without a backend round-trip.
+
+Docs branch flips from `v0.4` → `v0.5`; in-app docs panel reads from the matching documentation tag automatically.
+
+### Added
+
+- **Demo Snapshot view across every analysis tool.** Each of Concordance, Quotation, Trends, Token Frequency, and Topic Modelling now has a Save Snapshot / Open Snapshot pair in its parameter card header. Saved bundles are `.ldaca-snapshot` zips containing the result rows, the parameters that produced them, a manifest with capabilities + version compatibility info, and (optionally) a markdown description. Loading puts the analysis card into snapshot mode — a banner identifies the loaded snapshot and an "Exit" button returns to live view.
+- **Trends client-side re-aggregation.** Trends snapshots are captured at the user-chosen finest time bin and up to 3 group columns (string / categorical only). The viewer re-aggregates with `sequentialRebucket.ts` — pick any frequency coarser-or-equal to the captured bin, drop any group dimensions, toggle case-folding on legend values, all locally without re-hitting the backend. 22 golden tests pin bucket boundary semantics to polars (Monday-start ISO week, quarter on Jan/Apr/Jul/Oct).
+- **Trends snapshot configuration dialog.** A custom Save dialog asks for finest time bin, group-by columns (with real per-column cardinality counts via `nodesApi.uniqueValues`), and a numeric bin origin/step on the numeric path. A row-count estimator runs continuously; when the estimate creeps past half the 200 000-row hard cap, a "Verify actual row count" button surfaces and runs a backend dry-run through the new `/sequential-analysis/preview` endpoint (which sidesteps the live task slot).
+- **Demo snapshots import tab in the Sample Data dialog.** Snapshots bundled with the sample-data repo's `demo_snapshots/` catalogue appear in a new tab in the Sample Data import dialog; pick one to download to your local snapshots folder. Conflicts skip-by-default with an explicit "Replace" opt-in.
+- **Token-frequency post-fit controls active in snapshot view.** Stop-words filter, cloud/list display limits, and the sort button stay live in snapshot mode — they're all frontend-side projections, so they re-render the captured rows without needing a fresh fit. The same `persistEnabled` flag pattern is documented in `docs/snapshot-view/playbook.md` for future tools.
+- **Topic-modelling post-fit slider in snapshot view.** "Words per topic" stays adjustable in snapshot mode, up to the words-per-topic cap that was stored at fit time (`max(50, fit_value * 2)`).
+- **Concordance dispersion: per-document grouping at materialise time.** Replaces the previous "one bar per hit" layout, which exploded large multi-hit documents to dozens of bars.
+- **Dtype normalisation on load.** Mixed-precision integer / float / datetime columns are normalised to a canonical profile (Int64 / Float64 / Datetime[μs, UTC] / Utf8) at load time, with one consolidated warning per file listing what got promoted. Workspace save / reopen no longer fails for `Int8`/`Int16` columns produced by some sample-data feeds.
+- **`/workspaces/nodes/{node_id}/sequential-analysis/preview` backend endpoint.** Stateless aggregation that bypasses task registration + slot conflict checks. Used by the snapshot capture path (`include_data=true`) and the dry-run row estimator (`include_data=false`). Live users are unaffected — their task slot remains intact across capture flows.
+- **Centralised `SNAPSHOT_DISABLED_REASON` tooltip.** Every read-only control in snapshot mode now surfaces the same hover hint ("Disabled in snapshot view — exit demo mode to use this control.") via `<DisabledReasonTooltip>`, with no native `title=` 1–2 s delay.
+
+### Changed
+
+- **In-app documentation now reads from the `v0.5` branch of `ldaca-wordflow-docs`.** `VITE_DOCS_BASE_URL` points at `.../ldaca-wordflow-docs/v0.5`; the gh-pages publish workflow auto-publishes each `v*.X` branch under its own subdirectory. Bookmarks against old URLs still work — `v0.4` content remains live and matched the previous release.
+- **Demo-snapshot save eligibility caps each selected data block at 2 000 rows.** Snapshots aim to be small, shareable, and self-contained; the cap is enforced both client-side (Save button greys out with a tooltip) and at capture time. Trends raises the cap to 200 000 rows on captured output, since its viewer re-aggregates from a data-rich payload.
+- **Trends min-group-size filter now reads the viewer's chosen group-by columns in snapshot mode** (previously it compared against the captured columns, so re-grouping or removing dimensions in the viewer caused every series to fail the size check and the chart to read "No groups meet the current minimum group size").
+- **Trends group-by column picker filters to string / categorical types only** in the snapshot save dialog — picking a float / datetime / list column would otherwise inflate the captured row count past the hard cap.
+- **Topic-modelling "Words per topic" snapshot tooltip mirrors the actual stored cap** (`max(50, fit_value * 2)`) instead of the user's fit-time pick. Tooltip and slider now agree.
+
+### Fixed
+
+- **Controlled / uncontrolled Select warning in the Trends group-by panel.** The empty-string column slot stays controlled instead of flipping to `undefined` after the first pick.
+- **`UniqueValueCount` no longer flashes a red "Error" badge** when the unique-values query fails. The pill is a nice-to-have hint; common failure modes (snapshot view where the captured node isn't live-queryable, transient backend hiccup) now silently render nothing instead.
+- **Concordance dispersion summary line restored in separated view + snapshot view.** "Found N instances in M documents..." now appears regardless of which dispersion view mode is active.
+
 ## [0.4.4] — 2026-05-15
 
 Re-stamps v0.4.3. The code is byte-identical to v0.4.3, but three version sources were missed in the v0.4.3 bump (`frontend/package.json`, `frontend/src-tauri/tauri.conf.json`, `frontend/src-tauri/Cargo.toml`), with the result that:

@@ -1,6 +1,6 @@
 {
   "productName": "LDaCA Wordflow",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "identifier": "au.edu.ldaca.text-analytics",
   "build": {
     "beforeDevCommand": "npm run dev",
