@@ -32,15 +32,15 @@ Internet → Nginx (80/443) → FastAPI app (localhost:8001)
 
 ```bash
 cd /home/ubuntu/src/ldaca_wordflow
-git checkout v0.4
-git pull --ff-only origin v0.4
+git checkout v0.5
+git pull --ff-only origin v0.5
 git submodule sync --recursive
 git submodule update --init --recursive --checkout --force
 ```
 
 > The `git submodule update --init --recursive` step is mandatory: this repo embeds `ldaca-wordflow-backend` (along with `docworkspace`, `polars-text`, `ldaca-tabulator`) as git submodules, and a plain `git pull` only advances the *submodule pointer* in the parent tree without checking out the new submodule content. Skipping this leaves the systemd service running stale backend code while `git status` looks clean.
 
-> **Branch policy:** Nectar tracks `v0.4` (the production line). The legacy `main` branch is parked at v0.3.x. See [Routine Updates](#routine-updates) for the normal pull-and-restart sequence after first install.
+> **Branch policy:** Nectar tracks `v0.5` (the production line; promoted from `v0.4` after v0.5.0 shipped on 2026-05-17). `v0.4` remains as the previous production line for any back-port hot-fixes. The legacy `main` branch is parked at v0.3.x. See [Routine Updates](#routine-updates) for the normal pull-and-restart sequence after first install.
 
 ### 2. Configure Nginx
 
@@ -198,10 +198,10 @@ sudo certbot renew --dry-run
 
 Two release surfaces ship together:
 
-- The `backend/` submodule repo (`Australian-Text-Analytics-Platform/ldaca-wordflow-backend`) publishes the Python package consumed by `pip` / `uvx`. Tag on its `v0.4` branch → triggers `release.yml` → PyPI publish (`ldaca-wordflow`).
-- This root repo pins that backend tag. Tag on its `v0.4` branch → triggers `release.yml` → Tauri Windows MSI + Apple Silicon DMG attached to a GitHub release. Also what the Nectar VM deploys from source.
+- The `backend/` submodule repo (`Australian-Text-Analytics-Platform/ldaca-wordflow-backend`) publishes the Python package consumed by `pip` / `uvx`. Tag on its `v0.5` branch → triggers `release.yml` → PyPI publish (`ldaca-wordflow`).
+- This root repo pins that backend tag. Tag on its `v0.5` branch → triggers `release.yml` → Tauri Windows MSI + Apple Silicon DMG attached to a GitHub release. Also what the Nectar VM deploys from source.
 
-The working branch (any name — recent releases used `perf/cjk-tokeniser`) is the integration target; release tags are cut on `v0.4` after a fast-forward. `main` on the backend is parked at the legacy v0.3.x line and **must not** receive new v0.4.x tags.
+The working branch (any name — recent releases used `perf/cjk-tokeniser`, then `feat/demo-snapshot` for v0.5.0) is the integration target; release tags are cut on the active release branch (`v0.5` for v0.5.x, `v0.4` for back-port hot-fixes to the 0.4 line) after a fast-forward.
 
 > **Frontend bundle rule:** `build.tar.gz` inside the backend submodule is the **sole** source of frontend assets for both PyPI/uvx users and the Nectar deployment. Every `frontend/src/**` change — whether shipping in a release or hot-fixed onto a feature branch — is **invisible to users** until the bundle is rebuilt and committed. This applies equally to full releases and to feature branches deployed to Nectar before a release; see [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) below.
 
@@ -273,25 +273,34 @@ If `uvx ty check` is already failing on unrelated, pre-existing issues, record t
 
 ### 4. Publish the backend package repo
 
-Commit on the working branch, fast-forward `v0.4`, tag, push:
+Commit on the working branch, fast-forward `v0.5`, tag, push:
 
 ```bash
 cd /path/to/ldaca_wordflow/backend
 git add pyproject.toml uv.lock src/ldaca_wordflow/resources/frontend/
 git commit -m "Release v<VERSION>"
-git push origin <working-branch>          # e.g. perf/cjk-tokeniser
+git push origin <working-branch>          # e.g. feat/demo-snapshot
 
-git checkout v0.4
+git checkout v0.5
 git merge --ff-only <working-branch>      # should be ff-only
-git push origin v0.4
-git tag -a v<VERSION> v0.4 -m "Release v<VERSION>"
+git push origin v0.5
+git tag -a v<VERSION> v0.5 -m "Release v<VERSION>"
 git push origin v<VERSION>
 git checkout <working-branch>
 ```
 
 The tag push triggers the backend repo's PyPI publish workflow.
 
+<!--
 > **`backend/main` is the legacy v0.3 line — do not tag there.** Recent v0.4.x tags are all cut on `v0.4`. The backend's `main` is parked at `v0.3.5` for back-compat consumers of the old `ldaca-web-app` PyPI name. Putting a v0.4.x tag on `main` would either fail PyPI's trusted-publisher check (different branch policy) or produce a wheel under the wrong name. Always tag on `v0.4`.
+
+  ^ Commented out 2026-05-17 after v0.5.0 shipped. The `backend/main`
+    branch is still parked at `v0.3.5` for back-compat — but with the
+    rename complete and v0.5 the active line, no one is contemplating
+    tagging there anymore. Restore + update this warning if a future
+    release line ever needs to be cautioned away from `main`.
+-->
+
 
 ### 5. Update the root repo to the new backend submodule pointer
 
@@ -308,7 +317,7 @@ git push origin <working-branch>
 >
 > ```bash
 > git submodule status                              # `+` lines differ from the recorded SHA
-> git ls-tree origin/v0.4 -- polars-text docworkspace   # what v0.4 currently pins
+> git ls-tree origin/v0.5 -- polars-text docworkspace   # what v0.5 currently pins
 > ```
 >
 > If `git status` shows `modified: polars-text` or `modified: docworkspace` and they shouldn't ship in this release, revert each submodule HEAD to the right SHA before staging:
@@ -336,14 +345,14 @@ For a full smoke test:
 uvx --from ldaca-wordflow==<VERSION> ldaca-wordflow --host 127.0.0.1 --port 8016
 ```
 
-### 7. Fast-forward `v0.4` on the root repo, tag, push
+### 7. Fast-forward `v0.5` on the root repo, tag, push
 
 ```bash
 cd /path/to/ldaca_wordflow
-git checkout v0.4
+git checkout v0.5
 git merge --ff-only <working-branch>
-git push origin v0.4
-git tag -a v<VERSION> v0.4 -m "Release v<VERSION>"
+git push origin v0.5
+git tag -a v<VERSION> v0.5 -m "Release v<VERSION>"
 git push origin v<VERSION>
 git checkout <working-branch>
 ```
@@ -352,7 +361,7 @@ Pushing the root `v<VERSION>` tag triggers the root desktop release workflow, wh
 
 ### 8. Deploy Nectar
 
-See [Routine Updates](#routine-updates) below. Nectar tracks `v0.4` on this repo; the routine pull-and-restart sequence is the same whether you've just shipped a tag or are pulling in a hot-fix.
+See [Routine Updates](#routine-updates) below. Nectar tracks `v0.5` on this repo; the routine pull-and-restart sequence is the same whether you've just shipped a tag or are pulling in a hot-fix.
 
 ### 9. Verify the Nectar deployment
 
@@ -437,18 +446,18 @@ git submodule update --init --recursive --checkout --force
 sudo systemctl restart ldaca-wordflow
 ```
 
-Once the feature lands in a tagged release, switch Nectar back to `v0.4` (see [Routine Updates](#routine-updates)).
+Once the feature lands in a tagged release, switch Nectar back to `v0.5` (see [Routine Updates](#routine-updates)).
 
 ---
 
 ## Routine Updates
 
-Pull the latest `v0.4` tip and restart. Same sequence whether you just shipped a tag or are pulling in a hot-fix:
+Pull the latest `v0.5` tip and restart. Same sequence whether you just shipped a tag or are pulling in a hot-fix:
 
 ```bash
 cd /home/ubuntu/src/ldaca_wordflow
-git checkout v0.4                         # in case Nectar is on a feature branch
-git pull --ff-only origin v0.4
+git checkout v0.5                         # in case Nectar is on a feature branch or the legacy dev/v0.4 line
+git pull --ff-only origin v0.5
 git submodule sync --recursive
 git submodule update --init --recursive --checkout --force
 sudo systemctl restart ldaca-wordflow
