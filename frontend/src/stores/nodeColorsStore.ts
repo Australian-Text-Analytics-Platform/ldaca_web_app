@@ -24,7 +24,7 @@
  * pick.
  */
 import { create } from 'zustand';
-import { EXTENDED_PALETTE } from '@/features/analysis/common/palette';
+import { AUTO_ASSIGN_PALETTE } from '@/features/analysis/common/palette';
 
 type ColorMap = Record<string, string>;
 
@@ -102,12 +102,13 @@ interface NodeColorsState {
 }
 
 function pickRandomPaletteAvoiding(avoid: ReadonlySet<string>): string {
-  const free = EXTENDED_PALETTE.filter((c) => !avoid.has(c));
+  const free = AUTO_ASSIGN_PALETTE.filter((c) => !avoid.has(c));
   if (free.length === 0) {
-    // Palette exhausted (>12 distinct visible colours). Fall back to a
-    // random palette colour rather than blocking — duplicates inside
-    // one tab are rare in practice.
-    return EXTENDED_PALETTE[Math.floor(Math.random() * EXTENDED_PALETTE.length)]!;
+    // Palette exhausted (>11 distinct visible colours — grey is
+    // excluded from auto-assign per UNASSIGNED_NODE_COLOR). Fall back
+    // to a random auto-assign colour rather than blocking; duplicates
+    // inside one tab are rare in practice.
+    return AUTO_ASSIGN_PALETTE[Math.floor(Math.random() * AUTO_ASSIGN_PALETTE.length)]!;
   }
   return free[Math.floor(Math.random() * free.length)]!;
 }
@@ -125,8 +126,8 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     let mutated = false;
     for (const id of nodeIds) {
       if (!id || updatedColors[id]) continue;
-      const palettePos = updatedOrder.length % EXTENDED_PALETTE.length;
-      updatedColors[id] = EXTENDED_PALETTE[palettePos]!;
+      const palettePos = updatedOrder.length % AUTO_ASSIGN_PALETTE.length;
+      updatedColors[id] = AUTO_ASSIGN_PALETTE[palettePos]!;
       updatedOrder.push(id);
       mutated = true;
     }

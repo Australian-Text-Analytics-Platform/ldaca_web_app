@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { EXTENDED_PALETTE } from '@/features/analysis/common/palette';
+import { EXTENDED_PALETTE, UNASSIGNED_NODE_COLOR } from '@/features/analysis/common/palette';
 import { useNodeColorsStore } from '../nodeColorsStore';
 
 describe('useNodeColorsStore — assigned-only paths', () => {
@@ -26,6 +26,23 @@ describe('useNodeColorsStore — assigned-only paths', () => {
     expect(useNodeColorsStore.getState().colors.a).toBe('#abcdef');
     expect(useNodeColorsStore.getState().assignmentOrder).toContain('a');
   });
+
+  it('ensureColors never auto-assigns UNASSIGNED_NODE_COLOR even past one full palette cycle', () => {
+    // Grey doubles as the "no colour" indicator, so the auto-assign
+    // palette excludes it. Walking through 24 nodes — twice the
+    // palette length — must never produce a grey assignment.
+    const ids = Array.from({ length: 24 }, (_, i) => `n${i}`);
+    useNodeColorsStore.getState().ensureColors(ids);
+    const { colors } = useNodeColorsStore.getState();
+    for (const id of ids) {
+      expect(colors[id]).not.toBe(UNASSIGNED_NODE_COLOR);
+    }
+  });
+
+  it('setColor still accepts UNASSIGNED_NODE_COLOR — manual picks bypass the auto-roll filter', () => {
+    useNodeColorsStore.getState().setColor('a', UNASSIGNED_NODE_COLOR);
+    expect(useNodeColorsStore.getState().colors.a).toBe(UNASSIGNED_NODE_COLOR);
+  });
 });
 
 describe('useNodeColorsStore — per-tab temp layer', () => {
@@ -47,6 +64,18 @@ describe('useNodeColorsStore — per-tab temp layer', () => {
     const tab = useNodeColorsStore.getState().temps.concordance ?? {};
     const used = new Set(Object.values(tab));
     expect(used.size).toBe(3);
+  });
+
+  it('ensureTempColors never rolls UNASSIGNED_NODE_COLOR via the random path', () => {
+    // Seed assigned with a non-grey colour so the random roll path
+    // fires (not the "prefer assigned" short-circuit), then verify
+    // grey never lands on any of a large batch of nodes.
+    const ids = Array.from({ length: 50 }, (_, i) => `n${i}`);
+    useNodeColorsStore.getState().ensureTempColors('concordance', ids);
+    const tab = useNodeColorsStore.getState().temps.concordance ?? {};
+    for (const id of ids) {
+      expect(tab[id]).not.toBe(UNASSIGNED_NODE_COLOR);
+    }
   });
 
   it('ensureTempColors prefers a node\'s existing assigned colour as the starting temp', () => {
