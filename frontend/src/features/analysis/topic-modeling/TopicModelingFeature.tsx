@@ -925,7 +925,16 @@ const TopicModelingFeature: React.FC = () => {
         }
         representativeWordsCountLockedReason={
           inSnapshotMode
-            ? `Adjustable up to the ${Number(loadedSnapshot?.payload.settings?.representative_words_count) || '?'} words fitted in this snapshot.`
+            ? (() => {
+                // Backend fits + stores ``max(50, settings_value * 2)``
+                // representative words per topic, so the snapshot can be
+                // scaled up post-fit to that cap — not to the user's
+                // smaller fit-time pick. Mirror the cap formula the
+                // panel uses for the slider's ``max`` attribute.
+                const fitValue = Number(loadedSnapshot?.payload.settings?.representative_words_count) || 0;
+                const cap = Math.max(50, fitValue * 2);
+                return `Adjustable up to ${cap} words stored in this snapshot.`;
+              })()
             : undefined
         }
         onRepresentativeWordsCountChange={(v) => { setRepresentativeWordsCount(v); setRepresentativeWordsCountUserSet(true); }}

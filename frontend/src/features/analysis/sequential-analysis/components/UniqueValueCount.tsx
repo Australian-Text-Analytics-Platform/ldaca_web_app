@@ -23,8 +23,13 @@ export const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId,
     return <span className="text-xs text-gray-500 px-2">Loading...</span>;
   }
 
+  // Pill is a nice-to-have hint, not load-bearing. Render nothing on
+  // error so we don't flag the user with a red "Error" badge — most
+  // failure modes (snapshot view where the captured node isn't live-
+  // queryable, transient backend hiccup) are recoverable on their own
+  // and don't warrant a prominent error UI on a parameter dropdown.
   if (error || !data) {
-    return <span className="text-xs text-red-500 px-2">Error</span>;
+    return null;
   }
 
   return (
