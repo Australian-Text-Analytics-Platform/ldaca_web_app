@@ -64,6 +64,6 @@ def test_root_workspace_uses_local_backend_source() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text("utf-8"))
 
-    backend_source = pyproject["tool"]["uv"]["sources"]["ldaca-web-app"]
+    backend_source = pyproject["tool"]["uv"]["sources"]["ldaca-wordflow"]
 
-    assert backend_source == {"path": "./backend"}
+    assert backend_source == {"path": "./backend", "editable": True}
