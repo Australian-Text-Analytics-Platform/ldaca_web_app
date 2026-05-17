@@ -901,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "ldaca-wordflow"
-version = "0.4.2"
+version = "0.5.0"
 source = { editable = "backend" }
 dependencies = [
     { name = "aiosqlite" },
@@ -942,7 +942,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = ">=1.18.0" },
     { name = "openai", specifier = ">=2.26.0" },
     { name = "polars", extras = ["rtcompat"], specifier = ">=1.40.0" },
-    { name = "polars-text", specifier = ">=0.2.0" },
+    { name = "polars-text", specifier = ">=0.2.1" },
     { name = "psutil", specifier = ">=6.1.0" },
     { name = "pyarrow", specifier = ">=16.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
@@ -962,7 +962,7 @@ dev = [
 
 [[package]]
 name = "ldaca-wordflow-workspace"
-version = "0.4.2"
+version = "0.5.0"
 source = { virtual = "." }
 dependencies = [
     { name = "ldaca-loader" },
@@ -1453,16 +1453,16 @@ wheels = [
 
 [[package]]
 name = "polars-text"
-version = "0.2.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/ae/333de6ca83a7f66139a84e4d8ffea0df9ee582972f3e250e2fc62ef3e336/polars_text-0.2.0.tar.gz", hash = "sha256:5c323a8612010489aa38eddf8fda7998060e77230559720a0c25a9c09ca9442e", size = 5382696, upload-time = "2026-05-14T06:45:44.858Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/d3/c7aad91e33ffa633af0a255aef4c54cb6e2a388329bb690acae11ac9e7fa/polars_text-0.2.1.tar.gz", hash = "sha256:db655233f4edb693b00bbd232110d6e0ae893e8013a39aa4d115f8a6ad071f96", size = 5385266, upload-time = "2026-05-15T07:13:23.845Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/65/62/c823621b6ecd0b2ec34174f0479a95d1e7be1247180150547a0ec05ce83c/polars_text-0.2.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:fb618e6709b136b17b764a4c4fbe4fe498b8fdf659a3c80ccf9ba97ca368293c", size = 21852386, upload-time = "2026-05-14T06:45:34.798Z" },
-    { url = "https://files.pythonhosted.org/packages/8a/46/ceb087305afdfd975d5ef79035fb2911855773215580c2e019d5c95d092b/polars_text-0.2.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:915dc9a2ee3f3b43d4183730a471f9f47f69a779ad67c4b2a628ffb95a72f933", size = 27037798, upload-time = "2026-05-14T06:45:38.536Z" },
-    { url = "https://files.pythonhosted.org/packages/99/35/90df8e309ba4135fe42fad77f9c0227420ff89d33a4bcd5324c6d7b9e474/polars_text-0.2.0-cp314-cp314-win_amd64.whl", hash = "sha256:595a1c2c4e4064fc5afeacc2d47332c9e237e7d5f7d8ac5239825c4f36bd3238", size = 21924692, upload-time = "2026-05-14T06:45:42.133Z" },
+    { url = "https://files.pythonhosted.org/packages/77/4d/5964965c4bc82c62e0d8f06bac31713fd3d0d05a990273cdae0bc127636c/polars_text-0.2.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:e6f6d613d5fe43f9cca799ceca2e394edca340fba7f440dcf7921965cf80032d", size = 21846388, upload-time = "2026-05-15T07:13:15.307Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/88/91618ac1f15cd888e4adf56add213e8ad73a02963a5ab60aa9d18d220416/polars_text-0.2.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:bd14f08bb1e766388bc4d1ad8b3ea79f442ac1cdd1393948d947f9466aa07a44", size = 27033773, upload-time = "2026-05-15T07:13:18.264Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/6f/a2c73dcbfb6ffa21f9d22e5f69736ae402df49c22b6d012fd41ccd8541ad/polars_text-0.2.1-cp314-cp314-win_amd64.whl", hash = "sha256:b0a6f7a29d418b3693b684b3e6b7c9a71a1a530b094c1afb7ebdebd3503db139", size = 21929281, upload-time = "2026-05-15T07:13:21.646Z" },
 ]
 
 [[package]]
@@ -2526,11 +2526,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.6.3"
+version = "2.7.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/24/5f1b3bdffd70275f6661c76461e25f024d5a38a46f04aaca912426a2b1d3/urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed", size = 435556, upload-time = "2026-01-07T16:24:43.925Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4", size = 131584, upload-time = "2026-01-07T16:24:42.685Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
 ]
 
 [[package]]
