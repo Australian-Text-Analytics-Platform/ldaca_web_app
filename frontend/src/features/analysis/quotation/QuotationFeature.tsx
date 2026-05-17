@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query';
 import {
   isSnapshotMode,
+  SNAPSHOT_DISABLED_REASON,
   useSnapshotViewStore,
   useToolSnapshotMode,
   type LoadedSnapshot,
 } from '@/features/snapshot-view';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useQuotationSnapshotCapture } from './hooks/useQuotationSnapshotCapture';
 import { useQuotationSnapshotLoad } from './hooks/useQuotationSnapshotLoad';
 import type { QuotationSnapshotPayload } from './hooks/useQuotationSnapshotLoad';
@@ -1264,7 +1266,7 @@ const QuotationFeature: React.FC = () => {
             locked={!!isLocked || inSnapshotMode}
             originalCount={displayNodeCount}
             allowedDataTypes={['string']}
-            lockedMessage={inSnapshotMode ? 'Viewing a saved snapshot — selection is frozen.' : ANALYSIS_LOCKED_MESSAGE}
+            lockedMessage={inSnapshotMode ? SNAPSHOT_DISABLED_REASON : ANALYSIS_LOCKED_MESSAGE}
           />
         </AnalysisCardLayout>
         {quotationWaitingBanner && (
@@ -1486,51 +1488,58 @@ const QuotationFeature: React.FC = () => {
                         : <GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} totalProcessed={resultState?.pagination?.page_size} />
                       }
                     >
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleMaterialize(nodeId)}
-                        disabled={
-                          inSnapshotMode
-                          || Boolean(nodeMaterializing[nodeId])
-                          || Boolean(materializedPaths[nodeId])
-                          || Boolean(nodeDetaching[nodeId])
-                        }
-                        className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                        title={inSnapshotMode ? 'Disabled in snapshot view' : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
+                      <DisabledReasonTooltip
+                        reason={inSnapshotMode ? SNAPSHOT_DISABLED_REASON : undefined}
                       >
-                        {nodeMaterializing[nodeId] ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Processing…
-                          </>
-                        ) : materializedPaths[nodeId] ? (
-                          <>Processed</>
-                        ) : (
-                          <>Process All</>
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => void openDetachDialog(nodeId)}
-                        disabled={inSnapshotMode || Boolean(nodeDetaching[nodeId])}
-                        className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                        title={inSnapshotMode ? 'Disabled in snapshot view' : undefined}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleMaterialize(nodeId)}
+                          disabled={
+                            inSnapshotMode
+                            || Boolean(nodeMaterializing[nodeId])
+                            || Boolean(materializedPaths[nodeId])
+                            || Boolean(nodeDetaching[nodeId])
+                          }
+                          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                          title={inSnapshotMode ? undefined : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
+                        >
+                          {nodeMaterializing[nodeId] ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Processing…
+                            </>
+                          ) : materializedPaths[nodeId] ? (
+                            <>Processed</>
+                          ) : (
+                            <>Process All</>
+                          )}
+                        </Button>
+                      </DisabledReasonTooltip>
+                      <DisabledReasonTooltip
+                        reason={inSnapshotMode ? SNAPSHOT_DISABLED_REASON : undefined}
                       >
-                        {nodeDetaching[nodeId] ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Adding to Workspace…
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add to Workspace
-                          </>
-                        )}
-                      </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => void openDetachDialog(nodeId)}
+                          disabled={inSnapshotMode || Boolean(nodeDetaching[nodeId])}
+                          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                        >
+                          {nodeDetaching[nodeId] ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Adding to Workspace…
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add to Workspace
+                            </>
+                          )}
+                        </Button>
+                      </DisabledReasonTooltip>
                     </AnalysisPagination>
                   </section>
                 );

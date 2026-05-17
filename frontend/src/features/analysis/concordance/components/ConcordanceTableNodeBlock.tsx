@@ -8,6 +8,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceGroupedRow, ConcordanceResultEntry } from '@/api/text';
 import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
@@ -178,55 +180,59 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
           <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
           <div className="ml-auto flex items-center space-x-2">
             <span className="text-xs text-gray-500">Rows colored by source data block</span>
-            <Button
-              onClick={() => {
-                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                for (const nid of combinedNodeIds) {
-                  if (materializedPaths[nid]) continue;
-                  const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
-                  if (!col) continue;
-                  void handleMaterialize(nid, col);
+            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+              <Button
+                onClick={() => {
+                  if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                  for (const nid of combinedNodeIds) {
+                    if (materializedPaths[nid]) continue;
+                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                    if (!col) continue;
+                    void handleMaterialize(nid, col);
+                  }
+                }}
+                disabled={
+                  readOnly
+                  || isAnyCombinedMaterializing
+                  || allCombinedMaterialized
+                  || !searchWord.trim()
+                  || combinedNodeIds.length === 0
                 }
-              }}
-              disabled={
-                readOnly
-                || isAnyCombinedMaterializing
-                || allCombinedMaterialized
-                || !searchWord.trim()
-                || combinedNodeIds.length === 0
-              }
-              size="sm"
-              variant="outline"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title={readOnly ? 'Disabled in snapshot view' : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'}
-            >
-              {isAnyCombinedMaterializing ? (
-                <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
-              ) : allCombinedMaterialized ? (
-                <>Processed</>
-              ) : (
-                <>Process Both</>
-              )}
-            </Button>
-            <Button
-              onClick={() => {
-                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                const nodes = combinedNodeIds.map((nid) => {
-                  const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
-                  const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
-                  const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
-                  return { nodeId: nid, column: col, nodeLabel: sourceLabel };
-                }).filter((n) => n.column);
-                openDetachDialog(nodes);
-              }}
-              disabled={readOnly || combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
-              size="sm"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title={readOnly ? 'Disabled in snapshot view' : 'Create new data blocks with concordance results for both sources joined to their original tables'}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Both to Workspace
-            </Button>
+                size="sm"
+                variant="outline"
+                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                title={readOnly ? undefined : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'}
+              >
+                {isAnyCombinedMaterializing ? (
+                  <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
+                ) : allCombinedMaterialized ? (
+                  <>Processed</>
+                ) : (
+                  <>Process Both</>
+                )}
+              </Button>
+            </DisabledReasonTooltip>
+            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+              <Button
+                onClick={() => {
+                  if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                  const nodes = combinedNodeIds.map((nid) => {
+                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                    const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
+                    const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
+                    return { nodeId: nid, column: col, nodeLabel: sourceLabel };
+                  }).filter((n) => n.column);
+                  openDetachDialog(nodes);
+                }}
+                disabled={readOnly || combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
+                size="sm"
+                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                title={readOnly ? undefined : 'Create new data blocks with concordance results for both sources joined to their original tables'}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Both to Workspace
+              </Button>
+            </DisabledReasonTooltip>
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card">
@@ -447,6 +453,14 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
       </div>
 
       {(() => {
+        // Prefer the per-node materialised summary when it's available
+        // (live mode, after Process All has fired its event). When it's
+        // not — snapshot mode never persists materialize_summaries, and
+        // there's a transient window in live mode before the SSE event
+        // arrives — fall back to counting from ``nodeData.data`` +
+        // pagination, matching the combined branch's fallback. Snapshot
+        // captures use page_size: 'all' so the per-page count is the
+        // total, making the fallback exact rather than approximate.
         const summary = nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
           ? <GroupedResultsPageSizeSummary
               groups={[]}
@@ -454,9 +468,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
               totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
               totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
             />
-          : (nodeData.materialized
-            ? null
-            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={batchProcessedCount(nodeData.pagination)} />);
+          : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={batchProcessedCount(nodeData.pagination)} />;
         return summary ? (
           <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
             {summary}
@@ -472,53 +484,57 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
         onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
         loading={nodeIsLoading}
       >
-        <Button
-          onClick={() => {
-            if (detachNodeId) {
-              void handleMaterialize(detachNodeId, column);
+        <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+          <Button
+            onClick={() => {
+              if (detachNodeId) {
+                void handleMaterialize(detachNodeId, column);
+              }
+            }}
+            disabled={
+              readOnly
+              || nodeIsLoading
+              || isMaterializing
+              || hasMaterializedPath
+              || !searchWord.trim()
+              || !canDetach
+              || !detachNodeId
             }
-          }}
-          disabled={
-            readOnly
-            || nodeIsLoading
-            || isMaterializing
-            || hasMaterializedPath
-            || !searchWord.trim()
-            || !canDetach
-            || !detachNodeId
-          }
-          size="sm"
-          variant="outline"
-          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title={readOnly ? 'Disabled in snapshot view' : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
-        >
-          {isMaterializing ? (
-            <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
-          ) : hasMaterializedPath ? (
-            <>Processed</>
-          ) : (
-            <>Process All</>
-          )}
-        </Button>
-        <Button
-          onClick={() => {
-            if (detachNodeId) {
-              const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-              const detachLabel = (detachNode?.name || nodeKey) as string;
-              openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
-            }
-          }}
-          disabled={readOnly || nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
-          size="sm"
-          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title={readOnly ? 'Disabled in snapshot view' : 'Create a new data block with concordance results joined to the original table'}
-        >
-          {isDetaching ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
-          ) : (
-            <><Plus className="mr-2 h-4 w-4" />Add to Workspace</>
-          )}
-        </Button>
+            size="sm"
+            variant="outline"
+            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+            title={readOnly ? undefined : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
+          >
+            {isMaterializing ? (
+              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
+            ) : hasMaterializedPath ? (
+              <>Processed</>
+            ) : (
+              <>Process All</>
+            )}
+          </Button>
+        </DisabledReasonTooltip>
+        <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+          <Button
+            onClick={() => {
+              if (detachNodeId) {
+                const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
+                const detachLabel = (detachNode?.name || nodeKey) as string;
+                openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
+              }
+            }}
+            disabled={readOnly || nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
+            size="sm"
+            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+            title={readOnly ? undefined : 'Create a new data block with concordance results joined to the original table'}
+          >
+            {isDetaching ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
+            ) : (
+              <><Plus className="mr-2 h-4 w-4" />Add to Workspace</>
+            )}
+          </Button>
+        </DisabledReasonTooltip>
       </AnalysisPagination>
     </div>
   );

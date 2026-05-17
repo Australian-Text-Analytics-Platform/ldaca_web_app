@@ -16,6 +16,8 @@ export type {
 
 export { DEMO_SNAPSHOT_MODE, LIVE_MODE, isShareSnapshotMode, isSnapshotMode } from './mode';
 
+export { SNAPSHOT_DISABLED_REASON, snapshotDisabledReason } from './disabledReason';
+
 export {
   SNAPSHOT_CAPS,
   checkSnapshotEligibility,

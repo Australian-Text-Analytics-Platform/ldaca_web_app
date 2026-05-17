@@ -1,5 +1,7 @@
 import React, { useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
@@ -368,31 +370,35 @@ export function TopicModelingResultsPanel({
                   ) : (
                     <div className="hidden lg:block" />
                   )}
-                  <Button
-                    type="button"
-                    size="sm"
+                  <DisabledReasonTooltip
+                    reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
                     className="w-full shrink-0 lg:w-auto"
-                    onClick={() => void openDetachDialog()}
-                    disabled={isDetachLoading || isDetaching || isUpdatingExactTopicCount || readOnly}
-                    title={readOnly ? 'Disabled in snapshot view.' : undefined}
                   >
-                    {isDetachLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Preparing Add to Workspace…
-                      </>
-                    ) : selectedTopicIds.size > 0 ? (
-                      <>
-                        <Plus className="mr-2 h-4 w-4" />
-                        {`Add to Workspace (${selectedTopicIds.size} topics)`}
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add to Workspace (all)
-                      </>
-                    )}
-                  </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-full shrink-0 lg:w-auto"
+                      onClick={() => void openDetachDialog()}
+                      disabled={isDetachLoading || isDetaching || isUpdatingExactTopicCount || readOnly}
+                    >
+                      {isDetachLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Preparing Add to Workspace…
+                        </>
+                      ) : selectedTopicIds.size > 0 ? (
+                        <>
+                          <Plus className="mr-2 h-4 w-4" />
+                          {`Add to Workspace (${selectedTopicIds.size} topics)`}
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add to Workspace (all)
+                        </>
+                      )}
+                    </Button>
+                  </DisabledReasonTooltip>
                 </div>
               }
             />

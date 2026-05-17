@@ -6,6 +6,7 @@ import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisFeatureHeader } from '@/features/analysis/common/components/AnalysisFeatureHeader';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { SNAPSHOT_DISABLED_REASON, snapshotDisabledReason } from '@/features/snapshot-view';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
 import { TokensColumnMismatchNotice } from '@/features/analysis/common/components/TokensColumnMismatchNotice';
 import type { AnalysisActionState, NodeColumnSelection } from '../../common';
@@ -175,7 +176,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
           getNodeColumns={getColumnInfos}
           allowedDataTypes={['string']}
           originalCount={displayNodeCount}
-          lockedMessage={readOnly ? 'Viewing a saved snapshot — selection is frozen.' : ANALYSIS_LOCKED_MESSAGE}
+          lockedMessage={readOnly ? SNAPSHOT_DISABLED_REASON : ANALYSIS_LOCKED_MESSAGE}
         />
 
         <TokensColumnMismatchNotice
@@ -190,43 +191,58 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 <label className="block text-sm font-medium text-foreground">Search word or phrase</label>
                 <HelpIcon targetKey="analysis.concordance.search-term" label="Concordance search term" />
               </div>
-              <input
-                type="text"
-                value={searchWord}
-                onChange={(e) => setSearchWord(e.target.value)}
-                disabled={readOnly}
-                placeholder={
-                  searchMode === 'tokens'
-                    ? 'One or more tokens, separated by space, comma, or |'
-                    : 'Enter word or phrase to search for'
-                }
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-              />
+              <DisabledReasonTooltip
+                reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
+                className="w-full"
+              >
+                <input
+                  type="text"
+                  value={searchWord}
+                  onChange={(e) => setSearchWord(e.target.value)}
+                  disabled={readOnly}
+                  placeholder={
+                    searchMode === 'tokens'
+                      ? 'One or more tokens, separated by space, comma, or |'
+                      : 'Enter word or phrase to search for'
+                  }
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                />
+              </DisabledReasonTooltip>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-foreground">Left context (tokens)</label>
-                <input
-                  type="number"
-                  value={numLeftTokens}
-                  onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 0)}
-                  disabled={readOnly}
-                  min="0"
-                  max="50"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                />
+                <DisabledReasonTooltip
+                  reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
+                  className="w-full"
+                >
+                  <input
+                    type="number"
+                    value={numLeftTokens}
+                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 0)}
+                    disabled={readOnly}
+                    min="0"
+                    max="50"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </DisabledReasonTooltip>
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-foreground">Right context (tokens)</label>
-                <input
-                  type="number"
-                  value={numRightTokens}
-                  onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 0)}
-                  disabled={readOnly}
-                  min="0"
-                  max="50"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                />
+                <DisabledReasonTooltip
+                  reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
+                  className="w-full"
+                >
+                  <input
+                    type="number"
+                    value={numRightTokens}
+                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 0)}
+                    disabled={readOnly}
+                    min="0"
+                    max="50"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </DisabledReasonTooltip>
               </div>
             </div>
           </div>
@@ -244,26 +260,29 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 aria-label="Concordance search mode"
                 className="inline-flex overflow-hidden rounded-md border border-input"
               >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={searchMode === 'regex'}
-                  onClick={() => setSearchMode('regex')}
-                  disabled={readOnly}
-                  className={`px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                    searchMode === 'regex'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-background text-foreground hover:bg-muted'
-                  }`}
-                >
-                  Text
-                </button>
+                <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={searchMode === 'regex'}
+                    onClick={() => setSearchMode('regex')}
+                    disabled={readOnly}
+                    className={`px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      searchMode === 'regex'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    Text
+                  </button>
+                </DisabledReasonTooltip>
                 <DisabledReasonTooltip
-                  reason={
+                  reason={snapshotDisabledReason(
+                    readOnly,
                     tokensModeAvailable
                       ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                      : 'Run Tokenise on this column first — tokens-mode walks the derived tokens column for word-aware (CJK-friendly) context.'
-                  }
+                      : 'Run Tokenise on this column first — tokens-mode walks the derived tokens column for word-aware (CJK-friendly) context.',
+                  )}
                 >
                   <button
                     type="button"
@@ -288,18 +307,20 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                   is in tokens mode. Single-model nodes auto-pick silently
                   so the common case stays uncluttered. */}
               {searchMode === 'tokens' && tokensModelOptions.length > 1 ? (
-                <select
-                  value={tokensModel ?? ''}
-                  onChange={(e) => setTokensModel(e.target.value || null)}
-                  disabled={readOnly}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  aria-label="Tokens-mode model"
-                  title="Pick which tokeniser's column to walk"
-                >
-                  {tokensModelOptions.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+                  <select
+                    value={tokensModel ?? ''}
+                    onChange={(e) => setTokensModel(e.target.value || null)}
+                    disabled={readOnly}
+                    className="rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Tokens-mode model"
+                    title="Pick which tokeniser's column to walk"
+                  >
+                    {tokensModelOptions.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </DisabledReasonTooltip>
               ) : null}
               <HelpIcon
                 targetKey="analysis.concordance.search-mode"
@@ -309,11 +330,11 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
 
             <div className="flex items-center gap-2">
               <DisabledReasonTooltip
-                reason={
-                  searchMode === 'tokens'
-                    ? 'Whole-word applies to text-mode searches only — tokens-mode matches exact tokens by design.'
-                    : undefined
-                }
+                reason={snapshotDisabledReason(
+                  readOnly,
+                  searchMode === 'tokens' &&
+                    'Whole-word applies to text-mode searches only — tokens-mode matches exact tokens by design.',
+                )}
               >
                 <label className="flex items-center gap-2">
                   <input
@@ -329,11 +350,11 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
             </div>
             <div className="flex items-center gap-2">
               <DisabledReasonTooltip
-                reason={
-                  searchMode === 'tokens'
-                    ? 'Regex applies to text-mode only — switch to text-mode to use it.'
-                    : undefined
-                }
+                reason={snapshotDisabledReason(
+                  readOnly,
+                  searchMode === 'tokens' &&
+                    'Regex applies to text-mode only — switch to text-mode to use it.',
+                )}
               >
                 <label className="flex items-center gap-2">
                   <input
@@ -354,16 +375,18 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
               </DisabledReasonTooltip>
               <HelpIcon targetKey="analysis.concordance.regex-toggle" label="Regex mode toggle" />
             </div>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={caseSensitive}
-                onChange={(e) => setCaseSensitive(e.target.checked)}
-                disabled={readOnly}
-                className="h-4 w-4"
-              />
-              <span className="text-sm text-foreground">Case sensitive</span>
-            </label>
+            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={caseSensitive}
+                  onChange={(e) => setCaseSensitive(e.target.checked)}
+                  disabled={readOnly}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm text-foreground">Case sensitive</span>
+              </label>
+            </DisabledReasonTooltip>
           </div>
         </div>
       </CardContent>

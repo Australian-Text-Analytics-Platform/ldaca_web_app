@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceGroupedRow, ConcordanceResultEntry } from '@/api/text';
 import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
@@ -273,36 +274,38 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
           <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
           <div className="ml-auto flex items-center space-x-2">
             <span className="text-xs text-gray-500">Rows colored by source data block</span>
-            <Button
-              onClick={() => {
-                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                for (const nid of combinedNodeIds) {
-                  if (materializedPaths[nid]) continue;
-                  const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
-                  if (!col) continue;
-                  void handleMaterialize(nid, col);
+            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+              <Button
+                onClick={() => {
+                  if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                  for (const nid of combinedNodeIds) {
+                    if (materializedPaths[nid]) continue;
+                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                    if (!col) continue;
+                    void handleMaterialize(nid, col);
+                  }
+                }}
+                disabled={
+                  readOnly
+                  || isAnyCombinedMaterializing
+                  || allCombinedMaterialized
+                  || !searchWord.trim()
+                  || combinedNodeIds.length === 0
                 }
-              }}
-              disabled={
-                readOnly
-                || isAnyCombinedMaterializing
-                || allCombinedMaterialized
-                || !searchWord.trim()
-                || combinedNodeIds.length === 0
-              }
-              size="sm"
-              variant="outline"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title={readOnly ? 'Disabled in snapshot view' : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'}
-            >
-              {isAnyCombinedMaterializing ? (
-                <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
-              ) : allCombinedMaterialized ? (
-                <>Processed</>
-              ) : (
-                <>Process Both</>
-              )}
-            </Button>
+                size="sm"
+                variant="outline"
+                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                title={readOnly ? undefined : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'}
+              >
+                {isAnyCombinedMaterializing ? (
+                  <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
+                ) : allCombinedMaterialized ? (
+                  <>Processed</>
+                ) : (
+                  <>Process Both</>
+                )}
+              </Button>
+            </DisabledReasonTooltip>
             {(() => {
               const combinedSelection =
                 (selectedBinIndices['__COMBINED__'] as ReadonlySet<number> | undefined) ??
@@ -326,7 +329,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                 || combinedScopeMismatch
                 || allLegendHidden;
               const combinedDetachTitle = readOnly
-                ? 'Disabled in snapshot view'
+                ? SNAPSHOT_DISABLED_REASON
                 : combinedScopeMismatch
                 ? 'Materialise the corpus first (Process Both) to safely apply this bin selection across all source documents.'
                 : allLegendHidden
@@ -675,6 +678,11 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
       </div>
 
       {(() => {
+        // Mirror the table block's fallback: prefer the per-node
+        // materialised summary when available, otherwise count from
+        // ``nodeData.data`` + pagination. Snapshot bundles don't carry
+        // materialize_summaries, so this fallback is what makes the
+        // separated dispersion view display the count line at all.
         const summary = nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
           ? <GroupedResultsPageSizeSummary
               groups={[]}
@@ -682,9 +690,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
               totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
             />
-          : (nodeData.materialized
-            ? null
-            : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={batchProcessedCount(nodeData.pagination)} />);
+          : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={batchProcessedCount(nodeData.pagination)} />;
         return summary ? (
           <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
             {summary}
@@ -700,34 +706,36 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
         onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
         loading={nodeIsLoading}
       >
-        <Button
-          onClick={() => {
-            if (detachNodeId) {
-              void handleMaterialize(detachNodeId, column);
+        <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+          <Button
+            onClick={() => {
+              if (detachNodeId) {
+                void handleMaterialize(detachNodeId, column);
+              }
+            }}
+            disabled={
+              readOnly
+              || nodeIsLoading
+              || isMaterializing
+              || hasMaterializedPath
+              || !searchWord.trim()
+              || !canDetach
+              || !detachNodeId
             }
-          }}
-          disabled={
-            readOnly
-            || nodeIsLoading
-            || isMaterializing
-            || hasMaterializedPath
-            || !searchWord.trim()
-            || !canDetach
-            || !detachNodeId
-          }
-          size="sm"
-          variant="outline"
-          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title={readOnly ? 'Disabled in snapshot view' : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
-        >
-          {isMaterializing ? (
-            <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
-          ) : hasMaterializedPath ? (
-            <>Processed</>
-          ) : (
-            <>Process All</>
-          )}
-        </Button>
+            size="sm"
+            variant="outline"
+            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+            title={readOnly ? undefined : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
+          >
+            {isMaterializing ? (
+              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
+            ) : hasMaterializedPath ? (
+              <>Processed</>
+            ) : (
+              <>Process All</>
+            )}
+          </Button>
+        </DisabledReasonTooltip>
         {(() => {
           const nodeSelection =
             (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
@@ -753,7 +761,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
             || nodeScopeMismatch
             || allLegendHidden;
           const nodeDetachTitle = readOnly
-            ? 'Disabled in snapshot view'
+            ? SNAPSHOT_DISABLED_REASON
             : nodeScopeMismatch
             ? 'Materialise the corpus first (Process All) to safely apply this bin selection across all documents.'
             : allLegendHidden
