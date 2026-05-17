@@ -3,6 +3,7 @@ import { Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { SNAPSHOT_DISABLED_REASON, snapshotDisabledReason } from '@/features/snapshot-view';
 import type { ChartConfig } from '@/components/ui/chart';
 import {
   MultiSeriesChart,
@@ -149,7 +150,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                 className="min-w-0 flex-1"
               />
             </div>
-            <DisabledReasonTooltip reason={readOnly ? 'Disabled in snapshot view.' : 'No groups meet the current minimum group size — adjust the filter to enable selecting periods.'}>
+            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : 'No groups meet the current minimum group size — adjust the filter to enable selecting periods.'}>
               <Button
                 type="button"
                 size="sm"
@@ -277,32 +278,37 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
             >
               New data block name
             </label>
-            <Input
-              id="sequential-new-node-name"
-              value={detachNodeName}
-              onChange={(event) => onDetachNodeNameChange(event.target.value)}
-              onKeyDown={(event) =>
-                acceptPlaceholderOnTab({
-                  event,
-                  value: detachNodeName,
-                  setValue: onDetachNodeNameChange,
-                })
-              }
-              placeholder={detachNodeNamePlaceholder}
-              disabled={isDetaching || readOnly}
-              aria-label="New data block name"
+            <DisabledReasonTooltip
+              reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
               className="min-w-0 flex-1"
-            />
+            >
+              <Input
+                id="sequential-new-node-name"
+                value={detachNodeName}
+                onChange={(event) => onDetachNodeNameChange(event.target.value)}
+                onKeyDown={(event) =>
+                  acceptPlaceholderOnTab({
+                    event,
+                    value: detachNodeName,
+                    setValue: onDetachNodeNameChange,
+                  })
+                }
+                placeholder={detachNodeNamePlaceholder}
+                disabled={isDetaching || readOnly}
+                aria-label="New data block name"
+                className="min-w-0 flex-1"
+              />
+            </DisabledReasonTooltip>
           </div>
           <DisabledReasonTooltip
             reason={
               isDetaching
                 ? undefined
-                : readOnly
-                  ? 'Disabled in snapshot view.'
-                  : !canDetach
-                    ? 'Click periods on the chart (shift-click to extend) to pick a subset to add as a new data block.'
-                    : undefined
+                : snapshotDisabledReason(
+                    readOnly,
+                    !canDetach &&
+                      'Click periods on the chart (shift-click to extend) to pick a subset to add as a new data block.',
+                  )
             }
           >
             <Button

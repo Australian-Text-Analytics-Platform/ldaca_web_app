@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -8,7 +8,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import { useSchemaManagement } from '@/hooks/useSchemaManagement';
 import {
-  type SequentialAnalysisRequest,
   type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
@@ -19,7 +18,22 @@ import {
   useToolSnapshotMode,
   type LoadedSnapshot,
 } from '@/features/snapshot-view';
-import { useSequentialAnalysisSnapshotCapture } from './hooks/useSequentialAnalysisSnapshotCapture';
+import {
+  buildCaptureRequest,
+  useSequentialAnalysisSnapshotCapture,
+} from './hooks/useSequentialAnalysisSnapshotCapture';
+import {
+  FREQUENCY_ORDER,
+  isCoarserOrEqual,
+  rebucket,
+  type CapturedRow,
+} from './sequentialRebucket';
+import {
+  DEFAULT_TRENDS_SNAPSHOT_CONFIG,
+  TrendsSnapshotConfigDialog,
+  type SnapshotFinestFrequency,
+  type TrendsSnapshotConfig,
+} from './components/TrendsSnapshotConfigDialog';
 import { useSequentialAnalysisSnapshotLoad } from './hooks/useSequentialAnalysisSnapshotLoad';
 import type { SequentialAnalysisSnapshotPayload } from './hooks/useSequentialAnalysisSnapshotLoad';
 import { SequentialAnalysisSnapshotBanner } from './components/SequentialAnalysisSnapshotBanner';
@@ -423,18 +437,25 @@ const SequentialAnalysisFeature = () => {
     inSnapshotMode && loadedSnapshot ? loadedSnapshot.payload.result : liveResults;
 
   // Hydrate the parameter-panel state from the loaded snapshot when
-  // entering snapshot mode. The parameter inputs are disabled in
-  // snapshot mode (via ``isLocked`` + ``inputsDisabled``), so once
-  // synced the values stay frozen for the duration of the view.
-  // Mirrors the live ``onHydratedRequest`` path, but reads from the
-  // captured settings/result rather than the live task store.
-  /* eslint-disable react-hooks/set-state-in-effect -- Snapshot load
-     is a one-shot sync from the store; refactoring to render-time
-     would duplicate dispatch logic across every render. */
+  // entering snapshot mode. Two key differences from the live
+  // ``onHydratedRequest`` path:
+  //   1. Group-by columns default to ``[]`` (per the snapshot UX:
+  //      "start at the smallest frequency with no group option"), even
+  //      though the captured rows include all selected columns. The
+  //      user picks which to group by in the viewer.
+  //   2. Frequency / numeric interval default to the captured
+  //      ``finest_frequency`` / ``numeric_interval`` — the chart
+  //      starts at the finest captured granularity and the user
+  //      coarsens from there.
+  /* eslint-disable react-hooks/set-state-in-effect -- One-shot sync
+     from the snapshot store; refactoring to render-time would
+     duplicate dispatch logic across every render. */
   useEffect(() => {
     if (!inSnapshotMode || !loadedSnapshot) return;
     const settings = loadedSnapshot.payload.settings;
     const result = loadedSnapshot.payload.result;
+    const snapshotConfigBlob = (settings as { snapshot_config?: Record<string, unknown> } | undefined)
+      ?.snapshot_config;
     const analysisParams =
       (result?.analysis_params as Record<string, unknown> | undefined) ?? {};
     const tc =
@@ -442,44 +463,37 @@ const SequentialAnalysisFeature = () => {
       (analysisParams.time_column as string | undefined) ??
       '';
     setTimeColumn(tc);
-    const groups: string[] = Array.isArray(settings?.group_by_columns)
-      ? (settings!.group_by_columns as string[])
-      : Array.isArray(analysisParams.group_by_columns)
-        ? (analysisParams.group_by_columns as string[])
-        : [];
-    setGroupByColumns([...groups]);
+    // Default to no grouping — user opts in via the panel.
+    setGroupByColumns([]);
     const freq: SequentialFrequency =
+      (snapshotConfigBlob?.finest_frequency as SequentialFrequency | undefined) ??
       (settings?.frequency as SequentialFrequency | undefined) ??
       (analysisParams.frequency as SequentialFrequency | undefined) ??
       'daily';
     setFrequency(freq);
     const ct = isChartTypeOption(result?.chart_type) ? (result.chart_type as ChartTypeOption) : 'line';
     setChartType(ct);
-    setCaseSensitive(
-      typeof settings?.case_sensitive === 'boolean'
-        ? settings.case_sensitive
-        : typeof analysisParams.case_sensitive === 'boolean'
-          ? (analysisParams.case_sensitive as boolean)
-          : true,
-    );
+    // Captured rows always have case_sensitive=true (the capture pass
+    // forces it). The viewer toggle is purely client-side merging;
+    // default to ``true`` so the user sees the as-captured legend.
+    setCaseSensitive(true);
     const numericOrigin =
-      settings?.numeric_origin ?? (analysisParams.numeric_origin as number | null | undefined);
+      (snapshotConfigBlob?.numeric_origin as number | null | undefined) ??
+      settings?.numeric_origin ??
+      (analysisParams.numeric_origin as number | null | undefined);
     setNumericOriginInput(
       numericOrigin != null && Number.isFinite(numericOrigin) ? String(numericOrigin) : '',
     );
     const numericInterval =
-      settings?.numeric_interval ?? (analysisParams.numeric_interval as number | null | undefined);
+      (snapshotConfigBlob?.numeric_interval as number | null | undefined) ??
+      settings?.numeric_interval ??
+      (analysisParams.numeric_interval as number | null | undefined);
     setNumericIntervalInput(
       numericInterval != null && Number.isFinite(numericInterval) ? String(numericInterval) : '1',
     );
-    const civ =
-      settings?.custom_interval_value ??
-      (analysisParams.custom_interval_value as number | null | undefined);
-    setCustomIntervalValueInput(civ != null && Number.isFinite(civ) ? String(civ) : '1');
-    const ciu =
-      settings?.custom_interval_unit ??
-      (analysisParams.custom_interval_unit as SequentialCustomIntervalUnit | null | undefined);
-    setCustomIntervalUnit(isCustomIntervalUnit(ciu) ? ciu : 'minutes');
+    // Snapshot mode never uses ``custom`` frequency; reset to defaults.
+    setCustomIntervalValueInput('1');
+    setCustomIntervalUnit('minutes');
     setHiddenKeys(new Set());
     setSelectedPeriodIndices(new Set());
     setDetachNodeName('');
@@ -674,10 +688,10 @@ const SequentialAnalysisFeature = () => {
     handleAnalyze,
     handleClearResults,
     handleChartTypeChange,
-    chartData,
-    groupKeys,
-    chartConfig,
-    groupPointCounts,
+    chartData: liveChartData,
+    groupKeys: liveGroupKeys,
+    chartConfig: liveChartConfig,
+    groupPointCounts: liveGroupPointCounts,
   } = useSequentialAnalysisTaskFlow({
     state: {
       currentWorkspaceId,
@@ -710,6 +724,75 @@ const SequentialAnalysisFeature = () => {
     },
     lock: { getAuthHeaders, queryClient },
   });
+
+  // ── Snapshot-mode re-aggregation ─────────────────────────────────────
+  //
+  // In snapshot mode, the chart data comes from running the captured
+  // rows through ``rebucket`` with the user's view-time config (any
+  // post-fit frequency coarsening, group-dim drop, case-fold). In live
+  // mode we use the task-flow's output directly. The chart, summary
+  // counts, and detach surface all read these shadowed values without
+  // caring which path produced them.
+  const capturedRows: CapturedRow[] = (() => {
+    if (!inSnapshotMode || !loadedSnapshot) return [];
+    const data = (loadedSnapshot.payload.result as Record<string, unknown> | undefined)?.data;
+    return Array.isArray(data) ? (data as CapturedRow[]) : [];
+  })();
+  const capturedSnapshotConfig = (
+    loadedSnapshot?.payload.settings as { snapshot_config?: Record<string, unknown> } | undefined
+  )?.snapshot_config;
+  const captureFinestFrequency =
+    (capturedSnapshotConfig?.finest_frequency as SnapshotFinestFrequency | undefined)
+    ?? (loadedSnapshot?.payload.settings?.frequency === 'custom'
+      ? 'daily'
+      : (loadedSnapshot?.payload.settings?.frequency as SnapshotFinestFrequency | undefined))
+    ?? 'daily';
+  const captureNumericOrigin = (() => {
+    const fromConfig = capturedSnapshotConfig?.numeric_origin;
+    if (typeof fromConfig === 'number') return fromConfig;
+    const fromSettings = loadedSnapshot?.payload.settings?.numeric_origin;
+    return typeof fromSettings === 'number' ? fromSettings : null;
+  })();
+  const snapshotRebucket = inSnapshotMode && loadedSnapshot
+    ? rebucket(capturedRows, {
+        columnType: derivedColumnType,
+        viewFrequency: (frequency === 'custom' ? captureFinestFrequency : frequency as SnapshotFinestFrequency),
+        viewNumericInterval: numericIntervalValue ?? 1,
+        captureNumericOrigin,
+        viewGroupByColumns: groupByColumns.filter((c) => c.trim() !== ''),
+        caseSensitive,
+      })
+    : null;
+
+  const chartData = snapshotRebucket?.chartData ?? liveChartData;
+  const groupKeys = snapshotRebucket?.groupKeys ?? liveGroupKeys;
+  const chartConfig = snapshotRebucket?.chartConfig ?? liveChartConfig;
+  const groupPointCounts = snapshotRebucket?.groupPointCounts ?? liveGroupPointCounts;
+
+  // Snapshot-mode parameter-panel options:
+  //   - Frequency dropdown: coarser-or-equal to the captured finest
+  //     frequency (no 'custom', no refinement).
+  //   - Group-by column list: the columns the capture actually
+  //     shipped (a subset of the live workspace's columns).
+  // In live mode the panel uses its default options.
+  const snapshotFrequencyOptions = inSnapshotMode
+    ? FREQUENCY_ORDER
+        .filter((freq) => isCoarserOrEqual(freq, captureFinestFrequency))
+        .map((value) => ({
+          value: value as SequentialFrequency,
+          label: value.charAt(0).toUpperCase() + value.slice(1),
+        }))
+    : undefined;
+  const snapshotAvailableColumns = (() => {
+    if (!inSnapshotMode) return null;
+    const capturedGroupColumns: string[] = Array.isArray(capturedSnapshotConfig?.group_by_columns)
+      ? (capturedSnapshotConfig!.group_by_columns as string[])
+      : Array.isArray(loadedSnapshot?.payload.settings?.group_by_columns)
+        ? (loadedSnapshot!.payload.settings!.group_by_columns as string[])
+        : [];
+    // Map back to the ColumnLike shape the panel expects.
+    return capturedGroupColumns.map((name) => ({ name, dataType: 'string' }));
+  })();
 
   const handlePeriodClick = (index: number, shiftHeld: boolean) => {
     if (index < 0 || index >= chartData.length) return;
@@ -758,45 +841,115 @@ const SequentialAnalysisFeature = () => {
   const handleOpenSnapshot = useSequentialAnalysisSnapshotLoad();
 
   const liveCaptureNode: WorkspaceNodeLike | null = livePanelSelectedNodes[0] ?? null;
-  const getSequentialNodeRowCount = (node: WorkspaceNodeLike) => {
+  const getSequentialNodeRowCount = useCallback((node: WorkspaceNodeLike): number => {
     const shape = node.shape as unknown;
     if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
     return 0;
-  };
+  }, []);
 
-  // Build the live ``SequentialAnalysisRequest`` from current state
-  // for the capture-side ``settings.json`` payload. Returns null in
-  // snapshot mode (the Save button is disabled there anyway). Plain
-  // expression — the React Compiler memoizes per-render automatically.
-  const captureRequest: (SequentialAnalysisRequest & { node_id?: string }) | null = (() => {
-    if (inSnapshotMode) return null;
-    if (!activeNodeId || !activeTimeColumn) return null;
-    const validGroupBy = groupByColumns.filter((col) => col.trim() !== '');
-    const isCustomDt = derivedColumnType === 'datetime' && frequency === 'custom';
-    return {
-      node_id: activeNodeId,
-      time_column: activeTimeColumn,
-      group_by_columns: validGroupBy.length ? validGroupBy : null,
-      frequency,
-      sort_by_time: true,
-      column_type: derivedColumnType,
-      numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : null,
-      numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
-      custom_interval_value: isCustomDt ? customIntervalValue : null,
-      custom_interval_unit: isCustomDt ? customIntervalUnitValue : null,
-      case_sensitive: caseSensitive,
-    };
-  })();
+  // Snapshot capture config — picked by the user in
+  // <TrendsSnapshotConfigDialog> before saving. Seeded with sensible
+  // defaults so a quick Save → Save flow produces a reasonable
+  // bundle without forcing the user through every option.
+  const [snapshotConfig, setSnapshotConfig] = useState<TrendsSnapshotConfig>(() => ({
+    ...DEFAULT_TRENDS_SNAPSHOT_CONFIG,
+    // Seed group columns from the live form's selected groups so the
+    // user doesn't have to re-tick them after experimenting in live.
+    groupByColumns: groupByColumns.filter((c) => c.trim() !== '').slice(0, 3),
+  }));
 
-  const handleSaveSnapshot = useSequentialAnalysisSnapshotCapture({
+  // When the active live frequency changes, refresh the dialog's
+  // default to match (but only if the user hasn't customised it).
+  // ``inSnapshotMode`` skips the auto-sync — snapshot mode shouldn't
+  // touch this state.
+  const liveSnapshotFrequencyDefault = useMemo<SnapshotFinestFrequency>(() => {
+    if (frequency === 'custom') return 'daily';
+    if (frequency === 'second' || frequency === 'minute') return frequency;
+    return frequency as SnapshotFinestFrequency;
+  }, [frequency]);
+  /* eslint-disable react-hooks/set-state-in-effect -- Track live form
+     changes into the snapshot dialog's default. Sync-only, no risk of
+     infinite loops because deps are exact. */
+  useEffect(() => {
+    if (inSnapshotMode) return;
+    setSnapshotConfig((prev) =>
+      prev.finestFrequency === liveSnapshotFrequencyDefault ? prev : { ...prev, finestFrequency: liveSnapshotFrequencyDefault },
+    );
+  }, [inSnapshotMode, liveSnapshotFrequencyDefault]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const captureWithConfig = useSequentialAnalysisSnapshotCapture({
     workspaceId: currentWorkspaceId ?? null,
     workspaceName: currentWorkspace?.name ?? currentWorkspaceId ?? '(workspace)',
-    request: captureRequest,
-    results: liveResults,
+    timeColumn: activeTimeColumn,
+    columnType: derivedColumnType,
     selectedNode: liveCaptureNode,
     getNodeRowCount: getSequentialNodeRowCount,
     getAuthHeaders,
   });
+
+  // Wrapped onSave used by <SnapshotActions> — reads the current
+  // ``snapshotConfig`` state at call time so the dialog's final
+  // values flow through to the capture hook.
+  const handleSaveSnapshot = useCallback(
+    async (filename: string, description: string) => {
+      await captureWithConfig(filename, description, snapshotConfig);
+    },
+    [captureWithConfig, snapshotConfig],
+  );
+
+  // Available metadata columns the user can group by — derived
+  // inline (React Compiler handles memoisation automatically). Grouping
+  // only makes sense for low-cardinality categorical/text columns; the
+  // capture pass would otherwise blow past the row cap when a user
+  // ticks a float / datetime / list column.
+  const availableGroupByColumns: string[] = availableColumns
+    .filter((c) => {
+      if (!c.name || c.name === activeTimeColumn) return false;
+      const dt = normalizeTypeName(c.dataType);
+      return dt === 'string' || dt === 'categorical';
+    })
+    .map((c) => c.name);
+
+  // Years-span hint for the dialog's estimator. Inferred from the
+  // live result's earliest / latest time_period. ``null`` when fewer
+  // than two periods are available; the dialog assumes one year.
+  const liveYearsSpanHint: number | null = (() => {
+    const live = liveResults as Record<string, unknown> | null;
+    const liveData = Array.isArray(live?.data) ? (live!.data as Array<Record<string, unknown>>) : [];
+    if (liveData.length < 2) return null;
+    const periods = liveData
+      .map((r) => r.period_start ?? r.time_period)
+      .filter((v): v is string | number => v != null);
+    if (periods.length < 2) return null;
+    const first = new Date(String(periods[0])).getTime();
+    const last = new Date(String(periods[periods.length - 1])).getTime();
+    if (!Number.isFinite(first) || !Number.isFinite(last) || last <= first) return null;
+    return Math.max(0.01, (last - first) / (365 * 86400 * 1000));
+  })();
+
+  const liveCaptureNodeId = liveCaptureNode
+    ? ((liveCaptureNode.id as string | undefined) ?? (liveCaptureNode.node_id as string | undefined) ?? '')
+    : '';
+  const liveCaptureNodeRowCount = liveCaptureNode ? getSequentialNodeRowCount(liveCaptureNode) : 0;
+
+  // Optional backend dry-run: hits the preview endpoint which runs
+  // the same aggregation but doesn't touch the live task store —
+  // calling the regular ``sequentialAnalysis`` endpoint would conflict
+  // with the user's existing live result (the backend rejects
+  // differing requests under the same task slot with a 409
+  // "Clear current sequential analysis results..."). The preview
+  // endpoint returns just ``total_records``, no chart data shipped.
+  const dryRunSnapshotRows = async (config: TrendsSnapshotConfig): Promise<number> => {
+    if (!liveCaptureNode || !activeTimeColumn) return 0;
+    const nodeId = (liveCaptureNode.id as string | undefined)
+      ?? (liveCaptureNode.node_id as string | undefined)
+      ?? '';
+    if (!nodeId) return 0;
+    const req = buildCaptureRequest(activeTimeColumn, derivedColumnType, config);
+    const result = await textApi.sequentialAnalysisPreview(nodeId, req, getAuthHeaders());
+    return typeof result?.total_records === 'number' ? result.total_records : 0;
+  };
 
   const saveSnapshotDisabledReason = (() => {
     if (inSnapshotMode) {
@@ -846,12 +999,28 @@ const SequentialAnalysisFeature = () => {
     ? (results.data as Array<Record<string, unknown>>)
     : [];
 
-  const getGroupKey = (row: Record<string, unknown>) => summaryGroupBy
-    .map((column) => String(row[column] ?? ''))
+  // In snapshot mode the displayed grouping is the viewer's view-time
+  // choice (a subset of the captured columns), not the captured
+  // analysis_params group. Filtering must key off the viewer's columns
+  // so the keys generated here match the rebucketed ``groupKeys`` —
+  // otherwise every chart key looks up as 0 and the min-group-size
+  // filter rejects everything. Case-folding mirrors rebucket: captured
+  // rows are always case-sensitive, the viewer's toggle merges client-
+  // side.
+  const effectiveGroupBy = inSnapshotMode
+    ? groupByColumns.filter((c) => c.trim() !== '')
+    : summaryGroupBy;
+  const foldGroupValue = (raw: unknown): string => {
+    const str = raw == null ? '' : String(raw);
+    return inSnapshotMode && !caseSensitive ? str.toLowerCase() : str;
+  };
+
+  const getGroupKey = (row: Record<string, unknown>) => effectiveGroupBy
+    .map((column) => foldGroupValue(row[column]))
     .join(' - ');
 
   const groupSizeByKey = (() => {
-    if (!summaryGroupBy.length) return {} as Record<string, number>;
+    if (!effectiveGroupBy.length) return {} as Record<string, number>;
 
     const sizes: Record<string, number> = {};
     rawResultRows.forEach((row) => {
@@ -863,7 +1032,7 @@ const SequentialAnalysisFeature = () => {
     return sizes;
   })();
 
-  const passesMinGroupSize = (key: string) => !summaryGroupBy.length || (groupSizeByKey[key] ?? 0) >= minGroupSize;
+  const passesMinGroupSize = (key: string) => !effectiveGroupBy.length || (groupSizeByKey[key] ?? 0) >= minGroupSize;
   const filteredGroupKeys = groupKeys.filter((key) => passesMinGroupSize(key));
   const filteredOutGroupKeys = new Set(groupKeys.filter((key) => !passesMinGroupSize(key)));
   const invisibleGroupKeys = new Set([...hiddenKeys, ...filteredOutGroupKeys]);
@@ -886,7 +1055,7 @@ const SequentialAnalysisFeature = () => {
   });
 
   const isRowVisible = (row: Record<string, unknown>) => {
-    if (!summaryGroupBy.length) return true;
+    if (!effectiveGroupBy.length) return true;
     return !invisibleGroupKeys.has(getGroupKey(row));
   };
 
@@ -990,6 +1159,28 @@ const SequentialAnalysisFeature = () => {
           nodeLabels: livePanelSelectedNodes
             .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
             .filter((s) => s.length > 0),
+          // Trends overrides the standard Save dialog with a richer
+          // configuration dialog: pick the finest time bin + group-by
+          // columns so the viewer can re-aggregate client-side.
+          saveDialog: ({ open, onOpenChange, tool, existingFilenames, defaultName, onSave }) => (
+            <TrendsSnapshotConfigDialog
+              open={open}
+              onOpenChange={onOpenChange}
+              tool={tool}
+              existingFilenames={existingFilenames}
+              defaultName={defaultName}
+              onSave={onSave}
+              config={snapshotConfig}
+              onConfigChange={setSnapshotConfig}
+              columnType={derivedColumnType}
+              availableGroupByColumns={availableGroupByColumns}
+              workspaceId={currentWorkspaceId}
+              nodeId={liveCaptureNodeId}
+              nodeRowCount={liveCaptureNodeRowCount}
+              yearsSpanHint={liveYearsSpanHint}
+              dryRunRowCount={dryRunSnapshotRows}
+            />
+          ),
         }}
         actions={{
           onRun: () => {
@@ -1036,7 +1227,12 @@ const SequentialAnalysisFeature = () => {
               setTimeColumn(column);
             }}
             derivedColumnType={derivedColumnType}
-            inputsDisabled={inSnapshotMode || (!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId))}
+            // Snapshot mode unlocks all the post-fit-tunable inputs
+            // (frequency, group-by, case-sensitive, numeric interval).
+            // The captured x-axis column stays locked via ``isLocked``;
+            // the parameter inputs drive client-side ``rebucket``.
+            inputsDisabled={!inSnapshotMode && (!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId))}
+            frequencyOptions={snapshotFrequencyOptions}
             activeNodeId={activeNodeId}
             selectedNodeId={selectedNodeId}
             currentWorkspaceId={currentWorkspaceId}
@@ -1050,7 +1246,7 @@ const SequentialAnalysisFeature = () => {
             onNumericOriginChange={setNumericOriginInput}
             numericIntervalInput={numericIntervalInput}
             onNumericIntervalChange={setNumericIntervalInput}
-            availableColumns={availableColumns}
+            availableColumns={snapshotAvailableColumns ?? availableColumns}
             groupByColumns={groupByColumns}
             onAddGroupByColumn={handleAddGroupByColumn}
             onRemoveGroupByColumn={handleRemoveGroupByColumn}

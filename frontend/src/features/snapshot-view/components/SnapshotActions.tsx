@@ -37,6 +37,26 @@ export interface SnapshotActionsProps {
    * ``demo-{date}``. The tool prefix is added by the dialog, so
    * callers only need to supply the data-block-derived portion. */
   nodeLabels?: string[];
+  /** Optional override for the Save dialog. When provided, the
+   * built-in ``<SaveSnapshotDialog>`` is replaced by whatever the
+   * caller returns. Trends uses this to inject a richer
+   * configuration dialog (finest time bin + group-by columns + row
+   * estimator) since its snapshots are data-rich captures rather
+   * than direct freezes of the current view. Other tools leave the
+   * prop unset and get the standard dialog.
+   *
+   * The renderer receives the same wiring (open, existingFilenames,
+   * defaultName, wrapped onSave that refetches the snapshot list).
+   * Cross-tool extras (e.g. capture-time config) flow through the
+   * caller's own closure, not this prop. */
+  saveDialog?: (props: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    tool: SnapshotToolKey;
+    existingFilenames: string[];
+    defaultName: string;
+    onSave: (filename: string, description: string) => Promise<void>;
+  }) => React.ReactNode;
 }
 
 /** Slugify a single data-block label for inclusion in the default
@@ -76,6 +96,7 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   disabledReason,
   onOpenSnapshot,
   nodeLabels,
+  saveDialog,
 }) => {
   const enabled = usePreferencesStore((s) => s.demoSnapshotsEnabled);
   const { getAuthHeaders } = useAuth();
@@ -147,14 +168,25 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
       )}
 
       {onSave && (
-        <SaveSnapshotDialog
-          open={saveOpen}
-          onOpenChange={setSaveOpen}
-          tool={tool}
-          existingFilenames={existingFilenames}
-          defaultName={defaultName}
-          onSave={handleSave}
-        />
+        saveDialog
+          ? saveDialog({
+              open: saveOpen,
+              onOpenChange: setSaveOpen,
+              tool,
+              existingFilenames,
+              defaultName,
+              onSave: handleSave,
+            })
+          : (
+            <SaveSnapshotDialog
+              open={saveOpen}
+              onOpenChange={setSaveOpen}
+              tool={tool}
+              existingFilenames={existingFilenames}
+              defaultName={defaultName}
+              onSave={handleSave}
+            />
+          )
       )}
 
       <LoadSnapshotDialog

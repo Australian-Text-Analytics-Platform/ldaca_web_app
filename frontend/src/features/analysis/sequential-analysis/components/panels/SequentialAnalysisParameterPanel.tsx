@@ -31,14 +31,28 @@ interface NodeColumnSelectionLike {
   column: string;
 }
 
-const FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
-  { value: 'hourly', label: 'Hourly' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'yearly', label: 'Yearly' },
-  { value: 'custom', label: 'Customised' },
+const FREQUENCY_LABELS: Record<SequentialFrequency, string> = {
+  second: 'Per second',
+  minute: 'Per minute',
+  hourly: 'Hourly',
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  yearly: 'Yearly',
+  custom: 'Customised',
+};
+
+/** Default live-mode dropdown — hourly..yearly + custom. Snapshot
+ * mode passes a filtered list via the ``frequencyOptions`` prop. */
+const DEFAULT_FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
+  { value: 'hourly', label: FREQUENCY_LABELS.hourly },
+  { value: 'daily', label: FREQUENCY_LABELS.daily },
+  { value: 'weekly', label: FREQUENCY_LABELS.weekly },
+  { value: 'monthly', label: FREQUENCY_LABELS.monthly },
+  { value: 'quarterly', label: FREQUENCY_LABELS.quarterly },
+  { value: 'yearly', label: FREQUENCY_LABELS.yearly },
+  { value: 'custom', label: FREQUENCY_LABELS.custom },
 ];
 
 const CUSTOM_INTERVAL_UNIT_OPTIONS: Array<{
@@ -76,6 +90,12 @@ export interface SequentialAnalysisParameterPanelProps {
   // Datetime branch
   frequency: SequentialFrequency;
   onFrequencyChange: (value: SequentialFrequency) => void;
+  /** Optional override for the frequency dropdown options. Snapshot
+   * mode passes a filtered list (coarser-or-equal to the captured
+   * finest frequency) so the viewer can't ask for a refinement
+   * the captured data can't support. Defaults to the live preset
+   * list (hourly..yearly + custom). */
+  frequencyOptions?: Array<{ value: SequentialFrequency; label: string }>;
   customIntervalValueInput: string;
   onCustomIntervalValueChange: (value: string) => void;
   customIntervalUnit: SequentialCustomIntervalUnit;
@@ -130,6 +150,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
   onCustomIntervalValueChange,
   customIntervalUnit,
   onCustomIntervalUnitChange,
+  frequencyOptions = DEFAULT_FREQUENCY_OPTIONS,
   numericOriginInput,
   onNumericOriginChange,
   numericIntervalInput,
@@ -197,7 +218,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
                   <SelectValue placeholder="Select frequency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {FREQUENCY_OPTIONS.map((option) => (
+                  {frequencyOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -301,7 +322,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
         {groupByColumns.map((column, index) => (
           <div key={index} className="flex items-center space-x-2 mb-2">
             <Select
-              value={column || undefined}
+              value={column}
               onValueChange={(value) => onGroupByColumnChange(index, value)}
               disabled={inputsDisabled}
             >

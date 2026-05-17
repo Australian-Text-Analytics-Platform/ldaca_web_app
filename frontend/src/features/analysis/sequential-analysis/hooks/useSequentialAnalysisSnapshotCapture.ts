@@ -1,14 +1,26 @@
 /**
  * Trends (sequential-analysis) snapshot capture pipeline.
  *
- * Mirrors the token-frequency hook in shape: no pagination, no
- * materialise step, so the bundle is just the full result payload
- * (the live ``Record<string, unknown>`` that drives the chart) plus
- * the captured ``SequentialAnalysisRequest`` under ``settings.json``.
+ * Trends captures are **data-rich**: the user picks the finest time
+ * bin and which metadata columns to include via
+ * <TrendsSnapshotConfigDialog>, and the capture re-runs the backend
+ * analysis with those settings before bundling. The viewer (chunks
+ * b/c of the plan) re-aggregates the captured rows client-side to
+ * coarser frequencies and fewer group dimensions, so the captured
+ * payload is the **richest** sliceable view rather than a direct
+ * freeze of the current chart.
+ *
+ * Hard cap: 200,000 rows. Enforced client-side after the re-run
+ * returns; the dialog has already shown an estimate so this is a
+ * defensive backstop, not the primary gate.
+ *
+ * Case-sensitive is forced to ``true`` at capture so the viewer's
+ * client-side case-folding toggle can merge or split groups without
+ * losing the original casings.
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import type { SequentialAnalysisRequest } from '@/api/text';
+import { textApi, type SequentialAnalysisRequest } from '@/api/text';
 import { snapshotsApi } from '@/api/snapshots';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
@@ -19,6 +31,10 @@ import {
   type SnapshotManifest,
 } from '@/features/snapshot-view';
 import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+import {
+  SNAPSHOT_ROW_HARD_CAP,
+  type TrendsSnapshotConfig,
+} from '../components/TrendsSnapshotConfigDialog';
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
 const SETTINGS_PAYLOAD_PATH = 'settings.json';
@@ -26,14 +42,11 @@ const SETTINGS_PAYLOAD_PATH = 'settings.json';
 export interface UseSequentialAnalysisSnapshotCaptureInput {
   workspaceId: string | null;
   workspaceName: string;
-  /** Captured request — embedded verbatim in ``settings.json`` so the
-   * load flow can rehydrate the time column / frequency / group-by /
-   * numeric origin etc. into the read-only parameter panel. */
-  request: (SequentialAnalysisRequest & { node_id?: string }) | null;
-  /** Full live result, including ``data`` rows + ``analysis_params`` +
-   * ``chart_type``. Trends results are bounded by the time bucket count
-   * × group count, so the whole payload ships verbatim. */
-  results: Record<string, unknown> | null;
+  /** Live time / numeric column the user is analysing. Captured into
+   * the bundle so the viewer's parameter panel renders the same
+   * x-axis column. */
+  timeColumn: string;
+  columnType: 'datetime' | 'numeric';
   selectedNode: WorkspaceNodeLike | null;
   getNodeRowCount: (node: WorkspaceNodeLike) => number;
   getAuthHeaders: () => Record<string, string>;
@@ -51,19 +64,14 @@ function captureError(reason: string, message: string): CaptureError {
 
 function buildSequentialPreview(
   result: Record<string, unknown>,
-  request: SequentialAnalysisRequest | null,
+  request: SequentialAnalysisRequest,
 ): SnapshotManifest['preview'] {
   const data = Array.isArray(result.data) ? (result.data as Array<Record<string, unknown>>) : [];
   const timeBuckets = new Set<string>();
   const groupKeys = new Set<string>();
-  const groupingColumns: string[] = (() => {
-    const fromParams = (result.analysis_params as Record<string, unknown> | undefined)?.group_by_columns;
-    if (Array.isArray(fromParams)) return fromParams.filter((c): c is string => typeof c === 'string');
-    if (Array.isArray(request?.group_by_columns)) {
-      return request!.group_by_columns!.filter((c): c is string => typeof c === 'string');
-    }
-    return [];
-  })();
+  const groupingColumns: string[] = Array.isArray(request.group_by_columns)
+    ? request.group_by_columns.filter((c): c is string => typeof c === 'string')
+    : [];
   for (const row of data) {
     const period =
       (row.time_period_formatted as string | undefined) ??
@@ -75,9 +83,6 @@ function buildSequentialPreview(
       groupKeys.add(key);
     }
   }
-  // No grouping → one implicit "series" (sequential_count). Match the
-  // live chart's behaviour where a single series is rendered when no
-  // group-by columns are configured.
   const seriesCount = groupingColumns.length === 0 ? 1 : groupKeys.size;
   const chartType =
     typeof result.chart_type === 'string' ? (result.chart_type as string) : 'line';
@@ -89,23 +94,62 @@ function buildSequentialPreview(
   };
 }
 
+/** Build the ``SequentialAnalysisRequest`` the capture flow sends to
+ * the backend. Always emits ``case_sensitive: true`` so the viewer's
+ * case-fold toggle can merge variants client-side without information
+ * loss. Always uses a preset frequency (never ``custom``) — the
+ * dialog enforces this. */
+export function buildCaptureRequest(
+  timeColumn: string,
+  columnType: 'datetime' | 'numeric',
+  config: TrendsSnapshotConfig,
+): SequentialAnalysisRequest {
+  if (columnType === 'numeric') {
+    return {
+      time_column: timeColumn,
+      group_by_columns: config.groupByColumns.length ? config.groupByColumns : null,
+      frequency: 'monthly', // unused for numeric; backend ignores
+      sort_by_time: true,
+      column_type: 'numeric',
+      numeric_interval: config.numericInterval,
+      numeric_origin: config.numericOrigin,
+      case_sensitive: true,
+    };
+  }
+  return {
+    time_column: timeColumn,
+    group_by_columns: config.groupByColumns.length ? config.groupByColumns : null,
+    frequency: config.finestFrequency,
+    sort_by_time: true,
+    column_type: 'datetime',
+    case_sensitive: true,
+  };
+}
+
 export function useSequentialAnalysisSnapshotCapture(
   input: UseSequentialAnalysisSnapshotCaptureInput,
 ) {
   const {
     workspaceId,
     workspaceName,
-    request,
-    results,
+    timeColumn,
+    columnType,
     selectedNode,
     getNodeRowCount,
     getAuthHeaders,
   } = input;
 
   return useCallback(
-    async (filename: string, description: string): Promise<void> => {
+    async (
+      filename: string,
+      description: string,
+      config: TrendsSnapshotConfig,
+    ): Promise<void> => {
       if (!selectedNode) {
         throw captureError('no-selection', 'Select a data block first.');
+      }
+      if (!timeColumn) {
+        throw captureError('no-column', 'Pick a time / numeric column before capturing.');
       }
       const rowCount = Number.isFinite(getNodeRowCount(selectedNode))
         ? getNodeRowCount(selectedNode)
@@ -126,15 +170,38 @@ export function useSequentialAnalysisSnapshotCapture(
       if (!workspaceId) {
         throw captureError('no-workspace', 'Cannot snapshot without an active workspace.');
       }
-      if (!results) {
+
+      const nodeId = (selectedNode.id as string | undefined) ?? (selectedNode.node_id as string | undefined) ?? '';
+      if (!nodeId) {
+        throw captureError('no-node-id', 'Selected data block has no usable identifier.');
+      }
+
+      // Re-run the analysis with the dialog-chosen finest granularity.
+      // Route through the preview endpoint (``include_data=true``) so
+      // the snapshot's config doesn't fight the user's live task for
+      // the task-store slot — the live result the user was viewing
+      // stays intact and unmodified.
+      const captureRequest = buildCaptureRequest(timeColumn, columnType, config);
+      const headers = getAuthHeaders();
+      const captureResult = await textApi.sequentialAnalysisPreview(
+        nodeId,
+        captureRequest,
+        headers,
+        true,
+      );
+
+      const capturedRows = Array.isArray(captureResult.data)
+        ? (captureResult.data as Array<Record<string, unknown>>).length
+        : 0;
+      if (capturedRows > SNAPSHOT_ROW_HARD_CAP) {
         throw captureError(
-          'no-result',
-          'Run the trends analysis (and let it finish) before saving a snapshot.',
+          'over-row-cap',
+          `Capture produced ${capturedRows.toLocaleString()} rows; cap is ${SNAPSHOT_ROW_HARD_CAP.toLocaleString()}. ` +
+            `Try a coarser bin or fewer group columns.`,
         );
       }
 
       const nodeColours = useNodeColorsStore.getState().colors;
-      const nodeId = (selectedNode.id as string | undefined) ?? (selectedNode.node_id as string | undefined) ?? '';
       const nodeLabel = (selectedNode.name as string | undefined) ?? nodeId;
       const nodeColorsForSnapshot: Record<string, string> = {};
       const colour = nodeColours[nodeId];
@@ -152,9 +219,9 @@ export function useSequentialAnalysisSnapshotCapture(
         source: {
           workspace_id: workspaceId,
           workspace_name: workspaceName,
-          node_ids: nodeId ? [nodeId] : [],
-          node_labels: nodeId ? [nodeLabel] : [],
-          per_block_rows: nodeId ? [rowCount] : [],
+          node_ids: [nodeId],
+          node_labels: [nodeLabel],
+          per_block_rows: [rowCount],
           total_source_rows: rowCount,
         },
         capabilities: {
@@ -164,22 +231,31 @@ export function useSequentialAnalysisSnapshotCapture(
           canFilterSourceRows: false,
           canCrossJump: false,
         },
-        preview: buildSequentialPreview(results, request),
+        preview: buildSequentialPreview(captureResult, captureRequest),
         payloads: [
           { kind: 'result', path: RESULT_PAYLOAD_PATH },
-          ...(request
-            ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const)
-            : []),
+          { kind: 'settings', path: SETTINGS_PAYLOAD_PATH },
         ],
         node_colors: nodeColorsForSnapshot,
       };
 
       const zip = new JSZip();
       zip.file(MANIFEST_FILE_NAME, emitManifestJson(manifest));
-      zip.file(RESULT_PAYLOAD_PATH, JSON.stringify(results));
-      if (request) {
-        zip.file(SETTINGS_PAYLOAD_PATH, JSON.stringify(request, null, 2));
-      }
+      zip.file(RESULT_PAYLOAD_PATH, JSON.stringify(captureResult));
+      // Capture the request augmented with ``node_id`` and a snapshot
+      // marker so the viewer knows the captured granularity for its
+      // re-aggregation constraints.
+      const settingsBlob = {
+        ...captureRequest,
+        node_id: nodeId,
+        snapshot_config: {
+          finest_frequency: config.finestFrequency,
+          group_by_columns: config.groupByColumns,
+          numeric_interval: config.numericInterval,
+          numeric_origin: config.numericOrigin,
+        },
+      };
+      zip.file(SETTINGS_PAYLOAD_PATH, JSON.stringify(settingsBlob, null, 2));
       if (description.trim()) {
         zip.file('description.md', description);
       }
@@ -194,8 +270,8 @@ export function useSequentialAnalysisSnapshotCapture(
     [
       workspaceId,
       workspaceName,
-      request,
-      results,
+      timeColumn,
+      columnType,
       selectedNode,
       getNodeRowCount,
       getAuthHeaders,

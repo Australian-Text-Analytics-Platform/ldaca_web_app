@@ -35,6 +35,17 @@ type AnalysisCardLayoutProps = {
      * to <SnapshotActions> so the Save dialog pre-populates the
      * filename with something more useful than ``demo-{date}``. */
     nodeLabels?: string[];
+    /** Optional override for the Save dialog. See SnapshotActions for
+     * the renderer contract. Trends uses this to inject its richer
+     * configuration dialog. */
+    saveDialog?: (props: {
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      tool: SnapshotToolKey;
+      existingFilenames: string[];
+      defaultName: string;
+      onSave: (filename: string, description: string) => Promise<void>;
+    }) => React.ReactNode;
   };
   actions?: {
     onRun: () => void | Promise<void>;
@@ -107,6 +118,7 @@ export function AnalysisCardLayout({
                     disabledReason={snapshot.saveDisabledReason}
                     onOpenSnapshot={snapshot.onOpen}
                     nodeLabels={snapshot.nodeLabels}
+                    saveDialog={snapshot.saveDialog}
                   />
                 </div>
               ) : null}

@@ -62,6 +62,7 @@ export type {
   SequentialCustomIntervalUnit,
   SequentialFrequency,
 } from './sequential';
+export { SNAPSHOT_FINEST_FREQUENCIES } from './sequential';
 
 export type {
   TokenFrequencyNodeResult,
