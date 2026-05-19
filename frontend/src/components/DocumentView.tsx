@@ -156,12 +156,14 @@ const DocumentView: React.FC<{
     if (!activeAnchor || loading || error) return;
     const anchorElement = document.getElementById(activeAnchor);
     if (!anchorElement) {
+      // Anchor was removed or never rendered (e.g. raw <a id> stripped
+      // during markdown parsing). Keep the modal open and surface the
+      // document at the top — a missing in-page target shouldn't deny
+      // the user the surrounding tutorial. Toast once per anchor so
+      // repeated re-renders don't spam.
       if (missingAnchorRef.current !== activeAnchor) {
         missingAnchorRef.current = activeAnchor;
-        toast('Help anchor not found.');
-        if (onClose) {
-          onClose();
-        }
+        toast('Help section not found — showing top of document.');
       }
       return;
     }
@@ -173,7 +175,7 @@ const DocumentView: React.FC<{
       highlightTarget.classList.remove('tutorial-highlight');
     }, 3500);
     return () => window.clearTimeout(timeoutId);
-  }, [activeAnchor, error, loading, onClose]);
+  }, [activeAnchor, error, loading]);
 
   const markdownComponents: Components = {
     img: ({ node: _node, className, alt, ...props }) => {
