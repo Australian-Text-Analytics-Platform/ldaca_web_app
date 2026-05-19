@@ -46,20 +46,20 @@ function alignmentClassForColumn(columnKey: string): string {
   return '';
 }
 
-// Light-grey style on the L1/R1 cells: these columns are duplicates of
-// the closest token already visible at the edge of the wider context
-// columns. Dimming them signals "this is the sort handle, not new
-// information" without hiding either copy.
-function cellClassForColumn(columnKey: string): string {
-  const parts = [alignmentClassForColumn(columnKey)];
-  if (
-    columnKey === CONCORDANCE_COLUMN_KEYS.leftToken ||
-    columnKey === CONCORDANCE_COLUMN_KEYS.rightToken
-  ) {
-    parts.push('text-gray-400');
-  }
-  return parts.filter(Boolean).join(' ');
-}
+// L1/R1 columns duplicate the closest token already visible at the
+// edge of the wider context columns. The parent supplies the cell
+// font colour (default light grey; user picks via the colour picker;
+// `transparent` hides them entirely) so the duplication can be
+// readable, spotlight-bright, or fully suppressed without changing
+// the data flow.
+const isNearestTokenColumn = (columnKey: string): boolean =>
+  columnKey === CONCORDANCE_COLUMN_KEYS.leftToken ||
+  columnKey === CONCORDANCE_COLUMN_KEYS.rightToken;
+
+const cellStyleForColumn = (columnKey: string, nearestTokenColor?: string): React.CSSProperties | undefined =>
+  isNearestTokenColumn(columnKey) && nearestTokenColor
+    ? { color: nearestTokenColor }
+    : undefined;
 
 // Canonical concordance-column order for the result table:
 //   left_context | L1 | matched_text | R1 | right_context | freqs...
@@ -156,6 +156,10 @@ export type ConcordanceTableNodeBlockProps = {
    * buttons (both per-node and combined-view variants). Pagination,
    * sort, and row-click row-detail still work. */
   readOnly?: boolean;
+  /** Font colour for L1/R1 cells. Accepts any CSS colour string, plus
+   * the literal `transparent` for "hide". Defaults to light grey when
+   * absent so a parent can omit the prop in tests. */
+  nearestTokenColor?: string;
 };
 
 export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps> = ({
@@ -187,6 +191,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
   setCombinedPage,
   openDetachDialog,
   readOnly = false,
+  nearestTokenColor = '#9ca3af',
 }) => {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const effectiveNodeId = actualNodeId || requestNodeId;
@@ -351,7 +356,11 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                         }}
                       >
                         {displayColumns.map((c: string, i: number) => (
-                          <TableCell key={i} className={cellClassForColumn(c)}>
+                          <TableCell
+                            key={i}
+                            className={alignmentClassForColumn(c)}
+                            style={cellStyleForColumn(c, nearestTokenColor)}
+                          >
                             {row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}
                           </TableCell>
                         ))}
@@ -482,7 +491,11 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                     }}
                   >
                     {tableColumns.map((colKey: string, cellIndex) => (
-                      <TableCell key={cellIndex} className={cellClassForColumn(colKey)}>
+                      <TableCell
+                        key={cellIndex}
+                        className={alignmentClassForColumn(colKey)}
+                        style={cellStyleForColumn(colKey, nearestTokenColor)}
+                      >
                         {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
                       </TableCell>
                     ))}
