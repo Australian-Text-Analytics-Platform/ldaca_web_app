@@ -225,14 +225,18 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     }, 10);
   };
 
-  const handleRenameSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleRenameCommit = () => {
     if (onRename && node?.node_id && newName.trim()) {
       onRename(node.node_id, newName.trim());
     }
     setIsRenaming(false);
     setNewName('');
+  };
+
+  const handleRenameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleRenameCommit();
   };
 
   const handleRenameCancel = () => {
@@ -574,7 +578,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                onBlur={handleRenameCancel}
+                onBlur={handleRenameCommit}
                 onKeyDown={handleRenameKeyDown}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
