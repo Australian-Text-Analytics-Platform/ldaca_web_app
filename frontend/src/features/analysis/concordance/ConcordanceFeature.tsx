@@ -556,10 +556,20 @@ const ConcordanceFeature: React.FC = () => {
   }, [effectiveNodeColumnSelections, panelSelectedNodes]);
 
   // Auto-pick tokens-mode when it becomes available AND the user hasn't
-  // manually overridden. Reverting availability puts us back on regex.
+  // manually overridden. When tokens stop being available (e.g. user
+  // switches to a data block without a derived tokens column) force
+  // regex and clear the user-override flag — the override was
+  // contextual to a node/column selection that no longer holds, and
+  // leaving it sticky lets stale 'tokens' survive onto an ineligible
+  // block, where Run then errors at the backend.
   useEffect(() => {
+    if (!tokensModeAvailable) {
+      setSearchMode('regex');
+      setSearchModeUserSet(false);
+      return;
+    }
     if (searchModeUserSet) return;
-    setSearchMode(tokensModeAvailable ? 'tokens' : 'regex');
+    setSearchMode('tokens');
   }, [tokensModeAvailable, searchModeUserSet]);
 
   // Tokens-models the picker can offer for a tokens-mode search across the
