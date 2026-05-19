@@ -149,7 +149,9 @@ const buildColumns = () => [
   columnHelper.accessor('sort_percent_diff', {
     id: 'percent_diff',
     header: '%DIFF',
-    cell: (info) => formatNumber(info.row.original.percent_diff, { decimals: 2, suffix: '%', multiplier: 100 }),
+    // Backend now returns the Gabrielatos & Marchi (2012) %DIFF as a
+    // percent value already (no multiplier needed here).
+    cell: (info) => formatNumber(info.row.original.percent_diff, { decimals: 2, suffix: '%' }),
   }),
   columnHelper.accessor('sort_bayes_factor_bic', {
     id: 'bayes_factor_bic',
@@ -191,8 +193,25 @@ const buildColumns = () => [
               : significance === '*'
                 ? 'bg-green-100 text-green-800'
                 : 'bg-muted text-muted-foreground';
+      // Lancaster log-likelihood critical values (1 df) — every
+      // asterisk threshold maps to a documented p-level. Surfacing it
+      // here so users don't have to leave the table to interpret the
+      // stars; the same legend lives in the tutorial.
+      const significanceTitle =
+        significance === '****'
+          ? 'p < 0.0001  (LL ≥ 15.13)'
+          : significance === '***'
+            ? 'p < 0.001  (LL ≥ 10.83)'
+            : significance === '**'
+              ? 'p < 0.01  (LL ≥ 6.63)'
+              : significance === '*'
+                ? 'p < 0.05  (LL ≥ 3.84)'
+                : 'Not significant  (LL < 3.84)';
       return (
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}>
+        <span
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}
+          title={significanceTitle}
+        >
           {significance || 'n.s.'}
         </span>
       );
@@ -315,6 +334,13 @@ export const TokenFrequencyStatisticsTable = ({
               <span>; The Overuse column indicates how frequently a token appears in the study corpus compared to the reference corpus.</span>
             </p>
           ) : null}
+          <p className="text-xs text-muted-foreground">
+            Significance legend: <span className="font-mono">****</span>{' '}
+            p&lt;0.0001, <span className="font-mono">***</span> p&lt;0.001,{' '}
+            <span className="font-mono">**</span> p&lt;0.01,{' '}
+            <span className="font-mono">*</span> p&lt;0.05 (log-likelihood
+            critical values at 1 df).
+          </p>
         </div>
         <Button
           variant="outline"
