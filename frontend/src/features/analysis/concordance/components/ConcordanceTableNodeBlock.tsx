@@ -45,6 +45,43 @@ function alignmentClassForColumn(columnKey: string): string {
   if (columnKey === CONCORDANCE_COLUMN_KEYS.matchedText) return 'text-center';
   return '';
 }
+
+// Light-grey style on the L1/R1 cells: these columns are duplicates of
+// the closest token already visible at the edge of the wider context
+// columns. Dimming them signals "this is the sort handle, not new
+// information" without hiding either copy.
+function cellClassForColumn(columnKey: string): string {
+  const parts = [alignmentClassForColumn(columnKey)];
+  if (
+    columnKey === CONCORDANCE_COLUMN_KEYS.leftToken ||
+    columnKey === CONCORDANCE_COLUMN_KEYS.rightToken
+  ) {
+    parts.push('text-gray-400');
+  }
+  return parts.filter(Boolean).join(' ');
+}
+
+// Canonical concordance-column order for the result table:
+//   left_context | L1 | matched_text | R1 | right_context | freqs...
+// Non-concordance columns (metadata picked via Show metadata) keep their
+// relative order and land after all concordance columns. Array.sort is
+// stable in modern JS, so metadata-column order is preserved.
+const CONCORDANCE_COLUMN_RANK: Record<string, number> = {
+  [CONCORDANCE_COLUMN_KEYS.leftContext]: 0,
+  [CONCORDANCE_COLUMN_KEYS.leftToken]: 1,
+  [CONCORDANCE_COLUMN_KEYS.matchedText]: 2,
+  [CONCORDANCE_COLUMN_KEYS.rightToken]: 3,
+  [CONCORDANCE_COLUMN_KEYS.rightContext]: 4,
+  [CONCORDANCE_COLUMN_KEYS.leftTokenFreq]: 5,
+  [CONCORDANCE_COLUMN_KEYS.rightTokenFreq]: 6,
+};
+
+const reorderConcordanceColumns = (cols: string[]): string[] =>
+  [...cols].sort((a, b) => {
+    const ra = CONCORDANCE_COLUMN_RANK[a] ?? Number.MAX_SAFE_INTEGER;
+    const rb = CONCORDANCE_COLUMN_RANK[b] ?? Number.MAX_SAFE_INTEGER;
+    return ra - rb;
+  });
 import { batchProcessedCount, flattenConcordanceGroups } from '../concordanceViewModels';
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
@@ -170,7 +207,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
     const rawDisplayColumns = showMetadata
       ? [...concCols.filter((c) => columns.includes(c)), ...visibleMetaCols]
       : concCols.filter((c) => columns.includes(c));
-    const displayColumns = filterHiddenColumns(dedupeColumns(rawDisplayColumns));
+    const displayColumns = reorderConcordanceColumns(filterHiddenColumns(dedupeColumns(rawDisplayColumns)));
 
     const combinedNodeIds = takeMostRecent(selectedNodes, 2)
       .map((n) => n.id)
@@ -314,7 +351,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                         }}
                       >
                         {displayColumns.map((c: string, i: number) => (
-                          <TableCell key={i} className={alignmentClassForColumn(c)}>
+                          <TableCell key={i} className={cellClassForColumn(c)}>
                             {row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}
                           </TableCell>
                         ))}
@@ -368,8 +405,8 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
   const rawDisplayColumns = showMetadata
     ? [...concCols.filter((c) => allCols.includes(c)), ...visibleMetaCols.filter((c) => allCols.includes(c))]
     : concCols.filter((c) => allCols.includes(c));
-  const displayColumns = filterHiddenColumns(dedupeColumns(rawDisplayColumns));
-  const tableColumns = displayColumns.length > 0 ? displayColumns : filterHiddenColumns(allCols);
+  const displayColumns = reorderConcordanceColumns(filterHiddenColumns(dedupeColumns(rawDisplayColumns)));
+  const tableColumns = displayColumns.length > 0 ? displayColumns : reorderConcordanceColumns(filterHiddenColumns(allCols));
 
   const currentNodePagination = nodePagination[paginationKey];
   const currentPage = currentNodePagination?.currentPage ?? 1;
@@ -445,7 +482,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                     }}
                   >
                     {tableColumns.map((colKey: string, cellIndex) => (
-                      <TableCell key={cellIndex} className={alignmentClassForColumn(colKey)}>
+                      <TableCell key={cellIndex} className={cellClassForColumn(colKey)}>
                         {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
                       </TableCell>
                     ))}
