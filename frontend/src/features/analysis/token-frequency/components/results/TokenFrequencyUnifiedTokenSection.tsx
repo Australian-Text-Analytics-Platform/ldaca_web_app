@@ -317,8 +317,9 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
         <div className={view === 'list' ? undefined : 'hidden'}>
           {(() => {
             // lastCompareNodeIds is ordered [reference, study]; the
-            // task-flow request builder puts the reference data block
-            // first via `orderedPanelNodeIds`.
+            // task-flow request builder puts the study data block last
+            // (the user picks it via the radio in the parameter panel)
+            // and the non-selected block becomes the reference at [0].
             const referenceId = lastCompareNodeIds[0] ?? null;
             const studyId = lastCompareNodeIds[1] ?? null;
             return (

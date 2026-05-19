@@ -113,7 +113,7 @@ const TokenFrequencyFeature = () => {
 
   const [liveResults, resultRef, setResultSafely, setResults] = useSafeResult<TokenFrequencyResponse>();
   const [liveLastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
-  const [liveReferenceNodeId, setReferenceNodeId] = useState<string | null>(null);
+  const [liveStudyNodeId, setStudyNodeId] = useState<string | null>(null);
 
   // Snapshot view state — hoisted here so the effective-value dispatch
   // can shadow live state in one place. Below, the rest of the
@@ -154,10 +154,17 @@ const TokenFrequencyFeature = () => {
     return loadedSnapshot.payload.settings?.node_ids ?? loadedSnapshot.manifest.source.node_ids;
   }, [inSnapshotMode, loadedSnapshot, liveLastCompareNodeIds]);
 
-  const referenceNodeId = useMemo<string | null>(() => {
-    if (!inSnapshotMode || !loadedSnapshot) return liveReferenceNodeId;
-    return loadedSnapshot.payload.settings?.node_ids[0] ?? loadedSnapshot.manifest.source.node_ids[0] ?? null;
-  }, [inSnapshotMode, loadedSnapshot, liveReferenceNodeId]);
+  // The radio in the parameter panel picks the *study* data block — it
+  // gets sent as the second node_id in the request (Corpus 2 / O2/%2 in
+  // the keyword statistics), with the non-selected block treated as the
+  // reference (Corpus 1 / O1/%1). Snapshots written before this flip
+  // still place the user-selected at index 0, so old snapshots will land
+  // the radio on the non-selected node on reload — the captured stats
+  // remain correct since they're frozen in the payload.
+  const studyNodeId = useMemo<string | null>(() => {
+    if (!inSnapshotMode || !loadedSnapshot) return liveStudyNodeId;
+    return loadedSnapshot.payload.settings?.node_ids[1] ?? loadedSnapshot.manifest.source.node_ids[1] ?? null;
+  }, [inSnapshotMode, loadedSnapshot, liveStudyNodeId]);
 
   const panelNodeIds = useMemo(
     () =>
@@ -167,21 +174,21 @@ const TokenFrequencyFeature = () => {
     [panelSelectedNodes, activeNodeIds],
   );
 
-  const effectiveReferenceNodeId = useMemo(
+  const effectiveStudyNodeId = useMemo(
     () =>
-      referenceNodeId && panelNodeIds.includes(referenceNodeId)
-        ? referenceNodeId
+      studyNodeId && panelNodeIds.includes(studyNodeId)
+        ? studyNodeId
         : panelNodeIds[0] ?? null,
-    [referenceNodeId, panelNodeIds],
+    [studyNodeId, panelNodeIds],
   );
 
   const orderedPanelNodeIds = useMemo(() => {
-    if (!effectiveReferenceNodeId) return panelNodeIds;
+    if (!effectiveStudyNodeId) return panelNodeIds;
     return [
-      effectiveReferenceNodeId,
-      ...panelNodeIds.filter((nodeId) => nodeId !== effectiveReferenceNodeId),
+      ...panelNodeIds.filter((nodeId) => nodeId !== effectiveStudyNodeId),
+      effectiveStudyNodeId,
     ];
-  }, [effectiveReferenceNodeId, panelNodeIds]);
+  }, [effectiveStudyNodeId, panelNodeIds]);
 
   // ``tabKey`` routes colour changes through this tab's temp layer;
   // ``promoteTempColors`` is called from ``handleAnalyzeWithPromote``
@@ -235,7 +242,7 @@ const TokenFrequencyFeature = () => {
       const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
       setNodeColumnSelections(selections, { replace: true });
       setLastCompareNodeIds(nodeIds);
-      setReferenceNodeId(nodeIds[0] ?? null);
+      setStudyNodeId(nodeIds[1] ?? null);
       applyTokenLimitState(
         typeof requestData?.token_limit === 'number' ? requestData.token_limit : null,
       );
@@ -257,7 +264,7 @@ const TokenFrequencyFeature = () => {
       const node_columns: Record<string, string> = (reqObj.node_columns as Record<string, string>) || {};
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
-      setReferenceNodeId(nodeIds[0] ?? null);
+      setStudyNodeId(nodeIds[1] ?? null);
       if (nodeIds.length && currentWorkspaceId) {
         try {
           await restoreAnalysisLockFromRequest({
@@ -275,7 +282,7 @@ const TokenFrequencyFeature = () => {
       setResultSafely(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
       setLastCompareNodeIds([]);
-      setReferenceNodeId(null);
+      setStudyNodeId(null);
       resetPreferenceUiState();
     },
     pruneGlobalTasks: (taskIds) =>
@@ -860,10 +867,10 @@ const TokenFrequencyFeature = () => {
         appliedStopCount={appliedStopSet.size}
         hasResults={Boolean(results)}
         runLabel={actionState.runLabel}
-        referenceNodeId={effectiveReferenceNodeId}
-        onReferenceNodeChange={(nodeId: string) => {
+        studyNodeId={effectiveStudyNodeId}
+        onStudyNodeChange={(nodeId: string) => {
           if (inSnapshotMode) return;
-          setReferenceNodeId(nodeId);
+          setStudyNodeId(nodeId);
         }}
         getColorForNode={getColorForNode}
         computeDisplayName={computeDisplayName}
