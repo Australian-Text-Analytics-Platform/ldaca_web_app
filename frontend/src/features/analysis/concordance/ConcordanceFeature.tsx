@@ -143,6 +143,13 @@ const ConcordanceFeature: React.FC = () => {
   const [concordanceView, setConcordanceView] = useState<'table' | 'dispersion'>('table');
   const showDispersion = concordanceView === 'dispersion';
   const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
+  // L1/R1 cell text colour. The L1/R1 columns duplicate the closest
+  // token already visible at the edges of the context cells, so the
+  // default is a light grey (text-gray-400) — visible enough to use as
+  // a sort handle, dim enough to read as "not new information". Users
+  // can pick a brighter colour to spotlight the sort key, or hide the
+  // duplicates entirely via the Hide toggle (sets to `transparent`).
+  const [nearestTokenColor, setNearestTokenColor] = useState<string>('#9ca3af');
   const [colourMatches, setColourMatches] = useState(false);
   const [lowercaseMatches, setLowercaseMatches] = useState(false);
   const [hiddenMatchedTexts, setHiddenMatchedTexts] = useState<Set<string>>(new Set());
@@ -1732,6 +1739,8 @@ const ConcordanceFeature: React.FC = () => {
           metadataDisabledReason={metadataDisabledReason}
           selectedMetadataColumns={selectedMetadataColumns}
           setSelectedMetadataColumns={setSelectedMetadataColumns}
+          nearestTokenColor={nearestTokenColor}
+          setNearestTokenColor={setNearestTokenColor}
           proportionalDispersionBars={proportionalDispersionBars}
           setProportionalDispersionBars={setProportionalDispersionBars}
           combinedSourceMode={combinedSourceMode}

@@ -40,6 +40,11 @@ export type ConcordanceResultsPanelProps = {
   selectedMetadataColumns: string[];
   setSelectedMetadataColumns: Dispatch<SetStateAction<string[]>>;
 
+  // Table-view: L1/R1 cell text colour. CSS colour string — supports
+  // hex from the colour picker and the literal `transparent` (hide).
+  nearestTokenColor: string;
+  setNearestTokenColor: Dispatch<SetStateAction<string>>;
+
   // Dispersion-only state
   proportionalDispersionBars: boolean;
   setProportionalDispersionBars: Dispatch<SetStateAction<boolean>>;
@@ -133,6 +138,8 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
   metadataDisabledReason,
   selectedMetadataColumns,
   setSelectedMetadataColumns,
+  nearestTokenColor,
+  setNearestTokenColor,
   proportionalDispersionBars,
   setProportionalDispersionBars,
   combinedSourceMode,
@@ -251,6 +258,37 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
                 sections={metadataColumnSections}
                 disabledReason={metadataDisabledReason}
               />
+              {concordanceView === 'table' ? (
+                <div
+                  className="flex items-center gap-2 text-sm text-foreground"
+                  title="Font colour for the L1 and R1 columns (closest left/right tokens). Hide collapses them to transparent — click Show to restore."
+                >
+                  <span className="text-muted-foreground">L1/R1 colour</span>
+                  <input
+                    type="color"
+                    aria-label="L1/R1 cell colour"
+                    value={
+                      nearestTokenColor === 'transparent'
+                        ? '#9ca3af'
+                        : nearestTokenColor
+                    }
+                    onChange={(e) => setNearestTokenColor(e.target.value)}
+                    disabled={nearestTokenColor === 'transparent'}
+                    className="h-7 w-9 cursor-pointer rounded border border-input bg-background p-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNearestTokenColor((prev) =>
+                        prev === 'transparent' ? '#9ca3af' : 'transparent',
+                      )
+                    }
+                    className="rounded border border-input bg-background px-2 py-0.5 text-xs hover:bg-muted"
+                  >
+                    {nearestTokenColor === 'transparent' ? 'Show' : 'Hide'}
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
           {showDispersion ? (
@@ -416,6 +454,7 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
                       key={nodeName}
                       {...sharedProps}
                       handleSort={handleSort}
+                      nearestTokenColor={nearestTokenColor}
                     />
                   );
                 })}
