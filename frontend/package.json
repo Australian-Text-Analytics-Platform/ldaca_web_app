@@ -32,6 +32,7 @@
   ],
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/view": "^6.43.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -87,7 +88,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "pnpm build",
     "test": "vitest",
     "lint": "eslint 'src/**/*.{ts,tsx}' --max-warnings=0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
@@ -96,10 +97,10 @@
     "clean": "cd src-tauri && cargo clean",
     "package:backend-runtime": "cd .. && uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14",
     "stage:backend-runtime": "node scripts/stage-backend-runtime.mjs",
-    "prepare:backend-runtime": "npm run package:backend-runtime && npm run stage:backend-runtime",
-    "desktop:dev": "npm run prepare:backend-runtime && tauri dev",
-    "desktop:build:mac": "npm run prepare:backend-runtime && tauri build --bundles app,dmg",
-    "desktop:build:windows": "npm run prepare:backend-runtime && tauri build"
+    "prepare:backend-runtime": "pnpm package:backend-runtime && pnpm stage:backend-runtime",
+    "desktop:dev": "pnpm prepare:backend-runtime && tauri dev",
+    "desktop:build:mac": "pnpm prepare:backend-runtime && tauri build --bundles app,dmg",
+    "desktop:build:windows": "pnpm prepare:backend-runtime && tauri build"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",

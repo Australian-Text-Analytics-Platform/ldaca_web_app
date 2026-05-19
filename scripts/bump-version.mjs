@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Updates every version-bearing file in this repo to <new-version> in one
-// pass. Run as `npm run bump-version 0.5.0` from the wordflow repo root.
+// pass. Run as `pnpm bump-version 0.5.0` from the wordflow repo root.
 //
 // The set of files maintained here is the same set that ships an
 // independently-stamped version — drift between them is what shipped the
@@ -88,7 +88,7 @@ for (const t of TARGETS) {
 if (drift) process.exit(2)
 
 console.log(
-    `\nNext: \`npm run deploy_frontend_to_backend\` to rebuild the FE bundle\n` +
+    `\nNext: \`pnpm deploy_frontend_to_backend\` to rebuild the FE bundle\n` +
         `      (VITE_APP_VERSION is baked in at build time) and commit both\n` +
         `      repos. Cargo.lock regenerates on next \`cargo build\`.`,
 )

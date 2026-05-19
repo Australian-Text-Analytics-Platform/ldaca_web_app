@@ -94,9 +94,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-uv-
 
-      - name: Install Node workspace dependencies
+      - name: Install Node dependencies
         shell: bash
-        run: npm ci
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
 
       - name: Package backend runtime
         shell: bash
@@ -106,12 +108,12 @@ jobs:
       - name: Stage backend runtime for Tauri
         shell: bash
         working-directory: frontend
-        run: npm run stage:backend-runtime
+        run: pnpm stage:backend-runtime
 
       - name: Build Tauri desktop application
         shell: bash
         working-directory: frontend
-        run: npx tauri build --bundles app,dmg
+        run: pnpm tauri build --bundles app,dmg
 
       - name: Validate bundled backend runtime
         shell: bash

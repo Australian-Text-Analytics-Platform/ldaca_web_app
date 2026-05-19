@@ -205,7 +205,7 @@ The working branch (any name — recent releases used `perf/cjk-tokeniser`, then
 
 > **Frontend bundle rule:** `build.tar.gz` inside the backend submodule is the **sole** source of frontend assets for both PyPI/uvx users and the Nectar deployment. Every `frontend/src/**` change — whether shipping in a release or hot-fixed onto a feature branch — is **invisible to users** until the bundle is rebuilt and committed. This applies equally to full releases and to feature branches deployed to Nectar before a release; see [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) below.
 
-> **Version-source drift is guarded by CI.** Five files carry an independently-stamped version (workspace `pyproject.toml`, `backend/pyproject.toml`, `frontend/package.json`, `frontend/src-tauri/Cargo.toml`, `frontend/src-tauri/tauri.conf.json`). `npm run bump-version` writes all five in one pass; the `verify-versions` job in `.github/workflows/release.yml` re-checks them on every tag push and refuses to ship if any drift. (This guard exists because v0.4.3 shipped with three files at `0.4.2`, which is what triggered the v0.4.4 re-stamp.) Don't hand-edit version strings — always use the bumper.
+> **Version-source drift is guarded by CI.** Five files carry an independently-stamped version (workspace `pyproject.toml`, `backend/pyproject.toml`, `frontend/package.json`, `frontend/src-tauri/Cargo.toml`, `frontend/src-tauri/tauri.conf.json`). `pnpm bump-version` writes all five in one pass; the `verify-versions` job in `.github/workflows/release.yml` re-checks them on every tag push and refuses to ship if any drift. (This guard exists because v0.4.3 shipped with three files at `0.4.2`, which is what triggered the v0.4.4 re-stamp.) Don't hand-edit version strings — always use the bumper.
 
 ### 1. Bump all version strings + write the CHANGELOG entry (do this first, before any build)
 
@@ -213,8 +213,8 @@ From the wordflow repo root:
 
 ```bash
 cd /path/to/ldaca_wordflow
-npm run bump-version X.Y.Z   # rewrites all 5 version-bearing files atomically
-npm run check-versions       # belt-and-braces: same check the CI gate runs
+pnpm bump-version X.Y.Z   # rewrites all 5 version-bearing files atomically
+pnpm check-versions       # belt-and-braces: same check the CI gate runs
 ```
 
 `bump-version` updates: workspace `pyproject.toml`, `backend/pyproject.toml`, `frontend/package.json`, `frontend/src-tauri/Cargo.toml`, and `frontend/src-tauri/tauri.conf.json`. It does **not** touch:
@@ -225,7 +225,7 @@ npm run check-versions       # belt-and-braces: same check the CI gate runs
 | `CHANGELOG.md` | Always. Add `## [X.Y.Z] — YYYY-MM-DD` above the previous top entry. |
 | `backend/uv.lock` | Always — regenerate with `env -u CONDA_PREFIX uv lock` from `backend/` after the pyproject version bump. |
 
-> **Why `frontend/.env` is committed:** it contains only the public docs base URL — no secrets. It is tracked so that both the local `npm run build` and the Tauri GitHub Actions build pick up the correct docs version automatically via `git checkout`. Secrets and local overrides belong in `frontend/.env.local`, which remains gitignored.
+> **Why `frontend/.env` is committed:** it contains only the public docs base URL — no secrets. It is tracked so that both the local `pnpm -C frontend build` and the Tauri GitHub Actions build pick up the correct docs version automatically via `git checkout`. Secrets and local overrides belong in `frontend/.env.local`, which remains gitignored.
 
 > **CHANGELOG content:** follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format already used by the file — group under `### Added` / `### Changed` / `### Fixed`. Skim `git log v<PREVIOUS>..HEAD -- frontend/src backend/src` to remind yourself what shipped; user-facing strings (button labels, panel titles) are usually the easiest entry points into "what changed for the user".
 
@@ -235,10 +235,10 @@ npm run check-versions       # belt-and-braces: same check the CI gate runs
 
 ```bash
 cd /path/to/ldaca_wordflow
-npm run deploy_frontend_to_backend
+pnpm deploy_frontend_to_backend
 ```
 
-This single command runs `npm run build -w frontend` and then `scripts/deploy-frontend-to-backend.mjs`, refreshing:
+This single command runs `pnpm -C frontend build` and then `scripts/deploy-frontend-to-backend.mjs`, refreshing:
 
 - `backend/src/ldaca_wordflow/resources/frontend/build.tar.gz`
 - `backend/src/ldaca_wordflow/resources/frontend/build/`
@@ -401,7 +401,7 @@ Use this when a feature branch has frontend source changes and needs to be deplo
 
 ```bash
 cd /path/to/ldaca_wordflow
-npm run deploy_frontend_to_backend
+pnpm deploy_frontend_to_backend
 ```
 
 ### 2. (Optional) Confirm the new feature string is in the bundle
@@ -489,13 +489,13 @@ If you need to update environment variables (e.g. `GOOGLE_CLIENT_ID`) or startup
 
 ## Troubleshooting
 
-| Symptom                        | Check                                                                              |
-| ------------------------------ | ---------------------------------------------------------------------------------- |
-| App not responding             | `sudo systemctl status ldaca-wordflow` and `sudo journalctl -u ldaca-wordflow -n 50` |
-| 502 Bad Gateway from Nginx     | App may be down — restart with `sudo systemctl restart ldaca-wordflow`              |
-| Certificate expired            | `sudo certbot renew`                                                               |
-| Port 8001 already in use       | `sudo fuser -k 8001/tcp` then start the service                                    |
-| Old UI served after deploy     | Frontend source changed but `build.tar.gz` was not rebuilt — follow [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) steps 1–4, then redeploy |
-| New feature missing from UI    | Verify with the bundle-grep snippet under [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) step 2 — if `0` hits, rebuild and recommit the bundle |
-| In-app version doesn't match `pip show` | Forgot to run `npm run deploy_frontend_to_backend` after `bump-version`. The wheel metadata is correct but the FE bundle's baked-in `VITE_APP_VERSION` is stale. Rebuild + redeploy + recommit (or, post-tag, re-stamp under a new patch version — PyPI is immutable). |
-| `release.yml` fails at `verify-versions` | Version drift across the five sources. Run `npm run check-versions` locally to see which file is out, then `npm run bump-version <correct-semver>` to align them. |
+| Symptom | Check |
+| --- | --- |
+| App not responding | `sudo systemctl status ldaca-wordflow` and `sudo journalctl -u ldaca-wordflow -n 50` |
+| 502 Bad Gateway from Nginx | App may be down — restart with `sudo systemctl restart ldaca-wordflow` |
+| Certificate expired | `sudo certbot renew` |
+| Port 8001 already in use | `sudo fuser -k 8001/tcp` then start the service |
+| Old UI served after deploy | Frontend source changed but `build.tar.gz` was not rebuilt — follow [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) steps 1–4, then redeploy |
+| New feature missing from UI | Verify with the bundle-grep snippet under [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) step 2 — if `0` hits, rebuild and recommit the bundle |
+| In-app version doesn't match `pip show` | Forgot to run `pnpm deploy_frontend_to_backend` after `bump-version`. The wheel metadata is correct but the FE bundle's baked-in `VITE_APP_VERSION` is stale. Rebuild, redeploy, and recommit (or, post-tag, re-stamp under a new patch version because PyPI is immutable). |
+| `release.yml` fails at `verify-versions` | Version drift across the five sources. Run `pnpm check-versions` locally to see which file is out, then `pnpm bump-version <correct-semver>` to align them. |

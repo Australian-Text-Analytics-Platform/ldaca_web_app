@@ -14,7 +14,7 @@ Landed on the `refactoring` branch as four commits:
 - `5b96190` fix: B1–B5 (HintsController dup mount, zoom-brush effect loop, Replace-tooltip suppression while busy, slice-reset duplicate block, useFiles auth signature in query key + queryClient.clear() on logout).
 - `e64f2b8` refactor: dead-code deletion (7 files removed, 339 LoC). All items grep-verified zero-consumers before deletion.
 - `208e7e4` refactor: TutorialView → DocumentView consolidation (–268 LoC).
-- `7927805` refactor: import-path codemod (355 imports across 64 files now use `@/`); `scripts/codemod-relative-to-alias.mjs` left in tree for future re-runs.
+- `7927805` refactor: import-path codemod (355 imports across 64 files now use `@/`).
 
 Net Phase 1: ~9 fewer files, ~500 fewer LoC. Build / typecheck / eslint clean. Tests at baseline (2 pre-existing filter-tab failures, unchanged from before this refactor).
 

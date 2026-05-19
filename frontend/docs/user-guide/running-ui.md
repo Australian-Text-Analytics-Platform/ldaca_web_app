@@ -4,9 +4,9 @@
 
 ## Step 1 — Install dependencies
 
-**Question:** *Where do I run `npm install`?*
+**Question:** *Where do I run `pnpm install`?*
 
-**Answer:** Run it from the `ldaca_web_app/` workspace root so the frontend workspace is installed correctly.
+**Answer:** Run `pnpm install` from the `ldaca_web_app/` repo root so the root lockfile installs the frontend workspace package.
 
 ## Step 2 — Start the dev server
 

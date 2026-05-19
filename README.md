@@ -67,7 +67,7 @@ The desktop app uses Tauri v2. The Rust shell launches the packaged backend as a
 
 - Python `>=3.14`
 - `uv`
-- Node.js and npm
+- Node.js and pnpm
 - Rust and Cargo when working on `polars-text` or Tauri packaging
 
 ### Install Dependencies
@@ -76,7 +76,7 @@ From the repo root:
 
 ```sh
 uv sync
-npm install
+pnpm install
 ```
 
 Do not set `PYTHONPATH` manually for normal development. `uv` handles editable installs and resolution.
@@ -86,9 +86,9 @@ Do not set `PYTHONPATH` manually for normal development. `uv` handles editable i
 ### Frontend
 
 ```sh
-npm run dev -w frontend
-npm run build -w frontend
-npm run test -w frontend -- --run
+pnpm -C frontend dev
+pnpm -C frontend build
+pnpm -C frontend test -- --run
 ```
 
 ### Backend Commands
@@ -111,7 +111,7 @@ cd polars-text && uvx ty check
 
 ## Testing And Verification
 
-Run checks from the affected package directory, not from the repo root, unless the command explicitly targets a workspace member.
+Run checks from the affected package directory, not from the repo root, unless the command explicitly targets a package with `pnpm -C`.
 
 For Python package changes, the expected verification is:
 
@@ -123,8 +123,8 @@ uv run pytest
 For typical frontend changes, use:
 
 ```sh
-npm run build -w frontend
-npm run test -w frontend -- --run
+pnpm -C frontend build
+pnpm -C frontend test -- --run
 ```
 
 ## Key Conventions

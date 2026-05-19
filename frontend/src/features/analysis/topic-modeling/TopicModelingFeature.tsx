@@ -7,10 +7,8 @@ import { takeMostRecent } from '@/utils/selectionUtils';
 // Updated to use modular API object pattern
 import { textApi, type TopicModelingRequest, type TopicModelingResponse, type TopicModelingTopic } from '@/api/text';
 import {
-  isSnapshotMode,
-  useSnapshotViewStore,
-  useToolSnapshotMode,
-  type LoadedSnapshot,
+  snapshotSourceNodes,
+  useSnapshotBackedAnalysisState,
 } from '@/features/snapshot-view';
 import { useTopicModelingSnapshotCapture } from './hooks/useTopicModelingSnapshotCapture';
 import { useTopicModelingSnapshotLoad } from './hooks/useTopicModelingSnapshotLoad';
@@ -76,28 +74,14 @@ const TopicModelingFeature: React.FC = () => {
   // parameter state in one place. The rest of the component reads
   // the shadowed names and naturally picks up snapshot data when in
   // snapshot mode.
-  const snapshotMode = useToolSnapshotMode('topic_modeling');
-  const loadedSnapshot = useSnapshotViewStore(
-    (s) => s.snapshots.topic_modeling,
-  ) as LoadedSnapshot<TopicModelingSnapshotPayload> | null;
-  const inSnapshotMode = isSnapshotMode(snapshotMode) && loadedSnapshot != null;
+  const { loadedSnapshot, inSnapshotMode } =
+    useSnapshotBackedAnalysisState<TopicModelingSnapshotPayload>(
+      'topic_modeling',
+    );
 
   const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
     if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
-    const {
-      node_ids,
-      node_labels,
-      per_block_rows,
-      total_source_rows,
-    } = loadedSnapshot.manifest.source;
-    const evenSplit =
-      node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
-    return node_ids.map((id, idx) => ({
-      id,
-      node_id: id,
-      name: node_labels[idx] ?? id,
-      shape: [per_block_rows?.[idx] ?? evenSplit, 0] as [number, number],
-    }));
+    return snapshotSourceNodes(loadedSnapshot.manifest.source);
   }, [inSnapshotMode, loadedSnapshot, livePanelSelectedNodes]);
 
   const typedServerRequest = serverRequest as

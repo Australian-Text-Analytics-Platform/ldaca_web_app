@@ -69,5 +69,5 @@ if (distinct.length === 1) {
 }
 
 console.error(`\nVersion drift: ${distinct.join(' / ')}`)
-console.error(`Run \`npm run bump-version <semver>\` to realign.`)
+console.error(`Run \`pnpm bump-version <semver>\` to realign.`)
 process.exit(1)

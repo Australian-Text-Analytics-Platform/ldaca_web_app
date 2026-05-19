@@ -39,10 +39,10 @@ The chain that produced bad Chinese topic labels:
 | **c-TF-IDF / label stage** | Classic pipeline: no `vectorizer_model` → BERTopic falls back to `CountVectorizer(stop_words="english")` with `token_pattern=r"(?u)\b\w\w+\b"` | `\b` between two CJK ideographs is *not* a boundary, so the regex matches the entire contiguous Han run as one giant "word". Every Chinese document collapses to a single token in c-TF-IDF → degenerate topic labels. |
 | `BERTopic(language=...)` | Never set → defaulted to `"english"` | Skews some of BERTopic's internal heuristics toward English defaults even when the embedder is multilingual. |
 
-The online pipeline got a partial fix in Phase 3.5 — its
-`OnlineCountVectorizer` already dropped the English stoplist for non-English
-— but the default `token_pattern` still couldn't segment CJK, and the
-classic pipeline (which is what most users hit) was completely untouched.
+The label-stage vectorizer got a partial fix in Phase 3.5: it dropped the
+English stoplist for non-English labels, but the default `token_pattern` still
+couldn't segment CJK, and the classic pipeline remained the only shipped topic
+path users hit.
 
 ## Design choices and why
 
@@ -168,9 +168,8 @@ All changes in [backend/src/ldaca_web_app/core/worker_tasks_topic.py](../../back
 | Symbol | Role |
 |---|---|
 | `_bertopic_language_kwarg(language)` | Maps internal language code (`"en"`, `"zh"`, ...) to BERTopic's `language=` kwarg (`"english"` / `"multilingual"`). |
-| `_build_label_vectorizer(language, *, online)` | Returns the right `CountVectorizer` / `OnlineCountVectorizer` for the language. English: sklearn's English stoplist + default regex. Non-English: `token_pattern=r"(?u)\b\w+\b"`, no stopwords. |
+| `_build_label_vectorizer(language)` | Returns the right `CountVectorizer` for the language. English: sklearn's English stoplist + default regex. Non-English: `token_pattern=r"(?u)\b\w+\b"`, no stopwords. |
 | `_build_classic_pipeline(...)` | Now accepts `language=` and passes `vectorizer_model=_build_label_vectorizer(language)` + `language=_bertopic_language_kwarg(language)` to `BERTopic(...)`. |
-| `_build_online_pipeline(...)` | Same treatment; previously had partial language-routing for stopwords only. |
 | `_load_corpora_from_workspace(...)` | Now returns `(raw_corpora, vectorizer_corpora, tokens_columns)`. The second list mirrors the first row-for-row, with the derived `__derived__.<form>.<src>.<model>` column space-joined when present, else `None` for that node. |
 | `_compute_topics()` (in `run_topic_modeling_task`) | Builds two flat doc streams: `all_docs` (raw, fed to the embedder) and `all_docs_for_vectorizer` (pre-tokenised where available, raw text where not). The latter is passed to `fit_transform`, `reduce_topics`, and `_persist_exact_reduction_artifact` so exact-mode re-aggregation stays consistent. |
 
@@ -238,9 +237,8 @@ Fix in [worker_tasks_topic.py](../../backend/src/ldaca_web_app/core/worker_tasks
   Headroom for the stopword filter and effectively zero performance
   cost (c-TF-IDF already ranks the whole vocabulary; `top_n_words`
   only decides where to truncate).
-- Threaded through `_build_classic_pipeline(..., top_n_words=...)` and
-  `_build_online_pipeline(..., top_n_words=..., top_n_words=...)`, both
-  of which now pass the value to `BERTopic(...)`.
+- Threaded through `_build_classic_pipeline(..., top_n_words=...)`, which now
+  passes the value to `BERTopic(...)`.
 - Called once per run in `_compute_topics` from the resolved
   `representative_words_count` so both pipelines see the same value.
 

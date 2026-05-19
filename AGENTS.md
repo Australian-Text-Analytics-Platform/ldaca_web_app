@@ -8,19 +8,21 @@ Start here before exploring. This monorepo (renamed from `ldaca_web_app`; PyPI n
 - `backend/`: FastAPI backend (PyPI: `ldaca-wordflow`, import: `ldaca_wordflow`), uv-managed, Python `>=3.14`
 - `docworkspace/`: Python package for lazy Polars workspace/node graphs
 - `polars-text/`: Rust/PyO3 + Python package for text-analysis primitives
-- Root `package.json`: npm workspace wrapper for `frontend`
+- Root `package.json`: pnpm workspace command wrapper for `frontend`
 - Root `pyproject.toml`: uv workspace shim; do not rely on `PYTHONPATH=src`
 
 ## Environment And Order
 
 Use this order for a fresh task:
 
-1. Confirm prerequisites: Node/npm, `uv`, Python `3.14+`, and Rust/Cargo if touching `polars-text` or Tauri.
+1. Confirm prerequisites: Node/pnpm, `uv`, Python `3.14+`, and Rust/Cargo if touching `polars-text` or Tauri.
 2. From repo root, run `uv sync`.
-3. Install JS deps at repo root with `npm install` if `node_modules/` is absent. In this workspace, dependency state was validated with `npm ls --depth=0` because `node_modules/` already existed.
-4. Run package-specific checks from the package directory, not from repo root, unless the command explicitly uses `-w frontend`.
+3. Install JS deps from the repo root with `pnpm install` if `node_modules/` is absent.
+4. Run package-specific checks from the package directory, or use root wrapper scripts that call `pnpm -C frontend ...`.
 
 Do not set `PYTHONPATH` manually for normal local development. uv handles resolution. The packaged desktop runtime sets `PYTHONPATH` internally; that is a packaging detail, not a dev setup pattern.
+
+When debugging local Python packages that `pyproject.toml` normally resolves from PyPI, prefer editable local installs or uv path sources so changes in sibling packages are tested directly instead of against a released wheel.
 
 ## Validated Commands
 
@@ -28,8 +30,8 @@ These were validated in this workspace and are the fastest reliable entry points
 
 - Bootstrap: `uv sync` from repo root, passes.
 - Frontend run: existing dev server responds on `http://127.0.0.1:3000/` with Vite HTML.
-- Frontend build: `npm run build -w frontend`, passes.
-- Frontend tests: `npm run test -w frontend -- --run`, passes (`27` files, `70` tests).
+- Frontend build: `pnpm -C frontend build`, passes.
+- Frontend tests: `pnpm -C frontend test -- --run`, passes (`27` files, `70` tests).
 - Backend run: existing backend responds on `http://127.0.0.1:8001/health`.
 - Backend tests: `cd backend && uv run pytest -q`, passes (`269` tests).
 - `docworkspace` tests: `cd docworkspace && uv run pytest -q`, passes.
@@ -38,7 +40,7 @@ These were validated in this workspace and are the fastest reliable entry points
 ## Practical Rules For Agents
 
 - Trust this file first, then check the nearest manifest, CI workflow, or build script before doing broad repo exploration.
-- Prefer `npm run ... -w frontend` from repo root for frontend commands.
+- Prefer `pnpm -C frontend ...` from repo root for frontend commands.
 - Prefer `uv run ...` inside Python package directories.
 - Whenever you modify a Python project in this repo, run `uvx ty check` and `uv run pytest` from each affected Python package directory and make sure both commands pass before considering the work complete.
 - Do not run backend tests from repo root; run them from `backend/`.
@@ -58,20 +60,20 @@ These were validated in this workspace and are the fastest reliable entry points
 
 Five files carry an independently-stamped version and **must** agree before tagging — pip wheel metadata, npm package, Tauri bundler, Rust crate, and the workspace pyproject. Drift between them is what shipped the v0.4.3 "desktop says 0.4.2 / pip says 0.4.3" bug.
 
-1. `npm run bump-version <semver>` from repo root rewrites all five in one pass. Don't edit version strings by hand.
-2. `npm run check-versions` confirms they match; it's also wired as a pre-build gate in `.github/workflows/release.yml` so a tag push with drift never reaches the desktop builders.
-3. `npm run deploy_frontend_to_backend` after the bump — `VITE_APP_VERSION` is baked into the FE bundle at build time, so the bundle inside `backend/src/ldaca_wordflow/resources/frontend/build/` needs refreshing too.
+1. `pnpm bump-version <semver>` from repo root rewrites all five in one pass. Don't edit version strings by hand.
+2. `pnpm check-versions` confirms they match; it's also wired as a pre-build gate in `.github/workflows/release.yml` so a tag push with drift never reaches the desktop builders.
+3. `pnpm deploy_frontend_to_backend` after the bump — `VITE_APP_VERSION` is baked into the FE bundle at build time, so the bundle inside `backend/src/ldaca_wordflow/resources/frontend/build/` needs refreshing too.
 4. Commit, tag `vX.Y.Z` on `v0.4`, push the tag → release.yml fires → desktop assets + PyPI publish.
 
 ## CI-Relevant Checks
 
 For typical frontend changes, run:
 
-- `npm run build -w frontend`
-- `npm run test -w frontend -- --run`
-- `npm run lint -w frontend`
+- `pnpm -C frontend build`
+- `pnpm -C frontend test -- --run`
+- `pnpm -C frontend lint`
 
-Frontend changes are not complete until both `npm run test -w frontend -- --run` and `npm run lint -w frontend` have been run after the edit.
+Frontend changes are not complete until both `pnpm -C frontend test -- --run` and `pnpm -C frontend lint` have been run after the edit.
 
 For backend changes, run:
 

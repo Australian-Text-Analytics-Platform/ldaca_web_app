@@ -40,13 +40,12 @@ import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
 import {
   SNAPSHOT_CAPS,
   isSnapshotMode,
-  useToolSnapshotMode,
+  snapshotSourceNodes,
+  useSnapshotBackedAnalysisState,
 } from '@/features/snapshot-view';
 import { useConcordanceSnapshotCapture } from './hooks/useConcordanceSnapshotCapture';
 import { useConcordanceSnapshotLoad } from './hooks/useConcordanceSnapshotLoad';
 import { ConcordanceSnapshotBanner } from './components/ConcordanceSnapshotBanner';
-import { useSnapshotViewStore } from '@/features/snapshot-view';
-import type { LoadedSnapshot } from '@/features/snapshot-view';
 import type { ConcordanceSnapshotPayload } from './hooks/useConcordanceSnapshotLoad';
 import type { ConcordanceAnalysisRequest, ConcordanceResultEntry } from '@/api/text/concordance';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
@@ -210,11 +209,8 @@ const ConcordanceFeature: React.FC = () => {
   // results / materializedPaths / materializedBins) so the effective
   // dispatch can shadow those names at one site, propagating the
   // captured data through the rest of the component verbatim.
-  const snapshotMode = useToolSnapshotMode('concordance');
-  const loadedSnapshot = useSnapshotViewStore(
-    (s) => s.snapshots.concordance,
-  ) as LoadedSnapshot<ConcordanceSnapshotPayload> | null;
-  const inSnapshotMode = isSnapshotMode(snapshotMode) && loadedSnapshot != null;
+  const { snapshotMode, loadedSnapshot, inSnapshotMode } =
+    useSnapshotBackedAnalysisState<ConcordanceSnapshotPayload>('concordance');
 
   // Effective-value dispatch: when in snapshot mode, every downstream
   // useMemo / hook / JSX prop reads from the captured snapshot instead
@@ -228,20 +224,7 @@ const ConcordanceFeature: React.FC = () => {
   // a parallel viewer.
   const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
     if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
-    const {
-      node_ids,
-      node_labels,
-      per_block_rows,
-      total_source_rows,
-    } = loadedSnapshot.manifest.source;
-    const evenSplit =
-      node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
-    return node_ids.map((id, idx) => ({
-      id,
-      node_id: id,
-      name: node_labels[idx] ?? id,
-      shape: [per_block_rows?.[idx] ?? evenSplit, 0] as [number, number],
-    }));
+    return snapshotSourceNodes(loadedSnapshot.manifest.source);
   }, [inSnapshotMode, loadedSnapshot, livePanelSelectedNodes]);
 
   const results = useMemo<ConcordanceAnalysisResponse | null>(() => {

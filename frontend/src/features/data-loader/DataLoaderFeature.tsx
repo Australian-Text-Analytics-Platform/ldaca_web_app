@@ -1,28 +1,25 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Loader2, FolderPlus, Upload, Download as DownloadIcon, RefreshCcw } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useAuth } from '@/hooks/useAuth';
 import { useFiles } from '@/hooks/useFiles';
-import { queryKeys } from '@/lib/queryKeys';
-import { filesApi } from '@/api/files';
-import { workspacesApi } from '@/api/workspaces';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { useUIStore } from '@/stores/uiStore';
 import { useAnalysisStore, isRunningTaskState, isPendingTaskState } from '@/stores/analysisStore';
-import { type FileTreeDirectory } from '@/types';
 import { AddFilePanel, FilePreviewPanel } from '@/components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
 import { usePendingWorkspaceDownloads } from './hooks/usePendingWorkspaceDownloads';
+import { useDataLoaderWorkspaceActions } from './hooks/useDataLoaderWorkspaceActions';
+import { useFileBrowserActions } from './hooks/useFileBrowserActions';
+import { useFolderCreation } from './hooks/useFolderCreation';
+import { useLdacaImport } from './hooks/useLdacaImport';
+import { useUploadState } from './hooks/useUploadState';
 import { FileTree } from './components/FileTree';
 import { WorkspaceManagerCard } from './components/WorkspaceManagerCard';
 import { ActiveWorkspaceCard } from './components/ActiveWorkspaceCard';
@@ -34,9 +31,7 @@ import { getWorkspaceId } from './utils/format';
 const MAX_FILE_TREE_HEIGHT_REM = 40;
 
 export const DataLoaderFeature: React.FC = () => {
-  const queryClient = useQueryClient();
   const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
-  const workspaceActions = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
   const { dataFolder, getAuthHeaders } = useAuth({ autoStart: true, debugLabel: 'DataLoaderFeature' });
   const authHeaders = getAuthHeaders();
@@ -56,29 +51,6 @@ export const DataLoaderFeature: React.FC = () => {
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
   const [workspaceAlertOpen, setWorkspaceAlertOpen] = useState(false);
-  const [workspaceToDelete, setWorkspaceToDelete] = useState<{ id: string; name?: string | null } | null>(null);
-  const [deletingWorkspace, setDeletingWorkspace] = useState(false);
-  const [workspaceNameAlert, setWorkspaceNameAlert] = useState<string | null>(null);
-  const [ldacaImportOpen, setLdacaImportOpen] = useState(false);
-  const [ldacaUrl, setLdacaUrl] = useState('');
-  const [ldacaImporting, setLdacaImporting] = useState(false);
-  const [citationDirectory, setCitationDirectory] = useState<FileTreeDirectory | null>(null);
-  const [citationPath, setCitationPath] = useState<string | null>(null);
-  const [citationContent, setCitationContent] = useState<string | null>(null);
-  const [citationLoading, setCitationLoading] = useState(false);
-  const [createFolderOpen, setCreateFolderOpen] = useState(false);
-  const [createFolderParentPath, setCreateFolderParentPath] = useState('');
-  const [createFolderParentLabel, setCreateFolderParentLabel] = useState('root');
-  const [newFolderName, setNewFolderName] = useState('');
-  const [creatingFolder, setCreatingFolder] = useState(false);
-  const [folderNameAlert, setFolderNameAlert] = useState<string | null>(null);
-  const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
-  const [refreshingFiles, setRefreshingFiles] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState(false);
-  const [isFileDropActive, setIsFileDropActive] = useState(false);
-  const [uploadingWorkspaceZip, setUploadingWorkspaceZip] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     containerRef: splitContainerRef,
     value: topRatio,
@@ -101,6 +73,72 @@ export const DataLoaderFeature: React.FC = () => {
   }, []);
 
   const workspaceDownloads = usePendingWorkspaceDownloads({ authHeaders, notify });
+  const {
+    workspaceToDelete,
+    deletingWorkspace,
+    workspaceNameAlert,
+    refreshingWorkspaces,
+    uploadingWorkspaceZip,
+    closeWorkspaceNameAlert,
+    closeDeleteWorkspaceDialog,
+    handleCreateWorkspace,
+    handleRenameWorkspace,
+    handleSaveWorkspace,
+    handleSetCurrentWorkspace,
+    handleUpdateWorkspaceDescription,
+    openDeleteWorkspaceDialog,
+    handleConfirmDeleteWorkspace,
+    handleRefreshWorkspaces,
+    handleUploadWorkspaceZip,
+    handleAddFileToWorkspace,
+  } = useDataLoaderWorkspaceActions({
+    workspaces,
+    hasWorkspaceSelected,
+    authHeaders,
+    notify,
+  });
+  const {
+    citationDirectory,
+    citationPath,
+    citationContent,
+    citationLoading,
+    refreshingFiles,
+    handleRefreshFiles,
+    handleMoveFile,
+    openCitation,
+    closeCitation,
+  } = useFileBrowserActions({ authHeaders, refetchFiles, notify });
+  const {
+    ldacaImportOpen,
+    setLdacaImportOpen,
+    ldacaUrl,
+    setLdacaUrl,
+    ldacaImporting,
+    handleLdacaImport,
+  } = useLdacaImport({ authHeaders, refetchFiles, notify });
+  const {
+    fileInputRef,
+    uploadingFiles,
+    isFileDropActive,
+    openFilePicker,
+    handleFileAreaDragOver,
+    handleFileAreaDragLeave,
+    handleFileAreaDrop,
+    handleFileInputChange,
+  } = useUploadState({ uploadFile: handleUploadFile, notify });
+  const {
+    createFolderOpen,
+    setCreateFolderOpen,
+    createFolderParentPath,
+    createFolderParentLabel,
+    newFolderName,
+    setNewFolderName,
+    creatingFolder,
+    folderNameAlert,
+    closeFolderNameAlert,
+    openCreateFolderDialog,
+    handleCreateFolder,
+  } = useFolderCreation({ authHeaders, refetchFiles, notify });
 
   const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
 
@@ -125,322 +163,10 @@ export const DataLoaderFeature: React.FC = () => {
     currentWorkspace?.dataframe_count ??
     0;
 
-  const handleCreateWorkspace = async (name: string, description: string): Promise<boolean> => {
-    if (!name) return false;
-    try {
-      await workspaceActions.createWorkspace(name, description || undefined);
-      notify('success', `Workspace "${name}" created.`);
-      return true;
-    } catch (error) {
-      const message = getInvalidWorkspaceNameMessage(error);
-      if (message) {
-        setWorkspaceNameAlert(message);
-        return false;
-      }
-      notify('error', (error as Error).message || 'Failed to create workspace.');
-      return false;
-    }
-  };
-
-  const handleRenameWorkspace = async (value: string) => {
-    try {
-      await workspaceActions.renameWorkspace(value);
-      notify('success', 'Workspace renamed.');
-    } catch (error) {
-      const message = getInvalidWorkspaceNameMessage(error);
-      if (message) {
-        setWorkspaceNameAlert(message);
-        return;
-      }
-      notify('error', (error as Error).message || 'Failed to rename workspace.');
-    }
-  };
-
-  const handleSaveWorkspace = async () => {
-    if (!hasWorkspaceSelected) return;
-    try {
-      await workspaceActions.saveWorkspace();
-      notify('success', 'Workspace saved.');
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to save workspace.');
-    }
-  };
-
-  const handleSetCurrentWorkspace = async (workspaceId: string | null) => {
-    try {
-      await workspaceActions.setCurrentWorkspace(workspaceId);
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to update active workspace.');
-    }
-  };
-
-  const handleUpdateWorkspaceDescription = async (value: string) => {
-    try {
-      await workspaceActions.updateWorkspaceDescription(value);
-      notify('success', 'Workspace description updated.');
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to update workspace description.');
-    }
-  };
-
-  const openDeleteWorkspaceDialog = (workspaceId: string) => {
-    const target = workspaces.find((ws) => getWorkspaceId(ws) === workspaceId);
-    setWorkspaceToDelete({ id: workspaceId, name: target?.name });
-  };
-
-  const handleConfirmDeleteWorkspace = async () => {
-    if (!workspaceToDelete) return;
-    setDeletingWorkspace(true);
-    try {
-      await workspaceActions.deleteWorkspace(workspaceToDelete.id);
-      notify('success', 'Workspace deleted.');
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to delete workspace.');
-    } finally {
-      setDeletingWorkspace(false);
-      setWorkspaceToDelete(null);
-    }
-  };
-
-  const handleRefreshWorkspaces = async () => {
-    setRefreshingWorkspaces(true);
-    try {
-      await queryClient.refetchQueries({
-        queryKey: queryKeys.workspaces,
-        exact: true,
-      });
-      notify('success', 'Workspace list refreshed.');
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to refresh workspace list.');
-    } finally {
-      setRefreshingWorkspaces(false);
-    }
-  };
-
-  const handleUploadWorkspaceZip = async (file: File) => {
-    setUploadingWorkspaceZip(true);
-    try {
-      await workspacesApi.uploadZip(file, authHeaders);
-      await queryClient.refetchQueries({ queryKey: queryKeys.workspaces, exact: true });
-      notify('success', `Workspace ZIP "${file.name}" uploaded.`);
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to upload workspace ZIP.');
-    } finally {
-      setUploadingWorkspaceZip(false);
-    }
-  };
-
-  const handleRefreshFiles = async () => {
-    setRefreshingFiles(true);
-    try {
-      await refetchFiles();
-      notify('success', 'File list refreshed.');
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to refresh file list.');
-    } finally {
-      setRefreshingFiles(false);
-    }
-  };
-
-  const handleLdacaImport = async () => {
-    if (!ldacaUrl.trim()) return;
-    
-    setLdacaImporting(true);
-    try {
-      const response = await filesApi.importLdaca(ldacaUrl, authHeaders);
-
-      notify('success', response.message || 'LDaCA import started in background.');
-      setLdacaUrl('');
-      setLdacaImportOpen(false);
-      await refetchFiles();
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to start LDaCA import.');
-    } finally {
-      setLdacaImporting(false);
-    }
-  };
-
-  const openCreateFolderDialog = (parentPath: string, parentLabel: string) => {
-    setCreateFolderParentPath(parentPath);
-    setCreateFolderParentLabel(parentLabel);
-    setNewFolderName('');
-    setFolderNameAlert(null);
-    setCreateFolderOpen(true);
-  };
-
-  const handleCreateFolder = async () => {
-    const trimmedName = newFolderName.trim();
-    if (!trimmedName) {
-      return;
-    }
-
-    setCreatingFolder(true);
-    try {
-      await filesApi.createFolder(createFolderParentPath, trimmedName, authHeaders);
-      await refetchFiles();
-      notify('success', `Folder "${trimmedName}" created.`);
-      setCreateFolderOpen(false);
-      setNewFolderName('');
-    } catch (error) {
-      const message = (error as { message?: string })?.message || 'Failed to create folder.';
-      if (message.toLowerCase().includes('invalid folder name')) {
-        setFolderNameAlert(message);
-        return;
-      }
-      notify('error', message);
-    } finally {
-      setCreatingFolder(false);
-    }
-  };
-
-  const handleMoveFile = async (sourcePath: string, targetDirectoryPath: string) => {
-    try {
-      await filesApi.moveFile(sourcePath, targetDirectoryPath, authHeaders);
-      await refetchFiles();
-      notify('success', `Moved ${sourcePath.split('/').at(-1)}.`);
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to move file.');
-    }
-  };
-
-  const openCitation = async (directory: FileTreeDirectory, readmePath: string | null) => {
-    if (!readmePath) {
-      setCitationDirectory(directory);
-      setCitationPath(null);
-      setCitationContent(null);
-      return;
-    }
-
-    setCitationDirectory(directory);
-    setCitationPath(readmePath);
-    setCitationContent(null);
-    setCitationLoading(true);
-    try {
-      const rawContent = await filesApi.raw(readmePath, authHeaders);
-      setCitationContent(rawContent);
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to load citation.');
-    } finally {
-      setCitationLoading(false);
-    }
-  };
-
-  const openFilePicker = () => {
-    fileInputRef.current?.click();
-  };
-
-  const uploadSelectedFiles = async (filesToUpload: FileList | File[] | null | undefined) => {
-    const selectedFiles = Array.from(filesToUpload ?? []);
-    if (selectedFiles.length === 0) {
-      return;
-    }
-
-    setUploadingFiles(true);
-    let uploadedCount = 0;
-    const failedFiles: string[] = [];
-    const setLastUploadedFilePath = useUIStore.getState().setLastUploadedFilePath;
-    let lastSuccess: string | null = null;
-
-    try {
-      for (const file of selectedFiles) {
-        try {
-          const success = await handleUploadFile(file);
-          if (success) {
-            uploadedCount += 1;
-            lastSuccess = file.name;
-          } else {
-            failedFiles.push(file.name);
-          }
-        } catch {
-          failedFiles.push(file.name);
-        }
-      }
-
-      if (lastSuccess) {
-        // Server stores uploads at the data-folder root, so the visible path
-        // matches the file's basename. Used by the contextual hints system
-        // to highlight the matching file row's "Add" button.
-        setLastUploadedFilePath(lastSuccess);
-      }
-
-      if (failedFiles.length === 0) {
-        if (uploadedCount === 1) {
-          notify('success', `Uploaded ${selectedFiles[0]?.name}.`);
-        } else {
-          notify('success', `Uploaded ${uploadedCount} files.`);
-        }
-        return;
-      }
-
-      if (uploadedCount === 0) {
-        notify('error', `Failed to upload ${failedFiles.length === 1 ? failedFiles[0] : `${failedFiles.length} files`}.`);
-        return;
-      }
-
-      notify('error', `Uploaded ${uploadedCount} of ${selectedFiles.length} files. Failed: ${failedFiles.join(', ')}.`);
-    } finally {
-      setUploadingFiles(false);
-    }
-  };
-
-  const isFileDrag = (event: React.DragEvent<HTMLElement>) => {
-    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
-  };
-
-  const handleFileAreaDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
-      return;
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-    setIsFileDropActive(true);
-  };
-
-  const handleFileAreaDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
-      return;
-    }
-
-    const relatedTarget = event.relatedTarget;
-    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
-      return;
-    }
-
-    setIsFileDropActive(false);
-  };
-
-  const handleFileAreaDrop = async (event: React.DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
-      return;
-    }
-
-    event.preventDefault();
-    setIsFileDropActive(false);
-    await uploadSelectedFiles(event.dataTransfer.files);
-  };
-
-  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      await uploadSelectedFiles(event.target.files);
-    } catch (error) {
-      notify('error', (error as Error).message || 'Upload failed.');
-    } finally {
-      event.target.value = '';
-    }
-  };
-
   const handleAddToWorkspace = async (selectedSheet?: string | null) => {
     if (!addFileName) return;
     try {
-      await workspaceActions.createNodeFromFile(addFileName, selectedSheet ?? undefined);
-      notify('success', `${addFileName} added to workspace.`);
-      // The file has been added — clear the "new upload" hint state so the
-      // contextual hint stops pointing at this row.
-      const lastUploaded = useUIStore.getState().lastUploadedFilePath;
-      if (lastUploaded && (lastUploaded === addFileName || addFileName.endsWith(`/${lastUploaded}`))) {
-        useUIStore.getState().setLastUploadedFilePath(null);
-      }
+      await handleAddFileToWorkspace(addFileName, selectedSheet);
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to add file to workspace.');
     } finally {
@@ -463,7 +189,7 @@ export const DataLoaderFeature: React.FC = () => {
     : false;
 
   return (
-    <div className="flex h-[calc(100vh-9rem)] min-h-[640px] flex-col gap-4">
+    <div className="flex h-[calc(100vh-9rem)] min-h-160 flex-col gap-4">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <h1 className="font-semibold leading-none tracking-tight text-foreground">Data Loader</h1>
@@ -679,16 +405,16 @@ export const DataLoaderFeature: React.FC = () => {
         }}
         workspaceNameAlert={{
           message: workspaceNameAlert,
-          onClose: () => setWorkspaceNameAlert(null),
+          onClose: closeWorkspaceNameAlert,
         }}
         folderNameAlert={{
           message: folderNameAlert,
-          onClose: () => setFolderNameAlert(null),
+          onClose: closeFolderNameAlert,
         }}
         deleteWorkspace={{
           target: workspaceToDelete,
           deleting: deletingWorkspace,
-          onCancel: () => setWorkspaceToDelete(null),
+          onCancel: closeDeleteWorkspaceDialog,
           onConfirm: () => void handleConfirmDeleteWorkspace(),
         }}
         ldacaImport={{
@@ -714,12 +440,7 @@ export const DataLoaderFeature: React.FC = () => {
           path: citationPath,
           content: citationContent,
           loading: citationLoading,
-          onClose: () => {
-            setCitationDirectory(null);
-            setCitationPath(null);
-            setCitationContent(null);
-            setCitationLoading(false);
-          },
+          onClose: closeCitation,
         }}
       />
     </div>

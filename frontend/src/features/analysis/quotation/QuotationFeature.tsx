@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  isSnapshotMode,
   SNAPSHOT_DISABLED_REASON,
-  useSnapshotViewStore,
-  useToolSnapshotMode,
-  type LoadedSnapshot,
+  snapshotSourceNodes,
+  useSnapshotBackedAnalysisState,
 } from '@/features/snapshot-view';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useQuotationSnapshotCapture } from './hooks/useQuotationSnapshotCapture';
@@ -234,11 +232,8 @@ const QuotationFeature: React.FC = () => {
   // dispatch can shadow ``panelSelectedNodes`` / ``displayedNodes`` /
   // result state in one place; the rest of the component reads the
   // shadowed names and picks up snapshot data when in snapshot mode.
-  const snapshotMode = useToolSnapshotMode('quotation');
-  const loadedSnapshot = useSnapshotViewStore(
-    (s) => s.snapshots.quotation,
-  ) as LoadedSnapshot<QuotationSnapshotPayload> | null;
-  const inSnapshotMode = isSnapshotMode(snapshotMode) && loadedSnapshot != null;
+  const { loadedSnapshot, inSnapshotMode } =
+    useSnapshotBackedAnalysisState<QuotationSnapshotPayload>('quotation');
 
   // ``panelSelectedNodes`` in snapshot mode is reconstructed from the
   // captured manifest (the live workspace may not even contain those
@@ -246,20 +241,7 @@ const QuotationFeature: React.FC = () => {
   // exactly what the user had on screen before they hit Open.
   const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
     if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
-    const {
-      node_ids,
-      node_labels,
-      per_block_rows,
-      total_source_rows,
-    } = loadedSnapshot.manifest.source;
-    const evenSplit =
-      node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
-    return node_ids.map((id, idx) => ({
-      id,
-      node_id: id,
-      name: node_labels[idx] ?? id,
-      shape: [per_block_rows?.[idx] ?? evenSplit, 0] as [number, number],
-    }));
+    return snapshotSourceNodes(loadedSnapshot.manifest.source);
   }, [inSnapshotMode, loadedSnapshot, livePanelSelectedNodes]);
 
   const { getColumnInfos } = useNodeColumnInfos({

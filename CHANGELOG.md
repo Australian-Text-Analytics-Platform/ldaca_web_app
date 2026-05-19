@@ -177,7 +177,7 @@ The "topic-modelling optimisation" release. Brings the major performance and fea
 - **MPS embedder** for Apple Silicon — uses the GPU for ~3× faster cold runs.
 - **SHA-256-keyed embedding disk cache** so repeated topic-modelling runs over the same texts skip the embedding stage entirely.
 - **Per-chunk progress** during the slow embedding stage (every 10 chunks of 512 docs), so the progress bar moves smoothly instead of pausing for minutes.
-- **Online pipeline** (IncrementalPCA + MiniBatchKMeans) available via `force_mode="online"` for very large corpora that don't fit in memory under the classic UMAP+HDBSCAN path.
+- **Experimental large-corpus topic pipeline** for very large corpora. This path has since been retired in favor of the single classic BERTopic implementation.
 - **Stop button** that actually cancels a running topic-modelling task by SIGTERM-ing the worker process (new `/tasks/cancel` endpoint), so long runs can be aborted cleanly.
 
 ### Fixed

@@ -42,7 +42,7 @@ process.env.VITE_APP_BUILD_DATE ??= (() => {
 })();
 
 const serverConfig = {
-  port: Number(process.env.FRONTEND_PORT ?? 3002),
+  port: Number(process.env.FRONTEND_PORT ?? 3000),
   host: '0.0.0.0',
   forwardConsole: {
     unhandledErrors: true,

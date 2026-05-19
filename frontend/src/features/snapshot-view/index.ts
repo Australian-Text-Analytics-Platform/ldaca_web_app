@@ -31,6 +31,13 @@ export {
 export { useSnapshotViewStore, useToolSnapshotMode } from './store';
 
 export {
+  snapshotSourceNodes,
+  useSnapshotBackedAnalysisState,
+  type SnapshotSourceNode,
+  type SnapshotBackedAnalysisState,
+} from './useSnapshotBackedAnalysisState';
+
+export {
   V1_BUILD_SUPPORT,
   applyBuildCapabilityGating,
   emitManifestJson,

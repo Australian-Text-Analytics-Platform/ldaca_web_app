@@ -9,9 +9,9 @@ applyTo: '**/*.py'
 
 - **Python ≥ 3.14** is required. Use modern syntax features available in 3.14+.
 - **Package manager:** [uv](https://docs.astral.sh/uv/). Never use `pip install` directly.
-  - `uv sync` — install all workspace dependencies (run from repo root).
+  - `uv sync` — install the root project dependencies (run from repo root).
   - `uv run <command>` — run any script or tool in the managed environment.
-  - `uv add <package>` — add a dependency to the relevant workspace member.
+  - `uv add <package>` — add a dependency to the relevant package.
 - **Never** set `PYTHONPATH=src` — `uv sync` installs packages in editable mode automatically.
 
 ## Type Annotations
@@ -67,7 +67,7 @@ async def submit_analysis(
 ## Testing (pytest)
 
 - `asyncio_mode = "auto"` — no need for `@pytest.mark.asyncio` decorators.
-- Run tests from the specific workspace member directory, not the repo root:
+- Run tests from the specific package directory, not the repo root:
   ```sh
   cd backend && uv run pytest
   cd docworkspace && uv run pytest

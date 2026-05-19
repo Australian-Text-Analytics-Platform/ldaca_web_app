@@ -18,7 +18,7 @@ applyTo: '**/*.js, **/*.mjs, **/*.cjs, **/*.ts, **/*.tsx'
 
 - Use **Vitest** as the test runner (configured with `jsdom` environment).
 - Setup file: `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`.
-- Run tests: `cd frontend && npm test` (watch) or `npx vitest run` (CI).
+- Run tests: `cd frontend && pnpm test` (watch) or `pnpm vitest run` (CI).
 
 ### Test Patterns
 

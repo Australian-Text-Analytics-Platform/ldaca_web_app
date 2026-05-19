@@ -1,6 +1,6 @@
-# Frontend Publishing (npm)
+# Frontend Publishing (npm Registry)
 
-**Scope statement:** Publish the frontend package for `npx` usage.
+**Scope statement:** Publish the frontend package for command-runner usage.
 
 ## Step 1 — Build
 
@@ -12,13 +12,13 @@
 
 **Question:** *Where do I publish?*
 
-**Answer:** Publish to npm using the workspace’s release process.
+**Answer:** Publish to the npm registry using the repository release process.
 
 ## Step 3 — Verify
 
 **Question:** *How do I test the published package?*
 
-**Answer:** Run it via `npx` on a clean environment and confirm it connects to the backend.
+**Answer:** Run it via `pnpm dlx` on a clean environment and confirm it connects to the backend.
 
 ## Recap
 

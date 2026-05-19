@@ -1,25 +1,15 @@
 {
+	"inputs": [],
 	"servers": {
-		"io.github.ChromeDevTools/chrome-devtools-mcp": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"--registry",
-				"https://registry.npmjs.org",
-				"chrome-devtools-mcp@0.20.0"
-			],
-			"gallery": "https://api.mcp.github.com",
-			"version": "0.20.0"
-		},
 		"microsoft/playwright-mcp": {
 			"type": "stdio",
-			"command": "npx",
+			"command": "pnpm",
 			"args": [
+				"dlx",
 				"@playwright/mcp@latest"
 			],
 			"gallery": "https://api.mcp.github.com",
 			"version": "0.0.1-seed"
 		}
-	},
-	"inputs": []
+	}
 }

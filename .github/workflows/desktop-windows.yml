@@ -100,11 +100,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-uv-
 
-      - name: Install Node workspace dependencies
+      - name: Install Node dependencies
         shell: pwsh
         run: |
           Set-StrictMode -Version Latest
-          npm ci
+          corepack enable
+          pnpm install --frozen-lockfile
 
       - name: Package backend runtime
         shell: pwsh
@@ -118,7 +119,7 @@ jobs:
         working-directory: frontend
         run: |
           Set-StrictMode -Version Latest
-          node scripts/stage-backend-runtime.mjs
+          pnpm stage:backend-runtime
 
       - name: Build Tauri desktop application
         shell: pwsh
@@ -128,9 +129,9 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           if ($env:TAURI_BUILD_FLAGS) {
             Write-Host "Building with flags: $env:TAURI_BUILD_FLAGS"
-            npx tauri build $env:TAURI_BUILD_FLAGS
+            pnpm tauri build $env:TAURI_BUILD_FLAGS
           } else {
-            npx tauri build
+            pnpm tauri build
           }
 
       - name: Validate bundled backend runtime
