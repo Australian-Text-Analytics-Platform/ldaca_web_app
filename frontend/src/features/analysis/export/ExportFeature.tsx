@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { saveBlob } from '@/lib/download';
+import { isTauri } from '@/lib/isTauri';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import { useNodeColorManagement } from '@/features/analysis/common';
@@ -92,7 +93,7 @@ const ExportFeature: React.FC = () => {
   // that uses reqwest to stream the URL straight to the user's Downloads
   // folder. The body never crosses the WebView2 / IPC boundary.
   // The web build keeps the original fetch + blob + saveBlob path.
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  const isDesktopApp = isTauri();
 
   const tauriDownloadToDisk = async (
     url: string,
@@ -138,7 +139,7 @@ const ExportFeature: React.FC = () => {
         ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
         : `${toDisplay(selectedNodes[0]!).name || nodeIds[0]}.${ext}`;
 
-      if (isTauri) {
+      if (isDesktopApp) {
         const fullPath = await tauriDownloadToDisk(url, headers, filename);
         toast.success(`Saved ${filename} to Downloads`, { description: fullPath });
         return;
@@ -175,7 +176,7 @@ const ExportFeature: React.FC = () => {
       const ext = getDownloadExtension(format);
       const filename = `${name || id}.${ext}`;
 
-      if (isTauri) {
+      if (isDesktopApp) {
         const fullPath = await tauriDownloadToDisk(url, headers, filename);
         toast.success(`Saved ${filename} to Downloads`, { description: fullPath });
         return;

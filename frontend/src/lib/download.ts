@@ -8,9 +8,7 @@
  * browser's own download UI handles progress and the destination folder.
  */
 import { toast } from 'sonner';
-
-const isTauri = (): boolean =>
-  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+import { isTauri } from '@/lib/isTauri';
 
 /**
  * Append a numeric suffix before the extension if `filename` already exists

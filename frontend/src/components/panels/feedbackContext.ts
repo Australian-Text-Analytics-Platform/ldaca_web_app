@@ -1,9 +1,7 @@
 import { useUIStore } from '../../stores/uiStore';
+import { isTauri } from '@/lib/isTauri';
 
 export const SURVEY_BASE_URL = 'https://sydney.au1.qualtrics.com/jfe/form/SV_0HrF3tzJBz3lQk6';
-
-const isTauri = (): boolean =>
-  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export const resolveDeployment = (): string => {
   const fromBuild = (import.meta.env.VITE_DEPLOYMENT_ID as string | undefined)?.trim();

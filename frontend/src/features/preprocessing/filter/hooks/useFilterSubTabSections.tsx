@@ -146,6 +146,42 @@ const getDefaultOperatorForType = (dataType: string): FilterCondition['operator'
   return (operators[0]?.value as FilterCondition['operator']) ?? 'eq';
 };
 
+const buildCategoricalOptionEntries = (
+  rawValues: unknown[],
+  hasNullFromResponse: boolean,
+): CategoricalOptionEntry[] => {
+  const uniqueEntries = new Map<string, CategoricalOptionEntry>();
+
+  rawValues.forEach((value) => {
+    const primitive = toCategoricalPrimitive(value);
+    if (primitive === null) {
+      return;
+    }
+
+    const optionKey = getCategoricalOptionKey(primitive);
+    if (!uniqueEntries.has(optionKey)) {
+      uniqueEntries.set(optionKey, {
+        key: optionKey,
+        value: primitive,
+        label: formatPreviewValue(primitive),
+        isNull: false,
+      });
+    }
+  });
+
+  const optionList: CategoricalOptionEntry[] = [];
+  if (hasNullFromResponse) {
+    optionList.push({
+      key: NULL_OPTION_KEY,
+      value: null,
+      label: 'Null (no value)',
+      isNull: true,
+    });
+  }
+  optionList.push(...uniqueEntries.values());
+  return optionList;
+};
+
 export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubTabSectionsResult => {
   const {
     selectedNodeId,
@@ -262,34 +298,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         const rawValues: unknown[] = Array.isArray(response?.unique_values) ? response.unique_values : [];
         const includeNullOption = dataType === 'categorical';
         const hasNullFromResponse = includeNullOption && Boolean(response?.has_null);
-        const uniqueEntries = new Map<string, CategoricalOptionEntry>();
-
-        rawValues.forEach((value) => {
-          const primitive = toCategoricalPrimitive(value);
-          if (primitive === null) {
-            return;
-          }
-          const optionKey = getCategoricalOptionKey(primitive);
-          if (!uniqueEntries.has(optionKey)) {
-            uniqueEntries.set(optionKey, {
-              key: optionKey,
-              value: primitive,
-              label: formatPreviewValue(primitive),
-              isNull: false,
-            });
-          }
-        });
-
-        const optionList: CategoricalOptionEntry[] = [];
-        if (hasNullFromResponse) {
-          optionList.push({
-            key: NULL_OPTION_KEY,
-            value: null,
-            label: 'Null (no value)',
-            isNull: true,
-          });
-        }
-        optionList.push(...uniqueEntries.values());
+        const optionList = buildCategoricalOptionEntries(rawValues, hasNullFromResponse);
 
         setCategoricalOptions((prev) => ({
           ...prev,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getApiBase } from '../api/env';
+import { isTauri } from '@/lib/isTauri';
 
 /**
  * Polls `GET /health` until the backend responds successfully.
@@ -27,7 +28,7 @@ const resolveHealthUrl = async (): Promise<string> => {
     if (window.__BACKEND_URL__) {
       return `${window.__BACKEND_URL__.replace(/\/$/, '')}/health`;
     }
-    if ('__TAURI_INTERNALS__' in window) {
+    if (isTauri()) {
       const { invoke } = await import('@tauri-apps/api/core');
       const backendUrl = await invoke<string>('get_backend_url');
       if (backendUrl) {

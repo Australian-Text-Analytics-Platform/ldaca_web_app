@@ -16,10 +16,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { queryKeys } from '@/lib/queryKeys';
+import { isTauri } from '@/lib/isTauri';
 import { toast } from 'sonner';
 import { FolderOpen } from 'lucide-react';
-
-const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 interface DataFolderDialogProps {
   open: boolean;
