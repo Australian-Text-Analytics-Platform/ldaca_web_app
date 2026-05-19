@@ -63,3 +63,24 @@ export const TOPIC_COLUMN_KEYS = {
   topic: 'TOPIC_topic',
   topicMeaning: 'TOPIC_topic_meaning',
 } as const;
+
+// Columns the result-table viewer should hide from display. The data is
+// still useful for highlighting and as a column on detached data blocks,
+// but the raw character indices add noise to the on-screen table.
+export const HIDDEN_RESULT_TABLE_COLUMNS = new Set<string>([
+  CONCORDANCE_COLUMN_KEYS.startIdx,
+  CONCORDANCE_COLUMN_KEYS.endIdx,
+]);
+
+// Tool-specific column-name prefixes are useful when these columns land
+// on a data block in the workspace (so they don't collide with user
+// columns), but they're noise in the on-screen result table. Strip a
+// known prefix; leave anything else untouched (e.g. metadata columns).
+const TABLE_LABEL_PREFIXES = ['CONC_', 'QUOTE_', 'TOPIC_'];
+
+export function formatResultTableHeader(columnKey: string): string {
+  for (const prefix of TABLE_LABEL_PREFIXES) {
+    if (columnKey.startsWith(prefix)) return columnKey.slice(prefix.length);
+  }
+  return columnKey;
+}

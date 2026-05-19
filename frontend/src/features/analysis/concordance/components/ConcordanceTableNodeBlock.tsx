@@ -25,6 +25,8 @@ import {
   CONCORDANCE_COLUMN_KEYS,
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_FREQ_COLUMNS,
+  HIDDEN_RESULT_TABLE_COLUMNS,
+  formatResultTableHeader,
 } from '../../generatedColumns';
 
 /** Per-column alignment for the concordance table.
@@ -59,6 +61,9 @@ const dedupeColumns = (cols: string[]): string[] => {
     return true;
   });
 };
+
+const filterHiddenColumns = (cols: string[]): string[] =>
+  cols.filter((col) => !HIDDEN_RESULT_TABLE_COLUMNS.has(col));
 
 export type ConcordanceTableNodeBlockProps = {
   nodeKey: string;
@@ -165,7 +170,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
     const rawDisplayColumns = showMetadata
       ? [...concCols.filter((c) => columns.includes(c)), ...visibleMetaCols]
       : concCols.filter((c) => columns.includes(c));
-    const displayColumns = dedupeColumns(rawDisplayColumns);
+    const displayColumns = filterHiddenColumns(dedupeColumns(rawDisplayColumns));
 
     const combinedNodeIds = takeMostRecent(selectedNodes, 2)
       .map((n) => n.id)
@@ -245,7 +250,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                       key={c}
                       className={`px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 ${alignmentClassForColumn(c) || 'text-left'}`}
                     >
-                      {c}
+                      {formatResultTableHeader(c)}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -363,8 +368,8 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
   const rawDisplayColumns = showMetadata
     ? [...concCols.filter((c) => allCols.includes(c)), ...visibleMetaCols.filter((c) => allCols.includes(c))]
     : concCols.filter((c) => allCols.includes(c));
-  const displayColumns = dedupeColumns(rawDisplayColumns);
-  const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
+  const displayColumns = filterHiddenColumns(dedupeColumns(rawDisplayColumns));
+  const tableColumns = displayColumns.length > 0 ? displayColumns : filterHiddenColumns(allCols);
 
   const currentNodePagination = nodePagination[paginationKey];
   const currentPage = currentNodePagination?.currentPage ?? 1;
@@ -413,7 +418,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
                     <SortableHeader
                       key={key}
                       columnKey={key}
-                      label={key}
+                      label={formatResultTableHeader(key)}
                       paginationKey={paginationKey}
                       requestNodeId={requestNodeId}
                       nodePagination={nodePagination}
