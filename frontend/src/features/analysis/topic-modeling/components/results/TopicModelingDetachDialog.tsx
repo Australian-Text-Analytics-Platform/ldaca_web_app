@@ -53,8 +53,8 @@ export function TopicModelingDetachDialog({
       open={open}
       onOpenChange={onOpenChange}
       isDetaching={isDetaching}
-      title="Detach Topic Results"
-      description="Select optional source columns to include with the detached topic results. Required output columns stay checked automatically."
+      title="Add topic results to workspace"
+      description="Select optional source columns to include with the topic results being added to the workspace. Required output columns stay checked automatically."
       detachNodeOptions={detachNodeOptions}
       selectedDetachColumns={selectedDetachColumns}
       toggleDetachColumn={toggleDetachColumn}

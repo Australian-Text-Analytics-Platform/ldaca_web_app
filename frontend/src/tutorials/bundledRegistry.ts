@@ -221,7 +221,7 @@ const tutorial = {
   'preprocessing.concat.schema-status': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-concat-schema-status',
-    label: 'Schema status',
+    label: 'Column compatibility',
   },
   'preprocessing.aggregate.tab': {
     file: 'tutorials/preprocessing.md',

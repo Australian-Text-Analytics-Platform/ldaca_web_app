@@ -190,7 +190,7 @@ export function useTopicModelingTaskFlow({
     if (!currentWorkspaceId) return;
     const taskId = await resolveTopicModelingTaskId();
     if (!taskId) {
-      toast.error('No topic modeling task available for detach');
+      toast.error('No topic modeling task available to add to workspace');
       return;
     }
 
@@ -206,7 +206,7 @@ export function useTopicModelingTaskFlow({
       setSelectedDetachColumns(initialSelections);
       setDetachDialogOpen(true);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load topic detach options');
+      toast.error(error instanceof Error ? error.message : 'Failed to load topic add-to-workspace options');
     } finally {
       setIsDetachLoading(false);
     }
@@ -216,7 +216,7 @@ export function useTopicModelingTaskFlow({
     if (!currentWorkspaceId) return;
     const taskId = await resolveTopicModelingTaskId();
     if (!taskId) {
-      toast.error('No topic modeling task available for detach');
+      toast.error('No topic modeling task available to add to workspace');
       return;
     }
 
@@ -259,7 +259,7 @@ export function useTopicModelingTaskFlow({
       };
       const resp = await textApi.topicModelingDetach(taskId, payload, getAuthHeaders());
       if (resp?.state !== 'successful') {
-        throw new Error(resp?.message || 'Topic detach failed');
+        throw new Error(resp?.message || 'Failed to add topic results to workspace');
       }
 
       await Promise.all([
@@ -268,9 +268,9 @@ export function useTopicModelingTaskFlow({
       ]);
 
       setDetachDialogOpen(false);
-      toast.success('Detached topic data block(s) created');
+      toast.success('Topic data block(s) added to workspace');
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Topic detach failed');
+      toast.error(error instanceof Error ? error.message : 'Failed to add topic results to workspace');
     } finally {
       setIsDetaching(false);
     }

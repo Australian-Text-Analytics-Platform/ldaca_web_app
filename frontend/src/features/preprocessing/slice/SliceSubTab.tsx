@@ -87,8 +87,8 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="slice-offset">Offset</Label>
-                    <HelpIcon targetKey="preprocessing.slice.offset" label="Slice offset" />
+                    <Label htmlFor="slice-offset">Start row</Label>
+                    <HelpIcon targetKey="preprocessing.slice.offset" label="Slice start row" />
                   </div>
                   <Input
                     id="slice-offset"
@@ -115,7 +115,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
                     disabled={!hasSelection}
                     placeholder="Number of rows to include"
                   />
-                  <p className="text-xs text-muted-foreground">Number of rows to include from the offset.</p>
+                  <p className="text-xs text-muted-foreground">Number of rows to include from the start row.</p>
                 </div>
               </div>
             </TabsContent>

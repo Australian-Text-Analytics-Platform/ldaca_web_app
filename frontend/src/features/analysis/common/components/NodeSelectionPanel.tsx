@@ -193,7 +193,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
         <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
           { (originalCount && originalCount > 0)
             ? `Over-selected (${originalCount}) but none usable. Reduce to max ${maxCompare}.`
-            : `No data blocks selected. Single click on data blocks in the workspace view to select them (max ${maxCompare} for comparison).` }
+            : `No data blocks selected. Single click on data blocks in the workspace view to select them.` }
         </div>
       ) : (
         <NodeSelectionList

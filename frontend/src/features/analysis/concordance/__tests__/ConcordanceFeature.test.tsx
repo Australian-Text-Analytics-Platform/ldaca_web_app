@@ -588,7 +588,8 @@ describe('ConcordanceFeature', () => {
     renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
-      expect(screen.getByText('CONC_left_context')).toBeInTheDocument();
+      // Header strips the `CONC_` prefix for display.
+      expect(screen.getByText('left_context')).toBeInTheDocument();
     });
 
     // No metadata column should appear as a column header until the user

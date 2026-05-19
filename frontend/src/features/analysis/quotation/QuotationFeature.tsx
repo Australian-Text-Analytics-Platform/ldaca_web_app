@@ -80,7 +80,7 @@ import {
 import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
 import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
-import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
+import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN, formatResultTableHeader } from '../generatedColumns';
 import { flattenQuotationGroups } from './quotationViewModels';
 import {
   DEFAULT_CONTEXT_LENGTH,
@@ -1388,7 +1388,7 @@ const QuotationFeature: React.FC = () => {
                                       onClick={sortable ? () => effHandleSort(nodeId, c) : undefined}
                                     >
                                       <div className="flex items-center gap-1.5">
-                                        <span>{c}</span>
+                                        <span>{formatResultTableHeader(c)}</span>
                                         {sortable && (
                                           <ArrowUpDown className={`h-3 w-3 ${active ? 'text-foreground' : 'opacity-60'}`} />
                                         )}

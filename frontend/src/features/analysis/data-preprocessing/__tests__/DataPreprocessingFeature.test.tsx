@@ -197,11 +197,11 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
 
     expect(screen.getByRole('tab', { name: 'Slice' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Offset')).toBeInTheDocument();
+    expect(screen.getByLabelText('Start row')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Random Sample' }));
 
-    expect(screen.queryByLabelText('Offset')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Start row')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fraction / Count')).toBeInTheDocument();
     expect(screen.getByLabelText('Random seed')).toBeInTheDocument();
     expect(screen.getByLabelText('Random seed')).toHaveValue(42);

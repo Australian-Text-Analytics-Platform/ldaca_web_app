@@ -36,15 +36,15 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Layers className="h-5 w-5" />
-                Concatenate Datasets
+                Stack Data Blocks
                 <HelpIcon
                   targetKey="preprocessing.concat.tab"
-                  label="Concat sub-tab overview"
+                  label="Stack sub-tab overview"
                   tooltip="Stack compatible data blocks vertically into a single data block."
                 />
               </CardTitle>
             </div>
-            <SubTabActivityTag active={showActivityTag} verb="Concatenating" />
+            <SubTabActivityTag active={showActivityTag} verb="Stacking" />
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
@@ -82,7 +82,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
 
           {mismatches.length > 0 && (
             <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-              <div className="font-semibold">Schema mismatches detected:</div>
+              <div className="font-semibold">Column compatibility issues detected:</div>
               <ul className="space-y-2">
                 {mismatches.map((mismatch) => (
                   <li key={`concat-mismatch-${mismatch.nodeId}`} className="space-y-1">
@@ -100,8 +100,8 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label>Schema status</Label>
-              <HelpIcon targetKey="preprocessing.concat.schema-status" label="Schema status" />
+              <Label>Column compatibility</Label>
+              <HelpIcon targetKey="preprocessing.concat.schema-status" label="Column compatibility" />
             </div>
             <div className="rounded-md border border-muted-foreground/40 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
               {statusMessage}
@@ -140,7 +140,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
               {apply.isBusy ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Concatenating…
+                  Stacking…
                 </>
               ) : (
                 <>
@@ -157,7 +157,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
       <PreviewTable
         title={
           <span className="flex items-center gap-2">
-            Preview concat output
+            Preview stacked output
             <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
           </span>
         }

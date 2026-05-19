@@ -373,7 +373,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     form: {
       value: newNodeName,
       setValue: setNewNodeName,
-      placeholder: autoConcatName || 'Concatenated dataset',
+      placeholder: autoConcatName || 'Stacked dataset',
       deduplicate,
       setDeduplicate,
     },
