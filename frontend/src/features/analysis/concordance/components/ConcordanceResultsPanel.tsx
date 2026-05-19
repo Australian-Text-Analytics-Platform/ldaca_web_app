@@ -1,4 +1,4 @@
-import React, { type Dispatch, type SetStateAction, type RefObject } from 'react';
+import React, { useRef, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
@@ -7,6 +7,7 @@ import type { ConcordanceAnalysisResponse, ConcordanceGroupedRow } from '@/api/t
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
+import { NodeColorPicker } from '../../common/components/NodeColorPicker';
 import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
 import {
   type DispersionDisplayBinCount,
@@ -186,6 +187,13 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
   readOnly = false,
 }) => {
   const showDispersion = concordanceView === 'dispersion';
+  // Track the last user-picked L1/R1 colour so the "Show L1/R1" button
+  // can restore it after a Hide cycle. Defaults to the first palette
+  // swatch — the user's first explicit pick replaces it.
+  const lastVisibleColorRef = useRef<string>(defaultPalette[0] ?? '#2563eb');
+  if (nearestTokenColor !== 'transparent') {
+    lastVisibleColorRef.current = nearestTokenColor;
+  }
 
   return (
     <Card ref={resultsRef}>
@@ -251,6 +259,38 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
               </TabsList>
             </Tabs>
             <div className="flex flex-wrap items-center gap-4">
+              {concordanceView === 'table' ? (
+                <div className="flex items-center gap-2 text-sm text-foreground">
+                  {nearestTokenColor === 'transparent' ? (
+                    <button
+                      type="button"
+                      onClick={() => setNearestTokenColor(lastVisibleColorRef.current)}
+                      className="rounded border border-input bg-background px-2 py-0.5 text-xs hover:bg-muted"
+                      title="Tint the L1 and R1 columns (closest left/right tokens) so they're easier to scan as sort handles."
+                    >
+                      Show L1/R1
+                    </button>
+                  ) : (
+                    <>
+                      <NodeColorPicker
+                        color={nearestTokenColor}
+                        palette={defaultPalette}
+                        onChange={setNearestTokenColor}
+                        paletteOnly
+                        triggerClassName="h-5 w-5"
+                        aria-label="L1/R1 cell colour"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNearestTokenColor('transparent')}
+                        className="rounded border border-input bg-background px-2 py-0.5 text-xs hover:bg-muted"
+                      >
+                        Hide L1/R1
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : null}
               <MetadataColumnSelector
                 availableColumns={availableMetadataColumns}
                 selectedColumns={selectedMetadataColumns ?? []}
@@ -258,37 +298,6 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
                 sections={metadataColumnSections}
                 disabledReason={metadataDisabledReason}
               />
-              {concordanceView === 'table' ? (
-                <div
-                  className="flex items-center gap-2 text-sm text-foreground"
-                  title="Font colour for the L1 and R1 columns (closest left/right tokens). Hide collapses them to transparent — click Show to restore."
-                >
-                  <span className="text-muted-foreground">L1/R1 colour</span>
-                  <input
-                    type="color"
-                    aria-label="L1/R1 cell colour"
-                    value={
-                      nearestTokenColor === 'transparent'
-                        ? '#9ca3af'
-                        : nearestTokenColor
-                    }
-                    onChange={(e) => setNearestTokenColor(e.target.value)}
-                    disabled={nearestTokenColor === 'transparent'}
-                    className="h-7 w-9 cursor-pointer rounded border border-input bg-background p-0"
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setNearestTokenColor((prev) =>
-                        prev === 'transparent' ? '#9ca3af' : 'transparent',
-                      )
-                    }
-                    className="rounded border border-input bg-background px-2 py-0.5 text-xs hover:bg-muted"
-                  >
-                    {nearestTokenColor === 'transparent' ? 'Show' : 'Hide'}
-                  </button>
-                </div>
-              ) : null}
             </div>
           </div>
           {showDispersion ? (

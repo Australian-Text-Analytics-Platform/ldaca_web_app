@@ -9,6 +9,13 @@ export interface NodeColorPickerProps {
   onChange: (color: string) => void;
   triggerClassName?: string;
   'aria-label'?: string;
+  /**
+   * When true, hide the full RGB picker + hex input row and offer only
+   * the palette swatches. Used for cases (e.g. L1/R1 cell tint) where
+   * matching the canonical analysis palette is the point and a
+   * free-form picker would be overkill.
+   */
+  paletteOnly?: boolean;
 }
 
 export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
@@ -17,6 +24,7 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
   onChange,
   triggerClassName,
   'aria-label': ariaLabel = 'Select color',
+  paletteOnly = false,
 }) => {
   const [hexInput, setHexInput] = useState(color.toUpperCase());
 
@@ -66,27 +74,29 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
             />
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="color"
-            value={color}
-            onChange={(event) => {
-              const next = event.target.value.toUpperCase();
-              setHexInput(next);
-              onChange(next);
-            }}
-            className="h-9 w-9 cursor-pointer rounded border border-input bg-transparent p-0"
-            aria-label="Custom color"
-          />
-          <Input
-            value={hexInput}
-            onChange={(event) => handleHexChange(event.target.value)}
-            maxLength={7}
-            placeholder="#000000"
-            aria-label="Hex color"
-            className="flex-1 text-xs font-mono"
-          />
-        </div>
+        {!paletteOnly ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={color}
+              onChange={(event) => {
+                const next = event.target.value.toUpperCase();
+                setHexInput(next);
+                onChange(next);
+              }}
+              className="h-9 w-9 cursor-pointer rounded border border-input bg-transparent p-0"
+              aria-label="Custom color"
+            />
+            <Input
+              value={hexInput}
+              onChange={(event) => handleHexChange(event.target.value)}
+              maxLength={7}
+              placeholder="#000000"
+              aria-label="Hex color"
+              className="flex-1 text-xs font-mono"
+            />
+          </div>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
