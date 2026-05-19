@@ -27,8 +27,8 @@ type TokenFrequencyParameterPanelProps = {
   appliedStopCount: number;
   hasResults: boolean;
   runLabel?: string;
-  referenceNodeId: string | null;
-  onReferenceNodeChange: (nodeId: string) => void;
+  studyNodeId: string | null;
+  onStudyNodeChange: (nodeId: string) => void;
   getColorForNode: (nodeId: string, index?: number) => string;
   computeDisplayName: (nodeId: string) => string;
   /**
@@ -75,8 +75,8 @@ export const TokenFrequencyParameterPanel = ({
   appliedStopCount,
   hasResults,
   runLabel,
-  referenceNodeId,
-  onReferenceNodeChange,
+  studyNodeId,
+  onStudyNodeChange,
   getColorForNode,
   computeDisplayName,
   tokensModelOptions,
@@ -155,14 +155,14 @@ export const TokenFrequencyParameterPanel = ({
             ) : null}
             {hasMultipleNodes && nodeOptions.length > 1 ? (
               <div className="ml-auto flex items-center gap-2">
-                <Label className="whitespace-nowrap text-base font-medium">Reference Data Block</Label>
+                <Label className="whitespace-nowrap text-base font-medium">Study Data Block</Label>
                 <div className="inline-flex items-center gap-1">
                   {nodeOptions.map((option) => {
-                    const isActive = (referenceNodeId ?? nodeOptions[0]?.id) === option.id;
+                    const isActive = (studyNodeId ?? nodeOptions[0]?.id) === option.id;
                     return (
                       <DisabledReasonTooltip
                         key={option.id}
-                        reason={isLocked ? 'Clear results first to change the reference data block' : undefined}
+                        reason={isLocked ? 'Clear results first to change the study data block' : undefined}
                       >
                       <label
                         className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors${isLocked ? ' cursor-not-allowed opacity-60' : ''}`}
@@ -171,11 +171,11 @@ export const TokenFrequencyParameterPanel = ({
                       >
                         <input
                           type="radio"
-                          name="reference-node"
+                          name="study-node"
                           value={option.id}
                           checked={isActive}
                           disabled={isLocked}
-                          onChange={() => onReferenceNodeChange(option.id)}
+                          onChange={() => onStudyNodeChange(option.id)}
                           className="sr-only"
                         />
                         <span
@@ -193,8 +193,8 @@ export const TokenFrequencyParameterPanel = ({
                 </div>
                 <HelpIcon
                   targetKey="analysis.token-frequency.reference"
-                  label="Reference Data Block"
-                  tooltip="The reference block is treated as Corpus 1 (O1/%1) in the keyword statistics. Switching it flips the direction of measures like LogRatio."
+                  label="Study Data Block"
+                  tooltip="The study block is treated as Corpus 2 (O2/%2) in the keyword statistics; the other block is the reference (Corpus 1). Switching it flips the direction of measures like LogRatio."
                 />
               </div>
             ) : null}
