@@ -1,25 +1,25 @@
 LDaCA Wordflow
-Copyright 2024-2026 The University of Sydney and LDaCA Wordflow contributors
+Copyright 2025-2026 Language Data Commons of Australia (LDaCA)
+Copyright 2025-2026 Sydney Informatics Hub, The University of Sydney
 
-This product includes software developed at:
-  - Sydney Informatics Hub, The University of Sydney
-    (https://www.sydney.edu.au/research/facilities/sydney-informatics-hub.html)
-  - Sydney Corpus Lab, The University of Sydney
-    (https://sydneycorpuslab.com/)
-
-LDaCA Wordflow is part of the Language Data Commons of Australia (LDaCA,
-https://www.ldaca.edu.au), funded by the Australian Research Data Commons
-(ARDC) and enabled by the National Collaborative Research Infrastructure
-Strategy (NCRIS).
-
-Wordflow extends earlier analytical work by the Australian Text Analytics
-Platform (ATAP, https://www.atap.edu.au), an earlier ARDC-funded
-text-analytics initiative that has since been merged into LDaCA. The
-analytical design lineage and core development team have carried through
-unchanged. The GitHub organisation name "Australian-Text-Analytics-Platform"
-reflects that legacy ATAP origin.
+Developed by Sydney Informatics Hub (SIH) and Sydney Corpus Lab (SCL),
+The University of Sydney, for the Language Data Commons of Australia
+(LDaCA, https://www.ldaca.edu.au) — a national research infrastructure
+project funded by the Australian Research Data Commons (ARDC) and
+enabled by the National Collaborative Research Infrastructure Strategy
+(NCRIS). LDaCA was established in 2021; the Wordflow application was
+started from scratch in 2025, reusing analytical ideas from the
+Australian Text Analytics Platform (ATAP, https://www.atap.edu.au)
+whose tools have been folded into LDaCA. The GitHub organisation name
+"Australian-Text-Analytics-Platform" reflects that legacy ATAP origin.
 
 This product bundles components published under their own permissive
 licenses (MIT or MIT/Apache-2.0 dual): polars, FastAPI, React, Tauri,
-polars-text, docworkspace, and many others. Each is included subject to
-its own copyright notice and license terms.
+and others. Each is included subject to its own copyright notice and
+license terms. The sibling LDaCA-developed packages polars-text and
+docworkspace are also distributed under the Apache 2.0 license; see
+their respective LICENSE and NOTICE files for attribution.
+
+If you use LDaCA Wordflow in research, please cite both the LDaCA
+project and the Wordflow tool. See the in-app "Cite LDaCA Wordflow"
+panel or the project's README for the recommended citation form.
