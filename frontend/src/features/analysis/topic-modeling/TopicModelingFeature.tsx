@@ -432,8 +432,11 @@ const TopicModelingFeature: React.FC = () => {
   // from the captured request instead.
   useEffect(() => {
     if (inSnapshotMode) return;
-    setCorpusSamples(computeDefaultCorpusSamples());
-    setCorpusSamplesUserSet(false);
+    const samples = computeDefaultCorpusSamples();
+    Promise.resolve().then(() => {
+      setCorpusSamples(samples);
+      setCorpusSamplesUserSet(false);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inSnapshotMode, panelNodeIdsKey]);
 
@@ -445,24 +448,6 @@ const TopicModelingFeature: React.FC = () => {
     if (!inSnapshotMode || !loadedSnapshot) return;
     const settings = loadedSnapshot.payload.settings;
     if (!settings) return;
-    if (typeof settings.random_seed === 'number') {
-      setRandomSeed(settings.random_seed);
-      setRandomSeedUserSet(true);
-    }
-    if (typeof settings.representative_words_count === 'number') {
-      setRepresentativeWordsCount(settings.representative_words_count);
-      setRepresentativeWordsCountUserSet(true);
-    }
-    if (settings.topic_size_mode === 'min') {
-      setTopicSizeMode('min');
-    } else {
-      setTopicSizeMode('exact');
-    }
-    if (typeof settings.topic_size_value === 'number') {
-      setTopicSizeValue(settings.topic_size_value);
-      setReferenceTopicNo(settings.topic_size_value);
-      setTopicSizeUserSet(true);
-    }
     // Rehydrate sampling fractions: capture ships ``sample_fractions``
     // aligned with the captured ``node_ids``. ``null`` entries mean
     // "no sampling" for that block → enabled=false, percent=100.
@@ -475,10 +460,30 @@ const TopicModelingFeature: React.FC = () => {
       }
       return { percent: '100', enabled: false };
     });
-    setCorpusSamples(samples);
-    setCorpusSamplesUserSet(true);
-    setSelectedTopicIds(new Set());
-    setTopicSearchQuery('');
+    Promise.resolve().then(() => {
+      if (typeof settings.random_seed === 'number') {
+        setRandomSeed(settings.random_seed);
+        setRandomSeedUserSet(true);
+      }
+      if (typeof settings.representative_words_count === 'number') {
+        setRepresentativeWordsCount(settings.representative_words_count);
+        setRepresentativeWordsCountUserSet(true);
+      }
+      if (settings.topic_size_mode === 'min') {
+        setTopicSizeMode('min');
+      } else {
+        setTopicSizeMode('exact');
+      }
+      if (typeof settings.topic_size_value === 'number') {
+        setTopicSizeValue(settings.topic_size_value);
+        setReferenceTopicNo(settings.topic_size_value);
+        setTopicSizeUserSet(true);
+      }
+      setCorpusSamples(samples);
+      setCorpusSamplesUserSet(true);
+      setSelectedTopicIds(new Set());
+      setTopicSearchQuery('');
+    });
   }, [inSnapshotMode, loadedSnapshot]);
 
   const handleColumnChange = (nodeId: string, column: string) => {
@@ -523,7 +528,7 @@ const TopicModelingFeature: React.FC = () => {
   useEffect(() => {
     if (topicSizeMode !== 'min' || topicSizeUserSet || combinedEffective <= 0) return;
     const autoMin = Math.max(2, Math.floor(combinedEffective / (10 * referenceTopicNo)));
-    setTopicSizeValue(autoMin);
+    Promise.resolve().then(() => setTopicSizeValue(autoMin));
   }, [topicSizeMode, topicSizeUserSet, combinedEffective, referenceTopicNo]);
 
   const showSamplingWarning =

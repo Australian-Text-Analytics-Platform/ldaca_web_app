@@ -11,6 +11,26 @@ Start here before exploring. This monorepo (renamed from `ldaca_web_app`; PyPI n
 - Root `package.json`: pnpm workspace command wrapper for `frontend`
 - Root `pyproject.toml`: uv workspace shim; do not rely on `PYTHONPATH=src`
 
+## Developer Documentation System
+
+Use the developer guides for on-demand project context before broad code
+exploration, especially when changing unfamiliar modules:
+
+- Root guide: `docs/developer-guide/index.md`
+- Backend guide: `backend/docs/developer-guide/index.md`
+- Frontend guide: `frontend/docs/developer-guide/index.md`
+- DocWorkspace guide: `docworkspace/docs/developer-guide/index.md`
+- polars-text guide: `polars-text/docs/developer-guide/index.md`
+
+Architecture pages describe only the big picture. Read the sibling guide pages
+for lifecycle, state flow, workspace internals, analysis/worker logic, desktop
+packaging, persistence, package APIs, and release details.
+
+After future code, architecture, workflow, packaging, or API changes, update the
+relevant developer-guide page when the old documentation would become
+incomplete, misleading, or stale. Keep docs aligned with the code in the same
+change whenever practical.
+
 ## Environment And Order
 
 Use this order for a fresh task:
@@ -47,6 +67,7 @@ These were validated in this workspace and are the fastest reliable entry points
 - If you touch desktop packaging, inspect `scripts/package_backend_runtime.py` and `frontend/scripts/stage-backend-runtime.mjs` before changing anything.
 - Expect backend data under `~/Documents/ldaca` unless `DATA_ROOT` overrides it.
 - Some `polars-text` features download Hugging Face assets on first use; avoid treating that as an unexpected network regression.
+- When a change alters implementation wiring, public APIs, workflows, package boundaries, release steps, or important design rules, update the relevant `docs/developer-guide/` page in the same change.
 
 ## Codebase-Specific AI Rules
 

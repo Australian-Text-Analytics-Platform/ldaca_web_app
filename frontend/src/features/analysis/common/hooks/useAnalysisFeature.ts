@@ -112,12 +112,16 @@ export function useAnalysisFeature<TResult = unknown>(
 
   // Keep a ref to the full config so memoised callbacks always see latest values
   const configRef = useRef(config);
-  configRef.current = config;
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
 
   // ---- Task ID ----
   const [localTaskId, setLocalTaskId] = useState<string | null>(null);
   const localTaskIdRef = useRef<string | null>(null);
-  localTaskIdRef.current = localTaskId;
+  useEffect(() => {
+    localTaskIdRef.current = localTaskId;
+  }, [localTaskId]);
 
   // ---- Running state ----
   const [isRunning, setIsRunningState] = useState(false);
@@ -138,7 +142,7 @@ export function useAnalysisFeature<TResult = unknown>(
   // ---- Workspace change cleanup ----
   useEffect(() => {
     lastFetchedRef.current = { taskId: null, state: null };
-    setLocalTaskId(null);
+    Promise.resolve().then(() => setLocalTaskId(null));
   }, [config.workspaceId]);
 
   // Returns the cached server-lock data (fetched once by useAnalysisServerRequestLock).
@@ -302,7 +306,9 @@ export function useAnalysisFeature<TResult = unknown>(
   });
 
   // Keep task status accessible to resolveTaskId
-  taskStatusRef.current = taskStatus;
+  useEffect(() => {
+    taskStatusRef.current = taskStatus;
+  }, [taskStatus]);
 
   // ---- Sync isRunning with task status ----
   useEffect(() => {

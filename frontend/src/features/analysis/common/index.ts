@@ -5,7 +5,6 @@ export * from './hooks/useAnalysisLock';
 export * from './hooks/useAnalysisFeature';
 export * from './hooks/useMaterializeLifecycle';
 export * from './lockComparison';
-export * from './useColorStackAllocator';
 export * from './useNodeColumnOptions';
 export * from './nodeSelectionTypes';
 export * from './components';

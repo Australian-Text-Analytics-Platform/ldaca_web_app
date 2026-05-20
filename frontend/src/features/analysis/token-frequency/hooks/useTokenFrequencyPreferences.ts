@@ -76,27 +76,34 @@ export const useTokenFrequencyPreferences = ({
       typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit)
         ? backendTokenLimit
         : null;
+    let nextLimit: number | null = null;
     if (backendLimit !== null) {
       const { limit: sanitizedBackendLimit } = clampDisplayTokenLimit(backendLimit);
-      applyTokenLimitState(sanitizedBackendLimit);
+      nextLimit = sanitizedBackendLimit;
     } else if (tokenLimitOverride === null) {
-      applyTokenLimitState(DEFAULT_TOKEN_LIMIT);
+      nextLimit = DEFAULT_TOKEN_LIMIT;
+    }
+
+    if (nextLimit !== null) {
+      Promise.resolve().then(() => applyTokenLimitState(nextLimit));
     }
   }, [applyTokenLimitState, backendTokenLimit, tokenLimitOverride]);
 
   useEffect(() => {
-    if (!results) {
-      setStopWords('');
-      setAppliedStopSet(new Set());
-      return;
-    }
-
     const normalized = backendStopWordsKey
       ? backendStopWordsKey.split('|').filter((word) => word.length > 0)
       : [];
-    const joined = normalized.join(', ');
-    setStopWords(joined);
-    setAppliedStopSet(new Set(normalized));
+
+    Promise.resolve().then(() => {
+      if (!results) {
+        setStopWords('');
+        setAppliedStopSet(new Set());
+        return;
+      }
+
+      setStopWords(normalized.join(', '));
+      setAppliedStopSet(new Set(normalized));
+    });
   }, [backendStopWordsKey, results]);
 
   const effectiveTokenLimit = (() => {

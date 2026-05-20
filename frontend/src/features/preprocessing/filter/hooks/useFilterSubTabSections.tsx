@@ -607,8 +607,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         
         return { ...c, value: newValue };
       }));
-    } catch (error) {
-      console.error('Failed to fetch describe data for pre-filling:', error);
+    } catch {
+      // Best-effort prefill; leave the current value unchanged on failure.
     }
   };
 
@@ -642,8 +642,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
 
         return { ...c, value: newValue };
       }));
-    } catch (error) {
-      console.error('Failed to fetch describe data for numeric pre-filling:', error);
+    } catch {
+      // Best-effort prefill; leave the current value unchanged on failure.
     }
   };
 
@@ -866,7 +866,6 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       setIsFiltering(true);
       await filterNode(selectedNodeId, request);
     } catch (error) {
-      console.error('Filter error:', error);
       onAlert(`Error applying filter: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsFiltering(false);

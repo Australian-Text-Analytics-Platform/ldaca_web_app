@@ -138,14 +138,16 @@ export const TokenFrequencyResultsPanel = ({
   // (the cloud cap). Once list > 100 the two values diverge by design.
   React.useEffect(() => {
     if (!Number.isFinite(effectiveTokenLimit) || effectiveTokenLimit <= 0) return;
-    setListLimit((prev) => {
-      if (prev > 100) return prev;
-      return effectiveTokenLimit;
-    });
-    setListLimitInput((prev) => {
-      const prevNum = Number.parseInt(prev, 10);
-      if (Number.isFinite(prevNum) && prevNum > 100) return prev;
-      return String(effectiveTokenLimit);
+    Promise.resolve().then(() => {
+      setListLimit((prev) => {
+        if (prev > 100) return prev;
+        return effectiveTokenLimit;
+      });
+      setListLimitInput((prev) => {
+        const prevNum = Number.parseInt(prev, 10);
+        if (Number.isFinite(prevNum) && prevNum > 100) return prev;
+        return String(effectiveTokenLimit);
+      });
     });
   }, [effectiveTokenLimit]);
 

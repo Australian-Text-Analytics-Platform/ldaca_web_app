@@ -17,6 +17,11 @@ export type DocumentTarget = {
 
 export type DocumentType = 'tutorial' | 'warning' | 'information' | 'reference';
 
+type NavigationState = {
+  propTarget: DocumentTarget | null | undefined;
+  currentTarget: DocumentTarget | null;
+};
+
 const DOC_CONFIG: Record<DocumentType, { title: string; defaultFile: string }> = {
   tutorial: { title: 'LDaCA Tutorial', defaultFile: 'tutorials/index.md' },
   warning: { title: 'LDaCA Warnings', defaultFile: 'warnings/index.md' },
@@ -101,8 +106,14 @@ const DocumentView: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [zoom, setZoom] = useState<number>(1);
-  const [currentTarget, setCurrentTarget] = useState<DocumentTarget | null>(target ?? null);
-  const [activeAnchor, setActiveAnchor] = useState<string | null>(target?.anchor ?? null);
+  const [navigationState, setNavigationState] = useState<NavigationState>(() => ({
+    propTarget: target,
+    currentTarget: target ?? null,
+  }));
+  const currentTarget = target && navigationState.propTarget !== target
+    ? target
+    : navigationState.currentTarget;
+  const activeAnchor = currentTarget?.anchor ?? null;
   const missingAnchorRef = useRef<string | null>(null);
 
   const clamp = (v: number) => Math.min(2, Math.max(0.5, v));
@@ -142,15 +153,6 @@ const DocumentView: React.FC<{
     load();
     return () => { cancelled = true; };
   }, [currentTarget?.file, config.defaultFile]);
-
-  useEffect(() => {
-    setActiveAnchor(currentTarget?.anchor ?? null);
-  }, [currentTarget?.anchor]);
-
-  useEffect(() => {
-    if (!target) return;
-    setCurrentTarget(target);
-  }, [target]);
 
   useEffect(() => {
     if (!activeAnchor || loading || error) return;
@@ -203,7 +205,7 @@ const DocumentView: React.FC<{
         }
         if (!nextFile.endsWith('.md')) return;
         event.preventDefault();
-        setCurrentTarget({ file: nextFile, anchor: nextAnchor });
+        setNavigationState({ propTarget: target, currentTarget: { file: nextFile, anchor: nextAnchor } });
       };
 
       if (isExternalLink(href)) {

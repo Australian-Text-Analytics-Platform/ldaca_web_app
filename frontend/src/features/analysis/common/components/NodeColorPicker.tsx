@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -19,10 +19,8 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
   'aria-label': ariaLabel = 'Select color',
 }) => {
   const [hexInput, setHexInput] = useState(color.toUpperCase());
-
-  useEffect(() => {
-    setHexInput(color.toUpperCase());
-  }, [color]);
+  const [hexEditing, setHexEditing] = useState(false);
+  const displayedHex = hexEditing ? hexInput : color.toUpperCase();
 
   const handleHexChange = (value: string) => {
     const trimmed = value.trim().toUpperCase();
@@ -79,7 +77,12 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
             aria-label="Custom color"
           />
           <Input
-            value={hexInput}
+            value={displayedHex}
+            onFocus={() => {
+              setHexInput(color.toUpperCase());
+              setHexEditing(true);
+            }}
+            onBlur={() => setHexEditing(false)}
             onChange={(event) => handleHexChange(event.target.value)}
             maxLength={7}
             placeholder="#000000"

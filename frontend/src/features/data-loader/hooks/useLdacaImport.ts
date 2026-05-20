@@ -19,11 +19,12 @@ export function useLdacaImport({
   const [ldacaImporting, setLdacaImporting] = useState(false);
 
   const handleLdacaImport = async () => {
-    if (!ldacaUrl.trim()) return;
+    const trimmedUrl = ldacaUrl.trim();
+    if (!trimmedUrl) return;
 
     setLdacaImporting(true);
     try {
-      const response = await filesApi.importLdaca(ldacaUrl, authHeaders);
+      const response = await filesApi.importLdaca(trimmedUrl, authHeaders);
 
       notify('success', response.message || 'LDaCA import started in background.');
       setLdacaUrl('');

@@ -135,12 +135,12 @@ const Sidebar: React.FC = () => {
   const { toggleNodeSelection, clearSelection } = useWorkspaceActions();
   const { user, logout, dataFolder, isMultiUserMode } = useAuth();
   const queryClient = useQueryClient();
-  const handleLogout = React.useCallback(async () => {
+  const handleLogout = async () => {
     // Drop all cached query data so the next signed-in user never sees the
     // previous user's files, workspaces, nodes, or preferences.
     queryClient.clear();
     await logout();
-  }, [logout, queryClient]);
+  };
   const tasks = useAnalysisStore((state) => state.tasks);
   const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const {
@@ -149,10 +149,8 @@ const Sidebar: React.FC = () => {
     reconnect: reconnectTaskStream,
   } = useWorkspaceTaskInbox(currentWorkspaceId ?? null);
 
-  const nodes = React.useMemo<SidebarWorkspaceNode[]>(() => {
-    const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
-    return Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
-  }, [workspaceGraph]);
+  const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
+  const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
 
   const openQuotationEngineDialog = () => {
     setCurrentView('quotation');
@@ -408,7 +406,7 @@ const Sidebar: React.FC = () => {
                     <div className="flex h-full flex-col overflow-hidden">
                       <div
                         ref={(node) => assignSectionScrollRef(key, node)}
-                        className="flex h-full min-h-0 flex-col overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden px-2 py-2 text-sm"
+                        className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-sm"
                       >
                         {key === 'views' && renderViewsBody()}
                         {key === 'nodes' && (

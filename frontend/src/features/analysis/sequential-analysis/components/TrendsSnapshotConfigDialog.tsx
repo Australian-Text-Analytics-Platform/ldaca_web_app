@@ -20,7 +20,7 @@
  * SnapshotActions; the Trends feature's `handleSaveSnapshot` closure
  * reads its config state and runs the capture flow.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { AlertTriangle, FolderPlus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -44,12 +44,12 @@ import {
 } from '@/components/ui/select';
 import {
   SNAPSHOT_FINEST_FREQUENCIES,
-  type SequentialFrequency,
 } from '@/api/text';
 import { nodesApi } from '@/api/index';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 import type { SnapshotToolKey } from '@/features/snapshot-view';
+import type { SnapshotFinestFrequency, TrendsSnapshotConfig } from '../trendsSnapshotConfig';
 
 export const SNAPSHOT_ROW_HARD_CAP = 200_000;
 export const SNAPSHOT_ROW_SOFT_WARN = 100_000;
@@ -58,8 +58,6 @@ export const SNAPSHOT_ROW_SOFT_WARN = 100_000;
  * except ``custom``. The viewer's coarsening pass uses this same
  * ordered list: a snapshot captured at ``daily`` can be re-aggregated
  * to ``weekly`` / ``monthly`` / etc., but not to ``hourly``. */
-export type SnapshotFinestFrequency = Exclude<SequentialFrequency, 'custom'>;
-
 const FREQUENCY_LABELS: Record<SnapshotFinestFrequency, string> = {
   second: 'Per second',
   minute: 'Per minute',
@@ -69,27 +67,6 @@ const FREQUENCY_LABELS: Record<SnapshotFinestFrequency, string> = {
   monthly: 'Monthly',
   quarterly: 'Quarterly',
   yearly: 'Yearly',
-};
-
-export interface TrendsSnapshotConfig {
-  /** Captured finest time bin (datetime path). Ignored when
-   * ``columnType === 'numeric'``. */
-  finestFrequency: SnapshotFinestFrequency;
-  /** Captured columns the viewer can group by. 0-3 entries. */
-  groupByColumns: string[];
-  /** Captured numeric bin size (numeric path). Ignored when
-   * ``columnType === 'datetime'``. Defaults to 1; user can override. */
-  numericInterval: number;
-  /** Captured numeric origin (numeric path, optional). ``null`` =
-   * backend auto-detects from the data minimum. */
-  numericOrigin: number | null;
-}
-
-export const DEFAULT_TRENDS_SNAPSHOT_CONFIG: TrendsSnapshotConfig = {
-  finestFrequency: 'daily',
-  groupByColumns: [],
-  numericInterval: 1,
-  numericOrigin: null,
 };
 
 const INVALID_NAME_CHARS = /[/\\:*?"<>|]/g;
@@ -162,8 +139,13 @@ interface Props {
   dryRunRowCount?: (config: TrendsSnapshotConfig) => Promise<number>;
 }
 
-export const TrendsSnapshotConfigDialog: React.FC<Props> = ({
-  open,
+export const TrendsSnapshotConfigDialog: React.FC<Props> = ({ open, ...contentProps }) => (
+  <Dialog open={open} onOpenChange={contentProps.onOpenChange}>
+    {open ? <TrendsSnapshotConfigDialogContent key={contentProps.defaultName} {...contentProps} /> : null}
+  </Dialog>
+);
+
+const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
   onOpenChange,
   tool,
   existingFilenames,
@@ -240,26 +222,10 @@ export const TrendsSnapshotConfigDialog: React.FC<Props> = ({
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isEstimating, setIsEstimating] = useState(false);
-  const [actualRows, setActualRows] = useState<number | null>(null);
+  const [actualRowsResult, setActualRowsResult] = useState<{ signature: string; rows: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Reset transient state when the dialog opens.
-  useEffect(() => {
-    if (open) {
-      setName(defaultName ?? '');
-      setDescription('');
-      setIsSaving(false);
-      setActualRows(null);
-      setError(null);
-    }
-  }, [open, defaultName]);
-
-  // Invalidate the cached actual-row count on any config change — the
-  // estimate refreshes synchronously, but the actual count needs a new
-  // dry-run if the user wants verification.
-  useEffect(() => {
-    setActualRows(null);
-  }, [config]);
+  const configSignature = `${config.finestFrequency}|${config.groupByColumns.join('\0')}|${config.numericInterval}|${config.numericOrigin ?? ''}`;
+  const actualRows = actualRowsResult?.signature === configSignature ? actualRowsResult.rows : null;
 
   const nameValidation = useMemo(
     () => validateName(name, tool, existingFilenames),
@@ -282,7 +248,7 @@ export const TrendsSnapshotConfigDialog: React.FC<Props> = ({
     setError(null);
     try {
       const actual = await dryRunRowCount(config);
-      setActualRows(actual);
+        setActualRowsResult({ signature: configSignature, rows: actual });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -335,8 +301,7 @@ export const TrendsSnapshotConfigDialog: React.FC<Props> = ({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    return (
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Save Trends snapshot</DialogTitle>
@@ -555,6 +520,5 @@ export const TrendsSnapshotConfigDialog: React.FC<Props> = ({
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
   );
 };

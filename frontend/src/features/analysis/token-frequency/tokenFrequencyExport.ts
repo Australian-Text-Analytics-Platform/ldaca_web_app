@@ -53,38 +53,6 @@ export type ExportedDownloadFile = {
   blob: Blob;
 };
 
-const scheduleDownloadCleanup = (link: HTMLAnchorElement, urlToRevoke?: string) => {
-  if (typeof window === 'undefined') return;
-
-  window.setTimeout(() => {
-    if (link.parentNode) {
-      link.parentNode.removeChild(link);
-    }
-    if (urlToRevoke) {
-      URL.revokeObjectURL(urlToRevoke);
-    }
-  }, 0);
-};
-
-// Used for already-rendered href values (e.g. canvas data URLs). Always uses
-// the synchronous anchor click — the browser handles progress UI, and the
-// existing tests assert the anchor is created in the DOM.
-const triggerFileDownload = (href: string, filename: string, urlToRevoke?: string) => {
-  if (typeof document === 'undefined') return;
-
-  const link = document.createElement('a');
-  link.href = href;
-  link.download = filename;
-  link.style.display = 'none';
-  document.body.appendChild(link);
-
-  try {
-    link.click();
-  } finally {
-    scheduleDownloadCleanup(link, urlToRevoke);
-  }
-};
-
 const triggerBlobDownload = (blob: Blob, filename: string) => {
   // saveBlob handles Tauri (write to Downloads + toast) and browser (anchor)
   // paths. Fire-and-forget: callers historically had no async semantics.
@@ -319,81 +287,6 @@ export const downloadExportBundleAsZip = async (zipFilename: string, files: Expo
 
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   triggerBlobDownload(zipBlob, zipFilename);
-};
-
-export const downloadWordCloudSvgAsPng = (
-  svg: SVGSVGElement,
-  options: {
-    displayName: string;
-    fallbackKey: string;
-    scale?: number;
-  }
-) => {
-  if (typeof window === 'undefined') return;
-
-  let width = Number(svg.getAttribute('width')) || svg.clientWidth || 400;
-  let height = Number(svg.getAttribute('height')) || svg.clientHeight || 200;
-  const viewBox = svg.getAttribute('viewBox');
-
-  if ((!width || !height) && viewBox) {
-    const parts = viewBox.split(' ').map((part) => Number(part));
-    if (parts.length === 4) {
-      width = parts[2] || width;
-      height = parts[3] || height;
-    }
-  }
-
-  const clone = svg.cloneNode(true) as SVGSVGElement;
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  if (width) clone.setAttribute('width', String(width));
-  if (height) clone.setAttribute('height', String(height));
-
-  const serializer = new XMLSerializer();
-  const svgString = serializer.serializeToString(clone);
-  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-
-  const image = new Image();
-  image.onload = () => {
-    const canvas = document.createElement('canvas');
-    const exportScale = options.scale ?? 1;
-    const scale = Number.isFinite(exportScale) && exportScale > 1 ? exportScale : 1;
-    const scaledWidth = Math.max(1, Math.round(width * scale));
-    const scaledHeight = Math.max(1, Math.round(height * scale));
-    canvas.width = scaledWidth;
-    canvas.height = scaledHeight;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, scaledWidth, scaledHeight);
-    if (scale > 1) {
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
-    }
-    context.drawImage(image, 0, 0, scaledWidth, scaledHeight);
-    URL.revokeObjectURL(url);
-
-    const dataUrl = canvas.toDataURL('image/png');
-    triggerFileDownload(
-      dataUrl,
-      toRawStandaloneFilename(options.displayName || options.fallbackKey, 'wordcloud', 'png')
-    );
-  };
-
-  image.onerror = () => {
-    URL.revokeObjectURL(url);
-  };
-  image.src = url;
-};
-
-export const downloadFrequencyRowsAsCsv = (label: string, rows: Array<Record<string, unknown>>) => {
-  if (typeof window === 'undefined') return;
-  downloadExportedFile(buildFrequencyExportFile(label, rows, 'csv'));
 };
 
 export type WordCloudFormat = 'png' | 'jpeg' | 'svg';

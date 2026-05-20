@@ -7,7 +7,7 @@
  * with the same args is safe — backend reports ``is_new`` + an optional
  * ``replaced_column`` so we can decide which toast to surface.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -63,15 +63,40 @@ function pickDefaultColumn(columns: string[]): string | null {
   return columns[0] ?? null;
 }
 
+function getInitialModel(
+  defaultLanguage: string | null,
+  defaultTokenizerModel: string | null,
+): string {
+  return defaultTokenizerModel
+    ?? findLanguage(defaultLanguage ?? 'en')?.recommendedModel
+    ?? 'bert-base-uncased';
+}
+
 export function TokeniseDialog({
   open,
+  onClose,
+  ...formProps
+}: TokeniseDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+    >
+      {open && <TokeniseDialogForm {...formProps} onClose={onClose} />}
+    </Dialog>
+  );
+}
+
+function TokeniseDialogForm({
   onClose,
   nodeId,
   nodeName,
   columns,
   initialColumn,
   onSuccess,
-}: TokeniseDialogProps) {
+}: Omit<TokeniseDialogProps, 'open'>) {
   const { getAuthHeaders } = useAuth();
   const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const defaultTokenizerModel = usePreferencesStore(
@@ -82,53 +107,20 @@ export function TokeniseDialog({
     initialColumn ?? pickDefaultColumn(columns) ?? '',
   );
   const [language, setLanguage] = useState<string>(defaultLanguage ?? 'en');
-  // When the user hasn't manually set a model, derive it from the language
-  // choice so a CJK user gets jieba without having to type it.
   const [model, setModel] = useState<string>(
-    () => defaultTokenizerModel
-      ?? findLanguage(defaultLanguage ?? 'en')?.recommendedModel
-      ?? 'bert-base-uncased',
+    () => getInitialModel(defaultLanguage, defaultTokenizerModel),
   );
   const [modelUserSet, setModelUserSet] = useState<boolean>(
     Boolean(defaultTokenizerModel),
   );
   const [submitting, setSubmitting] = useState(false);
 
-  // Re-sync defaults when the dialog opens (the user may have changed
-  // their language preference between invocations).
-  useEffect(() => {
-    if (!open) return;
-    setSourceColumn(initialColumn ?? pickDefaultColumn(columns) ?? '');
-    setLanguage(defaultLanguage ?? 'en');
-    setModel(
-      defaultTokenizerModel
-        ?? findLanguage(defaultLanguage ?? 'en')?.recommendedModel
-        ?? 'bert-base-uncased',
-    );
-    setModelUserSet(Boolean(defaultTokenizerModel));
-    setSubmitting(false);
-  }, [open, initialColumn, columns, defaultLanguage, defaultTokenizerModel]);
-
-  const languageOption = useMemo(() => findLanguage(language), [language]);
-  const recommendedModelForLanguage = useMemo(
-    () => languageOption?.recommendedModel ?? 'bert-base-uncased',
-    [languageOption],
-  );
-  // Phase 5: a dict picker is only meaningful when the language has
-  // multiple choices (JA: IPADIC vs UniDic). KO + ZH + EN don't render it.
-  const dictOptions = useMemo(
-    () => (languageOption?.availableDicts && languageOption.availableDicts.length > 1
-      ? languageOption.availableDicts
-      : null),
-    [languageOption],
-  );
-  // The currently-selected dict matches whichever entry's model id equals
-  // the current model. If the user typed a custom model that isn't in the
-  // dict list, the selector still renders but with no item highlighted.
-  const selectedDictModel = useMemo(
-    () => dictOptions?.find((d) => d.model === model.trim())?.model ?? null,
-    [dictOptions, model],
-  );
+  const languageOption = findLanguage(language);
+  const recommendedModelForLanguage = languageOption?.recommendedModel ?? 'bert-base-uncased';
+  const dictOptions = languageOption?.availableDicts && languageOption.availableDicts.length > 1
+    ? languageOption.availableDicts
+    : null;
+  const selectedDictModel = dictOptions?.find((dict) => dict.model === model.trim())?.model ?? null;
 
   const handleLanguageChange = (next: string) => {
     setLanguage(next);
@@ -183,13 +175,7 @@ export function TokeniseDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
-    >
-      <DialogContent className="max-w-md">
+    <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-indigo-600" aria-hidden />
@@ -302,8 +288,7 @@ export function TokeniseDialog({
             )}
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
 }
 

@@ -158,7 +158,6 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
     } catch (err) {
       toast.dismiss(loadingToastId);
       toast.error((err as Error)?.message || 'Failed to import sample data.');
-      console.error('[SampleDataPanel] import failed', err);
     } finally {
       setImporting(false);
     }

@@ -1,32 +1,63 @@
-# Workspace Hooks (Developer Guide)
+# Workspace Hooks
 
-**Scope statement:** This page summarizes how workspace state is exposed to the UI.
+Workspace state is exposed through four slice contexts, all provided by
+`WorkspaceProvider`.
 
-## 1) Provider model
+## Provider Slices
 
-**Question:** *Why use `WorkspaceProvider`?*
+- `useWorkspaceData()` exposes workspace lists, current workspace metadata,
+  graph data, selected node data, and query-derived data.
+- `useWorkspaceSelection()` exposes selected node id(s), pagination, sorting,
+  and filter state.
+- `useWorkspaceStatus()` exposes loading and error state.
+- `useWorkspaceActions()` exposes workspace and node mutations.
 
-**Answer:** It composes the data, selection, status, and action slices so each component subscribes only to what it needs.
+The slices reduce re-render churn. Components should subscribe only to the
+slice they need.
 
-## 2) Slice hooks
+## Internal Composition
 
-**Question:** *Which hooks should I use?*
+`useWorkspaceInternal()` composes three lower-level hooks:
 
-**Answer:**
+- `useWorkspaceCore()` reads auth headers, selected workspace/node ids,
+  pagination state, and UI operation tracking.
+- `useWorkspaceQueries()` owns TanStack Query calls for workspace list, current
+  workspace, graph, and selected node data.
+- `useWorkspaceNodeMutations()` owns workspace creation/opening, node creation,
+  transforms, detach/materialize operations, and cache invalidation.
 
-- `useWorkspaceData()`
-- `useWorkspaceSelection()`
-- `useWorkspaceStatus()`
-- `useWorkspaceActions()`
+`useWorkspaceUiStateSync()` hydrates and persists workspace UI state such as
+node colors through backend `ui_state.json`.
 
-## 3) Migration rule
+## Query Keys And Invalidations
 
-**Question:** *Should I still use the old monolithic hook?*
+Selected node data is keyed by workspace id, node id, page, page size, sorting,
+and filters. Mutations invalidate the narrowest practical set of queries:
+graph, node data, workspace summaries, and schema/column metadata.
 
-**Answer:** No. The monolithic hook has been removed to reduce re‑render churn.
+New mutations should follow the existing invalidation helpers instead of
+manually reloading the whole app state.
 
-## Recap
+## Graph Hooks
 
-**Question:** *Where can I see this in action?*
+`graph-view/hooks/useWorkspaceGraph.ts` converts backend graph payloads to
+React Flow state. It handles dagre layout, derived metadata, selection/active
+visual state, fresh-node highlighting, color pruning, and React Flow state
+updates.
 
-**Answer:** The workspace features under `src/features/workspace` are built entirely on these slice hooks.
+The graph hook uses signatures and `requestAnimationFrame` to avoid rewriting
+React Flow state on every render.
+
+## Table Hooks
+
+`data-view/hooks/useWorkspaceDataTable.ts` maps node data to TanStack Table
+state. Sorting and filters feed back into the selected node data query key.
+Column cast, rename, delete, refresh, and query-plan actions all route through
+workspace actions.
+
+## Manual Memoization Boundary
+
+The repo uses React Compiler. The memoization still present around provider
+slice values, table callbacks, graph adapters, and effect dependencies is
+intentional because those are identity boundaries for React Context and
+external libraries.

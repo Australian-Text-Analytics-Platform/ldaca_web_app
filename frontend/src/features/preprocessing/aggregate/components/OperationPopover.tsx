@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 interface OperationPopoverProps {
   nodeId: string;
   column: string;
-  dtype: string;
   onSelect: (operation: string) => void;
   disabled?: boolean;
   children: React.ReactNode;

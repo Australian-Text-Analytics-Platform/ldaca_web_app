@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { textApi } from '@/api/text';
 import { useAuth } from '@/hooks/useAuth';
@@ -58,23 +57,7 @@ export const useDefaultStopwords = (
 ): UseDefaultStopwordsResult => {
   const { getAuthHeaders } = useAuth();
 
-  // ``languages`` is a freshly-built array each render in callers that
-  // derive it from selection state; depending on its identity alone
-  // would invalidate the memo every paint. Re-derive uniqueness from
-  // the *contents* via a stable serialised key.
-  const uniqueLanguages = useMemo<string[]>(() => {
-    const seen = new Set<string>();
-    const ordered: string[] = [];
-    for (const candidate of languages) {
-      if (typeof candidate !== 'string') continue;
-      const code = candidate.trim().toLowerCase();
-      if (!code || seen.has(code)) continue;
-      seen.add(code);
-      ordered.push(code);
-    }
-    return ordered;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(languages)]);
+  const uniqueLanguages = normalizeLanguages(languages);
 
   const queryResults = useQueries({
     queries: uniqueLanguages.map((language) => ({
@@ -85,29 +68,18 @@ export const useDefaultStopwords = (
     })),
   });
 
-  const byLanguage = useMemo<DefaultStopwordsLanguageGroup[]>(
-    () =>
-      uniqueLanguages.map((language, index) => {
-        const raw = queryResults[index]?.data?.stopwords;
-        const words = Array.isArray(raw)
-          ? raw.map((w) => String(w).trim()).filter(Boolean)
-          : [];
-        return { language, words };
-      }),
-    // ``queryResults`` is a new array each render; depend on the
-    // per-language data payloads instead so the memo only rebuilds
-    // when the backend returns fresh content.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [uniqueLanguages, ...queryResults.map((q) => q.data)],
-  );
+  const byLanguage = uniqueLanguages.map((language, index) => {
+    const raw = queryResults[index]?.data?.stopwords;
+    const words = Array.isArray(raw)
+      ? raw.map((word) => String(word).trim()).filter(Boolean)
+      : [];
+    return { language, words };
+  });
 
-  const stopwords = useMemo(() => {
-    const set = new Set<string>();
-    for (const group of byLanguage) {
-      for (const word of group.words) set.add(word);
-    }
-    return set;
-  }, [byLanguage]);
+  const stopwords = new Set<string>();
+  for (const group of byLanguage) {
+    for (const word of group.words) stopwords.add(word);
+  }
 
   const isLoading =
     uniqueLanguages.length > 0 && queryResults.some((q) => q.isLoading);
@@ -122,3 +94,18 @@ export const useDefaultStopwords = (
     isError,
   };
 };
+
+function normalizeLanguages(
+  languages: ReadonlyArray<string | null | undefined>,
+): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const candidate of languages) {
+    if (typeof candidate !== 'string') continue;
+    const code = candidate.trim().toLowerCase();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    ordered.push(code);
+  }
+  return ordered;
+}

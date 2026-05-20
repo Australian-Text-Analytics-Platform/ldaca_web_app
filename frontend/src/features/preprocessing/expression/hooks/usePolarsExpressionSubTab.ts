@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 
 import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { type FilterPreviewResponse, type PolarsExpressionRequest, type PolarsExpressionApplyResponse, type PolarsExpressionContext } from '@/api/nodes';
@@ -87,7 +87,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   const nodeColors = { [effectiveNode?.id ?? '']: DEFAULT_PALETTE[0]! };
 
-  const evalExpressions = useCallback(async () => {
+  const evalExpressions = async () => {
     setEvalError(null);
     setSerializedRequest(null);
 
@@ -131,7 +131,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     } catch (err) {
       setEvalError(err instanceof Error ? err.message : String(err));
     }
-  }, [activeContext, filterCode, groupByState, selectExpressions, sortItems, withColumns]);
+  };
 
   // Preview
   const preview = usePreprocessingPreview({
@@ -143,7 +143,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     },
   });
 
-  const applyExpression = useCallback(async () => {
+  const applyExpression = async () => {
     if (!nodeId || !serializedRequest) return;
     setIsApplying(true);
     try {
@@ -158,7 +158,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     } finally {
       setIsApplying(false);
     }
-  }, [nodeId, serializedRequest, newNodeName, newNodeNamePlaceholder, polarsExpressionApply, refreshNodeSchema, onAlert]);
+  };
 
   return {
     effectiveNode,

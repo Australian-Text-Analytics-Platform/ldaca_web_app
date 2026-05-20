@@ -1,9 +1,9 @@
 import React, { useRef } from 'react';
-import { WorkspaceGraphView } from './WorkspaceGraphView';
-import { WorkspaceDataView } from './WorkspaceDataView';
 import { WorkspaceControls } from './WorkspaceControls';
 import { InsetCard } from './InsetCard';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
+import { WorkspaceDataTableFeature } from '@/features/workspace/data-view';
+import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
 
 /**
  * Stacked workspace view: graph on top, data table on bottom, with a
@@ -38,7 +38,7 @@ const WorkspaceView: React.FC = () => {
           <WorkspaceControls />
         </div>
         <div className="flex-1 min-h-0">
-          <WorkspaceGraphView />
+          <WorkspaceGraphFeature />
         </div>
       </InsetCard>
 
@@ -60,7 +60,7 @@ const WorkspaceView: React.FC = () => {
         style={{ height: `calc(${(1 - ratio) * 100}% - 0.25rem)` }}
       >
         <div className="flex-1 min-h-0">
-          <WorkspaceDataView />
+          <WorkspaceDataTableFeature />
         </div>
       </InsetCard>
     </div>

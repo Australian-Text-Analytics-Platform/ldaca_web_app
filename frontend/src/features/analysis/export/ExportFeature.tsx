@@ -153,9 +153,8 @@ const ExportFeature: React.FC = () => {
       }
       const blob = await resp.blob();
       await saveBlob(blob, filename);
-    } catch (e) {
-      console.error(e);
-      const description = e instanceof Error ? e.message : String(e);
+      } catch (error) {
+        const description = error instanceof Error ? error.message : String(error);
       toast.error('Failed to export data blocks', { description });
     } finally {
       setExporting(false);
@@ -190,9 +189,8 @@ const ExportFeature: React.FC = () => {
       }
       const blob = await resp.blob();
       await saveBlob(blob, filename);
-    } catch (e) {
-      console.error(e);
-      const description = e instanceof Error ? e.message : String(e);
+      } catch (error) {
+        const description = error instanceof Error ? error.message : String(error);
       toast.error('Failed to download data block', { description });
     } finally {
       setDownloadingIds((s) => ({ ...s, [id]: 'idle' }));

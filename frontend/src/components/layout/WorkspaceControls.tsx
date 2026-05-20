@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -27,27 +27,18 @@ export const WorkspaceControls: React.FC = () => {
   const { renameWorkspace, deleteNode, clearSelection } = useWorkspaceActions();
   const { selectedNodeIds } = useWorkspaceSelection();
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(currentWorkspace?.name || '');
+  const [renameDraft, setRenameDraft] = useState<{ baseName: string; value: string }>();
   const [nameAlertOpen, setNameAlertOpen] = useState(false);
   const [nameAlertMessage, setNameAlertMessage] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  useEffect(() => {
-    setNameInput(currentWorkspace?.name || '');
-  }, [currentWorkspace?.name]);
+  const currentWorkspaceName = currentWorkspace?.name || '';
+  const isEditing = renameDraft?.baseName === currentWorkspaceName;
 
   const selectedCount = selectedNodeIds?.length ?? 0;
   const canBatchDelete = selectedCount >= MIN_BATCH_DELETE_COUNT;
 
-  // Build the "to-be-deleted" list once per selection change. Roots (no
-  // incoming edge in the graph) are bolded and pushed to the bottom of
-  // the list so they sit next to the Cancel/Delete buttons — those are
-  // the highest-impact deletions (orphan everything downstream when
-  // the cascade kicks in) and the user benefits from seeing them last,
-  // right above the action they're about to take.
-  const selectedForDelete = useMemo(() => {
+  const selectedForDelete = (() => {
     if (!workspaceGraph || !selectedNodeIds || selectedNodeIds.length === 0) return [];
     const idSet = new Set(selectedNodeIds);
     const incomingTargets = new Set(workspaceGraph.edges.map((edge) => edge.target));
@@ -62,7 +53,7 @@ export const WorkspaceControls: React.FC = () => {
       if (a.isRoot !== b.isRoot) return a.isRoot ? 1 : -1;
       return a.name.localeCompare(b.name);
     });
-  }, [workspaceGraph, selectedNodeIds]);
+  })();
 
   const handleBatchDelete = async () => {
     if (!canBatchDelete || isDeleting) return;
@@ -82,9 +73,12 @@ export const WorkspaceControls: React.FC = () => {
   };
 
   const handleRenameCommit = async () => {
-    const trimmed = nameInput.trim();
-    if (!trimmed || trimmed === currentWorkspace?.name) {
-      setIsEditing(false);
+    if (!isEditing) {
+      return;
+    }
+    const trimmed = renameDraft.value.trim();
+    if (!trimmed || trimmed === currentWorkspaceName) {
+      setRenameDraft(undefined);
       return;
     }
     try {
@@ -96,8 +90,15 @@ export const WorkspaceControls: React.FC = () => {
         setNameAlertOpen(true);
       }
     } finally {
-      setIsEditing(false);
+      setRenameDraft(undefined);
     }
+  };
+
+  const startRename = () => {
+    if (!currentWorkspaceName) {
+      return;
+    }
+    setRenameDraft({ baseName: currentWorkspaceName, value: currentWorkspaceName });
   };
 
   return (
@@ -109,12 +110,12 @@ export const WorkspaceControls: React.FC = () => {
       {isEditing ? (
         <input
           className="px-2 py-1 border rounded text-sm"
-          value={nameInput}
-          onChange={(e) => setNameInput(e.target.value)}
+          value={renameDraft.value}
+          onChange={(e) => setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value })}
           onBlur={handleRenameCommit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleRenameCommit();
-            if (e.key === 'Escape') setIsEditing(false);
+            if (e.key === 'Escape') setRenameDraft(undefined);
           }}
           autoFocus
           aria-label="Workspace name"
@@ -130,7 +131,7 @@ export const WorkspaceControls: React.FC = () => {
           {/* Edit name button with pencil icon */}
           <button
             className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
-            onClick={() => setIsEditing((v) => !v)}
+            onClick={startRename}
             title="Rename"
             aria-label="Rename workspace"
           >

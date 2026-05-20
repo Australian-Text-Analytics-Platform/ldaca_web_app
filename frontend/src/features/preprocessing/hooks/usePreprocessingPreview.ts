@@ -46,6 +46,14 @@ export interface UsePreprocessingPreviewResult<Row = PreviewRow> {
 const DEFAULT_DEBOUNCE_MS = 600;
 const DEFAULT_PAGE_SIZE = 10;
 
+type PaginationState = {
+  signature: string;
+  initialPage: number;
+  initialPageSize: number;
+  page: number;
+  pageSize: number;
+};
+
 export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
   options: UsePreprocessingPreviewOptions<RequestPayload, Row>,
 ): UsePreprocessingPreviewResult<Row> => {
@@ -59,26 +67,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     fetcher,
   } = options;
 
-  const [page, setPage] = useState(initialPage);
-  const [pageSize, setPageSize] = useState(initialPageSize);
-  const [data, setData] = useState<Row[]>([]);
-  const [columns, setColumns] = useState<string[]>([]);
-  const [pagination, setPagination] = useState<PreviewPagination | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-
   const ready = Boolean(enabled && request);
-
-  // Use refs for fetcher and request to avoid re-triggering the effect on
-  // every render — callers typically pass inline functions/objects.
-  const fetcherRef = useRef(fetcher);
-  const requestRef = useRef(request);
-  useEffect(() => {
-    fetcherRef.current = fetcher;
-    requestRef.current = request;
-  });
-
   const derivedSignature = (() => {
     if (!ready || !request) return 'disabled';
     if (signature) return signature;
@@ -90,11 +79,49 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     }
   })();
 
-  // Reset pagination when the request payload changes materially.
+  const [paginationState, setPaginationState] = useState<PaginationState>(() => ({
+    signature: derivedSignature,
+    initialPage,
+    initialPageSize,
+    page: initialPage,
+    pageSize: initialPageSize,
+  }));
+  const [data, setData] = useState<Row[]>([]);
+  const [columns, setColumns] = useState<string[]>([]);
+  const [pagination, setPagination] = useState<PreviewPagination | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const isPaginationCurrent =
+    paginationState.signature === derivedSignature &&
+    paginationState.initialPage === initialPage &&
+    paginationState.initialPageSize === initialPageSize;
+  const page = isPaginationCurrent ? paginationState.page : initialPage;
+  const pageSize = isPaginationCurrent ? paginationState.pageSize : initialPageSize;
+
+  const setPaginationDraft = (nextPage: number, nextPageSize: number) => {
+    setPaginationState({
+      signature: derivedSignature,
+      initialPage,
+      initialPageSize,
+      page: nextPage,
+      pageSize: nextPageSize,
+    });
+  };
+
+  const setPage = (nextPage: number) => {
+    setPaginationDraft(nextPage, pageSize);
+  };
+
+  // Use refs for fetcher and request to avoid re-triggering the effect on
+  // every render — callers typically pass inline functions/objects.
+  const fetcherRef = useRef(fetcher);
+  const requestRef = useRef(request);
   useEffect(() => {
-    setPage(initialPage);
-    setPageSize(initialPageSize);
-  }, [derivedSignature, initialPage, initialPageSize]);
+    fetcherRef.current = fetcher;
+    requestRef.current = request;
+  });
 
   // Debounced preview fetcher.
   useEffect(() => {
@@ -121,7 +148,13 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
           setColumns(Array.isArray(response.columns) ? response.columns : []);
           setPagination(response.pagination ?? null);
           if (response.pagination?.page && response.pagination.page !== page) {
-            setPage(response.pagination.page);
+            setPaginationState({
+              signature: derivedSignature,
+              initialPage,
+              initialPageSize,
+              page: response.pagination.page,
+              pageSize,
+            });
           }
         })
         .catch((err) => {
@@ -144,11 +177,10 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [ready, page, pageSize, debounceMs, refreshKey, derivedSignature]);
+  }, [ready, page, pageSize, debounceMs, refreshKey, derivedSignature, initialPage, initialPageSize]);
 
   const handleSetPageSize = (size: number) => {
-    setPageSize(size);
-    setPage(1);
+    setPaginationDraft(1, size);
   };
 
   const refresh = () => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -118,14 +118,11 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   // Wrap the host's onSave so the snapshot list refetches as soon as
   // the upload succeeds. Without this, the Load button stays hidden
   // until the 10-second staleTime expires or the user switches tabs.
-  const handleSave = useCallback(
-    async (filename: string, description: string) => {
-      if (!onSave) return;
-      await onSave(filename, description);
-      await queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
-    },
-    [onSave, queryClient, tool],
-  );
+  const handleSave = async (filename: string, description: string) => {
+    if (!onSave) return;
+    await onSave(filename, description);
+    await queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
+  };
 
   if (!enabled) return null;
 

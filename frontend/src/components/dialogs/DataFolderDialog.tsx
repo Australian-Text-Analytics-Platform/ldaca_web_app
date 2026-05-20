@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -29,18 +29,22 @@ export function DataFolderDialog({
   open,
   onOpenChange,
 }: DataFolderDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open && <DataFolderDialogContent onOpenChange={onOpenChange} />}
+    </Dialog>
+  );
+}
+
+function DataFolderDialogContent({
+  onOpenChange,
+}: Pick<DataFolderDialogProps, 'onOpenChange'>) {
   const queryClient = useQueryClient();
   const { dataFolder, refreshAuth } = useAuth();
   const { currentWorkspaceId } = useWorkspaceData();
   const { setCurrentWorkspace } = useWorkspaceActions();
   const [path, setPath] = useState(dataFolder || '');
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (open && dataFolder) {
-      setPath(dataFolder);
-    }
-  }, [open, dataFolder]);
 
   const handleBrowse = async () => {
     if (isTauri()) {
@@ -99,8 +103,7 @@ export function DataFolderDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+    <DialogContent className="sm:max-w-106.25">
         <DialogHeader>
           <DialogTitle>Set Working Directory</DialogTitle>
           <DialogDescription>
@@ -136,7 +139,6 @@ export function DataFolderDialog({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
 }

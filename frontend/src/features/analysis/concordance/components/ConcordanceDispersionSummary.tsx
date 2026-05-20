@@ -341,9 +341,9 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
         header,
         legend,
       });
-    } catch (err) {
-      toast.error('Failed to export chart.');
-      console.error(err);
+      } catch (error) {
+        const description = error instanceof Error ? error.message : String(error);
+        toast.error('Failed to export chart.', { description });
     }
   };
 

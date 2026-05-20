@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { computeZoomDomain, type ZoomDomain } from '../topicModelingAdapters';
 
 type BrushRect = {
@@ -11,6 +11,11 @@ type BrushRect = {
 type TopicPoint = {
   x: number;
   y: number;
+};
+
+type ZoomState<TTopic extends TopicPoint> = {
+  topics: TTopic[];
+  domain: ZoomDomain;
 };
 
 type TooltipLike<TTopic> = {
@@ -36,21 +41,16 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
   setHoveredTopicId,
   setTooltip,
 }: Params<TTopic>) {
-  const [zoomDomain, setZoomDomain] = useState<ZoomDomain | null>(null);
+  const [zoomState, setZoomState] = useState<ZoomState<TTopic> | null>(null);
   const [brushRect, setBrushRect] = useState<BrushRect | null>(null);
   const [isBrushing, setIsBrushing] = useState(false);
 
   const chartSvgRef = useRef<SVGSVGElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const fullDomain = useMemo(() => computeZoomDomain(topics), [topics]);
-  const activeDomain = zoomDomain ?? fullDomain;
-
-  // Reset zoom when the topics dataset changes. fullDomain is memoized on
-  // topics, so the effect only fires when the underlying data actually changes.
-  useEffect(() => {
-    setZoomDomain(fullDomain);
-  }, [fullDomain]);
+  const fullDomain = computeZoomDomain(topics);
+  const activeZoomDomain = zoomState?.topics === topics ? zoomState.domain : null;
+  const activeDomain = activeZoomDomain ?? fullDomain;
 
   useEffect(() => {
     return () => {
@@ -62,6 +62,7 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
   }, []);
 
   const animateDomainTo = (target: ZoomDomain) => {
+    const animationTopics = topics;
     const start = activeDomain ?? target;
     if (animationFrameRef.current != null) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -76,16 +77,19 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
       const raw = (now - startAt) / durationMs;
       const t = Math.max(0, Math.min(1, raw));
       const e = easeOutCubic(t);
-      setZoomDomain({
-        xMin: start.xMin + (target.xMin - start.xMin) * e,
-        xMax: start.xMax + (target.xMax - start.xMax) * e,
-        yMin: start.yMin + (target.yMin - start.yMin) * e,
-        yMax: start.yMax + (target.yMax - start.yMax) * e,
+      setZoomState({
+        topics: animationTopics,
+        domain: {
+          xMin: start.xMin + (target.xMin - start.xMin) * e,
+          xMax: start.xMax + (target.xMax - start.xMax) * e,
+          yMin: start.yMin + (target.yMin - start.yMin) * e,
+          yMax: start.yMax + (target.yMax - start.yMax) * e,
+        },
       });
       if (t < 1) {
         animationFrameRef.current = requestAnimationFrame(step);
       } else {
-        setZoomDomain(target);
+        setZoomState({ topics: animationTopics, domain: target });
         animationFrameRef.current = null;
       }
     };

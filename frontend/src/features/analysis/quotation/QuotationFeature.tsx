@@ -79,7 +79,6 @@ import { AnalysisPagination } from '@/features/analysis/common/components/Analys
 import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
-import { flattenQuotationGroups } from './quotationViewModels';
 import {
   DEFAULT_CONTEXT_LENGTH,
   MAX_CONTEXT_LENGTH,
@@ -141,7 +140,7 @@ function buildQuotationResultState(
   column: string,
 ): QuotationResultState {
   const groupedRows = result.data;
-  const rows = flattenQuotationGroups(groupedRows).map((row) => {
+  const rows = groupedRows.flatMap((group) => group).map((row) => {
     const spans: { start: number; end: number; type: string }[] = [];
     const addSpan = (start?: unknown, end?: unknown, type?: string) => {
       if (!type) return;
@@ -352,7 +351,7 @@ const QuotationFeature: React.FC = () => {
   };
 
   useEffect(() => {
-    setEngineError(null);
+    Promise.resolve().then(() => setEngineError(null));
   }, [engineConfig.type, engineConfig.url]);
 
   const quotationResultRef = useRef<QuotationAnalysisResponse | null>(null);
@@ -636,7 +635,7 @@ const QuotationFeature: React.FC = () => {
     const startIdx = (currentPage - 1) * pageSize;
     const pagedHits = workingHits.slice(startIdx, startIdx + pageSize);
     // Emit each hit as a singleton group — the table renderer flattens
-    // groups via flattenQuotationGroups anyway, so single-hit groups
+    // groups while building rows, so single-hit groups
     // produce the same rendered output as the original document-grouped
     // shape (and the proportional dispersion view doesn't apply here).
     const pagedGroups = pagedHits.map((h) => [h] as typeof allGroups[number]);
@@ -891,17 +890,21 @@ const QuotationFeature: React.FC = () => {
   // non-empty value so the brief refresh window after Process All
   // doesn't drop the capture's reference). Mirrors the concordance
   // ``captureTaskId`` pattern.
-  const liveQuotationTaskId = useRef<string>('');
+  const [liveQuotationTaskId, setLiveQuotationTaskId] = useState('');
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       const id = await resolveTaskId();
-      if (id) liveQuotationTaskId.current = id;
+      if (id && !cancelled) setLiveQuotationTaskId(id);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [resolveTaskId, hasLoaded]);
 
   // Build the typed ``QuotationRequest`` from live form state for the
   // capture-side ``settings.json`` payload.
-  const captureRequest = useMemo(() => {
+  const captureRequest = (() => {
     if (inSnapshotMode) return null;
     const node = livePanelSelectedNodes[0];
     const nodeId = node ? getNodeIdentifier(node, 0) : '';
@@ -917,13 +920,7 @@ const QuotationFeature: React.FC = () => {
           : { type: 'local' as const },
       language: nodeLanguage,
     };
-  }, [
-    inSnapshotMode,
-    livePanelSelectedNodes,
-    activeSelections,
-    resolvedEnginePayload,
-    nodeLanguage,
-  ]);
+  })();
 
   // Pick the live node for the capture hook to read row count from.
   const liveCaptureNode: WorkspaceNodeLike | null =
@@ -938,7 +935,7 @@ const QuotationFeature: React.FC = () => {
   const handleSaveSnapshot = useQuotationSnapshotCapture({
     workspaceId: currentWorkspaceId ?? null,
     workspaceName: currentWorkspace?.name ?? currentWorkspaceId ?? '(workspace)',
-    taskId: liveQuotationTaskId.current,
+    taskId: liveQuotationTaskId,
     request: captureRequest,
     materializeSummary: liveMaterializeSummary,
     selectedNode: liveCaptureNode,
@@ -960,7 +957,7 @@ const QuotationFeature: React.FC = () => {
     if (rowCount > 2_000) {
       return `Demo snapshots cap each selected data block at 2,000 rows; selected block has ${rowCount.toLocaleString()}.`;
     }
-    if (!liveQuotationTaskId.current) {
+    if (!liveQuotationTaskId) {
       return 'Run the quotation extractor (and let it finish) before saving a snapshot.';
     }
     if (!liveHasLoaded) {

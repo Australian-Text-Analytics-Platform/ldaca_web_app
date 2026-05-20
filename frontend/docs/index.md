@@ -18,7 +18,9 @@
 
 **Question:** *Where is the architecture overview?*
 
-**Answer:** See `developer-guide/architecture.md`.
+**Answer:** Start with `developer-guide/index.md`. The guide is split into
+architecture, feature structure, state/data flow, workspace hooks, analysis
+features, node colors, and Tauri desktop.
 
 ## Configuration
 

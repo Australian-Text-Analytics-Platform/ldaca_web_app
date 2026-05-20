@@ -17,7 +17,6 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { isGraphDebugEnabled } from '@/lib/debugFlags';
 import { nodeVisualInfo } from '@/lib/nodeVisualState';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
@@ -72,12 +71,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     clearSelection,
   } = useWorkspaceActions();
 
-  const DEBUG_GRAPH = isGraphDebugEnabled();
-  const dlog = useCallback((...args: unknown[]) => {
-    if (DEBUG_GRAPH) {
-      console.debug(...args);
-    }
-  }, [DEBUG_GRAPH]);
   const handleDelete = useCallback(
     (nodeId: string) => {
       if (!nodeId || !deleteNode) {
@@ -185,12 +178,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         ? node.document
         : null;
 
-      dlog('WorkspaceGraphView: Raw node data (condensed):', {
-        id: node.id,
-        operation: node.operation,
-        columns: columns.length,
-      });
-
         const rawShape = Array.isArray((node as { shape?: unknown }).shape)
           ? ((node as { shape?: unknown[] }).shape as unknown[])
           : null;
@@ -261,7 +248,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         connectable: false,
       } as Node;
     });
-  }, [workspaceGraph, selectedNodeIds, currentView, assignedColors, freshIds, handleDelete, handleRename, handleCopy, handleUndo, handleRedo, dlog]);
+  }, [workspaceGraph, selectedNodeIds, currentView, assignedColors, freshIds, handleDelete, handleRename, handleCopy, handleUndo, handleRedo]);
 
   const initialEdges = useMemo(() => {
     if (!workspaceGraph?.edges) {
@@ -338,10 +325,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     }
 
     updateRafRef.current = requestAnimationFrame(() => {
-      dlog('WorkspaceGraphView: Applying graph update', {
-        nodeCount: initialNodes.length,
-        edgeCount: initialEdges.length,
-      });
       setNodes(initialNodes);
       setEdges(initialEdges);
     });
@@ -351,14 +334,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         cancelAnimationFrame(updateRafRef.current);
       }
     };
-  }, [currentEdgeIds, currentNodeIds, currentNodesSignature, dlog, initialEdges, initialNodes, newEdgeIds, newNodeIds, newNodesSignature, setEdges, setNodes]);
-
-  useEffect(() => {
-    dlog('WorkspaceGraphView: React Flow state changed', {
-      nodes: nodes.length,
-      edges: edges.length,
-    });
-  }, [nodes, edges, dlog]);
+  }, [currentEdgeIds, currentNodeIds, currentNodesSignature, initialEdges, initialNodes, newEdgeIds, newNodeIds, newNodesSignature, setEdges, setNodes]);
 
   useEffect(() => {
     setNodes((existing) =>
@@ -424,33 +400,27 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   );
 
   const handleConnect = useCallback(
-    (connection: Connection) => {
-      dlog('WorkspaceGraphView: onConnect blocked - manual edges disabled', connection);
-    },
-    [dlog]
+    (_connection: Connection) => {},
+    []
   );
 
   const handleConnectStart = useCallback(
-    (_event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: string | null }) => {
-      dlog('WorkspaceGraphView: onConnectStart blocked', params);
-    },
-    [dlog]
+    (_event: MouseEvent | TouchEvent, _params: { nodeId: string | null; handleId: string | null; handleType: string | null }) => {},
+    []
   );
 
   const handleConnectEnd = useCallback(
-    (_event: MouseEvent | TouchEvent) => {
-      dlog('WorkspaceGraphView: onConnectEnd blocked');
-    },
-    [dlog]
+    (_event: MouseEvent | TouchEvent) => {},
+    []
   );
 
   const handleInit = useCallback((instance: ReactFlowInstance) => {
     try {
       instance.fitView({ padding: 0.2, includeHiddenNodes: false });
-    } catch (error) {
-      dlog('WorkspaceGraphView: fitView error (ignored)', error);
+    } catch {
+      // React Flow can reject fitView during teardown; layout remains usable.
     }
-  }, [dlog]);
+  }, []);
 
   const selectedCount = selectedNodeIds?.length ?? 0;
   const totalNodes = workspaceGraph?.nodes?.length ?? 0;

@@ -150,7 +150,6 @@ export const DemoSnapshotsTab: React.FC<Props> = ({
     } catch (err) {
       toast.dismiss(loadingToastId);
       toast.error((err as Error)?.message || 'Failed to import demo snapshots.');
-      console.error('[DemoSnapshotsTab] import failed', err);
     } finally {
       setImporting(false);
     }

@@ -3,10 +3,6 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { useAuthStore, type AuthPhase } from '@/stores/authStore';
 
-if (import.meta.env.DEV) {
-  console.debug('[useAuth] module loaded', import.meta.url);
-}
-
 export { REFRESH_FAILURE_THRESHOLD } from '@/stores/authStore';
 export type { AuthPhase };
 
@@ -16,13 +12,10 @@ export interface UseAuthOptions {
    * before making the initial /api/auth/ request.
    */
   autoStart?: boolean;
-  /** Optional label for development logging */
-  debugLabel?: string;
 }
 
 export const useAuth = (options: UseAuthOptions = {}) => {
   const autoStart = options.autoStart ?? false;
-  const debugLabel = options.debugLabel ?? 'useAuth';
 
   const { phase, authInfo, config, refreshAuth, loginWithGoogle, logout, getAuthHeaders } = useAuthStore(
     useShallow((state) => ({
@@ -35,14 +28,6 @@ export const useAuth = (options: UseAuthOptions = {}) => {
       getAuthHeaders: state.getAuthHeaders,
     })),
   );
-
-  if (import.meta.env.DEV) {
-    console.debug(`[useAuth] snapshot (${debugLabel})`, {
-      phase: phase.status,
-      hasAuthInfo: Boolean(authInfo),
-      hasConfig: Boolean(config),
-    });
-  }
 
   useEffect(() => {
     const store = useAuthStore.getState();

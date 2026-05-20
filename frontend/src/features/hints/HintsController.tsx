@@ -11,6 +11,15 @@ import type { HintDefinition, HintResolverContext } from './types';
 
 const POLL_INTERVAL_MS = 400;
 
+const orderedHintRegistry = [...hintRegistry]
+  .map((hint, index) => ({ hint, index }))
+  .sort(
+    (left, right) =>
+      (left.hint.priority ?? 100) - (right.hint.priority ?? 100) ||
+      left.index - right.index,
+  )
+  .map(({ hint }) => hint);
+
 function resolveAnchor(
   hint: HintDefinition,
   ctx: HintResolverContext,
@@ -28,16 +37,7 @@ function pickActiveHint(
   dismissedPersistent: ReadonlySet<string>,
   sessionDismissed: ReadonlySet<string>,
 ): { hint: HintDefinition; target: Element } | null {
-  // Sort by priority (lower first), preserving registry order on ties.
-  const ordered = [...hintRegistry]
-    .map((h, idx) => ({ h, idx }))
-    .sort(
-      (a, b) =>
-        (a.h.priority ?? 100) - (b.h.priority ?? 100) || a.idx - b.idx,
-    )
-    .map(({ h }) => h);
-
-  for (const hint of ordered) {
+  for (const hint of orderedHintRegistry) {
     if (dismissedPersistent.has(hint.id)) continue;
     if (sessionDismissed.has(hint.id)) continue;
     if (!conditions[hint.condition]) continue;
@@ -125,50 +125,6 @@ export const HintsController: React.FC = () => {
     conditions,
     context,
   ]);
-
-  // Expose a small debug helper so authors can introspect from DevTools:
-  //   window.__ldacaHints.debug()
-  //   window.__ldacaHints.reset()
-  useEffect(() => {
-    const w = window as unknown as { __ldacaHints?: unknown };
-    w.__ldacaHints = {
-      debug: () => {
-        const persistent = new Set(useHintsStore.getState().dismissedHints);
-        const session = useUIStore.getState().sessionDismissedHints;
-        const picked = pickActiveHint(conditions, context, persistent, session);
-        return {
-          hintsEnabled: useHintsStore.getState().hintsEnabled,
-          dismissedHints: useHintsStore.getState().dismissedHints,
-          sessionDismissed: Array.from(session),
-          lastUploadedFilePath: useUIStore.getState().lastUploadedFilePath,
-          renderPickedHintId: active?.hint.id ?? null,
-          tick,
-          currentConditions: conditions,
-          pickedHintId: picked?.hint.id ?? null,
-          registryEvaluation: hintRegistry.map((h) => ({
-            id: h.id,
-            condition: h.condition,
-            conditionTrue: conditions[h.condition],
-            dismissed: persistent.has(h.id),
-            sessionDismissed: session.has(h.id),
-            anchorFound: !!(h.resolveAnchor
-              ? h.resolveAnchor(context)
-              : h.anchorHintId
-                ? document.querySelector(`[data-hint-id="${CSS.escape(h.anchorHintId)}"]`)
-                : null),
-          })),
-        };
-      },
-      reset: () => {
-        useHintsStore.getState().resetHints();
-        // eslint-disable-next-line no-console
-        console.info('[ldaca-hints] dismissals cleared');
-      },
-    };
-    return () => {
-      delete (w as { __ldacaHints?: unknown }).__ldacaHints;
-    };
-  }, [active, conditions, context, tick]);
 
   if (!hintsEnabled) return null;
   if (!active) return null;

@@ -32,8 +32,9 @@ one **temp colour per analytics tab** during a preview-before-run window.
 ```
 
 The assigned colour is what the world sees outside the analytics tab.
-The temp is a preview the user can manually override; it only commits
-to "assigned" if the analysis runs.
+Assigned colours are persisted in the workspace UI state and are restored
+when the workspace is opened again. The temp is a preview the user can
+manually override; it only commits to "assigned" if the analysis runs.
 
 ## The two shades
 
@@ -248,9 +249,8 @@ detection against the now-current assigned colours.
   proposal: stroke newly added blocks with a black outline so users can
   quickly locate them. Deferred — not part of the initial implementation.
 
-- **Persistence beyond session**: the assigned colour map currently
-  lives in memory only. Saving it to the workspace plbin so colours
-  survive a reload is a future consideration, not part of this scope.
+- **Persistence boundary**: assigned colours persist through backend
+  workspace UI state. Temp colours remain per-tab and session-local.
 
 - **Palette exhaustion**: `EXTENDED_PALETTE` has 12 colours; with > 12
   ever-seen nodes the assignment cycles. This is acceptable for typical

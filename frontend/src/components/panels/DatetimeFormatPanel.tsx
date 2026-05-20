@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
+import { inferDatetimeFormat } from '../../utils/datetimeFormatInfer';
 
 interface DatetimeFormatPanelProps {
   open: boolean;
@@ -14,69 +15,58 @@ interface DatetimeFormatPanelProps {
 export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
   open,
   onClose,
-  onConfirm,
-  columnName,
-  sampleValues = []
+  ...contentProps
 }) => {
-  const [customFormat, setCustomFormat] = useState('');
-  const [autoFillTried, setAutoFillTried] = useState(false);
-  const [autoFillError, setAutoFillError] = useState<string | null>(null);
-
-  const resetForm = () => {
-    setCustomFormat('');
-    setAutoFillTried(false);
-    setAutoFillError(null);
-  };
-
-  const handleCancel = () => {
-    resetForm();
-    onClose();
-  };
-
-  const handleAutoFill = async () => {
-    setAutoFillTried(true);
-    setAutoFillError(null);
-    try {
-      const { inferDatetimeFormat } = await import('../../utils/datetimeFormatInfer');
-      const inferred = inferDatetimeFormat(sampleValues || []);
-      if (inferred) {
-        setCustomFormat(inferred);
-      } else {
-        setAutoFillError('Could not infer format');
-      }
-    } catch {
-      setAutoFillError('Inference error');
-    }
-  };
-
-  useEffect(() => {
-    if (open && sampleValues.length && !autoFillTried) {
-      void handleAutoFill();
-    }
-    if (!open) {
-      resetForm();
-    }
-    // handleAutoFill is intentionally excluded — it's an event handler whose identity changes every render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, sampleValues, autoFillTried]);
-
-  const handleConfirm = () => {
-    const trimmed = customFormat.trim();
-    onConfirm(trimmed.length ? trimmed : undefined);
-    resetForm();
-    onClose();
-  };
-
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
-          handleCancel();
+          onClose();
         }
       }}
     >
-      <DialogContent className="w-full max-w-lg border-none bg-transparent p-0 shadow-none">
+      {open && <DatetimeFormatPanelContent {...contentProps} onClose={onClose} />}
+    </Dialog>
+  );
+};
+
+function DatetimeFormatPanelContent({
+  onClose,
+  onConfirm,
+  columnName,
+  sampleValues = []
+}: Omit<DatetimeFormatPanelProps, 'open'>) {
+  const initialFormat = sampleValues.length ? inferDatetimeFormat(sampleValues) : null;
+  const [customFormat, setCustomFormat] = useState(initialFormat ?? '');
+  const [autoFillTried, setAutoFillTried] = useState(sampleValues.length > 0);
+  const [autoFillError, setAutoFillError] = useState<string | null>(
+    sampleValues.length > 0 && !initialFormat ? 'Could not infer format' : null,
+  );
+
+  const handleCancel = () => {
+    onClose();
+  };
+
+  const handleAutoFill = () => {
+    setAutoFillTried(true);
+    setAutoFillError(null);
+    const inferred = inferDatetimeFormat(sampleValues);
+    if (inferred) {
+      setCustomFormat(inferred);
+    } else {
+      setAutoFillError('Could not infer format');
+    }
+  };
+
+  const handleConfirm = () => {
+    const trimmed = customFormat.trim();
+    onConfirm(trimmed.length ? trimmed : undefined);
+    onClose();
+  };
+
+  return (
+    <DialogContent className="w-full max-w-lg border-none bg-transparent p-0 shadow-none">
         <DialogHeader className="sr-only">
           <DialogTitle>Convert {columnName || 'column'} to datetime</DialogTitle>
           <DialogDescription>Provide a strftime format or let Auto Fill guess it from sample values.</DialogDescription>
@@ -121,9 +111,8 @@ export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
             </div>
           </CardFooter>
         </Card>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
-};
+}
 
 export default DatetimeFormatPanel;

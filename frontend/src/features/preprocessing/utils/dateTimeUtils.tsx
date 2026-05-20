@@ -40,12 +40,7 @@ export const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps
 
   const [draft, setDraft] = React.useState(committedValue);
   const [focused, setFocused] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!focused) {
-      setDraft(committedValue);
-    }
-  }, [committedValue, focused]);
+  const displayedValue = focused ? draft : committedValue;
 
   const innerRef = React.useRef<HTMLInputElement | null>(null);
   const setRefs = (el: HTMLInputElement | null) => {
@@ -77,11 +72,12 @@ export const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps
       ref={setRefs}
       type="text"
       readOnly={parentReadOnly ?? false}
-      value={draft}
+      value={displayedValue}
       onClick={(e) => {
         parentOnClick?.(e);
       }}
       onFocus={(e) => {
+        setDraft(committedValue);
         setFocused(true);
         parentOnFocus?.(e);
       }}
@@ -140,10 +136,23 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value,
   const [timeValue, setTimeValue] = React.useState<string>(formatTimeInputValue(parsedValue));
   const timeInputId = React.useId();
 
-  React.useEffect(() => {
-    setDraftDate(parsedValue ?? undefined);
-    setTimeValue(formatTimeInputValue(parsedValue));
-  }, [parsedValue, open]);
+  const syncDraftFromValue = (nextValue: string) => {
+    const nextDate = nextValue ? parseIsoToLocalDate(nextValue) : null;
+    setDraftDate(nextDate ?? undefined);
+    setTimeValue(formatTimeInputValue(nextDate));
+  };
+
+  const openPicker = () => {
+    if (!open) {
+      syncDraftFromValue(value);
+    }
+    setOpen(true);
+  };
+
+  const handleIsoCommit = (nextValue: string) => {
+    onChange(nextValue);
+    syncDraftFromValue(nextValue);
+  };
 
   React.useEffect(() => {
     if (!open) {
@@ -169,55 +178,53 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value,
   }, [open]);
 
   const commitDate = (date: Date | undefined) => {
-      if (!date) {
-        onChange('');
-        return;
-      }
-      onChange(toIsoUtcString(date));
-    };
+    if (!date) {
+      onChange('');
+      return;
+    }
+    onChange(toIsoUtcString(date));
+  };
 
   const handleSelectDate = (day: Date | undefined) => {
-      if (!day) {
-        setDraftDate(undefined);
-        commitDate(undefined);
-        return;
-      }
-      const combined = combineDateAndTime(day, timeValue);
-      setDraftDate(combined);
-      commitDate(combined);
-    };
+    if (!day) {
+      setDraftDate(undefined);
+      commitDate(undefined);
+      return;
+    }
+    const combined = combineDateAndTime(day, timeValue);
+    setDraftDate(combined);
+    commitDate(combined);
+  };
 
   const handleTimeChange = (nextValue: string) => {
-      const normalized = normalizeTimeValue(nextValue);
-      setTimeValue(normalized);
-      setDraftDate((current) => {
-        if (!current) {
-          return current;
-        }
-        const updated = combineDateAndTime(current, normalized);
-        commitDate(updated);
-        return updated;
-      });
-    };
+    const normalized = normalizeTimeValue(nextValue);
+    setTimeValue(normalized);
+    if (!draftDate) {
+      return;
+    }
+    const updated = combineDateAndTime(draftDate, normalized);
+    setDraftDate(updated);
+    commitDate(updated);
+  };
 
-  const selectedDate = draftDate ?? parsedValue ?? undefined;
+  const selectedDate = draftDate ?? undefined;
 
   return (
     <div ref={containerRef} className="relative flex items-center">
       <IsoDateInput
         committedValue={value}
-        onCommit={onChange}
+        onCommit={handleIsoCommit}
         placeholder={placeholder}
         readOnly={disabled}
         className="pr-10"
         onFocus={() => {
           if (!disabled) {
-            setOpen(true);
+            openPicker();
           }
         }}
         onClick={() => {
           if (!disabled) {
-            setOpen(true);
+            openPicker();
           }
         }}
       />
@@ -239,7 +246,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value,
                 }}
               />
             </CardContent>
-            <CardFooter className="flex w-full flex-col gap-4 border-t px-4 !pt-4">
+            <CardFooter className="flex w-full flex-col gap-4 border-t px-4 pt-4!">
               <div className="flex w-full flex-col gap-3">
                 <Label htmlFor={timeInputId}>Time</Label>
                 <div className="relative flex w-full items-center">

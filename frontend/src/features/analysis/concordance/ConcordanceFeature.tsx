@@ -300,6 +300,10 @@ const ConcordanceFeature: React.FC = () => {
     const value = md?.task_id ?? md?.taskId;
     return typeof value === 'string' ? value : '';
   }, [liveResults]);
+  const concordanceTaskIdFallbackRef = useRef('');
+  useEffect(() => {
+    if (concordanceTaskId) concordanceTaskIdFallbackRef.current = concordanceTaskId;
+  }, [concordanceTaskId]);
 
   const resolveNodeIdForKey = useCallback((nodeKey: string): string | null => {
     if (nodeKey === '__COMBINED__') return null;
@@ -333,7 +337,7 @@ const ConcordanceFeature: React.FC = () => {
     // Same trick as the materialised-events consumer: when the bare task id is
     // briefly empty (results being refetched after a materialise), fall back
     // to the last known good value so we don't drop the fetch.
-    const effectiveTaskId = concordanceTaskId || concordanceTaskIdRef.current;
+    const effectiveTaskId = concordanceTaskId || concordanceTaskIdFallbackRef.current;
     if (!effectiveTaskId) return;
     const panelIds = panelSelectedNodes
       .map((n: WorkspaceNodeLike) => n.id)
@@ -546,13 +550,15 @@ const ConcordanceFeature: React.FC = () => {
   // leaving it sticky lets stale 'tokens' survive onto an ineligible
   // block, where Run then errors at the backend.
   useEffect(() => {
-    if (!tokensModeAvailable) {
-      setSearchMode('regex');
-      setSearchModeUserSet(false);
-      return;
-    }
-    if (searchModeUserSet) return;
-    setSearchMode('tokens');
+    Promise.resolve().then(() => {
+      if (!tokensModeAvailable) {
+        setSearchMode('regex');
+        setSearchModeUserSet(false);
+        return;
+      }
+      if (searchModeUserSet) return;
+      setSearchMode('tokens');
+    });
   }, [tokensModeAvailable, searchModeUserSet]);
 
   // Tokens-models the picker can offer for a tokens-mode search across the
@@ -574,18 +580,20 @@ const ConcordanceFeature: React.FC = () => {
   // current pick is no longer in the option list (the user might have
   // deleted that derivation via Manage tokens…).
   useEffect(() => {
-    if (tokensModelOptions.length === 0) {
-      if (tokensModel !== null) setTokensModel(null);
-      return;
-    }
-    if (tokensModelOptions.length === 1) {
-      const only = tokensModelOptions[0]!;
-      if (tokensModel !== only) setTokensModel(only);
-      return;
-    }
-    if (tokensModel === null || !tokensModelOptions.includes(tokensModel)) {
-      setTokensModel(tokensModelOptions[0] ?? null);
-    }
+    Promise.resolve().then(() => {
+      if (tokensModelOptions.length === 0) {
+        if (tokensModel !== null) setTokensModel(null);
+        return;
+      }
+      if (tokensModelOptions.length === 1) {
+        const only = tokensModelOptions[0]!;
+        if (tokensModel !== only) setTokensModel(only);
+        return;
+      }
+      if (tokensModel === null || !tokensModelOptions.includes(tokensModel)) {
+        setTokensModel(tokensModelOptions[0] ?? null);
+      }
+    });
   }, [tokensModelOptions, tokensModel]);
 
   const concordanceLanguage = useMemo(() => {
@@ -771,19 +779,19 @@ const ConcordanceFeature: React.FC = () => {
   // Materialise also triggers a refetch that briefly nukes every
   // live source (taskStatus.successfulTask, terminalTask, and
   // results.metadata.task_id all empty for the same render).
-  // Latch the latest non-empty value into a ref — same pattern
-  // ``concordanceTaskIdRef`` already uses for the bin fetcher
-  // (see useConcordanceMaterializedEvents).
+  // Latch the latest non-empty value so the Save button does not
+  // briefly lose the completed task id.
   const liveCaptureTaskId =
     concordanceTaskStatus.successfulTask?.task_id ||
     concordanceTaskStatus.terminalTask?.task_id ||
     concordanceTaskId ||
     '';
-  const latestCaptureTaskIdRef = useRef<string>('');
+  const [latestCaptureTaskId, setLatestCaptureTaskId] = useState('');
   useEffect(() => {
-    if (liveCaptureTaskId) latestCaptureTaskIdRef.current = liveCaptureTaskId;
+    if (!liveCaptureTaskId) return;
+    Promise.resolve().then(() => setLatestCaptureTaskId(liveCaptureTaskId));
   }, [liveCaptureTaskId]);
-  const captureTaskId = liveCaptureTaskId || latestCaptureTaskIdRef.current;
+  const captureTaskId = liveCaptureTaskId || latestCaptureTaskId;
 
   const getConcordanceNodeRowCount = useCallback((node: WorkspaceNodeLike) => {
     const shape = node.shape as unknown;
@@ -908,10 +916,12 @@ const ConcordanceFeature: React.FC = () => {
   // that are no longer in the available set (e.g. after a re-run that drops
   // a column from the source data).
   useEffect(() => {
-    setSelectedMetadataColumns((prev) => {
-      const filtered = prev.filter((column) => availableMetadataColumns.includes(column));
-      if (filtered.length === prev.length) return prev;
-      return filtered;
+    Promise.resolve().then(() => {
+      setSelectedMetadataColumns((prev) => {
+        const filtered = prev.filter((column) => availableMetadataColumns.includes(column));
+        if (filtered.length === prev.length) return prev;
+        return filtered;
+      });
     });
   }, [availableMetadataColumns, availableMetadataColumnsKey]);
 
@@ -1070,7 +1080,7 @@ const ConcordanceFeature: React.FC = () => {
 
   // Materialize lifecycle: terminal-state task watcher, task-id ref reset,
   // and `analysis_materialized` SSE consumer. See hook for details.
-  const { concordanceTaskIdRef, resetProcessedEvents } = useConcordanceMaterializedEvents({
+  const { resetProcessedEvents } = useConcordanceMaterializedEvents({
     concordanceTaskId,
     materializeTaskIds,
     materializedEvents,
@@ -1627,7 +1637,7 @@ const ConcordanceFeature: React.FC = () => {
   useEffect(() => {
     if (inSnapshotMode && loadedSnapshot) {
       const cap = loadedSnapshot.payload.settings?.combined ?? false;
-      setSnapshotViewMode(cap ? 'combined' : 'separated');
+      Promise.resolve().then(() => setSnapshotViewMode(cap ? 'combined' : 'separated'));
     }
   }, [inSnapshotMode, loadedSnapshot]);
 

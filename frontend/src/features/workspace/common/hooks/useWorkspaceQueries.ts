@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { workspacesApi } from '@/api/workspaces';
 import { nodesApi } from '@/api/nodes';
 import { queryKeys } from '@/lib/queryKeys';
-import { isGraphDebugEnabled } from '@/lib/debugFlags';
 import type { GraphNode, NodeDataResponse } from '@/types/api';
 import { type PaginationState } from './types';
 
@@ -34,25 +33,6 @@ interface WorkspaceQueriesParams {
   getPaginationForNode: (nodeId?: string | null) => PaginationState;
 }
 
-const logGraphDebug = (result: { nodes?: GraphNode[]; edges?: { source: string; target: string }[] }) => {
-  if (!isGraphDebugEnabled()) return;
-
-  console.debug('=== API Response Success ===');
-  console.debug('API response structure:', {
-    nodes: result?.nodes?.length || 0,
-    edges: result?.edges?.length || 0,
-  });
-
-  if (result?.nodes && result.nodes.length > 0) {
-    const sampleNode = result.nodes[0]!;
-    console.debug('Sample node structure:', {
-      id: sampleNode.id,
-      name: sampleNode.name,
-      operation: sampleNode.operation,
-    });
-  }
-};
-
 export const useWorkspaceQueries = ({
   authHeaders,
   isAuthenticated,
@@ -79,11 +59,7 @@ export const useWorkspaceQueries = ({
     queryKey: currentWorkspaceId
       ? queryKeys.workspaceGraph(currentWorkspaceId)
       : ['workspaces', 'graph'],
-    queryFn: async () => {
-      const result = await workspacesApi.graph(authHeaders);
-      logGraphDebug(result);
-      return result;
-    },
+    queryFn: () => workspacesApi.graph(authHeaders),
     enabled: isAuthenticated && !!currentWorkspaceId,
     refetchOnWindowFocus: false,
     staleTime: 30 * 1000,

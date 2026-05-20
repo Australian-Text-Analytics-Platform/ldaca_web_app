@@ -10,7 +10,7 @@ import {
   ReactFlow,
   type NodeTypes,
 } from '@xyflow/react';
-import { Loader2, Network } from 'lucide-react';
+import { CircleOff, Loader2, Map, Network } from 'lucide-react';
 
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,7 +34,7 @@ const OverviewToggle = ({
     onClick={onToggle}
     title={active ? 'Hide overview' : 'Show overview'}
   >
-    {active ? '▣' : '□'}
+    <Map className={active ? 'h-4 w-4' : 'h-4 w-4 opacity-60'} aria-hidden="true" />
   </button>
 );
 
@@ -53,7 +53,7 @@ const DeselectButton = ({
     title="Deselect all selected data blocks"
     style={{ opacity: disabled ? 0.5 : 1 }}
   >
-    ⊘
+    <CircleOff className="h-4 w-4" aria-hidden="true" />
   </button>
 );
 

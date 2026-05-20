@@ -49,7 +49,7 @@ const WorkspaceShell: React.FC = () => {
     error: authError,
     refreshAuth,
     availableAuthMethods,
-  } = useAuth({ autoStart: true, debugLabel: 'WorkspaceShell' });
+  } = useAuth({ autoStart: true });
 
   // Initialize preferences from backend and sync visible views into uiStore
   usePreferencesInit();
@@ -253,7 +253,7 @@ const WorkspaceShell: React.FC = () => {
                         isRightCollapsed ? 'pr-2' : 'pr-1'
                       } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
                       style={{ width: isRightCollapsed ? '100%' : `${(1 - asidePanelRatio) * 100}%`, minWidth: 280 }}
-                      innerClassName="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4"
+                      innerClassName="overflow-y-auto scrollbar-none p-4"
                     >
                       <div className="w-full max-w-none mx-0">
                         <ViewRouter />

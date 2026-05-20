@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { clampDisplayTokenLimit } from './utils';
 import { textApi } from '@/api/text';
 import { isNetworkError } from '@/api/http';
@@ -22,9 +22,18 @@ export interface HydrationState {
   lastHydratedAt?: number;
 }
 
+type HydrationInternalState = HydrationState & { workspaceId?: string | null };
+
+interface InflightHydration {
+  workspaceId: string;
+  promise: Promise<void>;
+}
+
 type MaybePromise<T> = T | Promise<T>;
 
 type Nullable<T> = T | null | undefined;
+
+const toHydrationState = ({ workspaceId: _workspaceId, ...state }: HydrationInternalState): HydrationState => state;
 
 export interface UseAnalysisHydrationConfig<TRequest, TResult, TPreferences> {
   workspaceId?: string | null;
@@ -84,27 +93,30 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
     onHydrationError,
   } = config;
 
-  const [hydrationState, setHydrationState] = useState<HydrationState>({ status: 'idle' });
-  const inflightRef = useRef<Promise<void> | null>(null);
-
-  useEffect(() => {
-    setHydrationState({ status: 'idle' });
-    inflightRef.current = null;
-  }, [workspaceId]);
+  const [internalHydrationState, setHydrationState] = useState<HydrationInternalState>({ status: 'idle', workspaceId });
+  const inflightRef = useRef<InflightHydration | null>(null);
+  const hydrationState: HydrationState = internalHydrationState.workspaceId === workspaceId
+    ? toHydrationState(internalHydrationState)
+    : { status: 'idle' };
 
   // Identity stability: used in useEffect dependency array and returned from hook
   const hydrateFromServer = useCallback(async () => {
-    if (!workspaceId || inflightRef.current) {
-      return inflightRef.current ?? Promise.resolve();
+    const activeWorkspaceId = workspaceId;
+    if (!activeWorkspaceId) {
+      return Promise.resolve();
+    }
+
+    if (inflightRef.current?.workspaceId === activeWorkspaceId) {
+      return inflightRef.current.promise;
     }
 
     const inflight = (async () => {
-      setHydrationState((prev) => ({ ...prev, status: 'loading', error: undefined }));
+      setHydrationState((prev) => ({ ...prev, workspaceId: activeWorkspaceId, status: 'loading', error: undefined }));
       try {
         let taskId: string | null = null;
         if (resolveTaskId) {
           taskId = await resolveTaskId();
-        } else if (analysisKey && getAuthHeaders && workspaceId) {
+        } else if (analysisKey && getAuthHeaders) {
           try {
             const current = await textApi.getAnalysisCurrent(analysisKey, getAuthHeaders()) as Record<string, unknown>;
             const currentTaskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
@@ -117,7 +129,7 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
         onTaskIdResolved?.(taskId ?? null);
 
         if (!taskId) {
-          setHydrationState({ status: 'idle', lastHydratedAt: Date.now() });
+          setHydrationState({ status: 'idle', lastHydratedAt: Date.now(), workspaceId: activeWorkspaceId });
           return;
         }
 
@@ -143,29 +155,31 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
 
         await Promise.allSettled([applyRequestPromise, applyResultPromise]);
 
-        setHydrationState({ status: 'idle', lastHydratedAt: Date.now() });
+        setHydrationState({ status: 'idle', lastHydratedAt: Date.now(), workspaceId: activeWorkspaceId });
       } catch (error) {
         logHydrationFailure('hydration failed', error);
-        setHydrationState({ status: 'error', error: error instanceof Error ? error.message : 'Unknown error' });
+        setHydrationState({ status: 'error', error: error instanceof Error ? error.message : 'Unknown error', workspaceId: activeWorkspaceId });
         onHydrationError?.(error);
       } finally {
-        inflightRef.current = null;
+        if (inflightRef.current?.workspaceId === activeWorkspaceId) {
+          inflightRef.current = null;
+        }
       }
     })();
 
-    inflightRef.current = inflight;
+    inflightRef.current = { workspaceId: activeWorkspaceId, promise: inflight };
     await inflight;
   }, [workspaceId, resolveTaskId, analysisKey, getAuthHeaders, onTaskIdResolved, fetchRequest, fetchResult, applyRequest, applyResult, onHydrationError]);
 
   const persistPreferencesSafe = async (partial: TPreferences) => {
-      if (!persistPreferences || !workspaceId || !partial) return;
-      const normalized = normalizePreferencePayload(partial);
-      await persistPreferences(normalized);
-    };
+    if (!persistPreferences || !workspaceId || !partial) return;
+    const normalized = normalizePreferencePayload(partial);
+    await persistPreferences(normalized);
+  };
 
-  return ({
-      hydrateFromServer,
-      hydrationState,
-      persistPreferences: persistPreferencesSafe,
-    });
+  return {
+    hydrateFromServer,
+    hydrationState,
+    persistPreferences: persistPreferencesSafe,
+  };
 }

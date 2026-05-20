@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
 import { useAuth } from '@/hooks/useAuth';
@@ -319,22 +319,15 @@ const TokenFrequencyFeature = () => {
     return models;
   }, [inSnapshotMode, loadedSnapshot, effectiveNodeColumnSelections, panelSelectedNodes]);
 
-  const [liveTokensModel, setLiveTokensModel] = useState<string | null>(null);
-  useEffect(() => {
-    if (inSnapshotMode) return;
-    if (tokensModelOptions.length === 0) {
-      if (liveTokensModel !== null) setLiveTokensModel(null);
-      return;
+  const [liveTokensModelDraft, setLiveTokensModel] = useState<string | null>(null);
+  const liveTokensModel = (() => {
+    if (tokensModelOptions.length === 0) return null;
+    if (tokensModelOptions.length === 1) return tokensModelOptions[0]!;
+    if (liveTokensModelDraft && tokensModelOptions.includes(liveTokensModelDraft)) {
+      return liveTokensModelDraft;
     }
-    if (tokensModelOptions.length === 1) {
-      const only = tokensModelOptions[0]!;
-      if (liveTokensModel !== only) setLiveTokensModel(only);
-      return;
-    }
-    if (liveTokensModel === null || !tokensModelOptions.includes(liveTokensModel)) {
-      setLiveTokensModel(tokensModelOptions[0] ?? null);
-    }
-  }, [inSnapshotMode, tokensModelOptions, liveTokensModel]);
+    return tokensModelOptions[0] ?? null;
+  })();
 
   const tokensModel = inSnapshotMode
     ? (loadedSnapshot?.payload.settings?.model ?? null)

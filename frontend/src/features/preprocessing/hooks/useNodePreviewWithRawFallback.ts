@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { nodesApi } from '@/api/nodes';
 import { useAuth } from '@/hooks/useAuth';
 import type { PreviewPagination, PreviewRow } from '../types';
@@ -66,20 +65,19 @@ export const useNodePreviewWithRawFallback = <P>(
   const { nodeId, operationPayload, operationFetch, signaturePrefix, enabled = true, debounceMs } = opts;
   const { getAuthHeaders } = useAuth();
 
-  const request: PreviewRequest<P> | null = useMemo(() => {
-    if (!enabled || !nodeId) return null;
-    return { nodeId, payload: operationPayload };
-  }, [enabled, nodeId, operationPayload]);
+  const request: PreviewRequest<P> | null =
+    enabled && nodeId ? { nodeId, payload: operationPayload } : null;
 
-  const signature = useMemo(() => {
-    if (!request) return `${signaturePrefix}-preview-disabled`;
-    if (!request.payload) return `${request.nodeId}::raw`;
+  let signature = `${signaturePrefix}-preview-disabled`;
+  if (request?.payload) {
     try {
-      return `${request.nodeId}::${JSON.stringify(request.payload)}`;
+      signature = `${request.nodeId}::${JSON.stringify(request.payload)}`;
     } catch {
-      return `${request.nodeId}::unserialisable`;
+      signature = `${request.nodeId}::unserialisable`;
     }
-  }, [request, signaturePrefix]);
+  } else if (request) {
+    signature = `${request.nodeId}::raw`;
+  }
 
   return usePreprocessingPreview<PreviewRequest<P>>({
     request,

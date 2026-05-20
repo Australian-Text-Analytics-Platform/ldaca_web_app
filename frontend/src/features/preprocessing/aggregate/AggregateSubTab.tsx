@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
+import { takeMostRecent } from '@/utils/selectionUtils';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
@@ -18,6 +19,18 @@ import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggreg
 export type { AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
 export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
+  return <AggregateSubTabContent key={getAggregateSelectionKey(props)} {...props} />;
+};
+
+const getAggregateSelectionKey = (props: AggregateSubTabProps): string => {
+  const [selectedNode] = takeMostRecent(props.selectedNodes, 1);
+  if (selectedNode) {
+    return selectedNode.id || selectedNode.node_id || props.selectedNodeId || 'none';
+  }
+  return props.selectedNodeId || 'none';
+};
+
+const AggregateSubTabContent: React.FC<AggregateSubTabProps> = (props) => {
   const { isLoading } = props;
   const {
     nodeSelection,
@@ -193,7 +206,6 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                                   <OperationPopover
                                     nodeId={nodeSelection.effectiveNodes[0]?.id ?? nodeSelection.effectiveNodes[0]?.node_id ?? ''}
                                     column={token.column}
-                                    dtype={token.dtype}
                                     onSelect={(op) => basicBuilder.addOperation(token.id, op)}
                                     disabled={basicBuilder.disabled}
                                   >
@@ -269,7 +281,6 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
               value={expression.columnName}
               onChange={expression.onChange.columnName}
               onBlur={expression.onColumnNameBlur}
-              onFocus={expression.onColumnNameFocus}
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="none"

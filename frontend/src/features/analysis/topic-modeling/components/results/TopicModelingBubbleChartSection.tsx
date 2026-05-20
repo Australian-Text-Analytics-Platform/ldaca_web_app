@@ -250,9 +250,9 @@ export function TopicModelingBubbleChartSection({
           legend: [],
         }).then(({ blob, filename }) => saveBlob(blob, filename));
       }
-    } catch (err) {
-      toast.error('Failed to export chart.');
-      console.error(err);
+      } catch (error) {
+        const description = error instanceof Error ? error.message : String(error);
+        toast.error('Failed to export chart.', { description });
     }
   };
 

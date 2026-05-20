@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -30,29 +30,26 @@ export const WorkspaceDataHeader = ({
   canUndo = false,
   canRedo = false,
 }: WorkspaceDataHeaderProps) => {
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [nameInput, setNameInput] = useState(info.nodeLabel);
+  const [renameDraft, setRenameDraft] = useState<{ baseLabel: string; value: string }>();
   const [queryPlanOpen, setQueryPlanOpen] = useState(false);
   const [queryPlan, setQueryPlan] = useState<string | null>(null);
   const [queryPlanLoading, setQueryPlanLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  /* Syncing input with prop when node changes */
-  useEffect(() => {
-    setNameInput(info.nodeLabel);
-  }, [info.nodeLabel]);
+  const isRenaming = renameDraft?.baseLabel === info.nodeLabel;
 
   const handleRenameCommit = () => {
-    const trimmed = nameInput.trim();
+    if (!isRenaming) {
+      return;
+    }
+    const trimmed = renameDraft.value.trim();
     if (trimmed && trimmed !== info.nodeLabel && onRename) {
       onRename(trimmed);
     }
-    setIsRenaming(false);
+    setRenameDraft(undefined);
   };
 
   const startRename = () => {
-    setNameInput(info.nodeLabel);
-    setIsRenaming(true);
+    setRenameDraft({ baseLabel: info.nodeLabel, value: info.nodeLabel });
     setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
@@ -82,12 +79,12 @@ export const WorkspaceDataHeader = ({
             <input
               ref={inputRef}
               className="px-2 py-0.5 border rounded text-sm font-semibold text-gray-800"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
+              value={renameDraft.value}
+              onChange={(e) => setRenameDraft({ baseLabel: info.nodeLabel, value: e.target.value })}
               onBlur={handleRenameCommit}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleRenameCommit();
-                if (e.key === 'Escape') setIsRenaming(false);
+                if (e.key === 'Escape') setRenameDraft(undefined);
               }}
               aria-label="Node name"
             />

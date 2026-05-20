@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { takeMostRecent } from '@/utils/selectionUtils';
@@ -56,10 +56,12 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
         .filter((column) => column.dataType === 'string')
         .map((column) => column.name)
     : [];
-  const stringColumnKey = stringColumns.join('\u0000');
   const firstStringColumn = stringColumns[0] ?? '';
 
-  const [selectedColumn, setSelectedColumn] = useState('');
+  const [selectedColumnDraft, setSelectedColumn] = useState('');
+  const selectedColumn = activeNodeId && stringColumns.includes(selectedColumnDraft)
+    ? selectedColumnDraft
+    : firstStringColumn;
   const [mode, setMode] = useState<'replace' | 'extract'>('replace');
   const [n, setN] = useState<number | null>(null);
   const count = n !== null ? 'first' : 'all';
@@ -72,16 +74,6 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const connectorValue = connector === '' ? undefined : connector;
 
   const previewColumnName = outputColumnName.trim() || selectedColumn;
-
-  useEffect(() => {
-    const availableColumns = stringColumnKey.length > 0 ? stringColumnKey.split('\u0000') : [];
-    if (!activeNodeId || stringColumnKey.length === 0) {
-      setSelectedColumn('');
-      return;
-    }
-    if (selectedColumn && availableColumns.includes(selectedColumn)) return;
-    setSelectedColumn(firstStringColumn);
-  }, [activeNodeId, firstStringColumn, selectedColumn, stringColumnKey]);
 
   const hasSelection = Boolean(activeNodeId);
   const hasOperation = Boolean(selectedColumn && pattern.length > 0);

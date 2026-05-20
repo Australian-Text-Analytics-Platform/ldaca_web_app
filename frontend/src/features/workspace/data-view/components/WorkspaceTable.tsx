@@ -261,6 +261,7 @@ export function WorkspaceTable({
     onPageChange?.(1);
   };
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable returns non-memoizable functions; React Compiler can skip this
   const tableInstance = useReactTable({
     data: sanitizedData,
     columns: columnDefs,

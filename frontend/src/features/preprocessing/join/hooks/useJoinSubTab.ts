@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { nodesApi } from '@/api/nodes';
 import { useAuth } from '@/hooks/useAuth';
@@ -59,6 +59,12 @@ interface JoinPreviewConfig {
   onPageSizeChange: (size: number) => void;
 }
 
+type JoinColumnDraft = {
+  nodeId: string;
+  columnsKey: string;
+  value: string;
+};
+
 interface JoinApplyState {
   run: () => Promise<void>;
   disabled: boolean;
@@ -91,24 +97,39 @@ const describeSharedColumns = (count: number, columns: string[]): string => {
   return `Found ${count} shared column${count === 1 ? '' : 's'}${list}.`;
 };
 
+const columnsKey = (columns: string[]): string => columns.join('\0');
+
+const resolveJoinColumn = (
+  nodeId: string,
+  columns: string[],
+  draft: JoinColumnDraft | null,
+  preferredColumn: string | undefined,
+): string => {
+  if (!nodeId || columns.length === 0) return '';
+  const key = columnsKey(columns);
+  if (draft?.nodeId === nodeId && draft.columnsKey === key && columns.includes(draft.value)) {
+    return draft.value;
+  }
+  return preferredColumn ?? columns[0] ?? '';
+};
+
 export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const { selectedNodeIds, currentWorkspaceId, workspaceNodes, joinNodes, isLoading, onAlert } = props;
   const { getAuthHeaders } = useAuth();
 
-  const [joinLeftNodeId, setJoinLeftNodeId] = useState('');
-  const [joinRightNodeId, setJoinRightNodeId] = useState('');
-  const [joinLeftColumn, setJoinLeftColumn] = useState('');
-  const [joinRightColumn, setJoinRightColumn] = useState('');
+  const [joinLeftColumnDraft, setJoinLeftColumnDraft] = useState<JoinColumnDraft | null>(null);
+  const [joinRightColumnDraft, setJoinRightColumnDraft] = useState<JoinColumnDraft | null>(null);
   const [joinType, setJoinType] = useState<JoinType>('left');
   const [joinNewNodeName, setJoinNewNodeName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
-  const joinNameAutofillRef = useRef('');
 
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
   const uniqueSelectedNodeIds = dedupeNodeIds(selectedNodeIds);
   const joinNodeIds = takeMostRecent(uniqueSelectedNodeIds, MAX_JOIN_NODES);
   const joinOriginalCount = uniqueSelectedNodeIds.length;
+  const joinLeftNodeId = joinNodeIds[0] ?? '';
+  const joinRightNodeId = joinNodeIds[1] ?? '';
 
   const joinSelectedNodes = (() => {
     return joinNodeIds
@@ -116,11 +137,10 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       .filter((node): node is WorkspaceNodeLike => Boolean(node));
   })();
 
-  // Identity stability: used in useEffect dependency array
-  const getNodeColumnsForJoin = useCallback((nodeId: string): string[] => {
+  const getNodeColumnsForJoin = (nodeId: string): string[] => {
     const node = workspaceNodeMap.get(nodeId);
     return extractNodeColumns(node);
-  }, [workspaceNodeMap]);
+  };
 
   const columnLabelFn = (node: WorkspaceNodeLike) => {
     const nodeId = getNodeKey(node);
@@ -128,17 +148,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     if (nodeId === joinRightNodeId) return 'Right column:';
     return 'Join column:';
   };
-
-  const joinNodeSelections: NodeColumnSelection[] = (() => {
-    const selections: NodeColumnSelection[] = [];
-    if (joinLeftNodeId) {
-      selections.push({ nodeId: joinLeftNodeId, column: joinLeftColumn });
-    }
-    if (joinRightNodeId && joinRightNodeId !== joinLeftNodeId) {
-      selections.push({ nodeId: joinRightNodeId, column: joinRightColumn });
-    }
-    return selections;
-  })();
 
   const joinNodeColors = (() => {
     const colors: Record<string, string> = {};
@@ -149,11 +158,31 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   const needsColumns = joinType !== 'cross';
 
+  const leftColumns = joinLeftNodeId ? getNodeColumnsForJoin(joinLeftNodeId) : [];
+  const rightColumns = joinRightNodeId ? getNodeColumnsForJoin(joinRightNodeId) : [];
+
   const sharedColumns = (() => {
     if (!joinLeftNodeId || !joinRightNodeId) return [] as string[];
-    const leftColumns = getNodeColumnsForJoin(joinLeftNodeId);
-    const rightColumns = getNodeColumnsForJoin(joinRightNodeId);
     return leftColumns.filter((column) => rightColumns.includes(column));
+  })();
+
+  const preferredJoinColumn = sharedColumns[0];
+  const joinLeftColumn = needsColumns
+    ? resolveJoinColumn(joinLeftNodeId, leftColumns, joinLeftColumnDraft, preferredJoinColumn)
+    : '';
+  const joinRightColumn = needsColumns
+    ? resolveJoinColumn(joinRightNodeId, rightColumns, joinRightColumnDraft, preferredJoinColumn)
+    : '';
+
+  const joinNodeSelections: NodeColumnSelection[] = (() => {
+    const selections: NodeColumnSelection[] = [];
+    if (joinLeftNodeId) {
+      selections.push({ nodeId: joinLeftNodeId, column: joinLeftColumn });
+    }
+    if (joinRightNodeId && joinRightNodeId !== joinLeftNodeId) {
+      selections.push({ nodeId: joinRightNodeId, column: joinRightColumn });
+    }
+    return selections;
   })();
 
   const joinConfigReady = Boolean(
@@ -202,35 +231,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     if (!leftName || !rightName) return '';
     return `${leftName}_${joinType}_join_${rightName}`.replace(/\s+/g, '_');
   })();
-
-  useEffect(() => {
-    joinNameAutofillRef.current = autoJoinName || '';
-  }, [autoJoinName]);
-
-  useEffect(() => {
-    const nextLeft = joinNodeIds[0] ?? '';
-    const nextRight = joinNodeIds[1] ?? '';
-    setJoinLeftNodeId((prev) => (prev === nextLeft ? prev : nextLeft));
-    setJoinRightNodeId((prev) => (prev === nextRight ? prev : nextRight));
-  }, [joinNodeIds]);
-
-  useEffect(() => {
-    if (joinType === 'cross') {
-      setJoinLeftColumn('');
-      setJoinRightColumn('');
-      return;
-    }
-    const leftColumns = joinLeftNodeId ? getNodeColumnsForJoin(joinLeftNodeId) : [];
-    const rightColumns = joinRightNodeId ? getNodeColumnsForJoin(joinRightNodeId) : [];
-    if (!leftColumns.length || !rightColumns.length) {
-      setJoinLeftColumn('');
-      setJoinRightColumn('');
-      return;
-    }
-    const common = leftColumns.filter((column) => rightColumns.includes(column));
-    setJoinLeftColumn((prev) => (prev && leftColumns.includes(prev) ? prev : common[0] ?? leftColumns[0] ?? ''));
-    setJoinRightColumn((prev) => (prev && rightColumns.includes(prev) ? prev : common[0] ?? rightColumns[0] ?? ''));
-  }, [joinLeftNodeId, joinRightNodeId, joinType, getNodeColumnsForJoin]);
 
   const joinPreviewRequest: JoinPreviewRequestPayload | null = (() => {
     if (!currentWorkspaceId || !joinConfigReady) return null;
@@ -317,9 +317,9 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   const handleJoinColumnChange = (nodeId: string, column: string) => {
     if (nodeId === joinLeftNodeId) {
-      setJoinLeftColumn(column);
+      setJoinLeftColumnDraft({ nodeId, columnsKey: columnsKey(leftColumns), value: column });
     } else if (nodeId === joinRightNodeId) {
-      setJoinRightColumn(column);
+      setJoinRightColumnDraft({ nodeId, columnsKey: columnsKey(rightColumns), value: column });
     }
   };
 
@@ -332,7 +332,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     }
     const leftColumns = needsColumns ? [joinLeftColumn] : [];
     const rightColumns = needsColumns ? [joinRightColumn] : [];
-    const requestedName = joinNewNodeName.trim() || joinNameAutofillRef.current || undefined;
+    const requestedName = joinNewNodeName.trim() || autoJoinName || undefined;
     try {
       setIsJoining(true);
       await joinNodes(joinLeftNodeId, joinRightNodeId, joinType, leftColumns, rightColumns, requestedName);

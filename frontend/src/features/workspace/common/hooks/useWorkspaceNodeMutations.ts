@@ -20,7 +20,6 @@ import {
   type QuotationMaterializeRequest,
 } from '@/api/text';
 import { queryKeys } from '@/lib/queryKeys';
-import { isGraphDebugEnabled } from '@/lib/debugFlags';
 import { type NodeSchemaResponse } from '@/types';
 import { type WorkspaceGraphResponse } from '@/types/api';
 import { fetchNodeInfo, invalidateNodeInfoQuery } from '@/lib/nodeInfo';
@@ -815,9 +814,6 @@ export const useWorkspaceNodeMutations = ({
       const existingNodes = graphData?.nodes || [];
       const nodeExists = existingNodes.some((node) => node.id === nodeId);
       if (!nodeExists) {
-        if (isGraphDebugEnabled()) {
-          console.debug(`Node ${nodeId} no longer exists, skipping schema refresh`);
-        }
         return null;
       }
       try {
@@ -834,14 +830,11 @@ export const useWorkspaceNodeMutations = ({
       } catch (error) {
         // `force: true` in fetchNodeInfo triggers removeQueries, which cancels
         // any inflight observer-driven query for the same key. TanStack throws
-        // CancelledError in that race — benign noise, downgrade to debug so
-        // the console stays readable. TanStack's CancelledError sets
+        // CancelledError in that race. TanStack's CancelledError sets
         // ``error.message === "CancelledError"`` but leaves ``error.name`` at
         // ``"Error"``, so use the exported type guard rather than name-sniffing.
         if (isCancelledError(error)) {
-          if (isGraphDebugEnabled()) {
-            console.debug('Node schema refresh cancelled by concurrent query', nodeId);
-          }
+          return null;
         } else {
           console.error('Failed to refresh node schema:', error);
         }

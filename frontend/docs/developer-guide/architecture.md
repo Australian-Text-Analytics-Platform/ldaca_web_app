@@ -1,38 +1,51 @@
-# Frontend Architecture (Developer Guide)
+# Frontend Architecture
 
-**Scope statement:** This page summarizes the frontend’s architecture and state flow.
+The frontend is a React 19, Vite 8, TypeScript application. It renders the
+workspace UI, talks to the FastAPI backend, listens to task events, and is also
+the web content loaded inside the Tauri desktop shell.
 
-## 1) Core stack
+## Runtime Shape
 
-**Question:** *Which core libraries are used?*
+The browser build and desktop build use the same React app. The only important
+runtime difference is API base discovery:
 
-**Answer:**
+- web/dev mode resolves the backend from environment, injected base path, or
+  localhost defaults;
+- desktop mode reads `window.__BACKEND_URL__`, injected by Tauri before React
+  boots.
 
-- React 19 + TypeScript
-- TanStack Query for server state
-- Zustand for UI state
-- XYFlow for graph rendering
+`src/index.tsx` initializes the app, loads Google OAuth config from injected
+globals or environment, and renders the TanStack Router. `src/App.tsx` waits
+for backend health and auth bootstrap before mounting the workspace shell.
 
-## 2) Feature‑first structure
+## Main Layers
 
-**Question:** *Where do feature modules live?*
+- `src/api/`: typed HTTP wrappers around backend endpoints.
+- `src/providers/`: app-level providers such as the singleton QueryClient.
+- `src/stores/`: Zustand stores for auth, UI, selection, preferences, tasks,
+  and node colors.
+- `src/features/`: feature-first UI modules for loader, preprocessing,
+  analysis, workspace graph/table, hints, and snapshots.
+- `src/hooks/`: shared hooks that are not feature-specific.
+- `src/tutorials/`: bundled and remote documentation registries used by help,
+  info, and reference icons.
+- `src-tauri/`: Rust desktop shell and Tauri configuration.
 
-**Answer:** Under `src/features/`, grouped by domain (workspace, preprocessing, analysis).
+## Data Flow
 
-## 3) State flow
+1. API modules call the backend through `httpRequest()`.
+2. TanStack Query owns server state and cache invalidation.
+3. Zustand owns client state that is not purely server-derived.
+4. `WorkspaceProvider` composes workspace queries, selection, status, and
+   mutation actions into slice contexts.
+5. Workspace graph/table features consume those slices and specialized hooks.
+6. Analysis features submit task requests, then update results from task stream
+   terminal events.
 
-**Question:** *How does workspace state propagate?*
+## React Compiler Rule
 
-**Answer:** `WorkspaceProvider` composes slice hooks (`useWorkspaceData`, `useWorkspaceSelection`, `useWorkspaceStatus`, `useWorkspaceActions`) so each component subscribes to the smallest state it needs.
-
-## 4) Task updates
-
-**Question:** *How are background task updates delivered?*
-
-**Answer:** The frontend subscribes to the workspace task stream and merges updates into the analysis store for consistent banners and task lists.
-
-## Recap
-
-**Question:** *What should I read next?*
-
-**Answer:** The configuration reference explains environment variables, and the tutorial shows how to add a small feature.
+The Vite React plugin uses React Compiler through the Babel compiler preset.
+Do not add `useMemo`, `useCallback`, or `React.memo` for routine performance.
+Manual memoization is reserved for identity-sensitive boundaries such as context
+provider values, effects/subscriptions, TanStack/React Flow/table adapters, and
+objects passed to external libraries.

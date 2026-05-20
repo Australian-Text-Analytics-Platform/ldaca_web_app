@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -101,10 +101,7 @@ export const SaveSnapshotDialog: React.FC<SaveSnapshotDialogProps> = ({
   }, [open, defaultName]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const validation = useMemo(
-    () => validateName(name, tool, existingFilenames),
-    [name, tool, existingFilenames],
-  );
+  const validation = validateName(name, tool, existingFilenames);
 
   const handleSave = async () => {
     if (!validation.ok || isSaving) return;

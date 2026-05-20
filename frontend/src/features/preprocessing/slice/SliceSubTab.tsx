@@ -12,13 +12,20 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { getNodeDocumentColumn } from '../utils/nodeMetadata';
+import { deriveNodeLabel, getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 
 export type { SliceSubTabProps } from './hooks/useSliceSubTab';
 
 export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
+  const selectedNodeLabel = deriveNodeLabel(props.selectedNode) || props.selectedNodeId || '';
+  const selectedNodeKey = `${props.selectedNodeId ?? ''}:${selectedNodeLabel}`;
+
+  return <SliceSubTabContent key={selectedNodeKey} {...props} />;
+};
+
+const SliceSubTabContent: React.FC<SliceSubTabProps> = (props) => {
   const {
     selectionPanel,
     form,

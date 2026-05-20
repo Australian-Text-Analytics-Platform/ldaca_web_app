@@ -10,6 +10,14 @@ type PendingDownload = {
   workspaceName: string;
 };
 
+const omitPendingDownload = (
+  pendingDownloads: Record<string, PendingDownload>,
+  workspaceId: string,
+): Record<string, PendingDownload> => {
+  if (!Object.prototype.hasOwnProperty.call(pendingDownloads, workspaceId)) return pendingDownloads;
+  return Object.fromEntries(Object.entries(pendingDownloads).filter(([id]) => id !== workspaceId));
+};
+
 type UsePendingWorkspaceDownloadsOptions = {
   authHeaders: Record<string, string>;
   notify: Notify;
@@ -47,6 +55,33 @@ export function usePendingWorkspaceDownloads({
     [authHeaders, notify],
   );
 
+    const dismissPendingDownload = useCallback((workspaceId: string) => {
+      setPendingDownloads((prev) => omitPendingDownload(prev, workspaceId));
+    }, []);
+
+    const completePendingDownload = useCallback(
+      async (workspaceId: string, taskId: string, workspaceName: string) => {
+        dismissPendingDownload(workspaceId);
+        try {
+          const blob = await workspacesApi.downloadTaskArtifact(taskId, authHeaders);
+          const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
+          await saveBlob(blob, filename);
+          notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
+        } catch (err) {
+          notify('error', (err as Error).message || 'Failed to download workspace ZIP.');
+        }
+      },
+      [authHeaders, dismissPendingDownload, notify],
+    );
+
+    const failPendingDownload = useCallback(
+      (workspaceId: string, message: string | undefined) => {
+        dismissPendingDownload(workspaceId);
+        notify('error', message || 'Workspace download failed.');
+      },
+      [dismissPendingDownload, notify],
+    );
+
   useEffect(() => {
     const entries = Object.entries(pendingDownloads);
     if (!entries.length) return;
@@ -56,31 +91,12 @@ export function usePendingWorkspaceDownloads({
       if (!task) continue;
 
       if (task.state === 'successful') {
-        // Remove from pending immediately to prevent double-trigger.
-        setPendingDownloads((prev) => {
-          const { [workspaceId]: _, ...next } = prev;
-          return next;
-        });
-        // Fetch the artifact and trigger browser download.
-        (async () => {
-          try {
-            const blob = await workspacesApi.downloadTaskArtifact(taskId, authHeaders);
-            const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
-            await saveBlob(blob, filename);
-            notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
-          } catch (err) {
-            notify('error', (err as Error).message || 'Failed to download workspace ZIP.');
-          }
-        })();
+          void Promise.resolve().then(() => completePendingDownload(workspaceId, taskId, workspaceName));
       } else if (task.state === 'failed' || task.state === 'cancelled') {
-        setPendingDownloads((prev) => {
-          const { [workspaceId]: _, ...next } = prev;
-          return next;
-        });
-        notify('error', task.message || 'Workspace download failed.');
+          void Promise.resolve().then(() => failPendingDownload(workspaceId, task.message));
       }
     }
-  }, [tasks, pendingDownloads, authHeaders, notify]);
+    }, [tasks, pendingDownloads, completePendingDownload, failPendingDownload]);
 
   const isStarting = useCallback(
     (workspaceId: string) => startingWorkspaceId === workspaceId,

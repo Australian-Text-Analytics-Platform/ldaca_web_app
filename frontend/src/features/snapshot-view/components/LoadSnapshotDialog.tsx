@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderOpen, Info, Quote, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -78,17 +78,14 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
     staleTime: 10_000,
   });
 
-  const decorated: DecoratedItem[] = useMemo(() => {
-    const items = data?.items ?? [];
-    return items.map((item) => ({
-      item,
-      compatible: isCompatibleSnapshot(
-        item.manifest.tool_version,
-        tool,
-        currentVersion,
-      ),
-    }));
-  }, [data, tool, currentVersion]);
+  const decorated: DecoratedItem[] = (data?.items ?? []).map((item) => ({
+    item,
+    compatible: isCompatibleSnapshot(
+      item.manifest.tool_version,
+      tool,
+      currentVersion,
+    ),
+  }));
 
   const incompatibleCount = decorated.filter((d) => !d.compatible).length;
   const totalCount = decorated.length;
@@ -118,7 +115,7 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
       void filename;
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete snapshot.');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete snapshots.');
     },
   });
 

@@ -391,7 +391,7 @@ const AiAnnotatorFeature: React.FC = () => {
   useEffect(() => {
     if (!currentWorkspaceId) return;
     if (endpointPreset === 'custom' && !customBaseUrl.trim()) return;
-    handleLoadModels();
+    Promise.resolve().then(() => handleLoadModels());
     // handleLoadModels is intentionally excluded — it's an event handler whose identity changes every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpointPreset, customBaseUrl, currentWorkspaceId]);
@@ -541,10 +541,12 @@ const AiAnnotatorFeature: React.FC = () => {
   // (e.g. a column got renamed or removed from the source data). No
   // auto-selection — only the user's explicit picks survive.
   useEffect(() => {
-    setSelectedMetadataColumns((previousSelection) => {
-      const filtered = previousSelection.filter((column) => availableMetadataColumns.includes(column));
-      if (filtered.length === previousSelection.length) return previousSelection;
-      return filtered;
+    Promise.resolve().then(() => {
+      setSelectedMetadataColumns((previousSelection) => {
+        const filtered = previousSelection.filter((column) => availableMetadataColumns.includes(column));
+        if (filtered.length === previousSelection.length) return previousSelection;
+        return filtered;
+      });
     });
   }, [availableMetadataColumns, availableMetadataColumnsKey]);
 
@@ -865,7 +867,7 @@ const AiAnnotatorFeature: React.FC = () => {
     !currentWorkspaceId || !selectedNodeId || !reviewTextColumn || !reviewAnnotationColumn || isReviewLoading;
 
   useEffect(() => {
-    setReviewEdits({});
+    Promise.resolve().then(() => setReviewEdits({}));
   }, [resultNodeId, page, pageSize]);
 
 

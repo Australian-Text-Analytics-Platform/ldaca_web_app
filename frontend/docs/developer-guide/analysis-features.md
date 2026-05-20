@@ -1,27 +1,78 @@
 # Analysis Feature Patterns
 
-**Scope statement:** This page summarizes the shared patterns used by analysis tabs.
+Analysis tabs share the same high-level lifecycle: lock a valid node selection,
+submit or hydrate a request, follow task status through SSE, and refresh result
+data only after terminal task events.
 
-## 1) Shared analysis helpers
+## Shared Lifecycle
 
-**Question:** *Which helpers should new analysis tabs reuse?*
+`features/analysis/common/hooks/useAnalysisFeature.ts` is the generic analysis
+state machine. It handles:
 
-**Answer:** Use the shared utilities in `src/features/analysis/common` (hydration, lock state, color palette, node column options).
+- local task id state,
+- running/locked state,
+- current request/result hydration from backend endpoints,
+- terminal result fetch,
+- clear/reset behavior,
+- request snapshots.
 
-## 2) Task lifecycle
+`features/analysis/common/tasks/useAnalysisTaskFlow.ts` connects an analysis
+tab to the task stream. It refreshes results only when the relevant task reaches
+a terminal state and the tab is active.
 
-**Question:** *How should tabs handle background tasks?*
+## Selection And Colors
 
-**Answer:** Store `task_id` from the backend response, subscribe to the task stream (SSE), and refresh results **only when a task reaches a terminal state and the tab is active**. Polling is intentionally disabled; the task stream is the source of truth.
+Analysis tabs use the current workspace selection but apply feature-specific
+caps:
 
-## 3) Results persistence
+- token frequency, concordance, and topic modeling allow one or two document
+  nodes;
+- sequential analysis, quotation, and AI annotation use one node;
+- preprocessing and export have separate active-node rules.
 
-**Question:** *How do I keep results after refresh?*
+`useNodeColorManagement` coordinates per-tab temp colors and committed node
+colors. A successful run promotes participating temp colors to assigned colors.
 
-**Answer:** Use the backend’s `current-request` and `current-result` endpoints and hydrate state when the tab becomes active.
+## Token Frequency
 
-## Recap
+Token frequency submits worker jobs, supports one-corpus or two-corpus
+comparison, applies stop words and token limits, and exports result tables.
+Pairwise keyness treats the second selected node as the study corpus and the
+first as the reference corpus.
 
-**Question:** *What should I check before shipping a new tab?*
+## Concordance
 
-**Answer:** Confirm the tab follows the container‑view pattern, uses shared analysis helpers, and handles task cancellation via `task_id`.
+Concordance supports regex and token modes, metadata columns, table and
+dispersion views, bin selection, detach, dispersion detach, and materialized
+result paging. It can receive a pending handoff from token frequency.
+
+## Quotation
+
+Quotation runs local or remote quote extraction depending on the user's
+preference. The tab manages engine configuration, grouped quote rows, metadata
+columns, result materialization, and detach.
+
+## Topic Modeling
+
+Topic modeling submits BERTopic/embedding work through backend workers. The UI
+handles exact/min topic size modes, sampling per corpus, random seed,
+representative words, stop-word display filtering, embedding cache state, and
+chart interactions.
+
+## Sequential Analysis
+
+Sequential analysis runs trend grouping over one node. It supports datetime,
+integer, and float time columns, frequency/custom intervals, chart export,
+selected-period detach, and snapshot capture at configurable granularity.
+
+## AI Annotation
+
+AI annotation calls backend OpenAI classification endpoints, manages providers
+and categories, and can detach saved labels into a workspace node.
+
+## Adding A New Analysis Tab
+
+Start from the shared common hooks. Add feature-specific API wrappers under
+`src/api/text/`, keep task refresh event-driven, and expose detach or
+materialize flows only through workspace actions so graph invalidation remains
+centralized.

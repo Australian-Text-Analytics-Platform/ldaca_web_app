@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 
 import { useRegistryStore } from './registryStore';
 
@@ -28,11 +28,8 @@ export const DocsEolBanner: React.FC = () => {
   // banner appear until they reload — acceptable for a "docs version
   // retired" nudge that's already informational rather than time-critical.
   const [evaluatedAt] = useState(() => Date.now());
-  const isPastEol = useMemo(() => {
-    if (!eolDate) return false;
-    const parsed = Date.parse(eolDate);
-    return !Number.isNaN(parsed) && parsed <= evaluatedAt;
-  }, [eolDate, evaluatedAt]);
+  const parsedEolDate = eolDate ? Date.parse(eolDate) : Number.NaN;
+  const isPastEol = !Number.isNaN(parsedEolDate) && parsedEolDate <= evaluatedAt;
 
   if (!isPastEol || !eolDate) return null;
   if (version && dismissedFor === version) return null;

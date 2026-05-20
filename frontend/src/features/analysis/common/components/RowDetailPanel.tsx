@@ -3,6 +3,7 @@ import React from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -101,6 +102,9 @@ export const RowDetailPanel: React.FC<RowDetailPanelProps> = ({
       <DialogContent className="max-w-4xl w-full max-h-[80vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Row Details{titleSuffix}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Full row text and metadata for the selected result.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[calc(80vh-120px)] pr-1">

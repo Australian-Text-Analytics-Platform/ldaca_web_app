@@ -64,16 +64,7 @@ export interface NodeSelectionConfig {
 
 export interface ExpressionConfig {
   expression: string;
-  setExpression: (value: string) => void;
   columnName: string;
-  setColumnName: (value: string) => void;
-  focused: {
-    expression: boolean;
-    columnName: boolean;
-  };
-  onExpressionFocus: () => void;
-  onExpressionBlur: () => void;
-  onColumnNameFocus: () => void;
   onColumnNameBlur: () => void;
   onChange: {
     columnName: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -199,8 +190,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const [columnName, setColumnName] = useState('new_column');
   const [applyLoading, setApplyLoading] = useState(false);
   const [lastAppliedExpression, setLastAppliedExpression] = useState<string | null>(null);
-  const [expressionFocused, setExpressionFocused] = useState(false);
-  const [columnNameFocused, setColumnNameFocused] = useState(false);
   const [basicTokens, setBasicTokens] = useState<BasicToken[]>([]);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
   const [basicDragActive, setBasicDragActive] = useState(false);
@@ -212,27 +201,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const customOriginalRef = useRef<string>('');
   const dropZoneRef = useRef<HTMLDivElement | null>(null);
   const latestExpressionRef = useRef('');
-  const latestColumnNameRef = useRef('');
+  const latestColumnNameRef = useRef('new_column');
   const lastDragPayloadRef = useRef<DragPayload | null>(null);
-
-  useEffect(() => {
-    setLastAppliedExpression(null);
-    setBasicTokens([]);
-    setEditingTokenId(null);
-    setDropIndicator(null);
-    setBasicDragActive(false);
-    setCustomDraft('');
-    setCommittedExpression('');
-    setCommittedColumnName('');
-  }, [limitedNodeId, selectedNodeId]);
-
-  useEffect(() => {
-    latestExpressionRef.current = expression;
-  }, [expression]);
-
-  useEffect(() => {
-    latestColumnNameRef.current = columnName;
-  }, [columnName]);
 
   const workspaceNodeMap = (() => {
     const map = new Map<string, WorkspaceNodeLike>();
@@ -254,7 +224,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   })();
 
   const hasSelection = Boolean(activeNodeId);
-  const trimmedExpression = latestExpressionRef.current.trim();
+  const trimmedExpression = expression.trim();
   const basicDisabled = !hasSelection || isLoading.operations;
 
   const availableColumns: ColumnInfo[] = (() => {
@@ -705,22 +675,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setColumnName(next);
     };
 
-  const handleExpressionBlur = () => {
-    setExpressionFocused(false);
-    commitExpression();
-  };
-
   const handleColumnBlur = () => {
-    setColumnNameFocused(false);
     commitExpression();
-  };
-
-  const handleExpressionFocus = () => {
-    setExpressionFocused(true);
-  };
-
-  const handleColumnFocus = () => {
-    setColumnNameFocused(true);
   };
 
   const handleCustomDraftChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -756,16 +712,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     },
     expression: {
       expression,
-      setExpression: setExpressionAndMarkDirty,
       columnName,
-      setColumnName,
-      focused: {
-        expression: expressionFocused,
-        columnName: columnNameFocused,
-      },
-      onExpressionFocus: handleExpressionFocus,
-      onExpressionBlur: handleExpressionBlur,
-      onColumnNameFocus: handleColumnFocus,
       onColumnNameBlur: handleColumnBlur,
       onChange: {
         columnName: handleColumnNameChange,

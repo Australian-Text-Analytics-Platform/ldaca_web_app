@@ -33,7 +33,7 @@ const MAX_FILE_TREE_HEIGHT_REM = 40;
 export const DataLoaderFeature: React.FC = () => {
   const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
-  const { dataFolder, getAuthHeaders } = useAuth({ autoStart: true, debugLabel: 'DataLoaderFeature' });
+  const { dataFolder, getAuthHeaders } = useAuth({ autoStart: true });
   const authHeaders = getAuthHeaders();
 
   const {

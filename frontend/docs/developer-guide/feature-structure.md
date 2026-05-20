@@ -1,27 +1,78 @@
-# Frontend Feature Structure
+# Feature Structure
 
-**Scope statement:** This page documents the feature‑first folder conventions used in the frontend.
+The frontend uses feature-first folders. Shared UI primitives live under
+`src/components/`, but workflow logic belongs in the owning feature directory.
 
-## 1) Workspace features
+## App Shell
 
-**Question:** *Where do workspace UI surfaces live?*
+`src/App.tsx` is the app composition point. It:
 
-**Answer:** Under `src/features/workspace/` with `components/`, `hooks/`, and `services/` per surface.
+- hydrates the documentation registry,
+- waits for backend health,
+- initializes auth and preferences,
+- sets up the query and workspace providers,
+- renders the sidebar, active feature route, and right-side workspace panel.
 
-## 2) Preprocessing features
+`ViewRouter.tsx` maps the current view id from `uiStore` to a lazy feature
+component.
 
-**Question:** *How are preprocessing subtabs organized?*
+## Workspace Features
 
-**Answer:** Each subtab lives under `src/features/preprocessing/<subtab>/` and shares preview helpers from `src/features/preprocessing/`.
+`src/features/workspace/` contains the persistent right-side workspace surface:
 
-## 3) Analysis features
+- `common/` provides `WorkspaceProvider` and workspace hooks.
+- `graph-view/` maps backend graph data into React Flow nodes and edges.
+- `data-view/` renders the selected node's paginated table and column actions.
+- `task-stream/` owns the SSE client and task event integration.
 
-**Question:** *Where do analysis tabs live?*
+Workspace code should consume the slice hooks from `WorkspaceContext`, not a
+monolithic workspace object.
 
-**Answer:** Under `src/features/analysis/<feature>/` with shared helpers in `src/features/analysis/common`.
+## Data Loader
 
-## Recap
+`src/features/data-loader/` owns workspace and file management:
 
-**Question:** *What makes a feature “done”?*
+- active workspace card,
+- workspace manager card,
+- file tree, preview, upload, and add-to-workspace flows,
+- sample data and demo snapshot import,
+- LDaCA import task submission.
 
-**Answer:** The container owns orchestration, the view is pure, and services expose reusable helpers for API calls and formatting.
+It blocks destructive workspace changes while active tasks exist.
+
+## Preprocessing
+
+`src/features/preprocessing/` contains reusable preprocessing subfeatures:
+
+- filter,
+- sample/slice,
+- join,
+- stack/concat,
+- find/replace,
+- create/aggregate,
+- Polars expression.
+
+Each subfeature owns its form state and preview/apply hooks, then delegates the
+actual workspace mutation to `useWorkspaceActions()`.
+
+## Analysis
+
+`src/features/analysis/` contains text-analysis tabs:
+
+- token frequency,
+- concordance,
+- sequential analysis/trends,
+- topic modeling,
+- quotation,
+- AI annotator,
+- export.
+
+Shared analysis lifecycle code lives in `analysis/common/`. New analysis tabs
+should start there before introducing feature-local task, color, or result
+hydration logic.
+
+## Hints, Docs, And Help
+
+`src/features/hints/` and `src/tutorials/` support contextual docs. Help/info
+icons reference literal registry keys. `frontend/scripts/check-docs-drift.mjs`
+scans those literals and fails if a key is missing from the bundled registry.

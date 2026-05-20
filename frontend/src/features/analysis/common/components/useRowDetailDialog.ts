@@ -11,15 +11,10 @@ export function useRowDetailDialog() {
     setDetailOpen(true);
   };
 
-  const closeDetail = () => {
-    setDetailOpen(false);
-  };
-
   return {
     detailPayload,
     detailOpen,
     setDetailOpen,
     openDetail,
-    closeDetail,
   };
 }

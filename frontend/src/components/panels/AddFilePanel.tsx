@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import { useFilePreview } from '../../hooks/useFilePreview';
 import { SUPPORTED_LANGUAGES } from '@/lib/languages';
@@ -16,6 +16,33 @@ interface AddFilePanelProps {
 }
 
 export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onClose, onConfirm }) => {
+  const isOpen = open && Boolean(filename);
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose();
+        }
+      }}
+    >
+      {isOpen && filename && (
+        <AddFilePanelContent
+          filename={filename}
+          onClose={onClose}
+          onConfirm={onConfirm}
+        />
+      )}
+    </Dialog>
+  );
+};
+
+function AddFilePanelContent({
+  filename,
+  onClose,
+  onConfirm,
+}: Omit<AddFilePanelProps, 'open'> & { filename: string }) {
   const {
     previewData,
     columns,
@@ -25,7 +52,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
     sheetNames,
     selectedSheet,
     setSelectedSheet,
-  } = useFilePreview(filename, open);
+  } = useFilePreview(filename, true);
 
   // Phase 4.2: language selector. Selecting a non-English language here
   // updates the per-user ``defaultLanguage`` preference, which the
@@ -37,12 +64,6 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
   const selectedLanguage = defaultLanguage ?? 'en';
 
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!open) {
-      setSubmitting(false);
-    }
-  }, [open]);
 
   const handleClose = () => {
     onClose();
@@ -60,15 +81,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
   };
 
   return (
-    <Dialog
-      open={open && Boolean(filename)}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          handleClose();
-        }
-      }}
-    >
-      <DialogContent className="w-full max-w-[min(80vw,960px)] border-none bg-transparent p-0 shadow-none">
+    <DialogContent className="w-full max-w-[min(80vw,960px)] border-none bg-transparent p-0 shadow-none">
         <DialogHeader className="sr-only">
           <DialogTitle>{filename ? `Add file: ${filename}` : 'Add file to workspace'}</DialogTitle>
           <DialogDescription>Files are added as data blocks automatically. Choose an optional sheet, inspect the preview, and confirm.</DialogDescription>
@@ -198,9 +211,8 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
             </div>
           </CardFooter>
         </Card>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
-};
+}
 
 export default AddFilePanel;
