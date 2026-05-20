@@ -32,8 +32,14 @@ interface PreviewTableProps {
 }
 
 function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow, unknown>[] {
+  // Use `accessorFn` instead of `accessorKey` so column names containing
+  // dots (e.g. `__derived__.tokens.<source>.<model>`) aren't interpreted
+  // by TanStack Table as nested-object paths. Without this, every render
+  // logs "X in deeply nested key Y returned undefined" warnings for each
+  // derived tokens column.
   return columnsToRender.map((col) => ({
-    accessorKey: col,
+    id: col,
+    accessorFn: (row: PreviewRow) => (row as Record<string, unknown>)[col],
     header: col,
     cell: ({ getValue }) => formatPreviewValue(getValue()),
   }));
