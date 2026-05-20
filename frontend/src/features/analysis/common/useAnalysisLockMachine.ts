@@ -171,16 +171,32 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
 
   const panelSelectedNodes: WorkspaceNodeLike[] = (() => {
     if (isLocked && lockedNodesSnapshot.length > 0) {
-      return lockedNodesSnapshot.map((snapshot) => {
-        // The lock snapshot is intentionally narrow (id/name/columns/shape),
-        // but downstream features (tokens-mode auto-pick, language inference)
-        // need ``derived`` metadata too. Pull it from the live graph node when
-        // the same id still exists in the workspace — falls back to undefined
-        // when the source node has since been removed.
-        const live = selectedNodes.find((n) => n.id === snapshot.id) as
-          | Record<string, unknown>
-          | undefined;
-        return {
+      // The lock snapshot is intentionally narrow (id/name/columns/shape),
+      // but downstream features (tokens-mode auto-pick, language inference)
+      // need ``derived`` metadata too. Pull it from the live graph node when
+      // the same id still exists in the workspace — falls back to undefined
+      // when the source node has since been removed.
+      //
+      // Iterate ``selectedNodes`` (workspace selection order) rather than
+      // ``lockedNodesSnapshot`` (request/node_ids order) so the panel
+      // display order matches what the user saw before clicking Run — the
+      // token-frequency study radio puts the picked block last in
+      // node_ids, and iterating the snapshot directly would flip the
+      // visual radio order after Run. Snapshot data is still authoritative
+      // for the per-node fields; only the iteration order changes.
+      const snapshotById = new Map(
+        lockedNodesSnapshot.map((snap) => [snap.id, snap]),
+      );
+      const decorated: WorkspaceNodeLike[] = [];
+      const consumed = new Set<string>();
+      for (const live of selectedNodes) {
+        const id = (live as Record<string, unknown>).id;
+        if (typeof id !== 'string') continue;
+        const snapshot = snapshotById.get(id);
+        if (!snapshot) continue;
+        consumed.add(id);
+        const liveRec = live as Record<string, unknown>;
+        decorated.push({
           id: snapshot.id,
           name: snapshot.name,
           shape: snapshot.shape,
@@ -192,10 +208,31 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
             columns: snapshot.columns,
           },
           columns: snapshot.columns,
-          derived: live?.derived,
-          derived_columns: live?.derived_columns,
-        };
-      });
+          derived: liveRec.derived,
+          derived_columns: liveRec.derived_columns,
+        });
+      }
+      // Fall through: any snapshot entries that the live workspace
+      // selection no longer contains (the user deselected mid-lock)
+      // still need to appear so the panel can finish rendering its
+      // per-node UI. Append them in their original snapshot order.
+      for (const snapshot of lockedNodesSnapshot) {
+        if (consumed.has(snapshot.id)) continue;
+        decorated.push({
+          id: snapshot.id,
+          name: snapshot.name,
+          shape: snapshot.shape,
+          data: {
+            id: snapshot.id,
+            name: snapshot.name,
+            nodeName: snapshot.name,
+            label: snapshot.name,
+            columns: snapshot.columns,
+          },
+          columns: snapshot.columns,
+        });
+      }
+      return decorated;
     }
 
     return selectedNodes as WorkspaceNodeLike[];

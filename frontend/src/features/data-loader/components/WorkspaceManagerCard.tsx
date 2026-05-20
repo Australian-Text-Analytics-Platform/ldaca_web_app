@@ -15,6 +15,15 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 import { formatBytes, formatTimestamp, getWorkspaceId } from '../utils/format';
 import type { PendingWorkspaceDownloadsHandle } from '../hooks/usePendingWorkspaceDownloads';
 
+// TEMP — hide workspace upload + per-row download buttons until the
+// lazy-plan cache deserialisation issue is resolved (tokenised nodes
+// can't round-trip through a shared ZIP because their cached parquet
+// files aren't carried with the workspace metadata; loading a shared
+// workspace breaks the entire graph). Flip back to `true` once the
+// tokenise step re-runs lazily on cache miss instead of failing the
+// plan deserialise. See HANDOVER.md for the design discussion.
+const WORKSPACE_TRANSFER_ENABLED = false;
+
 export type WorkspaceListItem = {
   id?: string;
   unique_id?: string;
@@ -89,22 +98,26 @@ export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
             />
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => zipInputRef.current?.click()}
-              disabled={uploadingZip || busy}
-            >
-              <Upload className="mr-1.5 h-4 w-4" />
-              {uploadingZip ? 'Uploading…' : 'Upload workspace'}
-            </Button>
-            <input
-              ref={zipInputRef}
-              type="file"
-              accept=".zip,application/zip"
-              className="hidden"
-              onChange={handleZipChange}
-            />
+            {WORKSPACE_TRANSFER_ENABLED ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => zipInputRef.current?.click()}
+                  disabled={uploadingZip || busy}
+                >
+                  <Upload className="mr-1.5 h-4 w-4" />
+                  {uploadingZip ? 'Uploading…' : 'Upload workspace'}
+                </Button>
+                <input
+                  ref={zipInputRef}
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="hidden"
+                  onChange={handleZipChange}
+                />
+              </>
+            ) : null}
             <Button
               size="icon"
               variant="ghost"
@@ -202,19 +215,21 @@ export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
                         {isActive ? 'Unload' : 'Load'}
                       </Button>
                     </DisabledReasonTooltip>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void downloads.startDownload(workspaceId, workspace.name || workspaceId)}
-                      disabled={downloads.isStarting(workspaceId) || downloads.isPending(workspaceId)}
-                    >
-                      <DownloadIcon className="mr-1.5 h-4 w-4" />
-                      {downloads.isPending(workspaceId)
-                        ? 'Preparing…'
-                        : downloads.isStarting(workspaceId)
-                          ? 'Starting…'
-                          : 'Download'}
-                    </Button>
+                    {WORKSPACE_TRANSFER_ENABLED ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void downloads.startDownload(workspaceId, workspace.name || workspaceId)}
+                        disabled={downloads.isStarting(workspaceId) || downloads.isPending(workspaceId)}
+                      >
+                        <DownloadIcon className="mr-1.5 h-4 w-4" />
+                        {downloads.isPending(workspaceId)
+                          ? 'Preparing…'
+                          : downloads.isStarting(workspaceId)
+                            ? 'Starting…'
+                            : 'Download'}
+                      </Button>
+                    ) : null}
                     <Button size="sm" variant="destructive" onClick={() => onDeleteWorkspace(workspaceId)}>
                       <Trash2 className="mr-1.5 h-4 w-4" /> Delete
                     </Button>
