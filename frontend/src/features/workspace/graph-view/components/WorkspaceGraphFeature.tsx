@@ -113,10 +113,11 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
   return (
     <div className="relative h-full w-full">
       {/* Banner is an absolute overlay so it doesn't shrink the graph
-        canvas and stays bounded width — full-width was overflowing the
-        workspace view on smaller screens. Sits below the selection
-        overlay so they don't fight for the top-left corner. */}
-      <div className="absolute top-4 left-32 right-16 z-20 pointer-events-none flex justify-center">
+        canvas and stays bounded width. Insets are tight (left-4 right-4)
+        so the banner can fit even when the workspace panel is narrow;
+        on wider panels the inner ``max-w-xl`` caps it at a readable
+        width and the flex-justify-center keeps it centred. */}
+      <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none flex justify-center">
         <div className="pointer-events-auto w-full max-w-xl">
           <TokensCacheRepairBanner />
         </div>
