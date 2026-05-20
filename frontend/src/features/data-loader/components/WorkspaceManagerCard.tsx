@@ -15,14 +15,16 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 import { formatBytes, formatTimestamp, getWorkspaceId } from '../utils/format';
 import type { PendingWorkspaceDownloadsHandle } from '../hooks/usePendingWorkspaceDownloads';
 
-// TEMP — hide workspace upload + per-row download buttons until the
-// lazy-plan cache deserialisation issue is resolved (tokenised nodes
-// can't round-trip through a shared ZIP because their cached parquet
-// files aren't carried with the workspace metadata; loading a shared
-// workspace breaks the entire graph). Flip back to `true` once the
-// tokenise step re-runs lazily on cache miss instead of failing the
-// plan deserialise. See HANDOVER.md for the design discussion.
-const WORKSPACE_TRANSFER_ENABLED = false;
+// Workspace ZIP upload/download was previously disabled because tokenised
+// nodes broke on transfer: the donor's absolute tokens-cache parquet paths
+// were baked into the lazy plan and the receiver had no such files. Fixed
+// by the workspace-load tokens-cache repair pass — missing cache files are
+// remapped to the receiver's cache (when present) or replaced with empty
+// stubs (so the plan deserialises without crashing). Users see a banner
+// listing nodes whose tokens cache was stubbed; re-tokenising restores
+// real tokens. See backend/docs/developer-guide/tokens-cache-portability.md
+// and TokensCacheRepairBanner.tsx.
+const WORKSPACE_TRANSFER_ENABLED = true;
 
 export type WorkspaceListItem = {
   id?: string;
