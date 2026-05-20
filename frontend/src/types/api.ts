@@ -61,7 +61,20 @@ export interface GraphEdge {
   target: string;
 }
 
+/**
+ * State written by the backend's workspace-load tokens-cache repair pass.
+ * Present in the graph response only when the most-recent load stubbed at
+ * least one node's cache (i.e. cross-machine workspace transfer where the
+ * receiver doesn't have the donor's cache files). Cleared automatically as
+ * the user retokenises each listed node. See backend docs:
+ * developer-guide/tokens-cache-portability.md.
+ */
+export interface TokensCacheRepairState {
+  stubbed_node_ids: string[];
+}
+
 export interface WorkspaceGraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  tokens_cache_repair?: TokensCacheRepairState;
 }

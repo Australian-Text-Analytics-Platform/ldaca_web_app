@@ -16,6 +16,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { useWorkspaceGraph } from '../hooks/useWorkspaceGraph';
+import { TokensCacheRepairBanner } from './TokensCacheRepairBanner';
 
 export interface WorkspaceGraphFeatureProps {
   fallback?: ReactNode;
@@ -110,10 +111,16 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
   }
 
   return (
-    <div className="relative h-full w-full">
-      <GraphSelectionOverlay selected={graph.selectedCount} total={graph.totalNodes} />
+    <div className="relative flex h-full w-full flex-col">
+      {/* Banner sits above the graph so users see it on the canonical
+        "this is your workspace" page after a cross-machine load. */}
+      <div className="px-4 pt-4">
+        <TokensCacheRepairBanner />
+      </div>
+      <div className="relative flex-1">
+        <GraphSelectionOverlay selected={graph.selectedCount} total={graph.totalNodes} />
 
-      <ReactFlow
+        <ReactFlow
         nodes={graph.nodes}
         edges={graph.edges}
         nodeTypes={graph.nodeTypes as unknown as NodeTypes}
@@ -149,7 +156,8 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         {showOverview && (
           <MiniMap position="bottom-right" nodeColor="#e2e8f0" maskColor="rgba(255, 255, 255, 0.8)" />
         )}
-      </ReactFlow>
+        </ReactFlow>
+      </div>
     </div>
   );
 }

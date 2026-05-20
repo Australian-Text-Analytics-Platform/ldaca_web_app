@@ -297,23 +297,11 @@ describe('DataLoaderFeature citation UI', () => {
     });
   });
 
-  it('hides workspace upload and download controls while transfer is disabled', () => {
-    // WorkspaceManagerCard sets WORKSPACE_TRANSFER_ENABLED=false until the
-    // lazy-plan cache deserialisation issue is resolved (tokenised nodes
-    // can't round-trip through a shared ZIP because the parquet cache files
-    // aren't carried with the workspace metadata). When the flag flips back
-    // to true, restore the original positive assertions.
+  it('renders workspace upload and download controls', () => {
     renderWithProviders(<DataLoaderFeature />);
 
-    expect(screen.queryByRole('button', { name: /upload workspace/i })).not.toBeInTheDocument();
-    // Per-file download buttons live elsewhere on the page; the workspace-row
-    // download button is the one gated by the transfer flag. Scope the check
-    // to the workspace-manager row so it doesn't catch unrelated downloads.
-    const workspaceRows = screen.getAllByTestId(/^workspace-manager-item-/);
-    expect(workspaceRows.length).toBeGreaterThan(0);
-    for (const row of workspaceRows) {
-      expect(within(row).queryByRole('button', { name: /download/i })).not.toBeInTheDocument();
-    }
+    expect(screen.getAllByRole('button', { name: /upload workspace/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /download/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByText('0 data blocks').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();
   });
