@@ -4,7 +4,6 @@ import { WorkspaceDataView } from './WorkspaceDataView';
 import { WorkspaceControls } from './WorkspaceControls';
 import { InsetCard } from './InsetCard';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
-import { TokensCacheRepairBanner } from '@/features/workspace/graph-view/components/TokensCacheRepairBanner';
 
 /**
  * Stacked workspace view: graph on top, data table on bottom, with a
@@ -38,17 +37,6 @@ const WorkspaceView: React.FC = () => {
         <div className="p-2 bg-muted border-b border-border shrink-0">
           <WorkspaceControls />
         </div>
-        {/* Banner lives as a normal in-flow sibling above the graph rather
-            than as an absolute overlay inside WorkspaceGraphFeature. That
-            previous placement triggered a Chrome-specific rendering bug
-            where ReactFlow's internal viewport (scrollWidth ≈ 2282 with
-            clientWidth ≈ 666 — its full unscaled canvas) propagated
-            through the absolute-banner sibling and pushed the page to
-            horizontally scroll. Safari handled the same DOM correctly,
-            confirming the issue was Chrome-specific. In-flow placement
-            here means the banner never overlaps ReactFlow at all and
-            ReactFlow's overflow-hidden does its job in both browsers. */}
-        <TokensCacheRepairBanner />
         <div className="flex-1 min-h-0">
           <WorkspaceGraphView />
         </div>

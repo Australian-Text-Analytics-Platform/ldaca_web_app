@@ -15,15 +15,11 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 import { formatBytes, formatTimestamp, getWorkspaceId } from '../utils/format';
 import type { PendingWorkspaceDownloadsHandle } from '../hooks/usePendingWorkspaceDownloads';
 
-// Workspace ZIP upload/download was previously disabled because tokenised
-// nodes broke on transfer: the donor's absolute tokens-cache parquet paths
-// were baked into the lazy plan and the receiver had no such files. Fixed
-// by the workspace-load tokens-cache repair pass — missing cache files are
-// remapped to the receiver's cache (when present) or replaced with empty
-// stubs (so the plan deserialises without crashing). Users see a banner
-// listing nodes whose tokens cache was stubbed; re-tokenising restores
-// real tokens. See backend/docs/developer-guide/tokens-cache-portability.md
-// and TokensCacheRepairBanner.tsx.
+// Workspace ZIP upload/download is enabled because tokenised nodes are now
+// cross-machine portable by construction: the lazy tokens-cache expression
+// resolves its cache directory at execution time, never bakes paths into
+// the serialised plan, and treats missing cache files as cache misses
+// (recompute on demand). See backend docs/developer-guide/lazy-tokenisation-refactor.md.
 const WORKSPACE_TRANSFER_ENABLED = true;
 
 export type WorkspaceListItem = {
