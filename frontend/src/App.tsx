@@ -17,6 +17,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
 import { Toaster } from './components/ui/sonner';
 import { DocumentModalHost } from './components/dialogs/DocumentModalHost';
+// TEMPORARY (Phase 2/2.5) — remove import + the <LazyTokeniseDevBadge />
+// mount below before publishing. See component file for full removal list.
+import { LazyTokeniseDevBadge } from './components/_dev/LazyTokeniseDevBadge';
 import { ViewRouter } from './components/layout/ViewRouter';
 import { LAG_HINT_DELAY_MS } from './config/timings';
 import { useResizableSplit } from './hooks/useResizableSplit';
@@ -211,6 +214,8 @@ const WorkspaceShell: React.FC = () => {
             style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` } as React.CSSProperties}
           >
             <DocumentModalHost />
+            {/* TEMPORARY (Phase 2/2.5) — remove before publishing. */}
+            <LazyTokeniseDevBadge />
 
             <RefreshStatusBanner />
             <Suspense fallback={null}>
