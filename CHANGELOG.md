@@ -3,6 +3,51 @@
 User-facing changes to the LDaCA Wordflow (previously "LDaCA Text Analytics Web Application") since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.1] — 2026-05-21
+
+Two themes:
+
+1. **Multi-user tokens-cache safety.** A workspace tokenised by user A and shared with user B no longer writes cache parquets into A's folder when B runs analyses — B's cache stays in B's own tree, full stop. Matters for the Nectar multi-user deployment and for any future filesystem where ACLs aren't relied on for separation.
+
+2. **Lazy on-demand tokenisation by default.** The cache is now a *side effect* of analysis (filled lazily on the first collect), not something the user manages explicitly. Tokenise dialog completes instantly; the per-row tokens fill in the bucket parquet on demand under an advisory lock. The Phase 2.5 "repair banner" + cross-machine workspace repair flow is gone, replaced by an automatic plan-time alignment hook that handles cross-user, cross-machine, and cross-OS path differences uniformly.
+
+Plus the usual sweep of analysis polish, copy fixes, and a graph-rendering safety fix that surfaces in PyPI users for the first time via `docworkspace>=0.2.9`.
+
+### Added
+
+- **Concordance: L1/R1 columns now sit adjacent to the match, with duplicates dimmed in-place and a per-column text-colour picker.** New "Hide L1/R1" toggle keeps the tighter table layout available when those columns aren't useful for the current corpus. Picker palette derives from the active node colour and defaults to hidden until the user opts in.
+- **Token-frequency: persist last-used language + model to preferences** so re-opening the dialog defaults to whatever the user picked last, not whatever was first in the registry.
+
+### Changed
+
+- **Token-frequency "Reference Data Block" selector renamed to "Study Data Block"** to match the analysis-card language already used elsewhere.
+- **Token-frequency: radio order + default reshuffled**, transfer-cache UI hidden (its only consumer was the retired repair banner), XLM tokeniser strip cleaned up.
+- **Tokens cache now lives at `{data_root}/<user_data_folder>/<user_dir>/user_cache/tokens/`** — sibling of `embeddings/` and `snapshots/`, inside each user's own folder. The previous `{data_root}/.cache/<user>/tokens/` umbrella was readable by every authenticated user via the data-loader, which on a multi-user host effectively shared raw tokenised document content across accounts.
+- **Auto-migrate eager-tokenised workspaces to the lazy form on load.** v0.5.0 and earlier workspaces that contain pre-materialised tokens columns are rewritten on first open; no user-visible action required.
+- **Tokens cache: opportunistic compaction.** Per-bucket delta parquets roll up to a single base parquet in the background once the threshold is crossed, capped per call so it never blocks `tokenise_column`. Triggers on each tokenise call and at backend startup.
+
+### Fixed
+
+- **Workspace-load alignment for cross-user-imported workspaces.** Opening a workspace whose lazy tokens expression was baked under another user's cache path now scrubs and re-stamps the expression under the current user's identity at load time. Path comparison (not user-id comparison) also catches single-user → multi-user migrations and cross-OS path-normalisation cases. Best-effort: a single bad node logs and skips rather than blocking the whole load.
+- **Manage Tokens · Delete now actually removes the underlying lazy expression.** Previously `LazyFrame.drop()` only hid the column from the schema; the `tokenize_with_cache_lookup` plugin call stayed alive in the serialised plan, accumulating dead expressions across re-tokenisations and (in shared workspaces) firing writes to the original author's tree. Both the user-triggered delete and the implicit re-tokenise replace now use `polars_text.scrub_plugin_expressions` so `.plbin` plans stay minimal.
+- **One broken node no longer breaks the workspace graph endpoint** (`docworkspace>=0.2.9`). A failing `Node.info()` (e.g. source parquet moved or deleted) now returns a per-node error envelope while sibling nodes render normally; previously the whole graph view 500'd. Already in source-checkout users since v0.5.0; this release brings it to `pip install` users too.
+- **Python and Rust now resolve the tokens-cache directory the same way.** Previously each could fall back to a different default path when `LDACA_TOKENS_CACHE_DIR` was unset; the backend startup hook now sets the env unconditionally, and the manifest writes / cache parquet writes always land in the same directory.
+- **Mojibake repair at the data-loader boundary.** UTF-8 strings that were re-encoded through CP-1252 (the classic "Ã©" / "â€™" garbage) are detected and repaired on load via `ftfy`, gated to the encoding fixers only so the repair is safe on CJK / Arabic / Cyrillic corpora.
+- **SentencePiece tokens no longer carry the leading `▁` prefix** when read back from cache — the strip happens at cache-write time so historical caches re-read cleanly too.
+- **Token-frequency: %DIFF + LogRatio formulas aligned with the Lancaster wizard** so cross-tool keyness comparisons agree to the published reference.
+- **Concordance dispersion detach: embedded newlines stripped** from the extract text so the detached node's preview table stays one row per hit.
+- **Graph: data-block rename commits on blur**, not just on Enter — same behaviour the rest of the app already has.
+- **Graph: ResizeObserver attached via callback ref** so it actually fires on first mount in some browsers.
+- **Concordance: search-mode override clears when tokens become unavailable** (e.g. after deleting the source's derived tokens column).
+- **Docs: tutorial modal stays open when an in-doc anchor is missing** instead of closing silently.
+- **Node colour assignment excludes grey** from both the random and positional auto-assign paths — grey is reserved for the "disabled" semantic.
+- **TanStack table no longer warns about "deeply nested keys"** for derived columns whose names contain dots — `accessorFn` replaces the dotted `accessorKey` so the table reads the field literally.
+- **CI verify-versions gate works on a fresh checkout.** The workflow now uses recursive submodule checkout, so the version-drift check sees the same five sources the bumper writes.
+
+### Security
+
+- **Dependabot alerts cleared.** Backend Python deps and frontend Tauri / bytes / postcss bumped to versions without open advisories.
+
 ## [0.5.0] — 2026-05-17
 
 Demo snapshots: save a frozen view of any analysis to a small `.ldaca-snapshot` bundle, then re-open it later (or share with a collaborator) without re-running the analysis. Snapshots ship with the dataset rows, parameters, and chart state required to re-render exactly what was on screen. Every one of the five analysis tools — Concordance, Quotation, Trends, Token Frequency, Topic Modelling — now has Save / Open buttons in its header and a banner-flagged read-only viewer for loaded snapshots.
