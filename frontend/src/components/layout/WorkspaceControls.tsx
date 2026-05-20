@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -15,17 +17,34 @@ import {
 import { Button } from '@/components/ui/button';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import HelpIcon from '@/components/help/HelpIcon';
+import { useAuth } from '@/hooks/useAuth';
+import { nodesApi } from '@/api/nodes';
+import { queryKeys } from '@/lib/queryKeys';
+import { parseDerivedColumn } from '@/types/index';
+import type { GraphNode } from '@/types/api';
 
 const MIN_BATCH_DELETE_COUNT = 3;
+const MIN_BATCH_RETOKENISE_COUNT = 2;
+
+function nodeHasTokensForm(node: GraphNode | undefined): boolean {
+  const derived = node?.derived_columns;
+  if (!Array.isArray(derived) || derived.length === 0) return false;
+  return derived.some((raw) => {
+    if (typeof raw !== 'string') return false;
+    return parseDerivedColumn(raw)?.form === 'tokens';
+  });
+}
 
 /**
  * Separated controls component focused only on workspace controls
  * Removed view mode toggle since both views are now shown vertically
  */
 export const WorkspaceControls: React.FC = () => {
-  const { currentWorkspace, workspaceGraph } = useWorkspaceData();
+  const { currentWorkspace, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { renameWorkspace, deleteNode, clearSelection } = useWorkspaceActions();
   const { selectedNodeIds } = useWorkspaceSelection();
+  const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState(currentWorkspace?.name || '');
@@ -33,6 +52,8 @@ export const WorkspaceControls: React.FC = () => {
   const [nameAlertMessage, setNameAlertMessage] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [retokeniseConfirmOpen, setRetokeniseConfirmOpen] = useState(false);
+  const [isRetokenising, setIsRetokenising] = useState(false);
 
   useEffect(() => {
     setNameInput(currentWorkspace?.name || '');
@@ -63,6 +84,65 @@ export const WorkspaceControls: React.FC = () => {
       return a.name.localeCompare(b.name);
     });
   }, [workspaceGraph, selectedNodeIds]);
+
+  // Selection × graph derived metadata → which selected nodes carry at
+  // least one tokens-form derived column. The Re-tokenise button only
+  // surfaces when ≥2 such nodes are selected. Nodes without tokens are
+  // left out of the batch (they'd be silently skipped by the bulk endpoint
+  // anyway, but excluding them up-front keeps the count honest).
+  const tokenisedSelected = useMemo(() => {
+    if (!workspaceGraph || !selectedNodeIds || selectedNodeIds.length === 0) {
+      return [] as { id: string; name: string }[];
+    }
+    const byId = new Map(workspaceGraph.nodes.map((n) => [n.id, n]));
+    return selectedNodeIds
+      .map((id) => byId.get(id))
+      .filter((n): n is GraphNode => Boolean(n) && nodeHasTokensForm(n))
+      .map((n) => ({
+        id: n.id,
+        name: typeof n.name === 'string' && n.name.trim() ? n.name : n.id,
+      }));
+  }, [workspaceGraph, selectedNodeIds]);
+
+  const canBatchRetokenise = tokenisedSelected.length >= MIN_BATCH_RETOKENISE_COUNT;
+
+  const handleBatchRetokenise = async () => {
+    if (!canBatchRetokenise || isRetokenising) return;
+    setIsRetokenising(true);
+    try {
+      const result = await nodesApi.bulkRetokenise(
+        tokenisedSelected.map((n) => n.id),
+        getAuthHeaders(),
+      );
+      const ok = result.succeeded.length;
+      const failed = result.failed.length;
+      const skipped = result.skipped.length;
+      if (ok > 0) {
+        toast.success(
+          `Re-tokenised ${ok} block${ok === 1 ? '' : 's'}` +
+            (failed ? ` · ${failed} failed` : '') +
+            (skipped ? ` · ${skipped} skipped` : ''),
+        );
+      } else if (failed > 0) {
+        toast.error(
+          `Re-tokenise failed: ${result.failed[0]?.error ?? 'unknown error'}`,
+        );
+      } else {
+        toast.info('No blocks were re-tokenised.');
+      }
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.workspaceGraph(currentWorkspaceId),
+        });
+      }
+      setRetokeniseConfirmOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Re-tokenise failed: ${message}`);
+    } finally {
+      setIsRetokenising(false);
+    }
+  };
 
   const handleBatchDelete = async () => {
     if (!canBatchDelete || isDeleting) return;
@@ -163,8 +243,63 @@ export const WorkspaceControls: React.FC = () => {
           >
             Delete ({selectedCount})
           </button>
+
+          {/* Re-tokenise — overwrites existing tokenised columns on every
+              selected block that already has at least one tokens-form
+              derived column. Stays hidden when fewer than 2 such blocks
+              are selected (per-block re-tokenise still lives in each
+              node's settings menu). Re-uses each block's own
+              (source_column, model, language) metadata so the user
+              doesn't have to repeat that picker N times — handy after a
+              cross-machine workspace import. */}
+          {canBatchRetokenise && (
+            <button
+              className="text-xs px-2 py-1 border rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 text-gray-600 hover:text-gray-800"
+              onClick={() => setRetokeniseConfirmOpen(true)}
+              disabled={isRetokenising}
+              title={`Re-tokenise existing token columns on ${tokenisedSelected.length} selected blocks using each block's recorded model + language`}
+            >
+              Re-tokenise ({tokenisedSelected.length})
+            </button>
+          )}
         </>
       )}
+
+      <AlertDialog open={retokeniseConfirmOpen} onOpenChange={setRetokeniseConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Re-tokenise {tokenisedSelected.length} data block{tokenisedSelected.length === 1 ? '' : 's'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will overwrite the existing tokenised columns on each
+              selected block, using the same model + language each block
+              was originally tokenised with. Useful after a cross-machine
+              workspace import where the donor's tokens cache didn't
+              travel along.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="max-h-60 overflow-y-auto rounded border bg-muted/40 p-2 text-sm">
+            {tokenisedSelected.map((item) => (
+              <li key={item.id}>{item.name}</li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRetokenising}>Cancel</AlertDialogCancel>
+            <Button asChild disabled={isRetokenising}>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleBatchRetokenise();
+                }}
+                disabled={isRetokenising}
+              >
+                {isRetokenising ? 'Re-tokenising…' : `Re-tokenise ${tokenisedSelected.length}`}
+              </AlertDialogAction>
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
