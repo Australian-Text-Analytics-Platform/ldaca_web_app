@@ -1,4 +1,4 @@
-import React, { useRef, type Dispatch, type SetStateAction, type RefObject } from 'react';
+import React, { useEffect, useRef, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
@@ -191,9 +191,14 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
   // can restore it after a Hide cycle. Defaults to the first palette
   // swatch — the user's first explicit pick replaces it.
   const lastVisibleColorRef = useRef<string>(defaultPalette[0] ?? '#2563eb');
-  if (nearestTokenColor !== 'transparent') {
-    lastVisibleColorRef.current = nearestTokenColor;
-  }
+  // Writing to a ref during render trips react-hooks/rules-of-hooks; mirror
+  // the latest non-transparent colour from an effect so the show/hide toggle
+  // can still restore the last visible pick.
+  useEffect(() => {
+    if (nearestTokenColor !== 'transparent') {
+      lastVisibleColorRef.current = nearestTokenColor;
+    }
+  }, [nearestTokenColor]);
 
   return (
     <Card ref={resultsRef}>

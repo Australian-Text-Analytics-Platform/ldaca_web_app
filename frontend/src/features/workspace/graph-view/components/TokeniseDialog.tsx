@@ -77,6 +77,12 @@ export function TokeniseDialog({
   const defaultTokenizerModel = usePreferencesStore(
     (state) => state.defaultTokenizerModel,
   );
+  const setDefaultLanguage = usePreferencesStore(
+    (state) => state.setDefaultLanguage,
+  );
+  const setDefaultTokenizerModel = usePreferencesStore(
+    (state) => state.setDefaultTokenizerModel,
+  );
 
   const [sourceColumn, setSourceColumn] = useState<string>(
     initialColumn ?? pickDefaultColumn(columns) ?? '',
@@ -168,6 +174,12 @@ export function TokeniseDialog({
           `Re-tokenised "${sourceColumn}" (replaced previous ${result.replaced_column ?? 'column'})`,
         );
       }
+      // Promote the just-used language + model to the user's defaults so the
+      // next dialog open reflects what they actually ran (instead of snapping
+      // back to English / bert-base-uncased). Also lets users correct a
+      // wrongly-detected language at load time by simply tokenising once.
+      setDefaultLanguage(language || null);
+      setDefaultTokenizerModel(model.trim() || null);
       onSuccess?.({
         column: result.column,
         isNew: result.is_new,
