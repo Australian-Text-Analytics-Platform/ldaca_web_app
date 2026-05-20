@@ -111,16 +111,19 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col">
-      {/* Banner sits above the graph so users see it on the canonical
-        "this is your workspace" page after a cross-machine load. */}
-      <div className="px-4 pt-4">
-        <TokensCacheRepairBanner />
+    <div className="relative h-full w-full">
+      {/* Banner is an absolute overlay so it doesn't shrink the graph
+        canvas and stays bounded width — full-width was overflowing the
+        workspace view on smaller screens. Sits below the selection
+        overlay so they don't fight for the top-left corner. */}
+      <div className="absolute top-4 left-32 right-16 z-20 pointer-events-none flex justify-center">
+        <div className="pointer-events-auto w-full max-w-xl">
+          <TokensCacheRepairBanner />
+        </div>
       </div>
-      <div className="relative flex-1">
-        <GraphSelectionOverlay selected={graph.selectedCount} total={graph.totalNodes} />
+      <GraphSelectionOverlay selected={graph.selectedCount} total={graph.totalNodes} />
 
-        <ReactFlow
+      <ReactFlow
         nodes={graph.nodes}
         edges={graph.edges}
         nodeTypes={graph.nodeTypes as unknown as NodeTypes}
@@ -156,8 +159,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         {showOverview && (
           <MiniMap position="bottom-right" nodeColor="#e2e8f0" maskColor="rgba(255, 255, 255, 0.8)" />
         )}
-        </ReactFlow>
-      </div>
+      </ReactFlow>
     </div>
   );
 }

@@ -330,6 +330,23 @@ export const nodesApi = {
       `/workspaces/nodes/${node}/derived/${column}`,
       headers,
     ),
+
+  /**
+   * Re-tokenise every tokens-form derived column on each listed node,
+   * using the column's own previously-captured (source_column, model,
+   * language) metadata. Used by the tokens-cache repair banner's
+   * "Re-tokenise all" shortcut and the Workspace Graph title-bar
+   * "Re-tokenise" button (multi-node selection).
+   */
+  bulkRetokenise: (
+    nodeIds: string[],
+    headers: Record<string, string> = {},
+  ) =>
+    post<BulkRetokeniseResponse>(
+      `/workspaces/nodes/derived/tokens/bulk`,
+      { node_ids: nodeIds },
+      headers,
+    ),
 };
 
 /** Phase 4.3: POST body for ``tokeniseColumn``. */
@@ -344,4 +361,17 @@ export interface TokeniseColumnResponse {
   column: string;
   is_new: boolean;
   replaced_column?: string | null;
+}
+
+export interface BulkRetokeniseNodeResult {
+  node_id: string;
+  rebuilt_columns: string[];
+  reason?: string | null;
+  error?: string | null;
+}
+
+export interface BulkRetokeniseResponse {
+  succeeded: BulkRetokeniseNodeResult[];
+  failed: BulkRetokeniseNodeResult[];
+  skipped: BulkRetokeniseNodeResult[];
 }

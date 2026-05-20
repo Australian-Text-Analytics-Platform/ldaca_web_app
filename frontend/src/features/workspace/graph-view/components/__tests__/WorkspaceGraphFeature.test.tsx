@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { WorkspaceGraphFeature } from '../WorkspaceGraphFeature';
 
@@ -24,7 +25,12 @@ vi.mock('@xyflow/react', () => ({
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     workspaceGraph: { nodes: [], edges: [] },
+    currentWorkspaceId: 'ws-1',
   }),
+}));
+
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ getAuthHeaders: () => ({}), isAuthenticated: true }),
 }));
 
 vi.mock('../../hooks/useWorkspaceGraph', () => ({
@@ -61,7 +67,12 @@ vi.mock('../../hooks/useWorkspaceGraph', () => ({
 
 describe('WorkspaceGraphFeature', () => {
   it('relaxes the graph zoom bounds so the full workspace can fit on screen', () => {
-    render(<WorkspaceGraphFeature />);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <WorkspaceGraphFeature />
+      </QueryClientProvider>,
+    );
 
     expect(reactFlowMock).toHaveBeenCalled();
     const props = reactFlowMock.mock.calls[0]?.[0] as Record<string, unknown>;
