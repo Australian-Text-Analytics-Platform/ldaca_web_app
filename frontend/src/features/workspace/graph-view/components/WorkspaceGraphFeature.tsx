@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import '@xyflow/react/dist/style.css';
 
@@ -9,6 +9,7 @@ import {
   MiniMap,
   ReactFlow,
   type NodeTypes,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import { Loader2, Network } from 'lucide-react';
 
@@ -100,6 +101,46 @@ const GraphEmptyState = () => (
 export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) {
   const [showOverview, setShowOverview] = useState(false);
   const graph = useWorkspaceGraph();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const instanceRef = useRef<ReactFlowInstance | null>(null);
+  // Track the previous container HEIGHT so we only auto-refit when the
+  // height changes by enough to suggest a banner mount/unmount (~50px+).
+  // Splitter drags and tiny px-level resizes fire ResizeObserver too —
+  // re-fitting on every one of them would override the user's manual
+  // pan/zoom from one drag to the next.
+  const lastHeightRef = useRef<number | null>(null);
+
+  // Re-fit on significant container resize. The banner above us toggles
+  // ~150px of height; without this the graph stays at its prior fit and
+  // ends up off-position when the banner mounts or the user dismisses
+  // it. Skips small height changes so manual splitter drags / window
+  // tweaks don't blow away the user's current view.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const SIGNIFICANT_PX = 50;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const next = entry.contentRect.height;
+      const prev = lastHeightRef.current;
+      lastHeightRef.current = next;
+      if (prev == null) return; // first observation, just record
+      if (Math.abs(next - prev) < SIGNIFICANT_PX) return;
+      try {
+        instanceRef.current?.fitView({ padding: 0.2, includeHiddenNodes: false });
+      } catch {
+        /* ReactFlow is between mounts; ignore */
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleInitWithInstance = (instance: ReactFlowInstance) => {
+    instanceRef.current = instance;
+    graph.handleInit?.(instance);
+  };
 
   if (graph.isGraphLoading) {
     return <GraphLoadingState />;
@@ -110,7 +151,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div ref={containerRef} className="relative h-full w-full">
       <GraphSelectionOverlay selected={graph.selectedCount} total={graph.totalNodes} />
 
       <ReactFlow
@@ -123,11 +164,18 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         onPaneClick={graph.handlePaneClick}
         connectionLineType={graph.connectionLineType}
         defaultEdgeOptions={graph.defaultEdgeOptions}
-        onInit={graph.handleInit}
+        onInit={handleInitWithInstance}
         attributionPosition="bottom-left"
         className="bg-gray-50"
         style={{ width: '100%', height: '100%' }}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        // `fitView` (with options) replaces our hand-rolled fitView in
+        // handleInit. ReactFlow runs this AFTER its own layout settles —
+        // it waits for nodes to report their measured dimensions before
+        // computing the viewport, so the graph isn't wedged into the
+        // pre-layout container size (which happens with manual fitView
+        // when the banner above is mounting simultaneously).
+        fitView
+        fitViewOptions={{ padding: 0.2, includeHiddenNodes: false }}
         minZoom={0.05}
         maxZoom={4}
         connectOnClick={false}

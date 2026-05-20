@@ -37,12 +37,18 @@ function TokeniseDialogContainer({
   nodeId,
   nodeName,
   columns,
+  documentColumn,
 }: {
   open: boolean;
   onClose: () => void;
   nodeId: string;
   nodeName: string;
   columns: string[];
+  /** Node's currently-recorded `document` column — promoted by the
+   *  tokenise endpoint after each successful run so the dialog reopens
+   *  pre-populated with the last-used choice instead of resetting to
+   *  the first column in the list. */
+  documentColumn?: string | null;
 }) {
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -53,6 +59,7 @@ function TokeniseDialogContainer({
       nodeId={nodeId}
       nodeName={nodeName}
       columns={columns}
+      initialColumn={documentColumn ?? undefined}
       onSuccess={() => {
         if (currentWorkspaceId && nodeId) {
           invalidateNodeInfoQuery(queryClient, currentWorkspaceId, nodeId);
@@ -471,6 +478,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       nodeId={node.node_id}
       nodeName={nodeName}
       columns={Array.isArray(node.columns) ? node.columns : []}
+      documentColumn={typeof node.document === 'string' ? node.document : null}
     />
   ) : null;
 
