@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
+import ReferenceIcon from '@/components/help/ReferenceIcon';
 import type { TokenFrequencyStatisticsEntry } from '../../tokenFrequencyAdapters';
 import { wildcardToRegExp } from '../../tokenFrequencyAdapters';
 
@@ -313,6 +314,11 @@ export const TokenFrequencyStatisticsTable = ({
               targetKey="analysis.token-frequency.statistical-measures"
               label="Keyword Analysis"
               tooltip="Comparative token-level keyness statistics for the two selected data blocks."
+            />
+            <ReferenceIcon
+              targetKey="analysis.token-frequency.keyness-statistics"
+              label="Cite this method"
+              tooltip="Method, formulas, and citations (Lancaster log-likelihood wizard)."
             />
           </div>
           {hasCorpusCaption ? (

@@ -544,6 +544,11 @@ const reference = {
     anchor: 'ref-general-platform',
     label: 'Cite LDaCA Wordflow',
   },
+  'analysis.token-frequency.keyness-statistics': {
+    file: 'references/keyness-statistics.md',
+    anchor: 'ref-token-frequency-keyness-statistics',
+    label: 'Keyword Analysis — method & citations',
+  },
 } as const satisfies Record<string, DocTarget>;
 
 export const BUNDLED_REGISTRY: RegistryShape = { tutorial, info, reference };

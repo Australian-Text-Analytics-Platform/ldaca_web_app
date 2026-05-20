@@ -4,4 +4,5 @@ This section provides citation and reference information for the datasets, tools
 
 ## Contents
 
-- Coming soon
+- [LDaCA Wordflow — platform citation](./general.md)
+- [Keyword Analysis — method & citations](./keyness-statistics.md) — Lancaster log-likelihood wizard formulas and the references for LL, BIC, ELL, %DIFF, RRisk, LogRatio, and OddsRatio.
