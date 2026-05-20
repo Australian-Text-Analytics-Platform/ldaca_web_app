@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import '@xyflow/react/dist/style.css';
 
@@ -101,8 +101,8 @@ const GraphEmptyState = () => (
 export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) {
   const [showOverview, setShowOverview] = useState(false);
   const graph = useWorkspaceGraph();
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<ReactFlowInstance | null>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
   // Track the previous container HEIGHT so we only auto-refit when the
   // height changes by enough to suggest a banner mount/unmount (~50px+).
   // Splitter drags and tiny px-level resizes fire ResizeObserver too —
@@ -110,13 +110,19 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
   // pan/zoom from one drag to the next.
   const lastHeightRef = useRef<number | null>(null);
 
-  // Re-fit on significant container resize. The banner above us toggles
-  // ~150px of height; without this the graph stays at its prior fit and
-  // ends up off-position when the banner mounts or the user dismisses
-  // it. Skips small height changes so manual splitter drags / window
-  // tweaks don't blow away the user's current view.
-  useEffect(() => {
-    const el = containerRef.current;
+  // Callback ref instead of useEffect+ref pair. The component returns
+  // early for loading / empty states (no graph div mounted), then later
+  // re-renders with the graph div once data arrives — useEffect([]) only
+  // runs once on mount and sees the ref still null in the loading
+  // render, so the observer never attached. A callback ref fires
+  // whenever the element is attached or detached, so we set up / tear
+  // down the observer at exactly the right moments.
+  const setContainerRef = useCallback((el: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    lastHeightRef.current = null;
     if (!el) return;
     const SIGNIFICANT_PX = 50;
     const observer = new ResizeObserver((entries) => {
@@ -134,7 +140,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
       }
     });
     observer.observe(el);
-    return () => observer.disconnect();
+    observerRef.current = observer;
   }, []);
 
   const handleInitWithInstance = (instance: ReactFlowInstance) => {
@@ -151,7 +157,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
   }
 
   return (
-    <div ref={containerRef} className="relative h-full w-full">
+    <div ref={setContainerRef} className="relative h-full w-full">
       <GraphSelectionOverlay selected={graph.selectedCount} total={graph.totalNodes} />
 
       <ReactFlow
