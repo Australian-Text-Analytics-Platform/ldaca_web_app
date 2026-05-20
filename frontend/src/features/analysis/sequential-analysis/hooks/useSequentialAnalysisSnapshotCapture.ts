@@ -34,7 +34,7 @@ import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelection
 import {
   SNAPSHOT_ROW_HARD_CAP,
   type TrendsSnapshotConfig,
-} from '../components/TrendsSnapshotConfigDialog';
+} from '../components/trendsSnapshotConfig';
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
 const SETTINGS_PAYLOAD_PATH = 'settings.json';
