@@ -663,6 +663,18 @@ wheels = [
 ]
 
 [[package]]
+name = "ftfy"
+version = "6.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wcwidth" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/d3/8650919bc3c7c6e90ee3fa7fd618bf373cbbe55dff043bd67353dbb20cd8/ftfy-6.3.1.tar.gz", hash = "sha256:9b3c3d90f84fb267fe64d375a07b7f8912d817cf86009ae134aa03e1819506ec", size = 308927, upload-time = "2024-10-26T00:50:35.149Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/6e/81d47999aebc1b155f81eca4477a616a70f238a2549848c38983f3c22a82/ftfy-6.3.1-py3-none-any.whl", hash = "sha256:7c70eb532015cd2f9adb53f101fb6c7945988d023a085d127d1573dc49dd0083", size = 44821, upload-time = "2024-10-26T00:50:33.425Z" },
+]
+
+[[package]]
 name = "google-auth"
 version = "2.49.2"
 source = { registry = "https://pypi.org/simple" }
@@ -910,6 +922,7 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "fastapi-users", extra = ["sqlalchemy"] },
     { name = "fastexcel" },
+    { name = "ftfy" },
     { name = "google-auth-oauthlib" },
     { name = "httpx" },
     { name = "onnxruntime" },
@@ -934,6 +947,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.0" },
     { name = "fastapi-users", extras = ["sqlalchemy"], specifier = ">=14.0.1" },
     { name = "fastexcel", specifier = ">=0.18.0" },
+    { name = "ftfy", specifier = ">=6.3.0" },
     { name = "google-auth-oauthlib", specifier = ">=1.2.2" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "ipython", marker = "extra == 'deploy'", specifier = ">=9.5.0" },
@@ -942,7 +956,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = ">=1.18.0" },
     { name = "openai", specifier = ">=2.26.0" },
     { name = "polars", extras = ["rtcompat"], specifier = ">=1.40.0" },
-    { name = "polars-text", specifier = ">=0.2.1" },
+    { name = "polars-text", specifier = ">=0.2.2" },
     { name = "psutil", specifier = ">=6.1.0" },
     { name = "pyarrow", specifier = ">=16.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
@@ -1453,16 +1467,16 @@ wheels = [
 
 [[package]]
 name = "polars-text"
-version = "0.2.1"
+version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/d3/c7aad91e33ffa633af0a255aef4c54cb6e2a388329bb690acae11ac9e7fa/polars_text-0.2.1.tar.gz", hash = "sha256:db655233f4edb693b00bbd232110d6e0ae893e8013a39aa4d115f8a6ad071f96", size = 5385266, upload-time = "2026-05-15T07:13:23.845Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/da/df619d0b6aab52c9e0784ffbfbd6b27dff22262b5cf62225ed162581e38b/polars_text-0.2.2.tar.gz", hash = "sha256:012b9431f9b0d268eb90fb16eb1d342de028d1d213ff880dd838216a3d4af8b8", size = 5383504, upload-time = "2026-05-20T00:29:30.514Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/4d/5964965c4bc82c62e0d8f06bac31713fd3d0d05a990273cdae0bc127636c/polars_text-0.2.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:e6f6d613d5fe43f9cca799ceca2e394edca340fba7f440dcf7921965cf80032d", size = 21846388, upload-time = "2026-05-15T07:13:15.307Z" },
-    { url = "https://files.pythonhosted.org/packages/f5/88/91618ac1f15cd888e4adf56add213e8ad73a02963a5ab60aa9d18d220416/polars_text-0.2.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:bd14f08bb1e766388bc4d1ad8b3ea79f442ac1cdd1393948d947f9466aa07a44", size = 27033773, upload-time = "2026-05-15T07:13:18.264Z" },
-    { url = "https://files.pythonhosted.org/packages/8a/6f/a2c73dcbfb6ffa21f9d22e5f69736ae402df49c22b6d012fd41ccd8541ad/polars_text-0.2.1-cp314-cp314-win_amd64.whl", hash = "sha256:b0a6f7a29d418b3693b684b3e6b7c9a71a1a530b094c1afb7ebdebd3503db139", size = 21929281, upload-time = "2026-05-15T07:13:21.646Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/60/3468555e242b547e78d99e7c34d0e5fc0ff0e4f8416f5f2928c89b9bbb72/polars_text-0.2.2-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:251549c6ac92beedd9829dbbf9c44dab55aaf7e1cd98fef94456efa5cb1ae81a", size = 21856474, upload-time = "2026-05-20T00:29:20.212Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/90/46e76a4f2541a734a9221f3313d7a67c5cccba4704eff508b3120955fa7f/polars_text-0.2.2-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:782b8f87b0942f3981f5e7ca4e67411c27377c05eb412dabe0a0c733126f44f6", size = 27034097, upload-time = "2026-05-20T00:29:23.695Z" },
+    { url = "https://files.pythonhosted.org/packages/67/e1/3a475f060c6c375884c753bf567599a237df7539b5fa3aef353f97aa250b/polars_text-0.2.2-cp314-cp314-win_amd64.whl", hash = "sha256:d997320c4045e2fba0f53b6935d81f2b151dd65bb397d7ad7c6ad8c3f6d62d71", size = 21929637, upload-time = "2026-05-20T00:29:27.463Z" },
 ]
 
 [[package]]
@@ -2526,11 +2540,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.7.0"
+version = "2.6.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/24/5f1b3bdffd70275f6661c76461e25f024d5a38a46f04aaca912426a2b1d3/urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed", size = 435556, upload-time = "2026-01-07T16:24:43.925Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
+    { url = "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4", size = 131584, upload-time = "2026-01-07T16:24:42.685Z" },
 ]
 
 [[package]]
@@ -2621,6 +2635,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4f/55/2af26693fd15165c4ff7857e38330e1b61ab8c37d15dc79118cdba115b7a/watchfiles-1.1.1-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8c91ed27800188c2ae96d16e3149f199d62f86c7af5f5f4d2c61a3ed8cd3666c", size = 455072, upload-time = "2025-10-14T15:05:48.928Z" },
     { url = "https://files.pythonhosted.org/packages/66/1d/d0d200b10c9311ec25d2273f8aad8c3ef7cc7ea11808022501811208a750/watchfiles-1.1.1-cp314-cp314t-musllinux_1_1_aarch64.whl", hash = "sha256:311ff15a0bae3714ffb603e6ba6dbfba4065ab60865d15a6ec544133bdb21099", size = 629104, upload-time = "2025-10-14T15:05:49.908Z" },
     { url = "https://files.pythonhosted.org/packages/e3/bd/fa9bb053192491b3867ba07d2343d9f2252e00811567d30ae8d0f78136fe/watchfiles-1.1.1-cp314-cp314t-musllinux_1_1_x86_64.whl", hash = "sha256:a916a2932da8f8ab582f242c065f5c81bed3462849ca79ee357dd9551b0e9b01", size = 622112, upload-time = "2025-10-14T15:05:50.941Z" },
+]
+
+[[package]]
+name = "wcwidth"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2c/ee/afaf0f85a9a18fe47a67f1e4422ed6cf1fe642f0ae0a2f81166231303c52/wcwidth-0.7.0.tar.gz", hash = "sha256:90e3a7ea092341c44b99562e75d09e4d5160fe7a3974c6fb842a101a95e7eed0", size = 182132, upload-time = "2026-05-02T16:04:12.653Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/41/52/e465037f5375f43533d1a80b6923955201596a99142ed524d77b571a1418/wcwidth-0.7.0-py3-none-any.whl", hash = "sha256:5d69154c429a82910e241c738cd0e2976fac8a2dd47a1a805f4afed1c0f136f2", size = 110825, upload-time = "2026-05-02T16:04:11.033Z" },
 ]
 
 [[package]]
