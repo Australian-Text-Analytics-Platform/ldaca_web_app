@@ -142,10 +142,7 @@ const WorkspaceShell: React.FC = () => {
     persistKey: 'ldaca.layout.asidePanelRatio',
     onLiveUpdate: (next) => {
       if (isRightCollapsed) return;
-      // Keep these widths in sync with the JSX `style` props above —
-      // main subtracts the 8px splitter via calc() so the row sums to
-      // exactly the parent's width; aside stays at its ratio.
-      if (mainRef.current) mainRef.current.style.width = `calc(${(1 - next) * 100}% - 8px)`;
+      if (mainRef.current) mainRef.current.style.width = `${(1 - next) * 100}%`;
       if (asideRef.current) asideRef.current.style.width = `${next * 100}%`;
     },
   });
@@ -255,21 +252,7 @@ const WorkspaceShell: React.FC = () => {
                       className={`relative h-full p-2 pl-1 ${
                         isRightCollapsed ? 'pr-2' : 'pr-1'
                       } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
-                      // ``calc(... - 8px)`` subtracts the splitter's 8px from
-                      // the percentage so main + splitter + aside sums to
-                      // exactly the parent's width — without this the row
-                      // overflows by 8px and the parent's ``overflow-hidden``
-                      // clips it from the right. ``minWidth: 200`` lets the
-                      // main pane shrink further on narrow viewports
-                      // (ViewRouter content already has its own scroll), so
-                      // the workspace graph aside doesn't get forced into
-                      // an unusable sliver when the sidebar is wide.
-                      style={{
-                        width: isRightCollapsed
-                          ? '100%'
-                          : `calc(${(1 - asidePanelRatio) * 100}% - 8px)`,
-                        minWidth: 200,
-                      }}
+                      style={{ width: isRightCollapsed ? '100%' : `${(1 - asidePanelRatio) * 100}%`, minWidth: 280 }}
                       innerClassName="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4"
                     >
                       <div className="w-full max-w-none mx-0">
