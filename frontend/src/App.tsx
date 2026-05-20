@@ -280,15 +280,9 @@ const WorkspaceShell: React.FC = () => {
 
                     <aside
                       ref={asideRef}
-                      // ``min-w-0`` (instead of the previous 320px floor)
-                      // lets the workspace panel shrink to whatever width
-                      // the user picks. With the sidebar + main InsetCard
-                      // (``minWidth: 280``) each taking their share, a
-                      // 320px aside floor pushed the panel off-viewport on
-                      // ~800px windows and the right-edge controls got
-                      // clipped. The internal flex layouts already keep
-                      // their content readable down to ~240px.
-                      className={`relative flex h-full flex-col overflow-hidden bg-transparent min-w-0 ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
+                      className={`relative flex h-full flex-col overflow-hidden bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
+                        isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
+                      }`}
                       style={{ width: isRightCollapsed ? 0 : `${asidePanelRatio * 100}%` }}
                     >
                       {!isRightCollapsed && (
