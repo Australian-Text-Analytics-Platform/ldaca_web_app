@@ -178,7 +178,15 @@ const TokenFrequencyFeature = () => {
     () =>
       studyNodeId && panelNodeIds.includes(studyNodeId)
         ? studyNodeId
-        : panelNodeIds[0] ?? null,
+        // No explicit pick → default study is the *last* displayed
+        // panel node, so it lands at node_ids[1] after
+        // `orderedPanelNodeIds` (which now places the study last) and
+        // the radio lights up on the same position the keyness-table
+        // caption labels as "Study corpus". The previous fallback to
+        // `panelNodeIds[0]` was the right default under the old
+        // "first block is the radio-selected (reference)" semantics
+        // but inverts the radio after the study-rename refactor.
+        : panelNodeIds[panelNodeIds.length - 1] ?? null,
     [studyNodeId, panelNodeIds],
   );
 
