@@ -42,23 +42,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  SNAPSHOT_FINEST_FREQUENCIES,
-  type SequentialFrequency,
-} from '@/api/text';
+import { SNAPSHOT_FINEST_FREQUENCIES } from '@/api/text';
 import { nodesApi } from '@/api/index';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 import type { SnapshotToolKey } from '@/features/snapshot-view';
+import {
+  SNAPSHOT_ROW_HARD_CAP,
+  SNAPSHOT_ROW_SOFT_WARN,
+  type SnapshotFinestFrequency,
+  type TrendsSnapshotConfig,
+} from './trendsSnapshotConfig';
 
-export const SNAPSHOT_ROW_HARD_CAP = 200_000;
-export const SNAPSHOT_ROW_SOFT_WARN = 100_000;
-
-/** The frequencies the snapshot capture dialog exposes — all presets
- * except ``custom``. The viewer's coarsening pass uses this same
- * ordered list: a snapshot captured at ``daily`` can be re-aggregated
- * to ``weekly`` / ``monthly`` / etc., but not to ``hourly``. */
-export type SnapshotFinestFrequency = Exclude<SequentialFrequency, 'custom'>;
+// Re-export so existing importers of `from '.../TrendsSnapshotConfigDialog'`
+// keep compiling. The Fast-Refresh rule (`react-refresh/only-export-components`)
+// only flags *value* re-exports — type-only re-exports are erased at compile
+// time and don't break HMR, so this stays safe.
+export type { SnapshotFinestFrequency, TrendsSnapshotConfig };
 
 const FREQUENCY_LABELS: Record<SnapshotFinestFrequency, string> = {
   second: 'Per second',
@@ -69,27 +69,6 @@ const FREQUENCY_LABELS: Record<SnapshotFinestFrequency, string> = {
   monthly: 'Monthly',
   quarterly: 'Quarterly',
   yearly: 'Yearly',
-};
-
-export interface TrendsSnapshotConfig {
-  /** Captured finest time bin (datetime path). Ignored when
-   * ``columnType === 'numeric'``. */
-  finestFrequency: SnapshotFinestFrequency;
-  /** Captured columns the viewer can group by. 0-3 entries. */
-  groupByColumns: string[];
-  /** Captured numeric bin size (numeric path). Ignored when
-   * ``columnType === 'datetime'``. Defaults to 1; user can override. */
-  numericInterval: number;
-  /** Captured numeric origin (numeric path, optional). ``null`` =
-   * backend auto-detects from the data minimum. */
-  numericOrigin: number | null;
-}
-
-export const DEFAULT_TRENDS_SNAPSHOT_CONFIG: TrendsSnapshotConfig = {
-  finestFrequency: 'daily',
-  groupByColumns: [],
-  numericInterval: 1,
-  numericOrigin: null,
 };
 
 const INVALID_NAME_CHARS = /[/\\:*?"<>|]/g;

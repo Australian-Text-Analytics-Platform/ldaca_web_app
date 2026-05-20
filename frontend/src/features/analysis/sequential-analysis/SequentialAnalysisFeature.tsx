@@ -28,12 +28,12 @@ import {
   rebucket,
   type CapturedRow,
 } from './sequentialRebucket';
+import { TrendsSnapshotConfigDialog } from './components/TrendsSnapshotConfigDialog';
 import {
   DEFAULT_TRENDS_SNAPSHOT_CONFIG,
-  TrendsSnapshotConfigDialog,
   type SnapshotFinestFrequency,
   type TrendsSnapshotConfig,
-} from './components/TrendsSnapshotConfigDialog';
+} from './components/trendsSnapshotConfig';
 import { useSequentialAnalysisSnapshotLoad } from './hooks/useSequentialAnalysisSnapshotLoad';
 import type { SequentialAnalysisSnapshotPayload } from './hooks/useSequentialAnalysisSnapshotLoad';
 import { SequentialAnalysisSnapshotBanner } from './components/SequentialAnalysisSnapshotBanner';
