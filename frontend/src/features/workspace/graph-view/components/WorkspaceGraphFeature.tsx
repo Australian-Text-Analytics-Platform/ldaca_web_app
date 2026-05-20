@@ -111,11 +111,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
   }
 
   return (
-    // ``min-w-0`` lets this container shrink below its content's
-    // intrinsic min-width when the parent flex column is narrow —
-    // without it, ReactFlow's children would refuse to shrink past
-    // their natural width and push the workspace panel off-viewport.
-    <div className="relative h-full w-full min-w-0">
+    <div className="relative h-full w-full">
       {/* Banner is an absolute overlay so it doesn't shrink the graph
         canvas and stays bounded width. Insets are tight (left-4 right-4)
         so the banner can fit even when the workspace panel is narrow;

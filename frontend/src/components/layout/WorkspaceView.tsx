@@ -34,10 +34,10 @@ const WorkspaceView: React.FC = () => {
         className="min-h-30 p-2 pb-1"
         style={{ height: `calc(${ratio * 100}% - 0.25rem)` }}
       >
-        <div className="p-2 bg-muted border-b border-border shrink-0 min-w-0">
+        <div className="p-2 bg-muted border-b border-border shrink-0">
           <WorkspaceControls />
         </div>
-        <div className="flex-1 min-h-0 min-w-0">
+        <div className="flex-1 min-h-0">
           <WorkspaceGraphView />
         </div>
       </InsetCard>
@@ -59,7 +59,7 @@ const WorkspaceView: React.FC = () => {
         className="min-h-30 p-2 pt-1"
         style={{ height: `calc(${(1 - ratio) * 100}% - 0.25rem)` }}
       >
-        <div className="flex-1 min-h-0 min-w-0">
+        <div className="flex-1 min-h-0">
           <WorkspaceDataView />
         </div>
       </InsetCard>
