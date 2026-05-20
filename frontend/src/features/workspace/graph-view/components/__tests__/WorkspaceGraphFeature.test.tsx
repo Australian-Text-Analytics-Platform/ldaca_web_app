@@ -18,10 +18,8 @@ vi.mock('@xyflow/react', () => ({
   },
 }));
 
-// The TokensCacheRepairBanner mounted above the graph reads workspace data
-// from a React context the test harness doesn't provide. Stub the hook so
-// the banner can render (it'll early-return because the stub graph has no
-// tokens_cache_repair payload) without crashing the test.
+// Stub the workspace-data hook so the graph feature can mount without the
+// React context the test harness doesn't provide.
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     workspaceGraph: { nodes: [], edges: [] },
