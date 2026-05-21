@@ -11,6 +11,7 @@ The work is split into 5 phases. Phase 1 is the "do today" subset: real bugs, de
 ## Phase 1 — Bugs, dead code, and `TutorialView` consolidation — ✅ DONE
 
 Landed on the `refactoring` branch as four commits:
+
 - `5b96190` fix: B1–B5 (HintsController dup mount, zoom-brush effect loop, Replace-tooltip suppression while busy, slice-reset duplicate block, useFiles auth signature in query key + queryClient.clear() on logout).
 - `e64f2b8` refactor: dead-code deletion (7 files removed, 339 LoC). All items grep-verified zero-consumers before deletion.
 - `208e7e4` refactor: TutorialView → DocumentView consolidation (–268 LoC).
@@ -19,6 +20,7 @@ Landed on the `refactoring` branch as four commits:
 Net Phase 1: ~9 fewer files, ~500 fewer LoC. Build / typecheck / eslint clean. Tests at baseline (2 pre-existing filter-tab failures, unchanged from before this refactor).
 
 Items deferred from the original Phase 1 scope:
+
 - **B6** (URL parse at module load in useAuth.ts) — ✅ resolved by Phase 4.7. The capture moved into `processGoogleRedirectToken()` and runs from a `useEffect` on first `useAuth()` mount.
 - **B8** (`key={index}` on user-mutable lists in concordance/sequential/expression) — moved to Phase 2 alongside the broader expression-sub-tab work, since proper fix needs `string[]` → `{id, value}[]` state-shape changes.
 - **B9** (useNodeColumnInfos cache dep loop) — ✅ resolved by Phase 4.3 (`5fd8323`). The hook now uses `useQueries`; the dep-loop pattern is gone.
@@ -55,6 +57,7 @@ Landed in `208e7e4` (TutorialView → DocumentView consolidation, –268 LoC). `
 ### 1.4 Import-path codemod — ✅ DONE
 
 Landed in `7927805` (355 imports across 64 files now use `@/`). Three intentionally-untouched deep-relative imports remain:
+
 - `src/test/__tests__/viteConfig.test.ts` — `../../../vite.config` (config file lives outside `src/`, can't be aliased).
 - `src/test/__tests__/frontendManifest.test.ts` — `../../../package.json` (same reason).
 - `src/features/analysis/common/hooks/__tests__/useDetachColumnsState.test.tsx` — `../../../components/DetachColumnsDialog` (still resolvable; could be migrated to `@/features/analysis/components/DetachColumnsDialog` for consistency, but cosmetic).
@@ -147,6 +150,7 @@ Net: ~7 commits, lint/typecheck clean throughout, tests at baseline (2 pre-exist
 ### 2.5 Magic literal cleanup — ✅ DONE
 
 Landed in `58b456f`:
+
 - [x] `TaskState` union + `PENDING_TASK_STATES` / `RUNNING_TASK_STATES` / `TERMINAL_TASK_STATES` sets and predicates in `analysisStore`.
 - [x] `lib/debugFlags.ts` with `isGraphDebugEnabled()` consumed by all three call sites.
 - [x] `queryKeys.filePreview` / `queryKeys.columnUniqueValues` / `queryKeys.analysisServerRequestLock` factory entries.
@@ -288,7 +292,8 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
   - `persistKey?: string` (Phase D) — lazy-reads `localStorage[persistKey]` on mount; writes committed values on every change. Used by all four call sites: `ldaca.layout.sidebarWidth`, `ldaca.layout.asidePanelRatio`, `ldaca.layout.workspaceGraphRatio`, `ldaca.layout.dataLoaderTopRatio`.
   - **Phase C breakpoint gating**: right-panel splitter gains `hidden md:flex` (matches the sidebar splitter, which has had it from the start). Below `md` the resize handles disappear; the splits themselves still render side-by-side for now (a true mobile-stacking layout is a separate, larger change).
 
-  App.tsx loses ~95 LoC of inline drag-handler boilerplate. Future-friendly: when shadcn icon-mode collapse (sidebar to vertical icon stripe) lands, the hook's persisted value will continue to represent the *expanded* sidebar width — icon mode keys off `data-state="collapsed"` on the sidebar root and uses shadcn's separate `--sidebar-width-icon` var.
+  App.tsx loses ~95 LoC of inline drag-handler boilerplate. Future-friendly: when shadcn icon-mode collapse (sidebar to vertical icon stripe) lands, the hook's persisted value will continue to represent the _expanded_ sidebar width — icon mode keys off `data-state="collapsed"` on the sidebar root and uses shadcn's separate `--sidebar-width-icon` var.
+
 - [x] Pre-auth `feedbackOpen` now reads `state.modals.feedbackModal` from `useUIStore` via a `useShallow` selector. The local `useState` is gone — pre- and post-auth screens share the same Send-feedback control.
 - [x] `LAG_HINT_DELAY_MS` moved to `config/timings.ts` along with `REFRESH_CHIP_DELAY_MS` (which `RefreshStatusBanner` now imports from there).
 
@@ -318,7 +323,7 @@ Landed across `2e685de`, `8d3fcfc`, `3f96e9d`, `6e8c02a`, `c21e891`, `c1af023`, 
 
 ### 3.10 tutorialRegistry.ts — design landed; implementation deferred
 
-- [x] Make `TutorialTargetKey` / `InfoTargetKey` / `ReferenceTargetKey` literal unions with `LooseAutoComplete<…>` for the dynamic pass-throughs. `0b48657`. So typos in *direct* call sites are compile errors now; runtime resolution is still string-keyed for dynamically-built targets.
+- [x] Make `TutorialTargetKey` / `InfoTargetKey` / `ReferenceTargetKey` literal unions with `LooseAutoComplete<…>` for the dynamic pass-throughs. `0b48657`. So typos in _direct_ call sites are compile errors now; runtime resolution is still string-keyed for dynamically-built targets.
 - [ ] **Out of scope for this branch.** The original design (build-time scan of `public/tutorials/**/*.md`) was superseded by a richer plan: externalize the registry AND markdown content to a versioned docs site, load registry dynamically with SWR cache + bundled fallback. Full plan lives in [`online-tutorial-migration.md`](./online-tutorial-migration.md) — 3.10A (loader infrastructure) is the meaningful structural change; 3.10B/C/D are content move + docs-repo setup + drift CI. Start this in a separate branch when doc-update friction becomes painful or rich-media docs are needed.
 
 ---
@@ -352,9 +357,10 @@ To make those slice memos actually stick, the inputs are stabilized at the sourc
 Landed in `5fd8323`. The parallel `Map`-based cache is gone; every node-info read routes through the shared TanStack `QueryClient` via `queryKeys.nodeInfo(workspaceId, nodeId)`.
 
 New `lib/nodeInfo.ts`:
-  - `nodeInfoQueryOptions(args)` for `useQuery` / `useQueries` consumers.
-  - `fetchNodeInfo({ queryClient, ... })` for non-hook async sites (mutation handlers, hydration callbacks). `queryClient.fetchQuery` gives built-in inflight dedup; `force: true` does a `removeQueries` first.
-  - `invalidateNodeInfoQuery(qc, ws, nodeId?)` — node-scoped or workspace-wide predicate-based invalidation.
+
+- `nodeInfoQueryOptions(args)` for `useQuery` / `useQueries` consumers.
+- `fetchNodeInfo({ queryClient, ... })` for non-hook async sites (mutation handlers, hydration callbacks). `queryClient.fetchQuery` gives built-in inflight dedup; `force: true` does a `removeQueries` first.
+- `invalidateNodeInfoQuery(qc, ws, nodeId?)` — node-scoped or workspace-wide predicate-based invalidation.
 
 `useNodeColumnInfos` (127 → 99 LoC) rewritten on `useQueries` — the manual effect + `pendingRef` + `cache` useState collapses to one declarative `useQueries({ queries: nodeIds.map(...) })`. **Resolves bug B9** — the original effect listed `cache` in its deps and called `setCache` inside, causing re-fetch loops; `useQueries` doesn't have that pitfall.
 
@@ -366,14 +372,14 @@ Test fixtures updated: `ConcordanceFeature.test.tsx` wraps each render in a `Que
 
 Landed in `8adf13e`. `api/text.ts` becomes a directory:
 
-  - `shared.ts` (14 LoC) — `SourceRowPagination` (used by concordance + quotation)
-  - `concordance.ts` (194 LoC) — types + `concordanceApi`
-  - `quotation.ts` (139 LoC) — types + `quotationApi`
-  - `sequential.ts` (80 LoC) — types + `sequentialAnalysisApi`
-  - `tokenFrequency.ts` (72 LoC) — types + `tokenFrequencyApi`
-  - `topicModeling.ts` (132 LoC) — types + `topicModelingApi`
-  - `aiAnnotation.ts` (205 LoC) — types + `aiAnnotationApi`
-  - `index.ts` (129 LoC) — type re-exports + composed `textApi` (spread of every feature slice) + `getAnalysisCurrent` (the only method that spans every feature)
+- `shared.ts` (14 LoC) — `SourceRowPagination` (used by concordance + quotation)
+- `concordance.ts` (194 LoC) — types + `concordanceApi`
+- `quotation.ts` (139 LoC) — types + `quotationApi`
+- `sequential.ts` (80 LoC) — types + `sequentialAnalysisApi`
+- `tokenFrequency.ts` (72 LoC) — types + `tokenFrequencyApi`
+- `topicModeling.ts` (132 LoC) — types + `topicModelingApi`
+- `aiAnnotation.ts` (205 LoC) — types + `aiAnnotationApi`
+- `index.ts` (129 LoC) — type re-exports + composed `textApi` (spread of every feature slice) + `getAnalysisCurrent` (the only method that spans every feature)
 
 Public surface unchanged: `import { textApi, FooType } from '@/api/text'` resolves to the directory's index. Single-line interface declarations reformatted to one field per line for diff readability.
 
@@ -385,10 +391,10 @@ Landed in `f8da9d2`. The shadow `useQuotationEngineConfigStore` is deleted; `Quo
 
 Landed in `9bd9789`. The four setters that used to fire `syncToBackend().catch(() => {})` inline are now pure local-state writers; backend writes flow through a debounced subscriber registered in `usePreferencesInit` (`hooks/usePreferences.ts`):
 
-  - 800 ms debounce coalesces bursts into one PUT.
-  - Subscribes only after `hydrated` flips true, so the initial load-from-backend doesn't echo back as a write.
-  - Skips when not authenticated — anonymous edits stay in localStorage until the user signs in.
-  - Auth headers are read fresh from `useAuth().getAuthHeaders` at fire-time, fixing the audit's "auth headers are missing" note.
+- 800 ms debounce coalesces bursts into one PUT.
+- Subscribes only after `hydrated` flips true, so the initial load-from-backend doesn't echo back as a write.
+- Skips when not authenticated — anonymous edits stay in localStorage until the user signs in.
+- Auth headers are read fresh from `useAuth().getAuthHeaders` at fire-time, fixing the audit's "auth headers are missing" note.
 
 A small per-field shallow snapshot comparison gates writes so identical-but-new-reference state changes don't trigger a redundant request.
 
@@ -420,10 +426,11 @@ Note: `components/layout/sidebar/types.ts` is listed in the original audit under
 
 Landed in `2e31c01`. The duplicated `buildPaginationRange` and `<PaginationJump>` move into the shared UI module:
 
-  - `components/ui/paginationRange.ts` — `buildPaginationRange` + `PaginationRangeItem` type. Sibling file (not in `Pagination.tsx`) so the component module stays component-only for `react-refresh/only-export-components`.
-  - `components/ui/Pagination.tsx` — `<PaginationJump>` exported alongside the existing `<Pagination*>` primitives. Density differences preserved via `triggerClassName?` and `showPageLabel?` props (ServerTablePagination uses `size-8` + no label to fit its tighter footer).
+- `components/ui/paginationRange.ts` — `buildPaginationRange` + `PaginationRangeItem` type. Sibling file (not in `Pagination.tsx`) so the component module stays component-only for `react-refresh/only-export-components`.
+- `components/ui/Pagination.tsx` — `<PaginationJump>` exported alongside the existing `<Pagination*>` primitives. Density differences preserved via `triggerClassName?` and `showPageLabel?` props (ServerTablePagination uses `size-8` + no label to fit its tighter footer).
 
 Per-file: `AnalysisPagination.tsx` 383→188, `ServerTablePagination.tsx` 236→114; `Pagination.tsx` 128→263 (gains the jump component).
+
 - [ ] Optionally collapse the two components into one with a `mode: 'server' | 'tanstack'` adapter.
 
 ---
@@ -450,7 +457,7 @@ Landed across five commits this session totalling **104 new tests** across 8 new
 ## What's explicitly out of scope
 
 - **Backend.** Audit was frontend-only.
-- **Submodules** (`backend`, `docworkspace`, `ldaca-tabulator`, `polars-text`). Refactor branch in this repo doesn't touch them.
+- **Submodules** (`backend`, `docworkspace`, `polars-text`). Refactor branch in this repo doesn't touch them.
 - **Dependency upgrades.** Separate concern.
 - **CSS / Tailwind cleanup.** A handful of low-priority items (vendor-prefixed scrollbar-hide repeated 4×, inline styles where Tailwind classes exist) are deferred to a styling-only sweep.
 - **Routing redesign.** `router.tsx` is a near-no-op (one route at `/`); deciding whether to add real routes is a product decision, not a refactor.

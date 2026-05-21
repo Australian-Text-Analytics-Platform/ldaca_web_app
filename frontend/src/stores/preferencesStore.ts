@@ -38,6 +38,7 @@ interface PreferencesState {
    */
   defaultLanguage: string | null;
   defaultTokenizerModel: string | null;
+  ldacaOniApiToken: string | null;
   /** Master switch for the demo-snapshot feature. When false, every
    * tool's Save/Load button is unmounted via the shared
    * ``<AnalysisFeatureHeader>``. Default false; persisted to backend
@@ -69,6 +70,7 @@ interface PreferencesActions {
    */
   setDefaultLanguage: (language: string | null) => void;
   setDefaultTokenizerModel: (model: string | null) => void;
+  setLdacaOniApiToken: (token: string | null) => void;
   setDemoSnapshotsEnabled: (enabled: boolean) => void;
   /** Fetch preferences from backend and hydrate the store */
   loadFromBackend: (headers?: Record<string, string>) => Promise<void>;
@@ -85,6 +87,7 @@ function applyServerState(state: PreferencesState, data: UserPreferences) {
   state.quotationLastRemoteUrl = data.quotation.last_remote_url;
   state.defaultLanguage = data.default_language;
   state.defaultTokenizerModel = data.default_tokenizer_model;
+  state.ldacaOniApiToken = data.ldaca_oni_api_token;
   state.demoSnapshotsEnabled = data.demo_snapshots_enabled;
   state.hydrated = true;
 }
@@ -127,6 +130,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
         quotationLastRemoteUrl: '',
         defaultLanguage: null,
         defaultTokenizerModel: null,
+        ldacaOniApiToken: null,
         demoSnapshotsEnabled: false,
         hydrated: false,
         syncing: false,
@@ -185,19 +189,23 @@ export const usePreferencesStore = create<PreferencesStore>()(
           // Normalise to a trimmed lowercase code so backend resolution
           // doesn't see stray case / whitespace from form inputs.
           const value =
-            typeof language === 'string' && language.trim()
-              ? language.trim().toLowerCase()
-              : null;
+            typeof language === 'string' && language.trim() ? language.trim().toLowerCase() : null;
           set((state) => {
             state.defaultLanguage = value;
           });
         },
 
         setDefaultTokenizerModel: (model) => {
-          const value =
-            typeof model === 'string' && model.trim() ? model.trim() : null;
+          const value = typeof model === 'string' && model.trim() ? model.trim() : null;
           set((state) => {
             state.defaultTokenizerModel = value;
+          });
+        },
+
+        setLdacaOniApiToken: (token) => {
+          const value = typeof token === 'string' && token.trim() ? token.trim() : null;
+          set((state) => {
+            state.ldacaOniApiToken = value;
           });
         },
 
@@ -224,7 +232,9 @@ export const usePreferencesStore = create<PreferencesStore>()(
         syncToBackend: async (headers) => {
           const state = get();
           if (state.syncing) return;
-          set((s) => { s.syncing = true; });
+          set((s) => {
+            s.syncing = true;
+          });
           const body: UserPreferencesUpdate = {
             hidden_views: state.hiddenViews,
             favorite_workspaces: state.favoriteWorkspaces,
@@ -236,12 +246,11 @@ export const usePreferencesStore = create<PreferencesStore>()(
             // "no change". To avoid losing a previously-set value when
             // the user hasn't touched the language UI this session, only
             // include the field when the user explicitly has one.
-            ...(state.defaultLanguage !== null
-              ? { default_language: state.defaultLanguage }
-              : {}),
+            ...(state.defaultLanguage !== null ? { default_language: state.defaultLanguage } : {}),
             ...(state.defaultTokenizerModel !== null
               ? { default_tokenizer_model: state.defaultTokenizerModel }
               : {}),
+            ldaca_oni_api_token: state.ldacaOniApiToken,
             demo_snapshots_enabled: state.demoSnapshotsEnabled,
           };
           try {
@@ -249,10 +258,11 @@ export const usePreferencesStore = create<PreferencesStore>()(
           } catch {
             // Silently fail — localStorage still has the latest state
           } finally {
-            set((s) => { s.syncing = false; });
+            set((s) => {
+              s.syncing = false;
+            });
           }
         },
-
       })),
       {
         name: 'ldaca-preferences',
@@ -263,12 +273,13 @@ export const usePreferencesStore = create<PreferencesStore>()(
           quotationLastRemoteUrl: state.quotationLastRemoteUrl,
           defaultLanguage: state.defaultLanguage,
           defaultTokenizerModel: state.defaultTokenizerModel,
+          ldacaOniApiToken: state.ldacaOniApiToken,
           demoSnapshotsEnabled: state.demoSnapshotsEnabled,
         }),
-      }
+      },
     ),
-    { name: 'preferences-store' }
-  )
+    { name: 'preferences-store' },
+  ),
 );
 
 migrateLegacyQuotationEngineKey();

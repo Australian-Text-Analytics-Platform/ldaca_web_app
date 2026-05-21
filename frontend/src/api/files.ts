@@ -1,5 +1,15 @@
 import { get, post, del, httpRequest } from './http';
 
+const LDACA_API_TOKEN_HEADER = 'X-LDACA-API-Token';
+
+function withLdacaApiToken(
+  headers: Record<string, string> = {},
+  token?: string | null,
+): Record<string, string> {
+  const trimmed = token?.trim();
+  return trimmed ? { ...headers, [LDACA_API_TOKEN_HEADER]: trimmed } : headers;
+}
+
 export interface FileTreeFile {
   name: string;
   path: string;
@@ -49,6 +59,35 @@ export interface LdacaImportStartResponse {
   metadata: {
     task_id: string;
   };
+}
+
+export type LdacaSearchMethod = 'keyword' | 'identifier';
+
+export interface LdacaSearchRequest {
+  method: LdacaSearchMethod;
+  query: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface LdacaSearchResult {
+  id: string;
+  crate_id?: string | null;
+  title: string;
+  description?: string | null;
+  types: string[];
+  license?: string | null;
+  importable: boolean;
+  access?: Record<string, unknown> | null;
+  collections?: string[];
+  file_formats?: string[];
+  stats: Record<string, unknown>;
+}
+
+export interface LdacaSearchResponse {
+  state: 'successful';
+  data: LdacaSearchResult[];
+  message: string;
 }
 
 export type SampleDataCollectionStatus = 'bundled' | 'downloaded' | 'partial' | 'not_downloaded';
@@ -135,8 +174,7 @@ export interface ImportDemoSnapshotsResponse {
 }
 
 export const filesApi = {
-  list: (headers: Record<string, string> = {}) =>
-    get<FileTreeNode[]>('/files/', headers),
+  list: (headers: Record<string, string> = {}) => get<FileTreeNode[]>('/files/', headers),
 
   raw: (path: string, headers: Record<string, string> = {}) =>
     get<string>('/files/raw', headers, { path }),
@@ -144,7 +182,11 @@ export const filesApi = {
   createFolder: (parentPath: string, name: string, headers: Record<string, string> = {}) =>
     post<CreateFolderResponse>('/files/folders', { parent_path: parentPath, name }, headers),
 
-  moveFile: (sourcePath: string, targetDirectoryPath: string, headers: Record<string, string> = {}) =>
+  moveFile: (
+    sourcePath: string,
+    targetDirectoryPath: string,
+    headers: Record<string, string> = {},
+  ) =>
     post<MoveFileResponse>(
       '/files/move',
       { source_path: sourcePath, target_directory_path: targetDirectoryPath },
@@ -181,7 +223,11 @@ export const filesApi = {
     get<string>('/files/sample-data/readme', headers, { path }),
 
   importSampleData: (collectionIds: string[] = [], headers: Record<string, string> = {}) =>
-    post<ImportSampleDataResponse>('/files/import-sample-data', { collection_ids: collectionIds }, headers),
+    post<ImportSampleDataResponse>(
+      '/files/import-sample-data',
+      { collection_ids: collectionIds },
+      headers,
+    ),
 
   getDemoSnapshotsCatalogue: (headers: Record<string, string> = {}) =>
     get<DemoSnapshotsCatalogueResponse>('/files/demo-snapshots/catalogue', headers),
@@ -197,8 +243,26 @@ export const filesApi = {
       headers,
     ),
 
-  importLdaca: (url: string, headers: Record<string, string> = {}) =>
-    post<LdacaImportStartResponse>('/files/import-ldaca', { url }, headers),
+  getLdacaFeatured: (headers: Record<string, string> = {}, ldacaApiToken?: string | null) =>
+    get<LdacaSearchResponse>('/files/ldaca/featured', withLdacaApiToken(headers, ldacaApiToken)),
+
+  searchLdaca: (
+    request: LdacaSearchRequest,
+    headers: Record<string, string> = {},
+    ldacaApiToken?: string | null,
+  ) =>
+    post<LdacaSearchResponse>(
+      '/files/ldaca/search',
+      request,
+      withLdacaApiToken(headers, ldacaApiToken),
+    ),
+
+  importLdaca: (url: string, headers: Record<string, string> = {}, ldacaApiToken?: string | null) =>
+    post<LdacaImportStartResponse>(
+      '/files/import-ldaca',
+      { url },
+      withLdacaApiToken(headers, ldacaApiToken),
+    ),
 
   /** Clear a single background task tracked under /files/tasks. */
   clearTasks: (

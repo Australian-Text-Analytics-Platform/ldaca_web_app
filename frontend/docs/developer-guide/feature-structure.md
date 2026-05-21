@@ -36,7 +36,14 @@ monolithic workspace object.
 - workspace manager card,
 - file tree, preview, upload, and add-to-workspace flows,
 - sample data and demo snapshot import,
-- LDaCA import task submission.
+- LDaCA Oni search and import task submission.
+
+The LDaCA import dialog is an `AlertDialog` driven by
+`hooks/useLdacaImport.ts`. It loads staff-picked records from the backend,
+supports keyword or identifier searches, derives collection and file-type
+filters from returned results, and submits the selected record ID to
+`/files/import-ldaca`. Keep Oni tokens and portal requests behind the backend
+API.
 
 It blocks destructive workspace changes while active tasks exist.
 

@@ -15,6 +15,7 @@ export interface UserPreferences {
   // Persisted alongside the rest of the prefs blob.
   default_language: string | null;
   default_tokenizer_model: string | null;
+  ldaca_oni_api_token: string | null;
   /** Master switch for the demo-snapshot feature. When false, the
    * Save/Load buttons in every analytic tool are unmounted. Default
    * false. See ``features/snapshot-view`` / plan §3.6. */
@@ -24,8 +25,7 @@ export interface UserPreferences {
 export type UserPreferencesUpdate = Partial<UserPreferences>;
 
 export const preferencesApi = {
-  get: (headers?: Record<string, string>) =>
-    get<UserPreferences>('/preferences/', headers),
+  get: (headers?: Record<string, string>) => get<UserPreferences>('/preferences/', headers),
 
   update: (body: UserPreferencesUpdate, headers?: Record<string, string>) =>
     put<UserPreferences>('/preferences/', body, headers),

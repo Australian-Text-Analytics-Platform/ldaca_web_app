@@ -34,13 +34,12 @@ const HintsController = lazy(() => import('./features/hints/HintsController'));
  * and the user has completed authentication (if required).
  */
 const WorkspaceShell: React.FC = () => {
-  const {
-    closeFeedbackModal,
-    feedbackOpen,
-  } = useUIStore(useShallow((state) => ({
-    closeFeedbackModal: state.closeFeedbackModal,
-    feedbackOpen: state.modals.feedbackModal,
-  })));
+  const { closeFeedbackModal, feedbackOpen } = useUIStore(
+    useShallow((state) => ({
+      closeFeedbackModal: state.closeFeedbackModal,
+      feedbackOpen: state.modals.feedbackModal,
+    })),
+  );
   const {
     phase,
     isAuthenticated,
@@ -157,7 +156,8 @@ const WorkspaceShell: React.FC = () => {
   }, [phase.status]);
 
   const blockingCopy = getBlockingCopy(phase, showLaggingHint);
-  const shouldShowLoginCard = isMultiUserMode && !isAuthenticated && phase.status !== 'bootstrapping';
+  const shouldShowLoginCard =
+    isMultiUserMode && !isAuthenticated && phase.status !== 'bootstrapping';
 
   // Collapse/expand the entire right panel (Outlook-like behavior). We
   // remember the last drag value so an uncollapse restores it. While
@@ -182,15 +182,15 @@ const WorkspaceShell: React.FC = () => {
         status={blockingCopy.status}
         hint={blockingCopy.hint}
         error={blockingCopy.error}
-        actions={(
+        actions={
           <button
             type="button"
             onClick={refreshAuth}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-white font-medium shadow hover:bg-blue-700 focus-visible:outline-offset-2 focus-visible:outline-blue-500 focus-visible:outline-2"
+            className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           >
             Retry connection
           </button>
-        )}
+        }
       />
     );
   }
@@ -199,7 +199,9 @@ const WorkspaceShell: React.FC = () => {
   // Reuses the same full-screen layout as BlockingScreen, but swaps the
   // spinner card for a Google sign-in card.
   if (shouldShowLoginCard) {
-    return <LoginScreen isLoading={authLoading} error={authError} authMethods={availableAuthMethods} />;
+    return (
+      <LoginScreen isLoading={authLoading} error={authError} authMethods={availableAuthMethods} />
+    );
   }
 
   return (
@@ -222,12 +224,12 @@ const WorkspaceShell: React.FC = () => {
               </ErrorBoundary>
 
               <div
-                className={`hidden md:flex shrink-0 cursor-col-resize group relative w-2 items-center justify-center ${isResizingSidebar ? 'z-20' : ''}`}
+                className={`group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex ${isResizingSidebar ? 'z-20' : ''}`}
                 aria-label="Resize sidebar"
                 {...sidebarSplitterProps}
               >
                 <div
-                  className={`pointer-events-none w-1 h-10 rounded-full transition-colors ${
+                  className={`pointer-events-none h-10 w-1 rounded-full transition-colors ${
                     isResizingSidebar ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
                   }`}
                 />
@@ -238,7 +240,7 @@ const WorkspaceShell: React.FC = () => {
                   <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
                 </Suspense>
 
-                <header className="border-b border-border/40 bg-white px-4 py-3 md:hidden">
+                <header className="border-border/40 border-b bg-white px-4 py-3 md:hidden">
                   <div className="flex items-center justify-between">
                     <SidebarTrigger />
                   </div>
@@ -252,10 +254,13 @@ const WorkspaceShell: React.FC = () => {
                       className={`relative h-full p-2 pl-1 ${
                         isRightCollapsed ? 'pr-2' : 'pr-1'
                       } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
-                      style={{ width: isRightCollapsed ? '100%' : `${(1 - asidePanelRatio) * 100}%`, minWidth: 280 }}
+                      style={{
+                        width: isRightCollapsed ? '100%' : `${(1 - asidePanelRatio) * 100}%`,
+                        minWidth: 280,
+                      }}
                       innerClassName="overflow-y-auto scrollbar-none p-4"
                     >
-                      <div className="w-full max-w-none mx-0">
+                      <div className="mx-0 flex min-h-0 w-full max-w-none flex-1">
                         <ViewRouter />
                       </div>
                     </InsetCard>
@@ -266,12 +271,12 @@ const WorkspaceShell: React.FC = () => {
                         // hard to grab on small screens and the aside
                         // layout itself collapses to stacked below `md`
                         // (separate change; tracked in plan §3.6 Phase C).
-                        className="hidden md:flex w-2 shrink-0 cursor-col-resize group relative items-center justify-center"
+                        className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex"
                         aria-label="Resize right panel"
                         {...rightPanelSplitterProps}
                       >
                         <div
-                          className={`pointer-events-none w-1 h-10 rounded-full transition-colors ${
+                          className={`pointer-events-none h-10 w-1 rounded-full transition-colors ${
                             isResizing ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
                           }`}
                         />
@@ -288,22 +293,24 @@ const WorkspaceShell: React.FC = () => {
                       {!isRightCollapsed && (
                         <button
                           onClick={toggleRightPanel}
-                          className="group absolute top-2 right-2 z-20 rounded-md border border-gray-300 bg-white/80 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow-sm flex items-center"
+                          className="group absolute top-2 right-2 z-20 flex items-center rounded-md border border-gray-300 bg-white/80 px-2 py-1 text-gray-700 shadow-sm backdrop-blur hover:bg-gray-50"
                           aria-label="Collapse right panel"
                           title="Collapse"
                         >
-                          <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-30 mr-1">Collapse</span>
+                          <span className="mr-1 max-w-0 overflow-hidden whitespace-nowrap transition-all duration-200 group-hover:max-w-30">
+                            Collapse
+                          </span>
                           <span aria-hidden>❯</span>
                         </button>
                       )}
                       <ErrorBoundary>
                         {!isRightCollapsed && (
                           <Suspense
-                            fallback={(
-                              <div className="flex h-full items-center justify-center bg-white text-sm text-muted-foreground">
+                            fallback={
+                              <div className="text-muted-foreground flex h-full items-center justify-center bg-white text-sm">
                                 Loading workspace view…
                               </div>
-                            )}
+                            }
                           >
                             <WorkspaceView />
                           </Suspense>
@@ -312,13 +319,15 @@ const WorkspaceShell: React.FC = () => {
                     </aside>
 
                     {isRightCollapsed && (
-                        <button
+                      <button
                         onClick={toggleRightPanel}
-                        className="group absolute top-2 right-2 z-30 rounded-md border border-gray-300 bg-white/90 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow flex items-center"
+                        className="group absolute top-2 right-2 z-30 flex items-center rounded-md border border-gray-300 bg-white/90 px-2 py-1 text-gray-700 shadow backdrop-blur hover:bg-gray-50"
                         aria-label="Expand right panel"
                         title="Expand"
                       >
-                        <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-24 mr-1">Show</span>
+                        <span className="mr-1 max-w-0 overflow-hidden whitespace-nowrap transition-all duration-200 group-hover:max-w-24">
+                          Show
+                        </span>
                         <span aria-hidden>❮</span>
                       </button>
                     )}
@@ -349,15 +358,13 @@ const App: React.FC = () => {
   // Read feedback-modal state from the shared UI store; the pre-auth and
   // post-auth paths both surface the same Send-feedback button so it'd be
   // surprising for them to maintain separate visibility state.
-  const {
-    feedbackOpen,
-    openFeedbackModal,
-    closeFeedbackModal,
-  } = useUIStore(useShallow((state) => ({
-    feedbackOpen: state.modals.feedbackModal,
-    openFeedbackModal: state.openFeedbackModal,
-    closeFeedbackModal: state.closeFeedbackModal,
-  })));
+  const { feedbackOpen, openFeedbackModal, closeFeedbackModal } = useUIStore(
+    useShallow((state) => ({
+      feedbackOpen: state.modals.feedbackModal,
+      openFeedbackModal: state.openFeedbackModal,
+      closeFeedbackModal: state.closeFeedbackModal,
+    })),
+  );
   let content: ReactNode;
 
   if (!backendReady) {
@@ -367,16 +374,20 @@ const App: React.FC = () => {
           title="Starting backend services"
           description="Hang tight while we verify the backend is up and happy."
           status="Checking /health…"
-          hint={backendError ? `Last error: ${backendError}` : 'If this takes more than ~30s, check the backend logs.'}
-          actions={(
+          hint={
+            backendError
+              ? `Last error: ${backendError}`
+              : 'If this takes more than ~30s, check the backend logs.'
+          }
+          actions={
             <button
               type="button"
               onClick={openFeedbackModal}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 font-medium shadow-sm hover:bg-gray-50 focus-visible:outline-offset-2 focus-visible:outline-blue-500 focus-visible:outline-2"
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               Send feedback
             </button>
-          )}
+          }
         />
         <Suspense fallback={null}>
           <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />

@@ -15,6 +15,10 @@ interface PersistedSnapshot {
   favoriteWorkspaces: readonly string[];
   quotationEngineKey: string;
   quotationLastRemoteUrl: string;
+  defaultLanguage: string | null;
+  defaultTokenizerModel: string | null;
+  ldacaOniApiToken: string | null;
+  demoSnapshotsEnabled: boolean;
 }
 
 /**
@@ -29,11 +33,19 @@ const snapshotPersisted = (
   favoriteWorkspaces: state.favoriteWorkspaces,
   quotationEngineKey: JSON.stringify(state.quotationEngine),
   quotationLastRemoteUrl: state.quotationLastRemoteUrl,
+  defaultLanguage: state.defaultLanguage,
+  defaultTokenizerModel: state.defaultTokenizerModel,
+  ldacaOniApiToken: state.ldacaOniApiToken,
+  demoSnapshotsEnabled: state.demoSnapshotsEnabled,
 });
 
 const snapshotsEqual = (a: PersistedSnapshot, b: PersistedSnapshot) => {
   if (a.quotationEngineKey !== b.quotationEngineKey) return false;
   if (a.quotationLastRemoteUrl !== b.quotationLastRemoteUrl) return false;
+  if (a.defaultLanguage !== b.defaultLanguage) return false;
+  if (a.defaultTokenizerModel !== b.defaultTokenizerModel) return false;
+  if (a.ldacaOniApiToken !== b.ldacaOniApiToken) return false;
+  if (a.demoSnapshotsEnabled !== b.demoSnapshotsEnabled) return false;
   if (a.hiddenViews.length !== b.hiddenViews.length) return false;
   if (a.favoriteWorkspaces.length !== b.favoriteWorkspaces.length) return false;
   for (let i = 0; i < a.hiddenViews.length; i++) {

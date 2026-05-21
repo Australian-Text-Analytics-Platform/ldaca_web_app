@@ -38,8 +38,7 @@ git submodule sync --recursive
 git submodule update --init --recursive --checkout --force
 ```
 
-> The `git submodule update --init --recursive` step is mandatory: this repo embeds `ldaca-wordflow-backend` (along with `docworkspace`, `polars-text`, `ldaca-tabulator`) as git submodules, and a plain `git pull` only advances the *submodule pointer* in the parent tree without checking out the new submodule content. Skipping this leaves the systemd service running stale backend code while `git status` looks clean.
-
+> The `git submodule update --init --recursive` step is mandatory: this repo embeds `ldaca-wordflow-backend` (along with `docworkspace` and `polars-text`) as git submodules, and a plain `git pull` only advances the _submodule pointer_ in the parent tree without checking out the new submodule content. Skipping this leaves the systemd service running stale backend code while `git status` looks clean.
 > **Branch policy:** Nectar tracks `v0.5` (the production line; promoted from `v0.4` after v0.5.0 shipped on 2026-05-17). `v0.4` remains as the previous production line for any back-port hot-fixes. The legacy `main` branch is parked at v0.3.x. See [Routine Updates](#routine-updates) for the normal pull-and-restart sequence after first install.
 
 ### 2. Configure Nginx
@@ -134,12 +133,12 @@ The production deployment at `analytics.ldaca.edu.au` uses CILogon (AAF-federate
 for authentication. The OIDC client was registered by Moises (ARDC/AAF) with the following
 parameters:
 
-| Parameter      | Value                                                                      |
-| -------------- | -------------------------------------------------------------------------- |
-| Client name    | `test.analytics.ldaca.edu.au`                                              |
-| Callback URL   | `https://analytics.ldaca.edu.au/api/auth/cilogon/callback`                 |
-| Configuration  | General LDaCA Transparent Enrollment (openid, email, profile, org.cilogon.userinfo) |
-| Discovery URL  | `https://test.cilogon.aaf.edu.au/.well-known/openid-configuration` (test)  |
+| Parameter     | Value                                                                               |
+| ------------- | ----------------------------------------------------------------------------------- |
+| Client name   | `test.analytics.ldaca.edu.au`                                                       |
+| Callback URL  | `https://analytics.ldaca.edu.au/api/auth/cilogon/callback`                          |
+| Configuration | General LDaCA Transparent Enrollment (openid, email, profile, org.cilogon.userinfo) |
+| Discovery URL | `https://test.cilogon.aaf.edu.au/.well-known/openid-configuration` (test)           |
 
 The client credentials are stored in the systemd service file above. No frontend changes
 are needed — the login button is served dynamically based on which provider is configured.
@@ -219,11 +218,11 @@ pnpm check-versions       # belt-and-braces: same check the CI gate runs
 
 `bump-version` updates: workspace `pyproject.toml`, `backend/pyproject.toml`, `frontend/package.json`, `frontend/src-tauri/Cargo.toml`, and `frontend/src-tauri/tauri.conf.json`. It does **not** touch:
 
-| File | When you need to edit it by hand |
-|---|---|
-| `frontend/.env` | Only when the **minor** version changes (e.g. `v0.4` → `v0.5`). Update `VITE_DOCS_BASE_URL=…/ldaca-wordflow-docs/vX.Y`. Patch releases don't touch this. |
-| `CHANGELOG.md` | Always. Add `## [X.Y.Z] — YYYY-MM-DD` above the previous top entry. |
-| `backend/uv.lock` | Always — regenerate with `env -u CONDA_PREFIX uv lock` from `backend/` after the pyproject version bump. |
+| File              | When you need to edit it by hand                                                                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend/.env`   | Only when the **minor** version changes (e.g. `v0.4` → `v0.5`). Update `VITE_DOCS_BASE_URL=…/ldaca-wordflow-docs/vX.Y`. Patch releases don't touch this. |
+| `CHANGELOG.md`    | Always. Add `## [X.Y.Z] — YYYY-MM-DD` above the previous top entry.                                                                                      |
+| `backend/uv.lock` | Always — regenerate with `env -u CONDA_PREFIX uv lock` from `backend/` after the pyproject version bump.                                                 |
 
 > **Why `frontend/.env` is committed:** it contains only the public docs base URL — no secrets. It is tracked so that both the local `pnpm -C frontend build` and the Tauri GitHub Actions build pick up the correct docs version automatically via `git checkout`. Secrets and local overrides belong in `frontend/.env.local`, which remains gitignored.
 
@@ -257,7 +256,7 @@ done
 
 Expect hits in `DocumentView-*.js` and `FeedbackPanel-*.js` at minimum. Zero total hits → delete the build output and repeat steps 1–2. (In normal flow this is unnecessary — `verify-versions` in CI catches mismatches between the five source files, and the build is deterministic from those.)
 
-If you're worried a *feature* string didn't make it in, swap the regex for a distinctive literal unique to the change (button label, panel title) and re-run.
+If you're worried a _feature_ string didn't make it in, swap the regex for a distinctive literal unique to the change (button label, panel title) and re-run.
 
 ### 3. Validate the backend release artifact
 
@@ -300,7 +299,6 @@ The tag push triggers the backend repo's PyPI publish workflow.
     tagging there anymore. Restore + update this warning if a future
     release line ever needs to be cautioned away from `main`.
 -->
-
 
 ### 5. Update the root repo to the new backend submodule pointer
 
@@ -463,7 +461,7 @@ git submodule update --init --recursive --checkout --force
 sudo systemctl restart ldaca-wordflow
 ```
 
-The submodule sync step is mandatory: this repo embeds `ldaca-wordflow-backend` (along with `docworkspace`, `polars-text`, `ldaca-tabulator`) as git submodules, and a plain `git pull` only advances the *submodule pointer* in the parent tree without checking out the new submodule content. Skipping the sync leaves systemd running stale backend code while `git status` looks clean.
+The submodule sync step is mandatory: this repo embeds `ldaca-wordflow-backend` (along with `docworkspace` and `polars-text`) as git submodules, and a plain `git pull` only advances the _submodule pointer_ in the parent tree without checking out the new submodule content. Skipping the sync leaves systemd running stale backend code while `git status` looks clean.
 
 If the service still serves stale frontend assets after the restart, confirm the backend submodule matches the root repo's recorded pointer. A leading `+` in `git submodule status backend` means the deployed backend checkout does not match — re-run the update line above.
 
@@ -489,13 +487,13 @@ If you need to update environment variables (e.g. `GOOGLE_CLIENT_ID`) or startup
 
 ## Troubleshooting
 
-| Symptom | Check |
-| --- | --- |
-| App not responding | `sudo systemctl status ldaca-wordflow` and `sudo journalctl -u ldaca-wordflow -n 50` |
-| 502 Bad Gateway from Nginx | App may be down — restart with `sudo systemctl restart ldaca-wordflow` |
-| Certificate expired | `sudo certbot renew` |
-| Port 8001 already in use | `sudo fuser -k 8001/tcp` then start the service |
-| Old UI served after deploy | Frontend source changed but `build.tar.gz` was not rebuilt — follow [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) steps 1–4, then redeploy |
-| New feature missing from UI | Verify with the bundle-grep snippet under [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) step 2 — if `0` hits, rebuild and recommit the bundle |
-| In-app version doesn't match `pip show` | Forgot to run `pnpm deploy_frontend_to_backend` after `bump-version`. The wheel metadata is correct but the FE bundle's baked-in `VITE_APP_VERSION` is stale. Rebuild, redeploy, and recommit (or, post-tag, re-stamp under a new patch version because PyPI is immutable). |
-| `release.yml` fails at `verify-versions` | Version drift across the five sources. Run `pnpm check-versions` locally to see which file is out, then `pnpm bump-version <correct-semver>` to align them. |
+| Symptom                                  | Check                                                                                                                                                                                                                                                                       |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App not responding                       | `sudo systemctl status ldaca-wordflow` and `sudo journalctl -u ldaca-wordflow -n 50`                                                                                                                                                                                        |
+| 502 Bad Gateway from Nginx               | App may be down — restart with `sudo systemctl restart ldaca-wordflow`                                                                                                                                                                                                      |
+| Certificate expired                      | `sudo certbot renew`                                                                                                                                                                                                                                                        |
+| Port 8001 already in use                 | `sudo fuser -k 8001/tcp` then start the service                                                                                                                                                                                                                             |
+| Old UI served after deploy               | Frontend source changed but `build.tar.gz` was not rebuilt — follow [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) steps 1–4, then redeploy                                                                                                  |
+| New feature missing from UI              | Verify with the bundle-grep snippet under [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) step 2 — if `0` hits, rebuild and recommit the bundle                                                                                               |
+| In-app version doesn't match `pip show`  | Forgot to run `pnpm deploy_frontend_to_backend` after `bump-version`. The wheel metadata is correct but the FE bundle's baked-in `VITE_APP_VERSION` is stale. Rebuild, redeploy, and recommit (or, post-tag, re-stamp under a new patch version because PyPI is immutable). |
+| `release.yml` fails at `verify-versions` | Version drift across the five sources. Run `pnpm check-versions` locally to see which file is out, then `pnpm bump-version <correct-semver>` to align them.                                                                                                                 |

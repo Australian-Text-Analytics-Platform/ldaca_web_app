@@ -4,6 +4,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
+import { filesApi } from '@/api/files';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 
 const {
   mockSetCurrentWorkspace,
@@ -35,7 +37,16 @@ type MockWorkspaceState = {
 };
 
 let mockWorkspaceState: MockWorkspaceState = {
-  workspaces: [{ id: 'ws-1', name: 'Main Workspace', description: 'Initial workspace description', created_at: '2024-01-01', updated_at: '2024-01-02', dataframe_count: 0 }],
+  workspaces: [
+    {
+      id: 'ws-1',
+      name: 'Main Workspace',
+      description: 'Initial workspace description',
+      created_at: '2024-01-01',
+      updated_at: '2024-01-02',
+      dataframe_count: 0,
+    },
+  ],
   currentWorkspaceId: 'ws-1',
   workspaceGraph: { nodes: [] },
 };
@@ -125,6 +136,8 @@ vi.mock('@/api/files', () => ({
     createFolder: mockCreateFolder,
     moveFile: mockMoveFile,
     importSampleData: vi.fn(),
+    getLdacaFeatured: vi.fn(async () => ({ state: 'successful', data: [], message: 'Loaded' })),
+    searchLdaca: vi.fn(async () => ({ state: 'successful', data: [], message: 'Searched' })),
     importLdaca: vi.fn(),
   },
 }));
@@ -186,8 +199,18 @@ describe('DataLoaderFeature citation UI', () => {
     mockRawFile.mockResolvedValue('# ADO Citation\n\nReference text.');
     mockCreateFolder.mockResolvedValue({ message: 'Folder created', path: 'new-folder' });
     mockMoveFile.mockResolvedValue({ message: 'File moved', path: 'sample_data/Other/docs.csv' });
+    usePreferencesStore.getState().setLdacaOniApiToken(null);
     mockWorkspaceState = {
-      workspaces: [{ id: 'ws-1', name: 'Main Workspace', description: 'Initial workspace description', created_at: '2024-01-01', updated_at: '2024-01-02', dataframe_count: 0 }],
+      workspaces: [
+        {
+          id: 'ws-1',
+          name: 'Main Workspace',
+          description: 'Initial workspace description',
+          created_at: '2024-01-01',
+          updated_at: '2024-01-02',
+          dataframe_count: 0,
+        },
+      ],
       currentWorkspaceId: 'ws-1',
       workspaceGraph: { nodes: [] },
     };
@@ -228,7 +251,9 @@ describe('DataLoaderFeature citation UI', () => {
     const user = userEvent.setup();
     renderWithProviders(<DataLoaderFeature />);
 
-    fireEvent.click(getVisibleMatch(screen.getAllByRole('button', { name: /add folder inside ado/i })));
+    fireEvent.click(
+      getVisibleMatch(screen.getAllByRole('button', { name: /add folder inside ado/i })),
+    );
     await user.type(screen.getByLabelText(/folder name/i), 'Transcripts');
     fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }));
 
@@ -240,7 +265,9 @@ describe('DataLoaderFeature citation UI', () => {
   it('moves a dragged file when dropped on a folder row', async () => {
     renderWithProviders(<DataLoaderFeature />);
 
-    const draggedFileRow = getVisibleMatch(screen.getAllByTestId('file-row-sample_data/ADO/docs.csv'));
+    const draggedFileRow = getVisibleMatch(
+      screen.getAllByTestId('file-row-sample_data/ADO/docs.csv'),
+    );
     const targetFolderRow = getVisibleMatch(screen.getAllByTestId('folder-row-sample_data/Other'));
     let currentDragPath = 'sample_data/ADO/docs.csv';
 
@@ -248,7 +275,9 @@ describe('DataLoaderFeature citation UI', () => {
       effectAllowed: 'move',
       dropEffect: 'move',
       setData: vi.fn(),
-      getData: vi.fn((type: string) => type === 'application/x-ldaca-file-path' ? currentDragPath : ''),
+      getData: vi.fn((type: string) =>
+        type === 'application/x-ldaca-file-path' ? currentDragPath : '',
+      ),
       types: ['application/x-ldaca-file-path', 'text/plain'],
     };
 
@@ -263,22 +292,32 @@ describe('DataLoaderFeature citation UI', () => {
     fireEvent.drop(targetFolderRow, { dataTransfer });
 
     await waitFor(() => {
-      expect(mockMoveFile).toHaveBeenCalledWith('sample_data/ADO/docs.csv', 'sample_data/Other', {});
+      expect(mockMoveFile).toHaveBeenCalledWith(
+        'sample_data/ADO/docs.csv',
+        'sample_data/Other',
+        {},
+      );
     });
   });
 
   it('moves a dragged file when dropped on a file row inside a folder', async () => {
     renderWithProviders(<DataLoaderFeature />);
 
-    const draggedFileRow = getVisibleMatch(screen.getAllByTestId('file-row-sample_data/ADO/docs.csv'));
-    const targetFileRow = getVisibleMatch(screen.getAllByTestId('file-row-sample_data/Other/no-readme.csv'));
+    const draggedFileRow = getVisibleMatch(
+      screen.getAllByTestId('file-row-sample_data/ADO/docs.csv'),
+    );
+    const targetFileRow = getVisibleMatch(
+      screen.getAllByTestId('file-row-sample_data/Other/no-readme.csv'),
+    );
     let currentDragPath = 'sample_data/ADO/docs.csv';
 
     const dataTransfer = {
       effectAllowed: 'move',
       dropEffect: 'move',
       setData: vi.fn(),
-      getData: vi.fn((type: string) => type === 'application/x-ldaca-file-path' ? currentDragPath : ''),
+      getData: vi.fn((type: string) =>
+        type === 'application/x-ldaca-file-path' ? currentDragPath : '',
+      ),
       types: ['application/x-ldaca-file-path', 'text/plain'],
     };
 
@@ -293,7 +332,11 @@ describe('DataLoaderFeature citation UI', () => {
     fireEvent.drop(targetFileRow, { dataTransfer });
 
     await waitFor(() => {
-      expect(mockMoveFile).toHaveBeenCalledWith('sample_data/ADO/docs.csv', 'sample_data/Other', {});
+      expect(mockMoveFile).toHaveBeenCalledWith(
+        'sample_data/ADO/docs.csv',
+        'sample_data/Other',
+        {},
+      );
     });
   });
 
@@ -306,22 +349,90 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();
   });
 
+  it('saves and deletes the LDaCA token through an in-app dialog', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DataLoaderFeature />);
+
+    await user.click(
+      getVisibleMatch(screen.getAllByRole('button', { name: /import from ldaca/i })),
+    );
+    expect(await screen.findByRole('heading', { name: 'Import from LDaCA' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /add your own token/i }));
+    expect(screen.getByRole('heading', { name: 'Add LDaCA Token' })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/token key/i), ' portal-token ');
+    await user.click(screen.getByRole('button', { name: /save token/i }));
+
+    await waitFor(() => {
+      expect(usePreferencesStore.getState().ldacaOniApiToken).toBe('portal-token');
+    });
+    expect(screen.getByRole('button', { name: /delete token/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /delete token/i }));
+    expect(usePreferencesStore.getState().ldacaOniApiToken).toBeNull();
+    expect(screen.getByRole('button', { name: /add your own token/i })).toBeInTheDocument();
+  });
+
+  it('links LDaCA collection card titles to their portal pages', async () => {
+    const user = userEvent.setup();
+    vi.mocked(filesApi.getLdacaFeatured).mockResolvedValueOnce({
+      state: 'successful',
+      data: [
+        {
+          id: 'arcp://name,hdl10.26180~23961609',
+          crate_id: 'arcp://name,hdl10.26180~23961609',
+          title: 'A COrpus of Oz Early English (COOEE)',
+          description: 'Historical English corpus',
+          types: ['Dataset'],
+          license: 'https://creativecommons.org/licenses/by/4.0/',
+          importable: true,
+          stats: {},
+        },
+      ],
+      message: 'Loaded',
+    });
+
+    renderWithProviders(<DataLoaderFeature />);
+
+    await user.click(
+      getVisibleMatch(screen.getAllByRole('button', { name: /import from ldaca/i })),
+    );
+
+    const titleLink = await screen.findByRole('link', {
+      name: 'A COrpus of Oz Early English (COOEE)',
+    });
+    expect(titleLink).toHaveAttribute(
+      'href',
+      'https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26180~23961609&_crateId=arcp%3A%2F%2Fname%2Chdl10.26180~23961609',
+    );
+    expect(titleLink).toHaveAttribute('target', '_blank');
+  });
+
   it('shows only active workspace controls when a workspace is loaded and allows quick unload from the manager', async () => {
     renderWithProviders(<DataLoaderFeature />);
 
     const activeWorkspaceCard = getVisibleMatch(screen.getAllByTestId('active-workspace-card'));
     expect(within(activeWorkspaceCard).getByText('Active workspace')).toBeInTheDocument();
     expect(within(activeWorkspaceCard).queryByText('Create workspace')).not.toBeInTheDocument();
-    expect(within(activeWorkspaceCard).queryByPlaceholderText('Workspace name')).not.toBeInTheDocument();
-    expect(within(activeWorkspaceCard).queryByPlaceholderText('Optional description')).not.toBeInTheDocument();
+    expect(
+      within(activeWorkspaceCard).queryByPlaceholderText('Workspace name'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(activeWorkspaceCard).queryByPlaceholderText('Optional description'),
+    ).not.toBeInTheDocument();
 
-    const workspaceManagerCard = getVisibleMatch(screen.getAllByTestId('workspace-manager-item-ws-1'));
+    const workspaceManagerCard = getVisibleMatch(
+      screen.getAllByTestId('workspace-manager-item-ws-1'),
+    );
     expect(workspaceManagerCard).toHaveClass('border-primary');
     expect(workspaceManagerCard).toHaveClass('bg-primary/10');
 
     expect(within(activeWorkspaceCard).getByPlaceholderText('Enter new name')).toBeInTheDocument();
 
-    const quickUnloadButton = within(workspaceManagerCard).getByText(/^Unload$/i, { selector: 'button' });
+    const quickUnloadButton = within(workspaceManagerCard).getByText(/^Unload$/i, {
+      selector: 'button',
+    });
     expect(quickUnloadButton).toBeEnabled();
 
     fireEvent.click(quickUnloadButton);
@@ -333,10 +444,16 @@ describe('DataLoaderFeature citation UI', () => {
     renderWithProviders(<DataLoaderFeature />);
 
     const activeWorkspaceCard = getVisibleMatch(screen.getAllByTestId('active-workspace-card'));
-    const workspaceManagerCard = getVisibleMatch(screen.getAllByTestId('workspace-manager-item-ws-1'));
-    expect(within(activeWorkspaceCard).getByDisplayValue('Initial workspace description')).toBeInTheDocument();
+    const workspaceManagerCard = getVisibleMatch(
+      screen.getAllByTestId('workspace-manager-item-ws-1'),
+    );
+    expect(
+      within(activeWorkspaceCard).getByDisplayValue('Initial workspace description'),
+    ).toBeInTheDocument();
 
-    const workspaceDescriptionButton = within(workspaceManagerCard).getByLabelText(/view workspace description/i);
+    const workspaceDescriptionButton = within(workspaceManagerCard).getByLabelText(
+      /view workspace description/i,
+    );
     fireEvent.pointerDown(workspaceDescriptionButton, { button: 0 });
 
     expect(screen.getByText('Initial workspace description')).toBeInTheDocument();
@@ -344,7 +461,16 @@ describe('DataLoaderFeature citation UI', () => {
 
   it('shows only the create workspace form when no workspace is loaded', () => {
     mockWorkspaceState = {
-      workspaces: [{ id: 'ws-1', name: 'Main Workspace', description: 'Initial workspace description', created_at: '2024-01-01', updated_at: '2024-01-02', dataframe_count: 0 }],
+      workspaces: [
+        {
+          id: 'ws-1',
+          name: 'Main Workspace',
+          description: 'Initial workspace description',
+          created_at: '2024-01-01',
+          updated_at: '2024-01-02',
+          dataframe_count: 0,
+        },
+      ],
       currentWorkspaceId: null,
       workspaceGraph: { nodes: [] },
     };
@@ -352,14 +478,22 @@ describe('DataLoaderFeature citation UI', () => {
     renderWithProviders(<DataLoaderFeature />);
 
     const createWorkspaceCard = getVisibleMatch(screen.getAllByTestId('create-workspace-card'));
-    const createWorkspaceButton = within(createWorkspaceCard).getByRole('button', { name: /create workspace/i });
+    const createWorkspaceButton = within(createWorkspaceCard).getByRole('button', {
+      name: /create workspace/i,
+    });
     expect(within(createWorkspaceCard).queryByText('Active workspace')).not.toBeInTheDocument();
     expect(within(createWorkspaceCard).getAllByText('Create workspace')).toHaveLength(2);
     expect(within(createWorkspaceCard).getByPlaceholderText('Workspace name')).toBeInTheDocument();
-    expect(within(createWorkspaceCard).getByPlaceholderText('Optional description')).toBeInTheDocument();
+    expect(
+      within(createWorkspaceCard).getByPlaceholderText('Optional description'),
+    ).toBeInTheDocument();
     expect(createWorkspaceButton).toBeInTheDocument();
-    expect(within(createWorkspaceCard).queryByPlaceholderText('Enter new name')).not.toBeInTheDocument();
-    expect(within(createWorkspaceCard).queryByLabelText('Workspace description')).not.toBeInTheDocument();
+    expect(
+      within(createWorkspaceCard).queryByPlaceholderText('Enter new name'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(createWorkspaceCard).queryByLabelText('Workspace description'),
+    ).not.toBeInTheDocument();
   });
 
   it('allows selecting multiple files from the upload picker', async () => {

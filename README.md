@@ -8,7 +8,6 @@ This repository (previously `ldaca_web_app`) contains the LDaCA Wordflow web app
 - `backend/`: FastAPI backend (PyPI: `ldaca-wordflow`, import: `ldaca_wordflow`) and workspace/task APIs
 - `docworkspace/`: lazy workspace graph library built around `Workspace` and `Node`
 - `polars-text/`: Rust/PyO3 Polars plugin package for concordance, quotation, tokenization, and related text analysis
-- `ldaca-tabulator/`: RO-Crate and tabular import/export utilities
 
 ## Architecture Summary
 

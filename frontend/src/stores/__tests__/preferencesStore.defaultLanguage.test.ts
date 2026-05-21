@@ -16,6 +16,8 @@ function resetStore() {
     quotationLastRemoteUrl: '',
     defaultLanguage: null,
     defaultTokenizerModel: null,
+    ldacaOniApiToken: null,
+    demoSnapshotsEnabled: false,
     hydrated: false,
     syncing: false,
   });
@@ -30,6 +32,7 @@ describe('preferencesStore default language fields', () => {
     const state = usePreferencesStore.getState();
     expect(state.defaultLanguage).toBeNull();
     expect(state.defaultTokenizerModel).toBeNull();
+    expect(state.ldacaOniApiToken).toBeNull();
   });
 
   it('setDefaultLanguage normalises case and whitespace', () => {
@@ -58,7 +61,7 @@ describe('preferencesStore default language fields', () => {
     const { setDefaultTokenizerModel } = usePreferencesStore.getState();
     setDefaultTokenizerModel('cl-tohoku/bert-base-japanese-v3');
     expect(usePreferencesStore.getState().defaultTokenizerModel).toBe(
-      'cl-tohoku/bert-base-japanese-v3'
+      'cl-tohoku/bert-base-japanese-v3',
     );
     // Trimming is still applied so stray copy/paste whitespace doesn't leak.
     setDefaultTokenizerModel(' jieba ');
@@ -72,16 +75,26 @@ describe('preferencesStore default language fields', () => {
     expect(usePreferencesStore.getState().defaultTokenizerModel).toBeNull();
   });
 
+  it('setLdacaOniApiToken trims and clears the saved token', () => {
+    const { setLdacaOniApiToken } = usePreferencesStore.getState();
+    setLdacaOniApiToken(' portal-token ');
+    expect(usePreferencesStore.getState().ldacaOniApiToken).toBe('portal-token');
+    setLdacaOniApiToken('   ');
+    expect(usePreferencesStore.getState().ldacaOniApiToken).toBeNull();
+  });
+
   it('defaults survive partialize persistence (covered by partialize key list)', () => {
     // Indirectly: the partialize selector includes defaultLanguage /
     // defaultTokenizerModel, so the persisted blob round-trips them.
-    const { setDefaultLanguage, setDefaultTokenizerModel } =
+    const { setDefaultLanguage, setDefaultTokenizerModel, setLdacaOniApiToken } =
       usePreferencesStore.getState();
     setDefaultLanguage('ja');
     setDefaultTokenizerModel('cl-tohoku/bert-base-japanese-v3');
+    setLdacaOniApiToken('portal-token');
 
     const state = usePreferencesStore.getState();
     expect(state.defaultLanguage).toBe('ja');
     expect(state.defaultTokenizerModel).toBe('cl-tohoku/bert-base-japanese-v3');
+    expect(state.ldacaOniApiToken).toBe('portal-token');
   });
 });

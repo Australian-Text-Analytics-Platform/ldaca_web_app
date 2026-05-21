@@ -47,7 +47,6 @@ or safely regenerable.
 ```text
 -70223d0d68f3c8c3544fc07c89755ea113c5342f backend
  b5380d03b7be25f00012bce712ad28db729f4c47 docworkspace (v0.2.8-3-gb5380d0)
- 051d3a4d0057a04664282da4cac888ffdc53e144 ldaca-tabulator (heads/ldaca_web_app_integration)
  fa797289f25259a20853144f2fc77c3bed7f3a40 polars-text (v0.2.1-2-gfa79728)
 ```
 
@@ -82,22 +81,14 @@ M backend
 (no file-level diff)
 ```
 
-#### Dirty files: ldaca-tabulator
-
-```text
-## ldaca_web_app_integration...origin/ldaca_web_app_integration [ahead 1]
-(no file-level diff)
-```
-
 ## Inventory Summary
 
-| Repository      | Tracked files | Initial Pending | Fixture | Generated/Inventory Only | Remove-Candidate |
-| --------------- | ------------: | --------------: | ------: | -----------------------: | ---------------: |
-| root            |           792 |             678 |     111 |                        3 |                0 |
-| backend         |           543 |             174 |      17 |                      352 |                0 |
-| docworkspace    |            25 |              24 |       0 |                        1 |                0 |
-| polars-text     |            40 |              38 |       0 |                        2 |                0 |
-| ldaca-tabulator |            49 |              14 |      34 |                        1 |                0 |
+| Repository   | Tracked files | Initial Pending | Fixture | Generated/Inventory Only | Remove-Candidate |
+| ------------ | ------------: | --------------: | ------: | -----------------------: | ---------------: |
+| root         |           792 |             678 |     111 |                        3 |                0 |
+| backend      |           543 |             174 |      17 |                      352 |                0 |
+| docworkspace |            25 |              24 |       0 |                        1 |                0 |
+| polars-text  |            40 |              38 |       0 |                        2 |                0 |
 
 ## Manual Review Notes
 
@@ -127,15 +118,6 @@ M backend
 | docworkspace/src/docworkspace/workspace/io.py       | Workspace persistence annotations                 | Reviewed-Keep after cleanup | Replaced legacy `Union` and `Dict` aliases with built-in generics without changing behavior.          | `uv run pytest -q` 95 passed and `uvx ty check` passed. |
 | docworkspace/src/docworkspace/workspace/analysis.py | JSON helper annotations                           | Reviewed-Keep after cleanup | Replaced legacy `Dict` and `List` aliases with built-in generics; code structure is otherwise simple. | `uv run pytest -q` 95 passed and `uvx ty check` passed. |
 | docworkspace/tests/test_node.py                     | Type-hint contract test                           | Reviewed-Keep after cleanup | Removed the now-unneeded `Optional` import and global namespace entry.                                | `uv run pytest -q` 95 passed and `uvx ty check` passed. |
-
-### Checkpoint 4: ldaca-tabulator
-
-| File                                            | Unit                                             | Decision                     | Rationale                                                                                                | Verification                                            |
-| ----------------------------------------------- | ------------------------------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| ldaca-tabulator/src/ldacatabulator/tabulator.py | URL corpus ID helpers                            | Reviewed-Keep after refactor | Centralized repeated zip URL corpus-ID extraction into `_corpus_id_from_zip_url`.                        | `uv run pytest -q` 22 passed and `uvx ty check` passed. |
-| ldaca-tabulator/src/ldacatabulator/tabulator.py | SQL entity-table loading                         | Reviewed-Keep after refactor | Added identifier quoting for table/column names and kept table-specific behavior explicit.               | `uv run pytest -q` 22 passed and `uvx ty check` passed. |
-| ldaca-tabulator/src/ldacatabulator/tabulator.py | get_text/get_people/get_organization/get_speaker | Reviewed-Keep after refactor | Shared the repeated clean-table wrapper while preserving `get_text` ID-column cleanup verified by tests. | `uv run pytest -q` 22 passed and `uvx ty check` passed. |
-| ldaca-tabulator/src/ldacatabulator/tabulator.py | Python version compatibility                     | Refactor                     | Replaced Python 3.14-only multiple-exception syntax with Python 3.12-compatible parentheses.             | `uvx ty check` passed.                                  |
 
 ### Checkpoint 5: backend baseline
 
@@ -482,14 +464,6 @@ M backend
 | polars-text/src/token_frequencies.rs | Token frequency binding         | Reviewed-Keep | Python-dict bridge is small; conversion `expect` is an internal invariant.                                                       | polars-text pytest command exited 0.                                                  |
 | polars-text config/docs              | Package metadata/workflows/docs | Reviewed-Keep | Package config and docs are conventional and cohesive; no dead config found.                                                     | `uvx ty check` passed; source scans completed.                                        |
 
-### Checkpoint 39: ldaca-tabulator inventory completion
-
-| File                                            | Unit                   | Decision      | Rationale                                                                       | Verification                                                                      |
-| ----------------------------------------------- | ---------------------- | ------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| ldaca-tabulator/src/ldacatabulator/**init**.py  | Package marker         | Reviewed-Keep | Empty package marker is intentional and minimal.                                | ldaca-tabulator pytest passed 22 tests; `env -u VIRTUAL_ENV uvx ty check` passed. |
-| ldaca-tabulator/src/ldacatabulator/configs/\*\* | Corpus/general configs | Reviewed-Keep | Static corpus/table configuration is data, not simplification target.           | ldaca-tabulator pytest passed 22 tests; config scan completed.                    |
-| ldaca-tabulator docs/config                     | Package docs/config    | Reviewed-Keep | README/TODO/license/pyproject/gitignore are conventional package support files. | ldaca-tabulator pytest passed 22 tests; `env -u VIRTUAL_ENV uvx ty check` passed. |
-
 ### Checkpoint 40: agent support inventory classification
 
 | File                                   | Unit                                | Decision      | Rationale                                                                                                        | Verification                                                |
@@ -615,9 +589,9 @@ M backend
 
 ### Checkpoint 55: inventory closure
 
-| File       | Unit                     | Decision | Rationale                                                                                                                                                                                                                                                                                            | Verification                                                                                                                                                 |
-| ---------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Repository | Remaining inventory rows | Complete | All file-inventory rows across root, backend, docworkspace, polars-text, ldaca-tabulator, and frontend now have a non-Pending decision in this ledger. The summary table now labels baseline counts as `Initial Pending` so searches for remaining pending rows do not false-positive on the header. | Search for remaining Pending status cells returned no matches. Full frontend validation passed: Vitest 103 files / 623 tests, `pnpm lint`, and `pnpm build`. |
+| File       | Unit                     | Decision | Rationale                                                                                                                                                                                                                                                                           | Verification                                                                                                                                                 |
+| ---------- | ------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Repository | Remaining inventory rows | Complete | All file-inventory rows across root, backend, docworkspace, polars-text, and frontend now have a non-Pending decision in this ledger. The summary table now labels baseline counts as `Initial Pending` so searches for remaining pending rows do not false-positive on the header. | Search for remaining Pending status cells returned no matches. Full frontend validation passed: Vitest 103 files / 623 tests, `pnpm lint`, and `pnpm build`. |
 
 ## File Inventory
 
@@ -1395,7 +1369,6 @@ M backend
 | frontend/src/vite-env.d.ts                                                                                          | code           | Reviewed-Keep                | Vite/window environment declarations retained.                                                                                                                   |
 | frontend/tsconfig.json                                                                                              | config         | Reviewed-Keep                | Strict TypeScript config retained.                                                                                                                               |
 | frontend/vite.config.ts                                                                                             | code           | Reviewed-Keep                | Vite/React Compiler/Tailwind/test config retained.                                                                                                               |
-| ldaca-tabulator                                                                                                     | other          | Reviewed-Keep                | Subpackage inventory completed; tests and type check pass.                                                                                                       |
 | package.json                                                                                                        | config         | Reviewed-Keep                | Root workspace script wrapper is compact and package-specific.                                                                                                   |
 | pnpm-lock.yaml                                                                                                      | config         | Generated/Inventory Only     | Lockfile; do not edit manually.                                                                                                                                  |
 | pnpm-workspace.yaml                                                                                                 | config         | Reviewed-Keep                | Minimal pnpm workspace config retained.                                                                                                                          |
@@ -2042,57 +2015,3 @@ M backend
 | tests/test_tokenize.py              | code   | Reviewed-Keep            | Tokenization coverage exercised by polars-text tests.                                                             |
 | tests/test_tokenize_with_offsets.py | code   | Reviewed-Keep            | Offset tokenization coverage exercised by polars-text tests.                                                      |
 | uv.lock                             | other  | Generated/Inventory Only | Lockfile; do not edit manually.                                                                                   |
-
-### Inventory: ldaca-tabulator
-
-| Path                                                                         | Kind           | Status                   | Notes                                                                       |
-| ---------------------------------------------------------------------------- | -------------- | ------------------------ | --------------------------------------------------------------------------- |
-| .gitignore                                                                   | other          | Reviewed-Keep            | Standard package ignore list retained.                                      |
-| LICENSE.txt                                                                  | other          | Reviewed-Keep            | Package license text retained.                                              |
-| README.md                                                                    | docs           | Reviewed-Keep            | Package usage docs retained.                                                |
-| TODO.md                                                                      | docs           | Reviewed-Keep            | Single-line project note retained.                                          |
-| example.ipynb                                                                | other          | Reviewed-Keep            | Example notebook retained as package demo asset.                            |
-| pyproject.toml                                                               | config         | Reviewed-Keep            | Package metadata/dependencies retained.                                     |
-| src/ldacatabulator/**init**.py                                               | code           | Reviewed-Keep            | Empty package marker is intentional and minimal.                            |
-| src/ldacatabulator/configs/corpora/23089559.json                             | config         | Reviewed-Keep            | Static corpus table config retained.                                        |
-| src/ldacatabulator/configs/corpora/23961609.json                             | config         | Reviewed-Keep            | Static corpus table config retained.                                        |
-| src/ldacatabulator/configs/corpora/24769173.json                             | config         | Reviewed-Keep            | Static corpus table config retained.                                        |
-| src/ldacatabulator/configs/general/general-config.json                       | config         | Reviewed-Keep            | Static general table config retained.                                       |
-| src/ldacatabulator/tabulator.py                                              | code           | Reviewed-Keep            | Repeated URL/table cleanup simplified; Python 3.12 syntax diagnostic fixed. |
-| tests/**init**.py                                                            | code           | Reviewed-Keep            | Package marker is minimal.                                                  |
-| tests/crates/languageFamily.zip                                              | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_Danish.mp3                            | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_Finnish.mp3                           | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_German.mp3                            | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_Icelandic.mp3                         | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_Latin.mp3                             | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_Lithuanian.mp3                        | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_Mongolian.mp3                         | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_ScottishGaelic.mp3                    | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Audio/UDHR_Welsh.mp3                             | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Images/UDHR_AncientEgyptian.png                  | binary/data    | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Images/UDHR_OldEnglish.png                       | binary/data    | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Licenses/Example.txt                             | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_Danish.txt                             | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_English.txt                            | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_Finnish.txt                            | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_German.txt                             | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_Icelandic.txt                          | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_Latin.txt                              | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_Lithuanian.txt                         | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_Mongolian.txt                          | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_OldEnglish.txt                         | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_ScottishGaelic.txt                     | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/Text/UDHR_Welsh.txt                              | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/ro-crate-metadata-w-subcollections_20250610.xlsx | binary/data    | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/ro-crate-metadata.json                           | config         | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/languageFamily/ro-crate-preview.html                            | frontend asset | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/minimal/ro-crate-metadata.json                                  | config         | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/textfiles/doc001/somethingelse.txt                              | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/textfiles/doc001/textfile.txt                                   | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/textfiles/ro-crate-metadata.json                                | config         | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/utf8/data/2-035-plain.txt                                       | other          | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/utf8/ro-crate-metadata.json                                     | config         | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/crates/wide/ro-crate-metadata.json                                     | config         | Fixture                  | Fixture/resource/static asset; review only if owning tests or docs change.  |
-| tests/test_LDaCATabulator.py                                                 | code           | Reviewed-Keep            | Tabulator behavior coverage exercised by ldaca-tabulator tests.             |
-| uv.lock                                                                      | other          | Generated/Inventory Only | Lockfile; do not edit manually.                                             |
