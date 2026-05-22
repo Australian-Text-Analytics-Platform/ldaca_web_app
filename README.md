@@ -141,3 +141,9 @@ npm run test -w frontend -- --run
 - Backend docs: `backend/docs/index.md`
 - Frontend docs: `frontend/docs/index.md`
 - Agent workflow and repo-specific coding guidance: `AGENTS.md`
+
+## License
+
+LDaCA Wordflow is licensed under the [Apache License, Version 2.0](./LICENSE). See [NOTICE](./NOTICE) for required attribution.
+
+This branch (`v0.4`) is parked as the back-port line for the pre-v0.5 release series. The relicense from MIT to Apache 2.0 landed on `v0.5` first and was back-ported here for consistency; any future v0.4.x hot-fix release ships under Apache 2.0.
