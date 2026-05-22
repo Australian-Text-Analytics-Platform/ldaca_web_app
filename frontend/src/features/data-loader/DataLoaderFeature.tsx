@@ -459,10 +459,17 @@ export const DataLoaderFeature: React.FC = () => {
     }
   };
 
-  const handleAddToWorkspace = async (selectedSheet?: string | null) => {
+  const handleAddToWorkspace = async (
+    selectedSheet?: string | null,
+    nodeName?: string,
+  ) => {
     if (!addFileName) return;
     try {
-      await workspaceActions.createNodeFromFile(addFileName, selectedSheet ?? undefined);
+      await workspaceActions.createNodeFromFile(
+        addFileName,
+        selectedSheet ?? undefined,
+        nodeName,
+      );
       notify('success', `${addFileName} added to workspace.`);
       // The file has been added — clear the "new upload" hint state so the
       // contextual hint stops pointing at this row.

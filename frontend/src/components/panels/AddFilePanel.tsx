@@ -1,18 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import { useFilePreview } from '../../hooks/useFilePreview';
 import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { defaultNodeNameFromFile } from '@/features/data-loader/utils/fileTreeHelpers';
+import { acceptPlaceholderOnTab } from '@/features/preprocessing/utils/placeholderTabFill';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface AddFilePanelProps {
   filename: string | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: (selectedSheet?: string | null) => Promise<void> | void;
+  onConfirm: (selectedSheet?: string | null, nodeName?: string) => Promise<void> | void;
 }
 
 export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onClose, onConfirm }) => {
@@ -37,12 +41,23 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
   const selectedLanguage = defaultLanguage ?? 'en';
 
   const [submitting, setSubmitting] = useState(false);
+  // User-supplied data block name. Empty string means "use the server's
+  // derived default" — the placeholder shows what that default would be.
+  const [nodeName, setNodeName] = useState('');
+  const defaultName = useMemo(() => defaultNodeNameFromFile(filename ?? ''), [filename]);
 
   useEffect(() => {
     if (!open) {
       setSubmitting(false);
+      setNodeName('');
     }
   }, [open]);
+
+  // Reset the typed name whenever the source file changes so a stale value
+  // from a previous panel open doesn't leak into the next file.
+  useEffect(() => {
+    setNodeName('');
+  }, [filename]);
 
   const handleClose = () => {
     onClose();
@@ -52,7 +67,10 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
     if (!filename) return;
     try {
       setSubmitting(true);
-      await onConfirm(selectedSheet);
+      const trimmed = nodeName.trim();
+      // Blank input means "let the server compute the default" — passing
+      // undefined keeps the API contract symmetric with the placeholder UX.
+      await onConfirm(selectedSheet, trimmed || undefined);
       handleClose();
     } finally {
       setSubmitting(false);
@@ -82,6 +100,24 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
           </CardHeader>
 
           <CardContent className="flex-1 min-w-0 space-y-4 overflow-auto px-6 py-6">
+            <div>
+              <Label htmlFor="add-file-node-name" className="mb-2 block text-sm font-medium text-foreground">
+                Data block name
+              </Label>
+              <Input
+                id="add-file-node-name"
+                value={nodeName}
+                placeholder={defaultName}
+                onChange={(event) => setNodeName(event.target.value)}
+                onKeyDown={(event) =>
+                  acceptPlaceholderOnTab({ event, value: nodeName, setValue: setNodeName })
+                }
+                aria-label="Data block name"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Leave blank to use the suggested name above. Press Tab to fill it in and edit, or start typing to replace it.
+              </p>
+            </div>
             <div>
               <label
                 htmlFor="add-file-language"

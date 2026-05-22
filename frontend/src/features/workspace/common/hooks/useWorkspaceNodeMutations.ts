@@ -320,11 +320,13 @@ export const useWorkspaceNodeMutations = ({
     mutationFn: ({
       filename,
       sheetName,
+      nodeName,
     }: {
       filename: string;
       sheetName?: string;
+      nodeName?: string;
     }) =>
-      nodesApi.createFromFile(filename, undefined, authHeaders, sheetName),
+      nodesApi.createFromFile(filename, nodeName, authHeaders, sheetName),
     onMutate: () => {
       startOperation('createNode');
     },
@@ -727,10 +729,11 @@ export const useWorkspaceNodeMutations = ({
       copyNodeMutation.mutateAsync({ nodeId }),
     deleteNode: (nodeId: string) =>
       deleteNodeMutation.mutateAsync({ nodeId }),
-    createNodeFromFile: (filename: string, sheetName?: string) =>
+    createNodeFromFile: (filename: string, sheetName?: string, nodeName?: string) =>
       createNodeMutation.mutateAsync({
         filename,
         sheetName,
+        nodeName,
       }),
     joinNodes: (
       leftNodeId: string,
