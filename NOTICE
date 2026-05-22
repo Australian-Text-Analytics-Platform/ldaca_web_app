@@ -1,0 +1,31 @@
+LDaCA Web App (legacy v0.3 release line, pre-rename)
+Copyright 2025-2026 Language Data Commons of Australia (LDaCA)
+Copyright 2025-2026 Sydney Informatics Hub, The University of Sydney
+
+Developed by Sydney Informatics Hub (SIH) and Sydney Corpus Lab (SCL),
+The University of Sydney, for the Language Data Commons of Australia
+(LDaCA, https://www.ldaca.edu.au) — a national research infrastructure
+project funded by the Australian Research Data Commons (ARDC) and
+enabled by the National Collaborative Research Infrastructure Strategy
+(NCRIS). LDaCA was established in 2021; this codebase was started
+from scratch in 2025, reusing analytical ideas from the Australian
+Text Analytics Platform (ATAP, https://www.atap.edu.au) whose tools
+have been folded into LDaCA. The GitHub organisation name
+"Australian-Text-Analytics-Platform" reflects that legacy ATAP origin.
+
+The project was renamed from "LDaCA Web App" to "LDaCA Wordflow" at
+v0.4.2 (2026-05-15). This branch is parked as the back-port line for
+the pre-rename v0.3.x release series, published on PyPI as
+`ldaca-web-app` and `ldaca_web_app_frontend`. Active development
+continues under the new name as `ldaca-wordflow` — see the `v0.5`
+branch of this repository for the current production release.
+
+This product bundles components published under their own permissive
+licenses (MIT or MIT/Apache-2.0 dual): polars, FastAPI, React, Tauri,
+and others. Each is included subject to its own copyright notice and
+license terms.
+
+If you use this software in research, please cite both the LDaCA
+project and the tool (whether referenced as LDaCA Web App or LDaCA
+Wordflow). See the project's README for the recommended citation
+form.

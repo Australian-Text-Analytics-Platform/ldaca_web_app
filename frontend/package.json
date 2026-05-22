@@ -19,7 +19,7 @@
     "vite"
   ],
   "author": "Australian Text Analytics Platform",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "bin": {
     "ldaca_web_app_frontend": "./bin/cli.js",
     "ldaca-frontend": "./bin/cli.js"

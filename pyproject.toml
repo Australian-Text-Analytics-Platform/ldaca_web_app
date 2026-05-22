@@ -3,6 +3,8 @@ name = "ldaca-web-app-workspace"
 version = "0.3.5"
 description = "LDaCA Web App Workspace"
 requires-python = ">=3.14"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = ["ldaca-web-app", "ldaca-loader"]
 
 [tool.uv.sources]
