@@ -28,3 +28,24 @@ export function getParentDirectoryPath(filePath: string): string {
   const lastSlashIndex = filePath.lastIndexOf('/');
   return lastSlashIndex === -1 ? '' : filePath.slice(0, lastSlashIndex);
 }
+
+// Mirrors the server-side default-name derivation in
+// ``backend/api/workspaces/base.py::add_node_to_workspace``: strip a known
+// data-file extension, then keep only the last one or two path components.
+// Used to populate the Add panel's name-input placeholder so it matches
+// exactly what the server would derive if the user leaves the field blank.
+const STRIPPABLE_EXTENSIONS = ['.csv', '.tsv', '.xlsx', '.json', '.jsonl', '.parquet'];
+
+export function defaultNodeNameFromFile(filename: string): string {
+  if (!filename) return '';
+  let name = filename;
+  for (const ext of STRIPPABLE_EXTENSIONS) {
+    if (name.toLowerCase().endsWith(ext)) {
+      name = name.slice(0, -ext.length);
+      break;
+    }
+  }
+  const parts = name.replace(/\\/g, '/').split('/').filter(Boolean);
+  if (parts.length >= 2) return parts.slice(-2).join('/');
+  return parts[0] ?? '';
+}
