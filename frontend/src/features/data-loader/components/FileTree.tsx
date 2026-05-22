@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { FileTreeDirectory, FileTreeFile, FileTreeNode } from '@/types';
+import { useUIStore } from '@/stores/uiStore';
 import {
   FILE_DRAG_MIME_TYPE,
   countFilesInNode,
@@ -38,6 +39,7 @@ export type FileTreeProps = {
   onSelectFile: (path: string) => void;
   onDownloadFile: (path: string) => void;
   onDeleteFile: (path: string) => void;
+  onDeleteFolder: (directory: FileTreeDirectory) => void;
   onWarnNoWorkspace: () => void;
   onCreateFolderInside: (parentPath: string, parentLabel: string) => void;
   onOpenCitation: (directory: FileTreeDirectory, readmePath: string | null) => void;
@@ -54,6 +56,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onSelectFile,
   onDownloadFile,
   onDeleteFile,
+  onDeleteFolder,
   onWarnNoWorkspace,
   onCreateFolderInside,
   onOpenCitation,
@@ -62,6 +65,13 @@ export const FileTree: React.FC<FileTreeProps> = ({
   const [draggingFilePath, setDraggingFilePath] = useState<string | null>(null);
   const [fileMoveTarget, setFileMoveTarget] = useState<FileMoveTarget | null>(null);
 
+  // Controlled open/closed state for folder Collapsibles. Default is open
+  // (matches the original UX) — only paths the user has explicitly collapsed
+  // appear in the set. Living in uiStore means a user's collapses survive
+  // navigating away and back within the session.
+  const collapsedFolders = useUIStore((state) => state.collapsedFolders);
+  const setFolderCollapsed = useUIStore((state) => state.setFolderCollapsed);
+
   const getDraggedFilePath = (event: React.DragEvent<HTMLElement>): string | null => {
     const customPath = event.dataTransfer.getData(FILE_DRAG_MIME_TYPE);
     if (customPath) return customPath;
@@ -69,8 +79,17 @@ export const FileTree: React.FC<FileTreeProps> = ({
     return plainTextPath || draggingFilePath;
   };
 
+  // Both files and folders share this drag-source state and the same
+  // drop-target plumbing — the only extra rule for folders is the
+  // self/descendant guard below.
+  const isSelfOrDescendantPath = (sourcePath: string, targetDirectoryPath: string): boolean => {
+    if (sourcePath === targetDirectoryPath) return true;
+    return targetDirectoryPath.startsWith(`${sourcePath}/`);
+  };
+
   const canDropFileIntoDirectory = (sourcePath: string | null, targetDirectoryPath: string): boolean => {
     if (!sourcePath) return false;
+    if (isSelfOrDescendantPath(sourcePath, targetDirectoryPath)) return false;
     return getParentDirectoryPath(sourcePath) !== targetDirectoryPath;
   };
 
@@ -92,6 +111,18 @@ export const FileTree: React.FC<FileTreeProps> = ({
 
   const handleTreeFileDragEnd = () => {
     setDraggingFilePath(null);
+    setFileMoveTarget(null);
+  };
+
+  const handleFolderDragStart = (
+    event: React.DragEvent<HTMLElement>,
+    folderPath: string,
+  ) => {
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(FILE_DRAG_MIME_TYPE, folderPath);
+    event.dataTransfer.setData('text/plain', folderPath);
+    setDraggingFilePath(folderPath);
     setFileMoveTarget(null);
   };
 
@@ -201,9 +232,15 @@ export const FileTree: React.FC<FileTreeProps> = ({
     const fileCount = countFilesInNode(node);
     const citationFile = getCitationFile(node);
     const visibleChildren = getVisibleDirectoryChildren(node);
+    const isOpen = !collapsedFolders.has(node.path);
     return (
-      <Collapsible key={node.path} defaultOpen>
+      <Collapsible
+        key={node.path}
+        open={isOpen}
+        onOpenChange={(open) => setFolderCollapsed(node.path, !open)}
+      >
         <div
+          draggable
           className={`flex items-center gap-1 rounded-md pr-1 hover:bg-accent/50 ${
             isFileMoveTargetActive(`folder:${node.path}`, node.path)
               ? 'bg-primary/10 ring-1 ring-primary/30'
@@ -211,6 +248,8 @@ export const FileTree: React.FC<FileTreeProps> = ({
           }`}
           data-folder-path={node.path}
           data-testid={`folder-row-${node.path}`}
+          onDragStart={(event) => handleFolderDragStart(event, node.path)}
+          onDragEnd={handleTreeFileDragEnd}
           onDragEnter={(event) => handleDirectoryDragOver(`folder:${node.path}`, node.path, event)}
           onDragOver={(event) => handleDirectoryDragOver(`folder:${node.path}`, node.path, event)}
           onDragLeave={(event) => handleDirectoryDragLeave(`folder:${node.path}`, event)}
@@ -250,6 +289,17 @@ export const FileTree: React.FC<FileTreeProps> = ({
             onClick={() => onCreateFolderInside(node.path, node.name)}
           >
             <FolderPlus className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            aria-label={`Delete folder ${node.name}`}
+            title={`Delete folder ${node.name}`}
+            disabled={loadingFiles}
+            onClick={() => onDeleteFolder(node)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
           <Badge variant="secondary" className="text-[10px]">
             {fileCount}

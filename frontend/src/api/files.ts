@@ -174,6 +174,19 @@ export const filesApi = {
   delete: (fileName: string, headers: Record<string, string> = {}) =>
     del<Record<string, unknown>>(`/files/${encodeURIComponent(fileName)}`, headers),
 
+  deleteFolder: (
+    folderPath: string,
+    recursive: boolean,
+    headers: Record<string, string> = {},
+  ) => {
+    const encoded = folderPath.split('/').map(encodeURIComponent).join('/');
+    return del<Record<string, unknown>>(
+      `/files/folders/${encoded}`,
+      headers,
+      { recursive: recursive ? 'true' : 'false' },
+    );
+  },
+
   getSampleDataCatalogue: (headers: Record<string, string> = {}) =>
     get<SampleDataCatalogueResponse>('/files/sample-data/catalogue', headers),
 

@@ -36,6 +36,12 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     onSuccess: invalidateFiles,
   });
 
+  const deleteFolderMutation = useMutation({
+    mutationFn: ({ folderPath, recursive }: { folderPath: string; recursive: boolean }) =>
+      filesApi.deleteFolder(folderPath, recursive, authHeaders),
+    onSuccess: invalidateFiles,
+  });
+
   const refetchFiles = async () => (await filesQuery.refetch()).data ?? null;
 
   const handleUploadFile = async (file: File) => {
@@ -61,6 +67,20 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     }
   };
 
+  const handleDeleteFolder = async (folderPath: string, recursive: boolean) => {
+    try {
+      await deleteFolderMutation.mutateAsync({ folderPath, recursive });
+      await refetchFiles();
+      if (selectedFile && selectedFile.startsWith(`${folderPath}/`)) {
+        setSelectedFile(null);
+      }
+      return true;
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+      throw error;
+    }
+  };
+
   const handleDownloadFile = async (filename: string) => {
     try {
       const blob = await filesApi.download(filename, authHeaders);
@@ -80,6 +100,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     uploading: uploadMutation.isPending,
     handleUploadFile,
     handleDeleteFile,
+    handleDeleteFolder,
     handleDownloadFile,
     refetchFiles,
   };

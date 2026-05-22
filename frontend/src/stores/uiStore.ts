@@ -99,6 +99,14 @@ interface UIState {
    * reloads). Permanent dismissals live in `hintsStore`.
    */
   sessionDismissedHints: Set<string>;
+
+  /**
+   * Folder paths the user has collapsed in the Data Loader file tree this
+   * session. Default-open semantics mean an absent path is treated as
+   * expanded; only explicit collapses are tracked. Not persisted: the set
+   * resets on page reload, matching the session-scoped intent.
+   */
+  collapsedFolders: Set<string>;
 }
 
 interface UIActions {
@@ -135,6 +143,9 @@ interface UIActions {
   setLastUploadedFilePath: (path: string | null) => void;
   sessionDismissHint: (id: string) => void;
   resetSessionDismissedHints: () => void;
+
+  // File tree expansion (session-scoped)
+  setFolderCollapsed: (path: string, collapsed: boolean) => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -162,6 +173,7 @@ export const useUIStore = create<UIStore>()(
       referenceTarget: null,
       lastUploadedFilePath: null,
       sessionDismissedHints: new Set<string>(),
+      collapsedFolders: new Set<string>(),
 
         setCurrentView: (view) => set((state) => {
           if (state.currentView !== view) state.currentView = view;
@@ -295,6 +307,14 @@ export const useUIStore = create<UIStore>()(
 
       resetSessionDismissedHints: () => set((state) => {
         state.sessionDismissedHints = new Set<string>();
+      }),
+
+      setFolderCollapsed: (path, collapsed) => set((state) => {
+        if (collapsed) {
+          state.collapsedFolders.add(path);
+        } else {
+          state.collapsedFolders.delete(path);
+        }
       }),
     })),
       {
