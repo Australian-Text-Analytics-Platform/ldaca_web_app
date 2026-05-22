@@ -44,6 +44,12 @@ export type DataLoaderDialogsProps = {
     onCancel: () => void;
     onConfirm: () => void;
   };
+  deleteFolder: {
+    target: { path: string; name: string; fileCount: number } | null;
+    deleting: boolean;
+    onCancel: () => void;
+    onConfirm: () => void;
+  };
   ldacaImport: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -76,6 +82,7 @@ export const DataLoaderDialogs: React.FC<DataLoaderDialogsProps> = ({
   workspaceNameAlert,
   folderNameAlert,
   deleteWorkspace,
+  deleteFolder,
   ldacaImport,
   createFolder,
   citation,
@@ -145,6 +152,38 @@ export const DataLoaderDialogs: React.FC<DataLoaderDialogsProps> = ({
               disabled={deleteWorkspace.deleting}
             >
               {deleteWorkspace.deleting ? 'Deleting…' : 'Delete workspace'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(deleteFolder.target)}
+        onOpenChange={(open) => {
+          if (!open) deleteFolder.onCancel();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteFolder.target
+                ? deleteFolder.target.fileCount > 0
+                  ? `This will permanently delete the folder "${deleteFolder.target.name}" and its ${deleteFolder.target.fileCount} file${deleteFolder.target.fileCount === 1 ? '' : 's'}. Any workspace nodes already added from these files will keep their own copy and are unaffected. This action cannot be undone.`
+                  : `This will permanently delete the empty folder "${deleteFolder.target.name}".`
+                : 'This will permanently delete the folder.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={deleteFolder.onCancel} disabled={deleteFolder.deleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteFolder.onConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteFolder.deleting}
+            >
+              {deleteFolder.deleting ? 'Deleting…' : 'Delete folder'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

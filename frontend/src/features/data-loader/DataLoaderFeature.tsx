@@ -49,6 +49,7 @@ export const DataLoaderFeature: React.FC = () => {
     uploading,
     handleUploadFile,
     handleDeleteFile,
+    handleDeleteFolder,
     handleDownloadFile,
     refetchFiles,
   } = useFiles({ authHeaders });
@@ -72,6 +73,12 @@ export const DataLoaderFeature: React.FC = () => {
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [folderNameAlert, setFolderNameAlert] = useState<string | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<{
+    path: string;
+    name: string;
+    fileCount: number;
+  } | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState(false);
   const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
   const [refreshingFiles, setRefreshingFiles] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
@@ -300,6 +307,28 @@ export const DataLoaderFeature: React.FC = () => {
       notify('success', `Moved ${sourcePath.split('/').at(-1)}.`);
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to move file.');
+    }
+  };
+
+  const openDeleteFolderDialog = (directory: FileTreeDirectory) => {
+    setFolderToDelete({
+      path: directory.path,
+      name: directory.name,
+      fileCount: countFilesInNode(directory),
+    });
+  };
+
+  const handleConfirmDeleteFolder = async () => {
+    if (!folderToDelete) return;
+    setDeletingFolder(true);
+    try {
+      await handleDeleteFolder(folderToDelete.path, folderToDelete.fileCount > 0);
+      notify('success', `Folder "${folderToDelete.name}" deleted.`);
+      setFolderToDelete(null);
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to delete folder.');
+    } finally {
+      setDeletingFolder(false);
     }
   };
 
@@ -647,6 +676,7 @@ export const DataLoaderFeature: React.FC = () => {
                       onSelectFile={setSelectedFile}
                       onDownloadFile={handleDownloadFile}
                       onDeleteFile={handleDeleteFile}
+                      onDeleteFolder={openDeleteFolderDialog}
                       onWarnNoWorkspace={() => setWorkspaceAlertOpen(true)}
                       onCreateFolderInside={openCreateFolderDialog}
                       onOpenCitation={openCitation}
@@ -690,6 +720,12 @@ export const DataLoaderFeature: React.FC = () => {
           deleting: deletingWorkspace,
           onCancel: () => setWorkspaceToDelete(null),
           onConfirm: () => void handleConfirmDeleteWorkspace(),
+        }}
+        deleteFolder={{
+          target: folderToDelete,
+          deleting: deletingFolder,
+          onCancel: () => setFolderToDelete(null),
+          onConfirm: () => void handleConfirmDeleteFolder(),
         }}
         ldacaImport={{
           open: ldacaImportOpen,
