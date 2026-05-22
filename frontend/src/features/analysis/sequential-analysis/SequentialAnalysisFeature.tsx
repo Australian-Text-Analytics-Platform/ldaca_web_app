@@ -236,10 +236,12 @@ const SequentialAnalysisFeature = () => {
     resolveTaskId,
     setLocalTaskId,
     isRunning: isAnalyzing,
+    isStopping,
     setIsRunning: setIsAnalyzing,
     banner: sequentialWaitingBanner,
     hasActiveTask,
     clearResults,
+    stopTask,
   } = useAnalysisFeature<Record<string, unknown>>({
     analysisType: 'sequential_analysis',
     taskType: 'sequential_analysis',
@@ -1173,6 +1175,10 @@ const SequentialAnalysisFeature = () => {
             if (inSnapshotMode) return;
             void handleRunOrUpdate();
           },
+          onStop: () => {
+            if (inSnapshotMode) return;
+            void stopTask();
+          },
           onClear: () => {
             if (inSnapshotMode) return;
             void handleClearResults();
@@ -1187,6 +1193,7 @@ const SequentialAnalysisFeature = () => {
           })(),
           clearDisabled: inSnapshotMode || actionState.clearDisabled,
           isRunning: isAnalyzing,
+          isStopping,
           hasResult: Boolean(results),
           runLabel: actionState.runLabel,
           clearHelp: {

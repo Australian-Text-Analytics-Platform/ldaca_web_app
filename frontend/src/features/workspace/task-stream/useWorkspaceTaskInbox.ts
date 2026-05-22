@@ -243,6 +243,14 @@ export const useWorkspaceTaskInbox = (
           }
           break;
         }
+        case 'task_removed': {
+          if (payload.task_id) {
+            setTasks((prevTasks: TaskItem[]) =>
+              prevTasks.filter((task) => task.task_id !== payload.task_id)
+            );
+          }
+          break;
+        }
         case 'analysis_materialized': {
           const taskType = typeof payload.task_type === 'string' ? payload.task_type : '';
           const taskId = typeof payload.task_id === 'string' ? payload.task_id : '';
@@ -264,24 +272,6 @@ export const useWorkspaceTaskInbox = (
         case 'analysis_save_failed': {
           if (payload.task_type === 'topic_modeling') {
             setTransientError(payload.message || 'Analysis save failed');
-          }
-          break;
-        }
-        case 'task_update': {
-          const updateTasks = payload.tasks;
-          if (Array.isArray(updateTasks)) {
-            const seq = nextEventSequence();
-            const eventTimestamp = normalizeTimestamp(payload.timestamp);
-            setTasks((prevTasks: TaskItem[]) =>
-              mergeTaskUpdates(
-                prevTasks,
-                updateTasks.map((task: TaskItem) => ({
-                  task,
-                  eventTimestamp,
-                  eventSequence: seq,
-                }))
-              )
-            );
           }
           break;
         }

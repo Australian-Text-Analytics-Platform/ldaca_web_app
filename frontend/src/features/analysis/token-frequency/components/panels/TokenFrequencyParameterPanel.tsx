@@ -22,6 +22,8 @@ type TokenFrequencyParameterPanelProps = {
   actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string; runDisabledReason?: string };
   isAnalyzing: boolean;
   onAnalyze: () => void;
+  onStop?: () => void;
+  isStopping?: boolean;
   onClearResults: () => void;
   hasIncompleteSelections: boolean;
   appliedStopCount: number;
@@ -70,6 +72,8 @@ export const TokenFrequencyParameterPanel = ({
   actionState,
   isAnalyzing,
   onAnalyze,
+  onStop,
+  isStopping,
   onClearResults,
   hasIncompleteSelections,
   appliedStopCount,
@@ -114,6 +118,7 @@ export const TokenFrequencyParameterPanel = ({
       snapshot={snapshot}
       actions={{
         onRun: onAnalyze,
+        onStop,
         onClear: onClearResults,
         runDisabled: actionState.runDisabled || hasIncompleteSelections,
         runDisabledReason: hasIncompleteSelections
@@ -121,6 +126,7 @@ export const TokenFrequencyParameterPanel = ({
           : actionState.runDisabledReason,
         clearDisabled: actionState.clearDisabled,
         isRunning: isAnalyzing,
+        isStopping,
         hasResult: hasResults,
         runLabel,
         runHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },

@@ -146,11 +146,13 @@ const TopicModelingFeature: React.FC = () => {
   const {
     resolveTaskId,
     isRunning,
+    isStopping,
     setIsRunning,
     runningRef,
     taskStatus,
     lastFetchedRef,
     clearResults,
+    stopTask,
     setLocalTaskId,
     banner: topicWaitingBanner,
     hasActiveTask,
@@ -928,8 +930,12 @@ const TopicModelingFeature: React.FC = () => {
         }
         onRepresentativeWordsCountChange={(v) => { setRepresentativeWordsCount(v); setRepresentativeWordsCountUserSet(true); }}
         isRunning={isRunning}
+        isStopping={isStopping}
         isClearing={isClearing}
         onRun={handleRunOrUpdate}
+        onStop={() => {
+          void stopTask();
+        }}
         onClear={handleClear}
         hasMissingColumns={panelHasMissingColumns}
         resultState={result?.state}

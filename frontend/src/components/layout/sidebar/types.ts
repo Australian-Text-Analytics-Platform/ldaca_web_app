@@ -12,6 +12,7 @@ export type SidebarTaskRecord = {
   name?: string;
   user_id?: string;
   workspace_id?: string;
+  parent_task_id?: string | null;
   state?: SidebarTaskStatus;
   message?: string;
   created_at?: number | string;

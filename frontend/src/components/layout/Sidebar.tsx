@@ -27,7 +27,6 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorkspaceTaskInbox';
-import { useTaskCardActions } from '@/features/workspace/task-stream/useTaskCardActions';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
@@ -249,8 +248,6 @@ const Sidebar: React.FC = () => {
       })}
     </SidebarMenu>
   );
-  const { handleClearTask, handleAutoDismissTask } = useTaskCardActions();
-
   return (
     <SidebarRoot
       className="md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden"
@@ -424,8 +421,6 @@ const Sidebar: React.FC = () => {
                             isConnecting={isConnecting}
                             connectionError={connectionError}
                             onReconnect={reconnectTaskStream}
-                            onClearTask={handleClearTask}
-                            onAutoDismissTask={handleAutoDismissTask}
                           />
                         )}
                       </div>

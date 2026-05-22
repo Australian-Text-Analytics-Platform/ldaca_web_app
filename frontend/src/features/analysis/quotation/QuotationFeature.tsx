@@ -362,6 +362,8 @@ const QuotationFeature: React.FC = () => {
     banner: quotationWaitingBanner,
     hasActiveTask,
     clearResults,
+    stopTask,
+    isStopping,
   } = useAnalysisFeature<QuotationAnalysisResponse>({
     analysisType: 'quotation_analysis',
     taskType: 'quotation',
@@ -1192,6 +1194,10 @@ const QuotationFeature: React.FC = () => {
               if (inSnapshotMode) return;
               void handleRunOrUpdate();
             },
+            onStop: () => {
+              if (inSnapshotMode) return;
+              void stopTask();
+            },
             onClear: async () => {
               if (inSnapshotMode) return;
               if (!currentWorkspaceId) return;
@@ -1211,6 +1217,7 @@ const QuotationFeature: React.FC = () => {
             })(),
             clearDisabled: inSnapshotMode || actionState.clearDisabled || isClearing,
             isRunning: isLoadingQuotations,
+            isStopping,
             isClearing,
             hasResult: hasLoaded,
             runLabel: actionState.runLabel,

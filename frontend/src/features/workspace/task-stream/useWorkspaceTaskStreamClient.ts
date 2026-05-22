@@ -5,6 +5,7 @@ import { getApiBase } from '@/api/env';
 export type TaskEventPayload =
   | { type: 'tasks_snapshot'; tasks?: TaskItem[]; timestamp?: number }
   | { type: 'task_changed'; task?: TaskItem; timestamp?: number }
+  | { type: 'task_removed'; task_id?: string; workspace_id?: string; timestamp?: number }
   | { type: 'analysis_save_failed'; task_type?: string; message?: string }
   | {
       type: 'analysis_materialized';
@@ -15,7 +16,6 @@ export type TaskEventPayload =
       materialized_path?: string;
       timestamp?: number;
     }
-  | { type: 'task_update'; tasks?: TaskItem[]; timestamp?: number }
   | { type: 'error'; message?: string }
   | { type: 'heartbeat' }
   | { type: 'workspace_updated' };

@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAnalysisFeature } from '../hooks/useAnalysisFeature';
 
-const { clearAnalysisMock } = vi.hoisted(() => ({
+const { cancelTaskMock, clearAnalysisMock } = vi.hoisted(() => ({
+  cancelTaskMock: vi.fn(),
   clearAnalysisMock: vi.fn(),
 }));
 
@@ -15,6 +16,12 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('../clearAnalysis', () => ({
   clearAnalysis: clearAnalysisMock,
+}));
+
+vi.mock('@/api/workspaces', () => ({
+  workspacesApi: {
+    cancelTask: cancelTaskMock,
+  },
 }));
 
 vi.mock('../useAnalysisHydration', () => ({
@@ -43,6 +50,8 @@ vi.mock('../tasks/useAnalysisTaskFlow', () => ({
 
 describe('useAnalysisFeature', () => {
   beforeEach(() => {
+    cancelTaskMock.mockReset();
+    cancelTaskMock.mockResolvedValue({ state: 'successful' });
     clearAnalysisMock.mockReset();
     clearAnalysisMock.mockImplementation(async ({ onCleanup }) => {
       onCleanup(['task-1']);
@@ -74,5 +83,29 @@ describe('useAnalysisFeature', () => {
     expect(onCleared).toHaveBeenCalledWith(['task-1'], {
       preserveLocalState: true,
     });
+  });
+
+  it('cancels the resolved analysis task from the owning analysis tab', async () => {
+    const headers = { Authorization: 'Bearer token' };
+
+    const { result } = renderHook(() =>
+      useAnalysisFeature({
+        analysisType: 'sequential_analysis',
+        taskType: 'sequential_analysis',
+        workspaceId: 'workspace-1',
+        getAuthHeaders: () => headers,
+        isTabActive: true,
+        resultRef: { current: { metadata: { task_id: 'task-1' } } },
+        fetchResult: vi.fn(async () => null),
+        onResultFetched: vi.fn(),
+        onCleared: vi.fn(),
+      })
+    );
+
+    await act(async () => {
+      await result.current.stopTask();
+    });
+
+    expect(cancelTaskMock).toHaveBeenCalledWith({ task_id: 'task-1' }, headers);
   });
 });

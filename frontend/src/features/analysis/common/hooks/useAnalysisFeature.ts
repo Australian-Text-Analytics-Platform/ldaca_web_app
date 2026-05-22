@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { textApi } from '@/api/text';
-import { resolveAnalysisTaskId } from '@/hooks/analysisTaskUtils';
+import { workspacesApi } from '@/api/workspaces';
+import { collectTaskIds, resolveAnalysisTaskId } from '@/hooks/analysisTaskUtils';
 import { useAnalysisHydration, type HydrationState } from '../useAnalysisHydration';
 import { clearAnalysis } from '../clearAnalysis';
 import { useAnalysisTaskFlow } from '../tasks/useAnalysisTaskFlow';
@@ -82,6 +83,7 @@ export interface UseAnalysisFeatureReturn {
   resolveTaskId: () => Promise<string | null>;
 
   isRunning: boolean;
+  isStopping: boolean;
   setIsRunning: (running: boolean) => void;
   runningRef: React.MutableRefObject<boolean>;
 
@@ -98,6 +100,7 @@ export interface UseAnalysisFeatureReturn {
   hydrateFromServer: () => Promise<void>;
   hydrationState: HydrationState;
 
+  stopTask: () => Promise<void>;
   clearResults: (options?: ClearAnalysisUiOptions) => Promise<void>;
 }
 
@@ -125,6 +128,7 @@ export function useAnalysisFeature<TResult = unknown>(
 
   // ---- Running state ----
   const [isRunning, setIsRunningState] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const runningRef = useRef(false);
   // Identity stability: used in useEffect dependency array
   const setIsRunning = useCallback((value: boolean) => {
@@ -433,11 +437,37 @@ export function useAnalysisFeature<TResult = unknown>(
     });
   };
 
+  const stopTask = async (): Promise<void> => {
+    const cfg = configRef.current;
+    if (!cfg.workspaceId) return;
+
+    const status = taskStatusRef.current;
+    const taskIds = collectTaskIds([
+      status?.runningTask?.task_id,
+      status?.activeTaskId,
+      localTaskIdRef.current,
+      (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id,
+    ]);
+    const taskId = taskIds[0] ?? (await resolveTaskId());
+    if (!taskId) return;
+
+    setIsStopping(true);
+    try {
+      await workspacesApi.cancelTask({ task_id: taskId }, cfg.getAuthHeaders());
+      setIsRunning(false);
+    } catch (error) {
+      console.warn(`[${cfg.analysisType}] Failed to stop task ${taskId}:`, error);
+    } finally {
+      setIsStopping(false);
+    }
+  };
+
   return {
     localTaskId,
     setLocalTaskId,
     resolveTaskId,
     isRunning,
+    isStopping,
     setIsRunning,
     runningRef,
     taskStatus,
@@ -447,6 +477,7 @@ export function useAnalysisFeature<TResult = unknown>(
     lastFetchedRef,
     hydrateFromServer,
     hydrationState,
+    stopTask,
     clearResults,
   };
 }

@@ -279,6 +279,8 @@ const AiAnnotatorFeature: React.FC = () => {
     localTaskId,
     setLocalTaskId,
     clearResults,
+    stopTask,
+    isStopping,
     banner: aiAnnotationWaitingBanner,
   } = useAnalysisFeature<AiAnnotationResponse>({
     analysisType: 'ai_annotation',
@@ -892,10 +894,14 @@ const AiAnnotatorFeature: React.FC = () => {
         }}
         actions={panelTab === 'ai-annotation' ? {
           onRun: handleRun,
+          onStop: () => {
+            void stopTask();
+          },
           onClear: handleClear,
           runDisabled,
           clearDisabled,
           isRunning,
+          isStopping,
           isClearing,
           hasResult: Boolean(localTaskId),
           extraContent: (

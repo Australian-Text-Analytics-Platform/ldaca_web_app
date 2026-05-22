@@ -67,8 +67,10 @@ type Props = {
   representativeWordsCountLockedReason?: string;
   onRepresentativeWordsCountChange: (value: number) => void;
   isRunning: boolean;
+  isStopping?: boolean;
   isClearing: boolean;
   onRun: () => void | Promise<void>;
+  onStop?: () => void | Promise<void>;
   onClear: () => void | Promise<void>;
   hasMissingColumns: boolean;
   resultState?: string;
@@ -125,8 +127,10 @@ export function TopicModelingParameterPanel({
   representativeWordsCountLockedReason,
   onRepresentativeWordsCountChange,
   isRunning,
+  isStopping,
   isClearing,
   onRun,
+  onStop,
   onClear,
   hasMissingColumns,
   resultState,
@@ -190,6 +194,7 @@ export function TopicModelingParameterPanel({
       snapshot={snapshot}
       actions={{
         onRun,
+        onStop,
         onClear,
         runDisabled: actionState.runDisabled || isRunning || hasMissingColumns,
         runDisabledReason: hasMissingColumns
@@ -197,6 +202,7 @@ export function TopicModelingParameterPanel({
           : actionState.runDisabledReason,
         clearDisabled: actionState.clearDisabled || isClearing,
         isRunning,
+        isStopping,
         isClearing,
         hasResult: resultState === 'successful' || resultState === 'failed',
         runLabel: actionState.runLabel,

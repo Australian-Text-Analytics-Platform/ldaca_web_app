@@ -4,7 +4,8 @@ import InfoIcon from '@/components/help/InfoIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { Loader2, Play, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Loader2, Play, Square, Trash2 } from 'lucide-react';
 import { SnapshotActions } from '@/features/snapshot-view/components/SnapshotActions';
 import type { SnapshotToolKey } from '@/features/snapshot-view';
 
@@ -49,15 +50,19 @@ type AnalysisCardLayoutProps = {
   };
   actions?: {
     onRun: () => void | Promise<void>;
+    onStop?: () => void | Promise<void>;
     onClear: () => void | Promise<void>;
     runDisabled?: boolean;
     runDisabledReason?: string;
+    stopDisabled?: boolean;
     clearDisabled?: boolean;
     isRunning?: boolean;
+    isStopping?: boolean;
     isClearing?: boolean;
     hasResult?: boolean;
     runLabel?: string;
     runHelp?: HelpConfig;
+    stopHelp?: HelpConfig;
     clearHelp?: HelpConfig;
     extraContent?: React.ReactNode;
   };
@@ -78,7 +83,7 @@ export function AnalysisCardLayout({
   footer,
   cardRef,
 }: AnalysisCardLayoutProps) {
-  const cardToneClassName = tone === 'error' ? 'border-destructive/50' : undefined;
+  const cardToneClassName = cn('w-full min-w-0', tone === 'error' && 'border-destructive/50');
   const runLabel = actions
     ? (actions.runLabel ?? (actions.isRunning ? 'Running' : actions.hasResult ? 'Update' : 'Run'))
     : 'Run';
@@ -146,6 +151,26 @@ export function AnalysisCardLayout({
               />
             ) : null}
           </div>
+
+          {actions.onStop && actions.isRunning ? (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={actions.onStop}
+                variant="outline"
+                disabled={actions.stopDisabled || actions.isStopping}
+              >
+                {actions.isStopping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
+                Stop
+              </Button>
+              {actions.stopHelp ? (
+                <HelpIcon
+                  targetKey={actions.stopHelp.targetKey}
+                  label={actions.stopHelp.label}
+                  tooltip={actions.stopHelp.tooltip}
+                />
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="flex items-center gap-2">
             <Button onClick={actions.onClear} variant="destructive" disabled={actions.clearDisabled}>

@@ -55,7 +55,6 @@ interface PreferencesActions {
   toggleFavorite: (workspaceId: string) => void;
   isFavorite: (workspaceId: string) => boolean;
   setQuotationEngine: (config: QuotationEngineConfig) => void;
-  setQuotationLastRemoteUrl: (url: string) => void;
   /**
    * Trim and write the remote URL. If the engine is currently in remote mode,
    * the engine config's `url` field is updated alongside `lastRemoteUrl` so a
@@ -91,34 +90,6 @@ function applyServerState(state: PreferencesState, data: UserPreferences) {
   state.demoSnapshotsEnabled = data.demo_snapshots_enabled;
   state.hydrated = true;
 }
-
-/**
- * Legacy localStorage blob migration. Pre-`ldaca-preferences` builds stored
- * the quotation engine config under `ldaca.quotation.engine` via a separate
- * shadow store. Reads + clears that key on first load and folds the value
- * into the preferences-store state.
- *
- * Runs at module load before any consumer reads. Safe to call repeatedly —
- * does nothing if the legacy key has already been cleared.
- */
-const migrateLegacyQuotationEngineKey = () => {
-  if (typeof window === 'undefined') return;
-  const oldRaw = window.localStorage.getItem('ldaca.quotation.engine');
-  if (!oldRaw) return;
-  try {
-    const parsed = JSON.parse(oldRaw);
-    const oldConfig = parsed?.state?.config as QuotationEngineConfig | undefined;
-    const oldUrl = (parsed?.state?.lastRemoteUrl as string) ?? '';
-    if (oldConfig) {
-      const prefs = usePreferencesStore.getState();
-      prefs.setQuotationEngine(oldConfig);
-      if (oldUrl) prefs.setQuotationLastRemoteUrl(oldUrl);
-    }
-  } catch {
-    /* legacy payload unreadable — discard */
-  }
-  window.localStorage.removeItem('ldaca.quotation.engine');
-};
 
 export const usePreferencesStore = create<PreferencesStore>()(
   devtools(
@@ -166,12 +137,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
             if (config.type === 'remote' && config.url) {
               state.quotationLastRemoteUrl = config.url;
             }
-          });
-        },
-
-        setQuotationLastRemoteUrl: (url) => {
-          set((state) => {
-            state.quotationLastRemoteUrl = url;
           });
         },
 
@@ -281,5 +246,3 @@ export const usePreferencesStore = create<PreferencesStore>()(
     { name: 'preferences-store' },
   ),
 );
-
-migrateLegacyQuotationEngineKey();

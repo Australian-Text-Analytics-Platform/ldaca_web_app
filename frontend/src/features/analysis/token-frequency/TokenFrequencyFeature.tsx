@@ -201,12 +201,14 @@ const TokenFrequencyFeature = () => {
   const {
     resolveTaskId,
     isRunning,
+    isStopping,
     setIsRunning,
     runningRef,
     taskStatus,
     hasActiveTask,
     lastFetchedRef,
     clearResults,
+    stopTask,
     setLocalTaskId,
   } = useAnalysisFeature<TokenFrequencyResponse>({
     analysisType: 'token_frequencies',
@@ -828,6 +830,7 @@ const TokenFrequencyFeature = () => {
         displayNodeCount={displayNodeCount}
         actionState={actionState}
         isAnalyzing={isRunning}
+        isStopping={isStopping}
         onAnalyze={() => {
           if (inSnapshotMode) return;
           // Promote pending per-tab temp colours to assigned before
@@ -835,6 +838,9 @@ const TokenFrequencyFeature = () => {
           // commit trigger.
           promoteTempColors(tokenActiveNodeIds);
           return handleAnalyze();
+        }}
+        onStop={() => {
+          void stopTask();
         }}
         onClearResults={() => {
           if (inSnapshotMode) return;

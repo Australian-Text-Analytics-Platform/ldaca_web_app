@@ -1,7 +1,7 @@
 import React, { type Dispatch, type SetStateAction } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Play, Trash2 } from 'lucide-react';
+import { Loader2, Play, Square, Trash2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisFeatureHeader } from '@/features/analysis/common/components/AnalysisFeatureHeader';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -64,6 +64,8 @@ export type ConcordanceParameterPanelProps = {
   isSearching: boolean;
   actionState: AnalysisActionState;
   handleRunOrUpdate: () => Promise<void>;
+  handleStopTask?: () => Promise<void>;
+  isStopping?: boolean;
   handleClearResults: () => Promise<void>;
 
   // Page size
@@ -124,6 +126,8 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   isSearching,
   actionState,
   handleRunOrUpdate,
+  handleStopTask,
+  isStopping,
   handleClearResults,
   globalPageSize,
   setGlobalPageSize,
@@ -412,6 +416,19 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                 )}
               </Button>
             </DisabledReasonTooltip>
+
+            {handleStopTask && isSearching ? (
+              <Button
+                onClick={() => {
+                  void handleStopTask();
+                }}
+                variant="outline"
+                disabled={isStopping}
+              >
+                {isStopping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
+                Stop
+              </Button>
+            ) : null}
 
             <div className="flex items-center gap-2">
               <Button

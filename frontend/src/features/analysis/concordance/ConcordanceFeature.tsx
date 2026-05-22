@@ -676,6 +676,8 @@ const ConcordanceFeature: React.FC = () => {
     hasActiveTask,
     hydrationState,
     clearResults,
+    stopTask,
+    isStopping,
   } = useAnalysisFeature<ConcordanceAnalysisResponse>({
     analysisType: 'concordance_analysis',
     taskType: 'concordance',
@@ -1683,6 +1685,8 @@ const ConcordanceFeature: React.FC = () => {
         isSearching={isSearching}
         actionState={actionState}
         handleRunOrUpdate={handleRunOrUpdate}
+        handleStopTask={stopTask}
+        isStopping={isStopping}
         handleClearResults={handleClearResults}
         globalPageSize={globalPageSize}
         setGlobalPageSize={setGlobalPageSize}

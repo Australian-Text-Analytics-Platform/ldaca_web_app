@@ -46,10 +46,12 @@ export const ViewRouter: React.FC = () => {
   const currentView = useUIStore((state) => state.currentView);
   const FeatureComponent = VIEW_COMPONENTS[currentView];
   return (
-    <ErrorBoundary>
-      <Suspense fallback={<Fallback />}>
-        <FeatureComponent />
-      </Suspense>
-    </ErrorBoundary>
+    <div className="min-h-0 min-w-0 w-full flex-1">
+      <ErrorBoundary>
+        <Suspense fallback={<Fallback />}>
+          <FeatureComponent />
+        </Suspense>
+      </ErrorBoundary>
+    </div>
   );
 };

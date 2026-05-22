@@ -14,11 +14,16 @@ state machine. It handles:
 - current request/result hydration from backend endpoints,
 - terminal result fetch,
 - clear/reset behavior,
+- cancelling the current backend task from the owning tab,
 - request snapshots.
 
 `features/analysis/common/tasks/useAnalysisTaskFlow.ts` connects an analysis
 tab to the task stream. It refreshes results only when the relevant task reaches
 a terminal state and the tab is active.
+
+Use the shared analysis card Stop and Clear Results actions for task lifecycle
+controls. The sidebar Task Center should not own cancellation or clearing;
+feature tabs know which task ids and descendants the backend should resolve.
 
 ## Selection And Colors
 

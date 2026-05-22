@@ -61,6 +61,12 @@ caches. It handles `tasks_snapshot`, `task_changed`, `workspace_updated`,
 `analysis_materialized`, heartbeat, and error events. It guards against older
 terminal-state events overwriting newer task state.
 
+The sidebar Task Center is observational. It shows the backend task register and
+removes cards only when the backend reports removal, either through a snapshot,
+`task_removed`, or the clear endpoint response. Workflow controls such as Stop
+and Clear Results belong in the owning feature tab so backend recursive cleanup
+stays the source of truth for parent and child tasks.
+
 ## Documentation Registry
 
 The help system uses a bundled registry plus optional remote registry. On app
