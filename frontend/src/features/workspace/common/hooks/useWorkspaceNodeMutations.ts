@@ -8,6 +8,7 @@ import {
   type SliceRequest,
   type ReplaceRequest,
   type PolarsExpressionRequest,
+  type PolarsExpressionApplyResponse,
   type NodeInfoResponse,
 } from '@/api/nodes';
 import {
@@ -498,6 +499,37 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
+  const polarsExpressionApplyMutation = useMutation({
+    mutationFn: ({ nodeId, request }: { nodeId: string; request: PolarsExpressionRequest }) =>
+      nodesApi.polarsExpressionApply(nodeId, request, authHeaders),
+    onMutate: () => {
+      startOperation('polarsExpressionApply');
+    },
+    onSuccess: (response: PolarsExpressionApplyResponse, variables) => {
+      if (currentWorkspaceId) {
+        // Always refresh the workspace graph so a newly created node shows up
+        // (or, when the source node was mutated in place, so its updated
+        // schema is reflected in the node list).
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        if (response.node_id !== variables.nodeId) {
+          setSelectedNodes([response.node_id]);
+        } else {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId),
+          });
+        }
+      }
+      endOperation('polarsExpressionApply');
+    },
+    onError: (error: Error) => {
+      setOperationError('polarsExpressionApply', error.message);
+      endOperation('polarsExpressionApply');
+    },
+  });
+
   const sliceNodeMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: SliceRequest }) =>
       nodesApi.slice(nodeId, request, authHeaders),
@@ -770,7 +802,7 @@ export const useWorkspaceNodeMutations = ({
     polarsExpressionPreview: (nodeId: string, request: PolarsExpressionRequest, page = 1, pageSize = 10) =>
       nodesApi.polarsExpressionPreview(nodeId, request, page, pageSize, authHeaders),
     polarsExpressionApply: (nodeId: string, request: PolarsExpressionRequest) =>
-      nodesApi.polarsExpressionApply(nodeId, request, authHeaders),
+      polarsExpressionApplyMutation.mutateAsync({ nodeId, request }),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
       castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
     renameColumn: (nodeId: string, column: string, newName: string) =>
