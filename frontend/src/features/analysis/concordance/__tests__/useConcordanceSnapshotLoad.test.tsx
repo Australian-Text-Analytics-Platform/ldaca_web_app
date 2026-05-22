@@ -1,9 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import JSZip from 'jszip';
-import * as snapshotsApiModule from '@/api/snapshots';
 import { useSnapshotViewStore } from '@/features/snapshot-view';
 import type { SnapshotManifest } from '@/features/snapshot-view';
+import {
+  buildJsonBundleBlob,
+  makeSnapshotManifest,
+  mockSnapshotDownload,
+  resetSnapshotStore,
+} from '@/features/analysis/common/__tests__/snapshotLoadTestUtils';
 import { useConcordanceSnapshotLoad } from '../hooks/useConcordanceSnapshotLoad';
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -11,42 +15,26 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 
 function makeManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManifest {
-  return {
-    schema_version: 1,
-    mode: 'demo',
-    tool: 'concordance',
-    tool_version: 'v0.4.4',
-    captured_at: '2026-05-16T08:00:00Z',
-    title: 'fixture',
-    source: {
-      workspace_id: 'ws-1',
-      workspace_name: 'WS',
-      node_ids: ['n1'],
-      node_labels: ['Node 1'],
-      total_source_rows: 100,
-    },
-    capabilities: {
-      canPaginate: true,
-      canSortAndFilterResult: true,
-      canExport: true,
-      canFilterSourceRows: false,
-      canCrossJump: false,
-    },
-    preview: {
+  return makeSnapshotManifest(
+    {
       tool: 'concordance',
-      searchTerm: 'love',
-      totalHits: 42,
-      materialised: true,
-      displayColumns: [],
+      version: 'v0.4.4',
+      canPaginate: true,
+      preview: {
+        tool: 'concordance',
+        searchTerm: 'love',
+        totalHits: 42,
+        materialised: true,
+        displayColumns: [],
+      },
+      payloads: [
+        { kind: 'result', path: 'tables/result.json' },
+        { kind: 'dispersion-bins', path: 'tables/dispersion-bins.json' },
+        { kind: 'settings', path: 'settings.json' },
+      ],
     },
-    payloads: [
-      { kind: 'result', path: 'tables/result.json' },
-      { kind: 'dispersion-bins', path: 'tables/dispersion-bins.json' },
-      { kind: 'settings', path: 'settings.json' },
-    ],
-    node_colors: { n1: '#aabbcc' },
-    ...overrides,
-  };
+    overrides,
+  );
 }
 
 async function buildBundleBlob(
@@ -55,25 +43,19 @@ async function buildBundleBlob(
   binsPayload: unknown,
   settingsPayload?: unknown,
 ): Promise<Blob> {
-  const zip = new JSZip();
-  zip.file('manifest.json', JSON.stringify(manifest));
-  zip.file('tables/result.json', JSON.stringify(resultPayload));
-  zip.file('tables/dispersion-bins.json', JSON.stringify(binsPayload));
-  if (settingsPayload !== undefined) {
-    zip.file('settings.json', JSON.stringify(settingsPayload));
-  }
-  const bytes = await zip.generateAsync({ type: 'uint8array' });
-  return new Blob([bytes as BlobPart], { type: 'application/zip' });
+  return buildJsonBundleBlob(manifest, {
+    'tables/result.json': resultPayload,
+    'tables/dispersion-bins.json': binsPayload,
+    ...(settingsPayload !== undefined ? { 'settings.json': settingsPayload } : {}),
+  });
 }
 
 describe('useConcordanceSnapshotLoad', () => {
   let downloadSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    downloadSpy = vi.spyOn(snapshotsApiModule.snapshotsApi, 'download');
-    act(() => {
-      useSnapshotViewStore.getState().reset();
-    });
+    downloadSpy = mockSnapshotDownload();
+    resetSnapshotStore();
   });
 
   afterEach(() => {
@@ -92,7 +74,9 @@ describe('useConcordanceSnapshotLoad', () => {
         materialized: true,
       },
     };
-    const bins = { n1: { node_id: 'n1', total_hits: 0, document_column: null, bin_count: 100, rows: [] } };
+    const bins = {
+      n1: { node_id: 'n1', total_hits: 0, document_column: null, bin_count: 100, rows: [] },
+    };
     const settings = {
       node_ids: ['n1'],
       node_columns: { n1: 'text' },
@@ -136,9 +120,9 @@ describe('useConcordanceSnapshotLoad', () => {
     downloadSpy.mockResolvedValue(await buildBundleBlob(manifest, {}, {}));
 
     const { result: hookResult } = renderHook(() => useConcordanceSnapshotLoad());
-    await expect(
-      hookResult.current('quotation-foo.ldaca-snapshot'),
-    ).rejects.toThrow(/not concordance/i);
+    await expect(hookResult.current('quotation-foo.ldaca-snapshot')).rejects.toThrow(
+      /not concordance/i,
+    );
     // Store should not have been mutated.
     expect(useSnapshotViewStore.getState().getSnapshot('concordance')).toBeNull();
   });
@@ -148,9 +132,7 @@ describe('useConcordanceSnapshotLoad', () => {
     downloadSpy.mockResolvedValue(await buildBundleBlob(manifest, {}, {}));
 
     const { result: hookResult } = renderHook(() => useConcordanceSnapshotLoad());
-    await expect(
-      hookResult.current('concordance-bad.ldaca-snapshot'),
-    ).rejects.toThrow();
+    await expect(hookResult.current('concordance-bad.ldaca-snapshot')).rejects.toThrow();
   });
 
   it('handles a bundle with missing dispersion-bins payload gracefully', async () => {
@@ -167,7 +149,10 @@ describe('useConcordanceSnapshotLoad', () => {
     const snap = useSnapshotViewStore.getState().snapshots.concordance;
     expect(snap).not.toBeNull();
     // Payload is loaded with an empty bins map.
-    type Payload = { resultByNodeId: Record<string, unknown>; binsByNodeId: Record<string, unknown> };
+    type Payload = {
+      resultByNodeId: Record<string, unknown>;
+      binsByNodeId: Record<string, unknown>;
+    };
     expect((snap?.payload as Payload).binsByNodeId).toEqual({});
   });
 });

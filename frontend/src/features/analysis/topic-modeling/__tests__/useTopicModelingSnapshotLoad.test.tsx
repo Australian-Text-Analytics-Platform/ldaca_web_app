@@ -1,9 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import JSZip from 'jszip';
-import * as snapshotsApiModule from '@/api/snapshots';
 import { useSnapshotViewStore } from '@/features/snapshot-view';
 import type { SnapshotManifest } from '@/features/snapshot-view';
+import {
+  buildJsonBundleBlob,
+  makeSnapshotManifest,
+  mockSnapshotDownload,
+  resetSnapshotStore,
+} from '@/features/analysis/common/__tests__/snapshotLoadTestUtils';
 import { useTopicModelingSnapshotLoad } from '../hooks/useTopicModelingSnapshotLoad';
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -11,41 +15,23 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 
 function makeManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManifest {
-  return {
-    schema_version: 1,
-    mode: 'demo',
-    tool: 'topic_modeling',
-    tool_version: 'v0.5.0',
-    captured_at: '2026-05-16T08:00:00Z',
-    title: 'fixture',
-    source: {
-      workspace_id: 'ws-1',
-      workspace_name: 'WS',
-      node_ids: ['n1'],
-      node_labels: ['Node 1'],
-      total_source_rows: 100,
-    },
-    capabilities: {
-      canPaginate: false,
-      canSortAndFilterResult: true,
-      canExport: true,
-      canFilterSourceRows: false,
-      canCrossJump: false,
-    },
-    preview: {
+  return makeSnapshotManifest(
+    {
       tool: 'topic_modeling',
-      numTopics: 12,
-      vocabSize: 180,
-      embedder: 'bertopic',
-      wordsPerTopic: 15,
+      preview: {
+        tool: 'topic_modeling',
+        numTopics: 12,
+        vocabSize: 180,
+        embedder: 'bertopic',
+        wordsPerTopic: 15,
+      },
+      payloads: [
+        { kind: 'result', path: 'tables/result.json' },
+        { kind: 'settings', path: 'settings.json' },
+      ],
     },
-    payloads: [
-      { kind: 'result', path: 'tables/result.json' },
-      { kind: 'settings', path: 'settings.json' },
-    ],
-    node_colors: { n1: '#aabbcc' },
-    ...overrides,
-  };
+    overrides,
+  );
 }
 
 async function buildBundleBlob(
@@ -53,24 +39,18 @@ async function buildBundleBlob(
   resultPayload: unknown,
   settingsPayload?: unknown,
 ): Promise<Blob> {
-  const zip = new JSZip();
-  zip.file('manifest.json', JSON.stringify(manifest));
-  zip.file('tables/result.json', JSON.stringify(resultPayload));
-  if (settingsPayload !== undefined) {
-    zip.file('settings.json', JSON.stringify(settingsPayload));
-  }
-  const bytes = await zip.generateAsync({ type: 'uint8array' });
-  return new Blob([bytes as BlobPart], { type: 'application/zip' });
+  return buildJsonBundleBlob(manifest, {
+    'tables/result.json': resultPayload,
+    ...(settingsPayload !== undefined ? { 'settings.json': settingsPayload } : {}),
+  });
 }
 
 describe('useTopicModelingSnapshotLoad', () => {
   let downloadSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    downloadSpy = vi.spyOn(snapshotsApiModule.snapshotsApi, 'download');
-    act(() => {
-      useSnapshotViewStore.getState().reset();
-    });
+    downloadSpy = mockSnapshotDownload();
+    resetSnapshotStore();
   });
 
   afterEach(() => {
@@ -84,7 +64,15 @@ describe('useTopicModelingSnapshotLoad', () => {
       message: '',
       data: {
         topics: [
-          { id: 0, label: 'foo, bar', representative_words: ['foo', 'bar'], size: [10], total_size: 10, x: 0, y: 0 },
+          {
+            id: 0,
+            label: 'foo, bar',
+            representative_words: ['foo', 'bar'],
+            size: [10],
+            total_size: 10,
+            x: 0,
+            y: 0,
+          },
         ],
         corpus_sizes: [100],
       },
@@ -129,12 +117,10 @@ describe('useTopicModelingSnapshotLoad', () => {
     downloadSpy.mockResolvedValue(await buildBundleBlob(manifest, {}));
 
     const { result: hookResult } = renderHook(() => useTopicModelingSnapshotLoad());
-    await expect(
-      hookResult.current('concordance-foo.ldaca-snapshot'),
-    ).rejects.toThrow(/not topic_modeling/i);
-    expect(
-      useSnapshotViewStore.getState().getSnapshot('topic_modeling'),
-    ).toBeNull();
+    await expect(hookResult.current('concordance-foo.ldaca-snapshot')).rejects.toThrow(
+      /not topic_modeling/i,
+    );
+    expect(useSnapshotViewStore.getState().getSnapshot('topic_modeling')).toBeNull();
   });
 
   it('throws when the bundle has no result payload', async () => {
@@ -142,9 +128,7 @@ describe('useTopicModelingSnapshotLoad', () => {
     downloadSpy.mockResolvedValue(await buildBundleBlob(manifest, {}));
 
     const { result: hookResult } = renderHook(() => useTopicModelingSnapshotLoad());
-    await expect(
-      hookResult.current('topic-bad.ldaca-snapshot'),
-    ).rejects.toThrow();
+    await expect(hookResult.current('topic-bad.ldaca-snapshot')).rejects.toThrow();
   });
 
   it('loads a bundle with no settings payload (settings becomes undefined)', async () => {

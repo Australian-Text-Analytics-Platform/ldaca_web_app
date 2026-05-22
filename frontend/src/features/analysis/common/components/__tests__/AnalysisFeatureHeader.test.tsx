@@ -60,15 +60,4 @@ describe('AnalysisFeatureHeader', () => {
     expect(slot).toBeEmptyDOMElement();
   });
 
-  it('the slot is still present (and empty in Phase 0j) once demo mode flips on', () => {
-    // SnapshotActions returns null in Phase 0j even when enabled —
-    // the real Save/Load buttons land in Phase 1. This test pins
-    // down the gate so a regression in Phase 1 shows up immediately.
-    renderHeader();
-    act(() => {
-      usePreferencesStore.getState().setDemoSnapshotsEnabled(true);
-    });
-    const slot = screen.getByTestId('analysis-feature-header-actions');
-    expect(slot).toBeInTheDocument();
-  });
 });

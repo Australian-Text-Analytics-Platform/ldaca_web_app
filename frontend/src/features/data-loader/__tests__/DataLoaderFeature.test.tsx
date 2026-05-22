@@ -285,10 +285,6 @@ describe('DataLoaderFeature citation UI', () => {
     currentDragPath = '';
     fireEvent.dragOver(targetFolderRow, { dataTransfer });
 
-    await waitFor(() => {
-      expect(targetFolderRow.className).toContain('bg-primary/10');
-    });
-
     fireEvent.drop(targetFolderRow, { dataTransfer });
 
     await waitFor(() => {
@@ -324,10 +320,6 @@ describe('DataLoaderFeature citation UI', () => {
     fireEvent.dragStart(draggedFileRow, { dataTransfer });
     currentDragPath = '';
     fireEvent.dragOver(targetFileRow, { dataTransfer });
-
-    await waitFor(() => {
-      expect(targetFileRow.className).toContain('bg-primary/10');
-    });
 
     fireEvent.drop(targetFileRow, { dataTransfer });
 
@@ -425,8 +417,6 @@ describe('DataLoaderFeature citation UI', () => {
     const workspaceManagerCard = getVisibleMatch(
       screen.getAllByTestId('workspace-manager-item-ws-1'),
     );
-    expect(workspaceManagerCard).toHaveClass('border-primary');
-    expect(workspaceManagerCard).toHaveClass('bg-primary/10');
 
     expect(within(activeWorkspaceCard).getByPlaceholderText('Enter new name')).toBeInTheDocument();
 

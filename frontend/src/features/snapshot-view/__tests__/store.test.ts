@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DEMO_SNAPSHOT_MODE, LIVE_MODE } from '../mode';
+import { DEMO_SNAPSHOT_MODE, LIVE_MODE, isShareSnapshotMode, isSnapshotMode } from '../mode';
 import { useSnapshotViewStore } from '../store';
-import type { LoadedSnapshot, SnapshotManifest } from '../types';
+import type { LoadedSnapshot, SnapshotManifest, ViewMode } from '../types';
 
-function makeFakeSnapshot(
-  overrides: Partial<SnapshotManifest> = {},
-): LoadedSnapshot {
+const SHARE_SNAPSHOT_MODE: ViewMode = { kind: 'shareSnapshot' };
+
+function makeFakeSnapshot(overrides: Partial<SnapshotManifest> = {}): LoadedSnapshot {
   const manifest: SnapshotManifest = {
     schema_version: 1,
     mode: 'demo',
@@ -52,12 +52,8 @@ describe('useSnapshotViewStore', () => {
   });
 
   it('defaults every tool to live mode', () => {
-    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(
-      LIVE_MODE,
-    );
-    expect(useSnapshotViewStore.getState().getMode('quotation')).toEqual(
-      LIVE_MODE,
-    );
+    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(LIVE_MODE);
+    expect(useSnapshotViewStore.getState().getMode('quotation')).toEqual(LIVE_MODE);
   });
 
   it('getSnapshot returns null when nothing is loaded', () => {
@@ -66,76 +62,61 @@ describe('useSnapshotViewStore', () => {
 
   it('setMode changes mode without touching the snapshot slice', () => {
     useSnapshotViewStore.getState().setMode('concordance', DEMO_SNAPSHOT_MODE);
-    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(
-      DEMO_SNAPSHOT_MODE,
-    );
+    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(DEMO_SNAPSHOT_MODE);
     expect(useSnapshotViewStore.getState().getSnapshot('concordance')).toBeNull();
   });
 
   it('loadSnapshot populates the slice and flips the mode atomically', () => {
     const snap = makeFakeSnapshot();
-    useSnapshotViewStore
-      .getState()
-      .loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
-    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(
-      DEMO_SNAPSHOT_MODE,
-    );
+    useSnapshotViewStore.getState().loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
+    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(DEMO_SNAPSHOT_MODE);
     expect(useSnapshotViewStore.getState().getSnapshot('concordance')).toBe(snap);
   });
 
   it('exitSnapshot clears the slice and returns to live', () => {
     const snap = makeFakeSnapshot();
-    useSnapshotViewStore
-      .getState()
-      .loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
+    useSnapshotViewStore.getState().loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
     useSnapshotViewStore.getState().exitSnapshot('concordance');
-    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(
-      LIVE_MODE,
-    );
+    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(LIVE_MODE);
     expect(useSnapshotViewStore.getState().getSnapshot('concordance')).toBeNull();
   });
 
   it('exitSnapshot is idempotent — exiting a tool already in live mode is a no-op', () => {
     useSnapshotViewStore.getState().exitSnapshot('concordance');
-    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(
-      LIVE_MODE,
-    );
+    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(LIVE_MODE);
     expect(useSnapshotViewStore.getState().getSnapshot('concordance')).toBeNull();
   });
 
   it('tools are independent — concordance in snapshot does not affect quotation', () => {
     const snap = makeFakeSnapshot();
-    useSnapshotViewStore
-      .getState()
-      .loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
-    expect(useSnapshotViewStore.getState().getMode('quotation')).toEqual(
-      LIVE_MODE,
-    );
+    useSnapshotViewStore.getState().loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
+    expect(useSnapshotViewStore.getState().getMode('quotation')).toEqual(LIVE_MODE);
     expect(useSnapshotViewStore.getState().getSnapshot('quotation')).toBeNull();
   });
 
   it('reset clears all tools', () => {
     const snap = makeFakeSnapshot();
-    useSnapshotViewStore
-      .getState()
-      .loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
+    useSnapshotViewStore.getState().loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
     useSnapshotViewStore.getState().setMode('quotation', DEMO_SNAPSHOT_MODE);
     useSnapshotViewStore.getState().reset();
-    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(
-      LIVE_MODE,
-    );
-    expect(useSnapshotViewStore.getState().getMode('quotation')).toEqual(
-      LIVE_MODE,
-    );
+    expect(useSnapshotViewStore.getState().getMode('concordance')).toEqual(LIVE_MODE);
+    expect(useSnapshotViewStore.getState().getMode('quotation')).toEqual(LIVE_MODE);
     expect(useSnapshotViewStore.getState().getSnapshot('concordance')).toBeNull();
   });
 
   it('sourceProjection is null on demo snapshots (forward-compat hook)', () => {
     const snap = makeFakeSnapshot();
-    useSnapshotViewStore
-      .getState()
-      .loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
+    useSnapshotViewStore.getState().loadSnapshot('concordance', snap, DEMO_SNAPSHOT_MODE);
     const loaded = useSnapshotViewStore.getState().getSnapshot('concordance');
     expect(loaded?.sourceProjection).toBeNull();
+  });
+
+  it('snapshot mode predicates distinguish live, demo, and share modes', () => {
+    expect(isSnapshotMode(LIVE_MODE)).toBe(false);
+    expect(isSnapshotMode(DEMO_SNAPSHOT_MODE)).toBe(true);
+    expect(isSnapshotMode(SHARE_SNAPSHOT_MODE)).toBe(true);
+    expect(isShareSnapshotMode(LIVE_MODE)).toBe(false);
+    expect(isShareSnapshotMode(DEMO_SNAPSHOT_MODE)).toBe(false);
+    expect(isShareSnapshotMode(SHARE_SNAPSHOT_MODE)).toBe(true);
   });
 });

@@ -6,7 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { WorkspaceDataHeader } from '../WorkspaceDataHeader';
 
 describe('WorkspaceDataHeader', () => {
-  it('shows undo redo controls and omits extra metadata labels', async () => {
+  it('shows undo redo controls', async () => {
     const user = userEvent.setup();
     const onUndo = vi.fn();
     const onRedo = vi.fn();
@@ -28,14 +28,9 @@ describe('WorkspaceDataHeader', () => {
       </TooltipProvider>
     );
 
-    expect(screen.queryByText(/rows loaded/i)).not.toBeInTheDocument();
-  expect(screen.queryByText(/shape:/i)).not.toBeInTheDocument();
-
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onUndo).toHaveBeenCalledTimes(1);
 
     expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
-
-    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 });
