@@ -141,3 +141,13 @@ npm run test -w frontend -- --run
 - Backend docs: `backend/docs/index.md`
 - Frontend docs: `frontend/docs/index.md`
 - Agent workflow and repo-specific coding guidance: `AGENTS.md`
+
+## License
+
+LDaCA Wordflow is licensed under the [Apache License, Version 2.0](./LICENSE). See [NOTICE](./NOTICE) for required attribution.
+
+In short: you are free to use, modify, and redistribute Wordflow — including for commercial purposes — provided that you preserve the copyright and license notices, mark any changed files as modified, and carry forward the NOTICE attribution in your own distribution. Apache 2.0 also includes an explicit patent grant from contributors.
+
+Wordflow's nested components ship under their own permissive licenses (MIT or MIT/Apache-2.0 dual): `polars`, `polars-text`, `docworkspace`, `FastAPI`, `React`, `Tauri`, and others. Each is honored by its own copyright notice.
+
+If you use LDaCA Wordflow in research, please cite it — see the in-app "Cite LDaCA Wordflow" page or [frontend/public/references/general.md](./frontend/public/references/general.md).

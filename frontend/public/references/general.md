@@ -53,6 +53,16 @@ These contributions have been essential in ensuring that LDaCA Wordflow meets th
 
 ---
 
+## License
+
+LDaCA Wordflow is licensed under the **Apache License, Version 2.0**. See the bundled [`LICENSE`](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/blob/main/LICENSE) and [`NOTICE`](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/blob/main/NOTICE) files, or the canonical license text at [apache.org/licenses/LICENSE-2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
+Apache 2.0 is a permissive open-source licence: you are free to use, modify, and redistribute Wordflow — including for commercial purposes — provided that you preserve the copyright and licence notices, mark any changed files as modified, and pass the `NOTICE` attribution forward in your own distribution. The licence also grants an explicit patent licence from contributors covering their contributions.
+
+Wordflow's nested components are distributed under their own permissive licences (MIT or MIT/Apache-2.0 dual), including `polars`, `polars-text`, `docworkspace`, `FastAPI`, `React`, and `Tauri`.
+
+---
+
 © Language Data Commons of Australia (LDaCA)
 
 Version {{VERSION}} - released on {{BUILD_DATE}}.

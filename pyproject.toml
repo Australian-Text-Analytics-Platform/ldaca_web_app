@@ -3,6 +3,8 @@ name = "ldaca-wordflow-workspace"
 version = "0.5.1"
 description = "LDaCA Wordflow Workspace"
 requires-python = ">=3.14"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = ["ldaca-wordflow", "ldaca-loader"]
 
 [tool.uv.sources]
