@@ -141,3 +141,9 @@ npm run test -w frontend -- --run
 - Backend docs: `backend/docs/index.md`
 - Frontend docs: `frontend/docs/index.md`
 - Agent workflow and repo-specific coding guidance: `AGENTS.md`
+
+## License
+
+LDaCA Web App is licensed under the [Apache License, Version 2.0](./LICENSE). See [NOTICE](./NOTICE) for required attribution.
+
+This branch (`v0.3`) is parked as the back-port line for the pre-rename `ldaca-web-app` release series. The project was renamed to "LDaCA Wordflow" at v0.4.2; active development continues on the `v0.5` branch. The relicense from MIT to Apache 2.0 was first applied on `v0.5` and back-ported here for consistency.
