@@ -3,6 +3,28 @@
 User-facing changes to the LDaCA Wordflow (previously "LDaCA Text Analytics Web Application") since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.2] — 2026-05-25
+
+A focused release on file-tree productivity, workspace lifecycle robustness, and a license change to Apache-2.0. No new analysis tools — the five existing ones (Concordance, Quotation, Trends, Token Frequency, Topic Modelling) are unchanged in this release.
+
+The headline is the workspace-rename fix: in v0.5.1 and earlier, renaming a workspace silently invalidated all of its data blocks — the scan paths inside the saved plan still pointed at the old workspace directory, so reopening the renamed workspace either produced empty blocks or failed on materialisation. v0.5.2 rebases those scan paths transactionally as part of the rename.
+
+### Added
+
+- **Folder operations in the file tree.** Delete a folder (and everything inside, with explicit confirmation); drag a file or folder onto another folder to move it; folder expand/collapse state is now remembered for the session so navigating a deep dataset keeps your context across dialogs.
+- **Name your data block when adding a file.** The Add-file flow offers an editable name field so the resulting workspace node carries the label you intend, not the auto-derived filename stem. Leaving the field untouched preserves the previous default.
+- **Find your newly uploaded workspace.** Uploading a workspace ZIP now scrolls the matching row into view in the workspace list and highlights it with the existing hint system — same UX as the file-upload "Add this file" nudge — so you can tell at a glance which workspace just landed and load it from there.
+
+### Changed
+
+- **Relicensed from MIT to Apache-2.0.** Source files carry Apache-2.0 headers and `NOTICE` lists the LDaCA + SIH joint copyright for 2025-2026. No behavioural changes for end users. Previous releases remain available under their original MIT license.
+- **AI Annotator hidden from the sidebar.** The early-prototype AI Annotator tool is removed from the sidebar nav and from the "Edit visible views" toggle. The feature code and routing are intact; it remains accessible via direct URL while the tool matures.
+
+### Fixed
+
+- **Workspace rename keeps data blocks loadable.** Rename now rebases the scan paths inside the workspace plan and re-emits the manifest, so blocks stay valid across renames instead of pointing at the old workspace directory.
+- **Graph refreshes after Polars Expression Apply.** Applying a Polars expression to add a derived column now repaints the workspace graph immediately, instead of waiting for the next workspace event.
+
 ## [0.5.1] — 2026-05-21
 
 Two themes:
