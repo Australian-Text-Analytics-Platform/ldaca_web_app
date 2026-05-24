@@ -227,9 +227,13 @@ export const DataLoaderFeature: React.FC = () => {
   const handleUploadWorkspaceZip = async (file: File) => {
     setUploadingWorkspaceZip(true);
     try {
-      await workspacesApi.uploadZip(file, authHeaders);
+      const response = await workspacesApi.uploadZip(file, authHeaders);
       await queryClient.refetchQueries({ queryKey: queryKeys.workspaces, exact: true });
       notify('success', `Workspace ZIP "${file.name}" uploaded.`);
+      const uploadedId = getWorkspaceId(response.workspace);
+      if (uploadedId) {
+        useUIStore.getState().setLastUploadedWorkspaceId(uploadedId);
+      }
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to upload workspace ZIP.');
     } finally {

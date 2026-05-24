@@ -17,6 +17,7 @@ export type HintConditionId =
   | 'workspace-has-no-nodes'
   | 'file-uploaded-not-added'
   | 'file-uploaded-no-workspace'
+  | 'workspace-uploaded-not-current'
   | 'filter-no-node-selected'
   | 'filter-awaiting-column-selection';
 
@@ -26,6 +27,8 @@ export type HintConditionMap = Record<HintConditionId, boolean>;
 export interface HintResolverContext {
   /** Path of the most recently uploaded file (if any). */
   lastUploadedFilePath: string | null;
+  /** Id of the most recently uploaded workspace ZIP (if any). */
+  lastUploadedWorkspaceId: string | null;
 }
 
 export interface HintDefinition {

@@ -14,7 +14,7 @@ export const workspacesApi = {
   uploadZip: (file: File, headers: Record<string, string> = {}) => {
     const fd = new FormData();
     fd.append('file', file);
-    return httpRequest<Record<string, unknown>>('/workspaces/upload', {
+    return httpRequest<{ state: string; workspace: WorkspaceInfo }>('/workspaces/upload', {
       method: 'POST',
       formData: fd,
       headers,

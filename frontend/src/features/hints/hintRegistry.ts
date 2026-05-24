@@ -37,6 +37,22 @@ export const hintRegistry: HintDefinition[] = [
     learnMoreTarget: 'data-loader.create-workspace.button',
   },
   {
+    id: 'data-loader.workspace-just-uploaded',
+    title: 'Your uploaded workspace is here',
+    body:
+      'The workspace ZIP has been imported into your list. Click "Load" on this row to switch to it.',
+    condition: 'workspace-uploaded-not-current',
+    priority: 15,
+    oneShot: false,
+    placement: 'right',
+    resolveAnchor: ({ lastUploadedWorkspaceId }) => {
+      if (!lastUploadedWorkspaceId) return null;
+      return document.querySelector(
+        `[data-testid="workspace-manager-item-${CSS.escape(lastUploadedWorkspaceId)}"]`,
+      );
+    },
+  },
+  {
     id: 'data-loader.add-file-row',
     title: 'Add this file to your workspace',
     body:
