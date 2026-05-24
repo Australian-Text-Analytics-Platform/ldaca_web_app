@@ -20,6 +20,7 @@ describe('hintRegistry', () => {
       'workspace-has-no-nodes',
       'file-uploaded-not-added',
       'file-uploaded-no-workspace',
+      'workspace-uploaded-not-current',
       'filter-no-node-selected',
       'filter-awaiting-column-selection',
     ];
@@ -43,7 +44,9 @@ describe('hintRegistry', () => {
     filledTrigger.setAttribute('data-filter-column-empty', 'false');
     document.body.appendChild(filledTrigger);
 
-    expect(hint?.resolveAnchor?.({ lastUploadedFilePath: null })).toBe(emptyTrigger);
+    expect(
+      hint?.resolveAnchor?.({ lastUploadedFilePath: null, lastUploadedWorkspaceId: null }),
+    ).toBe(emptyTrigger);
 
     emptyTrigger.remove();
     filledTrigger.remove();

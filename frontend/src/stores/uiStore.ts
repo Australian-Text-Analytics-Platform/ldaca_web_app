@@ -95,6 +95,14 @@ interface UIState {
   lastUploadedFilePath: string | null;
 
   /**
+   * Id of the most recently uploaded workspace ZIP. Used by the contextual
+   * hints system to scroll to and highlight its row in the workspace list so
+   * the user can find and load it. Cleared once the user loads it (i.e. it
+   * becomes the current workspace) or dismisses the hint.
+   */
+  lastUploadedWorkspaceId: string | null;
+
+  /**
    * Hints the user dismissed for this session only (won't persist across
    * reloads). Permanent dismissals live in `hintsStore`.
    */
@@ -141,6 +149,7 @@ interface UIActions {
 
   // Hints
   setLastUploadedFilePath: (path: string | null) => void;
+  setLastUploadedWorkspaceId: (id: string | null) => void;
   sessionDismissHint: (id: string) => void;
   resetSessionDismissedHints: () => void;
 
@@ -172,6 +181,7 @@ export const useUIStore = create<UIStore>()(
       infoTarget: null,
       referenceTarget: null,
       lastUploadedFilePath: null,
+      lastUploadedWorkspaceId: null,
       sessionDismissedHints: new Set<string>(),
       collapsedFolders: new Set<string>(),
 
@@ -299,6 +309,10 @@ export const useUIStore = create<UIStore>()(
 
       setLastUploadedFilePath: (path) => set((state) => {
         state.lastUploadedFilePath = path;
+      }),
+
+      setLastUploadedWorkspaceId: (id) => set((state) => {
+        state.lastUploadedWorkspaceId = id;
       }),
 
       sessionDismissHint: (id) => set((state) => {

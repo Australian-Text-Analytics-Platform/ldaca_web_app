@@ -18,10 +18,11 @@ export function useHintConditions(): {
 } {
   const { currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { selectedNodeId } = useWorkspaceSelection();
-  const { currentView, lastUploadedFilePath, hasAnyModalOpen } = useUIStore(
+  const { currentView, lastUploadedFilePath, lastUploadedWorkspaceId, hasAnyModalOpen } = useUIStore(
     useShallow((s) => ({
       currentView: s.currentView,
       lastUploadedFilePath: s.lastUploadedFilePath,
+      lastUploadedWorkspaceId: s.lastUploadedWorkspaceId,
       hasAnyModalOpen: Object.values(s.modals).some(Boolean),
     })),
   );
@@ -62,6 +63,12 @@ export function useHintConditions(): {
     return !matched;
   })();
 
+  // "Workspace uploaded but not current": user just uploaded a workspace ZIP
+  // and hasn't loaded it yet. Becomes false the moment they load it (id
+  // matches `currentWorkspaceId`), so the highlight naturally goes away.
+  const workspaceUploadedNotCurrent =
+    !!lastUploadedWorkspaceId && lastUploadedWorkspaceId !== currentWorkspaceId;
+
   // Suppress all hints while a modal/dialog is open to avoid stacking UI.
   const enabled = !hasAnyModalOpen;
   const isFilterView = currentView === 'filter';
@@ -76,11 +83,13 @@ export function useHintConditions(): {
       'workspace-has-no-nodes': enabled && workspaceHasNoNodes,
       'file-uploaded-not-added': enabled && fileUploadedNotAdded,
       'file-uploaded-no-workspace': enabled && fileUploadedNoWorkspace,
+      'workspace-uploaded-not-current': enabled && workspaceUploadedNotCurrent,
       'filter-no-node-selected': enabled && filterNoNodeSelected,
       'filter-awaiting-column-selection': enabled && filterAwaitingColumnSelection,
     },
     context: {
       lastUploadedFilePath,
+      lastUploadedWorkspaceId,
     },
   };
 }
