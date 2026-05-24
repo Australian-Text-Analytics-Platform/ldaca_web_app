@@ -97,7 +97,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'analysis', label: 'Trends', icon: TrendingUp },
   { id: 'topic-modeling', label: 'Topic Modeling', icon: Puzzle },
   { id: 'quotation', label: 'Quotation', icon: Quote },
-  { id: 'ai-annotator', label: 'AI Annotator', icon: Bot },
+  // { id: 'ai-annotator', label: 'AI Annotator', icon: Bot },
   { id: 'export', label: 'Export', icon: Upload },
 ];
 
