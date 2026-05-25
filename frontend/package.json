@@ -89,7 +89,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "prepublishOnly": "pnpm build",
-    "test": "vitest",
+    "test": "vitest run",
     "lint": "eslint 'src/**/*.{ts,tsx}' --max-warnings=0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",

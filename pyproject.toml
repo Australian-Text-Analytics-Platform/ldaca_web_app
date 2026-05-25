@@ -6,6 +6,7 @@ requires-python = ">=3.14"
 dependencies = ["ldaca-wordflow", "rocrate-tabular"]
 
 [tool.uv.sources]
+docworkspace = { path = "./docworkspace", editable = true }
 ldaca-wordflow = { path = "./backend", editable = true }
 rocrate-tabular = { path = "./backend/src/ldaca_wordflow/_vendor/rocrate-tabular" }
 
