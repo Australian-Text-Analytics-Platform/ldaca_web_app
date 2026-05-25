@@ -71,15 +71,28 @@ export const useTokenFrequencyPreferences = ({
     setTokenLimitError(null);
   }, [maxTokenLimitInput]);
 
+  // Tracks the last ``backendTokenLimit`` we synced the input from.
+  // Snapshot mode reads ``results`` from a frozen snapshot payload, so
+  // ``setResults`` cannot update ``backendTokenLimit``. Without this
+  // gate, every override change re-fires the resync effect below and
+  // snaps the user's input back to the captured value. With it, the
+  // resync only fires when the backend value itself changes (e.g. a
+  // new snapshot loads, or live results land).
+  const lastSyncedBackendRef = useRef<number | null | undefined>(undefined);
+
   useEffect(() => {
     const backendLimit =
       typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit)
         ? backendTokenLimit
         : null;
     if (backendLimit !== null) {
+      if (lastSyncedBackendRef.current === backendLimit) return;
+      lastSyncedBackendRef.current = backendLimit;
       const { limit: sanitizedBackendLimit } = clampDisplayTokenLimit(backendLimit);
       applyTokenLimitState(sanitizedBackendLimit);
     } else if (tokenLimitOverride === null) {
+      if (lastSyncedBackendRef.current === null) return;
+      lastSyncedBackendRef.current = null;
       applyTokenLimitState(DEFAULT_TOKEN_LIMIT);
     }
   }, [applyTokenLimitState, backendTokenLimit, tokenLimitOverride]);

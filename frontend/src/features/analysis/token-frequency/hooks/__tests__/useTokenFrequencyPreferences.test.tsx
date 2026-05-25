@@ -85,6 +85,47 @@ describe('useTokenFrequencyPreferences', () => {
     expect(result.current.stopWords).toBe('the, and, of');
   });
 
+  it('keeps a user-set token limit in snapshot mode (persistEnabled=false)', async () => {
+    // Snapshot mode: ``results`` comes from the frozen snapshot payload
+    // in the feature; ``setResults`` writes to a different (live) state
+    // that doesn't feed back into ``backendTokenLimit`` here. Before
+    // the resync gate was added, the input snapped back to the
+    // captured ``backendTokenLimit`` on every override change.
+    //
+    // Stable ``results`` reference: a separate useEffect inside the
+    // hook depends on ``results`` and calls ``setAppliedStopSet(new
+    // Set())``, which creates a fresh Set each render. If the test
+    // passed a new object literal on every renderHook render, that
+    // effect would re-fire forever and OOM the worker.
+    const frozenResults = { state: 'successful', token_limit: 100 } as unknown as Parameters<
+      typeof useTokenFrequencyPreferences
+    >[0]['results'];
+    const { result } = renderHook(() =>
+      useTokenFrequencyPreferences({
+        ...baseArgs,
+        results: frozenResults,
+        backendTokenLimit: 100,
+        persistEnabled: false,
+      }),
+    );
+
+    // Initial sync from backend.
+    await waitFor(() => {
+      expect(result.current.tokenLimitInput).toBe('100');
+    });
+
+    await act(async () => {
+      await result.current.applyTokenLimit(50);
+    });
+
+    // The user's override should stick — backend was not (and cannot be)
+    // updated to 50 in snapshot mode, so the resync effect must not
+    // overwrite it back to 100.
+    expect(result.current.tokenLimitInput).toBe('50');
+    expect(result.current.effectiveTokenLimit).toBe(50);
+    expect(postTokenFrequenciesTaskResultMock).not.toHaveBeenCalled();
+  });
+
   it('merges per-language groups when multiple languages are requested', async () => {
     defaultStopWordsMock.mockImplementation(
       (_headers: unknown, options?: { language?: string }) => {
