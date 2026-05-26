@@ -164,12 +164,16 @@ jobs:
           done < <(find "$runtime" -type f -print0)
           echo "Signed $signed_count Mach-O files inside backend-runtime/"
 
-          # Sign the BUNDLE (not the inner Mach-O directly) so codesign re-signs
-          # the main executable in bundle context — that's the only way the
-          # main binary's signature gets the Info.plist binding the notary
-          # requires. Signing the inner Mach-O standalone produces
-          # "Info.plist=not bound", which passes local --verify --strict but
-          # gets rejected as "signature of the binary is invalid" upstream.
+          # Strip Tauri's pre-existing signature from the main binary first.
+          # codesign --force on the bundle only signs the outer wrapper; it
+          # does NOT re-sign an already-signed main executable. Without this,
+          # Tauri's original signature (signed before the bundle was complete,
+          # without bundle context) survives and the notary rejects it as
+          # "signature of the binary is invalid".
+          codesign --remove-signature "$app_path/Contents/MacOS/ldaca-wordflow"
+
+          # Now sign the bundle. With the main binary unsigned, codesign signs
+          # it in bundle context — proper Info.plist binding included.
           codesign --force --options runtime --timestamp \
             --identifier au.edu.ldaca.wordflow \
             --entitlements src-tauri/entitlements.plist \
@@ -363,11 +367,25 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload signed .app on failure (for offline inspection)
+      - name: Tar signed .app on failure (preserves _CodeSignature/CodeResources)
+        if: failure()
+        shell: bash
+        working-directory: frontend
+        run: |
+          set -Eeuo pipefail
+          app_dir="src-tauri/target/release/bundle/macos"
+          if [ -d "$app_dir/LDaCA Wordflow.app" ]; then
+            tar -C "$app_dir" -czf /tmp/ldaca-wordflow-app.tgz "LDaCA Wordflow.app"
+            ls -la /tmp/ldaca-wordflow-app.tgz
+          else
+            echo "No .app to tar"
+          fi
+
+      - name: Upload signed .app tarball on failure (for offline inspection)
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: ldaca-wordflow-app-failure
-          path: frontend/src-tauri/target/release/bundle/macos/LDaCA Wordflow.app
+          path: /tmp/ldaca-wordflow-app.tgz
           if-no-files-found: warn
           retention-days: 7
