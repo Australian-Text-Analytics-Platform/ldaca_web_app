@@ -183,6 +183,78 @@ fn emit_setup(app: &AppHandle, phase: &str, message: &str) {
     );
 }
 
+/// Run a uv command with stdout+stderr piped, streaming each output line to the
+/// frontend as a `slim-setup` event (so the loading screen shows live download /
+/// install progress) and echoing to the console. uv detects the non-TTY pipe and
+/// emits plain line-based logs rather than redrawing progress bars.
+#[cfg(feature = "slim")]
+fn run_uv_streaming(
+    app: &AppHandle,
+    mut command: Command,
+    phase: &str,
+) -> io::Result<std::process::ExitStatus> {
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = command.spawn()?;
+
+    let mut readers: Vec<Box<dyn std::io::Read + Send>> = Vec::new();
+    if let Some(out) = child.stdout.take() {
+        readers.push(Box::new(out));
+    }
+    if let Some(err) = child.stderr.take() {
+        readers.push(Box::new(err));
+    }
+
+    let handles: Vec<_> = readers
+        .into_iter()
+        .map(|reader| {
+            let app = app.clone();
+            let phase = phase.to_string();
+            std::thread::spawn(move || {
+                for line in BufReader::new(reader).lines().map_while(Result::ok) {
+                    let text = line.trim_end();
+                    if text.is_empty() {
+                        continue;
+                    }
+                    println!("[slim/uv] {text}");
+                    emit_setup(&app, &phase, text);
+                }
+            })
+        })
+        .collect();
+
+    let status = child.wait()?;
+    for handle in handles {
+        let _ = handle.join();
+    }
+    Ok(status)
+}
+
+/// Locate the site-packages dir of the slim uv venv (`<runtime>/lib/python3.X/
+/// site-packages` on unix, `<runtime>/Lib/site-packages` on Windows). Distinct
+/// from `find_venv_site_packages`, which expects the bundled `python/` subdir.
+#[cfg(feature = "slim")]
+fn slim_site_packages(runtime_dir: &Path) -> Option<PathBuf> {
+    let win = runtime_dir.join("Lib").join("site-packages");
+    if win.is_dir() {
+        return Some(win);
+    }
+    let entries = std::fs::read_dir(runtime_dir.join("lib")).ok()?;
+    for entry in entries.flatten() {
+        let dir = entry.path();
+        if dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.starts_with("python3."))
+        {
+            let sp = dir.join("site-packages");
+            if sp.is_dir() {
+                return Some(sp);
+            }
+        }
+    }
+    None
+}
+
 /// Slim variant only: ensure a Python runtime exists in the per-user data dir,
 /// installing it via the bundled `uv` on first launch. Sets LDACA_BACKEND_PYTHON
 /// and LDACA_BACKEND_RUNTIME so the normal `locate_backend_runtime` path picks it
@@ -192,6 +264,13 @@ fn emit_setup(app: &AppHandle, phase: &str, message: &str) {
 fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
     let runtime_dir = data_dir.join("runtime");
+
+    // polars[rtcompat] always installs the feature-limited `_polars_runtime_32`
+    // base build alongside the full-feature `_polars_runtime_compat`; only compat
+    // is ever loaded. Force compat so the pruned-away `_32` is never imported.
+    // Set on every launch (incl. the fast path below) since it's process-global
+    // and inherited by the spawned backend.
+    std::env::set_var("POLARS_FORCE_PKG", "compat");
 
     #[cfg(windows)]
     let python = runtime_dir.join("Scripts").join("python.exe");
@@ -222,10 +301,9 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
 
     emit_setup(app, "creating-env", "Creating the Python environment…");
     println!("[slim] creating venv at {}", runtime_dir.display());
-    let status = Command::new(&uv)
-        .args(["venv", "--python", "3.14"])
-        .arg(&runtime_dir)
-        .status()?;
+    let mut venv_cmd = Command::new(&uv);
+    venv_cmd.args(["venv", "--python", "3.14"]).arg(&runtime_dir);
+    let status = run_uv_streaming(app, venv_cmd, "creating-env")?;
     if !status.success() {
         emit_setup(app, "error", "Failed to create the Python environment.");
         return Err(make_error(format!("uv venv failed (exit {status})")));
@@ -237,14 +315,29 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
         "Downloading and installing Wordflow — first launch only, this can take a few minutes…",
     );
     println!("[slim] installing ldaca-wordflow from PyPI (first launch — may take a few minutes)");
-    let status = Command::new(&uv)
+    let mut install_cmd = Command::new(&uv);
+    install_cmd
         .args(["pip", "install", "--python"])
         .arg(&python)
-        .arg("ldaca-wordflow>=0.5,<0.6")
-        .status()?;
+        .arg("ldaca-wordflow>=0.5,<0.6");
+    let status = run_uv_streaming(app, install_cmd, "installing")?;
     if !status.success() {
         emit_setup(app, "error", "Failed to install Wordflow from PyPI.");
         return Err(make_error(format!("uv pip install failed (exit {status})")));
+    }
+
+    // Reclaim ~179 MB: drop the unused `_polars_runtime_32` CPU-variant build.
+    // compat (full feature set) is what loads; 32 is dead weight. Safe to delete
+    // because we force POLARS_FORCE_PKG=compat above so it's never imported.
+    if let Some(sp) = slim_site_packages(&runtime_dir) {
+        let dead = sp.join("_polars_runtime_32");
+        if dead.is_dir() {
+            emit_setup(app, "installing", "Trimming unused runtime files…");
+            match std::fs::remove_dir_all(&dead) {
+                Ok(()) => println!("[slim] pruned _polars_runtime_32 (~179 MB)"),
+                Err(e) => eprintln!("[slim] prune of _polars_runtime_32 failed: {e}"),
+            }
+        }
     }
 
     std::fs::write(&marker, "ready\n")?;
