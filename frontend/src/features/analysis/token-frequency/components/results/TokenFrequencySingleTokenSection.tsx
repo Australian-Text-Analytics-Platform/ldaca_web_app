@@ -16,14 +16,8 @@ type TokenFrequencySingleTokenSectionProps = {
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
-  /**
-   * Which sub-view the parent results panel is showing. The component always
-   * mounts both the word cloud and the bar list so that download refs remain
-   * registered when switching tabs, and toggles visibility via the `hidden`
-   * Tailwind class. Defaults to 'cloud' for backward compatibility with
-   * callers (and tests) that haven't been updated to pass this prop.
-   */
-  view?: 'cloud' | 'list';
+  /** Which sub-view the parent results panel is showing. */
+  view: 'cloud' | 'list';
   /**
    * Optional wildcard filter applied to bar list rows in list view. Empty
    * string means "no filter". Cloud rendering is unaffected.
@@ -165,7 +159,7 @@ const TokenFrequencySingleTokenSectionInner = ({
   onDownloadWordCloud,
   onDownloadFrequencyCsv,
   registerWordCloudRef,
-  view = 'cloud',
+  view,
   tokenFilter = '',
   listLimit,
 }: TokenFrequencySingleTokenSectionProps) => {
@@ -251,7 +245,7 @@ const TokenFrequencySingleTokenSectionInner = ({
           <Card key={`${result.nodeId || result.displayName}-${index}`} className="h-full">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <CardTitle className="min-w-0 flex-1 break-words whitespace-normal text-base font-semibold [overflow-wrap:anywhere]">
+                <CardTitle className="min-w-0 flex-1 wrap-anywhere whitespace-normal text-base font-semibold">
                   {result.displayName}
                 </CardTitle>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end" data-testid={`token-frequency-actions-${nodeKey}`}>

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
+import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/lib/backend/text';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -64,12 +64,6 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
 const UNIFIED_WORDCLOUD_HEIGHT = 340;
-
-// Pre-fix this tab passed a bespoke ``TOKEN_FREQUENCY_PALETTE`` (Tailwind
-// 500 shades, intentionally lighter) into useNodeColorManagement. After
-// the global colour store landed, the palette argument is informational
-// only — the store always uses ``EXTENDED_PALETTE`` so every tab agrees
-// on the picked colour for a given node. Kept this comment as a tombstone.
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
@@ -305,8 +299,7 @@ const TokenFrequencyFeature = () => {
   // All distinct languages across the currently-selected corpora, in
   // selection order. "Apply Stop Words" merges the bundled lists for
   // every language present so a side-by-side EN/ZH comparison fills
-  // both stoplists at once; single-language runs still produce a
-  // one-element array and behave identically to the legacy flow.
+  // both stoplists at once.
   const defaultStopWordsLanguages = useMemo(() => {
     const seen = new Set<string>();
     const ordered: string[] = [];

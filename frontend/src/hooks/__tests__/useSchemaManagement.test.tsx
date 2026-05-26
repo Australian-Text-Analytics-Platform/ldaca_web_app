@@ -137,9 +137,8 @@ describe('createNodeSnapshot', () => {
     });
   });
 
-  it('falls back to data.name + data.columns + nodeId when top-level fields are missing', async () => {
+  it('uses nodeId and no columns when generated node info omits optional fields', async () => {
     fetchNodeInfoMock.mockResolvedValue({
-      data: { name: 'Inside Data', columns: ['only_col'] },
       schema: {},
     });
 
@@ -151,8 +150,8 @@ describe('createNodeSnapshot', () => {
       queryClient,
     );
 
-    expect(snapshot.name).toBe('Inside Data');
-    expect(snapshot.columns).toEqual(['only_col']);
+    expect(snapshot.name).toBe('node-fallback');
+    expect(snapshot.columns).toEqual([]);
     expect(snapshot.shape).toBeUndefined();
   });
 });

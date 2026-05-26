@@ -43,19 +43,19 @@ export type {
  */
 export type ConcordanceSearchMode = NonNullable<ConcordanceAnalysisRequest['search_mode']>;
 
-export interface ConcordanceMetadata {
+export type ConcordanceMetadata = {
   /** Core concordance columns (CONC_left_context, CONC_matched_text, CONC_right_context, etc.) */
   concordance_columns: string[];
   /** Original document metadata columns. */
   metadata_columns: string[];
   /** All available columns. */
   all_columns: string[];
-}
+};
 
 export type ConcordanceHitRow = Record<string, unknown>;
 export type ConcordanceGroupedRow = ConcordanceHitRow[];
 
-export interface ConcordanceRequest extends LanguageHint {
+export type ConcordanceRequest = LanguageHint & {
   column: string;
   search_word: string;
   num_left_tokens?: number;
@@ -64,7 +64,7 @@ export interface ConcordanceRequest extends LanguageHint {
   whole_word?: boolean;
   case_sensitive?: boolean;
   sort_by?: string;
-}
+};
 
 export type ConcordanceDetachOptionsResponse = Omit<GeneratedConcordanceDetachOptionsResponse, 'data' | 'metadata' | 'state'> & {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
@@ -74,31 +74,31 @@ export type ConcordanceDetachOptionsResponse = Omit<GeneratedConcordanceDetachOp
 
 export type ConcordancePagination = SourceRowPagination;
 
-export interface ConcordanceResultEntry {
+export type ConcordanceResultEntry = {
   data: ConcordanceGroupedRow[];
   columns: string[];
   metadata: ConcordanceMetadata;
   pagination: ConcordancePagination;
   sorting: { sort_by?: string; descending: boolean };
   materialized?: boolean;
-}
+};
 
-export interface ConcordanceDispersionBinRow {
+export type ConcordanceDispersionBinRow = {
   matched_text?: string;
   bin_idx?: number;
   count?: number;
-}
+};
 
-export interface ConcordanceDispersionBinsResponse {
+export type ConcordanceDispersionBinsResponse = {
   node_id: string;
   total_hits: number;
   document_column: string | null;
   /** Number of source bins the hits were pre-aggregated into (server-side). */
   bin_count: number;
   rows: ConcordanceDispersionBinRow[];
-}
+};
 
-export interface ConcordanceAnalysisResponse {
+export type ConcordanceAnalysisResponse = {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   message: string;
   data: Record<string, ConcordanceResultEntry>;
@@ -106,7 +106,7 @@ export interface ConcordanceAnalysisResponse {
   combinable?: boolean;
   preferences?: { page_size?: number; show_metadata?: boolean; [key: string]: unknown };
   metadata?: { task_id?: string; [key: string]: unknown };
-}
+};
 
 export const concordanceApi = {
   concordance: async (req: ConcordanceAnalysisRequest, headers: Record<string, string> = {}) => {

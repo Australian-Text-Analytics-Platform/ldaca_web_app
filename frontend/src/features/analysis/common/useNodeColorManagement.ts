@@ -4,10 +4,6 @@ import { EXTENDED_PALETTE } from './palette';
 
 export interface UseNodeColorManagementConfig {
   activeNodeIds: string[];
-  /** Informational only — kept for backwards compatibility. The store
-   * always uses ``EXTENDED_PALETTE`` so picker swatches and auto-assigned
-   * colours are consistent across every tab + Export. */
-  palette?: string[];
   /** Pass an analytics-tab identifier (typically the matching
    * ``ViewType``) to route this hook through the per-tab **temp** layer
    * instead of writing directly to the global assigned store. With
@@ -70,10 +66,7 @@ export function useNodeColorManagement(
   // ids.
   const idsKey = useMemo(() => activeNodeIds.join('|'), [activeNodeIds]);
 
-  // Ensure colours / temps for the active IDs whenever the active set
-  // changes. Two paths:
-  //   - tabKey set    → ensure per-tab temps
-  //   - tabKey unset  → ensure direct-assigned (legacy non-analytics path)
+  // Ensure colours / temps for the active IDs whenever the active set changes.
   useEffect(() => {
     if (tabKey) {
       ensureTempColors(tabKey, activeNodeIds);

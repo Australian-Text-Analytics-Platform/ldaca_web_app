@@ -28,17 +28,17 @@ export type {
   QuotationResultQuery,
 } from '@/api/generated/types.gen';
 
-export interface QuotationMetadata {
+export type QuotationMetadata = {
   quotation_columns: string[];
   metadata_columns: string[];
   all_columns: string[];
-}
+};
 
 export type QuotationHitRow = Record<string, unknown>;
 export type QuotationGroupedRow = QuotationHitRow[];
 export type QuotationPagination = SourceRowPagination;
 
-export interface QuotationAnalysisResponse {
+export type QuotationAnalysisResponse = {
   data: QuotationGroupedRow[];
   columns: string[];
   metadata: QuotationMetadata;
@@ -46,7 +46,7 @@ export interface QuotationAnalysisResponse {
   sorting: { sort_by?: string | null; descending: boolean };
   preferences?: { context_length?: number; [key: string]: unknown };
   task_id?: string;
-}
+};
 
 export type QuotationDetachOptionsResponse = Omit<GeneratedQuotationDetachOptionsResponse, 'data' | 'metadata' | 'state'> & {
   state: 'running' | 'successful' | 'failed' | 'cancelled';

@@ -15,41 +15,26 @@
  */
 import type { QueryClient } from '@tanstack/react-query';
 
-import { nodesApi } from '../api/nodes';
+import { nodesApi } from '@/lib/backend/nodes';
+import type { NodeInfoResponse } from '@/lib/backend/nodes';
 import { queryKeys } from './queryKeys';
 
-/**
- * Permissive node-info shape. The backend returns the flat
- * `NodeInfoResponse`, but consumers historically also accept a wrapped
- * `{ data: { name, columns } }` form (defensive against older response
- * shapes); both keep working through this interface.
- */
-export interface NodeInfo {
-  name?: string;
-  data?: Record<string, unknown> & {
-    name?: string;
-    columns?: string[];
-  };
-  columns?: string[];
-  schema?: unknown;
-  shape?: [number | null, number | null] | number[];
-  [key: string]: unknown;
-}
+export type NodeInfo = NodeInfoResponse;
 
-interface BaseQueryArgs {
+type BaseQueryArgs = {
   workspaceId: string;
   nodeId: string;
-}
+};
 
-interface HeadersArgs extends BaseQueryArgs {
+type HeadersArgs = BaseQueryArgs & {
   headers: Record<string, string>;
   getAuthHeaders?: never;
-}
+};
 
-interface AuthProviderArgs extends BaseQueryArgs {
+type AuthProviderArgs = BaseQueryArgs & {
   headers?: never;
   getAuthHeaders: () => Record<string, string>;
-}
+};
 
 /**
  * Either an explicit headers snapshot or an auth provider — never both.
@@ -68,12 +53,11 @@ const resolveHeaders = (args: NodeInfoQueryArgs): Record<string, string> =>
 export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
   queryKey: queryKeys.nodeInfo(args.workspaceId, args.nodeId),
   queryFn: async (): Promise<NodeInfo> => {
-    const info = await nodesApi.info(args.nodeId, resolveHeaders(args));
-    return info as unknown as NodeInfo;
+    return nodesApi.info(args.nodeId, resolveHeaders(args));
   },
 });
 
-export interface FetchNodeInfoArgs {
+export type FetchNodeInfoArgs = {
   queryClient: QueryClient;
   workspaceId: string;
   nodeId: string;
@@ -81,7 +65,7 @@ export interface FetchNodeInfoArgs {
   force?: boolean;
   headers?: Record<string, string>;
   getAuthHeaders?: () => Record<string, string>;
-}
+};
 
 /**
  * Non-hook fetcher used by mutation success handlers, hydration callbacks,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getApiBase } from '../api/env';
+import { getApiBase } from '@/lib/backend/env';
 import { isTauri } from '@/lib/isTauri';
 
 /**
@@ -77,16 +77,8 @@ export const useBackendHealth = () => {
       try {
         const resp = await fetch(healthUrl, { cache: 'no-store' });
         if (resp.ok) {
-          // Accept `{ status: 'healthy' | 'operational' }`, but also treat a
-          // 2xx response with no JSON body as healthy — older deployments
-          // return a plain text "OK".
-          let healthy = true;
-          try {
-            const body = await resp.json();
-            healthy = Boolean(body && (body.status === 'healthy' || body.status === 'operational'));
-          } catch {
-            /* non-JSON body treated as healthy */
-          }
+          const body = await resp.json();
+          const healthy = Boolean(body && (body.status === 'healthy' || body.status === 'operational'));
           if (healthy) {
             if (!cancelled) { setReady(true); setError(null); }
             return;

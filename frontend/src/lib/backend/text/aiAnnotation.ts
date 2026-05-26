@@ -54,32 +54,32 @@ export type AiAnnotationResponse = Omit<GeneratedAiAnnotationResponse, 'data' | 
   metadata?: { task_id?: string; [k: string]: unknown };
 };
 
-export interface AiAnnotationModelsResponse {
+export type AiAnnotationModelsResponse = {
   state: 'successful' | 'failed';
   message: string;
   data?: {
     models?: Array<{ id: string; name: string }>;
   };
   metadata?: Record<string, unknown>;
-}
+};
 
-export interface AiAnnotationProvidersResponse {
+export type AiAnnotationProvidersResponse = {
   state: 'successful' | 'failed';
   message: string;
   data?: {
     providers?: string[];
   };
   metadata?: Record<string, unknown>;
-}
+};
 
-export interface AiAnnotationCategoriesResponse {
+export type AiAnnotationCategoriesResponse = {
   state: 'successful' | 'failed';
   message: string;
   data?: {
     categories?: string[];
   };
   metadata?: Record<string, unknown>;
-}
+};
 
 export const aiAnnotationApi = {
   aiAnnotationModels: async (

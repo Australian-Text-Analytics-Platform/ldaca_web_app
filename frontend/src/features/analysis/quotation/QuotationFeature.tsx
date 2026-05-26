@@ -19,7 +19,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
-import { textApi } from '@/api/text';
+import { textApi } from '@/lib/backend/text';
 import type {
   QuotationAnalysisResponse,
   QuotationEngineConfig,
@@ -27,7 +27,7 @@ import type {
   QuotationGroupedRow,
   QuotationHitRow,
   QuotationMetadata,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -68,7 +68,6 @@ import {
   useAnalysisLock,
   useAnalysisFeature,
   useNodeColorManagement,
-  EXTENDED_PALETTE,
   getAnalysisActionState,
   executeAnalysisRunOrUpdate,
   type NodePaginationState,
@@ -273,7 +272,6 @@ const QuotationFeature: React.FC = () => {
   const { nodeColors: liveNodeColors, handleColorChange, defaultPalette, promoteTempColors } =
     useNodeColorManagement({
       activeNodeIds,
-      palette: EXTENDED_PALETTE,
       tabKey: 'quotation',
   });
   // In snapshot mode the live colour store has no entries for the

@@ -4,8 +4,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useAuth } from '@/hooks/useAuth';
 import { takeMostRecent } from '@/utils/selectionUtils';
-// Updated to use modular API object pattern
-import { textApi, type TopicModelingRequest, type TopicModelingResponse, type TopicModelingTopic } from '@/api/text';
+import { textApi, type TopicModelingRequest, type TopicModelingResponse, type TopicModelingTopic } from '@/lib/backend/text';
 import {
   snapshotSourceNodes,
   useSnapshotBackedAnalysisState,
@@ -195,9 +194,7 @@ const TopicModelingFeature: React.FC = () => {
       setRandomSeedUserSet(true);
       setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
       setRepresentativeWordsCountUserSet(true);
-      // Legacy 'target' mode was removed from the UI; treat any persisted
-      // 'target' request as the new default 'exact' so historical runs hydrate.
-      const persistedMode = req.topic_size_mode as 'target' | 'min' | 'exact' | undefined;
+      const persistedMode = req.topic_size_mode as 'min' | 'exact' | undefined;
       setTopicSizeMode(persistedMode === 'min' ? 'min' : 'exact');
       const hydratedTopicSizeValue = Number(req.topic_size_value ?? DEFAULT_TOPIC_SIZE_VALUE);
       setTopicSizeValue(hydratedTopicSizeValue);

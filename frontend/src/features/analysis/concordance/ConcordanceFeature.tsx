@@ -7,7 +7,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useAuth } from '@/hooks/useAuth';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
-import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, textApi } from '@/api/text';
+import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, textApi } from '@/lib/backend/text';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,7 +46,7 @@ import { useConcordanceSnapshotCapture } from './hooks/useConcordanceSnapshotCap
 import { useConcordanceSnapshotLoad } from './hooks/useConcordanceSnapshotLoad';
 import { ConcordanceSnapshotBanner } from './components/ConcordanceSnapshotBanner';
 import type { ConcordanceSnapshotPayload } from './hooks/useConcordanceSnapshotLoad';
-import type { ConcordanceAnalysisRequest, ConcordanceResultEntry } from '@/api/text/concordance';
+import type { ConcordanceAnalysisRequest, ConcordanceResultEntry } from '@/lib/backend/text/concordance';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
@@ -283,7 +283,6 @@ const ConcordanceFeature: React.FC = () => {
   const { nodeColors: liveNodeColors, handleColorChange, defaultPalette, promoteTempColors } =
     useNodeColorManagement({
       activeNodeIds,
-      palette: EXTENDED_PALETTE,
       tabKey: 'concordance',
     });
   // In snapshot mode the live colour store has no entries for the

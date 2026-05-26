@@ -4,8 +4,8 @@ import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelect
 import { useAuth } from '@/hooks/useAuth';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { type AiAnnotationResponse, textApi } from '@/api/text';
-import { nodesApi } from '@/api/nodes';
+import { type AiAnnotationResponse, textApi } from '@/lib/backend/text';
+import { nodesApi } from '@/lib/backend/nodes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
 import { useUIStore } from '@/stores/uiStore';
-import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId, restoreAnalysisLockFromRequest, resetAnalysisSelectionAfterClear, useNodeColorManagement, EXTENDED_PALETTE } from '../common';
+import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId, restoreAnalysisLockFromRequest, resetAnalysisSelectionAfterClear, useNodeColorManagement } from '../common';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -220,7 +220,6 @@ const AiAnnotatorFeature: React.FC = () => {
   const { nodeColors, handleColorChange, defaultPalette, promoteTempColors } =
     useNodeColorManagement({
       activeNodeIds: displayedNodeIds,
-      palette: EXTENDED_PALETTE,
       tabKey: 'ai-annotator',
     });
 

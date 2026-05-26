@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query';
-import { textApi } from '@/api/text';
+import { textApi } from '@/lib/backend/text';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -39,12 +39,6 @@ interface UseDefaultStopwordsResult {
  * ``useDefaultStopwords('zh', ...)`` — now passes ``['zh']``. Empty /
  * ``null`` entries in the array are skipped during normalisation, so
  * placeholder-during-render states stay safe.
- *
- * ``strict`` controls the unknown-language fallback at the backend:
- *  - ``true``: unknown languages return ``[]``, so callers can hide
- *    the toggle when nothing was actually fetched.
- *  - ``false``: unknown languages silently substitute the English
- *    list (legacy "fill defaults" behaviour for token-frequency).
  *
  * Caching: each unique ``(language, strict)`` pair gets its own
  * 1-hour-stale TanStack Query entry keyed via

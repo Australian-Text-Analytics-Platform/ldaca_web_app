@@ -14,11 +14,11 @@ declare global {
   }
 }
 
-export interface ApiEnvOptions {
+export type ApiEnvOptions = {
   explicitBase?: string; // override (useful for tests)
   windowLocation?: Location; // injection for testability
   localStorageGet?: (k: string) => string | null; // allow mock
-}
+};
 
 // Get backend port from env var, default to 8001
 function getBackendPort(): string {

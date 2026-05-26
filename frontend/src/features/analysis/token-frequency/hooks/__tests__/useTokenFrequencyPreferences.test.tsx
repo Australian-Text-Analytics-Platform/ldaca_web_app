@@ -10,7 +10,7 @@ const {
   postTokenFrequenciesTaskResultMock: vi.fn(),
 }));
 
-vi.mock('@/api/text', () => ({
+vi.mock('@/lib/backend/text', () => ({
   textApi: {
     defaultStopWords: defaultStopWordsMock,
     postTokenFrequenciesTaskResult: postTokenFrequenciesTaskResultMock,
@@ -51,22 +51,19 @@ describe('useTokenFrequencyPreferences', () => {
     await waitFor(() => {
       expect(defaultStopWordsMock).toHaveBeenCalledWith(
         { Authorization: 'Bearer test' },
-        { language: 'zh' },
+        { language: 'zh', strict: true },
       );
     });
 
     expect(result.current.stopWords).toBe('的, 了, 是');
   });
 
-  it('falls back to a no-language request when no languages are resolved', async () => {
+  it('does not request default stop words when no languages are resolved', async () => {
     defaultStopWordsMock.mockResolvedValue({ stopwords: ['the', 'and', 'of'] });
 
     const { result } = renderHook(() =>
       useTokenFrequencyPreferences({
         ...baseArgs,
-        // Empty list — feature couldn't infer a language. Hook should
-        // still request the legacy default (English-backed via the
-        // endpoint's non-strict fallback).
         defaultStopWordsLanguages: [],
       }),
     );
@@ -75,19 +72,13 @@ describe('useTokenFrequencyPreferences', () => {
       await result.current.handleFillDefaultStopWords();
     });
 
-    await waitFor(() => {
-      expect(defaultStopWordsMock).toHaveBeenCalledWith(
-        { Authorization: 'Bearer test' },
-        { language: undefined },
-      );
-    });
-
-    expect(result.current.stopWords).toBe('the, and, of');
+    expect(defaultStopWordsMock).not.toHaveBeenCalled();
+    expect(result.current.stopWords).toBe('');
   });
 
   it('merges per-language groups when multiple languages are requested', async () => {
     defaultStopWordsMock.mockImplementation(
-      (_headers: unknown, options?: { language?: string }) => {
+      (_headers: unknown, options?: { language?: string; strict?: boolean }) => {
         if (options?.language === 'en') {
           return Promise.resolve({ stopwords: ['the', 'and', 'of'] });
         }
@@ -112,12 +103,12 @@ describe('useTokenFrequencyPreferences', () => {
     await waitFor(() => {
       expect(defaultStopWordsMock).toHaveBeenCalledWith(
         { Authorization: 'Bearer test' },
-        { language: 'en' },
+        { language: 'en', strict: true },
       );
     });
     expect(defaultStopWordsMock).toHaveBeenCalledWith(
       { Authorization: 'Bearer test' },
-      { language: 'zh' },
+      { language: 'zh', strict: true },
     );
 
     // The hook builds groups separated by ``\n\n`` for visual clarity,

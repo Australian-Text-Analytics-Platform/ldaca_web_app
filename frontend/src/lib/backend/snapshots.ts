@@ -17,26 +17,26 @@ import {
   uploadSnapshotApiUsersMeSnapshotsPost,
 } from '@/api/generated/sdk.gen';
 
-export interface SnapshotListItem {
+export type SnapshotListItem = {
   filename: string;
   manifest: SnapshotManifest;
   /** On-disk bundle size in bytes. Used by the load dialog's size
    * pill alongside the version chip (plan §5.7.2). */
   size_bytes: number;
-}
+};
 
-export interface SnapshotListResponse {
+export type SnapshotListResponse = {
   items: SnapshotListItem[];
-}
+};
 
-export interface SnapshotUploadResponse {
+export type SnapshotUploadResponse = {
   filename: string;
   manifest: SnapshotManifest;
-}
+};
 
-export interface SnapshotDeleteResponse {
+export type SnapshotDeleteResponse = {
   deleted: string[];
-}
+};
 
 export const snapshotsApi = {
   /** List snapshots for the current user, optionally filtered by tool. */

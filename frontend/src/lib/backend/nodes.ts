@@ -51,14 +51,14 @@ export type {
   TokeniseColumnResponse,
 } from '@/api/generated/types.gen';
 
-export interface ColumnUniqueValuesResponse {
+export type ColumnUniqueValuesResponse = {
   column_name: string;
   unique_count: number;
   unique_values: Array<string | number | boolean | null>;
   has_null: boolean;
-}
+};
 
-export interface ColumnDescribeResponse {
+export type ColumnDescribeResponse = {
   column_name: string;
   count?: number;
   null_count?: number;
@@ -69,11 +69,11 @@ export interface ColumnDescribeResponse {
   median?: string | number | null;
   percentile_75?: string | number | null;
   max?: string | number | null;
-}
+};
 
-export interface QueryPlanResponse {
+export type QueryPlanResponse = {
   plan: string;
-}
+};
 
 export type FilterOperator =
   | 'eq'
@@ -95,32 +95,32 @@ export type FilterRequest = Omit<GeneratedFilterRequest, 'conditions' | 'logic' 
   logic?: string;
   new_node_name?: string;
 };
-interface JoinNodesRequest { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string; }
-interface JoinPreviewParams { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string; }
-interface CastNodeRequest { column: string; target_type: string; format?: string; }
-interface ConcatPreviewRequest { node_ids: string[]; deduplicate?: boolean; }
-interface ConcatRequest extends ConcatPreviewRequest { new_node_name?: string }
+type JoinNodesRequest = { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string };
+type JoinPreviewParams = { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string };
+type CastNodeRequest = { column: string; target_type: string; format?: string };
+type ConcatPreviewRequest = { node_ids: string[]; deduplicate?: boolean };
+type ConcatRequest = ConcatPreviewRequest & { new_node_name?: string };
 // ---------------------------------------------------------------------------
 // Column operations registry
 // ---------------------------------------------------------------------------
 
-interface OperationInfo {
+type OperationInfo = {
   method: string;
   label: string;
-}
+};
 
 export type ColumnOperationsResponse = {
   operations: Record<string, OperationInfo[]>;
 };
 
-export interface DtypeNormalizationChange {
+export type DtypeNormalizationChange = {
   column: string;
   from_dtype: string;
   to_dtype: string;
   reason: string;
-}
+};
 
-export interface NodeInfoResponse {
+export type NodeInfoResponse = {
   id: string;
   name: string;
   operation: string | null;
@@ -133,9 +133,9 @@ export interface NodeInfoResponse {
   can_undo?: boolean;
   can_redo?: boolean;
   dtype_normalization?: DtypeNormalizationChange[];
-}
+};
 
-export interface NodeDataParams {
+export type NodeDataParams = {
   page?: number;
   pageSize?: number;
   sortBy?: string | null;
@@ -143,7 +143,7 @@ export interface NodeDataParams {
   filterColumn?: string | null;
   filterValue?: string | null;
   filterOp?: string;
-}
+};
 
 export const nodesApi = {
   info: async (node: string, headers: Record<string, string> = {}): Promise<NodeInfoResponse> => {

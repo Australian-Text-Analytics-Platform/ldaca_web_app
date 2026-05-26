@@ -41,10 +41,10 @@ export const SNAPSHOT_FINEST_FREQUENCIES: readonly Exclude<SequentialFrequency, 
 
 export type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
-export interface SequentialAnalysisDetachResponse {
+export type SequentialAnalysisDetachResponse = {
   new_node_id: string;
   new_node_name: string;
-}
+};
 
 export const sequentialAnalysisApi = {
   sequentialAnalysis: async (

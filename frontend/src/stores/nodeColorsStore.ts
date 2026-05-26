@@ -34,8 +34,7 @@ interface NodeColorsState {
   colors: ColorMap;
   /** Order in which nodeIds first received an assigned colour. Stable
    * across re-renders so the next-new node gets the next palette
-   * colour deterministically when ``ensureColors`` is used (the legacy
-   * direct-assign path, kept for non-analytics callers). */
+    * colour deterministically when ``ensureColors`` is used. */
   assignmentOrder: string[];
   /** Per-tab temp colour layer. Outer key is the tab identifier (each
    * analytics tab passes its own constant — typically the matching

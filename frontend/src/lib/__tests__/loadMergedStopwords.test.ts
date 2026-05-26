@@ -5,7 +5,7 @@ const { defaultStopWordsMock } = vi.hoisted(() => ({
   defaultStopWordsMock: vi.fn(),
 }));
 
-vi.mock('@/api/text', () => ({
+vi.mock('@/lib/backend/text', () => ({
   textApi: {
     defaultStopWords: defaultStopWordsMock,
   },
@@ -36,13 +36,13 @@ describe('loadMergedStopwords', () => {
     expect(defaultStopWordsMock).toHaveBeenCalledTimes(1);
     expect(defaultStopWordsMock).toHaveBeenCalledWith(
       { Authorization: 'Bearer test' },
-      { language: 'en' },
+      { language: 'en', strict: true },
     );
   });
 
   it('produces per-language groups and a deduplicated flat merge', async () => {
     defaultStopWordsMock.mockImplementation(
-      (_headers: unknown, options?: { language?: string }) => {
+      (_headers: unknown, options?: { language?: string; strict?: boolean }) => {
         if (options?.language === 'en') {
           return Promise.resolve({ stopwords: ['the', 'and', 'shared'] });
         }
@@ -67,15 +67,4 @@ describe('loadMergedStopwords', () => {
     expect(result.merged).toEqual(['the', 'and', 'shared', '的', '了']);
   });
 
-  it('tolerates a backend payload with a legacy ``data`` field', async () => {
-    defaultStopWordsMock.mockResolvedValue({ data: ['foo', 'bar'] });
-    const result = await loadMergedStopwords({
-      languages: ['xx'],
-      getAuthHeaders,
-    });
-    expect(result.byLanguage[0]).toEqual({
-      language: 'xx',
-      words: ['foo', 'bar'],
-    });
-  });
 });

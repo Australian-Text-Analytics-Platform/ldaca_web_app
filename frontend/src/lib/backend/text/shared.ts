@@ -3,7 +3,7 @@
  * (e.g. concordance / quotation), where each source row may produce
  * multiple result rows.
  */
-export interface SourceRowPagination {
+export type SourceRowPagination = {
   page: number;
   page_size: number;
   total_source_rows: number;
@@ -11,7 +11,7 @@ export interface SourceRowPagination {
   result_count: number;
   has_next: boolean;
   has_prev: boolean;
-}
+};
 
 /**
  * ISO-style language code (e.g. ``"en"``, ``"zh"``, ``"ja"``). Phase 4
@@ -31,9 +31,9 @@ export type LanguageCode = string;
  * (topic modeling), label stop-words (topic modeling), or concordance
  * tokens-mode auto-pick.
  */
-export interface LanguageHint {
+export type LanguageHint = {
   language?: LanguageCode;
-}
+};
 
 /**
  * Pick a language code for an analysis request. Explicit override wins;

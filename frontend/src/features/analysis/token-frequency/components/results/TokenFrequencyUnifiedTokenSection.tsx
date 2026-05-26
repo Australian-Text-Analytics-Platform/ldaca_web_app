@@ -44,11 +44,8 @@ type TokenFrequencyUnifiedTokenSectionProps = {
   unifiedCloudContainerRef: React.RefObject<HTMLDivElement | null>;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
-  /**
-   * Active sub-view from the parent results panel. Defaults to 'cloud' for
-   * backward compatibility.
-   */
-  view?: 'cloud' | 'list';
+  /** Active sub-view from the parent results panel. */
+  view: 'cloud' | 'list';
   /**
    * Optional wildcard filter (lifted to the parent panel) applied to the
    * statistics table when in list view. Cloud rendering is unaffected.
@@ -81,7 +78,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   unifiedCloudContainerRef,
   registerWordCloudRef,
   onDownloadFrequencyCsv,
-  view = 'cloud',
+  view,
   tokenFilter = '',
 }: TokenFrequencyUnifiedTokenSectionProps) => {
   // Hook must come before any early return so React sees a stable call order

@@ -25,11 +25,8 @@
  * - ``merged`` deduplicates across languages on exact surface form
  *   (post-trim, preserving original case so e.g. ``Inc`` and ``inc``
  *   stay distinct — matching how the existing textarea treats words).
- * - The endpoint is called with ``strict=false`` (default) so unknown
- *   language codes silently fall back to the backend's English list,
- *   matching the legacy "Apply Stop Words" UX.
  */
-import { textApi } from '@/api/text';
+import { textApi } from '@/lib/backend/text';
 
 export interface MergedStopwordsLanguageGroup {
   /** Normalised language code requested (matches what the backend saw). */
@@ -56,15 +53,7 @@ const extractStopwords = (
   payload: DefaultStopWordsResponse | undefined,
 ): string[] => {
   if (!payload) return [];
-  // ``defaultStopWords`` returns ``{ stopwords?: string[] }``, but a
-  // legacy code path elsewhere in the token-frequency hook used
-  // ``response.data`` as a fallback for stale server bundles. Mirror
-  // that defence here so the merge doesn't degrade silently.
-  const fromTopLevel = payload.stopwords;
-  if (Array.isArray(fromTopLevel)) return fromTopLevel;
-  const fromData = (payload as Record<string, unknown>).data;
-  if (Array.isArray(fromData)) return fromData as string[];
-  return [];
+  return Array.isArray(payload.stopwords) ? payload.stopwords : [];
 };
 
 export async function loadMergedStopwords(args: {
@@ -89,7 +78,7 @@ export async function loadMergedStopwords(args: {
 
   const headers = getAuthHeaders();
   const responses = await Promise.all(
-    ordered.map((language) => textApi.defaultStopWords(headers, { language })),
+    ordered.map((language) => textApi.defaultStopWords(headers, { language, strict: true })),
   );
 
   const byLanguage: MergedStopwordsLanguageGroup[] = ordered.map(

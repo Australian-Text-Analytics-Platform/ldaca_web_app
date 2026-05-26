@@ -1,12 +1,9 @@
 import { create } from 'zustand';
 
-import type { ConcordanceAnalysisResponse } from '../api/text';
+import type { ConcordanceAnalysisResponse } from '@/lib/backend/text';
 import type { NodeColumnSelection } from '../hooks/useAutoNodeColumns';
 
-/**
- * Canonical task lifecycle states. Backend may add string variants (e.g.
- * 'submitted'); the union widens with `string` to preserve forward-compat.
- */
+/** Canonical task lifecycle states. */
 export type TaskState =
   | 'pending'
   | 'queued'
@@ -36,7 +33,7 @@ export interface TaskItem {
   name?: string;
   user_id?: string;
   workspace_id?: string;
-  state?: TaskState | string;
+  state?: TaskState;
   progress?: number;
   message?: string;
   created_at?: string;

@@ -1,8 +1,7 @@
 /**
  * `textApi` is the unified surface for every analysis-feature endpoint.
- * Implementation is split per-feature under `api/text/*.ts` so each feature
- * owns its types + methods in one file, but consumers continue to import
- * `textApi` and the shared types from `@/lib/backend/text` exactly as before.
+ * Implementation is split per feature so each module owns its types and
+ * methods while this barrel keeps feature imports compact.
  */
 import {
   aiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGet,

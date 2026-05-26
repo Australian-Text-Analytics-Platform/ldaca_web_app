@@ -53,6 +53,7 @@ const baseSingleSectionProps = {
   onDownloadWordCloud: vi.fn(),
   onDownloadFrequencyCsv: vi.fn(),
   registerWordCloudRef: vi.fn(),
+  view: 'cloud' as const,
 };
 
 const buildStatistic = (overrides: Partial<TokenFrequencyStatisticsEntry> = {}): TokenFrequencyStatisticsEntry => ({
@@ -63,6 +64,10 @@ const buildStatistic = (overrides: Partial<TokenFrequencyStatisticsEntry> = {}):
   percent_study: overrides.percent_study ?? 0.4,
   log_likelihood_llv: overrides.log_likelihood_llv ?? 3.1,
   percent_diff: overrides.percent_diff ?? 0.2,
+  expected_reference: overrides.expected_reference ?? 15,
+  expected_study: overrides.expected_study ?? 15,
+  reference_total: overrides.reference_total ?? 30,
+  study_total: overrides.study_total ?? 30,
   bayes_factor_bic: overrides.bayes_factor_bic ?? 1.4,
   effect_size_ell: overrides.effect_size_ell ?? 0.8,
   relative_risk: overrides.relative_risk ?? 1.2,
@@ -89,6 +94,7 @@ const baseUnifiedSectionProps = {
   unifiedCloudContainerRef: { current: null },
   registerWordCloudRef: vi.fn(),
   onDownloadFrequencyCsv: vi.fn(),
+  view: 'cloud' as const,
 };
 
 describe('Token frequency result layouts', () => {

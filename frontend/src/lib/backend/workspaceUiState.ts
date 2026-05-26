@@ -2,16 +2,17 @@ import {
   getWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGet,
   putWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePut,
 } from '@/api/generated/sdk.gen';
+import type { GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetResponse } from '@/api/generated/types.gen';
 
 /** Shape of the ``ui_state.json`` sidecar persisted alongside the
  * workspace's ``metadata.json``. Free-form JSON object so we can grow
  * it (column-visibility prefs, layout, etc.) without a backend
  * release. The frontend currently only writes ``node_colors``. */
-export interface WorkspaceUiState {
+export type WorkspaceUiState = GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetResponse & {
   /** Assigned node colour map. Hex strings keyed by docworkspace nodeId.
    * Mirrors ``useNodeColorsStore.colors`` at PUT time. */
   node_colors?: Record<string, string>;
-}
+};
 
 export const workspaceUiStateApi = {
   get: async (workspaceId: string, headers?: Record<string, string>): Promise<WorkspaceUiState> => {

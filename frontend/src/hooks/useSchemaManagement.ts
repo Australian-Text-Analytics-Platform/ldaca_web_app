@@ -51,13 +51,11 @@ export async function createNodeSnapshot(
 ): Promise<NodeSnapshot> {
   const info = await fetchNodeInfo({ queryClient, workspaceId, nodeId, getAuthHeaders });
 
-  const name = info?.name || info?.data?.name || nodeId;
-  const columns = Array.isArray(info?.columns)
-    ? info.columns
-    : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
+  const name = info.name || nodeId;
+  const columns = Array.isArray(info.columns) ? info.columns : [];
   const schema = normalizeSchemaFromInfo(info);
 
-  const shape = (info as Record<string, unknown>)?.shape as [number | null, number | null] | number[] | undefined;
+  const shape = info.shape;
 
   return {
     id: nodeId,

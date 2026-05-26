@@ -6,15 +6,15 @@ type Props = {
   hiddenMatchedTexts: Set<string>;
   onToggle: (text: string) => void;
   /**
-   * Per-matched-text total count across the *full* displayed graph.
-   * Pre-computed by the caller — when supplied, the legend renders
+  * Per-matched-text total count across the *full* displayed graph.
+  * Pre-computed by the caller; the legend renders
    * ``(n)`` after each label in the same colour/style.
    *
    * Hidden items keep their number; toggling visibility doesn't
    * recompute to zero so the user always sees the underlying weight of
    * the filter they just turned off.
    */
-  totals?: ReadonlyMap<string, number>;
+  totals: ReadonlyMap<string, number>;
   /**
    * Per-matched-text count across just the user-selected bins, when a
    * selection is active. ``null`` / undefined → no selection, render
@@ -42,15 +42,9 @@ export const ConcordanceDispersionLegend: React.FC<Props> = ({
       {matchedTexts.map((text) => {
         const color = matchedTextColors[text] ?? DEFAULT_COLOR;
         const isHidden = hiddenMatchedTexts.has(text);
-        const total = totals?.get(text);
+        const total = totals.get(text) ?? 0;
         const selected = selectedTotals?.get(text) ?? 0;
-        // ``(m/n)`` when a selection is active; ``(n)`` otherwise.
-        // ``totals`` may be undefined for callers that haven't
-        // upgraded — in which case render the legacy no-count form.
-        let countSuffix = '';
-        if (typeof total === 'number') {
-          countSuffix = hasSelection ? ` (${selected}/${total})` : ` (${total})`;
-        }
+        const countSuffix = hasSelection ? ` (${selected}/${total})` : ` (${total})`;
         return (
           <button
             key={text}
