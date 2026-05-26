@@ -114,6 +114,19 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
+      - name: List codesigning identities in keychain
+        shell: bash
+        run: |
+          echo "::group::All identities in signing_temp.keychain"
+          security find-identity -v signing_temp.keychain || true
+          echo "::endgroup::"
+          echo "::group::Codesigning identities in signing_temp.keychain"
+          security find-identity -v -p codesigning signing_temp.keychain || true
+          echo "::endgroup::"
+          echo "::group::Codesigning identities across default search list"
+          security find-identity -v -p codesigning || true
+          echo "::endgroup::"
+
       - name: Build Tauri desktop application
         shell: bash
         working-directory: frontend
