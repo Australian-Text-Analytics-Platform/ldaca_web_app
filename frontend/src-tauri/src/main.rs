@@ -162,11 +162,32 @@ fn strip_unc_prefix(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
+/// First-launch setup progress, emitted to the frontend so the loading screen
+/// can show "creating env / installing …" instead of a bare spinner.
+#[cfg(feature = "slim")]
+#[derive(Clone, serde::Serialize)]
+struct SlimSetupEvent {
+    phase: String,
+    message: String,
+}
+
+#[cfg(feature = "slim")]
+fn emit_setup(app: &AppHandle, phase: &str, message: &str) {
+    use tauri::Emitter;
+    let _ = app.emit(
+        "slim-setup",
+        SlimSetupEvent {
+            phase: phase.to_string(),
+            message: message.to_string(),
+        },
+    );
+}
+
 /// Slim variant only: ensure a Python runtime exists in the per-user data dir,
 /// installing it via the bundled `uv` on first launch. Sets LDACA_BACKEND_PYTHON
 /// and LDACA_BACKEND_RUNTIME so the normal `locate_backend_runtime` path picks it
 /// up unchanged. Idempotent: a `.ldaca-runtime-ready` marker short-circuits once
-/// the install has succeeded.
+/// the install has succeeded. Emits `slim-setup` events for the frontend.
 #[cfg(feature = "slim")]
 fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
@@ -199,15 +220,22 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
 
     std::fs::create_dir_all(&data_dir)?;
 
+    emit_setup(app, "creating-env", "Creating the Python environment…");
     println!("[slim] creating venv at {}", runtime_dir.display());
     let status = Command::new(&uv)
         .args(["venv", "--python", "3.14"])
         .arg(&runtime_dir)
         .status()?;
     if !status.success() {
+        emit_setup(app, "error", "Failed to create the Python environment.");
         return Err(make_error(format!("uv venv failed (exit {status})")));
     }
 
+    emit_setup(
+        app,
+        "installing",
+        "Downloading and installing Wordflow — first launch only, this can take a few minutes…",
+    );
     println!("[slim] installing ldaca-wordflow from PyPI (first launch — may take a few minutes)");
     let status = Command::new(&uv)
         .args(["pip", "install", "--python"])
@@ -215,12 +243,14 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
         .arg("ldaca-wordflow>=0.5,<0.6")
         .status()?;
     if !status.success() {
+        emit_setup(app, "error", "Failed to install Wordflow from PyPI.");
         return Err(make_error(format!("uv pip install failed (exit {status})")));
     }
 
     std::fs::write(&marker, "ready\n")?;
     std::env::set_var("LDACA_BACKEND_PYTHON", &python);
     std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+    emit_setup(app, "ready", "Runtime ready — starting Wordflow…");
     println!("[slim] runtime ready: {}", runtime_dir.display());
     Ok(())
 }
