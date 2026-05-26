@@ -108,10 +108,57 @@ jobs:
         working-directory: frontend
         run: npm run stage:backend-runtime
 
+      - name: Import Apple code-signing certificate
+        uses: Apple-Actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
       - name: Build Tauri desktop application
         shell: bash
         working-directory: frontend
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx tauri build --bundles app,dmg
+
+      - name: Verify Developer ID signature + notarization
+        shell: bash
+        working-directory: frontend
+        env:
+          EXPECTED_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -Eeuo pipefail
+          repo_root="$(cd .. && pwd -P)"
+          app_path="$repo_root/frontend/src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+
+          echo "::group::codesign -dvv"
+          codesign -dvv "$app_path" 2>&1 | tee /tmp/codesign.out
+          echo "::endgroup::"
+
+          if ! grep -q "Authority=Developer ID Application" /tmp/codesign.out; then
+            echo "::error::App is not signed with Developer ID"
+            exit 1
+          fi
+          if ! grep -q "TeamIdentifier=$EXPECTED_TEAM_ID" /tmp/codesign.out; then
+            echo "::error::Team identifier mismatch"
+            exit 1
+          fi
+
+          echo "::group::spctl --assess"
+          spctl --assess --verbose=4 --type execute "$app_path" 2>&1 | tee /tmp/spctl.out || true
+          echo "::endgroup::"
+
+          if grep -q "source=Notarized Developer ID" /tmp/spctl.out; then
+            echo "App is Developer ID signed and notarized."
+          elif grep -q "source=Developer ID" /tmp/spctl.out; then
+            echo "::warning::Signed with Developer ID but NOT notarized — fresh Macs will still warn."
+          else
+            echo "::error::Gatekeeper rejected the bundle"
+            exit 1
+          fi
 
       - name: Validate bundled backend runtime
         shell: bash
