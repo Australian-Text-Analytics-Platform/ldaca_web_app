@@ -8,6 +8,8 @@ dependencies = ["ldaca-wordflow", "rocrate-tabular"]
 [tool.uv.sources]
 docworkspace = { path = "./docworkspace", editable = true }
 ldaca-wordflow = { path = "./backend", editable = true }
+polars-text = { path = "./polars-text", editable = true }
+polars-source-utils = { path = "./polars-source-utils", editable = true }
 rocrate-tabular = { path = "./backend/src/ldaca_wordflow/_vendor/rocrate-tabular" }
 
 [tool.pytest.ini_options]

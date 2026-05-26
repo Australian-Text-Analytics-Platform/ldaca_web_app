@@ -66,7 +66,8 @@ submodules checked out, then delegates platform builds to:
 - `.github/workflows/desktop-windows.yml`
 - `.github/workflows/desktop-macos.yml`
 
-Both platform workflows install Node, Rust, uv, package the backend runtime,
-stage it for Tauri, build the desktop app, and validate that the bundled
-Python can import `ldaca_wordflow` and `polars_text`. The release workflow
-then uploads MSI and DMG assets to the GitHub release.
+Both platform workflows install Node, Rust stable for Tauri, Rust nightly for
+`polars-source-utils`, and uv; package the backend runtime; stage it for Tauri;
+build the desktop app; and validate that the bundled Python can import
+`ldaca_wordflow`, `polars_text`, and `polars_source_utils`. The release
+workflow then uploads MSI and DMG assets to the GitHub release.

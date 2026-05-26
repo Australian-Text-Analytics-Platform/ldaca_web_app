@@ -3,9 +3,9 @@
 ## Repository Boundaries
 
 The repository contains nested project directories. `backend/`,
-`docworkspace/`, and `polars-text/` have their own package manifests and tests.
-Treat those package roots as the working directory for package-specific Python
-or Rust checks.
+`docworkspace/`, `polars-text/`, and `polars-source-utils/` have their own
+package manifests and tests. Treat those package roots as the working directory
+for package-specific Python or Rust checks.
 
 Use the root only for orchestration scripts, frontend wrappers, release checks,
 and desktop packaging.
@@ -71,6 +71,10 @@ make test
 Some `polars-text` tokenizers download Hugging Face or Lindera assets on first
 use. That is expected for tokenizer features and should not be treated as a
 network regression without more evidence.
+
+`polars-source-utils` owns serialized Polars plan source-path inspection and
+rewriting. It carries the broad `polars-plan` feature surface needed for
+workspace persistence so tokenizer-focused `polars-text` builds do not have to.
 
 ## Desktop Development
 

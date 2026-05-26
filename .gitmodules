@@ -7,3 +7,6 @@
 [submodule "ldaca_wordflow_backend"]
 	path = backend
 	url = https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow-backend.git
+[submodule "polars-source-utils"]
+	path = polars-source-utils
+	url = https://github.com/AlexDrBanana/polars-source-utils.git

@@ -69,6 +69,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Set up Rust nightly for backend extension builds
+        uses: dtolnay/rust-toolchain@nightly
+
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -83,7 +86,8 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.toml',
             'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
-            'polars-text/Cargo.lock') }}
+            'polars-text/Cargo.lock', 'polars-source-utils/Cargo.toml',
+            'polars-source-utils/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -146,7 +150,7 @@ jobs:
             exit 1
           }
 
-          & $pythonExe -c "import encodings, ldaca_wordflow, polars_text, sys; print(sys.version)"
+          & $pythonExe -c "import encodings, ldaca_wordflow, polars_source_utils, polars_text, sys; print(sys.version)"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7

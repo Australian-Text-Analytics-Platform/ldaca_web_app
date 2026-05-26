@@ -8,6 +8,7 @@ Start here before exploring. This monorepo (renamed from `ldaca_web_app`; PyPI n
 - `backend/`: FastAPI backend (PyPI: `ldaca-wordflow`, import: `ldaca_wordflow`), uv-managed, Python `>=3.14`
 - `docworkspace/`: Python package for lazy Polars workspace/node graphs
 - `polars-text/`: Rust/PyO3 + Python package for text-analysis primitives
+- `polars-source-utils/`: Rust/PyO3 + Python package for serialized Polars plan source path listing/rewriting
 - Root `package.json`: pnpm workspace command wrapper for `frontend`
 - Root `pyproject.toml`: uv workspace shim; do not rely on `PYTHONPATH=src`
 
@@ -56,6 +57,7 @@ These were validated in this workspace and are the fastest reliable entry points
 - Backend tests: `cd backend && uv run pytest -q`, passes (`269` tests).
 - `docworkspace` tests: `cd docworkspace && uv run pytest -q`, passes.
 - `polars-text` tests: `cd polars-text && uv run pytest -q`, passes.
+- `polars-source-utils` manifest check: `cd polars-source-utils && cargo metadata --format-version 1 --no-deps`, passes.
 
 ## Practical Rules For Agents
 
@@ -72,6 +74,7 @@ These were validated in this workspace and are the fastest reliable entry points
 ## Codebase-Specific AI Rules
 
 - Avoid eager `collect()` except at I/O boundaries, artifact writing, or final response serialization.
+- Serialized Polars plan source path utilities live in `polars-source-utils`; do not add them back to `polars-text`.
 - Keep backend routers thin. Validate request shapes in the router, then delegate business logic to `core/` or analysis helpers.
 - Use `Depends(get_current_user)` for backend route authentication; do not bypass it in new routes.
 - For worker tasks, follow the existing worker pattern: call `configure_worker_environment()` first, import heavy dependencies inside the worker function, and write large outputs to artifacts.
