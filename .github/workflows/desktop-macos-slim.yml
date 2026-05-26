@@ -237,7 +237,9 @@ jobs:
           codesign --force --timestamp \
             --sign "$APPLE_SIGNING_IDENTITY" "$dmg"
 
-          echo "path=$dmg" >> "$GITHUB_OUTPUT"
+          # Absolute path: later steps (notarize DMG, upload) don't run with
+          # working-directory: frontend, so a relative path wouldn't resolve.
+          echo "path=$(pwd)/$dmg" >> "$GITHUB_OUTPUT"
 
       - name: Notarize DMG + staple
         timeout-minutes: 25
