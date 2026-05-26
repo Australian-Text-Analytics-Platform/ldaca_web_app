@@ -132,10 +132,126 @@ jobs:
         working-directory: frontend
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: npx tauri build --bundles app
+
+      - name: Deep-sign embedded backend runtime + re-sign app
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -Eeuo pipefail
+          app_path="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          runtime="$app_path/Contents/Resources/backend-runtime"
+
+          test -d "$runtime" || { echo "::error::backend-runtime missing inside .app"; exit 1; }
+
+          # Sign every Mach-O file inside the embedded runtime (executables, .dylib, .so).
+          # `file -b` identifies binary type; we skip non-Mach-O resources (json, py, etc).
+          signed_count=0
+          while IFS= read -r -d '' f; do
+            if file -b "$f" | grep -qE '^Mach-O'; then
+              codesign --force --options runtime --timestamp \
+                --sign "$APPLE_SIGNING_IDENTITY" "$f"
+              signed_count=$((signed_count + 1))
+            fi
+          done < <(find "$runtime" -type f -print0)
+          echo "Signed $signed_count Mach-O files inside backend-runtime/"
+
+          # Re-sign the main binary with hardened runtime + timestamp (Tauri's own sign
+          # may not have used these flags consistently for notarization).
+          codesign --force --options runtime --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            "$app_path/Contents/MacOS/ldaca-wordflow"
+
+          # Re-sign the outer .app so CodeResources reflects the new inner hashes.
+          codesign --force --options runtime --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" "$app_path"
+
+          # Sanity check: no unsigned Mach-O remaining
+          unsigned=$(find "$app_path" -type f -print0 | xargs -0 -I{} sh -c '
+            file -b "$1" | grep -qE "^Mach-O" || exit 0
+            codesign -dv "$1" >/dev/null 2>&1 || echo "$1"
+          ' _ {} 2>/dev/null || true)
+          if [ -n "$unsigned" ]; then
+            echo "::error::Unsigned Mach-O files remain in .app:"
+            echo "$unsigned"
+            exit 1
+          fi
+          echo "All Mach-O files in .app are signed."
+
+      - name: Notarize .app and staple
+        shell: bash
+        working-directory: frontend
+        env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx tauri build --bundles app,dmg
+        run: |
+          set -Eeuo pipefail
+          app_path="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          zip_path="$(mktemp -d)/ldaca.zip"
+          ditto -c -k --keepParent "$app_path" "$zip_path"
+
+          echo "::group::notarytool submit (this can take several minutes)"
+          xcrun notarytool submit "$zip_path" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          echo "::endgroup::"
+
+          xcrun stapler staple "$app_path"
+          xcrun stapler validate "$app_path"
+
+      - name: Build DMG from notarized .app
+        id: build-dmg
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -Eeuo pipefail
+          app_path="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          dmg_dir="src-tauri/target/release/bundle/dmg"
+          mkdir -p "$dmg_dir"
+
+          stage_dir="$(mktemp -d)"
+          ditto "$app_path" "$stage_dir/LDaCA Wordflow.app"
+          ln -s /Applications "$stage_dir/Applications"
+
+          app_version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          dmg_path="$dmg_dir/LDaCA Wordflow_${app_version}_aarch64.dmg"
+
+          hdiutil create -volname "LDaCA Wordflow" \
+            -srcfolder "$stage_dir" \
+            -ov -format UDZO \
+            "$dmg_path"
+
+          codesign --force --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" "$dmg_path"
+
+          echo "path=$dmg_path" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize DMG and staple
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          DMG_PATH: ${{ steps.build-dmg.outputs.path }}
+        run: |
+          set -Eeuo pipefail
+          echo "::group::notarytool submit DMG"
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          echo "::endgroup::"
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
 
       - name: Verify Developer ID signature + notarization
         shell: bash
