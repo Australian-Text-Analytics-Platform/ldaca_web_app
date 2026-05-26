@@ -31,6 +31,10 @@ jobs:
     runs-on: macos-latest
     env:
       CI: "true"
+      # Stop macOS file ops (cp, ditto, tar) from creating AppleDouble (._*)
+      # metadata sidecars; those get sealed into the bundle's CodeResources
+      # but then stripped out of the notarization zip, breaking the seal.
+      COPYFILE_DISABLE: "1"
 
     steps:
       - name: Checkout repository with submodules
@@ -146,11 +150,12 @@ jobs:
 
           test -d "$runtime" || { echo "::error::backend-runtime missing inside .app"; exit 1; }
 
-          # Strip extended attributes before signing — uv's managed-python tarball
-          # and macOS file ops can leave com.apple.quarantine / com.apple.metadata.*
-          # xattrs that get sealed into the signature and trip notarization with
-          # "signature of the binary is invalid".
+          # Strip extended attributes AND AppleDouble (._*) sidecar files before
+          # signing. xattrs get sealed into the signature; ._* files get sealed
+          # too AND then stripped from the notarization zip by ditto, breaking
+          # the seal. Both surface as "signature of the binary is invalid".
           xattr -cr "$app_path"
+          find "$app_path" -type f -name "._*" -delete
 
           # Sign every Mach-O file inside the embedded runtime (executables, .dylib, .so).
           # `file -b` identifies binary type; we skip non-Mach-O resources (json, py, etc).
@@ -202,7 +207,7 @@ jobs:
           set -Eeuo pipefail
           app_path="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
           zip_path="$(mktemp -d)/ldaca.zip"
-          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
+          ditto -c -k --keepParent "$app_path" "$zip_path"
 
           echo "::group::notarytool submit (this can take several minutes)"
           set +e
