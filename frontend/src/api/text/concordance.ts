@@ -110,8 +110,6 @@ export interface ConcordanceMaterializeRequest extends LanguageHint {
   /** Mirror the live ``/concordance`` request so the materialised parquet
    * honours the engine the user actually searched with. */
   search_mode?: ConcordanceSearchMode;
-  /** Tokens-mode model picker — same semantics as ConcordanceAnalysisRequest. */
-  model?: string;
 }
 
 export interface ConcordanceDetachNodeOption {
@@ -147,14 +145,6 @@ export interface ConcordanceAnalysisRequest extends LanguageHint {
    * been tokenised.
    */
   search_mode?: ConcordanceSearchMode;
-  /**
-   * Tokens-mode model picker. When the active node has >1 derived tokens
-   * column for the selected source (e.g. ``jieba`` + ``bert-base-uncased``
-   * coexisting), the frontend sets ``model`` so the backend looks up the
-   * exact column. ``undefined`` falls back to first-match (the historical
-   * behaviour for single-model nodes).
-   */
-  model?: string;
 }
 
 export interface ConcordanceResultQuery {

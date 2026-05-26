@@ -33,23 +33,7 @@ type TokenFrequencyParameterPanelProps = {
   onStudyNodeChange: (nodeId: string) => void;
   getColorForNode: (nodeId: string, index?: number) => string;
   computeDisplayName: (nodeId: string) => string;
-  /**
-   * Available tokeniser models on the active node for the selected source
-   * column. When >1 entry, render a picker so the user can route the
-   * frequency count through a specific tokeniser. Empty / one entry =
-   * picker hidden (auto-pick the single one or none).
-   */
-  tokensModelOptions: string[];
-  tokensModel: string | null;
-  setTokensModel: (next: string | null) => void;
-  /** Displayed when the panel is locked. Defaults to the standard
-   * "locked while results loaded" message; snapshot mode overrides it
-   * so users see "viewing a saved snapshot" instead. */
   lockedMessage?: string;
-  /** Snapshot Save/Load slot. Forwarded straight to the underlying
-   * AnalysisCardLayout, which renders <SnapshotActions> alongside any
-   * other header actions. Mirrors the per-tool wiring used by the
-   * concordance / quotation parameter cards. */
   snapshot?: {
     tool: SnapshotToolKey;
     onSave?: (filename: string, description: string) => Promise<void>;
@@ -83,9 +67,6 @@ export const TokenFrequencyParameterPanel = ({
   onStudyNodeChange,
   getColorForNode,
   computeDisplayName,
-  tokensModelOptions,
-  tokensModel,
-  setTokensModel,
   lockedMessage = ANALYSIS_LOCKED_MESSAGE,
   snapshot,
 }: TokenFrequencyParameterPanelProps) => {
@@ -138,27 +119,6 @@ export const TokenFrequencyParameterPanel = ({
                 Active filter: {appliedStopCount} word{appliedStopCount === 1 ? '' : 's'}
               </span>
             ) : null}
-            {/* Tokens-model picker — only when the active source has been
-                tokenised under >1 model. Frequency counts always read from
-                the derived tokens column when one exists, so picking which
-                model to use matters for users who tokenised the same
-                source twice (e.g. jieba and bert-base-uncased). */}
-            {tokensModelOptions.length > 1 ? (
-              <div className="flex items-center gap-2 text-xs">
-                <Label className="whitespace-nowrap text-xs font-medium">Tokeniser</Label>
-                <select
-                  value={tokensModel ?? ''}
-                  onChange={(e) => setTokensModel(e.target.value || null)}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Pick which tokeniser's column to count from"
-                  disabled={isLocked}
-                >
-                  {tokensModelOptions.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
             {hasMultipleNodes && nodeOptions.length > 1 ? (
               <div className="ml-auto flex items-center gap-2">
                 <Label className="whitespace-nowrap text-base font-medium">Study Data Block</Label>
@@ -170,29 +130,29 @@ export const TokenFrequencyParameterPanel = ({
                         key={option.id}
                         reason={isLocked ? 'Clear results first to change the study data block' : undefined}
                       >
-                      <label
-                        className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors${isLocked ? ' cursor-not-allowed opacity-60' : ''}`}
-                        title={option.label}
-                        aria-label={option.label}
-                      >
-                        <input
-                          type="radio"
-                          name="study-node"
-                          value={option.id}
-                          checked={isActive}
-                          disabled={isLocked}
-                          onChange={() => onStudyNodeChange(option.id)}
-                          className="sr-only"
-                        />
-                        <span
-                          className="inline-block h-5 w-5 rounded-full border-2 transition-colors"
-                          style={{
-                            borderColor: option.color,
-                            backgroundColor: isActive ? option.color : 'transparent',
-                          }}
-                          aria-hidden="true"
-                        />
-                      </label>
+                        <label
+                          className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors${isLocked ? ' cursor-not-allowed opacity-60' : ''}`}
+                          title={option.label}
+                          aria-label={option.label}
+                        >
+                          <input
+                            type="radio"
+                            name="study-node"
+                            value={option.id}
+                            checked={isActive}
+                            disabled={isLocked}
+                            onChange={() => onStudyNodeChange(option.id)}
+                            className="sr-only"
+                          />
+                          <span
+                            className="inline-block h-5 w-5 rounded-full border-2 transition-colors"
+                            style={{
+                              borderColor: option.color,
+                              backgroundColor: isActive ? option.color : 'transparent',
+                            }}
+                            aria-hidden="true"
+                          />
+                        </label>
                       </DisabledReasonTooltip>
                     );
                   })}

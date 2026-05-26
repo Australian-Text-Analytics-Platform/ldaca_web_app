@@ -193,7 +193,6 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
           },
           columns: snapshot.columns,
           derived: live?.derived,
-          derived_columns: live?.derived_columns,
         };
       });
     }

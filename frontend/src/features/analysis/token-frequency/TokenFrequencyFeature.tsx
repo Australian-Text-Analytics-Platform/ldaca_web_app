@@ -288,57 +288,6 @@ const TokenFrequencyFeature = () => {
     return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
   }, [inSnapshotMode, loadedSnapshot, isLocked, activeNodeColumnSelections, nodeColumnSelections]);
 
-  // Tokens-model picker state — mirrors the concordance feature. When the
-  // first selected node has >1 derived tokens column for the selected
-  // source, surface a dropdown so the user can pick which one drives
-  // the frequency count. Auto-pick when N=1; clear when N=0.
-  // In snapshot mode the picker is fixed to the captured ``settings.model``
-  // (or empty list when none was set), so the panel renders the captured
-  // value as a single read-only entry.
-  const tokensModelOptions = useMemo<string[]>(() => {
-    if (inSnapshotMode) {
-      const captured = loadedSnapshot?.payload.settings?.model;
-      return captured ? [captured] : [];
-    }
-    const firstSelection = effectiveNodeColumnSelections[0];
-    if (!firstSelection?.column) return [];
-    const firstNode = panelSelectedNodes.find((n) => {
-      const ids = [n.id, n.node_id];
-      return ids.some((id) => typeof id === 'string' && id === firstSelection.nodeId);
-    });
-    const derived = firstNode?.derived;
-    if (!derived || typeof derived !== 'object') return [];
-    const models: string[] = [];
-    for (const meta of Object.values(derived as Record<string, unknown>)) {
-      if (!meta || typeof meta !== 'object') continue;
-      const m = meta as { source_column?: unknown; form?: unknown; model?: unknown };
-      if (m.form !== 'tokens') continue;
-      if (m.source_column !== firstSelection.column) continue;
-      if (typeof m.model === 'string' && !models.includes(m.model)) {
-        models.push(m.model);
-      }
-    }
-    return models;
-  }, [inSnapshotMode, loadedSnapshot, effectiveNodeColumnSelections, panelSelectedNodes]);
-
-  const [liveTokensModelDraft, setLiveTokensModel] = useState<string | null>(null);
-  const liveTokensModel = (() => {
-    if (tokensModelOptions.length === 0) return null;
-    if (tokensModelOptions.length === 1) return tokensModelOptions[0]!;
-    if (liveTokensModelDraft && tokensModelOptions.includes(liveTokensModelDraft)) {
-      return liveTokensModelDraft;
-    }
-    return tokensModelOptions[0] ?? null;
-  })();
-
-  const tokensModel = inSnapshotMode
-    ? (loadedSnapshot?.payload.settings?.model ?? null)
-    : liveTokensModel;
-  const setTokensModel = (next: string | null) => {
-    if (inSnapshotMode) return;
-    setLiveTokensModel(next);
-  };
-
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,
   // every render hands a fresh function ref to the sections, busting
@@ -446,7 +395,6 @@ const TokenFrequencyFeature = () => {
       nodeIdToName,
       nodeColors,
       lastCompareNodeIds,
-      tokensModel,
     },
     actions: {
       setLocalTaskId,
@@ -708,9 +656,8 @@ const TokenFrequencyFeature = () => {
       node_ids: orderedIds,
       node_columns: nodeColumns,
     };
-    if (liveTokensModel) req.model = liveTokensModel;
     return req;
-  }, [inSnapshotMode, orderedPanelNodeIds, effectiveNodeColumnSelections, liveTokensModel]);
+  }, [inSnapshotMode, orderedPanelNodeIds, effectiveNodeColumnSelections]);
 
   // Order ``selectedNodes`` reference-first so the manifest's
   // ``node_ids`` list matches the captured request's ordering. The
@@ -857,9 +804,6 @@ const TokenFrequencyFeature = () => {
         }}
         getColorForNode={getColorForNode}
         computeDisplayName={computeDisplayName}
-        tokensModelOptions={tokensModelOptions}
-        tokensModel={tokensModel}
-        setTokensModel={setTokensModel}
       />
 
       <TokenFrequencyResultsPanel

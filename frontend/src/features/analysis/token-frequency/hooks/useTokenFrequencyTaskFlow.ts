@@ -20,12 +20,6 @@ interface AnalysisState {
   nodeColors: Record<string, string>;
   lockedNodeNameMap: Record<string, string>;
   nodeIdToName: Record<string, string>;
-  /**
-   * Tokens-model picker (Phase 4 follow-up). When the active node has
-   * >1 derived tokens column for the same source, the frontend picks
-   * one. ``null`` lets the backend fall back to first-match.
-   */
-  tokensModel?: string | null;
 }
 
 interface AnalysisActions {
@@ -72,7 +66,6 @@ export const useTokenFrequencyTaskFlow = ({
     nodeIdToName,
     nodeColors,
     lastCompareNodeIds,
-    tokensModel,
   },
   actions: {
     setLocalTaskId,
@@ -132,11 +125,6 @@ export const useTokenFrequencyTaskFlow = ({
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
       };
-      // Only forward `model` when the user explicitly picked one — the
-      // backend's first-match path is what we want for single-model nodes.
-      if (tokensModel) {
-        request.model = tokensModel;
-      }
 
       try {
         if (request.node_ids.length) {

@@ -188,7 +188,7 @@ describe('CustomNode', () => {
     expect(screen.queryByText(/^tokens:/)).not.toBeInTheDocument();
   });
 
-  it('shows a single-line summary when one derived tokens column is registered', () => {
+  it('shows a single-line tokenisation summary from metadata', () => {
     mockZoom = 1;
     const props = {
       id: 'node-1',
@@ -201,7 +201,15 @@ describe('CustomNode', () => {
           columns: ['text'],
           preview: [],
           is_text_data: true,
-          derived_columns: ['__derived__.tokens.text.jieba'],
+          derived: {
+            'text.tokenization.jieba': {
+              source_column: 'text',
+              form: 'tokens',
+              model: 'jieba',
+              language: 'zh',
+              generated_at: '2026-05-12T00:00:00+00:00',
+            },
+          },
         },
         onDelete: vi.fn(),
       },
@@ -290,42 +298,7 @@ describe('CustomNode', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('summarises multiple tokens columns', () => {
-    mockZoom = 1;
-    const props = {
-      id: 'node-1',
-      type: 'custom',
-      data: {
-        node: {
-          node_id: 'node-1',
-          name: 'multi-source',
-          shape: [3, 4] as [number, number],
-          columns: ['text', 'title'],
-          preview: [],
-          is_text_data: true,
-          derived_columns: [
-            '__derived__.tokens.text.jieba',
-            '__derived__.tokens.title.bert-base-uncased',
-          ],
-        },
-        onDelete: vi.fn(),
-      },
-      selected: false,
-      dragging: false,
-      zIndex: 0,
-      selectable: true,
-      deletable: true,
-      draggable: true,
-      isConnectable: true,
-      positionAbsoluteX: 0,
-      positionAbsoluteY: 0,
-    } satisfies React.ComponentProps<typeof CustomNode>;
-
-    render(<CustomNode {...props} />);
-    expect(screen.getByText('2 tokens columns')).toBeInTheDocument();
-  });
-
-  it('exposes a Manage tokens entry only when the node has registered derived columns', async () => {
+  it('never exposes a Manage tokens menu entry', async () => {
     mockZoom = 1;
     const user = userEvent.setup();
     const baseNode = {
@@ -337,7 +310,6 @@ describe('CustomNode', () => {
       is_text_data: true,
     };
 
-    // 1. No derived: menu must NOT show "Manage tokens…".
     const { unmount } = render(
       <CustomNode
         id="node-1"
@@ -360,7 +332,6 @@ describe('CustomNode', () => {
     ).not.toBeInTheDocument();
     unmount();
 
-    // 2. With a registered derivation: entry surfaces.
     render(
       <CustomNode
         id="node-1"
@@ -369,7 +340,7 @@ describe('CustomNode', () => {
           node: {
             ...baseNode,
             derived: {
-              '__derived__.tokens.text.jieba': {
+              'text.tokenization.jieba': {
                 source_column: 'text',
                 form: 'tokens',
                 model: 'jieba',
@@ -393,7 +364,7 @@ describe('CustomNode', () => {
     );
     await user.click(getLatestNodeSettingsButton());
     expect(
-      screen.getByRole('button', { name: 'Manage tokens…' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Manage tokens…' }),
+    ).not.toBeInTheDocument();
   });
 });

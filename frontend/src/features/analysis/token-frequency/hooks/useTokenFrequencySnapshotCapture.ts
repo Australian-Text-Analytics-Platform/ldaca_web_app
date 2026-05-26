@@ -30,10 +30,10 @@ const SETTINGS_PAYLOAD_PATH = 'settings.json';
 export interface UseTokenFrequencySnapshotCaptureInput {
   workspaceId: string | null;
   workspaceName: string;
-  /** The actual ``TokenFrequencyRequest`` (node ids, columns, model)
+  /** The actual ``TokenFrequencyRequest`` (node ids and columns)
    * that produced the live ``results``. Embedded verbatim in the
    * bundle under ``settings.json`` so the parameter panel can render
-   * the captured node selection and tokeniser at load time. */
+   * the captured node selection at load time. */
   request: TokenFrequencyRequest | null;
   /** Full live response — token-freq's result is already complete (no
    * pagination), so the capture just embeds what the user is looking
@@ -79,10 +79,7 @@ function buildTokenFrequencyPreview(
       }
     }
   }
-  // ``request.model`` only fires when the active node had >1 tokeniser
-  // model on the selected source. Otherwise fall back to a generic
-  // string — the preview block is informational only.
-  const tokeniserId = request?.model ?? '(default)';
+  const tokeniserId = request ? '(node tokenisation)' : '(default)';
   return {
     tool: 'token_frequencies',
     vocabSize,

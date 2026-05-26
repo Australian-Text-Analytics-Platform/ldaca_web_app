@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Settings2, Copy, Check, Sparkles } from 'lucide-react';
 import {
   AlertDialog,
@@ -12,15 +12,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { type WorkspaceNode, parseDerivedColumn } from '@/types';
+import { type WorkspaceNode } from '@/types';
 import { cn } from '@/lib/utils';
 import { DEFAULT_GREY_PAIR } from '@/lib/color';
 import type { NodeVisualInfo } from '@/lib/nodeVisualState';
 import TokeniseDialog from './TokeniseDialog';
-import DerivedColumnsDialog from './DerivedColumnsDialog';
-import { invalidateNodeInfoQuery, nodeInfoQueryOptions, type NodeInfo } from '@/lib/nodeInfo';
-import { useAuth } from '@/hooks/useAuth';
-import type { DerivedColumnMeta } from '@/types';
+import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
 import { queryKeys } from '@/lib/queryKeys';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 
@@ -71,75 +68,6 @@ function TokeniseDialogContainer({
   );
 }
 
-/**
- * Companion container for DerivedColumnsDialog — mirrors the lazy-mount
- * pattern of TokeniseDialogContainer so that CustomNode tests that don't
- * exercise derived-column management can render without a workspace +
- * query provider.
- *
- * Sources ``derived`` from the ``nodeInfo`` query directly (rather than
- * relying on the ReactFlow data-prop chain) so that invalidating the
- * cache after a successful delete reactively updates the dialog. Before
- * this, the dialog read from ``WorkspaceNode.derived`` passed through
- * ReactFlow's internal node store, which doesn't always re-sync a
- * single node's ``data`` immediately when the workspace-graph query
- * refetches — leaving the deleted row visible until the user closed
- * and re-opened the dialog. ``initialDerived`` keeps the first paint
- * snappy while the (likely-cached) ``nodeInfo`` query resolves.
- */
-function DerivedColumnsDialogContainer({
-  open,
-  onClose,
-  nodeId,
-  nodeName,
-  initialDerived,
-}: {
-  open: boolean;
-  onClose: () => void;
-  nodeId: string;
-  nodeName: string;
-  initialDerived: Record<string, DerivedColumnMeta>;
-}) {
-  const queryClient = useQueryClient();
-  const { currentWorkspaceId } = useWorkspaceData();
-  const { getAuthHeaders } = useAuth();
-
-  const nodeInfoQuery = useQuery({
-    ...nodeInfoQueryOptions({
-      workspaceId: currentWorkspaceId ?? '',
-      nodeId,
-      getAuthHeaders,
-    }),
-    enabled: open && Boolean(currentWorkspaceId) && Boolean(nodeId),
-  });
-
-  const liveDerived = (() => {
-    const raw = (nodeInfoQuery.data as NodeInfo | undefined)?.derived;
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      return raw as Record<string, DerivedColumnMeta>;
-    }
-    return null;
-  })();
-
-  return (
-    <DerivedColumnsDialog
-      open={open}
-      onClose={onClose}
-      nodeId={nodeId}
-      nodeName={nodeName}
-      derived={liveDerived ?? initialDerived}
-      onDeleted={() => {
-        if (currentWorkspaceId && nodeId) {
-          invalidateNodeInfoQuery(queryClient, currentWorkspaceId, nodeId);
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.workspaceGraph(currentWorkspaceId),
-          });
-        }
-      }}
-    />
-  );
-}
-
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
   isMultiSelected?: boolean;
@@ -179,7 +107,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTokeniseDialog, setShowTokeniseDialog] = useState(false);
-  const [showDerivedDialog, setShowDerivedDialog] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -313,35 +240,17 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     ? `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`
     : null;
 
-  // Phase 4.6: surface derived analytic columns (tokenisation etc.) so the
-  // user can see whether Tokenise has been run on this node and with which
-  // model. The label is a short summary ("3 tokens columns" or
-  // "tokens · jieba" when there's just one); the title attribute carries
-  // the parsed (form, source, model) details for hover inspection.
   const derivedSummary = ((): { label: string; tooltip: string } | null => {
-    const derived = node?.derived_columns;
-    if (!Array.isArray(derived) || derived.length === 0) return null;
-    const parsed = derived.map((rawName) => {
-      const p = parseDerivedColumn(rawName);
-      return p
-        ? { ...p, raw: rawName }
-        : { form: 'derived', source: '?', model: '?', raw: rawName };
-    });
-    const allTokens = parsed.every((p) => p.form === 'tokens');
-    const [only] = parsed;
-    if (parsed.length === 1 && only) {
+    const derived = node?.derived;
+    if (!derived || typeof derived !== 'object') return null;
+    for (const [name, meta] of Object.entries(derived)) {
+      if (!meta || meta.form !== 'tokens') continue;
       return {
-        label: `${only.form}: ${only.source} · ${only.model}`,
-        tooltip: only.raw,
+        label: `tokens: ${meta.source_column} · ${meta.model}`,
+        tooltip: name,
       };
     }
-    const summary = allTokens
-      ? `${parsed.length} tokens columns`
-      : `${parsed.length} derived columns`;
-    const tooltip = parsed
-      .map((p) => `${p.form}: ${p.source} · ${p.model}`)
-      .join('\n');
-    return { label: summary, tooltip };
+    return null;
   })();
 
   const menuButtonClassName = 'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
@@ -377,9 +286,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
               Clone
             </button>
 
-            {/* Phase 4.3 — Tokenise a string column on this node into a
-                hidden derived column. Only shown when the node has at
-                least one column to pick (no-op otherwise). */}
+            {/* Tokenise a string column on this node. */}
             {Array.isArray(node?.columns) && node.columns.length > 0 ? (
               <button
                 onClick={(e) => {
@@ -390,23 +297,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
                 className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
               >
                 Tokenise…
-              </button>
-            ) : null}
-
-            {/* Surfaced only when the node has at least one derivation
-                registered (post-Phase 4.6). Lets the user remove a wrong
-                tokenisation (e.g. CJK column tokenised under en model by
-                mistake) without an API call. */}
-            {node?.derived && Object.keys(node.derived).length > 0 ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMenu(false);
-                  setShowDerivedDialog(true);
-                }}
-                className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
-              >
-                Manage tokens…
               </button>
             ) : null}
 
@@ -470,16 +360,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     />
   ) : null;
 
-  const derivedDialog = showDerivedDialog && node?.node_id && node?.derived ? (
-    <DerivedColumnsDialogContainer
-      open={showDerivedDialog}
-      onClose={() => setShowDerivedDialog(false)}
-      nodeId={node.node_id}
-      nodeName={nodeName}
-      initialDerived={node.derived}
-    />
-  ) : null;
-
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
     const compactClasses = 'flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out shadow-md';
@@ -525,7 +405,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         {deleteDialog}
         {tokeniseDialog}
-        {derivedDialog}
       </div>
     );
   }
@@ -639,7 +518,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       {deleteDialog}
       {tokeniseDialog}
-      {derivedDialog}
     </div>
   );
 };

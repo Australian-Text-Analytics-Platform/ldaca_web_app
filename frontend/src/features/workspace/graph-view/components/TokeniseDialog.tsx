@@ -2,10 +2,8 @@
  * Phase 4.3: Tokenise action dialog.
  *
  * Picks a source column + language + tokenizer model and POSTs to the
- * Phase 2.5 endpoint (``/workspaces/nodes/{id}/derived/tokens``). The
- * operation is idempotent on ``(source_column, model)`` so re-running it
- * with the same args is safe — backend reports ``is_new`` + an optional
- * ``replaced_column`` so we can decide which toast to surface.
+ * tokenisation endpoint. Each node stores one tokenisation spec; saving a
+ * new source/model replaces the previous one.
  */
 import { useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
@@ -182,10 +180,8 @@ function TokeniseDialogForm({
             Tokenise “{nodeName}”
           </DialogTitle>
           <DialogDescription>
-            Adds a hidden derived tokens column on this node so concordance
-            (tokens-mode) and token-frequency can agree on a single
-            segmentation. Idempotent — re-running with the same model
-            replaces the previous column.
+            Records the source column and tokeniser model for this node. A
+            new selection replaces the previous tokenisation setting.
           </DialogDescription>
         </DialogHeader>
 

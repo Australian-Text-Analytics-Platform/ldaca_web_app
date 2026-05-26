@@ -298,13 +298,7 @@ export const nodesApi = {
     { method: 'POST', headers, body: req }
   ),
 
-  /**
-   * Phase 4.3 / 2.5: add or replace a derived tokens column on a node.
-   * Idempotent on ``(source_column, model)`` — same args replace the
-   * prior column, different ``model`` adds a second one. Returns the
-   * created/replaced derived column name + ``is_new`` so the UI can
-   * decide what toast to show.
-   */
+  /** Save this node's tokenisation spec; replaces any previous token spec. */
   tokeniseColumn: (
     node: string,
     req: TokeniseColumnRequest,
@@ -316,30 +310,14 @@ export const nodesApi = {
       headers,
     ),
 
-  /**
-   * Phase 4.3 / 2.5: drop a derived column from a node. Backend matches
-   * by column name; trying to delete a column that isn't registered on
-   * this node returns 404.
-   */
-  deleteDerivedColumn: (
-    node: string,
-    column: string,
-    headers: Record<string, string> = {},
-  ) =>
-    del<Record<string, unknown>>(
-      `/workspaces/nodes/${node}/derived/${column}`,
-      headers,
-    ),
 };
 
-/** Phase 4.3: POST body for ``tokeniseColumn``. */
 export interface TokeniseColumnRequest {
   source_column: string;
   model: string;
   language?: string | null;
 }
 
-/** Phase 4.3: response for ``tokeniseColumn``. */
 export interface TokeniseColumnResponse {
   column: string;
   is_new: boolean;

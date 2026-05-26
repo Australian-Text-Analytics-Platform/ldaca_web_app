@@ -28,9 +28,8 @@ import type {
  *   the live UI consumes via the ``results`` state, ready to feed
  *   straight into the normaliser adapters.
  * - ``settings`` is the captured ``TokenFrequencyRequest`` so the load
- *   flow can reconstruct the node selection, column choices, tokeniser
- *   model, and reference node. Optional: pre-v0.4.5 bundles didn't
- *   carry it. */
+ *   flow can reconstruct the node selection, column choices, and
+ *   reference node. Optional: pre-v0.4.5 bundles didn't carry it. */
 export interface TokenFrequencySnapshotPayload {
   result: TokenFrequencyResponse;
   settings?: TokenFrequencyRequest;

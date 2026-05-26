@@ -72,7 +72,6 @@ describe('useTokenFrequencySnapshotLoad', () => {
     const settings = {
       node_ids: ['n1'],
       node_columns: { n1: 'text' },
-      model: 'spacy:en_core_web_sm',
     };
     downloadSpy.mockResolvedValue(await buildBundleBlob(manifest, result, settings));
 
@@ -89,12 +88,11 @@ describe('useTokenFrequencySnapshotLoad', () => {
       expect(snap?.manifest.title).toBe('fixture');
       const payload = snap?.payload as {
         result: { state?: string };
-        settings?: { node_ids?: string[]; node_columns?: Record<string, string>; model?: string };
+        settings?: { node_ids?: string[]; node_columns?: Record<string, string> };
       };
       expect(payload.result.state).toBe('successful');
       expect(payload.settings?.node_ids).toEqual(['n1']);
       expect(payload.settings?.node_columns).toEqual({ n1: 'text' });
-      expect(payload.settings?.model).toBe('spacy:en_core_web_sm');
     });
   });
 

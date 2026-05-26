@@ -64,18 +64,8 @@ export interface WorkspaceNode {
   column_schema?: Record<string, string>;
   dtypes?: Record<string, string>;
   /**
-   * Phase 2.10 / 4.6: derived analytic column names (e.g.
-   * ``__derived__.tokens.text.jieba``) hidden from the user-facing
-   * schema but surfaced separately for inspector panels. Empty / absent
-   * when no derivation has run on this node.
-   */
-  derived_columns?: string[];
-  /**
-   * Phase 2.10 / 4.5–4.7: per-derived-column metadata (source_column,
-   * form, model, language, generated_at). Lets the frontend drive
-   * language-aware UI (quotation gate, concordance tokens-mode auto-pick)
-   * without having to parse the column name. Empty / absent on legacy
-   * payloads or nodes without derivations.
+    * Per-tokenisation metadata keyed by the backend's dynamic token column
+    * name. Empty / absent on nodes without tokenisation.
    */
   derived?: Record<string, DerivedColumnMeta>;
   [key: string]: unknown;
@@ -94,28 +84,6 @@ export interface DerivedColumnMeta {
   model: string;
   language: string | null;
   generated_at: string;
-}
-
-/**
- * Parsed parts of a Phase 2 derived column name. ``null`` when the name
- * doesn't follow the ``__derived__.<form>.<source>.<model>`` pattern
- * (e.g. source / model contained a dot — consult Node.derived metadata
- * instead). Mirrors the backend ``parse_derived_column`` semantics.
- */
-export interface ParsedDerivedColumn {
-  form: string;
-  source: string;
-  model: string;
-}
-
-const DERIVED_PREFIX = '__derived__';
-
-export function parseDerivedColumn(name: string): ParsedDerivedColumn | null {
-  const parts = name.split('.');
-  if (parts.length !== 4 || parts[0] !== DERIVED_PREFIX) return null;
-  const [, form, source, model] = parts;
-  if (!form || !source || !model) return null;
-  return { form, source, model };
 }
 
 export interface NodeSchemaResponse {

@@ -30,7 +30,6 @@ import {
   pruneTasksById,
 } from '@/hooks/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
-import { computeTokensModelIntersection } from './tokensModelIntersection';
 import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
@@ -561,41 +560,6 @@ const ConcordanceFeature: React.FC = () => {
     });
   }, [tokensModeAvailable, searchModeUserSet]);
 
-  // Tokens-models the picker can offer for a tokens-mode search across the
-  // current node selection. See ``computeTokensModelIntersection`` for the
-  // intersection rationale (Bug 1: pre-fix the picker was computed off the
-  // first selected node only, which silently mis-routed the JA node to
-  // jieba and made materialize 400 on mixed-language selections).
-  const tokensModelOptions = useMemo<string[]>(
-    () =>
-      computeTokensModelIntersection(
-        effectiveNodeColumnSelections,
-        panelSelectedNodes,
-      ),
-    [effectiveNodeColumnSelections, panelSelectedNodes],
-  );
-
-  const [tokensModel, setTokensModel] = useState<string | null>(null);
-  // Auto-pick when only one model exists; clear when no models OR when the
-  // current pick is no longer in the option list (the user might have
-  // deleted that derivation via Manage tokens…).
-  useEffect(() => {
-    Promise.resolve().then(() => {
-      if (tokensModelOptions.length === 0) {
-        if (tokensModel !== null) setTokensModel(null);
-        return;
-      }
-      if (tokensModelOptions.length === 1) {
-        const only = tokensModelOptions[0]!;
-        if (tokensModel !== only) setTokensModel(only);
-        return;
-      }
-      if (tokensModel === null || !tokensModelOptions.includes(tokensModel)) {
-        setTokensModel(tokensModelOptions[0] ?? null);
-      }
-    });
-  }, [tokensModelOptions, tokensModel]);
-
   const concordanceLanguage = useMemo(() => {
     const firstSelection = effectiveNodeColumnSelections[0];
     const firstNode = firstSelection
@@ -835,7 +799,6 @@ const ConcordanceFeature: React.FC = () => {
       case_sensitive: caseSensitive,
       combined: viewMode === 'combined',
       search_mode: searchMode,
-      ...(tokensModel ? { model: tokensModel } : {}),
       ...(concordanceLanguage ? { language: concordanceLanguage } : {}),
     };
   }, [
@@ -849,7 +812,6 @@ const ConcordanceFeature: React.FC = () => {
     caseSensitive,
     viewMode,
     searchMode,
-    tokensModel,
     concordanceLanguage,
   ]);
 
@@ -954,7 +916,6 @@ const ConcordanceFeature: React.FC = () => {
       caseSensitive,
       searchMode,
       language: concordanceLanguage,
-      model: tokensModel,
     },
     actions: {
       setNodePagination,
@@ -1621,7 +1582,6 @@ const ConcordanceFeature: React.FC = () => {
   const effWholeWord = effSettings?.whole_word ?? wholeWord;
   const effCaseSensitive = effSettings?.case_sensitive ?? caseSensitive;
   const effSearchMode = effSettings?.search_mode ?? searchMode;
-  const effTokensModel = effSettings?.model ?? tokensModel;
   // View-mode dispatch. In snapshot mode the dedicated
   // ``snapshotViewMode`` state drives the Separated/Combined toggle
   // (so Exit returns to the live ``viewMode`` untouched). The
@@ -1679,9 +1639,6 @@ const ConcordanceFeature: React.FC = () => {
           setSearchModeUserSet(true);
         }}
         tokensModeAvailable={tokensModeAvailable || inSnapshotMode}
-        tokensModelOptions={tokensModelOptions}
-        tokensModel={effTokensModel}
-        setTokensModel={setTokensModel}
         isSearching={isSearching}
         actionState={actionState}
         handleRunOrUpdate={handleRunOrUpdate}
