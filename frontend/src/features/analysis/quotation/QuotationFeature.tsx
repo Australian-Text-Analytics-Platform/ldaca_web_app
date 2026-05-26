@@ -287,7 +287,7 @@ const QuotationFeature: React.FC = () => {
   // backend gate at the UI so the Run button surfaces a clear "why is
   // this disabled" tooltip rather than letting the user submit a request
   // that's going to come back as HTTP 400. Resolves language from the
-  // active node's derived metadata (Phase 2.4 v2) first, then the
+  // active node's tokenization metadata first, then the
   // per-user default preference, then "en".
   const nodeLanguage = effectiveNodeLanguage({
     node: displayedNodes[0] ?? null,

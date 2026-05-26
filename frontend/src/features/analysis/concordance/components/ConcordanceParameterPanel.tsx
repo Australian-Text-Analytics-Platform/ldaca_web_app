@@ -44,7 +44,7 @@ export type ConcordanceParameterPanelProps = {
   setCaseSensitive: Dispatch<SetStateAction<boolean>>;
   /**
    * Phase 4.7: selected concordance engine. ``tokens`` mode walks a
-   * derived tokens column for word-aware CJK context; only meaningful
+  * tokenization column for word-aware CJK context; only meaningful
    * when ``tokensModeAvailable`` is true (active node has been
    * tokenised on the selected column).
    */
@@ -242,7 +242,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
 
           <div className="flex flex-wrap items-center gap-4 text-sm">
             {/* Phase 4.7 — search mode picker. ``tokens`` is auto-selected
-                when the active node carries a derived tokens column for
+              when the active node carries tokenization metadata for
                 the selected source column; the regex / whole-word / case
                 checkboxes don't apply in tokens mode so they're disabled
                 with a tooltip explaining why. */}
@@ -274,7 +274,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                     readOnly,
                     tokensModeAvailable
                       ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                      : 'Run Tokenise on this column first — tokens-mode walks the derived tokens column for word-aware (CJK-friendly) context.',
+                      : 'Run Tokenise on this column first - tokens-mode walks the tokenization column for word-aware (CJK-friendly) context.',
                   )}
                 >
                   <button

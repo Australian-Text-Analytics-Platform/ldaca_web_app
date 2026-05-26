@@ -63,27 +63,21 @@ export interface WorkspaceNode {
   data_type?: string;
   column_schema?: Record<string, string>;
   dtypes?: Record<string, string>;
-  /**
-    * Per-tokenisation metadata keyed by the backend's dynamic token column
-    * name. Empty / absent on nodes without tokenisation.
-   */
-  derived?: Record<string, DerivedColumnMeta>;
+  /** Per-tokenisation metadata keyed by source column. */
+  tokenization?: Record<string, TokenizationMeta>;
   [key: string]: unknown;
 }
 
-/**
- * Per-derived-column metadata mirrored from the backend
- * ``DerivedColumnMeta`` TypedDict. ``language`` is the language the
- * derivation was configured for (e.g. ``"zh"`` for a jieba run) — the
- * frontend uses it as the canonical signal for "is this node working
- * in language X".
- */
-export interface DerivedColumnMeta {
+/** Metadata for one source column's tokenisation spec. */
+export interface TokenizationMeta {
   source_column: string;
-  form: string;
+  column_name: string;
   model: string;
   language: string | null;
   generated_at: string;
+  cache_backend?: string;
+  cache_schema_version?: number;
+  params?: Record<string, unknown>;
 }
 
 export interface NodeSchemaResponse {

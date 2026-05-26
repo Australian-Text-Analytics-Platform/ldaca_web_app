@@ -13,7 +13,7 @@ import {
 
 const ZH_META = {
   source_column: 'text',
-  form: 'tokens',
+  column_name: 'tokenization.text.jieba',
   model: 'jieba',
   language: 'zh',
   generated_at: '2026-05-12T00:00:00+00:00',
@@ -21,7 +21,7 @@ const ZH_META = {
 
 const EN_META = {
   source_column: 'text',
-  form: 'tokens',
+  column_name: 'tokenization.text.bert-base-uncased',
   model: 'bert-base-uncased',
   language: 'en',
   generated_at: '2026-05-12T00:00:00+00:00',
@@ -32,24 +32,24 @@ describe('effectiveNodeLanguage', () => {
     expect(
       effectiveNodeLanguage({
         explicit: 'ja',
-        node: { derived: { 'a': ZH_META } },
+        node: { tokenization: { text: ZH_META } },
         defaultLanguage: 'zh',
       }),
     ).toBe('ja');
   });
 
-  it('falls back to derived metadata when no explicit override', () => {
+  it('falls back to tokenization metadata when no explicit override', () => {
     expect(
       effectiveNodeLanguage({
-        node: { derived: { 'a': ZH_META } },
+        node: { tokenization: { text: ZH_META } },
       }),
     ).toBe('zh');
   });
 
-  it('falls back to default preference after derived', () => {
+  it('falls back to default preference after tokenization', () => {
     expect(
       effectiveNodeLanguage({
-        node: { derived: {} },
+        node: { tokenization: {} },
         defaultLanguage: 'zh',
       }),
     ).toBe('zh');
@@ -69,20 +69,20 @@ describe('effectiveNodeLanguage', () => {
 
   it('reads through a node-like object with an index signature', () => {
     // ``WorkspaceNodeLike`` is ``Record<string, unknown>`` — the resolver
-    // must accept any shape that *might* carry a ``derived`` field.
-    const looseNode: Record<string, unknown> = { derived: { 'a': ZH_META } };
+    // must accept any shape that *might* carry a ``tokenization`` field.
+    const looseNode: Record<string, unknown> = { tokenization: { text: ZH_META } };
     expect(effectiveNodeLanguage({ node: looseNode })).toBe('zh');
   });
 
-  it('returns English when derived has only an English column', () => {
+  it('returns English when tokenization has only an English column', () => {
     expect(
-      effectiveNodeLanguage({ node: { derived: { 'a': EN_META } } }),
+      effectiveNodeLanguage({ node: { tokenization: { text: EN_META } } }),
     ).toBe('en');
   });
 
-  it('walks every derived entry until a non-empty language is found', () => {
+  it('walks every tokenization entry until a non-empty language is found', () => {
     const node = {
-      derived: {
+      tokenization: {
         a: { ...ZH_META, language: null },
         b: { ...ZH_META, language: '' },
         c: ZH_META,
@@ -91,15 +91,15 @@ describe('effectiveNodeLanguage', () => {
     expect(effectiveNodeLanguage({ node })).toBe('zh');
   });
 
-  it('is robust against malformed derived dicts', () => {
+  it('is robust against malformed tokenization dicts', () => {
     // Realistically a typed payload won't be malformed, but defensive
     // reads keep the resolver from throwing on unexpected backend changes.
     expect(
-      effectiveNodeLanguage({ node: { derived: 'not-a-dict' as unknown } }),
+      effectiveNodeLanguage({ node: { tokenization: 'not-a-dict' as unknown } }),
     ).toBe(DEFAULT_LANGUAGE);
     expect(
       effectiveNodeLanguage({
-        node: { derived: { a: 'not-a-meta' as unknown } as unknown },
+        node: { tokenization: { a: 'not-a-meta' as unknown } as unknown },
       }),
     ).toBe(DEFAULT_LANGUAGE);
   });

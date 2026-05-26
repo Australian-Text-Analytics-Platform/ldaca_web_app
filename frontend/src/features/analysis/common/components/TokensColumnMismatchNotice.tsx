@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
-type NodeWithDerived = {
+type NodeWithTokenization = {
   id?: unknown;
   node_id?: unknown;
-  derived?: unknown;
+  tokenization?: unknown;
   [key: string]: unknown;
 };
 
@@ -14,23 +14,22 @@ type Selection = {
 };
 
 export type TokensColumnMismatchNoticeProps = {
-  nodes: ReadonlyArray<NodeWithDerived>;
+  nodes: ReadonlyArray<NodeWithTokenization>;
   selections: ReadonlyArray<Selection>;
   className?: string;
 };
 
-const nodeMatchesId = (node: NodeWithDerived, id: string) =>
+const nodeMatchesId = (node: NodeWithTokenization, id: string) =>
   [node.id, node.node_id].some((value) => typeof value === 'string' && value === id);
 
-const collectTokensSources = (derived: unknown): string[] => {
-  if (!derived || typeof derived !== 'object') return [];
+const collectTokensSources = (tokenization: unknown): string[] => {
+  if (!tokenization || typeof tokenization !== 'object') return [];
   const sources = new Set<string>();
-  for (const meta of Object.values(derived as Record<string, unknown>)) {
-    if (!meta || typeof meta !== 'object') continue;
-    const m = meta as { source_column?: unknown; form?: unknown };
-    if (m.form !== 'tokens') continue;
-    if (typeof m.source_column === 'string' && m.source_column) {
-      sources.add(m.source_column);
+  for (const [source, meta] of Object.entries(tokenization as Record<string, unknown>)) {
+    if (source) sources.add(source);
+    if (meta && typeof meta === 'object') {
+      const sourceColumn = (meta as { source_column?: unknown }).source_column;
+      if (typeof sourceColumn === 'string' && sourceColumn) sources.add(sourceColumn);
     }
   }
   return Array.from(sources);
@@ -38,8 +37,8 @@ const collectTokensSources = (derived: unknown): string[] => {
 
 /**
  * Inline notice that surfaces when the user has selected a text column for
- * analysis that *doesn't* have a derived tokens column, but the node does
- * carry tokens derived for some *other* column. Without this, running the
+ * analysis that *doesn't* have a tokenization spec, but the node does
+ * carry tokenization for some *other* column. Without this, running the
  * analysis silently falls back to live-tokenisation on every run — fast on
  * Latin-script corpora, painfully slow on CJK ones. The notice nudges the
  * user to tokenise the selected column before running.
@@ -58,7 +57,7 @@ export const TokensColumnMismatchNotice: React.FC<TokensColumnMismatchNoticeProp
     if (!first?.column || !first.nodeId) return null;
     const node = nodes.find((n) => nodeMatchesId(n, first.nodeId));
     if (!node) return null;
-    const tokensSources = collectTokensSources(node.derived);
+    const tokensSources = collectTokensSources(node.tokenization);
     if (tokensSources.length === 0) return null;
     if (tokensSources.includes(first.column)) return null;
     return { selectedColumn: first.column, tokensSources };
@@ -75,7 +74,7 @@ export const TokensColumnMismatchNotice: React.FC<TokensColumnMismatchNoticeProp
       role="note"
     >
       <strong className="font-semibold">No tokens for <code>{mismatch.selectedColumn}</code>.</strong>{' '}
-      Tokens are derived for: {mismatch.tokensSources.map((src, i) => (
+      Tokens are cached for: {mismatch.tokensSources.map((src, i) => (
         <React.Fragment key={src}>
           {i > 0 ? ', ' : ''}
           <code>{src}</code>

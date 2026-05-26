@@ -298,14 +298,14 @@ export const nodesApi = {
     { method: 'POST', headers, body: req }
   ),
 
-  /** Save this node's tokenisation spec; replaces any previous token spec. */
+  /** Save this source column's tokenisation spec on the node. */
   tokeniseColumn: (
     node: string,
     req: TokeniseColumnRequest,
     headers: Record<string, string> = {},
   ) =>
     post<TokeniseColumnResponse>(
-      `/workspaces/nodes/${node}/derived/tokens`,
+      `/workspaces/nodes/${node}/tokenization`,
       req,
       headers,
     ),

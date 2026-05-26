@@ -156,7 +156,7 @@ describe('CustomNode', () => {
     expect(screen.getByText(/This action cannot be undone/)).toBeInTheDocument();
   });
 
-  it('does not render a derived-columns row when none are present', () => {
+  it('does not render a tokenization row when none is present', () => {
     mockZoom = 1;
     const props = {
       id: 'node-1',
@@ -201,10 +201,10 @@ describe('CustomNode', () => {
           columns: ['text'],
           preview: [],
           is_text_data: true,
-          derived: {
-            'text.tokenization.jieba': {
+          tokenization: {
+            text: {
               source_column: 'text',
-              form: 'tokens',
+              column_name: 'tokenization.text.jieba',
               model: 'jieba',
               language: 'zh',
               generated_at: '2026-05-12T00:00:00+00:00',
@@ -226,6 +226,53 @@ describe('CustomNode', () => {
 
     render(<CustomNode {...props} />);
     expect(screen.getByText('tokens: text · jieba')).toBeInTheDocument();
+  });
+
+  it('summarises multiple tokenised columns compactly', () => {
+    mockZoom = 1;
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: {
+        node: {
+          node_id: 'node-1',
+          name: 'mixed-corpus',
+          shape: [3, 2] as [number, number],
+          columns: ['text', 'notes'],
+          preview: [],
+          is_text_data: true,
+          tokenization: {
+            text: {
+              source_column: 'text',
+              column_name: 'tokenization.text.jieba',
+              model: 'jieba',
+              language: 'zh',
+              generated_at: '2026-05-12T00:00:00+00:00',
+            },
+            notes: {
+              source_column: 'notes',
+              column_name: 'tokenization.notes.bert-base-uncased',
+              model: 'bert-base-uncased',
+              language: 'en',
+              generated_at: '2026-05-12T00:00:00+00:00',
+            },
+          },
+        },
+        onDelete: vi.fn(),
+      },
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+    expect(screen.getByText('tokens: text · jieba + 1 more')).toBeInTheDocument();
   });
 
   it('exposes a Tokenise entry in the node menu when the node has columns', async () => {
@@ -339,10 +386,10 @@ describe('CustomNode', () => {
         data={{
           node: {
             ...baseNode,
-            derived: {
-              'text.tokenization.jieba': {
+            tokenization: {
+              text: {
                 source_column: 'text',
-                form: 'tokens',
+                column_name: 'tokenization.text.jieba',
                 model: 'jieba',
                 language: 'zh',
                 generated_at: '2026-05-12T00:00:00+00:00',

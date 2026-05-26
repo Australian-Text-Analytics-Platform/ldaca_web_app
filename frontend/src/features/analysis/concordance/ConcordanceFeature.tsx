@@ -129,7 +129,7 @@ const ConcordanceFeature: React.FC = () => {
   const [caseSensitive, setCaseSensitive] = useState(false);
   // Phase 4.7: concordance has two engines. ``regex`` walks raw text (the
   // historical default, preserves ``equ\w*``-style affordances); ``tokens``
-  // walks the active node's derived tokens column for N-actual-token CJK-
+  // walks the active node's tokenization column for N-actual-token CJK-
   // aware context (decision 6). Auto-picked below when the active node
   // has been tokenised AND the user hasn't manually overridden.
   const [searchMode, setSearchMode] = useState<'regex' | 'tokens'>('regex');
@@ -517,10 +517,8 @@ const ConcordanceFeature: React.FC = () => {
     return map;
   }, [panelSelectedNodes, nodeColors, defaultPalette]);
 
-  // Phase 4.7: check whether any selected node has a derived tokens
-  // column matching the column the user picked, so tokens-mode is only
-  // offered when it makes sense. We look at the first node's selection
-  // and its ``derived`` metadata.
+  // Phase 4.7: check whether the selected source column has tokenization
+  // metadata, so tokens-mode is only offered when it makes sense.
   const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const tokensModeAvailable = useMemo(() => {
     const firstSelection = effectiveNodeColumnSelections[0];
@@ -531,19 +529,14 @@ const ConcordanceFeature: React.FC = () => {
         (id) => typeof id === 'string' && id === firstSelection.nodeId,
       );
     });
-    const derived = firstNode?.derived;
-    if (!derived || typeof derived !== 'object') return false;
-    return Object.values(derived as Record<string, unknown>).some((meta) => {
-      if (!meta || typeof meta !== 'object') return false;
-      const sourceColumn = (meta as { source_column?: unknown }).source_column;
-      const form = (meta as { form?: unknown }).form;
-      return form === 'tokens' && sourceColumn === firstSelection.column;
-    });
+    const tokenization = firstNode?.tokenization;
+    if (!tokenization || typeof tokenization !== 'object') return false;
+    return Boolean((tokenization as Record<string, unknown>)[firstSelection.column]);
   }, [effectiveNodeColumnSelections, panelSelectedNodes]);
 
   // Auto-pick tokens-mode when it becomes available AND the user hasn't
   // manually overridden. When tokens stop being available (e.g. user
-  // switches to a data block without a derived tokens column) force
+  // switches to a data block without tokenization for the selected column) force
   // regex and clear the user-override flag — the override was
   // contextual to a node/column selection that no longer holds, and
   // leaving it sticky lets stale 'tokens' survive onto an ineligible

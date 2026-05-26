@@ -174,7 +174,7 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
       return lockedNodesSnapshot.map((snapshot) => {
         // The lock snapshot is intentionally narrow (id/name/columns/shape),
         // but downstream features (tokens-mode auto-pick, language inference)
-        // need ``derived`` metadata too. Pull it from the live graph node when
+        // need ``tokenization`` metadata too. Pull it from the live graph node when
         // the same id still exists in the workspace — falls back to undefined
         // when the source node has since been removed.
         const live = selectedNodes.find((n) => n.id === snapshot.id) as
@@ -192,7 +192,7 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
             columns: snapshot.columns,
           },
           columns: snapshot.columns,
-          derived: live?.derived,
+          tokenization: live?.tokenization,
         };
       });
     }

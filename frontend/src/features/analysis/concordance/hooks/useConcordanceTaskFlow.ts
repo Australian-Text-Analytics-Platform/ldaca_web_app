@@ -34,7 +34,7 @@ interface ConcordanceState {
   caseSensitive: boolean;
   /**
    * Phase 4.7: selected concordance engine. ``"regex"`` (default) walks
-   * raw text; ``"tokens"`` walks the active node's derived tokens
+  * raw text; ``"tokens"`` walks the active node's tokenization
    * column for N-actual-token CJK-aware context.
    */
   searchMode: 'regex' | 'tokens';

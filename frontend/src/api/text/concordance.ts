@@ -9,7 +9,7 @@ import type { LanguageHint, SourceRowPagination } from './shared';
  *   partial-word patterns like ``equ\w*`` survive. On CJK,
  *   ``num_left_tokens`` silently means "characters" because there's no
  *   whitespace.
- * - ``tokens`` — walks the derived tokens column added by Tokenise.
+ * - ``tokens`` — walks the tokenization column added by Tokenise.
  *   N-actual-token left/right context, exact-token match. Only meaningful
  *   on nodes that have been tokenised.
  */
@@ -140,7 +140,7 @@ export interface ConcordanceAnalysisRequest extends LanguageHint {
   combined?: boolean;
   /**
    * Phase 2.6 / 4.7: pick concordance engine. Defaults to ``"regex"`` so
-   * existing EN flows are unchanged; ``"tokens"`` walks the derived
+    * existing EN flows are unchanged; ``"tokens"`` walks the tokenization
    * tokens column for N-actual-token context on CJK nodes that have
    * been tokenised.
    */

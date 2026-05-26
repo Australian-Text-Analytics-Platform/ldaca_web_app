@@ -554,7 +554,7 @@ const TopicModelingFeature: React.FC = () => {
   // first corpus's language.
   //
   // Resolution order per node (via ``effectiveNodeLanguage``):
-  // 1. ``node.derived[*].language`` — set by Tokenise; authoritative
+  // 1. ``node.tokenization[*].language`` — set by Tokenise; authoritative
   // 2. user preferences ``defaultLanguage``
   // 3. ``en`` — global fallback
   //

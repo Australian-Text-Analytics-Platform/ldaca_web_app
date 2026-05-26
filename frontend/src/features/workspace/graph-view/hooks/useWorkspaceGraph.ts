@@ -191,10 +191,10 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
 
       const position = positions.get(node.id) || { x: index * 320, y: 50 };
 
-      const rawDerived = (node as { derived?: unknown }).derived;
-      const passthroughDerived =
-        rawDerived && typeof rawDerived === 'object' && !Array.isArray(rawDerived)
-          ? (rawDerived as Record<string, unknown>)
+      const rawTokenization = (node as { tokenization?: unknown }).tokenization;
+      const passthroughTokenization =
+        rawTokenization && typeof rawTokenization === 'object' && !Array.isArray(rawTokenization)
+          ? (rawTokenization as Record<string, unknown>)
           : undefined;
 
       return {
@@ -215,7 +215,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             document: documentColumn,
             document_column: documentColumn,
             column_schema: columnSchema,
-            derived: passthroughDerived,
+            tokenization: passthroughTokenization,
           },
           isMultiSelected:
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),

@@ -18,7 +18,7 @@ export interface SourceRowPagination {
  * threading: every analysis request that has per-language behaviour
  * carries an optional ``language`` so the frontend can override the
  * backend's per-request fallback chain
- * (request → derived metadata → ``"en"``). Use :func:`buildLanguageHint`
+ * (request -> tokenization metadata -> ``"en"``). Use :func:`buildLanguageHint`
  * to combine an explicit override with the per-user
  * ``defaultLanguage`` preference.
  */

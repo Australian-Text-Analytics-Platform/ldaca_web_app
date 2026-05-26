@@ -53,7 +53,7 @@ function TokeniseDialogContainer({
       onSuccess={() => {
         if (currentWorkspaceId && nodeId) {
           invalidateNodeInfoQuery(queryClient, currentWorkspaceId, nodeId);
-          // The graph payload carries `derived` per-node (used by the
+          // The graph payload carries `tokenization` per-node (used by the
           // concordance tokens-mode auto-pick, language inference, and
           // the inspector chip). Skipping this invalidation leaves the
           // graph cache stale until its 30 s staleTime elapses, so the
@@ -240,17 +240,20 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     ? `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`
     : null;
 
-  const derivedSummary = ((): { label: string; tooltip: string } | null => {
-    const derived = node?.derived;
-    if (!derived || typeof derived !== 'object') return null;
-    for (const [name, meta] of Object.entries(derived)) {
-      if (!meta || meta.form !== 'tokens') continue;
-      return {
-        label: `tokens: ${meta.source_column} · ${meta.model}`,
-        tooltip: name,
-      };
-    }
-    return null;
+  const tokenizationSummary = ((): { label: string; tooltip: string } | null => {
+    const tokenization = node?.tokenization;
+    if (!tokenization || typeof tokenization !== 'object') return null;
+    const entries = Object.entries(tokenization);
+    if (entries.length === 0) return null;
+    const [source, meta] = entries[0]!;
+    const sourceColumn = meta.source_column || source;
+    const extraCount = entries.length - 1;
+    return {
+      label: `tokens: ${sourceColumn} · ${meta.model}${extraCount > 0 ? ` + ${extraCount} more` : ''}`,
+      tooltip: entries
+        .map(([key, entry]) => `${entry.source_column || key}: ${entry.model}`)
+        .join('\n'),
+    };
   })();
 
   const menuButtonClassName = 'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
@@ -502,13 +505,13 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         ) : (
           <div className="font-mono text-xs text-gray-400 italic">Shape unavailable</div>
         )}
-        {derivedSummary ? (
+        {tokenizationSummary ? (
           <div
             className="flex items-center gap-1 font-mono text-xs text-indigo-700"
-            title={derivedSummary.tooltip}
+            title={tokenizationSummary.tooltip}
           >
             <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
-            <span className="truncate">{derivedSummary.label}</span>
+            <span className="truncate">{tokenizationSummary.label}</span>
           </div>
         ) : null}
       </div>

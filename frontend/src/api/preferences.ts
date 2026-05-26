@@ -11,7 +11,7 @@ export interface UserPreferences {
   favorite_workspaces: string[];
   quotation: QuotationPreferences;
   // Phase 4.1: per-user multilingual defaults. ``null`` falls back to the
-  // backend's per-request resolution chain (request → derived → "en").
+  // backend's per-request resolution chain (request → tokenization → "en").
   // Persisted alongside the rest of the prefs blob.
   default_language: string | null;
   default_tokenizer_model: string | null;

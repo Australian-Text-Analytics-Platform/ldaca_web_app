@@ -41,7 +41,7 @@ manually reloading the whole app state.
 ## Graph Hooks
 
 `graph-view/hooks/useWorkspaceGraph.ts` converts backend graph payloads to
-React Flow state. It handles dagre layout, derived metadata, selection/active
+React Flow state. It handles dagre layout, tokenization metadata, selection/active
 visual state, fresh-node highlighting, color pruning, and React Flow state
 updates.
 

@@ -7,13 +7,13 @@
  *
  * Resolution order:
  *   1. ``explicit`` — caller-supplied string (e.g. selector value).
- *   2. ``node.derived[*].language`` — language tagged on any derived
- *      column registered on this node. The Tokenise operation records
+ *   2. ``node.tokenization[*].language`` — language tagged on any tokenization
+ *      spec registered on this node. The Tokenise operation records
  *      this, so once a user has tokenised, the corpus language is known.
  *   3. ``defaultLanguage`` — per-user preference from the store.
  *   4. ``"en"`` — global fallback so existing English flows stay quiet.
  */
-import type { DerivedColumnMeta } from '@/types';
+import type { TokenizationMeta } from '@/types';
 
 export const DEFAULT_LANGUAGE = 'en';
 
@@ -21,11 +21,11 @@ export const DEFAULT_LANGUAGE = 'en';
  * Structural minimum the resolver needs from a node. Both
  * ``WorkspaceNode`` and the looser ``WorkspaceNodeLike`` (``Record<string,
  * unknown>`` for backend payloads that may omit fields) satisfy this
- * via the index signature — ``derived`` is read defensively, so any
+ * via the index signature — ``tokenization`` is read defensively, so any
  * shape that surfaces it will work.
  */
-export type NodeLikeWithDerived = {
-  derived?: Record<string, DerivedColumnMeta> | unknown;
+export type NodeLikeWithTokenization = {
+  tokenization?: Record<string, TokenizationMeta> | unknown;
   [key: string]: unknown;
 };
 
@@ -35,9 +35,9 @@ function normalise(value: string | null | undefined): string | null {
   return trimmed || null;
 }
 
-function readLanguageFromDerived(derived: unknown): string | null {
-  if (!derived || typeof derived !== 'object') return null;
-  for (const meta of Object.values(derived as Record<string, unknown>)) {
+function readLanguageFromTokenization(tokenization: unknown): string | null {
+  if (!tokenization || typeof tokenization !== 'object') return null;
+  for (const meta of Object.values(tokenization as Record<string, unknown>)) {
     if (!meta || typeof meta !== 'object') continue;
     const lang = normalise((meta as { language?: unknown }).language as string | null);
     if (lang) return lang;
@@ -47,13 +47,13 @@ function readLanguageFromDerived(derived: unknown): string | null {
 
 export function effectiveNodeLanguage(args: {
   explicit?: string | null;
-  node?: NodeLikeWithDerived | null;
+  node?: NodeLikeWithTokenization | null;
   defaultLanguage?: string | null;
 }): string {
   const explicit = normalise(args.explicit);
   if (explicit) return explicit;
 
-  const fromNode = readLanguageFromDerived(args.node?.derived);
+  const fromNode = readLanguageFromTokenization(args.node?.tokenization);
   if (fromNode) return fromNode;
 
   const fallback = normalise(args.defaultLanguage);
