@@ -1,0 +1,111 @@
+name: Desktop Windows Build — Slim (x64)
+
+# Builds the SLIM Windows desktop variant: no bundled Python runtime. The MSI
+# ships a bundled `uv.exe` and installs ldaca-wordflow from PyPI into the
+# per-user data dir on first launch (see src-tauri/src/main.rs
+# `ensure_slim_runtime`). The MSI is left UNSIGNED (ad-hoc) — there's no Windows
+# code-signing cert wired up. The bundled desktop-windows.yml and the macOS
+# builds are intentionally left untouched.
+
+on:
+  # TEMPORARY (prototype): run while the workflow lives only on the feature
+  # branch. Remove when promoting to the default branch (workflow_dispatch).
+  push:
+    branches:
+      - tauri/slim-dmg-prototype
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to build"
+        required: false
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Optional Git ref to build (branch, tag, or SHA)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.8.22"
+
+jobs:
+  build-windows-slim-x64:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-slim-cargo-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-slim-cargo-
+
+      - name: Install Node workspace dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Download + stage pinned uv.exe
+        shell: pwsh
+        working-directory: frontend/src-tauri
+        run: |
+          $url = "https://github.com/astral-sh/uv/releases/download/$env:UV_VERSION/uv-x86_64-pc-windows-msvc.zip"
+          Write-Host "Downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile uv.zip
+          Expand-Archive -Path uv.zip -DestinationPath uv_extract -Force
+          $exe = Get-ChildItem -Path uv_extract -Recurse -Filter uv.exe | Select-Object -First 1
+          Copy-Item $exe.FullName ./uv.exe -Force
+          Remove-Item -Recurse -Force uv.zip, uv_extract
+          ./uv.exe --version
+
+      - name: Build slim Tauri app (unsigned)
+        shell: bash
+        working-directory: frontend
+        run: |
+          npx tauri build \
+            --features slim \
+            --config src-tauri/tauri.slim.windows.conf.json
+
+      - name: Locate MSI
+        id: msi
+        shell: bash
+        working-directory: frontend
+        run: |
+          set -Eeuo pipefail
+          msi=$(ls src-tauri/target/release/bundle/msi/*.msi | head -1)
+          test -n "$msi"
+          abs="$(pwd)/$msi"
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          echo "path=$abs" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Built MSI: $abs"
+
+      - name: Upload slim MSI artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ldaca-wordflow-slim-windows-x64
+          path: ${{ steps.msi.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14

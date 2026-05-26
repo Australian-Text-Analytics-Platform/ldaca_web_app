@@ -39,3 +39,4 @@ backend-runtime/
 
 # Bundled uv binary (copied locally; CI downloads a pinned release)
 uv
+uv.exe

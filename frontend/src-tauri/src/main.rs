@@ -286,6 +286,10 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
         return Ok(());
     }
 
+    // Windows needs the .exe extension to execute the bundled binary.
+    #[cfg(windows)]
+    let uv = app.path().resolve("uv.exe", BaseDirectory::Resource)?;
+    #[cfg(not(windows))]
     let uv = app.path().resolve("uv", BaseDirectory::Resource)?;
     #[cfg(unix)]
     {
