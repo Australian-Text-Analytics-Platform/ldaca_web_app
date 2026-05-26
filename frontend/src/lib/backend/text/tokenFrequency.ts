@@ -12,7 +12,7 @@ import type {
 
 export type { TokenFrequencyNodeResult, TokenFrequencyRequest } from '@/api/generated/types.gen';
 
-export type TokenFrequencyResponse = Omit<GeneratedTokenFrequencyResponse, 'message' | 'state'> & {
+export type TokenFrequencyResultResponse = Omit<GeneratedTokenFrequencyResponse, 'message' | 'state'> & {
   message?: string;
   state: 'running' | 'successful' | 'failed' | 'cancelled';
 };
@@ -24,7 +24,7 @@ export const tokenFrequencyApi = {
       headers,
       throwOnError: true,
     });
-    return data as TokenFrequencyResponse;
+    return data as TokenFrequencyResultResponse;
   },
 
   /**
@@ -62,7 +62,7 @@ export const tokenFrequencyApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as TokenFrequencyResponse;
+    return data as TokenFrequencyResultResponse;
   },
 
   postTokenFrequenciesTaskResult: async (
@@ -76,6 +76,6 @@ export const tokenFrequencyApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as TokenFrequencyResponse;
+    return data as TokenFrequencyResultResponse;
   },
 };

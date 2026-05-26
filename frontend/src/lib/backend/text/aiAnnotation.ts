@@ -31,7 +31,7 @@ export type {
   AiAnnotationSaveRequest,
 } from '@/api/generated/types.gen';
 
-export type AiAnnotationNodeResult = Omit<GeneratedAiAnnotationNodeResult, 'metadata' | 'pagination' | 'sorting'> & {
+export type AiAnnotationNodeResultView = Omit<GeneratedAiAnnotationNodeResult, 'metadata' | 'pagination' | 'sorting'> & {
   metadata?: Record<string, unknown>;
   pagination?: {
     page: number;
@@ -48,9 +48,9 @@ export type AiAnnotationNodeResult = Omit<GeneratedAiAnnotationNodeResult, 'meta
   };
 };
 
-export type AiAnnotationResponse = Omit<GeneratedAiAnnotationResponse, 'data' | 'metadata' | 'state'> & {
+export type AiAnnotationResultResponse = Omit<GeneratedAiAnnotationResponse, 'data' | 'metadata' | 'state'> & {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
-  data?: Record<string, AiAnnotationNodeResult> | null;
+  data?: Record<string, AiAnnotationNodeResultView> | null;
   metadata?: { task_id?: string; [k: string]: unknown };
 };
 
@@ -100,7 +100,7 @@ export const aiAnnotationApi = {
       headers,
       throwOnError: true,
     });
-    return data as AiAnnotationResponse;
+    return data as AiAnnotationResultResponse;
   },
 
   aiAnnotationDetach: async (
@@ -182,7 +182,7 @@ export const aiAnnotationApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as AiAnnotationResponse;
+    return data as AiAnnotationResultResponse;
   },
 
   postAiAnnotationTaskResult: async (
@@ -196,6 +196,6 @@ export const aiAnnotationApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as AiAnnotationResponse;
+    return data as AiAnnotationResultResponse;
   },
 };

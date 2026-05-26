@@ -12,20 +12,14 @@ import HelpIcon from '@/components/help/HelpIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useShallow } from 'zustand/react/shallow';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import type { WorkspaceSummary } from '@/api/generated/types.gen';
 import { formatBytes, formatTimestamp, getWorkspaceId } from '../utils/format';
 import type { PendingWorkspaceDownloadsHandle } from '../hooks/usePendingWorkspaceDownloads';
 
-export type WorkspaceListItem = {
-  id?: string;
+export type WorkspaceListItem = Partial<WorkspaceSummary> & {
   unique_id?: string;
-  name?: string;
-  description?: string;
-  modified_at?: string | null;
   updated_at?: string | null;
-  created_at?: string | null;
-  total_nodes?: number;
   dataframe_count?: number;
-  workspace_size_Byte?: number;
 };
 
 export type WorkspaceManagerCardProps = {

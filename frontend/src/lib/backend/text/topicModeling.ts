@@ -15,22 +15,20 @@ import type {
   TopicModelingDetachResponse as GeneratedTopicModelingDetachResponse,
   TopicModelingRequest as GeneratedTopicModelingRequest,
   TopicModelingResponse as GeneratedTopicModelingResponse,
-  TopicModelingTopic as GeneratedTopicModelingTopic,
 } from '@/api/generated/types.gen';
 
 export type {
   TopicMeaningOverrideItem,
   TopicModelingDetachNodeOption,
   TopicModelingDetachRequest,
+  TopicModelingTopic,
 } from '@/api/generated/types.gen';
 
-export type TopicModelingRequest = Omit<GeneratedTopicModelingRequest, 'topic_size_mode'> & {
+export type TopicModelingRunRequest = Omit<GeneratedTopicModelingRequest, 'topic_size_mode'> & {
   topic_size_mode?: 'min' | 'exact' | null;
 };
 
-export type TopicModelingTopic = GeneratedTopicModelingTopic;
-
-export type TopicModelingData = Omit<GeneratedTopicModelingData, 'meta'> & {
+export type TopicModelingResultData = Omit<GeneratedTopicModelingData, 'meta'> & {
   meta?: Record<string, unknown>;
 };
 
@@ -38,31 +36,31 @@ export type TopicModelingResultUpdate = {
   topic_size_value: number;
 };
 
-export type TopicModelingResponse = Omit<GeneratedTopicModelingResponse, 'data' | 'metadata' | 'state'> & {
+export type TopicModelingResultResponse = Omit<GeneratedTopicModelingResponse, 'data' | 'metadata' | 'state'> & {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
-  data?: TopicModelingData;
+  data?: TopicModelingResultData;
   metadata?: { task_id?: string; [key: string]: unknown };
 };
 
-export type TopicModelingDetachOptionsResponse = Omit<GeneratedTopicModelingDetachOptionsResponse, 'metadata' | 'state'> & {
+export type TopicModelingDetachOptionsResult = Omit<GeneratedTopicModelingDetachOptionsResponse, 'metadata' | 'state'> & {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   metadata?: { task_id?: string; [key: string]: unknown };
 };
 
-export type TopicModelingDetachResponse = Omit<GeneratedTopicModelingDetachResponse, 'data' | 'metadata' | 'state'> & {
+export type TopicModelingDetachResult = Omit<GeneratedTopicModelingDetachResponse, 'data' | 'metadata' | 'state'> & {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   data?: { detached_nodes?: Array<{ source_node_id: string; new_node_id: string }> };
   metadata?: { task_id?: string; [key: string]: unknown };
 };
 
 export const topicModelingApi = {
-  topicModeling: async (req: TopicModelingRequest, headers: Record<string, string> = {}) => {
+  topicModeling: async (req: TopicModelingRunRequest, headers: Record<string, string> = {}) => {
     const { data } = await runTopicModelingApiWorkspacesTopicModelingPost({
       body: req,
       headers,
       throwOnError: true,
     });
-    return data as TopicModelingResponse;
+    return data as TopicModelingResultResponse;
   },
 
   getTopicModelingTaskRequest: async (taskId: string, headers: Record<string, string> = {}) => {
@@ -80,7 +78,7 @@ export const topicModelingApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as TopicModelingResponse;
+    return data as TopicModelingResultResponse;
   },
 
   postTopicModelingTaskResult: async (
@@ -94,7 +92,7 @@ export const topicModelingApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as TopicModelingResponse;
+    return data as TopicModelingResultResponse;
   },
 
   getTopicModelingDetachOptions: async (taskId: string, headers: Record<string, string> = {}) => {
@@ -103,7 +101,7 @@ export const topicModelingApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as TopicModelingDetachOptionsResponse;
+    return data as TopicModelingDetachOptionsResult;
   },
 
   topicModelingDetach: async (
@@ -117,7 +115,7 @@ export const topicModelingApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as TopicModelingDetachResponse;
+    return data as TopicModelingDetachResult;
   },
 
   getTopicModelingEmbeddingCacheSize: async (headers: Record<string, string> = {}) => {

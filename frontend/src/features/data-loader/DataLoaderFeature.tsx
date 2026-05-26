@@ -163,8 +163,8 @@ export const DataLoaderFeature: React.FC = () => {
     const aFav = favoriteWorkspaces.includes(aId) ? 1 : 0;
     const bFav = favoriteWorkspaces.includes(bId) ? 1 : 0;
     if (aFav !== bFav) return bFav - aFav;
-    const aTime = Date.parse(String(a?.modified_at || a?.updated_at || a?.created_at || ''));
-    const bTime = Date.parse(String(b?.modified_at || b?.updated_at || b?.created_at || ''));
+    const aTime = Date.parse(String(a?.modified_at || a?.created_at || ''));
+    const bTime = Date.parse(String(b?.modified_at || b?.created_at || ''));
     return (bTime || 0) - (aTime || 0);
   });
 
@@ -176,7 +176,6 @@ export const DataLoaderFeature: React.FC = () => {
   const nodeCount =
     workspaceGraph?.nodes?.length ??
     currentWorkspace?.total_nodes ??
-    currentWorkspace?.dataframe_count ??
     0;
 
   const handleAddToWorkspace = async (selectedSheet?: string | null) => {

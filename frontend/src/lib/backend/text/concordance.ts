@@ -66,7 +66,7 @@ export type ConcordanceRequest = LanguageHint & {
   sort_by?: string;
 };
 
-export type ConcordanceDetachOptionsResponse = Omit<GeneratedConcordanceDetachOptionsResponse, 'data' | 'metadata' | 'state'> & {
+export type ConcordanceDetachOptionsResult = Omit<GeneratedConcordanceDetachOptionsResponse, 'data' | 'metadata' | 'state'> & {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   data?: { nodes: ConcordanceDetachNodeOption[] };
   metadata?: { task_id?: string; [key: string]: unknown };
@@ -175,7 +175,7 @@ export const concordanceApi = {
       path: { node_id: node },
       query: { column },
       throwOnError: true,
-    }).then(({ data }) => data as ConcordanceDetachOptionsResponse);
+    }).then(({ data }) => data as ConcordanceDetachOptionsResult);
   },
 
   getConcordanceTaskRequest: async (taskId: string, headers: Record<string, string> = {}) => {

@@ -14,13 +14,14 @@ import {
   updateWorkspaceDescriptionApiWorkspacesDescriptionPut,
   uploadWorkspaceZipApiWorkspacesUploadPost,
 } from '@/api/generated/sdk.gen';
-import type { WorkspaceInfo, WorkspaceGraphResponse } from '@/types/api';
+import type { WorkspaceSummary } from '@/api/generated/types.gen';
+import type { WorkspaceGraphResponse } from '@/types/api';
 import { ApiError } from '@/lib/apiError';
 
 export const workspacesApi = {
-  list: async (headers: Record<string, string> = {}): Promise<WorkspaceInfo[]> => {
+  list: async (headers: Record<string, string> = {}): Promise<WorkspaceSummary[]> => {
     const { data } = await listWorkspacesApiWorkspacesGet({ headers, throwOnError: true });
-    return data as WorkspaceInfo[];
+    return data;
   },
 
   create: async (name: string, description = '', headers: Record<string, string> = {}) => {

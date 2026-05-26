@@ -5,7 +5,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUIStore } from '@/stores/uiStore';
-import type { WorkspaceInfo } from '@/types/api';
+import type { WorkspaceSummary } from '@/api/generated/types.gen';
 import { getWorkspaceId } from '../utils/format';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
@@ -16,7 +16,7 @@ interface DeleteWorkspaceTarget {
 }
 
 interface UseDataLoaderWorkspaceActionsParams {
-  workspaces: WorkspaceInfo[];
+  workspaces: WorkspaceSummary[];
   hasWorkspaceSelected: boolean;
   authHeaders: Record<string, string>;
   notify: Notify;

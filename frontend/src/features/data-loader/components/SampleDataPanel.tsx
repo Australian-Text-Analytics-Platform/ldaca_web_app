@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { FolderPlus, Quote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { filesApi, type SampleDataCollection, type SampleDataCollectionStatus } from '@/lib/backend/files';
+import { filesApi, type SampleDataCollectionView, type SampleDataCollectionStatus } from '@/lib/backend/files';
 import {
   getSampleDataCatalogueApiFilesSampleDataCatalogueGetOptions,
   getSampleDataReadmeApiFilesSampleDataReadmeGetOptions,
@@ -50,7 +50,7 @@ const normalizeSampleDataStatus = (status: string): SampleDataCollectionStatus =
 
 const normalizeSampleDataCatalogue = (
   catalogue: GeneratedSampleDataCatalogueResponse | undefined,
-): { collections: SampleDataCollection[]; schema_version: number } | undefined => {
+): { collections: SampleDataCollectionView[]; schema_version: number } | undefined => {
   if (!catalogue) return undefined;
   return {
     ...catalogue,
@@ -78,7 +78,7 @@ function StatusChip({ status }: { status: SampleDataCollectionStatus }) {
   return <span className={cn('text-xs font-medium whitespace-nowrap', className)}>{label}</span>;
 }
 
-function readmePath(col: SampleDataCollection): string | null {
+function readmePath(col: SampleDataCollectionView): string | null {
   return col.files.find((f) => f.path.endsWith('README.md'))?.path ?? null;
 }
 
@@ -158,7 +158,7 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
   });
   const catalogue = normalizeSampleDataCatalogue(data);
 
-  const getChecked = (col: SampleDataCollection) => {
+  const getChecked = (col: SampleDataCollectionView) => {
     if (col.bundled) return true;
     return checked[col.id] ?? false;
   };

@@ -29,7 +29,7 @@ export type {
   ConcordanceAnalysisRequest,
   ConcordanceAnalysisResponse,
   ConcordanceDetachNodeOption,
-  ConcordanceDetachOptionsResponse,
+  ConcordanceDetachOptionsResult as ConcordanceDetachOptionsResponse,
   ConcordanceDetachRequest,
   ConcordanceDispersionBinRow,
   ConcordanceDispersionDetachRequest,
@@ -48,7 +48,7 @@ export type {
 export type {
   QuotationAnalysisResponse,
   QuotationDetachNodeOption,
-  QuotationDetachOptionsResponse,
+  QuotationDetachOptionsResult as QuotationDetachOptionsResponse,
   QuotationDetachRequest,
   QuotationEngineConfig,
   QuotationEngineType,
@@ -73,17 +73,17 @@ export { SNAPSHOT_FINEST_FREQUENCIES } from './sequential';
 export type {
   TokenFrequencyNodeResult,
   TokenFrequencyRequest,
-  TokenFrequencyResponse,
+  TokenFrequencyResultResponse as TokenFrequencyResponse,
 } from './tokenFrequency';
 
 export type {
-  TopicModelingData,
+  TopicModelingResultData as TopicModelingData,
   TopicModelingDetachNodeOption,
-  TopicModelingDetachOptionsResponse,
+  TopicModelingDetachOptionsResult as TopicModelingDetachOptionsResponse,
   TopicModelingDetachRequest,
-  TopicModelingDetachResponse,
-  TopicModelingRequest,
-  TopicModelingResponse,
+  TopicModelingDetachResult as TopicModelingDetachResponse,
+  TopicModelingRunRequest as TopicModelingRequest,
+  TopicModelingResultResponse as TopicModelingResponse,
   TopicModelingResultUpdate,
   TopicModelingTopic,
 } from './topicModeling';
@@ -96,10 +96,10 @@ export type {
   AiAnnotationExample,
   AiAnnotationModelsRequest,
   AiAnnotationModelsResponse,
-  AiAnnotationNodeResult,
+  AiAnnotationNodeResultView as AiAnnotationNodeResult,
   AiAnnotationProvidersResponse,
   AiAnnotationRequest,
-  AiAnnotationResponse,
+  AiAnnotationResultResponse as AiAnnotationResponse,
   AiAnnotationResultQuery,
   AiAnnotationSaveRequest,
 } from './aiAnnotation';

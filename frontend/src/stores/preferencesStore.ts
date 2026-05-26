@@ -18,7 +18,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { UserPreferences, UserPreferencesUpdate } from '@/lib/backend/preferences';
+import type { ResolvedUserPreferences, UserPreferencesUpdate } from '@/lib/backend/preferences';
 import { preferencesApi } from '@/lib/backend/preferences';
 import type { QuotationEngineConfig } from '@/lib/backend/text';
 import type { ViewType } from '@/stores/uiStore';
@@ -79,7 +79,7 @@ interface PreferencesActions {
 
 type PreferencesStore = PreferencesState & PreferencesActions;
 
-function applyServerState(state: PreferencesState, data: UserPreferences) {
+function applyServerState(state: PreferencesState, data: ResolvedUserPreferences) {
   state.hiddenViews = data.hidden_views;
   state.favoriteWorkspaces = data.favorite_workspaces;
   state.quotationEngine = data.quotation.engine;

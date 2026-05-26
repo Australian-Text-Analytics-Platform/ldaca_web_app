@@ -7,8 +7,8 @@
 // Re-exported here so preprocessing call sites don't have to know about
 // the api/ layer and so the narrower UI types live alongside the API
 // shape.
-export type { FilterCondition, FilterRequest } from '@/lib/backend/nodes';
-import type { FilterCondition } from '@/lib/backend/nodes';
+export type { FilterConditionPayload as FilterCondition, FilterRequestPayload as FilterRequest } from '@/lib/backend/nodes';
+import type { FilterConditionPayload } from '@/lib/backend/nodes';
 
 /**
  * UI-side narrowing of the value space — what the filter form actually
@@ -40,7 +40,7 @@ export interface ConditionColumnOption {
 export interface FilterConditionWithId {
   id: string;
   column: string;
-  operator: FilterCondition['operator'];
+  operator: FilterConditionPayload['operator'];
   value: ConditionValue;
   negate?: boolean;
   regex?: boolean;

@@ -86,12 +86,12 @@ export type FilterOperator =
   | 'between'
   | 'in';
 
-export type FilterCondition = Omit<GeneratedFilterCondition, 'operator'> & {
+export type FilterConditionPayload = Omit<GeneratedFilterCondition, 'operator'> & {
   operator: FilterOperator;
 };
 
-export type FilterRequest = Omit<GeneratedFilterRequest, 'conditions' | 'logic' | 'new_node_name'> & {
-  conditions: FilterCondition[];
+export type FilterRequestPayload = Omit<GeneratedFilterRequest, 'conditions' | 'logic' | 'new_node_name'> & {
+  conditions: FilterConditionPayload[];
   logic?: string;
   new_node_name?: string;
 };
@@ -324,7 +324,7 @@ export const nodesApi = {
     });
     return data as Record<string, unknown>;
   },
-  filter: async (node: string, req: FilterRequest, headers: Record<string, string> = {}): Promise<void> => {
+  filter: async (node: string, req: FilterRequestPayload, headers: Record<string, string> = {}): Promise<void> => {
     await filterNodeApiWorkspacesNodesNodeIdFilterPost({
       body: req,
       headers,
@@ -332,7 +332,7 @@ export const nodesApi = {
       throwOnError: true,
     });
   },
-  filterPreview: async (node: string, req: FilterRequest, page = 1, pageSize = 10, headers: Record<string, string> = {}) => {
+  filterPreview: async (node: string, req: FilterRequestPayload, page = 1, pageSize = 10, headers: Record<string, string> = {}) => {
     const { data } = await filterPreviewApiWorkspacesNodesNodeIdFilterPreviewPost({
       body: req,
       headers,

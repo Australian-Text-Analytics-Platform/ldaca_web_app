@@ -59,7 +59,7 @@ export type MoveFileResponse = CreateFolderResponse;
 
 export type UnifiedFilePreviewRequest = FilePreviewRequest;
 
-export type FilePreviewResponse = Omit<
+export type FilePreviewResult = Omit<
   GeneratedFilePreviewResponse,
   'file_type' | 'selected_sheet' | 'sheet_names'
 > & {
@@ -92,12 +92,12 @@ export type LdacaSearchResponse = Omit<OniSearchResponse, 'data' | 'state'> & {
 
 export type SampleDataCollectionStatus = 'bundled' | 'downloaded' | 'partial' | 'not_downloaded';
 
-export type SampleDataCollection = Omit<GeneratedSampleDataCollection, 'status'> & {
+export type SampleDataCollectionView = Omit<GeneratedSampleDataCollection, 'status'> & {
   status: SampleDataCollectionStatus;
 };
 
-export type SampleDataCatalogueResponse = Omit<GeneratedSampleDataCatalogueResponse, 'collections'> & {
-  collections: SampleDataCollection[];
+export type SampleDataCatalogue = Omit<GeneratedSampleDataCatalogueResponse, 'collections'> & {
+  collections: SampleDataCollectionView[];
 };
 
 // ── Demo-snapshot catalogue ─────────────────────────────────────────────
@@ -110,12 +110,12 @@ export type SampleDataCatalogueResponse = Omit<GeneratedSampleDataCatalogueRespo
 
 export type DemoSnapshotStatus = 'downloaded' | 'not_downloaded' | 'conflict';
 
-export type DemoSnapshotEntry = Omit<GeneratedDemoSnapshotEntry, 'status'> & {
+export type DemoSnapshotEntryView = Omit<GeneratedDemoSnapshotEntry, 'status'> & {
   status: DemoSnapshotStatus;
 };
 
-export type DemoSnapshotsCatalogueResponse = Omit<GeneratedDemoSnapshotsCatalogueResponse, 'snapshots'> & {
-  snapshots: DemoSnapshotEntry[];
+export type DemoSnapshotsCatalogue = Omit<GeneratedDemoSnapshotsCatalogueResponse, 'snapshots'> & {
+  snapshots: DemoSnapshotEntryView[];
 };
 
 export type DemoSnapshotImportStatus =
@@ -125,7 +125,7 @@ export type DemoSnapshotImportStatus =
   | 'skipped_conflict'
   | 'failed';
 
-export type DemoSnapshotImportResult = Omit<GeneratedDemoSnapshotImportResult, 'status'> & {
+export type DemoSnapshotImportOutcome = Omit<GeneratedDemoSnapshotImportResult, 'status'> & {
   status: DemoSnapshotImportStatus;
 };
 
@@ -188,7 +188,7 @@ export const filesApi = {
 
   preview: async (body: UnifiedFilePreviewRequest, headers: Record<string, string> = {}) => {
     const { data } = await unifiedFilePreviewApiFilesPreviewPost({ body, headers, throwOnError: true });
-    return data as FilePreviewResponse;
+    return data as FilePreviewResult;
   },
 
   delete: async (fileName: string, headers: Record<string, string> = {}) => {
@@ -202,7 +202,7 @@ export const filesApi = {
 
   getSampleDataCatalogue: async (headers: Record<string, string> = {}) => {
     const { data } = await getSampleDataCatalogueApiFilesSampleDataCatalogueGet({ headers, throwOnError: true });
-    return data as SampleDataCatalogueResponse;
+    return data as SampleDataCatalogue;
   },
 
   getSampleDataReadme: async (path: string, headers: Record<string, string> = {}) => {
@@ -229,7 +229,7 @@ export const filesApi = {
       headers,
       throwOnError: true,
     });
-    return data as DemoSnapshotsCatalogueResponse;
+    return data as DemoSnapshotsCatalogue;
   },
 
   importDemoSnapshots: async (

@@ -48,7 +48,7 @@ export type QuotationAnalysisResponse = {
   task_id?: string;
 };
 
-export type QuotationDetachOptionsResponse = Omit<GeneratedQuotationDetachOptionsResponse, 'data' | 'metadata' | 'state'> & {
+export type QuotationDetachOptionsResult = Omit<GeneratedQuotationDetachOptionsResponse, 'data' | 'metadata' | 'state'> & {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   data?: { nodes: QuotationDetachNodeOption[] };
   metadata?: { task_id?: string; [key: string]: unknown };
@@ -75,7 +75,7 @@ export const quotationApi = {
       path: { node_id: node },
       query: { column },
       throwOnError: true,
-    }).then(({ data }) => data as QuotationDetachOptionsResponse);
+    }).then(({ data }) => data as QuotationDetachOptionsResult);
   },
 
   quotationDetach: async (

@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { workspacesApi } from '@/lib/backend/workspaces';
 import {
   nodesApi,
-  type FilterRequest,
+  type FilterRequestPayload,
   type SliceRequest,
   type ReplaceRequest,
   type PolarsExpressionRequest,
@@ -456,7 +456,7 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const filterNodeMutation = useMutation({
-    mutationFn: ({ nodeId, request }: { nodeId: string; request: FilterRequest }) =>
+    mutationFn: ({ nodeId, request }: { nodeId: string; request: FilterRequestPayload }) =>
       nodesApi.filter(nodeId, request, authHeaders),
     onMutate: () => {
       startOperation('filterNode');
@@ -751,9 +751,9 @@ export const useWorkspaceNodeMutations = ({
       concatNodesMutation.mutateAsync({ nodeIds, newNodeName, deduplicate }),
     concatPreview: (nodeIds: string[], page = 1, pageSize = 10, deduplicate?: boolean) =>
       nodesApi.concatPreview({ node_ids: nodeIds, deduplicate }, page, pageSize, authHeaders),
-    filterNode: (nodeId: string, request: FilterRequest) =>
+    filterNode: (nodeId: string, request: FilterRequestPayload) =>
       filterNodeMutation.mutateAsync({ nodeId, request }),
-    filterPreview: (nodeId: string, request: FilterRequest, page = 1, pageSize = 10) =>
+    filterPreview: (nodeId: string, request: FilterRequestPayload, page = 1, pageSize = 10) =>
       nodesApi.filterPreview(nodeId, request, page, pageSize, authHeaders),
     sliceNode: (nodeId: string, request: SliceRequest) =>
       sliceNodeMutation.mutateAsync({ nodeId, request }),
