@@ -168,17 +168,17 @@ jobs:
           codesign --force --options runtime --timestamp \
             --sign "$APPLE_SIGNING_IDENTITY" "$app_path"
 
-          # Sanity check: no unsigned Mach-O remaining
-          unsigned=$(find "$app_path" -type f -print0 | xargs -0 -I{} sh -c '
-            file -b "$1" | grep -qE "^Mach-O" || exit 0
-            codesign -dv "$1" >/dev/null 2>&1 || echo "$1"
-          ' _ {} 2>/dev/null || true)
-          if [ -n "$unsigned" ]; then
-            echo "::error::Unsigned Mach-O files remain in .app:"
-            echo "$unsigned"
-            exit 1
-          fi
-          echo "All Mach-O files in .app are signed."
+          echo "::group::codesign -dvv on main binary"
+          codesign -dvv "$app_path/Contents/MacOS/ldaca-wordflow" 2>&1 || true
+          echo "::endgroup::"
+
+          echo "::group::codesign -dvv on outer .app"
+          codesign -dvv "$app_path" 2>&1 || true
+          echo "::endgroup::"
+
+          echo "::group::codesign --verify --strict --deep on whole bundle"
+          codesign --verify --strict --deep --verbose=4 "$app_path"
+          echo "::endgroup::"
 
       - name: Notarize .app and staple
         shell: bash
