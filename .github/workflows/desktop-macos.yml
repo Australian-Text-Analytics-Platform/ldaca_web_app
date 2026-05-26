@@ -194,12 +194,32 @@ jobs:
           ditto -c -k --keepParent "$app_path" "$zip_path"
 
           echo "::group::notarytool submit (this can take several minutes)"
+          set +e
           xcrun notarytool submit "$zip_path" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait
+            --wait 2>&1 | tee /tmp/notarize.log
+          submit_rc=${PIPESTATUS[0]}
+          set -e
           echo "::endgroup::"
+
+          # notarytool exits 0 even when status is Invalid; parse it explicitly.
+          status=$(grep -E "^  status: " /tmp/notarize.log | tail -1 | awk '{print $2}')
+          sub_id=$(grep -E "^  id: " /tmp/notarize.log | head -1 | awk '{print $2}')
+
+          if [ "$status" != "Accepted" ] || [ $submit_rc -ne 0 ]; then
+            echo "::error::Notarization failed (status=$status, rc=$submit_rc, id=$sub_id)"
+            if [ -n "$sub_id" ]; then
+              echo "::group::notarytool log $sub_id"
+              xcrun notarytool log "$sub_id" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" || true
+              echo "::endgroup::"
+            fi
+            exit 1
+          fi
 
           xcrun stapler staple "$app_path"
           xcrun stapler validate "$app_path"
