@@ -164,17 +164,12 @@ jobs:
           done < <(find "$runtime" -type f -print0)
           echo "Signed $signed_count Mach-O files inside backend-runtime/"
 
-          # Re-sign the main binary with the bundle identifier, hardened runtime,
-          # timestamp, and entitlements that hardened-runtime WebKit + bundled
-          # Python interpreter need (jit / unsigned-exec-memory / dyld env vars /
-          # library validation off so we can dlopen the bundled Python).
-          codesign --force --options runtime --timestamp \
-            --identifier au.edu.ldaca.wordflow \
-            --entitlements src-tauri/entitlements.plist \
-            --sign "$APPLE_SIGNING_IDENTITY" \
-            "$app_path/Contents/MacOS/ldaca-wordflow"
-
-          # Re-sign the outer .app so CodeResources reflects the new inner hashes.
+          # Sign the BUNDLE (not the inner Mach-O directly) so codesign re-signs
+          # the main executable in bundle context — that's the only way the
+          # main binary's signature gets the Info.plist binding the notary
+          # requires. Signing the inner Mach-O standalone produces
+          # "Info.plist=not bound", which passes local --verify --strict but
+          # gets rejected as "signature of the binary is invalid" upstream.
           codesign --force --options runtime --timestamp \
             --identifier au.edu.ldaca.wordflow \
             --entitlements src-tauri/entitlements.plist \
