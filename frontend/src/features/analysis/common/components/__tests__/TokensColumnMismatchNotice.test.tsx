@@ -12,11 +12,9 @@ describe('TokensColumnMismatchNotice', () => {
             id: 'node-1',
             tokenization: {
               text: {
-                source_column: 'text',
                 column_name: 'tokenization.text.jieba',
                 model: 'jieba',
                 language: 'zh',
-                generated_at: '2026-05-12T00:00:00+00:00',
               },
             },
           },
@@ -37,11 +35,9 @@ describe('TokensColumnMismatchNotice', () => {
             id: 'node-1',
             tokenization: {
               text: {
-                source_column: 'text',
                 column_name: 'tokenization.text.jieba',
                 model: 'jieba',
                 language: 'zh',
-                generated_at: '2026-05-12T00:00:00+00:00',
               },
             },
           },

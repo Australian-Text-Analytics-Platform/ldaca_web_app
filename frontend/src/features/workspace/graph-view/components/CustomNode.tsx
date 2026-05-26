@@ -246,12 +246,11 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     const entries = Object.entries(tokenization);
     if (entries.length === 0) return null;
     const [source, meta] = entries[0]!;
-    const sourceColumn = meta.source_column || source;
     const extraCount = entries.length - 1;
     return {
-      label: `tokens: ${sourceColumn} · ${meta.model}${extraCount > 0 ? ` + ${extraCount} more` : ''}`,
+      label: `tokens: ${source} · ${meta.model}${extraCount > 0 ? ` + ${extraCount} more` : ''}`,
       tooltip: entries
-        .map(([key, entry]) => `${entry.source_column || key}: ${entry.model}`)
+        .map(([key, entry]) => `${key}: ${entry.model}`)
         .join('\n'),
     };
   })();

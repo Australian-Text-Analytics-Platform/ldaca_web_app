@@ -70,13 +70,9 @@ export interface WorkspaceNode {
 
 /** Metadata for one source column's tokenisation spec. */
 export interface TokenizationMeta {
-  source_column: string;
   column_name: string;
   model: string;
   language: string | null;
-  generated_at: string;
-  cache_backend?: string;
-  cache_schema_version?: number;
   params?: Record<string, unknown>;
 }
 

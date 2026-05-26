@@ -24,15 +24,7 @@ const nodeMatchesId = (node: NodeWithTokenization, id: string) =>
 
 const collectTokensSources = (tokenization: unknown): string[] => {
   if (!tokenization || typeof tokenization !== 'object') return [];
-  const sources = new Set<string>();
-  for (const [source, meta] of Object.entries(tokenization as Record<string, unknown>)) {
-    if (source) sources.add(source);
-    if (meta && typeof meta === 'object') {
-      const sourceColumn = (meta as { source_column?: unknown }).source_column;
-      if (typeof sourceColumn === 'string' && sourceColumn) sources.add(sourceColumn);
-    }
-  }
-  return Array.from(sources);
+  return Object.keys(tokenization).filter(Boolean);
 };
 
 /**

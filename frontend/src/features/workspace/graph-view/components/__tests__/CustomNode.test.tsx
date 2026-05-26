@@ -203,11 +203,9 @@ describe('CustomNode', () => {
           is_text_data: true,
           tokenization: {
             text: {
-              source_column: 'text',
               column_name: 'tokenization.text.jieba',
               model: 'jieba',
               language: 'zh',
-              generated_at: '2026-05-12T00:00:00+00:00',
             },
           },
         },
@@ -243,18 +241,14 @@ describe('CustomNode', () => {
           is_text_data: true,
           tokenization: {
             text: {
-              source_column: 'text',
               column_name: 'tokenization.text.jieba',
               model: 'jieba',
               language: 'zh',
-              generated_at: '2026-05-12T00:00:00+00:00',
             },
             notes: {
-              source_column: 'notes',
               column_name: 'tokenization.notes.bert-base-uncased',
               model: 'bert-base-uncased',
               language: 'en',
-              generated_at: '2026-05-12T00:00:00+00:00',
             },
           },
         },
@@ -388,11 +382,9 @@ describe('CustomNode', () => {
             ...baseNode,
             tokenization: {
               text: {
-                source_column: 'text',
                 column_name: 'tokenization.text.jieba',
                 model: 'jieba',
                 language: 'zh',
-                generated_at: '2026-05-12T00:00:00+00:00',
               },
             },
           },

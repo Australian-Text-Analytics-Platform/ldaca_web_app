@@ -12,19 +12,15 @@ import {
 } from '../effectiveNodeLanguage';
 
 const ZH_META = {
-  source_column: 'text',
   column_name: 'tokenization.text.jieba',
   model: 'jieba',
   language: 'zh',
-  generated_at: '2026-05-12T00:00:00+00:00',
 };
 
 const EN_META = {
-  source_column: 'text',
   column_name: 'tokenization.text.bert-base-uncased',
   model: 'bert-base-uncased',
   language: 'en',
-  generated_at: '2026-05-12T00:00:00+00:00',
 };
 
 describe('effectiveNodeLanguage', () => {
