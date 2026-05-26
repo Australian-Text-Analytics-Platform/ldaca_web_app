@@ -2,7 +2,7 @@
 name = "ldaca-wordflow"
 version = "0.5.4"
 description = "LDaCA Wordflow Desktop Application"
-authors = ["Australian Text Analytics Platform"]
+authors = ["Chao Sun", "Senhui Guo", "Sydney Informatics Hub"]
 license = "Apache-2.0"
 edition = "2021"
 
