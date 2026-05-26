@@ -36,3 +36,6 @@ backend-runtime/
 # Temp files
 *~
 .DS_Store
+
+# Bundled uv binary (copied locally; CI downloads a pinned release)
+uv

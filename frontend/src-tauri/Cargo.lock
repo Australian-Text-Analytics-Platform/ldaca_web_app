@@ -1972,7 +1972,7 @@ dependencies = [
 
 [[package]]
 name = "ldaca-wordflow"
-version = "0.5.0"
+version = "0.5.4"
 dependencies = [
  "dotenvy",
  "futures-util",

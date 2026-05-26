@@ -8,6 +8,13 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+# Slim desktop variant: ships no bundled Python runtime. On first launch the
+# shell uses a bundled `uv` to create a venv and install ldaca-wordflow from
+# PyPI into the per-user data dir, then points the existing launch path at it
+# via LDACA_BACKEND_PYTHON / LDACA_BACKEND_RUNTIME.
+slim = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

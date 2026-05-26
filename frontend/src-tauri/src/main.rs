@@ -162,6 +162,69 @@ fn strip_unc_prefix(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
+/// Slim variant only: ensure a Python runtime exists in the per-user data dir,
+/// installing it via the bundled `uv` on first launch. Sets LDACA_BACKEND_PYTHON
+/// and LDACA_BACKEND_RUNTIME so the normal `locate_backend_runtime` path picks it
+/// up unchanged. Idempotent: a `.ldaca-runtime-ready` marker short-circuits once
+/// the install has succeeded.
+#[cfg(feature = "slim")]
+fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let data_dir = app.path().app_data_dir()?;
+    let runtime_dir = data_dir.join("runtime");
+
+    #[cfg(windows)]
+    let python = runtime_dir.join("Scripts").join("python.exe");
+    #[cfg(not(windows))]
+    let python = runtime_dir.join("bin").join("python3");
+
+    let marker = runtime_dir.join(".ldaca-runtime-ready");
+
+    if marker.exists() && python.exists() {
+        println!("[slim] runtime present: {}", runtime_dir.display());
+        std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+        std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+        return Ok(());
+    }
+
+    let uv = app.path().resolve("uv", BaseDirectory::Resource)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&uv) {
+            let mut perms = meta.permissions();
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(&uv, perms);
+        }
+    }
+
+    std::fs::create_dir_all(&data_dir)?;
+
+    println!("[slim] creating venv at {}", runtime_dir.display());
+    let status = Command::new(&uv)
+        .args(["venv", "--python", "3.14"])
+        .arg(&runtime_dir)
+        .status()?;
+    if !status.success() {
+        return Err(make_error(format!("uv venv failed (exit {status})")));
+    }
+
+    println!("[slim] installing ldaca-wordflow from PyPI (first launch — may take a few minutes)");
+    let status = Command::new(&uv)
+        .args(["pip", "install", "--python"])
+        .arg(&python)
+        .arg("ldaca-wordflow>=0.5,<0.6")
+        .status()?;
+    if !status.success() {
+        return Err(make_error(format!("uv pip install failed (exit {status})")));
+    }
+
+    std::fs::write(&marker, "ready\n")?;
+    std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+    std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+    println!("[slim] runtime ready: {}", runtime_dir.display());
+    Ok(())
+}
+
 fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std::error::Error>> {
     if let Some(python_override) = path_from_env("LDACA_BACKEND_PYTHON") {
         let runtime_dir = path_from_env("LDACA_BACKEND_RUNTIME")
@@ -1076,19 +1139,59 @@ fn main() {
                 backend_port = backend_port
             ))?;
 
-            let app_handle = app.handle();
-            let runtime = locate_backend_runtime(&app_handle)?;
-            let runtime_env = load_runtime_env(&runtime.root)?;
-            let process = spawn_backend_process(&runtime, backend_port, &runtime_env)?;
-            let backend_pid = process.pid();
-            write_pidfile(backend_pid);
-            let state: State<BackendState> = app.state();
-            *state.process.lock().unwrap() = Some(process);
+            // Bundled variant: runtime ships inside the .app, so locate + spawn
+            // synchronously and surface any failure immediately.
+            #[cfg(not(feature = "slim"))]
+            {
+                let app_handle = app.handle();
+                let runtime = locate_backend_runtime(&app_handle)?;
+                let runtime_env = load_runtime_env(&runtime.root)?;
+                let process = spawn_backend_process(&runtime, backend_port, &runtime_env)?;
+                let backend_pid = process.pid();
+                write_pidfile(backend_pid);
+                let state: State<BackendState> = app.state();
+                *state.process.lock().unwrap() = Some(process);
 
-            println!(
-                "Backend launched at: {} (pid {}) – health polling delegated to frontend",
-                backend_url, backend_pid
-            );
+                println!(
+                    "Backend launched at: {} (pid {}) – health polling delegated to frontend",
+                    backend_url, backend_pid
+                );
+            }
+
+            // Slim variant: the runtime may not exist yet on first launch. Run the
+            // uv bootstrap + backend spawn on a background thread so the window
+            // appears immediately; the frontend's health-poll loading screen
+            // covers the gap until the backend is ready.
+            #[cfg(feature = "slim")]
+            {
+                let app_handle = app.handle().clone();
+                let backend_url_log = backend_url.clone();
+                std::thread::spawn(move || {
+                    if let Err(e) = ensure_slim_runtime(&app_handle) {
+                        eprintln!("[slim] runtime bootstrap failed: {e}");
+                        return;
+                    }
+                    let result = (|| -> Result<u32, Box<dyn std::error::Error>> {
+                        let runtime = locate_backend_runtime(&app_handle)?;
+                        let runtime_env = load_runtime_env(&runtime.root)?;
+                        let process =
+                            spawn_backend_process(&runtime, backend_port, &runtime_env)?;
+                        let pid = process.pid();
+                        write_pidfile(pid);
+                        if let Some(state) = app_handle.try_state::<BackendState>() {
+                            *state.process.lock().unwrap() = Some(process);
+                        }
+                        Ok(pid)
+                    })();
+                    match result {
+                        Ok(pid) => println!(
+                            "[slim] backend launched at: {} (pid {}) – health polling delegated to frontend",
+                            backend_url_log, pid
+                        ),
+                        Err(e) => eprintln!("[slim] backend start failed: {e}"),
+                    }
+                });
+            }
 
             // Don't block setup waiting for /health — the frontend already
             // polls the backend and shows a loading screen via useBackendHealth.
