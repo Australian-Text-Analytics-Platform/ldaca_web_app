@@ -146,6 +146,12 @@ jobs:
 
           test -d "$runtime" || { echo "::error::backend-runtime missing inside .app"; exit 1; }
 
+          # Strip extended attributes before signing — uv's managed-python tarball
+          # and macOS file ops can leave com.apple.quarantine / com.apple.metadata.*
+          # xattrs that get sealed into the signature and trip notarization with
+          # "signature of the binary is invalid".
+          xattr -cr "$app_path"
+
           # Sign every Mach-O file inside the embedded runtime (executables, .dylib, .so).
           # `file -b` identifies binary type; we skip non-Mach-O resources (json, py, etc).
           signed_count=0
@@ -191,7 +197,7 @@ jobs:
           set -Eeuo pipefail
           app_path="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
           zip_path="$(mktemp -d)/ldaca.zip"
-          ditto -c -k --keepParent "$app_path" "$zip_path"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
 
           echo "::group::notarytool submit (this can take several minutes)"
           set +e
