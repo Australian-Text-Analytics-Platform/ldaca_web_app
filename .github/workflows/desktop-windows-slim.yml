@@ -96,11 +96,14 @@ jobs:
           set -Eeuo pipefail
           msi=$(ls src-tauri/target/release/bundle/msi/*.msi | head -1)
           test -n "$msi"
-          abs="$(pwd)/$msi"
+          # Emit a path relative to the workspace root. upload-artifact is
+          # node-based and cannot resolve the MSYS-style `/d/a/...` path that
+          # bash `pwd` returns on Windows runners.
+          rel="frontend/$msi"
           version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
-          echo "path=$abs" >> "$GITHUB_OUTPUT"
+          echo "path=$rel" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Built MSI: $abs"
+          echo "Built MSI: $rel"
 
       - name: Upload slim MSI artifact
         uses: actions/upload-artifact@v7
