@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { TokenFrequencyResponse } from '@/api/text';
+import type { TokenFrequencyResponse } from '@/lib/backend/text';
 import {
   buildSelectionNameKey,
   buildSelectionNameById,

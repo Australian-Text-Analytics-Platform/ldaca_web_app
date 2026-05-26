@@ -5,7 +5,7 @@ import {
   type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import type { ChartConfig } from '@/components/ui/chart';
 import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
 

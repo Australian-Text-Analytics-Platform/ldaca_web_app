@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { textApi } from '@/api/text';
+import { textApi } from '@/lib/backend/text';
 import { queryKeys } from '@/lib/queryKeys';
 import type { SequentialAnalysisDatum } from './useSequentialAnalysisTaskFlow';
 

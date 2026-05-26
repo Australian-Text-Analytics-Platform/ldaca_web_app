@@ -6,7 +6,7 @@ import {
   type SetStateAction,
   type MutableRefObject,
 } from 'react';
-import type { ConcordanceAnalysisResponse } from '@/api/text';
+import type { ConcordanceAnalysisResponse } from '@/lib/backend/text';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { HydrationState } from '../../common/useAnalysisHydration';
 import type { NodeColumnSelection } from '../../common';

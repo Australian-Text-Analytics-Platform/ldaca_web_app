@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { filesApi } from '../api/files';
+import { filesApi } from '../lib/backend/files';
 import { saveBlob } from '../lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '../lib/queryKeys';

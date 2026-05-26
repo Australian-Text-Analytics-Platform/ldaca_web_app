@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { filesApi, type LdacaSearchMethod, type LdacaSearchResult } from '@/api/files';
+import { filesApi, type LdacaSearchMethod, type LdacaSearchResult } from '@/lib/backend/files';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 

@@ -20,7 +20,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { FolderPlus, AlertTriangle } from 'lucide-react';
-import { filesApi, type DemoSnapshotEntry } from '@/api/files';
+import { filesApi, type DemoSnapshotEntry } from '@/lib/backend/files';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';

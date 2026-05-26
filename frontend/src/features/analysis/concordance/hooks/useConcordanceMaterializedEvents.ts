@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import {
   type ConcordanceDispersionBinRow,
   textApi,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import type { AnalysisMaterializedEvent } from '@/stores/analysisStore';
 import { useMaterializeLifecycle } from '../../common/hooks/useMaterializeLifecycle';
 import type { PaginationState } from './useConcordanceTaskFlow';

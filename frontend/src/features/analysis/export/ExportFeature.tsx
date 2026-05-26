@@ -4,7 +4,7 @@ import type { GraphNode } from '@/types/api';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useAuth } from '@/hooks/useAuth';
-import { getApiBase } from '@/api/env';
+import { getApiBase } from '@/lib/backend/env';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

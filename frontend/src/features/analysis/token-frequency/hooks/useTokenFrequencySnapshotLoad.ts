@@ -9,7 +9,7 @@
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { snapshotsApi } from '@/api/snapshots';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
@@ -20,7 +20,7 @@ import {
 import type {
   TokenFrequencyRequest,
   TokenFrequencyResponse,
-} from '@/api/text';
+} from '@/lib/backend/text';
 
 /** Token-frequency-specific payload held by ``LoadedSnapshot.payload``.
  *

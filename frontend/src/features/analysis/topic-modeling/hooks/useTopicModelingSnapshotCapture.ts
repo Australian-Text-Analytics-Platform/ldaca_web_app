@@ -15,8 +15,8 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import type { TopicModelingRequest, TopicModelingResponse } from '@/api/text';
-import { snapshotsApi } from '@/api/snapshots';
+import type { TopicModelingRequest, TopicModelingResponse } from '@/lib/backend/text';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,

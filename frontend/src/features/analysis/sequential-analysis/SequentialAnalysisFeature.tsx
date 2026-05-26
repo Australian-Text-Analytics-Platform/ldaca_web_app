@@ -11,7 +11,7 @@ import {
   type SequentialCustomIntervalUnit,
   type SequentialFrequency,
   textApi,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import {
   snapshotSourceNodes,
   useSnapshotBackedAnalysisState,

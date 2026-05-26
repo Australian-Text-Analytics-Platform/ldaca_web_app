@@ -4,7 +4,12 @@ import { toast } from 'sonner';
 import { FolderPlus, Quote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { filesApi, type SampleDataCollection, type SampleDataCollectionStatus } from '@/api/files';
+import { filesApi, type SampleDataCollection, type SampleDataCollectionStatus } from '@/lib/backend/files';
+import {
+  getSampleDataCatalogueApiFilesSampleDataCatalogueGetOptions,
+  getSampleDataReadmeApiFilesSampleDataReadmeGetOptions,
+} from '@/api/generated/@tanstack/react-query.gen';
+import type { SampleDataCatalogueResponse as GeneratedSampleDataCatalogueResponse } from '@/api/generated/types.gen';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +33,32 @@ const TOOL_LABELS: Record<string, string> = {
   'data-loader': 'Data Loader',
   'topic-modeling': 'Topic Modeling',
   'sequential-analysis': 'Sequential Analysis',
+};
+
+const SAMPLE_DATA_COLLECTION_STATUSES: SampleDataCollectionStatus[] = [
+  'bundled',
+  'downloaded',
+  'partial',
+  'not_downloaded',
+];
+
+const normalizeSampleDataStatus = (status: string): SampleDataCollectionStatus => (
+  SAMPLE_DATA_COLLECTION_STATUSES.includes(status as SampleDataCollectionStatus)
+    ? status as SampleDataCollectionStatus
+    : 'not_downloaded'
+);
+
+const normalizeSampleDataCatalogue = (
+  catalogue: GeneratedSampleDataCatalogueResponse | undefined,
+): { collections: SampleDataCollection[]; schema_version: number } | undefined => {
+  if (!catalogue) return undefined;
+  return {
+    ...catalogue,
+    collections: catalogue.collections.map((collection) => ({
+      ...collection,
+      status: normalizeSampleDataStatus(collection.status),
+    })),
+  };
 };
 
 function formatBytes(bytes: number): string {
@@ -56,18 +87,19 @@ function readmePath(col: SampleDataCollection): string | null {
 interface ReadmeViewerProps {
   path: string | null;
   collectionName: string;
-  authHeaders: Record<string, string>;
   onClose: () => void;
 }
 
-const ReadmeViewer: React.FC<ReadmeViewerProps> = ({ path, collectionName, authHeaders, onClose }) => {
-  const { data: content, isLoading, isError } = useQuery({
-    queryKey: ['sample-data-readme', path],
-    queryFn: () => filesApi.getSampleDataReadme(path!, authHeaders),
+const ReadmeViewer: React.FC<ReadmeViewerProps> = ({ path, collectionName, onClose }) => {
+  const { data, isLoading, isError } = useQuery({
+    ...getSampleDataReadmeApiFilesSampleDataReadmeGetOptions({
+      query: { path: path ?? '' },
+    }),
     enabled: path !== null,
     staleTime: 5 * 60_000,
     retry: 1,
   });
+  const content = typeof data === 'string' ? data : '';
 
   return (
     <Dialog open={path !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -118,13 +150,13 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
   const [importing, setImporting] = useState(false);
   const [viewingReadme, setViewingReadme] = useState<{ path: string; name: string } | null>(null);
 
-  const { data: catalogue, isLoading, isError } = useQuery({
-    queryKey: ['sample-data-catalogue'],
-    queryFn: () => filesApi.getSampleDataCatalogue(authHeaders),
+  const { data, isLoading, isError } = useQuery({
+    ...getSampleDataCatalogueApiFilesSampleDataCatalogueGetOptions(),
     staleTime: 30_000,
     retry: 1,
     enabled: open,
   });
+  const catalogue = normalizeSampleDataCatalogue(data);
 
   const getChecked = (col: SampleDataCollection) => {
     if (col.bundled) return true;
@@ -280,7 +312,6 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
       <ReadmeViewer
         path={viewingReadme?.path ?? null}
         collectionName={viewingReadme?.name ?? ''}
-        authHeaders={authHeaders}
         onClose={() => setViewingReadme(null)}
       />
     </>

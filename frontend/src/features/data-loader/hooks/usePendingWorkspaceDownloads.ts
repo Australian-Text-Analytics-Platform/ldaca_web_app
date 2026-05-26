@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { workspacesApi } from '@/api/workspaces';
+import { workspacesApi } from '@/lib/backend/workspaces';
 import { saveBlob } from '@/lib/download';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 

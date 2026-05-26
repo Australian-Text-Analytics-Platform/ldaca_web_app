@@ -1,4 +1,4 @@
-import { workspacesApi } from '@/api/workspaces';
+import { workspacesApi } from '@/lib/backend/workspaces';
 import { collectTaskIds } from '@/hooks/analysisTaskUtils';
 import {
   analysisServerRequestLockQueryKey,

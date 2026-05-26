@@ -7,7 +7,7 @@ import {
   type FilterPreviewResponse,
   type PolarsExpressionRequest,
   type PolarsExpressionApplyResponse,
-} from '@/api/nodes';
+} from '@/lib/backend/nodes';
 import { mapColumnsToInfo, type ColumnInfo } from '@/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import type { PreviewPagination, PreviewRow } from '../../types';

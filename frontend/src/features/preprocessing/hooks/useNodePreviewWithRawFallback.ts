@@ -1,4 +1,4 @@
-import { nodesApi } from '@/api/nodes';
+import { nodesApi } from '@/lib/backend/nodes';
 import { useAuth } from '@/hooks/useAuth';
 import type { PreviewPagination, PreviewRow } from '../types';
 import {

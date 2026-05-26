@@ -4,12 +4,25 @@
 
 `src/api/http.ts` is the central HTTP wrapper. It builds query strings, handles
 JSON and `FormData`, applies timeouts, and normalizes failures into `ApiError`.
-Feature API modules should call the shared wrapper instead of using `fetch`
-directly.
+Feature API modules should call the shared wrapper or the generated hey-api SDK
+instead of using `fetch` directly.
 
 `src/api/env.ts` resolves the base URL in this order: explicit override,
 Tauri-injected `window.__BACKEND_URL__`, Vite environment, backend-injected
 base path, local dev backend port, then same-origin.
+
+`openapi.config.ts` configures hey-api from
+`openapi/ldaca-wordflow.openapi.json`. Regenerate the schema and generated SDK
+with `pnpm -C frontend openapi:generate` after backend API shape changes. The
+generated fetch client uses `src/api/generatedClientConfig.ts`, which preserves
+the existing API base discovery, credentials, auth headers, timeout behavior,
+and `ApiError` normalization. Keep handwritten domain modules such as
+`src/api/config.ts` and `src/api/preferences.ts` as the public API surface while
+moving their internals to generated calls incrementally.
+
+MSW test infrastructure lives under `src/test/msw/` and is enabled from
+`src/test/setup.ts`. Add endpoint handlers or per-test `server.use(...)`
+overrides for generated-client tests instead of mocking generated modules.
 
 ## TanStack Query
 
@@ -35,6 +48,15 @@ The main stores are:
 
 Stores are used for cross-feature UI state, not as a replacement for query
 cache.
+
+## URL View State
+
+`uiStore.currentView` still drives feature rendering. `ViewRouteSync` mirrors
+that view into TanStack Router search state as `?view=...` and applies validated
+incoming view search params when the target view is visible and, for workspace
+views, a workspace is loaded. The default `data-loader` view is omitted from the
+URL. Keep this as search state rather than path routes so static backend and
+Tauri builds continue to reload correctly.
 
 ## Auth Bootstrap
 

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import type { ConcordanceGroupedRow } from '@/api/text';
+import type { ConcordanceGroupedRow } from '@/lib/backend/text';
 import {
   Tooltip,
   TooltipContent,

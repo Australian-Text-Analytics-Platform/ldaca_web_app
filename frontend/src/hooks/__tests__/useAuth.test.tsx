@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { AuthInfoResponse } from '@/types';
-import type { ConfigResponse } from '@/api/config';
+import type { ConfigResponse } from '@/lib/backend/config';
 
 // ---------- API mocks (hoisted so they're in place before the auth store
 // imports `authApi`/`configApi`; `runAuthFetch` would otherwise hit the
@@ -18,8 +18,8 @@ const configApiMock = vi.hoisted(() => ({
   getConfig: vi.fn<() => Promise<ConfigResponse>>(),
 }));
 
-vi.mock('@/api/auth', () => ({ authApi: authApiMock }));
-vi.mock('@/api/config', () => ({ configApi: configApiMock }));
+vi.mock('@/lib/backend/auth', () => ({ authApi: authApiMock }));
+vi.mock('@/lib/backend/config', () => ({ configApi: configApiMock }));
 
 const buildAuthInfo = (overrides: Partial<AuthInfoResponse> = {}): AuthInfoResponse => ({
   authenticated: true,

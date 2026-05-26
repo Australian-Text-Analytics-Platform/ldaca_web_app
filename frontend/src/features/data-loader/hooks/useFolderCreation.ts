@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { filesApi } from '@/api/files';
+import { filesApi } from '@/lib/backend/files';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '@/api/nodes';
+import { useForm, useStore } from '@tanstack/react-form';
+import { type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '@/lib/backend/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
@@ -89,6 +90,16 @@ interface SliceFormControllers {
   newNodeNamePlaceholder: string;
 }
 
+interface SliceFormValues {
+  mode: SamplingMode;
+  offsetInput: string;
+  lengthInput: string;
+  sampleSizeInput: string;
+  randomSeedInput: string;
+  noRandomSeed: boolean;
+  newNodeName: string;
+}
+
 interface SlicePreviewConfig {
   columns: string[];
   data: PreviewRow[];
@@ -123,6 +134,15 @@ export interface UseSliceSubTabResult {
 const SINGLE_NODE_PALETTE = ['#2563eb'];
 const PREVIEW_DEBOUNCE_MS = 400;
 const DEFAULT_RANDOM_SEED = '42';
+const DEFAULT_SLICE_FORM_VALUES: SliceFormValues = {
+  mode: 'slice',
+  offsetInput: '0',
+  lengthInput: '',
+  sampleSizeInput: '',
+  randomSeedInput: DEFAULT_RANDOM_SEED,
+  noRandomSeed: false,
+  newNodeName: '',
+};
 
 const buildSlicePayload = ({
   mode,
@@ -176,16 +196,27 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     onAlert,
   } = props;
 
-  const [mode, setMode] = useState<SamplingMode>('slice');
-  const [offsetInput, setOffsetInput] = useState('0');
-  const [lengthInput, setLengthInput] = useState('');
-  const [sampleSizeInput, setSampleSizeInput] = useState('');
-  const [randomSeedInput, setRandomSeedInput] = useState(DEFAULT_RANDOM_SEED);
-  const [noRandomSeed, setNoRandomSeed] = useState(false);
-  const [newNodeName, setNewNodeName] = useState('');
+  const sliceForm = useForm({ defaultValues: DEFAULT_SLICE_FORM_VALUES });
+  const {
+    mode,
+    offsetInput,
+    lengthInput,
+    sampleSizeInput,
+    randomSeedInput,
+    noRandomSeed,
+    newNodeName,
+  } = useStore(sliceForm.store, (state) => state.values);
   const [inlineErrorState, setInlineErrorState] = useState<ScopedInlineError | null>(null);
   const [isSlicing, setIsSlicing] = useState(false);
   const [lastResultState, setLastResultState] = useState<ScopedSliceHistory | null>(null);
+
+  const setMode = (value: SamplingMode) => sliceForm.setFieldValue('mode', value);
+  const setOffsetInput = (value: string) => sliceForm.setFieldValue('offsetInput', value);
+  const setLengthInput = (value: string) => sliceForm.setFieldValue('lengthInput', value);
+  const setSampleSizeInput = (value: string) => sliceForm.setFieldValue('sampleSizeInput', value);
+  const setRandomSeedInput = (value: string) => sliceForm.setFieldValue('randomSeedInput', value);
+  const setNoRandomSeed = (value: boolean) => sliceForm.setFieldValue('noRandomSeed', value);
+  const setNewNodeName = (value: string) => sliceForm.setFieldValue('newNodeName', value);
 
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
@@ -391,9 +422,9 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     if (trimmedLength.length === 0) return;
     if (lengthNumber === null || !Number.isInteger(lengthNumber)) return;
     if (lengthNumber < 1) {
-      setLengthInput('1');
+      sliceForm.setFieldValue('lengthInput', '1');
     } else if (nodeRowCount !== null && lengthNumber > nodeRowCount) {
-      setLengthInput(String(nodeRowCount));
+      sliceForm.setFieldValue('lengthInput', String(nodeRowCount));
     }
   };
 
@@ -405,7 +436,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       Number.isInteger(sampleSizeNumber) &&
       sampleSizeNumber >= nodeRowCount
     ) {
-      setSampleSizeInput(String(nodeRowCount));
+      sliceForm.setFieldValue('sampleSizeInput', String(nodeRowCount));
     }
   };
 

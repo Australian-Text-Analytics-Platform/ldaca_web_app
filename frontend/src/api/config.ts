@@ -1,19 +1,16 @@
-import { httpRequest } from './http';
+import { getConfigApiConfigGet, updateConfigApiConfigPost } from './generated/sdk.gen';
+import type { ConfigResponse, ConfigUpdate } from './generated/types.gen';
 
-export interface ConfigResponse {
-  data_root: string;
-  multi_user_mode: boolean;
-  google_client_id?: string;
-}
-
-export interface UpdateConfigRequest {
-  data_root: string;
-}
+export type { ConfigResponse };
+export type UpdateConfigRequest = ConfigUpdate;
 
 export const configApi = {
-  getConfig: () => httpRequest<ConfigResponse>('/config/', { method: 'GET' }),
-  updateConfig: (data: UpdateConfigRequest) => httpRequest<ConfigResponse>('/config/', {
-    method: 'POST',
-    body: data,
-  }),
+  getConfig: async (): Promise<ConfigResponse> => {
+    const { data } = await getConfigApiConfigGet({ throwOnError: true });
+    return data;
+  },
+  updateConfig: async (data: UpdateConfigRequest): Promise<ConfigResponse> => {
+    const response = await updateConfigApiConfigPost({ body: data, throwOnError: true });
+    return response.data;
+  },
 };

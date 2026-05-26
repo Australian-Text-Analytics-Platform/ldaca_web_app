@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { nodesApi } from '@/api/nodes';
+import { nodesApi } from '@/lib/backend/nodes';
 import { useAuth } from '@/hooks/useAuth';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 import type { FilterOperator } from '../types';

@@ -14,8 +14,8 @@
  */
 import { create } from 'zustand';
 
-import { authApi } from '@/api/auth';
-import { configApi, type ConfigResponse } from '@/api/config';
+import { authApi } from '@/lib/backend/auth';
+import { configApi, type ConfigResponse } from '@/lib/backend/config';
 import type { AuthInfoResponse } from '@/types';
 
 const AUTH_INFO_TIMEOUT_MS = 7000;

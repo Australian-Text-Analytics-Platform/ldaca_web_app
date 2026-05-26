@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
-import { snapshotsApi } from '@/api/snapshots';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 
 export interface SnapshotDescriptionDialogProps {
   /** When non-null, the dialog is open and fetching this filename's

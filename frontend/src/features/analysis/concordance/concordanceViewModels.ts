@@ -2,7 +2,7 @@ import type {
   ConcordanceDispersionBinRow,
   ConcordanceGroupedRow,
   ConcordanceHitRow,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import {
   CONCORDANCE_COLUMN_KEYS,
   CONCORDANCE_CORE_COLUMNS,

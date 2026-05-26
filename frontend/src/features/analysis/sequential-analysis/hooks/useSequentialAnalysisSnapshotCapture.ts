@@ -20,8 +20,8 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import { textApi, type SequentialAnalysisRequest } from '@/api/text';
-import { snapshotsApi } from '@/api/snapshots';
+import { textApi, type SequentialAnalysisRequest } from '@/lib/backend/text';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,

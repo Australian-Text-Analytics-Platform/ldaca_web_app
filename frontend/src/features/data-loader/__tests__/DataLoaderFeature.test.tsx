@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
-import { filesApi } from '@/api/files';
+import { filesApi } from '@/lib/backend/files';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 
 const {
@@ -130,7 +130,7 @@ const mockFileTree = [
   },
 ];
 
-vi.mock('@/api/files', () => ({
+vi.mock('@/lib/backend/files', () => ({
   filesApi: {
     raw: mockRawFile,
     createFolder: mockCreateFolder,
@@ -170,7 +170,7 @@ vi.mock('@/components/help/InfoIcon', () => ({
   default: () => null,
 }));
 
-vi.mock('@/api/workspaces', () => ({
+vi.mock('@/lib/backend/workspaces', () => ({
   workspacesApi: {
     uploadZip: vi.fn(),
     downloadZip: vi.fn(),

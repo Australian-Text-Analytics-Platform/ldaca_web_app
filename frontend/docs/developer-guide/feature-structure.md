@@ -62,6 +62,11 @@ It blocks destructive workspace changes while active tasks exist.
 Each subfeature owns its form state and preview/apply hooks, then delegates the
 actual workspace mutation to `useWorkspaceActions()`.
 
+Use TanStack Form for preprocessing forms when it reduces scattered scalar
+state or validation plumbing. Keep existing hook/component contracts stable
+during migration, and preserve preview payload derivation in the owning
+subfeature hook so tests can validate behavior at the feature level.
+
 ## Analysis
 
 `src/features/analysis/` contains text-analysis tabs:

@@ -18,9 +18,9 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { UserPreferences, UserPreferencesUpdate } from '@/api/preferences';
-import { preferencesApi } from '@/api/preferences';
-import type { QuotationEngineConfig } from '@/api/text';
+import type { UserPreferences, UserPreferencesUpdate } from '@/lib/backend/preferences';
+import { preferencesApi } from '@/lib/backend/preferences';
+import type { QuotationEngineConfig } from '@/lib/backend/text';
 import type { ViewType } from '@/stores/uiStore';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = ['ai-annotator'];

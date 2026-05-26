@@ -2,31 +2,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { snapshotsApi } from '../snapshots';
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status < 400,
+  return new Response(JSON.stringify(body), {
     status,
-    headers: new Headers({ 'content-type': 'application/json' }),
-    json: async () => body,
-  } as unknown as Response;
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 function blobResponse(bytes: Uint8Array, status = 200): Response {
-  return {
-    ok: status < 400,
+  return new Response(new Blob([bytes as BlobPart]), {
     status,
-    headers: new Headers({ 'content-type': 'application/zip' }),
-    blob: async () => new Blob([bytes as BlobPart]),
-  } as unknown as Response;
+    headers: { 'content-type': 'application/zip' },
+  });
 }
 
 function textResponse(text: string, contentType: string, status = 200): Response {
-  return {
-    ok: status < 400,
+  return new Response(text, {
     status,
-    headers: new Headers({ 'content-type': contentType }),
-    text: async () => text,
-  } as unknown as Response;
+    headers: { 'content-type': contentType },
+  });
 }
+
+const requestAt = (fetchMock: ReturnType<typeof vi.fn>, index = 0): Request =>
+  fetchMock.mock.calls[index]![0] as Request;
 
 describe('snapshotsApi', () => {
   const originalFetch = global.fetch;
@@ -44,9 +41,9 @@ describe('snapshotsApi', () => {
 
     await snapshotsApi.list(undefined);
 
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('/api/users/me/snapshots');
-    expect(url).not.toContain('tool=');
+    const request = requestAt(fetchMock);
+    expect(request.url).toContain('/api/users/me/snapshots');
+    expect(request.url).not.toContain('tool=');
   });
 
   it('list with tool filter passes ?tool= query', async () => {
@@ -57,11 +54,11 @@ describe('snapshotsApi', () => {
 
     await snapshotsApi.list('concordance');
 
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('tool=concordance');
+    expect(requestAt(fetchMock).url).toContain('tool=concordance');
   });
 
   it('upload sends multipart body with file + filename form fields', async () => {
+    const appendSpy = vi.spyOn(FormData.prototype, 'append');
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
         filename: 'concordance-x.ldaca-snapshot',
@@ -70,16 +67,14 @@ describe('snapshotsApi', () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const bundle = new Blob([new Uint8Array([1, 2, 3]) as BlobPart]);
+    const bundle = new File([new Uint8Array([1, 2, 3]) as BlobPart], 'concordance-x.ldaca-snapshot');
     await snapshotsApi.upload(bundle, 'concordance-x.ldaca-snapshot');
 
-    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('/api/users/me/snapshots');
-    expect(options.method).toBe('POST');
-    expect(options.body).toBeInstanceOf(FormData);
-    const fd = options.body as FormData;
-    expect(fd.get('filename')).toBe('concordance-x.ldaca-snapshot');
-    expect(fd.get('file')).toBeInstanceOf(Blob);
+    const request = requestAt(fetchMock);
+    expect(request.url).toContain('/api/users/me/snapshots');
+    expect(request.method).toBe('POST');
+    expect(appendSpy).toHaveBeenCalledWith('filename', 'concordance-x.ldaca-snapshot');
+    expect(appendSpy).toHaveBeenCalledWith('file', bundle);
   });
 
   it('download GETs the bundle and returns a Blob', async () => {
@@ -90,9 +85,9 @@ describe('snapshotsApi', () => {
     const result = await snapshotsApi.download('concordance-x.ldaca-snapshot');
 
     expect(result).toBeInstanceOf(Blob);
-    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('/api/users/me/snapshots/concordance-x.ldaca-snapshot');
-    expect(options.method).toBe('GET');
+    const request = requestAt(fetchMock);
+    expect(request.url).toContain('/api/users/me/snapshots/concordance-x.ldaca-snapshot');
+    expect(request.method).toBe('GET');
   });
 
   it('getDescription returns the .md text', async () => {
@@ -103,8 +98,7 @@ describe('snapshotsApi', () => {
 
     const result = await snapshotsApi.getDescription('concordance-x.ldaca-snapshot');
     expect(result).toBe('# Hello\n');
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain(
+    expect(requestAt(fetchMock).url).toContain(
       '/api/users/me/snapshots/concordance-x.ldaca-snapshot/description',
     );
   });
@@ -117,9 +111,9 @@ describe('snapshotsApi', () => {
 
     await snapshotsApi.deleteOne('concordance-x.ldaca-snapshot');
 
-    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('/api/users/me/snapshots/concordance-x.ldaca-snapshot');
-    expect(options.method).toBe('DELETE');
+    const request = requestAt(fetchMock);
+    expect(request.url).toContain('/api/users/me/snapshots/concordance-x.ldaca-snapshot');
+    expect(request.method).toBe('DELETE');
   });
 
   it('deleteBatch without incompatibleWith sends only ?tool=', async () => {
@@ -130,10 +124,10 @@ describe('snapshotsApi', () => {
 
     await snapshotsApi.deleteBatch('concordance', undefined);
 
-    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(options.method).toBe('DELETE');
-    expect(url).toContain('tool=concordance');
-    expect(url).not.toContain('incompatible_with');
+    const request = requestAt(fetchMock);
+    expect(request.method).toBe('DELETE');
+    expect(request.url).toContain('tool=concordance');
+    expect(request.url).not.toContain('incompatible_with');
   });
 
   it('deleteBatch with incompatibleWith passes the version', async () => {
@@ -144,9 +138,9 @@ describe('snapshotsApi', () => {
 
     await snapshotsApi.deleteBatch('concordance', 'v0.4.4');
 
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('tool=concordance');
-    expect(url).toContain('incompatible_with=v0.4.4');
+    const request = requestAt(fetchMock);
+    expect(request.url).toContain('tool=concordance');
+    expect(request.url).toContain('incompatible_with=v0.4.4');
   });
 
   it('encodes filenames with special chars in the URL path', async () => {
@@ -155,7 +149,6 @@ describe('snapshotsApi', () => {
 
     await snapshotsApi.deleteOne('concordance-name with spaces.ldaca-snapshot');
 
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('concordance-name%20with%20spaces.ldaca-snapshot');
+    expect(requestAt(fetchMock).url).toContain('concordance-name%20with%20spaces.ldaca-snapshot');
   });
 });

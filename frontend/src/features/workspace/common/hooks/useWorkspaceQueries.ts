@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { workspacesApi } from '@/api/workspaces';
-import { nodesApi } from '@/api/nodes';
+import { workspacesApi } from '@/lib/backend/workspaces';
+import { nodesApi } from '@/lib/backend/nodes';
 import { queryKeys } from '@/lib/queryKeys';
 import type { GraphNode, NodeDataResponse } from '@/types/api';
 import { type PaginationState } from './types';

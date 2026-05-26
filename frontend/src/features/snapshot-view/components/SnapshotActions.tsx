@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { snapshotsApi } from '@/api/snapshots';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useAuth } from '@/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { LoadSnapshotDialog } from './LoadSnapshotDialog';

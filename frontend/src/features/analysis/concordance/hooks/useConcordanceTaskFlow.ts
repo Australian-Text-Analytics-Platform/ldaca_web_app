@@ -9,7 +9,7 @@ import {
   type ConcordanceMaterializeRequest,
   type ConcordanceResultQuery,
   textApi,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';

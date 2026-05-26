@@ -1,91 +1,135 @@
-import { ApiError, get, post, del, httpRequest } from './http';
+import {
+  cancelTaskApiTasksCancelPost,
+  clearTasksApiTasksClearPost,
+  createWorkspaceApiWorkspacesPost,
+  deleteWorkspaceApiWorkspacesDeleteDelete,
+  downloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGet,
+  getCurrentWorkspaceApiWorkspacesCurrentGet,
+  getWorkspaceGraphApiWorkspacesGraphGet,
+  listWorkspacesApiWorkspacesGet,
+  renameWorkspaceApiWorkspacesNamePut,
+  saveWorkspaceApiWorkspacesSavePost,
+  setCurrentWorkspaceApiWorkspacesCurrentPost,
+  startWorkspaceDownloadApiWorkspacesDownloadPost,
+  updateWorkspaceDescriptionApiWorkspacesDescriptionPut,
+  uploadWorkspaceZipApiWorkspacesUploadPost,
+} from './generated/sdk.gen';
 import type { WorkspaceInfo, WorkspaceGraphResponse } from '../types/api';
+import { ApiError } from '@/lib/apiError';
 
 export const workspacesApi = {
-  list: (headers: Record<string, string> = {}) =>
-    get<WorkspaceInfo[]>('/workspaces/', headers),
-
-  create: (name: string, description = '', headers: Record<string, string> = {}) =>
-    post<Record<string, unknown>>('/workspaces/', { name, description }, headers),
-
-  delete: (id: string, headers: Record<string, string> = {}) =>
-    del<Record<string, unknown>>('/workspaces/delete', headers, { workspace_id: id }),
-
-  uploadZip: (file: File, headers: Record<string, string> = {}) => {
-    const fd = new FormData();
-    fd.append('file', file);
-    return httpRequest<Record<string, unknown>>('/workspaces/upload', {
-      method: 'POST',
-      formData: fd,
-      headers,
-    });
+  list: async (headers: Record<string, string> = {}): Promise<WorkspaceInfo[]> => {
+    const { data } = await listWorkspacesApiWorkspacesGet({ headers, throwOnError: true });
+    return data as WorkspaceInfo[];
   },
 
-  startDownloadTask: (headers: Record<string, string> = {}) =>
-    post<{ state: string; message: string; metadata: { task_id: string } }>(
-      '/workspaces/download',
-      {},
+  create: async (name: string, description = '', headers: Record<string, string> = {}) => {
+    const { data } = await createWorkspaceApiWorkspacesPost({
+      body: { name, description },
       headers,
-    ),
+      throwOnError: true,
+    });
+    return data;
+  },
 
-  downloadTaskArtifact: (taskId: string, headers: Record<string, string> = {}) =>
-    httpRequest<Blob>(`/workspaces/download/tasks/${taskId}/artifact`, {
-      method: 'GET',
+  delete: async (id: string, headers: Record<string, string> = {}): Promise<Record<string, unknown>> => {
+    const { data } = await deleteWorkspaceApiWorkspacesDeleteDelete({
       headers,
-      expectBlob: true,
-    }),
+      query: { workspace_id: id },
+      throwOnError: true,
+    });
+    return data as Record<string, unknown>;
+  },
 
-  graph: (headers: Record<string, string> = {}) =>
-    get<WorkspaceGraphResponse>('/workspaces/graph', headers),
-
-  save: (headers: Record<string, string> = {}) =>
-    post<Record<string, unknown>>('/workspaces/save', {}, headers),
-
-  updateName: (newName: string, headers: Record<string, string> = {}) =>
-    httpRequest<Record<string, unknown>>('/workspaces/name', {
-      method: 'PUT',
+  uploadZip: async (file: File, headers: Record<string, string> = {}) => {
+    const { data } = await uploadWorkspaceZipApiWorkspacesUploadPost({
+      body: { file },
       headers,
-      params: { new_name: newName },
-    }),
+      throwOnError: true,
+    });
+    return data;
+  },
 
-  updateDescription: (description: string, headers: Record<string, string> = {}) =>
-    httpRequest<Record<string, unknown>>('/workspaces/description', {
-      method: 'PUT',
+  startDownloadTask: async (headers: Record<string, string> = {}) => {
+    const { data } = await startWorkspaceDownloadApiWorkspacesDownloadPost({
       headers,
-      params: { description },
-    }),
+      throwOnError: true,
+    });
+    return data as { state: string; message: string; metadata: { task_id: string } };
+  },
 
-  /** Clear a single task artifact (alias endpoint under /tasks/clear). */
-  clearTasks: (options: { task_id: string }, headers: Record<string, string> = {}) =>
-    httpRequest<Record<string, unknown>>('/tasks/clear', {
-      method: 'POST',
+  downloadTaskArtifact: async (taskId: string, headers: Record<string, string> = {}) => {
+    const { data } = await downloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGet({
       headers,
-      params: options,
-    }),
+      parseAs: 'blob',
+      path: { task_id: taskId },
+      throwOnError: true,
+    });
+    return data as Blob;
+  },
 
-  /** Stop a running task (sends SIGTERM to the worker process) and mark it cancelled.
-   *  The task record is kept so the user can explicitly clear it afterwards. */
-  cancelTask: (options: { task_id: string }, headers: Record<string, string> = {}) =>
-    httpRequest<Record<string, unknown>>('/tasks/cancel', {
-      method: 'POST',
+  graph: async (headers: Record<string, string> = {}): Promise<WorkspaceGraphResponse> => {
+    const { data } = await getWorkspaceGraphApiWorkspacesGraphGet({ headers, throwOnError: true });
+    return data as WorkspaceGraphResponse;
+  },
+
+  save: async (headers: Record<string, string> = {}) => {
+    const { data } = await saveWorkspaceApiWorkspacesSavePost({ headers, throwOnError: true });
+    return data;
+  },
+
+  updateName: async (newName: string, headers: Record<string, string> = {}) => {
+    const { data } = await renameWorkspaceApiWorkspacesNamePut({
       headers,
-      params: options,
-    }),
+      query: { new_name: newName },
+      throwOnError: true,
+    });
+    return data;
+  },
 
-  /** Current (active) workspace id accessors. */
+  updateDescription: async (description: string, headers: Record<string, string> = {}) => {
+    const { data } = await updateWorkspaceDescriptionApiWorkspacesDescriptionPut({
+      headers,
+      query: { description },
+      throwOnError: true,
+    });
+    return data;
+  },
+
+  clearTasks: async (options: { task_id: string }, headers: Record<string, string> = {}) => {
+    const { data } = await clearTasksApiTasksClearPost({
+      headers,
+      query: options,
+      throwOnError: true,
+    });
+    return data;
+  },
+
+  cancelTask: async (options: { task_id: string }, headers: Record<string, string> = {}) => {
+    const { data } = await cancelTaskApiTasksCancelPost({
+      headers,
+      query: options,
+      throwOnError: true,
+    });
+    return data;
+  },
+
   current: {
-    get: (headers: Record<string, string> = {}) =>
-      get<{ id: string | null }>('/workspaces/current', headers).then(r => r.id),
+    get: async (headers: Record<string, string> = {}) => {
+      const { data } = await getCurrentWorkspaceApiWorkspacesCurrentGet({ headers, throwOnError: true });
+      return (data as { id?: string | null }).id ?? null;
+    },
     set: async (workspaceId: string | null, headers: Record<string, string> = {}) => {
-      const qs = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
       const setCurrentWorkspace = () =>
-        httpRequest<Record<string, unknown>>(`/workspaces/current${qs}`, {
-          method: 'POST',
+        setCurrentWorkspaceApiWorkspacesCurrentPost({
           headers,
+          query: workspaceId === null ? undefined : { workspace_id: workspaceId },
+          throwOnError: true,
         });
 
       try {
-        return await setCurrentWorkspace();
+        const { data } = await setCurrentWorkspace();
+        return data as Record<string, unknown>;
       } catch (error) {
         const shouldRefreshAndRetry =
           workspaceId !== null &&
@@ -96,9 +140,9 @@ export const workspacesApi = {
           throw error;
         }
 
-        // Some backend flows rebuild workspace-id path indexes on list fetch.
-        await get<WorkspaceInfo[]>('/workspaces/', headers);
-        return setCurrentWorkspace();
+        await listWorkspacesApiWorkspacesGet({ headers, throwOnError: true });
+        const { data } = await setCurrentWorkspace();
+        return data as Record<string, unknown>;
       }
     },
   },

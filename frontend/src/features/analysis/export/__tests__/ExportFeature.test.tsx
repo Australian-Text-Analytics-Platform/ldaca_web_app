@@ -35,7 +35,7 @@ vi.mock('@/hooks/useAuth', () => ({
   }),
 }));
 
-vi.mock('@/api/env', () => ({
+vi.mock('@/lib/backend/env', () => ({
   getApiBase: () => 'http://api.test',
 }));
 

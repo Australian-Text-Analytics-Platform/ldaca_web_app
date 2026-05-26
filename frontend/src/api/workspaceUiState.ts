@@ -1,4 +1,7 @@
-import { get, put } from './http';
+import {
+  getWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGet,
+  putWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePut,
+} from './generated/sdk.gen';
 
 /** Shape of the ``ui_state.json`` sidecar persisted alongside the
  * workspace's ``metadata.json``. Free-form JSON object so we can grow
@@ -11,20 +14,26 @@ export interface WorkspaceUiState {
 }
 
 export const workspaceUiStateApi = {
-  get: (workspaceId: string, headers?: Record<string, string>) =>
-    get<WorkspaceUiState>(
-      `/workspaces/${encodeURIComponent(workspaceId)}/ui-state`,
+  get: async (workspaceId: string, headers?: Record<string, string>): Promise<WorkspaceUiState> => {
+    const { data } = await getWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGet({
       headers,
-    ),
+      path: { workspace_id: workspaceId },
+      throwOnError: true,
+    });
+    return data as WorkspaceUiState;
+  },
 
-  put: (
+  put: async (
     workspaceId: string,
     payload: WorkspaceUiState,
     headers?: Record<string, string>,
-  ) =>
-    put<WorkspaceUiState>(
-      `/workspaces/${encodeURIComponent(workspaceId)}/ui-state`,
-      payload,
+  ): Promise<WorkspaceUiState> => {
+    const { data } = await putWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePut({
+      body: payload as Record<string, unknown>,
       headers,
-    ),
+      path: { workspace_id: workspaceId },
+      throwOnError: true,
+    });
+    return data as WorkspaceUiState;
+  },
 };

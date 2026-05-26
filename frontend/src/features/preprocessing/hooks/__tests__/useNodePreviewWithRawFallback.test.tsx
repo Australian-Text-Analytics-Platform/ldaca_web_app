@@ -29,7 +29,7 @@ const useAuthMock = vi.hoisted(() => vi.fn(() => ({
 vi.mock('@/hooks/useAuth', () => ({ useAuth: useAuthMock }));
 
 const nodesApiDataMock = vi.hoisted(() => vi.fn());
-vi.mock('@/api/nodes', () => ({
+vi.mock('@/lib/backend/nodes', () => ({
   nodesApi: { data: nodesApiDataMock },
 }));
 

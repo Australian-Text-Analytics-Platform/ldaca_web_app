@@ -9,7 +9,7 @@
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { snapshotsApi } from '@/api/snapshots';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
@@ -17,7 +17,7 @@ import {
   useSnapshotViewStore,
   type LoadedSnapshot,
 } from '@/features/snapshot-view';
-import type { SequentialAnalysisRequest } from '@/api/text';
+import type { SequentialAnalysisRequest } from '@/lib/backend/text';
 
 /** Sequential-analysis-specific payload held by ``LoadedSnapshot.payload``.
  *

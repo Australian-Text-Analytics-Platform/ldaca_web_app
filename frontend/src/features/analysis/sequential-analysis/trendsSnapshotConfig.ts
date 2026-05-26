@@ -1,4 +1,4 @@
-import type { SequentialFrequency } from '@/api/text';
+import type { SequentialFrequency } from '@/lib/backend/text';
 
 export type SnapshotFinestFrequency = Exclude<SequentialFrequency, 'custom'>;
 

@@ -1,9 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { filesApi, type LdacaSearchResult } from '@/api/files';
+import { filesApi, type LdacaSearchResult } from '@/lib/backend/files';
 import { useLdacaImport } from '../useLdacaImport';
 
-vi.mock('@/api/files', () => ({
+vi.mock('@/lib/backend/files', () => ({
   filesApi: {
     getLdacaFeatured: vi.fn(),
     searchLdaca: vi.fn(),

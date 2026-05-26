@@ -2,7 +2,7 @@ import { act } from '@testing-library/react';
 import JSZip from 'jszip';
 import { vi } from 'vitest';
 
-import * as snapshotsApiModule from '@/api/snapshots';
+import * as snapshotsApiModule from '@/lib/backend/snapshots';
 import {
   useSnapshotViewStore,
   type SnapshotManifest,

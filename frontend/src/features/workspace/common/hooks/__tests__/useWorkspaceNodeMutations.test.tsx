@@ -52,9 +52,9 @@ const textApiMock = vi.hoisted(() => ({
 
 const fetchNodeInfoMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/api/workspaces', () => ({ workspacesApi: workspacesApiMock }));
-vi.mock('@/api/nodes', () => ({ nodesApi: nodesApiMock }));
-vi.mock('@/api/text', () => ({ textApi: textApiMock }));
+vi.mock('@/lib/backend/workspaces', () => ({ workspacesApi: workspacesApiMock }));
+vi.mock('@/lib/backend/nodes', () => ({ nodesApi: nodesApiMock }));
+vi.mock('@/lib/backend/text', () => ({ textApi: textApiMock }));
 vi.mock('@/lib/nodeInfo', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {

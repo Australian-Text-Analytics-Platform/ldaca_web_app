@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
-import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
+import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/lib/backend/text';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/features/analysis/token-frequency/tokenFrequencyHelpers';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';

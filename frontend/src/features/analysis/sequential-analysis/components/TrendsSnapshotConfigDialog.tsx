@@ -44,8 +44,8 @@ import {
 } from '@/components/ui/select';
 import {
   SNAPSHOT_FINEST_FREQUENCIES,
-} from '@/api/text';
-import { nodesApi } from '@/api/index';
+} from '@/lib/backend/text';
+import { nodesApi } from '@/lib/backend/nodes';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 import type { SnapshotToolKey } from '@/features/snapshot-view';

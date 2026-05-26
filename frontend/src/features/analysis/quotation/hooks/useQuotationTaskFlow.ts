@@ -7,8 +7,8 @@ import type {
   QuotationEngineConfig,
   QuotationDetachRequest,
   QuotationMaterializeRequest,
-} from '@/api/text';
-import { textApi } from '@/api/text';
+} from '@/lib/backend/text';
+import { textApi } from '@/lib/backend/text';
 import { getNodeIdentifier, restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 

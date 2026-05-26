@@ -1,4 +1,4 @@
-import type { TokenFrequencyResponse } from '@/api/text';
+import type { TokenFrequencyResponse } from '@/lib/backend/text';
 import { isNonEmptyString } from '../common';
 
 export interface NodeNameEntry {

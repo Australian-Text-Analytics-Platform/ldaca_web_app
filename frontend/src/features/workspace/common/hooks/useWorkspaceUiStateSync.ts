@@ -19,7 +19,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
-import { workspaceUiStateApi } from '@/api/workspaceUiState';
+import { workspaceUiStateApi } from '@/lib/backend/workspaceUiState';
 
 /** Coalesce window for outbound PUTs. Long enough that picker + run
  * fall into the same write, short enough that the user doesn't lose

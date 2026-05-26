@@ -15,7 +15,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
-import { snapshotsApi, type SnapshotListItem } from '@/api/snapshots';
+import { snapshotsApi, type SnapshotListItem } from '@/lib/backend/snapshots';
 import { formatBytes } from '@/lib/utils';
 import { getCurrentAppVersion, isCompatibleSnapshot } from '../compat';
 import type { SnapshotToolKey } from '../types';

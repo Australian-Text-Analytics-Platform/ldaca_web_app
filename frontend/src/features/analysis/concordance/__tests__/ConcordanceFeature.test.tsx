@@ -164,7 +164,7 @@ vi.mock('@/stores', () => ({
     selector({ currentView: 'concordance' }),
 }));
 
-vi.mock('@/api/text', () => ({
+vi.mock('@/lib/backend/text', () => ({
   textApi: {},
 }));
 

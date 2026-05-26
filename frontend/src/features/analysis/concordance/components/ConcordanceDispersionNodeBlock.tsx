@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceGroupedRow, ConcordanceResultEntry } from '@/api/text';
+import type { ConcordanceGroupedRow, ConcordanceResultEntry } from '@/lib/backend/text';
 import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
 import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';

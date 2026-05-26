@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
-import { nodesApi } from '@/api/nodes';
+import { nodesApi } from '@/lib/backend/nodes';
 import { useAuth } from '@/hooks/useAuth';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';

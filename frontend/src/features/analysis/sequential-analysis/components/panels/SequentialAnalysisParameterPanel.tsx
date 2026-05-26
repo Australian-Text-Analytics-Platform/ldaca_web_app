@@ -18,7 +18,7 @@ import {
 import type {
   SequentialCustomIntervalUnit,
   SequentialFrequency,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import { UniqueValueCount } from '../UniqueValueCount';
 
 interface ColumnLike {

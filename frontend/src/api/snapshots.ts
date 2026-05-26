@@ -7,8 +7,15 @@
  * snapshot machinery lives in ``features/snapshot-view/``; this
  * file is the *transport* layer the capture/load UI calls into.
  */
-import { del, get, httpRequest } from './http';
 import type { SnapshotManifest, SnapshotToolKey } from '@/features/snapshot-view';
+import {
+  batchDeleteSnapshotsApiUsersMeSnapshotsDelete,
+  deleteSnapshotApiUsersMeSnapshotsFilenameDelete,
+  downloadSnapshotApiUsersMeSnapshotsFilenameGet,
+  getSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGet,
+  listSnapshotsApiUsersMeSnapshotsGet,
+  uploadSnapshotApiUsersMeSnapshotsPost,
+} from './generated/sdk.gen';
 
 export interface SnapshotListItem {
   filename: string;
@@ -33,51 +40,61 @@ export interface SnapshotDeleteResponse {
 
 export const snapshotsApi = {
   /** List snapshots for the current user, optionally filtered by tool. */
-  list: (tool: SnapshotToolKey | undefined, headers: Record<string, string> = {}) =>
-    get<SnapshotListResponse>(
-      '/users/me/snapshots',
+  list: async (tool: SnapshotToolKey | undefined, headers: Record<string, string> = {}) => {
+    const { data } = await listSnapshotsApiUsersMeSnapshotsGet({
       headers,
-      tool ? { tool } : undefined,
-    ),
+      query: tool ? { tool } : undefined,
+      throwOnError: true,
+    });
+    return data as unknown as SnapshotListResponse;
+  },
 
   /** Upload a bundle. The frontend should validate the filename and
    * collision before calling — the server re-checks defensively. */
-  upload: (
+  upload: async (
     bundle: Blob,
     filename: string,
     headers: Record<string, string> = {},
   ) => {
-    const formData = new FormData();
-    formData.append('file', bundle, filename);
-    formData.append('filename', filename);
-    return httpRequest<SnapshotUploadResponse>('/users/me/snapshots', {
-      method: 'POST',
-      formData,
+    const { data } = await uploadSnapshotApiUsersMeSnapshotsPost({
+      body: { file: bundle, filename },
       headers,
+      throwOnError: true,
     });
+    return data as unknown as SnapshotUploadResponse;
   },
 
   /** Download a bundle as a Blob. */
-  download: (filename: string, headers: Record<string, string> = {}) =>
-    httpRequest<Blob>(`/users/me/snapshots/${encodeURIComponent(filename)}`, {
-      method: 'GET',
+  download: async (filename: string, headers: Record<string, string> = {}) => {
+    const { data } = await downloadSnapshotApiUsersMeSnapshotsFilenameGet({
       headers,
-      expectBlob: true,
-    }),
+      parseAs: 'blob',
+      path: { filename },
+      throwOnError: true,
+    });
+    return data as Blob;
+  },
 
   /** Fetch the human-readable .md description for a snapshot. */
-  getDescription: (filename: string, headers: Record<string, string> = {}) =>
-    httpRequest<string>(
-      `/users/me/snapshots/${encodeURIComponent(filename)}/description`,
-      { method: 'GET', headers },
-    ),
+  getDescription: async (filename: string, headers: Record<string, string> = {}) => {
+    const { data } = await getSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGet({
+      headers,
+      parseAs: 'text',
+      path: { filename },
+      throwOnError: true,
+    });
+    return data as string;
+  },
 
   /** Delete one snapshot (bundle + both sidecars). */
-  deleteOne: (filename: string, headers: Record<string, string> = {}) =>
-    del<SnapshotDeleteResponse>(
-      `/users/me/snapshots/${encodeURIComponent(filename)}`,
+  deleteOne: async (filename: string, headers: Record<string, string> = {}) => {
+    const { data } = await deleteSnapshotApiUsersMeSnapshotsFilenameDelete({
       headers,
-    ),
+      path: { filename },
+      throwOnError: true,
+    });
+    return data as unknown as SnapshotDeleteResponse;
+  },
 
   /** Batch delete for a tool. Without ``incompatibleWith``, deletes
    * every snapshot for the tool. With it, deletes only those whose
@@ -87,8 +104,10 @@ export const snapshotsApi = {
     incompatibleWith: string | undefined,
     headers: Record<string, string> = {},
   ) => {
-    const params: Record<string, string> = { tool };
-    if (incompatibleWith) params.incompatible_with = incompatibleWith;
-    return del<SnapshotDeleteResponse>('/users/me/snapshots', headers, params);
+    return batchDeleteSnapshotsApiUsersMeSnapshotsDelete({
+      headers,
+      query: { tool, incompatible_with: incompatibleWith ?? null },
+      throwOnError: true,
+    }).then(({ data }) => data as unknown as SnapshotDeleteResponse);
   },
 };

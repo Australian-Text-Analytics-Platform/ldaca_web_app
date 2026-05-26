@@ -1,4 +1,4 @@
-import { getApiBase } from '@/api/env';
+import { getApiBase } from '@/lib/backend/env';
 
 interface CILogonLoginProps {
   isLoading?: boolean;

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { textApi } from '@/api/text';
+import { textApi } from '@/lib/backend/text';
 import { useAuth } from '@/hooks/useAuth';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';

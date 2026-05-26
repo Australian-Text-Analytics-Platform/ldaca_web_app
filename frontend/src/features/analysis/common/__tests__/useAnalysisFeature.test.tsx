@@ -18,7 +18,7 @@ vi.mock('../clearAnalysis', () => ({
   clearAnalysis: clearAnalysisMock,
 }));
 
-vi.mock('@/api/workspaces', () => ({
+vi.mock('@/lib/backend/workspaces', () => ({
   workspacesApi: {
     cancelTask: cancelTaskMock,
   },

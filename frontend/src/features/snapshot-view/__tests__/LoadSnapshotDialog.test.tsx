@@ -5,9 +5,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Toaster } from 'sonner';
 import { LoadSnapshotDialog } from '../components/LoadSnapshotDialog';
-import * as snapshotsApiModule from '@/api/snapshots';
+import * as snapshotsApiModule from '@/lib/backend/snapshots';
 import * as compatModule from '../compat';
-import type { SnapshotListItem } from '@/api/snapshots';
+import type { SnapshotListItem } from '@/lib/backend/snapshots';
 import type { SnapshotManifest } from '../types';
 
 vi.mock('@/hooks/useAuth', () => ({

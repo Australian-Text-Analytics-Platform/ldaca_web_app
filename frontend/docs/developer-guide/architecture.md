@@ -15,12 +15,15 @@ runtime difference is API base discovery:
   boots.
 
 `src/index.tsx` initializes the app, loads Google OAuth config from injected
-globals or environment, and renders the TanStack Router. `src/App.tsx` waits
-for backend health and auth bootstrap before mounting the workspace shell.
+globals or environment, and renders the TanStack Router. `src/router.tsx` keeps
+the single static route required by backend and Tauri packaging, but validates
+the `view` search param so URLs can deep-link to a workspace view without
+requiring path-based server fallback. `src/App.tsx` waits for backend health
+and auth bootstrap before mounting the workspace shell.
 
 ## Main Layers
 
-- `src/api/`: typed HTTP wrappers around backend endpoints.
+- `src/api/`: typed HTTP wrappers and generated backend SDK helpers.
 - `src/providers/`: app-level providers such as the singleton QueryClient.
 - `src/stores/`: Zustand stores for auth, UI, selection, preferences, tasks,
   and node colors.
@@ -33,7 +36,8 @@ for backend health and auth bootstrap before mounting the workspace shell.
 
 ## Data Flow
 
-1. API modules call the backend through `httpRequest()`.
+1. API modules call the backend through `httpRequest()` or generated hey-api
+   SDK functions wrapped by stable domain adapters.
 2. TanStack Query owns server state and cache invalidation.
 3. Zustand owns client state that is not purely server-derived.
 4. `WorkspaceProvider` composes workspace queries, selection, status, and
@@ -41,6 +45,15 @@ for backend health and auth bootstrap before mounting the workspace shell.
 5. Workspace graph/table features consume those slices and specialized hooks.
 6. Analysis features submit task requests, then update results from task stream
    terminal events.
+
+## Routing
+
+The frontend remains a client-side SPA with one route. Do not introduce
+TanStack Start, SSR routes, or server functions unless the backend and desktop
+packaging model changes. Use TanStack Router for typed app URL state that works
+inside the existing static route. The active view is mirrored through the
+validated `view` search param by `ViewRouteSync`, while `uiStore.currentView`
+remains the UI source of truth for feature rendering and sidebar behavior.
 
 ## React Compiler Rule
 

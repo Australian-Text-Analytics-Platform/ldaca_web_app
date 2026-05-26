@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { clampDisplayTokenLimit } from './utils';
-import { textApi } from '@/api/text';
-import { isNetworkError } from '@/api/http';
+import { textApi } from '@/lib/backend/text';
+import { isNetworkError } from '@/lib/apiError';
 
 /**
  * Hydration is opportunistic — failures leave the feature in its empty

@@ -15,7 +15,7 @@
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { snapshotsApi } from '@/api/snapshots';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
@@ -27,7 +27,7 @@ import type {
   ConcordanceAnalysisRequest,
   ConcordanceDispersionBinsResponse,
   ConcordanceResultEntry,
-} from '@/api/text/concordance';
+} from '@/lib/backend/text/concordance';
 
 /** Concordance-specific payload held by ``LoadedSnapshot.payload``.
  * Mirrors the live UI's data shape so the live ParameterPanel +

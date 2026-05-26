@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { textApi } from '@/api/text';
+import { textApi } from '@/lib/backend/text';
 import { queryKeys } from '@/lib/queryKeys';
 
 export type ServerLockAnalysisType =

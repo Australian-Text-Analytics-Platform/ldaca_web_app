@@ -9,7 +9,7 @@
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { snapshotsApi } from '@/api/snapshots';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
@@ -20,7 +20,7 @@ import {
 import type {
   QuotationAnalysisResponse,
   QuotationRequest,
-} from '@/api/text/quotation';
+} from '@/lib/backend/text/quotation';
 
 /** Materialise summary that mirrors the live ``materializeSummary``
  * React state — total hit count, unique documents with hits, and total

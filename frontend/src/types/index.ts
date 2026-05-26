@@ -1,8 +1,8 @@
 /**
  * Shared app-level types.
  *
- * Kept intentionally small; most request/response shapes live in `./api` or
- * alongside the API client in `src/api/*.ts`. Add a type here only if it is
+ * Kept intentionally small; most request/response shapes live in generated
+ * API types or backend adapters under `src/lib/backend/`. Add a type here only if it is
  * used by at least two consumers across feature boundaries.
  */
 
@@ -41,7 +41,7 @@ export type {
   FileTreeFile,
   FileTreeDirectory,
   FileTreeNode,
-} from '../api/files';
+} from '../lib/backend/files';
 
 // ---------- Workspace / Node ----------
 

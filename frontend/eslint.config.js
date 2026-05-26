@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 import testingLibrary from 'eslint-plugin-testing-library';
 
 export default tseslint.config([
-  { ignores: ['dist', 'build', 'node_modules', '**/*.config.js'] },
+  { ignores: ['dist', 'build', 'node_modules', 'src/api/generated/**', '**/*.config.js'] },
 
   // ── Main: TypeScript + React ────────────────────────────────────
   {

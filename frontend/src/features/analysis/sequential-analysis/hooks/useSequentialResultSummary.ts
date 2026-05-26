@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import type { SequentialCustomIntervalUnit, SequentialFrequency } from '@/api/text';
+import type { SequentialCustomIntervalUnit, SequentialFrequency } from '@/lib/backend/text';
 
 const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
   'minutes',

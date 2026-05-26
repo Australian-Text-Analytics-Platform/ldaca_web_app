@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { nodesApi } from '@/api/index';
+import { nodesApi } from '@/lib/backend/nodes';
 import { queryKeys } from '@/lib/queryKeys';
 
 interface UniqueValueCountProps {

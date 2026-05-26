@@ -6,7 +6,7 @@ import {
   type TopicModelingRequest,
   type TopicModelingResponse,
   type TopicModelingDetachRequest,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import { queryKeys } from '@/lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import { useDetachColumnsState } from '@/features/analysis/common/hooks/useDetachColumnsState';

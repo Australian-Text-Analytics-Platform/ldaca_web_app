@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { type QueryClient, useMutation, isCancelledError } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { workspacesApi } from '@/api/workspaces';
+import { workspacesApi } from '@/lib/backend/workspaces';
 import {
   nodesApi,
   type FilterRequest,
@@ -9,7 +9,7 @@ import {
   type ReplaceRequest,
   type PolarsExpressionRequest,
   type NodeInfoResponse,
-} from '@/api/nodes';
+} from '@/lib/backend/nodes';
 import {
   textApi,
   type ConcordanceDetachRequest,
@@ -18,7 +18,7 @@ import {
   type QuotationRequest,
   type QuotationDetachRequest,
   type QuotationMaterializeRequest,
-} from '@/api/text';
+} from '@/lib/backend/text';
 import { queryKeys } from '@/lib/queryKeys';
 import { type NodeSchemaResponse } from '@/types';
 import { type WorkspaceGraphResponse } from '@/types/api';

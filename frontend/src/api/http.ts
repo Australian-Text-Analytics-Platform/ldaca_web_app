@@ -40,7 +40,7 @@ function buildQuery(params?: Record<string, unknown>): string {
   return qs ? `?${qs}` : '';
 }
 
-function formatErrorDetail(detail: unknown): string | null {
+export function formatErrorDetail(detail: unknown): string | null {
   if (detail == null) return null;
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail)) {

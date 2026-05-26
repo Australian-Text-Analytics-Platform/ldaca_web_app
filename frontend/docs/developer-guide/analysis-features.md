@@ -78,6 +78,6 @@ and categories, and can detach saved labels into a workspace node.
 ## Adding A New Analysis Tab
 
 Start from the shared common hooks. Add feature-specific API wrappers under
-`src/api/text/`, keep task refresh event-driven, and expose detach or
+`src/lib/backend/text/`, keep task refresh event-driven, and expose detach or
 materialize flows only through workspace actions so graph invalidation remains
 centralized.

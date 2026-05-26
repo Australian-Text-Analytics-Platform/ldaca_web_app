@@ -17,13 +17,13 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import { concordanceApi } from '@/api/text/concordance';
+import { concordanceApi } from '@/lib/backend/text/concordance';
 import type {
   ConcordanceAnalysisRequest,
   ConcordanceAnalysisResponse,
   ConcordanceDispersionBinsResponse,
-} from '@/api/text/concordance';
-import { snapshotsApi } from '@/api/snapshots';
+} from '@/lib/backend/text/concordance';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,

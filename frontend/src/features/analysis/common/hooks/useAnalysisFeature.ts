@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { textApi } from '@/api/text';
-import { workspacesApi } from '@/api/workspaces';
+import { textApi } from '@/lib/backend/text';
+import { workspacesApi } from '@/lib/backend/workspaces';
 import { collectTaskIds, resolveAnalysisTaskId } from '@/hooks/analysisTaskUtils';
 import { useAnalysisHydration, type HydrationState } from '../useAnalysisHydration';
 import { clearAnalysis } from '../clearAnalysis';

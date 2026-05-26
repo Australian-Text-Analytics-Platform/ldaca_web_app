@@ -4,7 +4,14 @@
  * owns its types + methods in one file, but consumers continue to import
  * `textApi` and the shared types from `@/api/text` exactly as before.
  */
-import { httpRequest } from '../http';
+import {
+  aiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGet,
+  concordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGet,
+  quotationCurrentTasksApiWorkspacesQuotationTasksCurrentGet,
+  sequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGet,
+  tokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGet,
+  topicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGet,
+} from '../generated/sdk.gen';
 
 import { aiAnnotationApi } from './aiAnnotation';
 import { concordanceApi } from './concordance';
@@ -98,28 +105,42 @@ export type {
   AiAnnotationSaveRequest,
 } from './aiAnnotation';
 
-const ANALYSIS_URL_SLUG: Record<string, string> = {
-  concordance: 'concordance',
-  concordance_analysis: 'concordance',
-  ai_annotation: 'ai-annotation',
-  quotation: 'quotation',
-  quotation_analysis: 'quotation',
-  token_frequencies: 'token-frequencies',
-  topic_modeling: 'topic-modeling',
-  sequential_analysis: 'sequential-analysis',
-};
-
 /**
  * Fetch the current/most-recent task descriptor for a given analysis kind.
  * Lives at the top level because every feature defers to the same endpoint
  * shape, just with a different URL slug.
  */
-const getAnalysisCurrent = (analysis: string, headers: Record<string, string> = {}) => {
-  const slug = ANALYSIS_URL_SLUG[analysis] ?? analysis.replace(/_/g, '-');
-  return httpRequest<Record<string, unknown>>(
-    `/workspaces/${slug}/tasks/current`,
-    { method: 'GET', headers },
-  );
+const getAnalysisCurrent = async (analysis: string, headers: Record<string, string> = {}) => {
+  switch (analysis) {
+    case 'concordance':
+    case 'concordance_analysis': {
+      const { data } = await concordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGet({ headers, throwOnError: true });
+      return data as Record<string, unknown>;
+    }
+    case 'quotation':
+    case 'quotation_analysis': {
+      const { data } = await quotationCurrentTasksApiWorkspacesQuotationTasksCurrentGet({ headers, throwOnError: true });
+      return data as Record<string, unknown>;
+    }
+    case 'ai_annotation': {
+      const { data } = await aiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGet({ headers, throwOnError: true });
+      return data as Record<string, unknown>;
+    }
+    case 'token_frequencies': {
+      const { data } = await tokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGet({ headers, throwOnError: true });
+      return data as Record<string, unknown>;
+    }
+    case 'topic_modeling': {
+      const { data } = await topicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGet({ headers, throwOnError: true });
+      return data as Record<string, unknown>;
+    }
+    case 'sequential_analysis': {
+      const { data } = await sequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGet({ headers, throwOnError: true });
+      return data as Record<string, unknown>;
+    }
+    default:
+      throw new Error(`Unsupported analysis type: ${analysis}`);
+  }
 };
 
 export const textApi = {

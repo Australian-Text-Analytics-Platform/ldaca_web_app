@@ -8,12 +8,12 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import { quotationApi } from '@/api/text/quotation';
+import { quotationApi } from '@/lib/backend/text/quotation';
 import type {
   QuotationAnalysisResponse,
   QuotationRequest,
-} from '@/api/text/quotation';
-import { snapshotsApi } from '@/api/snapshots';
+} from '@/lib/backend/text/quotation';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,

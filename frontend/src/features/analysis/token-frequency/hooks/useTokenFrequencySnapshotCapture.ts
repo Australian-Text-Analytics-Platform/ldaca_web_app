@@ -12,8 +12,8 @@ import JSZip from 'jszip';
 import type {
   TokenFrequencyRequest,
   TokenFrequencyResponse,
-} from '@/api/text';
-import { snapshotsApi } from '@/api/snapshots';
+} from '@/lib/backend/text';
+import { snapshotsApi } from '@/lib/backend/snapshots';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,

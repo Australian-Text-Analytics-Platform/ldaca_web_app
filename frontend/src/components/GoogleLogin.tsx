@@ -1,5 +1,5 @@
 import { GoogleLogin as OAuthGoogleLogin } from '@react-oauth/google';
-import { getApiBase } from '@/api/env';
+import { getApiBase } from '@/lib/backend/env';
 
 interface GoogleLoginProps {
   isLoading?: boolean;

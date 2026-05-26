@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { filesApi } from '../api/files';
+import { filesApi } from '../lib/backend/files';
 import { queryKeys } from '../lib/queryKeys';
 import { useAuth } from './useAuth';
 

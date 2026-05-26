@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
-import { nodesApi } from '@/api/nodes';
+import { nodesApi } from '@/lib/backend/nodes';
 import { findLanguage, SUPPORTED_LANGUAGES } from '@/lib/languages';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 

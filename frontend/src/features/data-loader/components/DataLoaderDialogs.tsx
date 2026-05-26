@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { LdacaSearchMethod, LdacaSearchResult } from '@/api/files';
+import type { LdacaSearchMethod, LdacaSearchResult } from '@/lib/backend/files';
 import type { FileTreeDirectory } from '@/types';
 
 const LDACA_SEARCH_METHOD_LABELS: Record<LdacaSearchMethod, string> = {

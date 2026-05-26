@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TaskItem } from '@/stores/analysisStore';
-import { getApiBase } from '@/api/env';
+import { getApiBase } from '@/lib/backend/env';
 
 export type TaskEventPayload =
   | { type: 'tasks_snapshot'; tasks?: TaskItem[]; timestamp?: number }

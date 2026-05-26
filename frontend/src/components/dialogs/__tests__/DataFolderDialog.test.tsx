@@ -17,7 +17,7 @@ vi.mock('sonner', () => ({
   }),
 }));
 
-vi.mock('@/api/config', () => ({
+vi.mock('@/lib/backend/config', () => ({
   configApi: {
     updateConfig: (...args: unknown[]) => updateConfig(...args),
   },

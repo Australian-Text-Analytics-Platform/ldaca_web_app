@@ -17,6 +17,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
 import { Toaster } from './components/ui/sonner';
 import { DocumentModalHost } from './components/dialogs/DocumentModalHost';
+import { ViewRouteSync } from './components/layout/ViewRouteSync';
 import { ViewRouter } from './components/layout/ViewRouter';
 import { LAG_HINT_DELAY_MS } from './config/timings';
 import { useResizableSplit } from './hooks/useResizableSplit';
@@ -207,6 +208,7 @@ const WorkspaceShell: React.FC = () => {
   return (
     <QueryProvider>
       <WorkspaceProvider>
+        <ViewRouteSync />
         <ErrorBoundary>
           <SidebarProvider
             className="bg-linear-to-br from-slate-50 to-blue-50"
