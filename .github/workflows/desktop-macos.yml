@@ -67,7 +67,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.toml',
+          key:
+            ${{ runner.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.toml',
             'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
             'polars-text/Cargo.lock', 'polars-source-utils/Cargo.toml',
             'polars-source-utils/Cargo.lock') }}
@@ -78,7 +79,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ hashFiles('frontend/src-tauri/Cargo.toml',
+          key:
+            ${{ runner.os }}-rustup-${{ hashFiles('frontend/src-tauri/Cargo.toml',
             'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
             'polars-text/Cargo.lock', 'polars-source-utils/Cargo.toml',
             'polars-source-utils/Cargo.lock') }}
@@ -107,7 +109,8 @@ jobs:
 
       - name: Package backend runtime
         shell: bash
-        run: uv run --no-project --python 3.14 python scripts/package_backend_runtime.py
+        run:
+          uv run --no-project --python 3.14 python scripts/package_backend_runtime.py
           --clean --python-version 3.14
 
       - name: Stage backend runtime for Tauri

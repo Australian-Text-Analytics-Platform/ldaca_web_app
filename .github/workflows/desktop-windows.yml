@@ -84,7 +84,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.toml',
+          key:
+            ${{ runner.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.toml',
             'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
             'polars-text/Cargo.lock', 'polars-source-utils/Cargo.toml',
             'polars-source-utils/Cargo.lock') }}
