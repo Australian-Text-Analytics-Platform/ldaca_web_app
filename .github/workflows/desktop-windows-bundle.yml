@@ -29,6 +29,10 @@ env:
   ZSTD_VERSION: "1.5.6"
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
+  # Pinned uv release bundled into the app (Resources/uv.exe). The bundle
+  # variant ships uv too so in-app upgrades (uv pip install ==version into the
+  # extracted venv) work the same as on slim.
+  UV_VERSION: "0.8.22"
 
 jobs:
   build-windows-bundle-x64:
@@ -123,6 +127,19 @@ jobs:
           & $zstd -19 -T0 -f runtime.tar -o frontend\src-tauri\backend-runtime.tar.zst
           if ($LASTEXITCODE -ne 0) { throw "zstd compression failed" }
           Get-Item frontend\src-tauri\backend-runtime.tar.zst | Select-Object Name, Length
+
+      - name: Download + stage pinned uv.exe
+        shell: pwsh
+        working-directory: frontend/src-tauri
+        run: |
+          $url = "https://github.com/astral-sh/uv/releases/download/$env:UV_VERSION/uv-x86_64-pc-windows-msvc.zip"
+          Write-Host "Downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile uv.zip
+          Expand-Archive -Path uv.zip -DestinationPath uv_extract -Force
+          $exe = Get-ChildItem -Path uv_extract -Recurse -Filter uv.exe | Select-Object -First 1
+          Copy-Item $exe.FullName ./uv.exe -Force
+          Remove-Item -Recurse -Force uv.zip, uv_extract
+          ./uv.exe --version
 
       - name: Build bundle Tauri app (unsigned)
         shell: bash

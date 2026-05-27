@@ -1,5 +1,5 @@
 {
   "bundle": {
-    "resources": ["backend-runtime.tar.zst"]
+    "resources": ["backend-runtime.tar.zst", "uv.exe"]
   }
 }
