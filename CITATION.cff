@@ -24,7 +24,6 @@ abstract: >-
   Commons of Australia (LDaCA), providing stackable, single-purpose tools for
   exploring and analysing language data.
 license: Apache-2.0
-# Concept DOI — resolves to the latest version on Zenodo. Uncomment and fill in
-# once the GitHub-Zenodo integration is enabled and the first release has been
-# archived (the DOI never changes after that):
-# doi: 10.5281/zenodo.XXXXXXX
+# Concept DOI — resolves to the latest version on Zenodo (never changes). This
+# is the "all versions" DOI, distinct from each release's version-specific DOI.
+doi: 10.5281/zenodo.20408328

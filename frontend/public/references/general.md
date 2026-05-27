@@ -7,7 +7,7 @@
 
 If you use LDaCA Wordflow in your research, please include the following statement (or an appropriate variation):
 
-Guo, S., Sun, C., Bednarek, M., Haan, S., Lynch, M. & Rehman, A. (2026), LDaCA Wordflow {{VERSION}} [Computer software]. https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/. DOI: [DOI_PLACEHOLDER]
+Guo, S., Sun, C., Bednarek, M., Haan, S., Lynch, M. & Rehman, A. (2026), LDaCA Wordflow {{VERSION}} [Computer software]. https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/. DOI: 10.5281/zenodo.20408328
 
 The DOI above always resolves to the latest version of LDaCA Wordflow on Zenodo. The version you used is recorded above (LDaCA Wordflow {{VERSION}}); each release also has its own version-specific DOI on its Zenodo record if you need to cite an exact version.
 
