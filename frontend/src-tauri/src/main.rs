@@ -193,6 +193,11 @@ fn run_uv_streaming(
     mut command: Command,
     phase: &str,
 ) -> io::Result<std::process::ExitStatus> {
+    // Windows: suppress the console window each uv invocation would otherwise pop
+    // (a blank black terminal the user might close mid-install). The backend spawn
+    // sets this already; uv venv / uv pip install must too.
+    #[cfg(target_os = "windows")]
+    command.creation_flags(CREATE_NO_WINDOW);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = command.spawn()?;
 
