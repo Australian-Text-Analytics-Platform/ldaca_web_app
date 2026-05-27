@@ -1,0 +1,294 @@
+name: Desktop macOS Build — Slim (Apple Silicon)
+
+# Builds the SLIM desktop variant: no bundled Python runtime. The .app ships a
+# bundled `uv` and installs ldaca-wordflow from PyPI into the per-user data dir
+# on first launch (see frontend/src-tauri/src/main.rs `ensure_slim_runtime`).
+# Signed surface is tiny (Rust shell + uv binary), so signing + notarization are
+# fast. The bundled-runtime workflow (desktop-macos.yml) and Windows builds are
+# intentionally left untouched.
+
+on:
+  workflow_call:
+    inputs:
+      build-notes:
+        description: "Optional note about this build"
+        required: false
+        type: string
+      ref:
+        description: "Git ref to build"
+        required: false
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      build-notes:
+        description: "Optional note about this build"
+        required: false
+        type: string
+      ref:
+        description: "Optional Git ref to build (branch, tag, or SHA)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # Pinned uv release bundled into the slim .app. Bump deliberately.
+  UV_VERSION: "0.8.22"
+
+jobs:
+  build-macos-slim-apple-silicon:
+    runs-on: macos-latest
+    env:
+      CI: "true"
+      # Stop macOS file ops from creating AppleDouble (._*) sidecars that would
+      # get sealed into CodeResources and then break notarization.
+      COPYFILE_DISABLE: "1"
+
+    steps:
+      # Slim build needs only the main repo (frontend React + standalone Tauri
+      # crate). The npm workspace is just `frontend`; the crate has no submodule
+      # path deps — so no `submodules: recursive` (keeps this pipeline lean).
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+
+      - name: Prepare cache directories
+        run: |
+          mkdir -p ~/.cargo/registry
+          mkdir -p ~/.cargo/git
+          mkdir -p ~/.rustup
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-slim-cargo-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-slim-cargo-
+
+      - name: Cache rustup toolchains
+        uses: actions/cache@v5
+        with:
+          path: ~/.rustup
+          key: ${{ runner.os }}-slim-rustup-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-slim-rustup-
+
+      - name: Install Node workspace dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Download + stage pinned uv binary
+        shell: bash
+        working-directory: frontend/src-tauri
+        run: |
+          set -Eeuo pipefail
+          asset="uv-aarch64-apple-darwin.tar.gz"
+          url="https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${asset}"
+          echo "Downloading $url"
+          curl -fSL "$url" -o /tmp/uv.tar.gz
+          tar -xzf /tmp/uv.tar.gz -C /tmp
+          cp "/tmp/uv-aarch64-apple-darwin/uv" ./uv
+          chmod +x ./uv
+          ./uv --version
+
+      - name: Import Apple code-signing certificate
+        uses: Apple-Actions/import-codesign-certs@v7.0.0
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Build slim Tauri app
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          npx tauri build \
+            --features slim \
+            --config src-tauri/tauri.slim.conf.json \
+            --bundles app
+
+      - name: Sign app (uv resource + bundle) with hardened runtime
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -Eeuo pipefail
+          app="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+
+          # Lessons from the bundled-runtime notarization saga:
+          #  - strip xattrs + AppleDouble (._*) files so they aren't sealed then
+          #    stripped from the notarization zip (breaks the seal).
+          xattr -cr "$app"
+          find "$app" -type f -name "._*" -delete
+
+          # Sign the bundled uv (a Resources Mach-O that Tauri's signer skips).
+          codesign --force --options runtime --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            "$app/Contents/Resources/uv"
+
+          # codesign --force on a bundle does NOT re-sign an already-signed main
+          # executable. Strip Tauri's sig so the bundle sign re-creates the main
+          # binary's signature in bundle context (Info.plist binding intact).
+          codesign --remove-signature "$app/Contents/MacOS/ldaca-wordflow"
+
+          # Sign the bundle: re-signs main in-context with entitlements + binding,
+          # re-seals CodeResources (incl. uv's new signature).
+          codesign --force --options runtime --timestamp \
+            --identifier au.edu.ldaca.wordflow \
+            --entitlements src-tauri/entitlements.plist \
+            --sign "$APPLE_SIGNING_IDENTITY" "$app"
+
+          echo "::group::codesign --verify --strict --deep"
+          codesign --verify --strict --deep --verbose=4 "$app"
+          echo "::endgroup::"
+
+      - name: Notarize app + staple
+        # Hard cap so a stuck Apple submission fails the step in ~25 min instead
+        # of consuming the 6h macOS-runner job timeout (which happened on the
+        # bundled 36k-file app).
+        timeout-minutes: 25
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -Eeuo pipefail
+          app="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          zip="$(mktemp -d)/ldaca-slim.zip"
+          ditto -c -k --keepParent "$app" "$zip"
+
+          echo "::group::notarytool submit"
+          set +e
+          xcrun notarytool submit "$zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait 2>&1 | tee /tmp/notarize.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "::endgroup::"
+
+          status=$(grep -E "^  status: " /tmp/notarize.log | tail -1 | awk '{print $2}')
+          sub_id=$(grep -E "^  id: " /tmp/notarize.log | head -1 | awk '{print $2}')
+          if [ "$status" != "Accepted" ] || [ "$rc" -ne 0 ]; then
+            echo "::error::Notarization failed (status=$status rc=$rc id=$sub_id)"
+            if [ -n "$sub_id" ]; then
+              echo "::group::notarytool log $sub_id"
+              xcrun notarytool log "$sub_id" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" || true
+              echo "::endgroup::"
+            fi
+            exit 1
+          fi
+
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+
+      - name: Build DMG from notarized .app
+        id: build-dmg
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -Eeuo pipefail
+          app="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          dmg_dir="src-tauri/target/release/bundle/dmg"
+          mkdir -p "$dmg_dir"
+
+          stage="$(mktemp -d)"
+          ditto "$app" "$stage/LDaCA Wordflow.app"
+          ln -s /Applications "$stage/Applications"
+
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          dmg="$dmg_dir/ldaca-wordflow-slim-apple-silicon-${version}.dmg"
+
+          hdiutil create -volname "LDaCA Wordflow" \
+            -srcfolder "$stage" -ov -format UDZO "$dmg"
+          codesign --force --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" "$dmg"
+
+          # Absolute path: later steps (notarize DMG, upload) don't run with
+          # working-directory: frontend, so a relative path wouldn't resolve.
+          echo "path=$(pwd)/$dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize DMG + staple
+        timeout-minutes: 25
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          DMG_PATH: ${{ steps.build-dmg.outputs.path }}
+        run: |
+          set -Eeuo pipefail
+          echo "::group::notarytool submit DMG"
+          set +e
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait 2>&1 | tee /tmp/notarize-dmg.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "::endgroup::"
+          status=$(grep -E "^  status: " /tmp/notarize-dmg.log | tail -1 | awk '{print $2}')
+          if [ "$status" != "Accepted" ] || [ "$rc" -ne 0 ]; then
+            echo "::error::DMG notarization failed (status=$status rc=$rc)"
+            exit 1
+          fi
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+
+      - name: Verify Developer ID signature + notarization
+        shell: bash
+        working-directory: frontend
+        env:
+          EXPECTED_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -Eeuo pipefail
+          app="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          echo "::group::codesign -dvv"
+          codesign -dvv "$app" 2>&1 | tee /tmp/codesign.out
+          echo "::endgroup::"
+          grep -q "Authority=Developer ID Application" /tmp/codesign.out \
+            || { echo "::error::not Developer ID signed"; exit 1; }
+          grep -q "TeamIdentifier=$EXPECTED_TEAM_ID" /tmp/codesign.out \
+            || { echo "::error::team id mismatch"; exit 1; }
+          echo "::group::spctl --assess"
+          spctl --assess --verbose=4 --type execute "$app" 2>&1 | tee /tmp/spctl.out || true
+          echo "::endgroup::"
+          grep -q "source=Notarized Developer ID" /tmp/spctl.out \
+            || { echo "::error::not notarized per spctl"; exit 1; }
+          echo "Slim app is Developer ID signed and notarized."
+
+      - name: Upload slim DMG artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ldaca-wordflow-slim-macos-apple-silicon
+          path: ${{ steps.build-dmg.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
