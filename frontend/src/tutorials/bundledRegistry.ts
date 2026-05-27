@@ -343,6 +343,11 @@ const tutorial = {
     anchor: 'help-concordance-regex-toggle',
     label: 'Regex mode toggle',
   },
+  'analysis.concordance.search-mode': {
+    file: 'tutorials/concordance.md',
+    anchor: 'help-concordance-search-mode',
+    label: 'Search mode (text vs tokens)',
+  },
   'analysis.topic-modeling.tab': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-section',
