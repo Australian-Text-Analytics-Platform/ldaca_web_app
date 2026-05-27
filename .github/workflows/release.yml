@@ -51,44 +51,101 @@ jobs:
       - name: Check that all 5 version-bearing files agree
         run: node scripts/check-versions.mjs
 
-  build-windows:
-    name: Build Windows MSI
+  # Four desktop variants build in parallel: {slim, bundle} × {macOS, Windows}.
+  # Slim ships a tiny shell that installs the runtime via uv on first launch;
+  # bundle ships the runtime as a tarball for an offline-capable first launch.
+  # macOS variants are Developer-ID signed + notarized (hence `secrets: inherit`
+  # — the reusable workflows reference secrets.APPLE_* directly); Windows MSIs
+  # are unsigned, so they need no secrets.
+  build-macos-slim:
+    name: Build macOS DMG (slim)
     needs: verify-versions
-    uses: ./.github/workflows/desktop-windows.yml
+    uses: ./.github/workflows/desktop-macos-slim.yml
     with:
-      build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop build for {0}', inputs.ref) || format('Automated desktop release build for {0}', github.ref_name) }}
-      debug: false
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+    secrets: inherit
+
+  build-macos-bundle:
+    name: Build macOS DMG (bundle)
+    needs: verify-versions
+    uses: ./.github/workflows/desktop-macos-bundle.yml
+    with:
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+    secrets: inherit
+
+  build-windows-slim:
+    name: Build Windows MSI (slim)
+    needs: verify-versions
+    uses: ./.github/workflows/desktop-windows-slim.yml
+    with:
       ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
-  build-macos:
-    name: Build macOS DMG
+  build-windows-bundle:
+    name: Build Windows MSI (bundle)
     needs: verify-versions
-    uses: ./.github/workflows/desktop-macos.yml
+    uses: ./.github/workflows/desktop-windows-bundle.yml
     with:
-      build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop build for {0}', inputs.ref) || format('Automated desktop release build for {0}', github.ref_name) }}
       ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
   publish-release:
     name: Publish Desktop Assets
     if: ${{ github.event_name == 'push' || inputs.publish_release }}
     needs:
-      - build-windows
-      - build-macos
+      - build-macos-slim
+      - build-macos-bundle
+      - build-windows-slim
+      - build-windows-bundle
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Download Windows artifact
+      - name: Download macOS slim DMG
         uses: actions/download-artifact@v8
         with:
-          name: ldaca-desktop-windows-msi
-          path: release-assets/windows
+          name: ldaca-wordflow-slim-macos-apple-silicon
+          path: release-assets/macos-slim
 
-      - name: Download macOS artifact
+      - name: Download macOS bundle DMG
         uses: actions/download-artifact@v8
         with:
-          name: ldaca-desktop-macos-apple-silicon
-          path: release-assets/macos
+          name: ldaca-wordflow-bundle-macos-apple-silicon
+          path: release-assets/macos-bundle
+
+      - name: Download Windows slim MSI
+        uses: actions/download-artifact@v8
+        with:
+          name: ldaca-wordflow-slim-windows-x64
+          path: release-assets/windows-slim
+
+      - name: Download Windows bundle MSI
+        uses: actions/download-artifact@v8
+        with:
+          name: ldaca-wordflow-bundle-windows-x64
+          path: release-assets/windows-bundle
+
+      - name: Collect + canonically name the four installers
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          release_tag="${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}"
+          if [ -z "$release_tag" ]; then
+            echo "release_tag input is required when publish_release is true" >&2
+            exit 1
+          fi
+          ver="${release_tag#v}"
+
+          mkdir -p out
+          # macOS DMGs already encode variant + version in their filename
+          # (ldaca-wordflow-{slim,bundle}-apple-silicon-<ver>.dmg).
+          cp release-assets/macos-slim/*.dmg out/
+          cp release-assets/macos-bundle/*.dmg out/
+          # Both Windows MSIs use Tauri's identical default name, so rename them
+          # to disambiguate the two variants on the release.
+          cp release-assets/windows-slim/*.msi "out/ldaca-wordflow-slim-x64-${ver}.msi"
+          cp release-assets/windows-bundle/*.msi "out/ldaca-wordflow-bundle-x64-${ver}.msi"
+
+          echo "Release assets:"
+          ls -lh out/
 
       - name: Create or update GitHub release assets
         shell: bash
@@ -96,21 +153,12 @@ jobs:
           set -Eeuo pipefail
           release_tag="${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}"
 
-          if [ -z "$release_tag" ]; then
-            echo "release_tag input is required when publish_release is true" >&2
-            exit 1
-          fi
-
           if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$release_tag" \
-              release-assets/windows/*.msi \
-              release-assets/macos/*.dmg \
+            gh release upload "$release_tag" out/* \
               --clobber \
               --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$release_tag" \
-              release-assets/windows/*.msi \
-              release-assets/macos/*.dmg \
+            gh release create "$release_tag" out/* \
               --generate-notes \
               --title "$release_tag" \
               --repo "$GITHUB_REPOSITORY"
