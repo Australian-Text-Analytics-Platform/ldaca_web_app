@@ -163,15 +163,16 @@ fn strip_unc_prefix(path: &Path) -> PathBuf {
 }
 
 /// First-launch setup progress, emitted to the frontend so the loading screen
-/// can show "creating env / installing …" instead of a bare spinner.
-#[cfg(feature = "slim")]
+/// can show "creating env / installing / unpacking …" instead of a bare spinner.
+/// Shared by the slim (uv-install) and bundle (tarball-extract) variants.
+#[cfg(any(feature = "slim", feature = "bundle"))]
 #[derive(Clone, serde::Serialize)]
 struct SlimSetupEvent {
     phase: String,
     message: String,
 }
 
-#[cfg(feature = "slim")]
+#[cfg(any(feature = "slim", feature = "bundle"))]
 fn emit_setup(app: &AppHandle, phase: &str, message: &str) {
     use tauri::Emitter;
     let _ = app.emit(
@@ -234,41 +235,22 @@ fn run_uv_streaming(
     Ok(status)
 }
 
-/// Locate the site-packages dir of the slim uv venv (`<runtime>/lib/python3.X/
-/// site-packages` on unix, `<runtime>/Lib/site-packages` on Windows). Distinct
-/// from `find_venv_site_packages`, which expects the bundled `python/` subdir.
-#[cfg(feature = "slim")]
-fn slim_site_packages(runtime_dir: &Path) -> Option<PathBuf> {
-    let win = runtime_dir.join("Lib").join("site-packages");
-    if win.is_dir() {
-        return Some(win);
-    }
-    let entries = std::fs::read_dir(runtime_dir.join("lib")).ok()?;
-    for entry in entries.flatten() {
-        let dir = entry.path();
-        if dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.starts_with("python3."))
-        {
-            let sp = dir.join("site-packages");
-            if sp.is_dir() {
-                return Some(sp);
-            }
-        }
-    }
-    None
-}
-
 /// Slim variant only: ensure a Python runtime exists in the per-user data dir,
 /// installing it via the bundled `uv` on first launch. Sets LDACA_BACKEND_PYTHON
 /// and LDACA_BACKEND_RUNTIME so the normal `locate_backend_runtime` path picks it
 /// up unchanged. Idempotent: a `.ldaca-runtime-ready` marker short-circuits once
 /// the install has succeeded. Emits `slim-setup` events for the frontend.
+///
+/// Layout is shared with the `bundle` variant: the venv lives at
+/// `<data>/runtime/python` (so the existing `find_venv_site_packages` /
+/// `find_managed_python_home` helpers work for both), and the runtime ROOT
+/// `<data>/runtime` is what we export as LDACA_BACKEND_RUNTIME. Either variant
+/// reuses a runtime the other already provisioned at this path.
 #[cfg(feature = "slim")]
 fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
     let runtime_dir = data_dir.join("runtime");
+    let venv_dir = runtime_dir.join("python");
 
     // polars[rtcompat] always installs the feature-limited `_polars_runtime_32`
     // base build alongside the full-feature `_polars_runtime_compat`; only compat
@@ -278,9 +260,9 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
     std::env::set_var("POLARS_FORCE_PKG", "compat");
 
     #[cfg(windows)]
-    let python = runtime_dir.join("Scripts").join("python.exe");
+    let python = venv_dir.join("Scripts").join("python.exe");
     #[cfg(not(windows))]
-    let python = runtime_dir.join("bin").join("python3");
+    let python = venv_dir.join("bin").join("python3");
 
     let marker = runtime_dir.join(".ldaca-runtime-ready");
 
@@ -289,6 +271,13 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
         std::env::set_var("LDACA_BACKEND_PYTHON", &python);
         std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
         return Ok(());
+    }
+
+    // Clear any partial install or a pre-`python/`-layout runtime (older slim
+    // builds put the venv at the runtime root) so we always rebuild cleanly.
+    // User workspaces live elsewhere in the data dir, so this is safe.
+    if runtime_dir.exists() {
+        let _ = std::fs::remove_dir_all(&runtime_dir);
     }
 
     // Windows needs the .exe extension to execute the bundled binary.
@@ -306,12 +295,12 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    std::fs::create_dir_all(&data_dir)?;
+    std::fs::create_dir_all(&runtime_dir)?;
 
     emit_setup(app, "creating-env", "Creating the Python environment…");
-    println!("[slim] creating venv at {}", runtime_dir.display());
+    println!("[slim] creating venv at {}", venv_dir.display());
     let mut venv_cmd = Command::new(&uv);
-    venv_cmd.args(["venv", "--python", "3.14"]).arg(&runtime_dir);
+    venv_cmd.args(["venv", "--python", "3.14"]).arg(&venv_dir);
     let status = run_uv_streaming(app, venv_cmd, "creating-env")?;
     if !status.success() {
         emit_setup(app, "error", "Failed to create the Python environment.");
@@ -338,7 +327,7 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
     // Reclaim ~179 MB: drop the unused `_polars_runtime_32` CPU-variant build.
     // compat (full feature set) is what loads; 32 is dead weight. Safe to delete
     // because we force POLARS_FORCE_PKG=compat above so it's never imported.
-    if let Some(sp) = slim_site_packages(&runtime_dir) {
+    if let Some(sp) = find_venv_site_packages(&runtime_dir) {
         let dead = sp.join("_polars_runtime_32");
         if dead.is_dir() {
             emit_setup(app, "installing", "Trimming unused runtime files…");
@@ -354,6 +343,90 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
     std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
     emit_setup(app, "ready", "Runtime ready — starting Wordflow…");
     println!("[slim] runtime ready: {}", runtime_dir.display());
+    Ok(())
+}
+
+/// Bundle variant only: ensure the Python runtime exists in the per-user data
+/// dir by extracting the shipped `backend-runtime.tar.zst` on first launch.
+/// Mirrors `ensure_slim_runtime` but unpacks a pre-built, self-contained runtime
+/// (its own `managed-python/`) instead of installing from PyPI — offline + fast.
+/// Targets the SAME shared layout (`<data>/runtime/python`) so the two variants
+/// are interchangeable and reuse one runtime. The archive's top level is the
+/// runtime contents (`python/`, `managed-python/`, …), extracted into
+/// `<data>/runtime`.
+#[cfg(feature = "bundle")]
+fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let data_dir = app.path().app_data_dir()?;
+    let runtime_dir = data_dir.join("runtime");
+    let venv_dir = runtime_dir.join("python");
+
+    // The shipped runtime has `_polars_runtime_32` pruned at packaging time;
+    // force the full-feature compat build that actually loads. Process-global,
+    // inherited by the spawned backend; set on every launch incl. the fast path.
+    std::env::set_var("POLARS_FORCE_PKG", "compat");
+
+    #[cfg(windows)]
+    let python = venv_dir.join("Scripts").join("python.exe");
+    #[cfg(not(windows))]
+    let python = venv_dir.join("bin").join("python3");
+
+    let marker = runtime_dir.join(".ldaca-runtime-ready");
+
+    if marker.exists() && python.exists() {
+        println!("[bundle] runtime present: {}", runtime_dir.display());
+        std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+        std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+        return Ok(());
+    }
+
+    // Clear any partial/old extraction so we unpack cleanly. User workspaces
+    // live elsewhere in the data dir, so this only removes the runtime.
+    if runtime_dir.exists() {
+        let _ = std::fs::remove_dir_all(&runtime_dir);
+    }
+
+    let archive = app
+        .path()
+        .resolve("backend-runtime.tar.zst", BaseDirectory::Resource)?;
+    std::fs::create_dir_all(&runtime_dir)?;
+
+    emit_setup(app, "extracting", "Unpacking the Python runtime…");
+    println!(
+        "[bundle] extracting {} -> {}",
+        archive.display(),
+        runtime_dir.display()
+    );
+    let file = std::fs::File::open(&archive)?;
+    let decoder = zstd::Decoder::new(file)?;
+    let mut tar = tar::Archive::new(decoder);
+    tar.set_preserve_permissions(true);
+    tar.unpack(&runtime_dir)?;
+
+    if !python.exists() {
+        emit_setup(app, "error", "Bundled runtime is missing its Python interpreter.");
+        return Err(make_error(format!(
+            "extracted runtime has no python at {}",
+            python.display()
+        )));
+    }
+
+    // tar should preserve modes, but be defensive on unix so the interpreter
+    // is executable after extraction.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&python) {
+            let mut perms = meta.permissions();
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(&python, perms);
+        }
+    }
+
+    std::fs::write(&marker, "ready\n")?;
+    std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+    std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+    emit_setup(app, "ready", "Runtime ready — starting Wordflow…");
+    println!("[bundle] runtime ready: {}", runtime_dir.display());
     Ok(())
 }
 
@@ -1271,9 +1344,11 @@ fn main() {
                 backend_port = backend_port
             ))?;
 
-            // Bundled variant: runtime ships inside the .app, so locate + spawn
-            // synchronously and surface any failure immediately.
-            #[cfg(not(feature = "slim"))]
+            // Legacy bundled variant: runtime ships inside the .app (loose tree),
+            // so locate + spawn synchronously and surface any failure immediately.
+            // Excluded for both slim and the new tarball `bundle` variant, which
+            // provision the runtime into the user data dir on a background thread.
+            #[cfg(not(any(feature = "slim", feature = "bundle")))]
             {
                 let app_handle = app.handle();
                 let runtime = locate_backend_runtime(&app_handle)?;
@@ -1321,6 +1396,40 @@ fn main() {
                             backend_url_log, pid
                         ),
                         Err(e) => eprintln!("[slim] backend start failed: {e}"),
+                    }
+                });
+            }
+
+            // Bundle variant: same background-thread pattern as slim, but the
+            // runtime is provisioned by extracting the shipped tarball into the
+            // shared user-data runtime dir instead of installing from PyPI.
+            #[cfg(feature = "bundle")]
+            {
+                let app_handle = app.handle().clone();
+                let backend_url_log = backend_url.clone();
+                std::thread::spawn(move || {
+                    if let Err(e) = ensure_bundle_runtime(&app_handle) {
+                        eprintln!("[bundle] runtime bootstrap failed: {e}");
+                        return;
+                    }
+                    let result = (|| -> Result<u32, Box<dyn std::error::Error>> {
+                        let runtime = locate_backend_runtime(&app_handle)?;
+                        let runtime_env = load_runtime_env(&runtime.root)?;
+                        let process =
+                            spawn_backend_process(&runtime, backend_port, &runtime_env)?;
+                        let pid = process.pid();
+                        write_pidfile(pid);
+                        if let Some(state) = app_handle.try_state::<BackendState>() {
+                            *state.process.lock().unwrap() = Some(process);
+                        }
+                        Ok(pid)
+                    })();
+                    match result {
+                        Ok(pid) => println!(
+                            "[bundle] backend launched at: {} (pid {}) – health polling delegated to frontend",
+                            backend_url_log, pid
+                        ),
+                        Err(e) => eprintln!("[bundle] backend start failed: {e}"),
                     }
                 });
             }

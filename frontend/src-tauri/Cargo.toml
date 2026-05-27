@@ -14,6 +14,11 @@ edition = "2021"
 # PyPI into the per-user data dir, then points the existing launch path at it
 # via LDACA_BACKEND_PYTHON / LDACA_BACKEND_RUNTIME.
 slim = []
+# Bundle desktop variant: ships a pre-built, self-contained Python runtime as a
+# single `backend-runtime.tar.zst` resource and extracts it (in-process zstd+tar,
+# no system `tar` dependency) into the SAME per-user runtime dir the slim variant
+# uses. Offline-capable instant-ish first launch; shares the slim runtime layout.
+bundle = ["dep:zstd", "dep:tar"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -30,6 +35,10 @@ dotenvy = "0.15"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 futures-util = "0.3"
 tokio = { version = "1", features = ["fs", "io-util"] }
+# Bundle variant only (optional, gated by the `bundle` feature): in-process
+# extraction of the shipped runtime tarball — no reliance on a system `tar`.
+zstd = { version = "0.13", optional = true }
+tar = { version = "0.4", optional = true }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-opener = "2"
