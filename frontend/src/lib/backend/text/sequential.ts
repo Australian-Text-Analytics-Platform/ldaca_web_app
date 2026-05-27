@@ -9,14 +9,25 @@ import {
 
 import type {
   SequentialAnalysisDetachRequest,
-  SequentialAnalysisRequest,
+  SequentialAnalysisDetachResponse,
+  SequentialAnalysisPreferenceUpdateResponse,
+  SequentialAnalysisPreviewResponse,
+  SequentialAnalysisRequestInput,
+  SequentialAnalysisRequestOutput,
+  SequentialAnalysisResponse,
 } from '@/api/generated/types.gen';
 
 export type {
   SelectedPeriod,
   SequentialAnalysisDetachRequest,
-  SequentialAnalysisRequest,
+  SequentialAnalysisDetachResponse,
+  SequentialAnalysisPreferenceUpdateResponse,
+  SequentialAnalysisPreviewResponse,
+  SequentialAnalysisRequestOutput,
+  SequentialAnalysisResponse,
 } from '@/api/generated/types.gen';
+
+export type SequentialAnalysisRequest = SequentialAnalysisRequestInput;
 
 export type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 
@@ -41,24 +52,19 @@ export const SNAPSHOT_FINEST_FREQUENCIES: readonly Exclude<SequentialFrequency, 
 
 export type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
-export type SequentialAnalysisDetachResponse = {
-  new_node_id: string;
-  new_node_name: string;
-};
-
 export const sequentialAnalysisApi = {
   sequentialAnalysis: async (
     node: string,
     req: SequentialAnalysisRequest,
     headers: Record<string, string> = {},
-  ) => {
+  ): Promise<SequentialAnalysisResponse> => {
     const { data } = await runSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPost({
       body: req,
       headers,
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   /** Preview-mode sequential analysis. Skips task registration and
@@ -76,52 +82,46 @@ export const sequentialAnalysisApi = {
     req: SequentialAnalysisRequest,
     headers: Record<string, string> = {},
     includeData = false,
-  ) => {
+  ): Promise<SequentialAnalysisPreviewResponse> => {
     return previewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPost({
       body: req,
       headers,
       path: { node_id: node },
       query: { include_data: includeData },
       throwOnError: true,
-    }).then(({ data }) => data as {
-      state: string;
-      total_records: number;
-      columns: string[];
-      data?: Array<Record<string, unknown>>;
-      analysis_params?: Record<string, unknown>;
-    });
+    }).then(({ data }) => data);
   },
 
-  getSequentialAnalysisTaskRequest: async (taskId: string, headers: Record<string, string> = {}) => {
+  getSequentialAnalysisTaskRequest: async (taskId: string, headers: Record<string, string> = {}): Promise<SequentialAnalysisRequestOutput> => {
     const { data } = await sequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGet({
       headers,
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
-  getSequentialAnalysisTaskResult: async (taskId: string, headers: Record<string, string> = {}) => {
+  getSequentialAnalysisTaskResult: async (taskId: string, headers: Record<string, string> = {}): Promise<SequentialAnalysisResponse> => {
     const { data } = await sequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGet({
       headers,
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   postSequentialAnalysisTaskResult: async (
     taskId: string,
     body: Record<string, unknown>,
     headers: Record<string, string> = {},
-  ) => {
+  ): Promise<SequentialAnalysisPreferenceUpdateResponse> => {
     const { data } = await updateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPost({
       body,
       headers,
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   sequentialAnalysisDetach: async (
@@ -134,5 +134,5 @@ export const sequentialAnalysisApi = {
       headers,
       path: { task_id: taskId },
       throwOnError: true,
-    }).then(({ data }) => data as SequentialAnalysisDetachResponse),
+    }).then(({ data }) => data),
 };

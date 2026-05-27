@@ -10,49 +10,33 @@ import {
 
 import type { SourceRowPagination } from './shared';
 import type {
-  QuotationDetachNodeOption,
-  QuotationDetachOptionsResponse as GeneratedQuotationDetachOptionsResponse,
   QuotationDetachRequest,
   QuotationMaterializeRequest,
-  QuotationRequest,
+  QuotationEngineConfigInput,
+  QuotationRequestInput,
+  QuotationRequestOutput,
   QuotationResultQuery,
 } from '@/api/generated/types.gen';
 
 export type {
+  AnalysisTaskActionResponse,
+  QuotationAnalysisResponse,
   QuotationDetachNodeOption,
+  QuotationDetachOptionsResponse as QuotationDetachOptionsResult,
   QuotationDetachRequest,
-  QuotationEngineConfig,
   QuotationEngineType,
   QuotationMaterializeRequest,
-  QuotationRequest,
+  QuotationMetadata,
+  QuotationRequestOutput,
   QuotationResultQuery,
 } from '@/api/generated/types.gen';
 
-export type QuotationMetadata = {
-  quotation_columns: string[];
-  metadata_columns: string[];
-  all_columns: string[];
-};
+export type QuotationEngineConfig = QuotationEngineConfigInput;
+export type QuotationRequest = QuotationRequestInput;
 
 export type QuotationHitRow = Record<string, unknown>;
 export type QuotationGroupedRow = QuotationHitRow[];
 export type QuotationPagination = SourceRowPagination;
-
-export type QuotationAnalysisResponse = {
-  data: QuotationGroupedRow[];
-  columns: string[];
-  metadata: QuotationMetadata;
-  pagination: QuotationPagination;
-  sorting: { sort_by?: string | null; descending: boolean };
-  preferences?: { context_length?: number; [key: string]: unknown };
-  task_id?: string;
-};
-
-export type QuotationDetachOptionsResult = Omit<GeneratedQuotationDetachOptionsResponse, 'data' | 'metadata' | 'state'> & {
-  state: 'running' | 'successful' | 'failed' | 'cancelled';
-  data?: { nodes: QuotationDetachNodeOption[] };
-  metadata?: { task_id?: string; [key: string]: unknown };
-};
 
 export const quotationApi = {
   quotation: async (node: string, req: QuotationRequest, headers: Record<string, string> = {}) => {
@@ -62,7 +46,7 @@ export const quotationApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as QuotationAnalysisResponse;
+    return data;
   },
 
   getQuotationDetachOptions: (
@@ -75,7 +59,7 @@ export const quotationApi = {
       path: { node_id: node },
       query: { column },
       throwOnError: true,
-    }).then(({ data }) => data as QuotationDetachOptionsResult);
+    }).then(({ data }) => data);
   },
 
   quotationDetach: async (
@@ -102,16 +86,16 @@ export const quotationApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as { state: string; message: string; data: null; metadata?: { task_id?: string } };
+    return data;
   },
 
-  getQuotationTaskRequest: async (taskId: string, headers: Record<string, string> = {}) => {
+  getQuotationTaskRequest: async (taskId: string, headers: Record<string, string> = {}): Promise<QuotationRequestOutput> => {
     const { data } = await quotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGet({
       headers,
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   getQuotationTaskResult: async (
@@ -130,7 +114,7 @@ export const quotationApi = {
       } } : {}),
       throwOnError: true,
     });
-    return data as QuotationAnalysisResponse;
+    return data;
   },
 
   postQuotationTaskResult: async (
@@ -144,6 +128,6 @@ export const quotationApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as QuotationAnalysisResponse;
+    return data;
   },
 };

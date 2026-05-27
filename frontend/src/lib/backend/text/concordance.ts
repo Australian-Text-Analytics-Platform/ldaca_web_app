@@ -12,9 +12,9 @@ import {
 
 import type { LanguageHint, SourceRowPagination } from './shared';
 import type {
+  AnalysisTaskActionResponse,
   ConcordanceAnalysisRequest,
-  ConcordanceDetachNodeOption,
-  ConcordanceDetachOptionsResponse as GeneratedConcordanceDetachOptionsResponse,
+  ConcordanceRequest as ConcordanceStoredRequest,
   ConcordanceDetachRequest,
   ConcordanceDispersionDetachRequest,
   ConcordanceMaterializeRequest,
@@ -23,10 +23,17 @@ import type {
 
 export type {
   ConcordanceAnalysisRequest,
+  ConcordanceAnalysisResponse,
+  ConcordanceRequest as ConcordanceStoredRequest,
   ConcordanceDetachNodeOption,
+  ConcordanceDetachOptionsResponse as ConcordanceDetachOptionsResult,
   ConcordanceDetachRequest,
+  ConcordanceDispersionBinsResponse,
+  ConcordanceDispersionBinRow,
   ConcordanceDispersionDetachRequest,
   ConcordanceMaterializeRequest,
+  ConcordanceMetadata,
+  ConcordanceNodeResult as ConcordanceResultEntry,
   ConcordanceResultQuery,
 } from '@/api/generated/types.gen';
 
@@ -43,15 +50,6 @@ export type {
  */
 export type ConcordanceSearchMode = NonNullable<ConcordanceAnalysisRequest['search_mode']>;
 
-export type ConcordanceMetadata = {
-  /** Core concordance columns (CONC_left_context, CONC_matched_text, CONC_right_context, etc.) */
-  concordance_columns: string[];
-  /** Original document metadata columns. */
-  metadata_columns: string[];
-  /** All available columns. */
-  all_columns: string[];
-};
-
 export type ConcordanceHitRow = Record<string, unknown>;
 export type ConcordanceGroupedRow = ConcordanceHitRow[];
 
@@ -66,47 +64,7 @@ export type ConcordanceRequest = LanguageHint & {
   sort_by?: string;
 };
 
-export type ConcordanceDetachOptionsResult = Omit<GeneratedConcordanceDetachOptionsResponse, 'data' | 'metadata' | 'state'> & {
-  state: 'running' | 'successful' | 'failed' | 'cancelled';
-  data?: { nodes: ConcordanceDetachNodeOption[] };
-  metadata?: { task_id?: string; [key: string]: unknown };
-};
-
 export type ConcordancePagination = SourceRowPagination;
-
-export type ConcordanceResultEntry = {
-  data: ConcordanceGroupedRow[];
-  columns: string[];
-  metadata: ConcordanceMetadata;
-  pagination: ConcordancePagination;
-  sorting: { sort_by?: string; descending: boolean };
-  materialized?: boolean;
-};
-
-export type ConcordanceDispersionBinRow = {
-  matched_text?: string;
-  bin_idx?: number;
-  count?: number;
-};
-
-export type ConcordanceDispersionBinsResponse = {
-  node_id: string;
-  total_hits: number;
-  document_column: string | null;
-  /** Number of source bins the hits were pre-aggregated into (server-side). */
-  bin_count: number;
-  rows: ConcordanceDispersionBinRow[];
-};
-
-export type ConcordanceAnalysisResponse = {
-  state: 'running' | 'successful' | 'failed' | 'cancelled';
-  message: string;
-  data: Record<string, ConcordanceResultEntry>;
-  analysis_params?: Record<string, unknown>;
-  combinable?: boolean;
-  preferences?: { page_size?: number; show_metadata?: boolean; [key: string]: unknown };
-  metadata?: { task_id?: string; [key: string]: unknown };
-};
 
 export const concordanceApi = {
   concordance: async (req: ConcordanceAnalysisRequest, headers: Record<string, string> = {}) => {
@@ -115,7 +73,7 @@ export const concordanceApi = {
       headers,
       throwOnError: true,
     });
-    return data as ConcordanceAnalysisResponse;
+    return data;
   },
 
   concordanceDetach: async (
@@ -142,27 +100,21 @@ export const concordanceApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    const resp = data as {
-      state: string;
-      message: string;
-      data: null;
-      metadata?: { task_id?: string };
-    };
-    return { task_id: resp?.metadata?.task_id };
+    return { task_id: data.metadata?.task_id ?? undefined };
   },
 
   concordanceMaterialize: async (
     node: string,
     req: ConcordanceMaterializeRequest,
     headers: Record<string, string> = {},
-  ) => {
+  ): Promise<AnalysisTaskActionResponse> => {
     const { data } = await materializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePost({
       body: req,
       headers,
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as { state: string; message: string; data: null; metadata?: { task_id?: string } };
+    return data;
   },
 
   getConcordanceDetachOptions: (
@@ -175,16 +127,16 @@ export const concordanceApi = {
       path: { node_id: node },
       query: { column },
       throwOnError: true,
-    }).then(({ data }) => data as ConcordanceDetachOptionsResult);
+    }).then(({ data }) => data);
   },
 
-  getConcordanceTaskRequest: async (taskId: string, headers: Record<string, string> = {}) => {
+  getConcordanceTaskRequest: async (taskId: string, headers: Record<string, string> = {}): Promise<ConcordanceStoredRequest> => {
     const { data } = await concordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGet({
       headers,
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   getConcordanceTaskResult: async (taskId: string, headers: Record<string, string> = {}) => {
@@ -193,7 +145,7 @@ export const concordanceApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as ConcordanceAnalysisResponse;
+    return data;
   },
 
   getConcordanceTaskDispersionBins: (
@@ -206,7 +158,7 @@ export const concordanceApi = {
       path: { task_id: taskId },
       query: { node_id: nodeId },
       throwOnError: true,
-    }).then(({ data }) => data as ConcordanceDispersionBinsResponse);
+    }).then(({ data }) => data);
   },
 
   postConcordanceTaskResult: async (
@@ -220,6 +172,6 @@ export const concordanceApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as ConcordanceAnalysisResponse;
+    return data;
   },
 };

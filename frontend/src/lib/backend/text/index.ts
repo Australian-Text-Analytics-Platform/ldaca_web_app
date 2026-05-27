@@ -114,28 +114,28 @@ const getAnalysisCurrent = async (analysis: string, headers: Record<string, stri
     case 'concordance':
     case 'concordance_analysis': {
       const { data } = await concordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGet({ headers, throwOnError: true });
-      return data as Record<string, unknown>;
+      return data;
     }
     case 'quotation':
     case 'quotation_analysis': {
       const { data } = await quotationCurrentTasksApiWorkspacesQuotationTasksCurrentGet({ headers, throwOnError: true });
-      return data as Record<string, unknown>;
+      return data;
     }
     case 'ai_annotation': {
       const { data } = await aiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGet({ headers, throwOnError: true });
-      return data as Record<string, unknown>;
+      return data;
     }
     case 'token_frequencies': {
       const { data } = await tokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGet({ headers, throwOnError: true });
-      return data as Record<string, unknown>;
+      return data;
     }
     case 'topic_modeling': {
       const { data } = await topicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGet({ headers, throwOnError: true });
-      return data as Record<string, unknown>;
+      return data;
     }
     case 'sequential_analysis': {
       const { data } = await sequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGet({ headers, throwOnError: true });
-      return data as Record<string, unknown>;
+      return data;
     }
     default:
       throw new Error(`Unsupported analysis type: ${analysis}`);

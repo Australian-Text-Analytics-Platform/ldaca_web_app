@@ -5,6 +5,32 @@ export type ClientOptions = {
 };
 
 /**
+ * AiAnnotationCategoriesData
+ */
+export type AiAnnotationCategoriesData = {
+    /**
+     * Categories
+     */
+    categories: Array<string>;
+};
+
+/**
+ * AiAnnotationCategoriesResponse
+ */
+export type AiAnnotationCategoriesResponse = {
+    data: AiAnnotationCategoriesData;
+    /**
+     * Message
+     */
+    message: string;
+    metadata?: AnalysisTaskMetadata | null;
+    /**
+     * State
+     */
+    state: 'successful' | 'failed';
+};
+
+/**
  * AiAnnotationClassDef
  */
 export type AiAnnotationClassDef = {
@@ -16,6 +42,20 @@ export type AiAnnotationClassDef = {
      * Name
      */
     name: string;
+};
+
+/**
+ * AiAnnotationDetachData
+ */
+export type AiAnnotationDetachData = {
+    /**
+     * New Node Name
+     */
+    new_node_name: string;
+    /**
+     * Record Count
+     */
+    record_count: number;
 };
 
 /**
@@ -77,6 +117,21 @@ export type AiAnnotationDetachRequest = {
 };
 
 /**
+ * AiAnnotationDetachResponse
+ */
+export type AiAnnotationDetachResponse = {
+    data: AiAnnotationDetachData;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
  * AiAnnotationEdit
  */
 export type AiAnnotationEdit = {
@@ -109,6 +164,30 @@ export type AiAnnotationExample = {
 };
 
 /**
+ * AiAnnotationModelInfo
+ */
+export type AiAnnotationModelInfo = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * AiAnnotationModelsData
+ */
+export type AiAnnotationModelsData = {
+    /**
+     * Models
+     */
+    models: Array<AiAnnotationModelInfo>;
+};
+
+/**
  * AiAnnotationModelsRequest
  */
 export type AiAnnotationModelsRequest = {
@@ -120,6 +199,22 @@ export type AiAnnotationModelsRequest = {
      * Base Url
      */
     base_url?: string | null;
+};
+
+/**
+ * AiAnnotationModelsResponse
+ */
+export type AiAnnotationModelsResponse = {
+    data: AiAnnotationModelsData;
+    /**
+     * Message
+     */
+    message: string;
+    metadata?: AnalysisTaskMetadata | null;
+    /**
+     * State
+     */
+    state: 'successful' | 'failed';
 };
 
 /**
@@ -136,24 +231,35 @@ export type AiAnnotationNodeResult = {
     data: Array<{
         [key: string]: unknown;
     }>;
+    metadata?: AnalysisTaskMetadata | null;
+    pagination?: SourceRowPagination | null;
+    sorting?: AnalysisSorting | null;
+};
+
+/**
+ * AiAnnotationProvidersData
+ */
+export type AiAnnotationProvidersData = {
     /**
-     * Metadata
+     * Providers
      */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    providers: Array<string>;
+};
+
+/**
+ * AiAnnotationProvidersResponse
+ */
+export type AiAnnotationProvidersResponse = {
+    data: AiAnnotationProvidersData;
     /**
-     * Pagination
+     * Message
      */
-    pagination?: {
-        [key: string]: unknown;
-    } | null;
+    message: string;
+    metadata?: AnalysisTaskMetadata | null;
     /**
-     * Sorting
+     * State
      */
-    sorting?: {
-        [key: string]: unknown;
-    } | null;
+    state: 'successful' | 'failed';
 };
 
 /**
@@ -257,16 +363,11 @@ export type AiAnnotationResponse = {
      * Message
      */
     message: string;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    metadata?: AnalysisTaskMetadata | null;
     /**
      * State
      */
-    state: string;
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
 };
 
 /**
@@ -292,6 +393,20 @@ export type AiAnnotationResultQuery = {
 };
 
 /**
+ * AiAnnotationSaveData
+ */
+export type AiAnnotationSaveData = {
+    /**
+     * Annotation Column
+     */
+    annotation_column: string;
+    /**
+     * Edits Applied
+     */
+    edits_applied: number;
+};
+
+/**
  * AiAnnotationSaveRequest
  */
 export type AiAnnotationSaveRequest = {
@@ -303,6 +418,79 @@ export type AiAnnotationSaveRequest = {
      * Edits
      */
     edits?: Array<AiAnnotationEdit>;
+};
+
+/**
+ * AiAnnotationSaveResponse
+ */
+export type AiAnnotationSaveResponse = {
+    data: AiAnnotationSaveData;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
+ * AnalysisClearResponse
+ */
+export type AnalysisClearResponse = {
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
+ * AnalysisSorting
+ */
+export type AnalysisSorting = {
+    /**
+     * Descending
+     */
+    descending: boolean;
+    /**
+     * Sort By
+     */
+    sort_by?: string | null;
+};
+
+/**
+ * AnalysisTaskActionResponse
+ */
+export type AnalysisTaskActionResponse = {
+    /**
+     * Data
+     */
+    data?: null;
+    /**
+     * Message
+     */
+    message: string;
+    metadata?: AnalysisTaskMetadata | null;
+    /**
+     * State
+     */
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
+};
+
+/**
+ * AnalysisTaskMetadata
+ */
+export type AnalysisTaskMetadata = {
+    /**
+     * Task Id
+     */
+    task_id?: string | null;
+    [key: string]: unknown;
 };
 
 /**
@@ -394,6 +582,102 @@ export type BodyUploadWorkspaceZipApiWorkspacesUploadPost = {
      * File
      */
     file: Blob | File;
+};
+
+/**
+ * ColumnDescribeResponse
+ *
+ * Response model for column describe statistics.
+ */
+export type ColumnDescribeResponse = {
+    /**
+     * Column Name
+     */
+    column_name: string;
+    /**
+     * Count
+     */
+    count?: number | null;
+    /**
+     * Max
+     */
+    max?: string | number | number | boolean | null;
+    /**
+     * Mean
+     */
+    mean?: string | number | number | boolean | null;
+    /**
+     * Median
+     */
+    median?: string | number | number | boolean | null;
+    /**
+     * Min
+     */
+    min?: string | number | number | boolean | null;
+    /**
+     * Null Count
+     */
+    null_count?: number | null;
+    /**
+     * Percentile 25
+     */
+    percentile_25?: string | number | number | boolean | null;
+    /**
+     * Percentile 75
+     */
+    percentile_75?: string | number | number | boolean | null;
+    /**
+     * Std
+     */
+    std?: string | number | number | boolean | null;
+};
+
+/**
+ * ColumnOperationInfo
+ */
+export type ColumnOperationInfo = {
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Method
+     */
+    method: string;
+};
+
+/**
+ * ColumnOperationsResponse
+ */
+export type ColumnOperationsResponse = {
+    /**
+     * Operations
+     */
+    operations: {
+        [key: string]: Array<ColumnOperationInfo>;
+    };
+};
+
+/**
+ * ColumnUniqueValuesResponse
+ */
+export type ColumnUniqueValuesResponse = {
+    /**
+     * Column Name
+     */
+    column_name: string;
+    /**
+     * Has Null
+     */
+    has_null: boolean;
+    /**
+     * Unique Count
+     */
+    unique_count: number;
+    /**
+     * Unique Values
+     */
+    unique_values: Array<string | number | number | boolean>;
 };
 
 /**
@@ -489,6 +773,45 @@ export type ConcordanceAnalysisRequest = {
 };
 
 /**
+ * ConcordanceAnalysisResponse
+ *
+ * Unified concordance response for single or multi-node requests.
+ */
+export type ConcordanceAnalysisResponse = {
+    /**
+     * Analysis Params
+     */
+    analysis_params?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Combinable
+     */
+    combinable?: boolean | null;
+    /**
+     * Data
+     */
+    data: {
+        [key: string]: ConcordanceNodeResult;
+    };
+    /**
+     * Message
+     */
+    message: string;
+    metadata?: AnalysisTaskMetadata | null;
+    /**
+     * Preferences
+     */
+    preferences?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * State
+     */
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
+};
+
+/**
  * ConcordanceDetachNodeOption
  */
 export type ConcordanceDetachNodeOption = {
@@ -521,23 +844,18 @@ export type ConcordanceDetachOptionsResponse = {
     /**
      * Data
      */
-    data: {
+    data?: {
         [key: string]: Array<ConcordanceDetachNodeOption>;
-    };
+    } | null;
     /**
      * Message
      */
     message: string;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    metadata?: AnalysisTaskMetadata | null;
     /**
      * State
      */
-    state: string;
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
 };
 
 /**
@@ -588,6 +906,50 @@ export type ConcordanceDetachRequest = {
      * Whole Word
      */
     whole_word?: boolean;
+};
+
+/**
+ * ConcordanceDispersionBinRow
+ */
+export type ConcordanceDispersionBinRow = {
+    /**
+     * Bin Idx
+     */
+    bin_idx?: number | null;
+    /**
+     * Count
+     */
+    count?: number | null;
+    /**
+     * Matched Text
+     */
+    matched_text?: string | null;
+};
+
+/**
+ * ConcordanceDispersionBinsResponse
+ */
+export type ConcordanceDispersionBinsResponse = {
+    /**
+     * Bin Count
+     */
+    bin_count: number;
+    /**
+     * Document Column
+     */
+    document_column?: string | null;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Rows
+     */
+    rows: Array<ConcordanceDispersionBinRow>;
+    /**
+     * Total Hits
+     */
+    total_hits: number;
 };
 
 /**
@@ -713,6 +1075,122 @@ export type ConcordanceMaterializeRequest = {
 };
 
 /**
+ * ConcordanceMetadata
+ *
+ * Metadata about concordance columns to help frontend display logic
+ */
+export type ConcordanceMetadata = {
+    /**
+     * All Columns
+     */
+    all_columns: Array<string>;
+    /**
+     * Concordance Columns
+     */
+    concordance_columns: Array<string>;
+    /**
+     * Metadata Columns
+     */
+    metadata_columns: Array<string>;
+};
+
+/**
+ * ConcordanceNodeResult
+ *
+ * Per-node concordance payload returned to the frontend.
+ */
+export type ConcordanceNodeResult = {
+    /**
+     * Columns
+     */
+    columns: Array<string>;
+    /**
+     * Data
+     */
+    data: Array<Array<{
+        [key: string]: unknown;
+    }>>;
+    /**
+     * Materialized
+     */
+    materialized?: boolean | null;
+    metadata: ConcordanceMetadata;
+    pagination: SourceRowPagination;
+    sorting: AnalysisSorting;
+    /**
+     * Total Matches
+     */
+    total_matches?: number | null;
+};
+
+/**
+ * ConcordanceRequest
+ *
+ * Request payload schema for concordance runs.
+ *
+ * Used by:
+ * - concordance route/task creation flows
+ *
+ * Why:
+ * - Validates all search/context/pagination-related analysis inputs.
+ */
+export type ConcordanceRequest = {
+    /**
+     * Case Sensitive
+     */
+    case_sensitive?: boolean;
+    /**
+     * Combined
+     */
+    combined?: boolean;
+    /**
+     * Language
+     */
+    language?: string | null;
+    /**
+     * Materialized Paths
+     */
+    materialized_paths?: {
+        [key: string]: string;
+    } | null;
+    /**
+     * Node Columns
+     */
+    node_columns?: {
+        [key: string]: string;
+    } | null;
+    /**
+     * Node Ids
+     */
+    node_ids: Array<string>;
+    /**
+     * Num Left Tokens
+     */
+    num_left_tokens?: number;
+    /**
+     * Num Right Tokens
+     */
+    num_right_tokens?: number;
+    /**
+     * Regex
+     */
+    regex?: boolean;
+    /**
+     * Search Mode
+     */
+    search_mode?: 'regex' | 'tokens';
+    /**
+     * Search Word
+     */
+    search_word: string;
+    /**
+     * Whole Word
+     */
+    whole_word?: boolean;
+    [key: string]: unknown;
+};
+
+/**
  * ConcordanceResultQuery
  *
  * Query overrides for reading persisted concordance results.
@@ -825,6 +1303,40 @@ export type CreateFolderResponse = {
 };
 
 /**
+ * CurrentAnalysisTasksResponse
+ */
+export type CurrentAnalysisTasksResponse = {
+    /**
+     * Task Ids
+     */
+    task_ids: Array<string>;
+};
+
+/**
+ * CurrentWorkspaceResponse
+ */
+export type CurrentWorkspaceResponse = {
+    /**
+     * Id
+     */
+    id?: string | null;
+};
+
+/**
+ * DefaultStopWordsResponse
+ */
+export type DefaultStopWordsResponse = {
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Stopwords
+     */
+    stopwords: Array<string>;
+};
+
+/**
  * DemoSnapshotEntry
  *
  * A single demo-snapshot bundle in the catalogue.
@@ -910,6 +1422,28 @@ export type DemoSnapshotsCatalogueResponse = {
      * Snapshots
      */
     snapshots: Array<DemoSnapshotEntry>;
+};
+
+/**
+ * DtypeNormalizationChange
+ */
+export type DtypeNormalizationChange = {
+    /**
+     * Column
+     */
+    column: string;
+    /**
+     * From Dtype
+     */
+    from_dtype: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * To Dtype
+     */
+    to_dtype: string;
 };
 
 /**
@@ -1369,6 +1903,86 @@ export type MoveFileRequest = {
 };
 
 /**
+ * NodeDataFiltering
+ */
+export type NodeDataFiltering = {
+    /**
+     * Column
+     */
+    column?: string | null;
+    /**
+     * Op
+     */
+    op: string;
+    /**
+     * Value
+     */
+    value?: string | null;
+};
+
+/**
+ * NodeDataResponse
+ */
+export type NodeDataResponse = {
+    /**
+     * Columns
+     */
+    columns: Array<string>;
+    /**
+     * Data
+     */
+    data: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Dtypes
+     */
+    dtypes: {
+        [key: string]: string;
+    };
+    filtering: NodeDataFiltering;
+    pagination: PaginationInfo;
+    sorting: NodeDataSorting;
+};
+
+/**
+ * NodeDataSorting
+ */
+export type NodeDataSorting = {
+    /**
+     * Descending
+     */
+    descending: boolean;
+    /**
+     * Sort By
+     */
+    sort_by?: string | null;
+};
+
+/**
+ * NodeQueryPlanResponse
+ */
+export type NodeQueryPlanResponse = {
+    /**
+     * Plan
+     */
+    plan: string;
+};
+
+/**
+ * NodeShapeResponse
+ */
+export type NodeShapeResponse = {
+    /**
+     * Shape
+     */
+    shape: [
+        number | null,
+        number | null
+    ];
+};
+
+/**
  * OniSearchRequest
  */
 export type OniSearchRequest = {
@@ -1547,6 +2161,35 @@ export type PolarsExpressionRequest = {
 };
 
 /**
+ * QuotationAnalysisResponse
+ */
+export type QuotationAnalysisResponse = {
+    /**
+     * Columns
+     */
+    columns: Array<string>;
+    /**
+     * Data
+     */
+    data: Array<Array<{
+        [key: string]: unknown;
+    }>>;
+    metadata: QuotationMetadata;
+    pagination: SourceRowPagination;
+    /**
+     * Preferences
+     */
+    preferences?: {
+        [key: string]: unknown;
+    } | null;
+    sorting: AnalysisSorting;
+    /**
+     * Task Id
+     */
+    task_id?: string | null;
+};
+
+/**
  * QuotationDetachNodeOption
  */
 export type QuotationDetachNodeOption = {
@@ -1579,23 +2222,18 @@ export type QuotationDetachOptionsResponse = {
     /**
      * Data
      */
-    data: {
+    data?: {
         [key: string]: Array<QuotationDetachNodeOption>;
-    };
+    } | null;
     /**
      * Message
      */
     message: string;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    metadata?: AnalysisTaskMetadata | null;
     /**
      * State
      */
-    state: string;
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
 };
 
 /**
@@ -1606,7 +2244,7 @@ export type QuotationDetachRequest = {
      * Column
      */
     column: string;
-    engine?: QuotationEngineConfig | null;
+    engine?: QuotationEngineConfigInput | null;
     /**
      * Language
      */
@@ -1632,7 +2270,7 @@ export type QuotationDetachRequest = {
 /**
  * QuotationEngineConfig
  */
-export type QuotationEngineConfig = {
+export type QuotationEngineConfigInput = {
     type?: QuotationEngineType;
     /**
      * Url
@@ -1653,7 +2291,7 @@ export type QuotationMaterializeRequest = {
      * Column
      */
     column: string;
-    engine?: QuotationEngineConfig | null;
+    engine?: QuotationEngineConfigInput | null;
     /**
      * Language
      */
@@ -1665,10 +2303,64 @@ export type QuotationMaterializeRequest = {
 };
 
 /**
+ * QuotationMetadata
+ */
+export type QuotationMetadata = {
+    /**
+     * All Columns
+     */
+    all_columns: Array<string>;
+    /**
+     * Metadata Columns
+     */
+    metadata_columns: Array<string>;
+    /**
+     * Quotation Columns
+     */
+    quotation_columns: Array<string>;
+};
+
+/**
+ * QuotationPreferenceUpdateData
+ */
+export type QuotationPreferenceUpdateData = {
+    /**
+     * Context Length
+     */
+    context_length?: number | null;
+};
+
+/**
+ * QuotationPreferenceUpdateResponse
+ */
+export type QuotationPreferenceUpdateResponse = {
+    data?: QuotationPreferenceUpdateData | null;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
  * QuotationPreferences
  */
-export type QuotationPreferences = {
-    engine?: QuotationEngineConfig;
+export type QuotationPreferencesInput = {
+    engine?: QuotationEngineConfigInput;
+    /**
+     * Last Remote Url
+     */
+    last_remote_url?: string;
+};
+
+/**
+ * QuotationPreferences
+ */
+export type QuotationPreferencesOutput = {
+    engine?: LdacaWordflowModelsQuotationEngineConfig;
     /**
      * Last Remote Url
      */
@@ -1678,7 +2370,7 @@ export type QuotationPreferences = {
 /**
  * QuotationRequest
  */
-export type QuotationRequest = {
+export type QuotationRequestInput = {
     /**
      * Column
      */
@@ -1687,7 +2379,7 @@ export type QuotationRequest = {
      * Descending
      */
     descending?: boolean;
-    engine?: QuotationEngineConfig | null;
+    engine?: QuotationEngineConfigInput | null;
     /**
      * Language
      */
@@ -1704,6 +2396,54 @@ export type QuotationRequest = {
      * Sort By
      */
     sort_by?: string | null;
+};
+
+/**
+ * QuotationRequest
+ *
+ * Request payload schema for quotation analysis.
+ *
+ * Used by:
+ * - quotation run/update endpoints
+ *
+ * Why:
+ * - Validates node/column/engine/paging options for quotation workflows.
+ */
+export type QuotationRequestOutput = {
+    /**
+     * Column
+     */
+    column: string;
+    /**
+     * Context Length
+     */
+    context_length?: number | null;
+    /**
+     * Descending
+     */
+    descending?: boolean | null;
+    engine?: LdacaWordflowAnalysisImplementationsQuotationQuotationEngineConfig | null;
+    /**
+     * Materialized Path
+     */
+    materialized_path?: string | null;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Page
+     */
+    page?: number | null;
+    /**
+     * Page Size
+     */
+    page_size?: number | null;
+    /**
+     * Sort By
+     */
+    sort_by?: string | null;
+    [key: string]: unknown;
 };
 
 /**
@@ -1911,9 +2651,78 @@ export type SequentialAnalysisDetachRequest = {
 };
 
 /**
+ * SequentialAnalysisDetachResponse
+ */
+export type SequentialAnalysisDetachResponse = {
+    /**
+     * New Node Id
+     */
+    new_node_id: string;
+    /**
+     * New Node Name
+     */
+    new_node_name: string;
+};
+
+/**
+ * SequentialAnalysisPreferenceUpdateData
+ */
+export type SequentialAnalysisPreferenceUpdateData = {
+    /**
+     * Chart Type
+     */
+    chart_type: 'line' | 'bar' | 'area';
+};
+
+/**
+ * SequentialAnalysisPreferenceUpdateResponse
+ */
+export type SequentialAnalysisPreferenceUpdateResponse = {
+    data: SequentialAnalysisPreferenceUpdateData;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
+ * SequentialAnalysisPreviewResponse
+ */
+export type SequentialAnalysisPreviewResponse = {
+    /**
+     * Analysis Params
+     */
+    analysis_params?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Columns
+     */
+    columns: Array<string>;
+    /**
+     * Data
+     */
+    data?: Array<{
+        [key: string]: unknown;
+    }> | null;
+    /**
+     * State
+     */
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
+    /**
+     * Total Records
+     */
+    total_records: number;
+};
+
+/**
  * SequentialAnalysisRequest
  */
-export type SequentialAnalysisRequest = {
+export type SequentialAnalysisRequestInput = {
     /**
      * Case Sensitive
      */
@@ -1957,6 +2766,134 @@ export type SequentialAnalysisRequest = {
 };
 
 /**
+ * SequentialAnalysisRequest
+ *
+ * Request model for sequential analysis.
+ *
+ * Used by:
+ * - sequential analysis run/update endpoints
+ *
+ * Why:
+ * - Validates temporal grouping and binning parameters.
+ *
+ * Refactor note:
+ * - `column_type`, `numeric_origin`, and `numeric_interval` are declared twice;
+ * remove duplicated declarations to reduce schema ambiguity.
+ */
+export type SequentialAnalysisRequestOutput = {
+    /**
+     * Case Sensitive
+     *
+     * Whether group-by values are compared case-sensitively
+     */
+    case_sensitive?: boolean;
+    /**
+     * Column Type
+     *
+     * Column type (datetime or numeric)
+     */
+    column_type?: string;
+    /**
+     * Custom Interval Unit
+     *
+     * Custom datetime interval unit (seconds|minutes|hours|days|weeks)
+     */
+    custom_interval_unit?: string | null;
+    /**
+     * Custom Interval Value
+     *
+     * Custom datetime interval count (used when frequency='custom')
+     */
+    custom_interval_value?: number | null;
+    /**
+     * Frequency
+     *
+     * Frequency (daily, weekly, monthly, yearly)
+     */
+    frequency?: string;
+    /**
+     * Group By Columns
+     *
+     * Columns to group by
+     */
+    group_by_columns?: Array<string> | null;
+    /**
+     * Node Id
+     *
+     * Node ID to analyze
+     */
+    node_id?: string | null;
+    /**
+     * Numeric Interval
+     *
+     * Interval for numeric binning
+     */
+    numeric_interval?: number | null;
+    /**
+     * Numeric Origin
+     *
+     * Origin for numeric binning
+     */
+    numeric_origin?: number | null;
+    /**
+     * Sort By Time
+     *
+     * Whether to sort by time
+     */
+    sort_by_time?: boolean;
+    /**
+     * Time Column
+     *
+     * Column containing time/numeric data
+     */
+    time_column: string;
+    [key: string]: unknown;
+};
+
+/**
+ * SequentialAnalysisResponse
+ */
+export type SequentialAnalysisResponse = {
+    /**
+     * Chart Type
+     */
+    chart_type?: 'line' | 'bar' | 'area' | null;
+    /**
+     * Columns
+     */
+    columns?: Array<string> | null;
+    /**
+     * Data
+     */
+    data?: Array<{
+        [key: string]: unknown;
+    }> | null;
+    metadata?: AnalysisTaskMetadata | null;
+    /**
+     * State
+     */
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
+    /**
+     * Total Records
+     */
+    total_records?: number | null;
+};
+
+/**
+ * SetCurrentWorkspaceResponse
+ */
+export type SetCurrentWorkspaceResponse = {
+    /**
+     * Id
+     */
+    id?: string | null;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
  * SliceRequest
  */
 export type SliceRequest = {
@@ -1987,6 +2924,40 @@ export type SliceRequest = {
 };
 
 /**
+ * SourceRowPagination
+ */
+export type SourceRowPagination = {
+    /**
+     * Has Next
+     */
+    has_next: boolean;
+    /**
+     * Has Prev
+     */
+    has_prev: boolean;
+    /**
+     * Page
+     */
+    page: number;
+    /**
+     * Page Size
+     */
+    page_size: number;
+    /**
+     * Result Count
+     */
+    result_count: number;
+    /**
+     * Total Source Pages
+     */
+    total_source_pages: number;
+    /**
+     * Total Source Rows
+     */
+    total_source_rows: number;
+};
+
+/**
  * TokenFrequencyData
  */
 export type TokenFrequencyData = {
@@ -2012,18 +2983,13 @@ export type TokenFrequencyNodeResult = {
      * Data
      */
     data: Array<TokenFrequencyData>;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    metadata?: AnalysisTaskMetadata | null;
 };
 
 /**
  * TokenFrequencyRequest
  */
-export type TokenFrequencyRequest = {
+export type TokenFrequencyRequestInput = {
     /**
      * Node Columns
      */
@@ -2042,6 +3008,47 @@ export type TokenFrequencyRequest = {
      * Token Limit
      */
     token_limit?: number | null;
+};
+
+/**
+ * TokenFrequencyRequest
+ *
+ * Request model for token-frequency analysis.
+ *
+ * Used by:
+ * - token-frequency run/update endpoints
+ *
+ * Why:
+ * - Validates node selection, stop-word, and token-limit parameters.
+ */
+export type TokenFrequencyRequestOutput = {
+    /**
+     * Node Columns
+     *
+     * Map of node_id to column name
+     */
+    node_columns?: {
+        [key: string]: string;
+    } | null;
+    /**
+     * Node Ids
+     *
+     * List of node IDs to analyze (1 or 2)
+     */
+    node_ids: Array<string>;
+    /**
+     * Stop Words
+     *
+     * List of stop words to exclude
+     */
+    stop_words?: Array<string> | null;
+    /**
+     * Token Limit
+     *
+     * Limit on number of tokens returned
+     */
+    token_limit?: number | null;
+    [key: string]: unknown;
 };
 
 /**
@@ -2065,17 +3072,12 @@ export type TokenFrequencyResponse = {
     /**
      * Message
      */
-    message: string;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    message?: string | null;
+    metadata?: AnalysisTaskMetadata | null;
     /**
      * State
      */
-    state?: string | null;
+    state?: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled' | null;
     /**
      * Statistics
      */
@@ -2242,12 +3244,7 @@ export type TopicModelingData = {
      * Corpus Sizes
      */
     corpus_sizes: Array<number>;
-    /**
-     * Meta
-     */
-    meta?: {
-        [key: string]: unknown;
-    } | null;
+    meta?: AnalysisTaskMetadata | null;
     /**
      * Per Corpus Topic Counts
      */
@@ -2258,6 +3255,16 @@ export type TopicModelingData = {
      * Topics
      */
     topics: Array<TopicModelingTopic>;
+};
+
+/**
+ * TopicModelingDetachData
+ */
+export type TopicModelingDetachData = {
+    /**
+     * Detached Nodes
+     */
+    detached_nodes?: Array<TopicModelingDetachedNode>;
 };
 
 /**
@@ -2293,23 +3300,18 @@ export type TopicModelingDetachOptionsResponse = {
     /**
      * Data
      */
-    data: {
+    data?: {
         [key: string]: Array<TopicModelingDetachNodeOption>;
-    };
+    } | null;
     /**
      * Message
      */
     message: string;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    metadata?: AnalysisTaskMetadata | null;
     /**
      * State
      */
-    state: string;
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
 };
 
 /**
@@ -2352,32 +3354,95 @@ export type TopicModelingDetachRequest = {
  * TopicModelingDetachResponse
  */
 export type TopicModelingDetachResponse = {
+    data?: TopicModelingDetachData | null;
     /**
-     * Data
+     * Message
      */
-    data?: {
-        [key: string]: unknown;
-    } | null;
+    message: string;
+    metadata?: AnalysisTaskMetadata | null;
+    /**
+     * State
+     */
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
+};
+
+/**
+ * TopicModelingDetachedNode
+ */
+export type TopicModelingDetachedNode = {
+    /**
+     * New Node Id
+     */
+    new_node_id: string;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+    /**
+     * Topic Meanings Node Id
+     */
+    topic_meanings_node_id?: string | null;
+};
+
+/**
+ * TopicModelingEmbeddingCacheClearData
+ */
+export type TopicModelingEmbeddingCacheClearData = {
+    /**
+     * Bytes Freed
+     */
+    bytes_freed: number;
+    /**
+     * Files Removed
+     */
+    files_removed: number;
+    measured_before: TopicModelingEmbeddingCacheMeasurement;
+};
+
+/**
+ * TopicModelingEmbeddingCacheClearResponse
+ */
+export type TopicModelingEmbeddingCacheClearResponse = {
+    data: TopicModelingEmbeddingCacheClearData;
     /**
      * Message
      */
     message: string;
     /**
-     * Metadata
+     * State
      */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    state: 'successful';
+};
+
+/**
+ * TopicModelingEmbeddingCacheMeasurement
+ */
+export type TopicModelingEmbeddingCacheMeasurement = {
+    /**
+     * Bytes
+     */
+    bytes: number;
+    /**
+     * Files
+     */
+    files: number;
+};
+
+/**
+ * TopicModelingEmbeddingCacheSizeResponse
+ */
+export type TopicModelingEmbeddingCacheSizeResponse = {
+    data: TopicModelingEmbeddingCacheMeasurement;
     /**
      * State
      */
-    state: string;
+    state: 'successful';
 };
 
 /**
  * TopicModelingRequest
  */
-export type TopicModelingRequest = {
+export type TopicModelingRequestInput = {
     /**
      * Language
      */
@@ -2419,6 +3484,71 @@ export type TopicModelingRequest = {
 };
 
 /**
+ * TopicModelingRequest
+ *
+ * Request model for topic-modeling analysis.
+ *
+ * Used by:
+ * - topic-modeling run/update endpoints
+ *
+ * Why:
+ * - Validates node selection and clustering configuration inputs.
+ */
+export type TopicModelingRequestOutput = {
+    /**
+     * Min Topic Size
+     *
+     * Kept for backwards compatibility. Ignored when topic_size_mode is 'target' or 'exact' — computed from topic_size_value in those modes.
+     */
+    min_topic_size?: number;
+    /**
+     * Node Columns
+     *
+     * Map of node_id to column name
+     */
+    node_columns?: {
+        [key: string]: string;
+    } | null;
+    /**
+     * Node Ids
+     *
+     * List of node IDs to analyze
+     */
+    node_ids: Array<string>;
+    /**
+     * Random Seed
+     *
+     * Random seed used for reproducible topic-modeling runs
+     */
+    random_seed?: number;
+    /**
+     * Representative Words Count
+     *
+     * Number of representative words to keep per topic
+     */
+    representative_words_count?: number;
+    /**
+     * Sample Fractions
+     *
+     * One sampling fraction (0 < f ≤ 1) per corpus in node_ids order. None for a corpus means no sampling. Sampling uses random_seed.
+     */
+    sample_fractions?: Array<number | null> | null;
+    /**
+     * Topic Size Mode
+     *
+     * 'target': min_topic_size = max(2, n_eff // (topic_size_value * 10)). 'min': topic_size_value used directly as min_topic_size. 'exact': min_topic_size = max(5, int(target_min_topic_size * 0.75)) where target_min_topic_size = max(2, n_eff // (topic_size_value * 10)), then reduce_topics(nr_topics=topic_size_value) post-fit.
+     */
+    topic_size_mode?: 'target' | 'min' | 'exact' | null;
+    /**
+     * Topic Size Value
+     *
+     * Numeric parameter interpreted according to topic_size_mode.
+     */
+    topic_size_value?: number | null;
+    [key: string]: unknown;
+};
+
+/**
  * TopicModelingResponse
  */
 export type TopicModelingResponse = {
@@ -2427,16 +3557,11 @@ export type TopicModelingResponse = {
      * Message
      */
     message: string;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
+    metadata?: AnalysisTaskMetadata | null;
     /**
      * State
      */
-    state: string;
+    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
 };
 
 /**
@@ -2539,7 +3664,7 @@ export type UserPreferences = {
      * Ldaca Oni Api Token
      */
     ldaca_oni_api_token?: string | null;
-    quotation?: QuotationPreferences;
+    quotation?: QuotationPreferencesOutput;
 };
 
 /**
@@ -2572,7 +3697,7 @@ export type UserPreferencesUpdate = {
      * Ldaca Oni Api Token
      */
     ldaca_oni_api_token?: string | null;
-    quotation?: QuotationPreferences | null;
+    quotation?: QuotationPreferencesInput | null;
 };
 
 /**
@@ -2668,6 +3793,40 @@ export type WorkspaceCreateRequest = {
 };
 
 /**
+ * WorkspaceGraphEdge
+ */
+export type WorkspaceGraphEdge = {
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Target
+     */
+    target: string;
+    [key: string]: unknown;
+};
+
+/**
+ * WorkspaceGraphResponse
+ */
+export type WorkspaceGraphResponse = {
+    /**
+     * Edges
+     */
+    edges: Array<WorkspaceGraphEdge>;
+    /**
+     * Nodes
+     */
+    nodes: Array<WorkspaceNodeInfo>;
+    [key: string]: unknown;
+};
+
+/**
  * WorkspaceInfo
  */
 export type WorkspaceInfo = {
@@ -2703,6 +3862,84 @@ export type WorkspaceInfo = {
      * Total Nodes
      */
     total_nodes: number;
+};
+
+/**
+ * WorkspaceNodeInfo
+ */
+export type WorkspaceNodeInfo = {
+    /**
+     * Can Redo
+     */
+    can_redo?: boolean | null;
+    /**
+     * Can Undo
+     */
+    can_undo?: boolean | null;
+    /**
+     * Child Ids
+     */
+    child_ids?: Array<string>;
+    /**
+     * Columns
+     */
+    columns?: Array<string>;
+    /**
+     * Document
+     */
+    document?: string | null;
+    /**
+     * Dtype Normalization
+     */
+    dtype_normalization?: Array<DtypeNormalizationChange> | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Operation
+     */
+    operation?: string | null;
+    /**
+     * Parent Ids
+     */
+    parent_ids?: Array<string>;
+    /**
+     * Schema
+     */
+    schema?: {
+        [key: string]: string;
+    };
+    /**
+     * Shape
+     */
+    shape?: [
+        number | null,
+        number | null
+    ];
+    /**
+     * Tokenization
+     */
+    tokenization?: {
+        [key: string]: {
+            [key: string]: unknown;
+        };
+    };
+    [key: string]: unknown;
+};
+
+/**
+ * WorkspaceNodesResponse
+ */
+export type WorkspaceNodesResponse = {
+    /**
+     * Nodes
+     */
+    nodes: Array<WorkspaceNodeInfo>;
 };
 
 /**
@@ -2751,6 +3988,47 @@ export type WorkspaceSummary = {
      * Workspace Size Byte
      */
     workspace_size_Byte?: number;
+};
+
+/**
+ * QuotationEngineConfig
+ *
+ * Configuration schema for quotation extraction engines.
+ *
+ * Used by:
+ * - `QuotationRequest`
+ *
+ * Why:
+ * - Supports local and remote engine selection with optional model/auth fields.
+ */
+export type LdacaWordflowAnalysisImplementationsQuotationQuotationEngineConfig = {
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Model
+     */
+    model?: string | null;
+    /**
+     * Type
+     */
+    type?: string;
+    /**
+     * Url
+     */
+    url?: string | null;
+};
+
+/**
+ * QuotationEngineConfig
+ */
+export type LdacaWordflowModelsQuotationEngineConfig = {
+    type?: QuotationEngineType;
+    /**
+     * Url
+     */
+    url?: string | null;
 };
 
 export type RootGetData = {
@@ -3977,8 +5255,10 @@ export type GetDefaultStopWordsApiTextDefaultStopWordsGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: DefaultStopWordsResponse;
 };
+
+export type GetDefaultStopWordsApiTextDefaultStopWordsGetResponse = GetDefaultStopWordsApiTextDefaultStopWordsGetResponses[keyof GetDefaultStopWordsApiTextDefaultStopWordsGetResponses];
 
 export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteData = {
     body?: never;
@@ -4297,8 +5577,10 @@ export type ClearAiAnnotationApiWorkspacesAiAnnotationDeleteResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisClearResponse;
 };
+
+export type ClearAiAnnotationApiWorkspacesAiAnnotationDeleteResponse = ClearAiAnnotationApiWorkspacesAiAnnotationDeleteResponses[keyof ClearAiAnnotationApiWorkspacesAiAnnotationDeleteResponses];
 
 export type RunAiAnnotationApiWorkspacesAiAnnotationPostData = {
     body: AiAnnotationRequest;
@@ -4357,8 +5639,10 @@ export type GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostResponses = 
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AiAnnotationModelsResponse;
 };
+
+export type GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostResponse = GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostResponses[keyof GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostResponses];
 
 export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetData = {
     body?: never;
@@ -4386,8 +5670,10 @@ export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetResp
     /**
      * Successful Response
      */
-    200: unknown;
+    200: CurrentAnalysisTasksResponse;
 };
+
+export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetResponse = AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetResponses[keyof AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetResponses];
 
 export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetData = {
     body?: never;
@@ -4420,8 +5706,10 @@ export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGe
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AiAnnotationRequest;
 };
+
+export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetResponse = AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetResponses[keyof AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetResponses];
 
 export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetData = {
     body?: never;
@@ -4469,10 +5757,14 @@ export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetE
 
 export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetResponses = {
     /**
+     * Response Ai Annotation Task Result Api Workspaces Ai Annotation Tasks  Task Id  Result Get
+     *
      * Successful Response
      */
-    200: unknown;
+    200: AiAnnotationResponse | null;
 };
+
+export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetResponse = AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetResponses[keyof AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetResponses];
 
 export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostData = {
     body: AiAnnotationResultQuery;
@@ -4505,8 +5797,10 @@ export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResult
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AiAnnotationResponse;
 };
+
+export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostResponse = AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostResponses[keyof AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostResponses];
 
 export type RunConcordanceApiWorkspacesConcordancePostData = {
     body: ConcordanceAnalysisRequest;
@@ -4534,8 +5828,10 @@ export type RunConcordanceApiWorkspacesConcordancePostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: ConcordanceAnalysisResponse;
 };
+
+export type RunConcordanceApiWorkspacesConcordancePostResponse = RunConcordanceApiWorkspacesConcordancePostResponses[keyof RunConcordanceApiWorkspacesConcordancePostResponses];
 
 export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetData = {
     body?: never;
@@ -4563,8 +5859,10 @@ export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetRespon
     /**
      * Successful Response
      */
-    200: unknown;
+    200: CurrentAnalysisTasksResponse;
 };
+
+export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetResponse = ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetResponses[keyof ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetResponses];
 
 export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetData = {
     body?: never;
@@ -4602,8 +5900,10 @@ export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBins
     /**
      * Successful Response
      */
-    200: unknown;
+    200: ConcordanceDispersionBinsResponse;
 };
+
+export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetResponse = ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetResponses[keyof ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetResponses];
 
 export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetData = {
     body?: never;
@@ -4636,8 +5936,10 @@ export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetR
     /**
      * Successful Response
      */
-    200: unknown;
+    200: ConcordanceRequest;
 };
+
+export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetResponse = ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetResponses[keyof ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetResponses];
 
 export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetData = {
     body?: never;
@@ -4705,10 +6007,14 @@ export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetErr
 
 export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetResponses = {
     /**
+     * Response Concordance Task Result Api Workspaces Concordance Tasks  Task Id  Result Get
+     *
      * Successful Response
      */
-    200: unknown;
+    200: ConcordanceAnalysisResponse | null;
 };
+
+export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetResponse = ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetResponses[keyof ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetResponses];
 
 export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostData = {
     body: ConcordanceResultQuery;
@@ -4739,10 +6045,14 @@ export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPo
 
 export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostResponses = {
     /**
+     * Response Concordance Task Result Post Api Workspaces Concordance Tasks  Task Id  Result Post
+     *
      * Successful Response
      */
-    200: unknown;
+    200: ConcordanceAnalysisResponse | null;
 };
+
+export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostResponse = ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostResponses[keyof ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostResponses];
 
 export type GetCurrentWorkspaceApiWorkspacesCurrentGetData = {
     body?: never;
@@ -4770,8 +6080,10 @@ export type GetCurrentWorkspaceApiWorkspacesCurrentGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: CurrentWorkspaceResponse;
 };
+
+export type GetCurrentWorkspaceApiWorkspacesCurrentGetResponse = GetCurrentWorkspaceApiWorkspacesCurrentGetResponses[keyof GetCurrentWorkspaceApiWorkspacesCurrentGetResponses];
 
 export type SetCurrentWorkspaceApiWorkspacesCurrentPostData = {
     body?: never;
@@ -4804,8 +6116,10 @@ export type SetCurrentWorkspaceApiWorkspacesCurrentPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: SetCurrentWorkspaceResponse;
 };
+
+export type SetCurrentWorkspaceApiWorkspacesCurrentPostResponse = SetCurrentWorkspaceApiWorkspacesCurrentPostResponses[keyof SetCurrentWorkspaceApiWorkspacesCurrentPostResponses];
 
 export type DeleteWorkspaceApiWorkspacesDeleteDeleteData = {
     body?: never;
@@ -5002,8 +6316,10 @@ export type GetWorkspaceGraphApiWorkspacesGraphGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceGraphResponse;
 };
+
+export type GetWorkspaceGraphApiWorkspacesGraphGetResponse = GetWorkspaceGraphApiWorkspacesGraphGetResponses[keyof GetWorkspaceGraphApiWorkspacesGraphGetResponses];
 
 export type GetWorkspaceInfoApiWorkspacesInfoGetData = {
     body?: never;
@@ -5031,8 +6347,10 @@ export type GetWorkspaceInfoApiWorkspacesInfoGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceInfo;
 };
+
+export type GetWorkspaceInfoApiWorkspacesInfoGetResponse = GetWorkspaceInfoApiWorkspacesInfoGetResponses[keyof GetWorkspaceInfoApiWorkspacesInfoGetResponses];
 
 export type RenameWorkspaceApiWorkspacesNamePutData = {
     body?: never;
@@ -5094,8 +6412,10 @@ export type GetWorkspaceNodesApiWorkspacesNodesGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodesResponse;
 };
+
+export type GetWorkspaceNodesApiWorkspacesNodesGetResponse = GetWorkspaceNodesApiWorkspacesNodesGetResponses[keyof GetWorkspaceNodesApiWorkspacesNodesGetResponses];
 
 export type AddNodeToWorkspaceApiWorkspacesNodesPostData = {
     body?: never;
@@ -5140,8 +6460,10 @@ export type AddNodeToWorkspaceApiWorkspacesNodesPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type AddNodeToWorkspaceApiWorkspacesNodesPostResponse = AddNodeToWorkspaceApiWorkspacesNodesPostResponses[keyof AddNodeToWorkspaceApiWorkspacesNodesPostResponses];
 
 export type ConcatNodesApiWorkspacesNodesConcatPostData = {
     body: ConcatRequest;
@@ -5387,8 +6709,10 @@ export type GetNodeInfoApiWorkspacesNodesNodeIdGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type GetNodeInfoApiWorkspacesNodesNodeIdGetResponse = GetNodeInfoApiWorkspacesNodesNodeIdGetResponses[keyof GetNodeInfoApiWorkspacesNodesNodeIdGetResponses];
 
 export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetData = {
     body?: never;
@@ -5426,8 +6750,10 @@ export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategor
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AiAnnotationCategoriesResponse;
 };
+
+export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetResponse = GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetResponses[keyof GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetResponses];
 
 export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostData = {
     body: AiAnnotationDetachRequest;
@@ -5460,8 +6786,10 @@ export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostResp
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AiAnnotationDetachResponse;
 };
+
+export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostResponse = DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostResponses[keyof DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostResponses];
 
 export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetData = {
     body?: never;
@@ -5499,8 +6827,10 @@ export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvider
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AiAnnotationProvidersResponse;
 };
+
+export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetResponse = GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetResponses[keyof GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetResponses];
 
 export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostData = {
     body: AiAnnotationSaveRequest;
@@ -5533,8 +6863,10 @@ export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponse
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AiAnnotationSaveResponse;
 };
+
+export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponse = SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponses[keyof SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponses];
 
 export type CastNodeApiWorkspacesNodesNodeIdCastPostData = {
     /**
@@ -5606,8 +6938,10 @@ export type CloneNodeApiWorkspacesNodesNodeIdClonePostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type CloneNodeApiWorkspacesNodesNodeIdClonePostResponse = CloneNodeApiWorkspacesNodesNodeIdClonePostResponses[keyof CloneNodeApiWorkspacesNodesNodeIdClonePostResponses];
 
 export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteData = {
     body?: never;
@@ -5725,8 +7059,10 @@ export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetRe
     /**
      * Successful Response
      */
-    200: unknown;
+    200: ColumnDescribeResponse;
 };
+
+export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetResponse = DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetResponses[keyof DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetResponses];
 
 export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetData = {
     body?: never;
@@ -5763,8 +7099,10 @@ export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsG
     /**
      * Successful Response
      */
-    200: unknown;
+    200: ColumnOperationsResponse;
 };
+
+export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetResponse = ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetResponses[keyof ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetResponses];
 
 export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetData = {
     body?: never;
@@ -5801,8 +7139,10 @@ export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUnique
     /**
      * Successful Response
      */
-    200: unknown;
+    200: ColumnUniqueValuesResponse;
 };
+
+export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetResponse = GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetResponses[keyof GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetResponses];
 
 export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostData = {
     body: ConcordanceDetachRequest;
@@ -5910,8 +7250,10 @@ export type DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDisper
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisTaskActionResponse;
 };
+
+export type DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostResponse = DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostResponses[keyof DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostResponses];
 
 export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostData = {
     body: ConcordanceMaterializeRequest;
@@ -5944,8 +7286,10 @@ export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterialize
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisTaskActionResponse;
 };
+
+export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostResponse = MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostResponses[keyof MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostResponses];
 
 export type GetNodeDataApiWorkspacesNodesNodeIdDataGetData = {
     body?: never;
@@ -6007,8 +7351,10 @@ export type GetNodeDataApiWorkspacesNodesNodeIdDataGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: NodeDataResponse;
 };
+
+export type GetNodeDataApiWorkspacesNodesNodeIdDataGetResponse = GetNodeDataApiWorkspacesNodesNodeIdDataGetResponses[keyof GetNodeDataApiWorkspacesNodesNodeIdDataGetResponses];
 
 export type PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostData = {
     body: PolarsExpressionRequest;
@@ -6240,11 +7586,13 @@ export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: NodeQueryPlanResponse;
 };
 
+export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetResponse = GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetResponses[keyof GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetResponses];
+
 export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostData = {
-    body: QuotationRequest;
+    body: QuotationRequestInput;
     headers?: {
         /**
          * Authorization
@@ -6274,8 +7622,10 @@ export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: QuotationAnalysisResponse;
 };
+
+export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostResponse = GetQuotationApiWorkspacesNodesNodeIdQuotationPostResponses[keyof GetQuotationApiWorkspacesNodesNodeIdQuotationPostResponses];
 
 export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostData = {
     body: QuotationDetachRequest;
@@ -6383,8 +7733,10 @@ export type MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePost
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisTaskActionResponse;
 };
+
+export type MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostResponse = MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostResponses[keyof MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostResponses];
 
 export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostData = {
     body?: never;
@@ -6417,8 +7769,10 @@ export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostResponse = RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostResponses[keyof RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostResponses];
 
 export type ReplaceApplyApiWorkspacesNodesNodeIdReplacePostData = {
     body: ReplaceRequest;
@@ -6502,7 +7856,7 @@ export type ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostResponses = 
 export type ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostResponse = ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostResponses[keyof ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostResponses];
 
 export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostData = {
-    body: SequentialAnalysisRequest;
+    body: SequentialAnalysisRequestInput;
     headers?: {
         /**
          * Authorization
@@ -6532,11 +7886,13 @@ export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostR
     /**
      * Successful Response
      */
-    200: unknown;
+    200: SequentialAnalysisResponse;
 };
 
+export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostResponse = RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostResponses[keyof RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostResponses];
+
 export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostData = {
-    body: SequentialAnalysisRequest;
+    body: SequentialAnalysisRequestInput;
     headers?: {
         /**
          * Authorization
@@ -6573,8 +7929,10 @@ export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisP
     /**
      * Successful Response
      */
-    200: unknown;
+    200: SequentialAnalysisPreviewResponse;
 };
+
+export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostResponse = PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostResponses[keyof PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostResponses];
 
 export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetData = {
     body?: never;
@@ -6607,8 +7965,10 @@ export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: NodeShapeResponse;
 };
+
+export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetResponse = GetNodeShapeApiWorkspacesNodesNodeIdShapeGetResponses[keyof GetNodeShapeApiWorkspacesNodesNodeIdShapeGetResponses];
 
 export type SliceNodeApiWorkspacesNodesNodeIdSlicePostData = {
     body: SliceRequest;
@@ -6756,8 +8116,10 @@ export type UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostResponse = UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostResponses[keyof UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostResponses];
 
 export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetData = {
     body?: never;
@@ -6785,8 +8147,10 @@ export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetResponses 
     /**
      * Successful Response
      */
-    200: unknown;
+    200: CurrentAnalysisTasksResponse;
 };
+
+export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetResponse = QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetResponses[keyof QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetResponses];
 
 export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetData = {
     body?: never;
@@ -6819,8 +8183,10 @@ export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetRespo
     /**
      * Successful Response
      */
-    200: unknown;
+    200: QuotationRequestOutput;
 };
+
+export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetResponse = QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetResponses[keyof QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetResponses];
 
 export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetData = {
     body?: never;
@@ -6868,10 +8234,14 @@ export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetError =
 
 export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetResponses = {
     /**
+     * Response Quotation Task Result Api Workspaces Quotation Tasks  Task Id  Result Get
+     *
      * Successful Response
      */
-    200: unknown;
+    200: QuotationAnalysisResponse | null;
 };
+
+export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetResponse = QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetResponses[keyof QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetResponses];
 
 export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostData = {
     body: QuotationResultQuery;
@@ -6902,10 +8272,14 @@ export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPost
 
 export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostResponses = {
     /**
+     * Response Update Quotation Task Result Api Workspaces Quotation Tasks  Task Id  Result Post
+     *
      * Successful Response
      */
-    200: unknown;
+    200: QuotationAnalysisResponse | QuotationPreferenceUpdateResponse;
 };
+
+export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostResponse = UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostResponses[keyof UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostResponses];
 
 export type SaveWorkspaceApiWorkspacesSavePostData = {
     body?: never;
@@ -6962,8 +8336,10 @@ export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCu
     /**
      * Successful Response
      */
-    200: unknown;
+    200: CurrentAnalysisTasksResponse;
 };
+
+export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetResponse = SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetResponses[keyof SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetResponses];
 
 export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostData = {
     body: SequentialAnalysisDetachRequest;
@@ -6996,8 +8372,10 @@ export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTask
     /**
      * Successful Response
      */
-    200: unknown;
+    200: SequentialAnalysisDetachResponse;
 };
+
+export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostResponse = DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostResponses[keyof DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostResponses];
 
 export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetData = {
     body?: never;
@@ -7030,8 +8408,10 @@ export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTas
     /**
      * Successful Response
      */
-    200: unknown;
+    200: SequentialAnalysisRequestOutput;
 };
+
+export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetResponse = SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetResponses[keyof SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetResponses];
 
 export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetData = {
     body?: never;
@@ -7064,8 +8444,10 @@ export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTask
     /**
      * Successful Response
      */
-    200: unknown;
+    200: SequentialAnalysisResponse;
 };
+
+export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetResponse = SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetResponses[keyof SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetResponses];
 
 export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostData = {
     /**
@@ -7103,8 +8485,10 @@ export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTas
     /**
      * Successful Response
      */
-    200: unknown;
+    200: SequentialAnalysisPreferenceUpdateResponse;
 };
+
+export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostResponse = UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostResponses[keyof UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostResponses];
 
 export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteData = {
     body?: never;
@@ -7136,7 +8520,7 @@ export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponses = 
 };
 
 export type CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostData = {
-    body: TokenFrequencyRequest;
+    body: TokenFrequencyRequestInput;
     headers?: {
         /**
          * Authorization
@@ -7192,8 +8576,10 @@ export type TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurren
     /**
      * Successful Response
      */
-    200: unknown;
+    200: CurrentAnalysisTasksResponse;
 };
+
+export type TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetResponse = TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetResponses[keyof TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetResponses];
 
 export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetData = {
     body?: never;
@@ -7226,8 +8612,10 @@ export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdR
     /**
      * Successful Response
      */
-    200: unknown;
+    200: TokenFrequencyRequestOutput;
 };
+
+export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetResponse = TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetResponses[keyof TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetResponses];
 
 export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetData = {
     body?: never;
@@ -7258,10 +8646,14 @@ export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdRe
 
 export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetResponses = {
     /**
+     * Response Token Frequencies Task Result Api Workspaces Token Frequencies Tasks  Task Id  Result Get
+     *
      * Successful Response
      */
-    200: unknown;
+    200: TokenFrequencyResponse | null;
 };
+
+export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetResponse = TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetResponses[keyof TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetResponses];
 
 export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostData = {
     /**
@@ -7299,8 +8691,10 @@ export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTa
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisClearResponse;
 };
+
+export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostResponse = UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostResponses[keyof UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostResponses];
 
 export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteData = {
     body?: never;
@@ -7328,11 +8722,13 @@ export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteResponses =
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisClearResponse;
 };
 
+export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteResponse = ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteResponses[keyof ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteResponses];
+
 export type RunTopicModelingApiWorkspacesTopicModelingPostData = {
-    body: TopicModelingRequest;
+    body: TopicModelingRequestInput;
     headers?: {
         /**
          * Authorization
@@ -7388,8 +8784,10 @@ export type ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingC
     /**
      * Successful Response
      */
-    200: unknown;
+    200: TopicModelingEmbeddingCacheClearResponse;
 };
+
+export type ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteResponse = ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteResponses[keyof ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteResponses];
 
 export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetData = {
     body?: never;
@@ -7417,8 +8815,10 @@ export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddin
     /**
      * Successful Response
      */
-    200: unknown;
+    200: TopicModelingEmbeddingCacheSizeResponse;
 };
+
+export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetResponse = GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetResponses[keyof GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetResponses];
 
 export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetData = {
     body?: never;
@@ -7446,8 +8846,10 @@ export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetRe
     /**
      * Successful Response
      */
-    200: unknown;
+    200: CurrentAnalysisTasksResponse;
 };
+
+export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetResponse = TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetResponses[keyof TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetResponses];
 
 export type DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostData = {
     body: TopicModelingDetachRequest;
@@ -7552,8 +8954,10 @@ export type TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequest
     /**
      * Successful Response
      */
-    200: unknown;
+    200: TopicModelingRequestOutput;
 };
+
+export type TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetResponse = TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetResponses[keyof TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetResponses];
 
 export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetData = {
     body?: never;

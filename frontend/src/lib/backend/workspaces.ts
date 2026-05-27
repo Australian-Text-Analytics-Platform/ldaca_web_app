@@ -14,8 +14,7 @@ import {
   updateWorkspaceDescriptionApiWorkspacesDescriptionPut,
   uploadWorkspaceZipApiWorkspacesUploadPost,
 } from '@/api/generated/sdk.gen';
-import type { WorkspaceSummary } from '@/api/generated/types.gen';
-import type { WorkspaceGraphResponse } from '@/types/api';
+import type { WorkspaceGraphResponse, WorkspaceSummary } from '@/api/generated/types.gen';
 import { ApiError } from '@/lib/apiError';
 
 export const workspacesApi = {
@@ -71,7 +70,7 @@ export const workspacesApi = {
 
   graph: async (headers: Record<string, string> = {}): Promise<WorkspaceGraphResponse> => {
     const { data } = await getWorkspaceGraphApiWorkspacesGraphGet({ headers, throwOnError: true });
-    return data as WorkspaceGraphResponse;
+    return data;
   },
 
   save: async (headers: Record<string, string> = {}) => {

@@ -22,6 +22,8 @@ const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
   },
   columns: [],
   dtypes: {},
+  sorting: { sort_by: null, descending: false },
+  filtering: { column: null, value: null, op: 'contains' },
 }) as NodeDataResponse;
 
 interface WorkspaceQueriesParams {

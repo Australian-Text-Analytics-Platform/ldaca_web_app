@@ -211,6 +211,13 @@ export function useConcordanceSnapshotCapture(
         if (result) binsPayload[result.id] = result.bins;
       }
 
+      if (!perNodeResult) {
+        throw captureError(
+          'no-result',
+          'No saved concordance result was returned. Run the search again before saving a snapshot.',
+        );
+      }
+
       // Hard-require materialise (plan §4): the host's disable-reason
       // check already gates the Save button on this, but assert here
       // too so the hook stays self-contained — a captured bundle's
@@ -235,7 +242,7 @@ export function useConcordanceSnapshotCapture(
       const mergedData = { ...perNodeResult.data };
       const combinedEntry = combinedResult?.data?.__COMBINED__;
       if (combinedEntry) mergedData.__COMBINED__ = combinedEntry;
-      const fullResult = { ...perNodeResult, data: mergedData };
+      const fullResult: ConcordanceAnalysisResponse = { ...perNodeResult, data: mergedData };
 
       // Compose the manifest.
       const nodeColours = useNodeColorsStore.getState().colors;

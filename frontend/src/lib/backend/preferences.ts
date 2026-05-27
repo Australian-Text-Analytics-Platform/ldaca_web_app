@@ -1,6 +1,6 @@
 import { getPreferencesApiPreferencesGet, updatePreferencesApiPreferencesPut } from '@/api/generated/sdk.gen';
 import type {
-  QuotationPreferences as GeneratedQuotationPreferences,
+  QuotationPreferencesOutput as GeneratedQuotationPreferences,
   UserPreferences as GeneratedUserPreferences,
   UserPreferencesUpdate as GeneratedUserPreferencesUpdate,
 } from '@/api/generated/types.gen';

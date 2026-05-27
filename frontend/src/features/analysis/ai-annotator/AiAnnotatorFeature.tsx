@@ -4,7 +4,7 @@ import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelect
 import { useAuth } from '@/hooks/useAuth';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { type AiAnnotationResponse, textApi } from '@/lib/backend/text';
+import { type AiAnnotationNodeResult, type AiAnnotationResponse, textApi } from '@/lib/backend/text';
 import { nodesApi } from '@/lib/backend/nodes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,21 +93,6 @@ const parseExamples = (raw: string) => {
       return { query, classification };
     })
     .filter((item): item is { query: string; classification: string } => Boolean(item));
-};
-
-type AiAnnotationNodeResult = {
-  data: Array<Record<string, unknown>>;
-  columns: string[];
-  metadata?: Record<string, unknown>;
-  pagination?: {
-    page: number;
-    page_size: number;
-    total_source_rows?: number;
-    total_source_pages?: number;
-    result_count?: number;
-    has_next: boolean;
-    has_prev: boolean;
-  };
 };
 
 const DEFAULT_PAGE_SIZE = 5;
@@ -266,7 +251,7 @@ const AiAnnotatorFeature: React.FC = () => {
 
     const nodeData = data[firstNodeId] ?? null;
     if (nodeData && response?.metadata) {
-      nodeData.metadata = { ...nodeData.metadata, ...response.metadata };
+      nodeData.metadata = { ...(nodeData.metadata ?? {}), ...response.metadata };
     }
 
     setResultNodeId(firstNodeId);
@@ -622,9 +607,9 @@ const AiAnnotatorFeature: React.FC = () => {
     setIsReviewPaging(true);
     try {
       const response = await nodesApi.data(nodeId, { page: pg, pageSize: pgSize }, getAuthHeaders());
-      const rows = (response as { data?: Array<Record<string, unknown>> })?.data ?? [];
-      const columns = (response as { columns?: string[] })?.columns ?? [];
-      const pagination = (response as { pagination?: AiAnnotationNodeResult['pagination'] })?.pagination;
+      const rows = response.data ?? [];
+      const columns = response.columns ?? [];
+      const pagination = response.pagination;
       setReviewData({
         data: rows,
         columns,
@@ -632,8 +617,8 @@ const AiAnnotatorFeature: React.FC = () => {
         pagination: pagination ? {
           page: pagination.page ?? pg,
           page_size: pagination.page_size ?? pgSize,
-          total_source_rows: (pagination as Record<string, unknown>).total_rows as number | undefined,
-          total_source_pages: (pagination as Record<string, unknown>).total_pages as number | undefined,
+          total_source_rows: pagination.total_rows,
+          total_source_pages: pagination.total_pages,
           result_count: rows.length,
           has_next: pagination.has_next ?? false,
           has_prev: pagination.has_prev ?? false,

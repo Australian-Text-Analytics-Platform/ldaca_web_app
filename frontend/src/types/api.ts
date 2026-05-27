@@ -1,35 +1,21 @@
-import type { PaginationInfo } from '@/api/generated/types.gen';
+import type {
+  PaginationInfo,
+  NodeDataResponse as GeneratedNodeDataResponse,
+  WorkspaceGraphEdge as GeneratedWorkspaceGraphEdge,
+  WorkspaceGraphResponse as GeneratedWorkspaceGraphResponse,
+  WorkspaceNodeInfo as GeneratedWorkspaceNodeInfo,
+} from '@/api/generated/types.gen';
 
 // ---------- Node data (paginated table view) ----------
 
 export type NodeDataPagination = PaginationInfo;
 
-export type NodeDataResponse = {
-  data: Record<string, unknown>[];
-  pagination: NodeDataPagination;
-  columns: string[];
-  dtypes: Record<string, string>;
-  sorting?: { sort_by: string | null; descending: boolean };
-  filtering?: { column: string | null; value: string | null; op: string };
-  [key: string]: unknown;
-};
+export type NodeDataResponse = GeneratedNodeDataResponse;
 
 // ---------- Workspace graph ----------
 
-export type GraphNode = {
-  id: string;
-  name: string;
-  operation: string;
-  shape?: [number, number] | [number | null, number | null] | number[];
-  [key: string]: unknown;
-};
+export type GraphNode = GeneratedWorkspaceNodeInfo;
 
-export type GraphEdge = {
-  source: string;
-  target: string;
-};
+export type GraphEdge = GeneratedWorkspaceGraphEdge;
 
-export type WorkspaceGraphResponse = {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-};
+export type WorkspaceGraphResponse = GeneratedWorkspaceGraphResponse;

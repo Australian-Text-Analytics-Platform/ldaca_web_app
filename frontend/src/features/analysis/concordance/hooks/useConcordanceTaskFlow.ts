@@ -67,7 +67,7 @@ interface ConcordanceLock {
   materializeConcordance?: (
     nodeId: string,
     request: ConcordanceMaterializeRequest
-  ) => Promise<{ metadata?: { task_id?: string } } | undefined>;
+  ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
   queryClient: QueryClient;
 }
 

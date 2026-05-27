@@ -243,13 +243,13 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     if (!workspaceGraph?.edges) {
       return [];
     }
-    return workspaceGraph.edges.map((edge: GraphEdge & { label?: string }, index: number) => ({
+    return workspaceGraph.edges.map((edge: GraphEdge, index: number) => ({
       id: `edge-${edge.source}-${edge.target}-${index}`,
       source: edge.source,
       target: edge.target,
       type: 'default',
       animated: true,
-      label: edge.label,
+      label: edge.label ?? undefined,
       style: {
         strokeDasharray: '6 4',
         strokeWidth: 2.5,

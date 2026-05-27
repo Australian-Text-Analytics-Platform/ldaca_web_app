@@ -12,74 +12,33 @@ import {
 } from '@/api/generated/sdk.gen';
 import type {
   AiAnnotationDetachRequest,
+  AiAnnotationDetachResponse,
   AiAnnotationModelsRequest,
-  AiAnnotationNodeResult as GeneratedAiAnnotationNodeResult,
   AiAnnotationRequest,
-  AiAnnotationResponse as GeneratedAiAnnotationResponse,
   AiAnnotationResultQuery,
+  AiAnnotationSaveResponse,
   AiAnnotationSaveRequest,
+  AnalysisClearResponse,
 } from '@/api/generated/types.gen';
 
 export type {
   AiAnnotationClassDef,
   AiAnnotationDetachRequest,
+  AiAnnotationDetachResponse,
   AiAnnotationEdit,
   AiAnnotationExample,
+  AiAnnotationModelsResponse,
   AiAnnotationModelsRequest,
+  AiAnnotationNodeResult as AiAnnotationNodeResultView,
+  AiAnnotationProvidersResponse,
+  AiAnnotationCategoriesResponse,
   AiAnnotationRequest,
+  AiAnnotationResponse as AiAnnotationResultResponse,
   AiAnnotationResultQuery,
+  AiAnnotationSaveResponse,
   AiAnnotationSaveRequest,
+  AnalysisClearResponse,
 } from '@/api/generated/types.gen';
-
-export type AiAnnotationNodeResultView = Omit<GeneratedAiAnnotationNodeResult, 'metadata' | 'pagination' | 'sorting'> & {
-  metadata?: Record<string, unknown>;
-  pagination?: {
-    page: number;
-    page_size: number;
-    total_source_rows?: number;
-    total_source_pages?: number;
-    result_count?: number;
-    has_next: boolean;
-    has_prev: boolean;
-  };
-  sorting?: {
-    sort_by?: string | null;
-    descending: boolean;
-  };
-};
-
-export type AiAnnotationResultResponse = Omit<GeneratedAiAnnotationResponse, 'data' | 'metadata' | 'state'> & {
-  state: 'running' | 'successful' | 'failed' | 'cancelled';
-  data?: Record<string, AiAnnotationNodeResultView> | null;
-  metadata?: { task_id?: string; [k: string]: unknown };
-};
-
-export type AiAnnotationModelsResponse = {
-  state: 'successful' | 'failed';
-  message: string;
-  data?: {
-    models?: Array<{ id: string; name: string }>;
-  };
-  metadata?: Record<string, unknown>;
-};
-
-export type AiAnnotationProvidersResponse = {
-  state: 'successful' | 'failed';
-  message: string;
-  data?: {
-    providers?: string[];
-  };
-  metadata?: Record<string, unknown>;
-};
-
-export type AiAnnotationCategoriesResponse = {
-  state: 'successful' | 'failed';
-  message: string;
-  data?: {
-    categories?: string[];
-  };
-  metadata?: Record<string, unknown>;
-};
 
 export const aiAnnotationApi = {
   aiAnnotationModels: async (
@@ -91,7 +50,7 @@ export const aiAnnotationApi = {
       headers,
       throwOnError: true,
     });
-    return data as AiAnnotationModelsResponse;
+    return data;
   },
 
   aiAnnotation: async (req: AiAnnotationRequest, headers: Record<string, string> = {}) => {
@@ -100,35 +59,35 @@ export const aiAnnotationApi = {
       headers,
       throwOnError: true,
     });
-    return data as AiAnnotationResultResponse;
+    return data;
   },
 
   aiAnnotationDetach: async (
     node: string,
     req: AiAnnotationDetachRequest,
     headers: Record<string, string> = {},
-  ) => {
+  ): Promise<AiAnnotationDetachResponse> => {
     const { data } = await detachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPost({
       body: req,
       headers,
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   aiAnnotationSave: async (
     node: string,
     req: AiAnnotationSaveRequest,
     headers: Record<string, string> = {},
-  ) => {
+  ): Promise<AiAnnotationSaveResponse> => {
     const { data } = await saveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePost({
       body: req,
       headers,
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   aiAnnotationProviders: async (
@@ -142,7 +101,7 @@ export const aiAnnotationApi = {
       query: { annotation_column: annotationColumn },
       throwOnError: true,
     });
-    return data as AiAnnotationProvidersResponse;
+    return data;
   },
 
   aiAnnotationCategories: async (
@@ -156,24 +115,24 @@ export const aiAnnotationApi = {
       query: { annotation_column: annotationColumn },
       throwOnError: true,
     });
-    return data as AiAnnotationCategoriesResponse;
+    return data;
   },
 
-  clearAiAnnotation: async (headers: Record<string, string> = {}) => {
+  clearAiAnnotation: async (headers: Record<string, string> = {}): Promise<AnalysisClearResponse> => {
     const { data } = await clearAiAnnotationApiWorkspacesAiAnnotationDelete({
       headers,
       throwOnError: true,
     });
-    return data as { state: string; message: string };
+    return data;
   },
 
-  getAiAnnotationTaskRequest: async (taskId: string, headers: Record<string, string> = {}) => {
+  getAiAnnotationTaskRequest: async (taskId: string, headers: Record<string, string> = {}): Promise<AiAnnotationRequest> => {
     const { data } = await aiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGet({
       headers,
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   getAiAnnotationTaskResult: async (taskId: string, headers: Record<string, string> = {}) => {
@@ -182,7 +141,7 @@ export const aiAnnotationApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as AiAnnotationResultResponse;
+    return data;
   },
 
   postAiAnnotationTaskResult: async (
@@ -196,6 +155,6 @@ export const aiAnnotationApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as AiAnnotationResultResponse;
+    return data;
   },
 };

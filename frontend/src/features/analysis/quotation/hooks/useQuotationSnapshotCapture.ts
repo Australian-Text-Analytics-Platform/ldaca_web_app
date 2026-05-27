@@ -146,6 +146,12 @@ export function useQuotationSnapshotCapture(
         { page_size: 'all', update_only: false },
         headers,
       );
+      if (!('columns' in fullResult)) {
+        throw captureError(
+          'no-result',
+          'No saved quotation result was returned. Run the extractor again before saving a snapshot.',
+        );
+      }
 
       // Compose the manifest. Quotation works on one node — list it
       // as the only source, copy its frozen colour into the manifest.

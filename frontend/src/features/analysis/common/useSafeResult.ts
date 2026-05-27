@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 
-type ResultLike = { state?: string };
+type ResultLike = { state?: string | null };
 
 const RESULT_STATE_RANK: Record<string, number> = {
   pending: 0,
@@ -13,7 +13,7 @@ const RESULT_STATE_RANK: Record<string, number> = {
 
 const TERMINAL_STATES = new Set(['failed', 'cancelled', 'successful', 'completed']);
 
-function resultStateRank(state: string | undefined): number {
+function resultStateRank(state: string | null | undefined): number {
   return state ? (RESULT_STATE_RANK[state] ?? 0) : 0;
 }
 

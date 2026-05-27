@@ -1,6 +1,58 @@
 {
   "components": {
     "schemas": {
+      "AiAnnotationCategoriesData": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          }
+        },
+        "required": [
+          "categories"
+        ],
+        "title": "AiAnnotationCategoriesData",
+        "type": "object"
+      },
+      "AiAnnotationCategoriesResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AiAnnotationCategoriesData"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "successful",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "data"
+        ],
+        "title": "AiAnnotationCategoriesResponse",
+        "type": "object"
+      },
       "AiAnnotationClassDef": {
         "properties": {
           "description": {
@@ -17,6 +69,24 @@
           "description"
         ],
         "title": "AiAnnotationClassDef",
+        "type": "object"
+      },
+      "AiAnnotationDetachData": {
+        "properties": {
+          "new_node_name": {
+            "title": "New Node Name",
+            "type": "string"
+          },
+          "record_count": {
+            "title": "Record Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "new_node_name",
+          "record_count"
+        ],
+        "title": "AiAnnotationDetachData",
         "type": "object"
       },
       "AiAnnotationDetachRequest": {
@@ -139,6 +209,29 @@
         "title": "AiAnnotationDetachRequest",
         "type": "object"
       },
+      "AiAnnotationDetachResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AiAnnotationDetachData"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "data"
+        ],
+        "title": "AiAnnotationDetachResponse",
+        "type": "object"
+      },
       "AiAnnotationEdit": {
         "properties": {
           "annotation": {
@@ -182,6 +275,40 @@
         "title": "AiAnnotationExample",
         "type": "object"
       },
+      "AiAnnotationModelInfo": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "AiAnnotationModelInfo",
+        "type": "object"
+      },
+      "AiAnnotationModelsData": {
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/AiAnnotationModelInfo"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "AiAnnotationModelsData",
+        "type": "object"
+      },
       "AiAnnotationModelsRequest": {
         "properties": {
           "api_key": {
@@ -210,6 +337,42 @@
         "title": "AiAnnotationModelsRequest",
         "type": "object"
       },
+      "AiAnnotationModelsResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AiAnnotationModelsData"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "successful",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "data"
+        ],
+        "title": "AiAnnotationModelsResponse",
+        "type": "object"
+      },
       "AiAnnotationNodeResult": {
         "properties": {
           "columns": {
@@ -230,38 +393,32 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           },
           "pagination": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/SourceRowPagination"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Pagination"
+            ]
           },
           "sorting": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisSorting"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Sorting"
+            ]
           }
         },
         "required": [
@@ -269,6 +426,58 @@
           "columns"
         ],
         "title": "AiAnnotationNodeResult",
+        "type": "object"
+      },
+      "AiAnnotationProvidersData": {
+        "properties": {
+          "providers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Providers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "providers"
+        ],
+        "title": "AiAnnotationProvidersData",
+        "type": "object"
+      },
+      "AiAnnotationProvidersResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AiAnnotationProvidersData"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "successful",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "data"
+        ],
+        "title": "AiAnnotationProvidersResponse",
         "type": "object"
       },
       "AiAnnotationRequest": {
@@ -491,16 +700,21 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           },
           "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
             "title": "State",
             "type": "string"
           }
@@ -563,6 +777,24 @@
         "title": "AiAnnotationResultQuery",
         "type": "object"
       },
+      "AiAnnotationSaveData": {
+        "properties": {
+          "annotation_column": {
+            "title": "Annotation Column",
+            "type": "string"
+          },
+          "edits_applied": {
+            "title": "Edits Applied",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "annotation_column",
+          "edits_applied"
+        ],
+        "title": "AiAnnotationSaveData",
+        "type": "object"
+      },
       "AiAnnotationSaveRequest": {
         "properties": {
           "annotation_column": {
@@ -585,6 +817,129 @@
           }
         },
         "title": "AiAnnotationSaveRequest",
+        "type": "object"
+      },
+      "AiAnnotationSaveResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AiAnnotationSaveData"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "data"
+        ],
+        "title": "AiAnnotationSaveResponse",
+        "type": "object"
+      },
+      "AnalysisClearResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message"
+        ],
+        "title": "AnalysisClearResponse",
+        "type": "object"
+      },
+      "AnalysisSorting": {
+        "properties": {
+          "descending": {
+            "title": "Descending",
+            "type": "boolean"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          }
+        },
+        "required": [
+          "descending"
+        ],
+        "title": "AnalysisSorting",
+        "type": "object"
+      },
+      "AnalysisTaskActionResponse": {
+        "properties": {
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message"
+        ],
+        "title": "AnalysisTaskActionResponse",
+        "type": "object"
+      },
+      "AnalysisTaskMetadata": {
+        "additionalProperties": true,
+        "properties": {
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "title": "AnalysisTaskMetadata",
         "type": "object"
       },
       "AuthInfoResponse": {
@@ -720,6 +1075,263 @@
           "file"
         ],
         "title": "Body_upload_workspace_zip_api_workspaces_upload_post",
+        "type": "object"
+      },
+      "ColumnDescribeResponse": {
+        "description": "Response model for column describe statistics.",
+        "properties": {
+          "column_name": {
+            "title": "Column Name",
+            "type": "string"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "null_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Null Count"
+          },
+          "percentile_25": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile 25"
+          },
+          "percentile_75": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile 75"
+          },
+          "std": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Std"
+          }
+        },
+        "required": [
+          "column_name"
+        ],
+        "title": "ColumnDescribeResponse",
+        "type": "object"
+      },
+      "ColumnOperationInfo": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "label"
+        ],
+        "title": "ColumnOperationInfo",
+        "type": "object"
+      },
+      "ColumnOperationsResponse": {
+        "properties": {
+          "operations": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/ColumnOperationInfo"
+              },
+              "type": "array"
+            },
+            "title": "Operations",
+            "type": "object"
+          }
+        },
+        "required": [
+          "operations"
+        ],
+        "title": "ColumnOperationsResponse",
+        "type": "object"
+      },
+      "ColumnUniqueValuesResponse": {
+        "properties": {
+          "column_name": {
+            "title": "Column Name",
+            "type": "string"
+          },
+          "has_null": {
+            "title": "Has Null",
+            "type": "boolean"
+          },
+          "unique_count": {
+            "title": "Unique Count",
+            "type": "integer"
+          },
+          "unique_values": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Unique Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "column_name",
+          "unique_count",
+          "unique_values",
+          "has_null"
+        ],
+        "title": "ColumnUniqueValuesResponse",
         "type": "object"
       },
       "ConcatPreviewRequest": {
@@ -873,6 +1485,85 @@
         "title": "ConcordanceAnalysisRequest",
         "type": "object"
       },
+      "ConcordanceAnalysisResponse": {
+        "description": "Unified concordance response for single or multi-node requests.",
+        "properties": {
+          "analysis_params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Params"
+          },
+          "combinable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Combinable"
+          },
+          "data": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ConcordanceNodeResult"
+            },
+            "title": "Data",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferences"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "data"
+        ],
+        "title": "ConcordanceAnalysisResponse",
+        "type": "object"
+      },
       "ConcordanceDetachNodeOption": {
         "properties": {
           "available_columns": {
@@ -920,14 +1611,21 @@
       "ConcordanceDetachOptionsResponse": {
         "properties": {
           "data": {
-            "additionalProperties": {
-              "items": {
-                "$ref": "#/components/schemas/ConcordanceDetachNodeOption"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConcordanceDetachNodeOption"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
               },
-              "type": "array"
-            },
-            "title": "Data",
-            "type": "object"
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
           },
           "message": {
             "title": "Message",
@@ -936,24 +1634,28 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           },
           "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
             "title": "State",
             "type": "string"
           }
         },
         "required": [
           "state",
-          "message",
-          "data"
+          "message"
         ],
         "title": "ConcordanceDetachOptionsResponse",
         "type": "object"
@@ -1040,6 +1742,87 @@
           "search_word"
         ],
         "title": "ConcordanceDetachRequest",
+        "type": "object"
+      },
+      "ConcordanceDispersionBinRow": {
+        "properties": {
+          "bin_idx": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bin Idx"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "matched_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Text"
+          }
+        },
+        "title": "ConcordanceDispersionBinRow",
+        "type": "object"
+      },
+      "ConcordanceDispersionBinsResponse": {
+        "properties": {
+          "bin_count": {
+            "title": "Bin Count",
+            "type": "integer"
+          },
+          "document_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Column"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ConcordanceDispersionBinRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_hits": {
+            "title": "Total Hits",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node_id",
+          "total_hits",
+          "bin_count",
+          "rows"
+        ],
+        "title": "ConcordanceDispersionBinsResponse",
         "type": "object"
       },
       "ConcordanceDispersionDetachRequest": {
@@ -1245,6 +2028,203 @@
         "title": "ConcordanceMaterializeRequest",
         "type": "object"
       },
+      "ConcordanceMetadata": {
+        "description": "Metadata about concordance columns to help frontend display logic",
+        "properties": {
+          "all_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "All Columns",
+            "type": "array"
+          },
+          "concordance_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Concordance Columns",
+            "type": "array"
+          },
+          "metadata_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metadata Columns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "concordance_columns",
+          "metadata_columns",
+          "all_columns"
+        ],
+        "title": "ConcordanceMetadata",
+        "type": "object"
+      },
+      "ConcordanceNodeResult": {
+        "description": "Per-node concordance payload returned to the frontend.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "data": {
+            "items": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "materialized": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Materialized"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ConcordanceMetadata"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/SourceRowPagination"
+          },
+          "sorting": {
+            "$ref": "#/components/schemas/AnalysisSorting"
+          },
+          "total_matches": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Matches"
+          }
+        },
+        "required": [
+          "data",
+          "columns",
+          "metadata",
+          "pagination",
+          "sorting"
+        ],
+        "title": "ConcordanceNodeResult",
+        "type": "object"
+      },
+      "ConcordanceRequest": {
+        "additionalProperties": true,
+        "description": "Request payload schema for concordance runs.\n\nUsed by:\n- concordance route/task creation flows\n\nWhy:\n- Validates all search/context/pagination-related analysis inputs.",
+        "properties": {
+          "case_sensitive": {
+            "default": false,
+            "title": "Case Sensitive",
+            "type": "boolean"
+          },
+          "combined": {
+            "default": false,
+            "title": "Combined",
+            "type": "boolean"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "materialized_paths": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Materialized Paths"
+          },
+          "node_columns": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Columns"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Node Ids",
+            "type": "array"
+          },
+          "num_left_tokens": {
+            "default": 50,
+            "title": "Num Left Tokens",
+            "type": "integer"
+          },
+          "num_right_tokens": {
+            "default": 50,
+            "title": "Num Right Tokens",
+            "type": "integer"
+          },
+          "regex": {
+            "default": false,
+            "title": "Regex",
+            "type": "boolean"
+          },
+          "search_mode": {
+            "default": "regex",
+            "enum": [
+              "regex",
+              "tokens"
+            ],
+            "title": "Search Mode",
+            "type": "string"
+          },
+          "search_word": {
+            "title": "Search Word",
+            "type": "string"
+          },
+          "whole_word": {
+            "default": false,
+            "title": "Whole Word",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "node_ids",
+          "search_word"
+        ],
+        "title": "ConcordanceRequest",
+        "type": "object"
+      },
       "ConcordanceResultQuery": {
         "description": "Query overrides for reading persisted concordance results.\n\nUsed by:\n- `concordance_task_result`\n- `concordance_task_result_post`\n\nWhy:\n- Allows pagination and sorting updates without recomputing concordance.\n- ``page_size`` accepts the literal string ``\"all\"`` for the\n  snapshot-view capture flow \u2014 translated server-side to\n  ``SNAPSHOT_ALL_PAGE_SIZE_CAP`` rows by\n  :func:`_apply_result_query_overrides`. Downstream code continues\n  to see an ``int`` for ``page_size``.",
         "properties": {
@@ -1421,6 +2401,66 @@
         "title": "CreateFolderResponse",
         "type": "object"
       },
+      "CurrentAnalysisTasksResponse": {
+        "properties": {
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Task Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "task_ids"
+        ],
+        "title": "CurrentAnalysisTasksResponse",
+        "type": "object"
+      },
+      "CurrentWorkspaceResponse": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          }
+        },
+        "title": "CurrentWorkspaceResponse",
+        "type": "object"
+      },
+      "DefaultStopWordsResponse": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "stopwords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stopwords",
+            "type": "array"
+          }
+        },
+        "required": [
+          "stopwords"
+        ],
+        "title": "DefaultStopWordsResponse",
+        "type": "object"
+      },
       "DemoSnapshotEntry": {
         "description": "A single demo-snapshot bundle in the catalogue.",
         "properties": {
@@ -1550,6 +2590,34 @@
           "snapshots"
         ],
         "title": "DemoSnapshotsCatalogueResponse",
+        "type": "object"
+      },
+      "DtypeNormalizationChange": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "from_dtype": {
+            "title": "From Dtype",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "to_dtype": {
+            "title": "To Dtype",
+            "type": "string"
+          }
+        },
+        "required": [
+          "column",
+          "from_dtype",
+          "to_dtype",
+          "reason"
+        ],
+        "title": "DtypeNormalizationChange",
         "type": "object"
       },
       "FileInfoResponse": {
@@ -2278,6 +3346,160 @@
         "title": "MoveFileRequest",
         "type": "object"
       },
+      "NodeDataFiltering": {
+        "properties": {
+          "column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "NodeDataFiltering",
+        "type": "object"
+      },
+      "NodeDataResponse": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "data": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "dtypes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Dtypes",
+            "type": "object"
+          },
+          "filtering": {
+            "$ref": "#/components/schemas/NodeDataFiltering"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo"
+          },
+          "sorting": {
+            "$ref": "#/components/schemas/NodeDataSorting"
+          }
+        },
+        "required": [
+          "data",
+          "pagination",
+          "columns",
+          "dtypes",
+          "sorting",
+          "filtering"
+        ],
+        "title": "NodeDataResponse",
+        "type": "object"
+      },
+      "NodeDataSorting": {
+        "properties": {
+          "descending": {
+            "title": "Descending",
+            "type": "boolean"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          }
+        },
+        "required": [
+          "descending"
+        ],
+        "title": "NodeDataSorting",
+        "type": "object"
+      },
+      "NodeQueryPlanResponse": {
+        "properties": {
+          "plan": {
+            "title": "Plan",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "title": "NodeQueryPlanResponse",
+        "type": "object"
+      },
+      "NodeShapeResponse": {
+        "properties": {
+          "shape": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ],
+            "title": "Shape",
+            "type": "array"
+          }
+        },
+        "required": [
+          "shape"
+        ],
+        "title": "NodeShapeResponse",
+        "type": "object"
+      },
       "OniSearchRequest": {
         "properties": {
           "limit": {
@@ -2564,6 +3786,69 @@
         "title": "PolarsExpressionRequest",
         "type": "object"
       },
+      "QuotationAnalysisResponse": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "data": {
+            "items": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/QuotationMetadata"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/SourceRowPagination"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferences"
+          },
+          "sorting": {
+            "$ref": "#/components/schemas/AnalysisSorting"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "data",
+          "columns",
+          "metadata",
+          "pagination",
+          "sorting"
+        ],
+        "title": "QuotationAnalysisResponse",
+        "type": "object"
+      },
       "QuotationDetachNodeOption": {
         "properties": {
           "available_columns": {
@@ -2611,14 +3896,21 @@
       "QuotationDetachOptionsResponse": {
         "properties": {
           "data": {
-            "additionalProperties": {
-              "items": {
-                "$ref": "#/components/schemas/QuotationDetachNodeOption"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuotationDetachNodeOption"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
               },
-              "type": "array"
-            },
-            "title": "Data",
-            "type": "object"
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
           },
           "message": {
             "title": "Message",
@@ -2627,24 +3919,28 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           },
           "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
             "title": "State",
             "type": "string"
           }
         },
         "required": [
           "state",
-          "message",
-          "data"
+          "message"
         ],
         "title": "QuotationDetachOptionsResponse",
         "type": "object"
@@ -2659,7 +3955,7 @@
           "engine": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/QuotationEngineConfig"
+                "$ref": "#/components/schemas/QuotationEngineConfig-Input"
               },
               {
                 "type": "null"
@@ -2725,7 +4021,7 @@
         "title": "QuotationDetachRequest",
         "type": "object"
       },
-      "QuotationEngineConfig": {
+      "QuotationEngineConfig-Input": {
         "additionalProperties": false,
         "properties": {
           "type": {
@@ -2767,7 +4063,7 @@
           "engine": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/QuotationEngineConfig"
+                "$ref": "#/components/schemas/QuotationEngineConfig-Input"
               },
               {
                 "type": "null"
@@ -2797,11 +4093,89 @@
         "title": "QuotationMaterializeRequest",
         "type": "object"
       },
-      "QuotationPreferences": {
+      "QuotationMetadata": {
+        "properties": {
+          "all_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "All Columns",
+            "type": "array"
+          },
+          "metadata_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metadata Columns",
+            "type": "array"
+          },
+          "quotation_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Quotation Columns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "quotation_columns",
+          "metadata_columns",
+          "all_columns"
+        ],
+        "title": "QuotationMetadata",
+        "type": "object"
+      },
+      "QuotationPreferenceUpdateData": {
+        "properties": {
+          "context_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Length"
+          }
+        },
+        "title": "QuotationPreferenceUpdateData",
+        "type": "object"
+      },
+      "QuotationPreferenceUpdateResponse": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuotationPreferenceUpdateData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message"
+        ],
+        "title": "QuotationPreferenceUpdateResponse",
+        "type": "object"
+      },
+      "QuotationPreferences-Input": {
         "additionalProperties": false,
         "properties": {
           "engine": {
-            "$ref": "#/components/schemas/QuotationEngineConfig"
+            "$ref": "#/components/schemas/QuotationEngineConfig-Input"
           },
           "last_remote_url": {
             "default": "",
@@ -2812,7 +4186,22 @@
         "title": "QuotationPreferences",
         "type": "object"
       },
-      "QuotationRequest": {
+      "QuotationPreferences-Output": {
+        "additionalProperties": false,
+        "properties": {
+          "engine": {
+            "$ref": "#/components/schemas/ldaca_wordflow__models__QuotationEngineConfig"
+          },
+          "last_remote_url": {
+            "default": "",
+            "title": "Last Remote Url",
+            "type": "string"
+          }
+        },
+        "title": "QuotationPreferences",
+        "type": "object"
+      },
+      "QuotationRequest-Input": {
         "additionalProperties": false,
         "properties": {
           "column": {
@@ -2827,7 +4216,7 @@
           "engine": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/QuotationEngineConfig"
+                "$ref": "#/components/schemas/QuotationEngineConfig-Input"
               },
               {
                 "type": "null"
@@ -2874,6 +4263,104 @@
           }
         },
         "required": [
+          "column"
+        ],
+        "title": "QuotationRequest",
+        "type": "object"
+      },
+      "QuotationRequest-Output": {
+        "additionalProperties": true,
+        "description": "Request payload schema for quotation analysis.\n\nUsed by:\n- quotation run/update endpoints\n\nWhy:\n- Validates node/column/engine/paging options for quotation workflows.",
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "context_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Length"
+          },
+          "descending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": true,
+            "title": "Descending"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ldaca_wordflow__analysis__implementations__quotation__QuotationEngineConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "materialized_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Materialized Path"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Size"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          }
+        },
+        "required": [
+          "node_id",
           "column"
         ],
         "title": "QuotationRequest",
@@ -3231,7 +4718,126 @@
         "title": "SequentialAnalysisDetachRequest",
         "type": "object"
       },
-      "SequentialAnalysisRequest": {
+      "SequentialAnalysisDetachResponse": {
+        "properties": {
+          "new_node_id": {
+            "title": "New Node Id",
+            "type": "string"
+          },
+          "new_node_name": {
+            "title": "New Node Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "new_node_id",
+          "new_node_name"
+        ],
+        "title": "SequentialAnalysisDetachResponse",
+        "type": "object"
+      },
+      "SequentialAnalysisPreferenceUpdateData": {
+        "properties": {
+          "chart_type": {
+            "enum": [
+              "line",
+              "bar",
+              "area"
+            ],
+            "title": "Chart Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chart_type"
+        ],
+        "title": "SequentialAnalysisPreferenceUpdateData",
+        "type": "object"
+      },
+      "SequentialAnalysisPreferenceUpdateResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SequentialAnalysisPreferenceUpdateData"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "data"
+        ],
+        "title": "SequentialAnalysisPreferenceUpdateResponse",
+        "type": "object"
+      },
+      "SequentialAnalysisPreviewResponse": {
+        "properties": {
+          "analysis_params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Params"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "total_records": {
+            "title": "Total Records",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "state",
+          "total_records",
+          "columns"
+        ],
+        "title": "SequentialAnalysisPreviewResponse",
+        "type": "object"
+      },
+      "SequentialAnalysisRequest-Input": {
         "example": {
           "column_type": "datetime",
           "frequency": "monthly",
@@ -3354,6 +4960,232 @@
         "title": "SequentialAnalysisRequest",
         "type": "object"
       },
+      "SequentialAnalysisRequest-Output": {
+        "additionalProperties": true,
+        "description": "Request model for sequential analysis.\n\nUsed by:\n- sequential analysis run/update endpoints\n\nWhy:\n- Validates temporal grouping and binning parameters.\n\nRefactor note:\n- `column_type`, `numeric_origin`, and `numeric_interval` are declared twice;\n    remove duplicated declarations to reduce schema ambiguity.",
+        "properties": {
+          "case_sensitive": {
+            "default": true,
+            "description": "Whether group-by values are compared case-sensitively",
+            "title": "Case Sensitive",
+            "type": "boolean"
+          },
+          "column_type": {
+            "default": "datetime",
+            "description": "Column type (datetime or numeric)",
+            "title": "Column Type",
+            "type": "string"
+          },
+          "custom_interval_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom datetime interval unit (seconds|minutes|hours|days|weeks)",
+            "title": "Custom Interval Unit"
+          },
+          "custom_interval_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom datetime interval count (used when frequency='custom')",
+            "title": "Custom Interval Value"
+          },
+          "frequency": {
+            "default": "monthly",
+            "description": "Frequency (daily, weekly, monthly, yearly)",
+            "title": "Frequency",
+            "type": "string"
+          },
+          "group_by_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Columns to group by",
+            "title": "Group By Columns"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Node ID to analyze",
+            "title": "Node Id"
+          },
+          "numeric_interval": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Interval for numeric binning",
+            "title": "Numeric Interval"
+          },
+          "numeric_origin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Origin for numeric binning",
+            "title": "Numeric Origin"
+          },
+          "sort_by_time": {
+            "default": true,
+            "description": "Whether to sort by time",
+            "title": "Sort By Time",
+            "type": "boolean"
+          },
+          "time_column": {
+            "description": "Column containing time/numeric data",
+            "title": "Time Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time_column"
+        ],
+        "title": "SequentialAnalysisRequest",
+        "type": "object"
+      },
+      "SequentialAnalysisResponse": {
+        "properties": {
+          "chart_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "line",
+                  "bar",
+                  "area"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart Type"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "total_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Records"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "SequentialAnalysisResponse",
+        "type": "object"
+      },
+      "SetCurrentWorkspaceResponse": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "SetCurrentWorkspaceResponse",
+        "type": "object"
+      },
       "SliceRequest": {
         "properties": {
           "length": {
@@ -3423,6 +5255,49 @@
         "title": "SliceRequest",
         "type": "object"
       },
+      "SourceRowPagination": {
+        "properties": {
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "has_prev": {
+            "title": "Has Prev",
+            "type": "boolean"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "result_count": {
+            "title": "Result Count",
+            "type": "integer"
+          },
+          "total_source_pages": {
+            "title": "Total Source Pages",
+            "type": "integer"
+          },
+          "total_source_rows": {
+            "title": "Total Source Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "page_size",
+          "total_source_rows",
+          "total_source_pages",
+          "result_count",
+          "has_next",
+          "has_prev"
+        ],
+        "title": "SourceRowPagination",
+        "type": "object"
+      },
       "TokenFrequencyData": {
         "properties": {
           "frequency": {
@@ -3464,14 +5339,12 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           }
         },
         "required": [
@@ -3480,7 +5353,7 @@
         "title": "TokenFrequencyNodeResult",
         "type": "object"
       },
-      "TokenFrequencyRequest": {
+      "TokenFrequencyRequest-Input": {
         "example": {
           "node_columns": {
             "node1": "text_column",
@@ -3545,6 +5418,67 @@
         "title": "TokenFrequencyRequest",
         "type": "object"
       },
+      "TokenFrequencyRequest-Output": {
+        "additionalProperties": true,
+        "description": "Request model for token-frequency analysis.\n\nUsed by:\n- token-frequency run/update endpoints\n\nWhy:\n- Validates node selection, stop-word, and token-limit parameters.",
+        "properties": {
+          "node_columns": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Map of node_id to column name",
+            "title": "Node Columns"
+          },
+          "node_ids": {
+            "description": "List of node IDs to analyze (1 or 2)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Node Ids",
+            "type": "array"
+          },
+          "stop_words": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "List of stop words to exclude",
+            "title": "Stop Words"
+          },
+          "token_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Limit on number of tokens returned",
+            "title": "Token Limit"
+          }
+        },
+        "required": [
+          "node_ids"
+        ],
+        "title": "TokenFrequencyRequest",
+        "type": "object"
+      },
       "TokenFrequencyResponse": {
         "description": "Unified response model for token frequency analysis.",
         "properties": {
@@ -3575,24 +5509,36 @@
             "title": "Data"
           },
           "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Metadata"
+            "title": "Message"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "state": {
             "anyOf": [
               {
+                "enum": [
+                  "pending",
+                  "running",
+                  "successful",
+                  "failed",
+                  "cancelled"
+                ],
                 "type": "string"
               },
               {
@@ -3641,9 +5587,6 @@
             "title": "Token Limit"
           }
         },
-        "required": [
-          "message"
-        ],
         "title": "TokenFrequencyResponse",
         "type": "object"
       },
@@ -3942,14 +5885,12 @@
           "meta": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Meta"
+            ]
           },
           "per_corpus_topic_counts": {
             "anyOf": [
@@ -3981,6 +5922,19 @@
           "corpus_sizes"
         ],
         "title": "TopicModelingData",
+        "type": "object"
+      },
+      "TopicModelingDetachData": {
+        "properties": {
+          "detached_nodes": {
+            "items": {
+              "$ref": "#/components/schemas/TopicModelingDetachedNode"
+            },
+            "title": "Detached Nodes",
+            "type": "array"
+          }
+        },
+        "title": "TopicModelingDetachData",
         "type": "object"
       },
       "TopicModelingDetachNodeOption": {
@@ -4030,14 +5984,21 @@
       "TopicModelingDetachOptionsResponse": {
         "properties": {
           "data": {
-            "additionalProperties": {
-              "items": {
-                "$ref": "#/components/schemas/TopicModelingDetachNodeOption"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/TopicModelingDetachNodeOption"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
               },
-              "type": "array"
-            },
-            "title": "Data",
-            "type": "object"
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
           },
           "message": {
             "title": "Message",
@@ -4046,24 +6007,28 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           },
           "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
             "title": "State",
             "type": "string"
           }
         },
         "required": [
           "state",
-          "message",
-          "data"
+          "message"
         ],
         "title": "TopicModelingDetachOptionsResponse",
         "type": "object"
@@ -4158,14 +6123,12 @@
           "data": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/TopicModelingDetachData"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Data"
+            ]
           },
           "message": {
             "title": "Message",
@@ -4174,16 +6137,21 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           },
           "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
             "title": "State",
             "type": "string"
           }
@@ -4195,7 +6163,117 @@
         "title": "TopicModelingDetachResponse",
         "type": "object"
       },
-      "TopicModelingRequest": {
+      "TopicModelingDetachedNode": {
+        "properties": {
+          "new_node_id": {
+            "title": "New Node Id",
+            "type": "string"
+          },
+          "source_node_id": {
+            "title": "Source Node Id",
+            "type": "string"
+          },
+          "topic_meanings_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Meanings Node Id"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "new_node_id"
+        ],
+        "title": "TopicModelingDetachedNode",
+        "type": "object"
+      },
+      "TopicModelingEmbeddingCacheClearData": {
+        "properties": {
+          "bytes_freed": {
+            "title": "Bytes Freed",
+            "type": "integer"
+          },
+          "files_removed": {
+            "title": "Files Removed",
+            "type": "integer"
+          },
+          "measured_before": {
+            "$ref": "#/components/schemas/TopicModelingEmbeddingCacheMeasurement"
+          }
+        },
+        "required": [
+          "bytes_freed",
+          "files_removed",
+          "measured_before"
+        ],
+        "title": "TopicModelingEmbeddingCacheClearData",
+        "type": "object"
+      },
+      "TopicModelingEmbeddingCacheClearResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TopicModelingEmbeddingCacheClearData"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "data"
+        ],
+        "title": "TopicModelingEmbeddingCacheClearResponse",
+        "type": "object"
+      },
+      "TopicModelingEmbeddingCacheMeasurement": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bytes",
+          "files"
+        ],
+        "title": "TopicModelingEmbeddingCacheMeasurement",
+        "type": "object"
+      },
+      "TopicModelingEmbeddingCacheSizeResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TopicModelingEmbeddingCacheMeasurement"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "data"
+        ],
+        "title": "TopicModelingEmbeddingCacheSizeResponse",
+        "type": "object"
+      },
+      "TopicModelingRequest-Input": {
         "example": {
           "node_columns": {
             "node1": "text",
@@ -4334,6 +6412,111 @@
         "title": "TopicModelingRequest",
         "type": "object"
       },
+      "TopicModelingRequest-Output": {
+        "additionalProperties": true,
+        "description": "Request model for topic-modeling analysis.\n\nUsed by:\n- topic-modeling run/update endpoints\n\nWhy:\n- Validates node selection and clustering configuration inputs.",
+        "properties": {
+          "min_topic_size": {
+            "default": 5,
+            "description": "Kept for backwards compatibility. Ignored when topic_size_mode is 'target' or 'exact' \u2014 computed from topic_size_value in those modes.",
+            "title": "Min Topic Size",
+            "type": "integer"
+          },
+          "node_columns": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Map of node_id to column name",
+            "title": "Node Columns"
+          },
+          "node_ids": {
+            "description": "List of node IDs to analyze",
+            "items": {
+              "type": "string"
+            },
+            "title": "Node Ids",
+            "type": "array"
+          },
+          "random_seed": {
+            "default": 42,
+            "description": "Random seed used for reproducible topic-modeling runs",
+            "title": "Random Seed",
+            "type": "integer"
+          },
+          "representative_words_count": {
+            "default": 5,
+            "description": "Number of representative words to keep per topic",
+            "title": "Representative Words Count",
+            "type": "integer"
+          },
+          "sample_fractions": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One sampling fraction (0 < f \u2264 1) per corpus in node_ids order. None for a corpus means no sampling. Sampling uses random_seed.",
+            "title": "Sample Fractions"
+          },
+          "topic_size_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "target",
+                  "min",
+                  "exact"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "target",
+            "description": "'target': min_topic_size = max(2, n_eff // (topic_size_value * 10)). 'min': topic_size_value used directly as min_topic_size. 'exact': min_topic_size = max(5, int(target_min_topic_size * 0.75)) where target_min_topic_size = max(2, n_eff // (topic_size_value * 10)), then reduce_topics(nr_topics=topic_size_value) post-fit.",
+            "title": "Topic Size Mode"
+          },
+          "topic_size_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 25,
+            "description": "Numeric parameter interpreted according to topic_size_mode.",
+            "title": "Topic Size Value"
+          }
+        },
+        "required": [
+          "node_ids"
+        ],
+        "title": "TopicModelingRequest",
+        "type": "object"
+      },
       "TopicModelingResponse": {
         "properties": {
           "data": {
@@ -4353,16 +6536,21 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AnalysisTaskMetadata"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           },
           "state": {
+            "enum": [
+              "pending",
+              "running",
+              "successful",
+              "failed",
+              "cancelled"
+            ],
             "title": "State",
             "type": "string"
           }
@@ -4556,7 +6744,7 @@
             "title": "Ldaca Oni Api Token"
           },
           "quotation": {
-            "$ref": "#/components/schemas/QuotationPreferences"
+            "$ref": "#/components/schemas/QuotationPreferences-Output"
           }
         },
         "title": "UserPreferences",
@@ -4641,7 +6829,7 @@
           "quotation": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/QuotationPreferences"
+                "$ref": "#/components/schemas/QuotationPreferences-Input"
               },
               {
                 "type": "null"
@@ -4784,6 +6972,61 @@
         "title": "WorkspaceCreateRequest",
         "type": "object"
       },
+      "WorkspaceGraphEdge": {
+        "additionalProperties": true,
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "WorkspaceGraphEdge",
+        "type": "object"
+      },
+      "WorkspaceGraphResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceGraphEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceNodeInfo"
+            },
+            "title": "Nodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges"
+        ],
+        "title": "WorkspaceGraphResponse",
+        "type": "object"
+      },
       "WorkspaceInfo": {
         "properties": {
           "created_at": {
@@ -4842,6 +7085,167 @@
           "leaf_nodes"
         ],
         "title": "WorkspaceInfo",
+        "type": "object"
+      },
+      "WorkspaceNodeInfo": {
+        "additionalProperties": true,
+        "properties": {
+          "can_redo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Can Redo"
+          },
+          "can_undo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Can Undo"
+          },
+          "child_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Child Ids",
+            "type": "array"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "document": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document"
+          },
+          "dtype_normalization": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DtypeNormalizationChange"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dtype Normalization"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation"
+          },
+          "parent_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Parent Ids",
+            "type": "array"
+          },
+          "schema": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Schema",
+            "type": "object"
+          },
+          "shape": {
+            "default": [
+              null,
+              null
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ],
+            "title": "Shape",
+            "type": "array"
+          },
+          "tokenization": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Tokenization",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "WorkspaceNodeInfo",
+        "type": "object"
+      },
+      "WorkspaceNodesResponse": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceNodeInfo"
+            },
+            "title": "Nodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nodes"
+        ],
+        "title": "WorkspaceNodesResponse",
         "type": "object"
       },
       "WorkspaceSummary": {
@@ -4907,6 +7311,75 @@
           "name"
         ],
         "title": "WorkspaceSummary",
+        "type": "object"
+      },
+      "ldaca_wordflow__analysis__implementations__quotation__QuotationEngineConfig": {
+        "description": "Configuration schema for quotation extraction engines.\n\nUsed by:\n- `QuotationRequest`\n\nWhy:\n- Supports local and remote engine selection with optional model/auth fields.",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "type": {
+            "default": "local",
+            "title": "Type",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "title": "QuotationEngineConfig",
+        "type": "object"
+      },
+      "ldaca_wordflow__models__QuotationEngineConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/QuotationEngineType",
+            "default": "local"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "format": "uri",
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "title": "QuotationEngineConfig",
         "type": "object"
       }
     }
@@ -7079,7 +9552,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultStopWordsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -7624,7 +10099,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisClearResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -7742,7 +10219,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AiAnnotationModelsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -7791,7 +10270,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -7849,7 +10330,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AiAnnotationRequest"
+                }
               }
             },
             "description": "Successful Response"
@@ -7971,7 +10454,17 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AiAnnotationResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Ai Annotation Task Result Api Workspaces Ai Annotation Tasks  Task Id  Result Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8037,7 +10530,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AiAnnotationResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -8096,7 +10591,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ConcordanceAnalysisResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -8145,7 +10642,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -8212,7 +10711,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ConcordanceDispersionBinsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -8270,7 +10771,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ConcordanceRequest"
+                }
               }
             },
             "description": "Successful Response"
@@ -8470,7 +10973,17 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ConcordanceAnalysisResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Concordance Task Result Api Workspaces Concordance Tasks  Task Id  Result Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8536,7 +11049,17 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ConcordanceAnalysisResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Concordance Task Result Post Api Workspaces Concordance Tasks  Task Id  Result Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -8584,7 +11107,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentWorkspaceResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -8647,7 +11172,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SetCurrentWorkspaceResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -8986,7 +11513,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceGraphResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -9034,7 +11563,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -9139,7 +11670,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodesResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -9225,7 +11758,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -9717,7 +12252,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -9785,7 +12322,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AiAnnotationCategoriesResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -9853,7 +12392,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AiAnnotationDetachResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -9921,7 +12462,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AiAnnotationProvidersResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -9989,7 +12532,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AiAnnotationSaveResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -10116,7 +12661,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -10327,7 +12874,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ColumnDescribeResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -10394,7 +12943,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ColumnOperationsResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -10460,7 +13011,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ColumnUniqueValuesResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -10665,7 +13218,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTaskActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -10733,7 +13288,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTaskActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -10878,7 +13435,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDataResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -11321,7 +13880,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/NodeQueryPlanResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -11379,7 +13940,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/QuotationRequest"
+                "$ref": "#/components/schemas/QuotationRequest-Input"
               }
             }
           },
@@ -11389,7 +13950,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/QuotationAnalysisResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -11594,7 +14157,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTaskActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -11652,7 +14217,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -11871,7 +14438,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SequentialAnalysisRequest"
+                "$ref": "#/components/schemas/SequentialAnalysisRequest-Input"
               }
             }
           },
@@ -11881,7 +14448,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SequentialAnalysisResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -11950,7 +14519,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SequentialAnalysisRequest"
+                "$ref": "#/components/schemas/SequentialAnalysisRequest-Input"
               }
             }
           },
@@ -11960,7 +14529,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SequentialAnalysisPreviewResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12016,7 +14587,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/NodeShapeResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12302,7 +14875,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -12351,7 +14926,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12409,7 +14986,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/QuotationRequest-Output"
+                }
               }
             },
             "description": "Successful Response"
@@ -12531,7 +15110,17 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/QuotationAnalysisResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Quotation Task Result Api Workspaces Quotation Tasks  Task Id  Result Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -12597,7 +15186,17 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/QuotationAnalysisResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QuotationPreferenceUpdateResponse"
+                    }
+                  ],
+                  "title": "Response Update Quotation Task Result Api Workspaces Quotation Tasks  Task Id  Result Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -12694,7 +15293,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12761,7 +15362,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SequentialAnalysisDetachResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12818,7 +15421,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SequentialAnalysisRequest-Output"
+                }
               }
             },
             "description": "Successful Response"
@@ -12875,7 +15480,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SequentialAnalysisResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12949,7 +15556,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SequentialAnalysisPreferenceUpdateResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13043,7 +15652,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TokenFrequencyRequest"
+                "$ref": "#/components/schemas/TokenFrequencyRequest-Input"
               }
             }
           },
@@ -13103,7 +15712,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13160,7 +15771,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TokenFrequencyRequest-Output"
+                }
               }
             },
             "description": "Successful Response"
@@ -13217,7 +15830,17 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/TokenFrequencyResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Token Frequencies Task Result Api Workspaces Token Frequencies Tasks  Task Id  Result Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -13291,7 +15914,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisClearResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13339,7 +15964,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisClearResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13386,7 +16013,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TopicModelingRequest"
+                "$ref": "#/components/schemas/TopicModelingRequest-Input"
               }
             }
           },
@@ -13447,7 +16074,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TopicModelingEmbeddingCacheClearResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13496,7 +16125,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TopicModelingEmbeddingCacheSizeResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13545,7 +16176,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13733,7 +16366,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TopicModelingRequest-Output"
+                }
               }
             },
             "description": "Successful Response"

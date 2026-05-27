@@ -12,14 +12,14 @@ import type { ZoomDomain } from '../../topicModelingAdapters';
 
 type TopicModelingTopic = { id: number; label: string; size: number[]; total_size: number; x: number; y: number };
 type TopicModelingResult = {
-  state?: string;
+  state?: string | null;
   data?: {
     topics: TopicModelingTopic[];
-    corpus_sizes?: number[];
-    meta?: Record<string, unknown>;
-  };
-  metadata?: Record<string, unknown>;
-  message?: string;
+    corpus_sizes?: number[] | null;
+    meta?: Record<string, unknown> | null;
+  } | null;
+  metadata?: Record<string, unknown> | null;
+  message?: string | null;
 } | null;
 
 type ExactTopicCountSliderProps = {

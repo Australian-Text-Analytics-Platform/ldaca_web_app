@@ -92,7 +92,7 @@ interface QuotationLock {
   materializeQuotation?: (
     nodeId: string,
     request: QuotationMaterializeRequest,
-  ) => Promise<{ metadata?: { task_id?: string } } | undefined>;
+  ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
   openEngineDialog: () => void;
   queryClient: QueryClient;
 }
@@ -309,7 +309,7 @@ export function useQuotationTaskFlow({
         payload,
         getAuthHeaders(),
       );
-      if (!response) return null;
+      if (!response || !('columns' in response)) return null;
       applyContextLengthPreferenceFromResult(response);
       updateResultState(nodeId, column, response);
       setHasLoaded(true);

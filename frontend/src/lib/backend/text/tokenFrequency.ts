@@ -6,16 +6,12 @@ import {
   updateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPost,
 } from '@/api/generated/sdk.gen';
 import type {
-  TokenFrequencyRequest,
-  TokenFrequencyResponse as GeneratedTokenFrequencyResponse,
+  TokenFrequencyRequestInput,
+  TokenFrequencyRequestOutput,
 } from '@/api/generated/types.gen';
 
-export type { TokenFrequencyNodeResult, TokenFrequencyRequest } from '@/api/generated/types.gen';
-
-export type TokenFrequencyResultResponse = Omit<GeneratedTokenFrequencyResponse, 'message' | 'state'> & {
-  message?: string;
-  state: 'running' | 'successful' | 'failed' | 'cancelled';
-};
+export type { DefaultStopWordsResponse, TokenFrequencyNodeResult, TokenFrequencyRequestOutput, TokenFrequencyResponse as TokenFrequencyResultResponse } from '@/api/generated/types.gen';
+export type TokenFrequencyRequest = TokenFrequencyRequestInput;
 
 export const tokenFrequencyApi = {
   tokenFrequencies: async (req: TokenFrequencyRequest, headers: Record<string, string> = {}) => {
@@ -24,7 +20,7 @@ export const tokenFrequencyApi = {
       headers,
       throwOnError: true,
     });
-    return data as TokenFrequencyResultResponse;
+    return data;
   },
 
   /**
@@ -44,16 +40,16 @@ export const tokenFrequencyApi = {
         strict: options?.strict,
       },
       throwOnError: true,
-    }).then(({ data }) => data as { stopwords?: string[]; error?: string });
+    }).then(({ data }) => data);
   },
 
-  getTokenFrequenciesTaskRequest: async (taskId: string, headers: Record<string, string> = {}) => {
+  getTokenFrequenciesTaskRequest: async (taskId: string, headers: Record<string, string> = {}): Promise<TokenFrequencyRequestOutput> => {
     const { data } = await tokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGet({
       headers,
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   getTokenFrequenciesTaskResult: async (taskId: string, headers: Record<string, string> = {}) => {
@@ -62,7 +58,7 @@ export const tokenFrequencyApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as TokenFrequencyResultResponse;
+    return data;
   },
 
   postTokenFrequenciesTaskResult: async (
@@ -76,6 +72,6 @@ export const tokenFrequencyApi = {
       path: { task_id: taskId },
       throwOnError: true,
     });
-    return data as TokenFrequencyResultResponse;
+    return data;
   },
 };

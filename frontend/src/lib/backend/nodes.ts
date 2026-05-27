@@ -28,19 +28,31 @@ import {
   updateNodeNameApiWorkspacesNodesNodeIdNamePut,
   createTokenizationApiWorkspacesNodesNodeIdTokenizationPost,
 } from '@/api/generated/sdk.gen';
-import type { NodeDataResponse } from '@/types/api';
 import type {
+  ColumnDescribeResponse,
+  ColumnOperationsResponse,
+  ColumnUniqueValuesResponse,
   FilterCondition as GeneratedFilterCondition,
   FilterPreviewResponse,
   FilterRequest as GeneratedFilterRequest,
+  NodeDataResponse,
+  NodeQueryPlanResponse as QueryPlanResponse,
   PolarsExpressionRequest,
   ReplaceRequest,
   SliceRequest,
   TokeniseColumnRequest,
+  WorkspaceNodeInfo as NodeInfoResponse,
 } from '@/api/generated/types.gen';
 
 export type {
+  ColumnDescribeResponse,
+  ColumnOperationsResponse,
+  ColumnUniqueValuesResponse,
+  DtypeNormalizationChange,
   FilterPreviewResponse,
+  NodeDataResponse,
+  NodeQueryPlanResponse as QueryPlanResponse,
+  WorkspaceNodeInfo as NodeInfoResponse,
   PolarsExpressionApplyResponse,
   PolarsExpressionContext,
   PolarsExpressionRequest,
@@ -50,30 +62,6 @@ export type {
   TokeniseColumnRequest,
   TokeniseColumnResponse,
 } from '@/api/generated/types.gen';
-
-export type ColumnUniqueValuesResponse = {
-  column_name: string;
-  unique_count: number;
-  unique_values: Array<string | number | boolean | null>;
-  has_null: boolean;
-};
-
-export type ColumnDescribeResponse = {
-  column_name: string;
-  count?: number;
-  null_count?: number;
-  mean?: number;
-  std?: number;
-  min?: string | number | null;
-  percentile_25?: string | number | null;
-  median?: string | number | null;
-  percentile_75?: string | number | null;
-  max?: string | number | null;
-};
-
-export type QueryPlanResponse = {
-  plan: string;
-};
 
 export type FilterOperator =
   | 'eq'
@@ -100,41 +88,6 @@ type JoinPreviewParams = { left_node_id: string; right_node_id: string; left_on?
 type CastNodeRequest = { column: string; target_type: string; format?: string };
 type ConcatPreviewRequest = { node_ids: string[]; deduplicate?: boolean };
 type ConcatRequest = ConcatPreviewRequest & { new_node_name?: string };
-// ---------------------------------------------------------------------------
-// Column operations registry
-// ---------------------------------------------------------------------------
-
-type OperationInfo = {
-  method: string;
-  label: string;
-};
-
-export type ColumnOperationsResponse = {
-  operations: Record<string, OperationInfo[]>;
-};
-
-export type DtypeNormalizationChange = {
-  column: string;
-  from_dtype: string;
-  to_dtype: string;
-  reason: string;
-};
-
-export type NodeInfoResponse = {
-  id: string;
-  name: string;
-  operation: string | null;
-  parent_ids: string[];
-  child_ids: string[];
-  document: string | null;
-  shape: [number | null, number | null];
-  schema: Record<string, string>;
-  columns: string[];
-  can_undo?: boolean;
-  can_redo?: boolean;
-  dtype_normalization?: DtypeNormalizationChange[];
-};
-
 export type NodeDataParams = {
   page?: number;
   pageSize?: number;
