@@ -61,7 +61,7 @@ Five files carry an independently-stamped version and **must** agree before tagg
 1. `npm run bump-version <semver>` from repo root rewrites all five in one pass. Don't edit version strings by hand.
 2. `npm run check-versions` confirms they match; it's also wired as a pre-build gate in `.github/workflows/release.yml` so a tag push with drift never reaches the desktop builders.
 3. `npm run deploy_frontend_to_backend` after the bump — `VITE_APP_VERSION` is baked into the FE bundle at build time, so the bundle inside `backend/src/ldaca_wordflow/resources/frontend/build/` needs refreshing too.
-4. Commit, tag `vX.Y.Z` on `v0.4`, push the tag → release.yml fires → desktop assets + PyPI publish.
+4. Commit, tag `vX.Y.Z` on the current release branch (`v0.5`), push the tag → release.yml fires → desktop assets + PyPI publish.
 
 ## CI-Relevant Checks
 
