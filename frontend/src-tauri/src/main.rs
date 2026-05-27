@@ -1384,6 +1384,7 @@ fn main() {
                 std::thread::spawn(move || {
                     if let Err(e) = ensure_slim_runtime(&app_handle) {
                         eprintln!("[slim] runtime bootstrap failed: {e}");
+                        emit_setup(&app_handle, "error", &format!("Setup failed: {e}"));
                         return;
                     }
                     let result = (|| -> Result<u32, Box<dyn std::error::Error>> {
@@ -1403,7 +1404,10 @@ fn main() {
                             "[slim] backend launched at: {} (pid {}) – health polling delegated to frontend",
                             backend_url_log, pid
                         ),
-                        Err(e) => eprintln!("[slim] backend start failed: {e}"),
+                        Err(e) => {
+                            eprintln!("[slim] backend start failed: {e}");
+                            emit_setup(&app_handle, "error", &format!("Backend failed to start: {e}"));
+                        }
                     }
                 });
             }
@@ -1418,6 +1422,7 @@ fn main() {
                 std::thread::spawn(move || {
                     if let Err(e) = ensure_bundle_runtime(&app_handle) {
                         eprintln!("[bundle] runtime bootstrap failed: {e}");
+                        emit_setup(&app_handle, "error", &format!("Setup failed: {e}"));
                         return;
                     }
                     let result = (|| -> Result<u32, Box<dyn std::error::Error>> {
@@ -1437,7 +1442,10 @@ fn main() {
                             "[bundle] backend launched at: {} (pid {}) – health polling delegated to frontend",
                             backend_url_log, pid
                         ),
-                        Err(e) => eprintln!("[bundle] backend start failed: {e}"),
+                        Err(e) => {
+                            eprintln!("[bundle] backend start failed: {e}");
+                            emit_setup(&app_handle, "error", &format!("Backend failed to start: {e}"));
+                        }
                     }
                 });
             }
