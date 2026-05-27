@@ -142,6 +142,14 @@ npm run test -w frontend -- --run
 - Frontend docs: `frontend/docs/index.md`
 - Agent workflow and repo-specific coding guidance: `AGENTS.md`
 
+## Citation
+
+If you use LDaCA Wordflow in your research, please cite it:
+
+> Guo, S., Sun, C., Bednarek, M., Haan, S., Lynch, M. & Rehman, A. (2026), _LDaCA Wordflow_ [Computer software]. https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/. DOI: [10.5281/zenodo.20408328](https://doi.org/10.5281/zenodo.20408328)
+
+The DOI above is the **concept DOI** — it always resolves to the latest version on Zenodo. Each release also has its own version-specific DOI on its Zenodo record if you need to cite an exact version. See [`CITATION.cff`](./CITATION.cff) or the in-app "Cite LDaCA Wordflow" page for the full metadata.
+
 ## License
 
 LDaCA Wordflow is licensed under the [Apache License, Version 2.0](./LICENSE). See [NOTICE](./NOTICE) for required attribution.
@@ -149,5 +157,3 @@ LDaCA Wordflow is licensed under the [Apache License, Version 2.0](./LICENSE). S
 In short: you are free to use, modify, and redistribute Wordflow — including for commercial purposes — provided that you preserve the copyright and license notices, mark any changed files as modified, and carry forward the NOTICE attribution in your own distribution. Apache 2.0 also includes an explicit patent grant from contributors.
 
 Wordflow's nested components ship under their own permissive licenses (MIT or MIT/Apache-2.0 dual): `polars`, `polars-text`, `docworkspace`, `FastAPI`, `React`, `Tauri`, and others. Each is honored by its own copyright notice.
-
-If you use LDaCA Wordflow in research, please cite it — see the in-app "Cite LDaCA Wordflow" page or [frontend/public/references/general.md](./frontend/public/references/general.md).
