@@ -6232,7 +6232,8 @@
             "and",
             "or"
           ],
-          "token_limit": 50
+          "token_limit": 50,
+          "tokenizer_model": "plain_words_en"
         },
         "properties": {
           "node_columns": {
@@ -6273,6 +6274,17 @@
               }
             ],
             "title": "Token Limit"
+          },
+          "tokenizer_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokenizer Model"
           }
         },
         "required": [
@@ -6335,6 +6347,18 @@
             ],
             "description": "Limit on number of tokens returned",
             "title": "Token Limit"
+          },
+          "tokenizer_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tokenizer model ID used for raw text token-frequency analysis",
+            "title": "Tokenizer Model"
           }
         },
         "required": [

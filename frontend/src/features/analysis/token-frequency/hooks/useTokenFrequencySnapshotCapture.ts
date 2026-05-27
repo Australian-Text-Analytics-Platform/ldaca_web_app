@@ -80,7 +80,7 @@ function buildTokenFrequencyPreview(
       }
     }
   }
-  const tokeniserId = request ? '(node tokenisation)' : '(default)';
+  const tokeniserId = request?.tokenizer_model ?? '(default)';
   return {
     tool: 'token_frequencies',
     vocabSize,

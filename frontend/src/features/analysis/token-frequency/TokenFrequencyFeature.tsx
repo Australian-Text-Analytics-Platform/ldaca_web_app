@@ -56,6 +56,7 @@ import {
 } from '../common';
 import { pruneTasksById } from '@/hooks/analysisTaskUtils';
 import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
+import { findLanguage } from '@/lib/languages';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
 import { useAnalysisStore } from '@/stores/analysisStore';
@@ -66,6 +67,7 @@ const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
 const UNIFIED_WORDCLOUD_HEIGHT = 340;
 type TokenFrequencyRequest = TokenFrequencyRequestInput;
+const DEFAULT_TOKENIZER_MODEL = 'plain_words_en';
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
@@ -310,6 +312,7 @@ const TokenFrequencyFeature = () => {
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
   const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
+  const defaultTokenizerModel = usePreferencesStore((state) => state.defaultTokenizerModel);
   // All distinct languages across the currently-selected corpora, in
   // selection order. "Apply Stop Words" merges the bundled lists for
   // every language present so a side-by-side EN/ZH comparison fills
@@ -337,6 +340,19 @@ const TokenFrequencyFeature = () => {
     }
     return ordered;
   }, [effectiveNodeColumnSelections, panelSelectedNodes, defaultLanguage]);
+
+  const tokenFrequencyTokenizerModel = useMemo(() => {
+    if (defaultTokenizerModel) return defaultTokenizerModel;
+    const recommendedModels = new Set(
+      defaultStopWordsLanguages
+        .map((languageCode) => findLanguage(languageCode)?.recommendedModel)
+        .filter((model): model is string => Boolean(model)),
+    );
+    if (recommendedModels.size === 1) {
+      return Array.from(recommendedModels)[0]!;
+    }
+    return DEFAULT_TOKENIZER_MODEL;
+  }, [defaultTokenizerModel, defaultStopWordsLanguages]);
 
   const {
     stopWords,
@@ -396,6 +412,7 @@ const TokenFrequencyFeature = () => {
       panelNodeIds: orderedPanelNodeIds,
       panelSelectedNodes,
       effectiveNodeColumnSelections,
+      tokenizerModel: tokenFrequencyTokenizerModel,
       stopWords,
       results,
       lockedNodeNameMap,
@@ -662,9 +679,10 @@ const TokenFrequencyFeature = () => {
     const req: TokenFrequencyRequest = {
       node_ids: orderedIds,
       node_columns: nodeColumns,
+      tokenizer_model: tokenFrequencyTokenizerModel,
     };
     return req;
-  }, [inSnapshotMode, orderedPanelNodeIds, effectiveNodeColumnSelections]);
+  }, [inSnapshotMode, orderedPanelNodeIds, effectiveNodeColumnSelections, tokenFrequencyTokenizerModel]);
 
   // Order ``selectedNodes`` reference-first so the manifest's
   // ``node_ids`` list matches the captured request's ordering. The

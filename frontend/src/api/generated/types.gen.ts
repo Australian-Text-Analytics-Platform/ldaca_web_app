@@ -3535,6 +3535,10 @@ export type TokenFrequencyRequestInput = {
      * Token Limit
      */
     token_limit?: number | null;
+    /**
+     * Tokenizer Model
+     */
+    tokenizer_model?: string | null;
 };
 
 /**
@@ -3575,6 +3579,12 @@ export type TokenFrequencyRequestOutput = {
      * Limit on number of tokens returned
      */
     token_limit?: number | null;
+    /**
+     * Tokenizer Model
+     *
+     * Tokenizer model ID used for raw text token-frequency analysis
+     */
+    tokenizer_model?: string | null;
     [key: string]: unknown;
 };
 

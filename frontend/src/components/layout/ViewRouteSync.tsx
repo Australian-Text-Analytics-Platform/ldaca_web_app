@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -38,21 +38,31 @@ export const ViewRouteSync = () => {
     (routeView === 'data-loader' || isWorkspaceLoaded),
   );
 
+  // Tracks the routeView from the previous effect run to distinguish URL-driven
+  // navigation (routeView changed) from store-driven navigation (sidebar click,
+  // where only currentView changes). Initialized to null so the very first run
+  // always treats the initial URL as a potential "just changed" value.
+  const prevRouteViewRef = useRef<typeof routeView | null>(null);
+
   useEffect(() => {
-    if (routeViewAllowed && routeView && routeView !== currentView) {
+    const prevRouteView = prevRouteViewRef.current;
+    prevRouteViewRef.current = routeView;
+    const routeViewJustChanged = routeView !== prevRouteView;
+
+    // URL → store: the URL's view param changed to a valid, different view.
+    // Apply it to the store and skip the URL update (handles back/forward and
+    // direct URL entry). Without this guard the two directions would race.
+    if (routeViewAllowed && routeViewJustChanged && routeView && routeView !== currentView) {
       setCurrentView(routeView);
+      return;
     }
-  }, [currentView, routeView, routeViewAllowed, setCurrentView]);
 
-  useEffect(() => {
-    if (routeViewAllowed && routeView !== currentView) return;
-
+    // Store → URL: keep the URL in sync with the current store view.
     const nextView = getRoutableView({ currentView, isWorkspaceLoaded, visibleViews });
     const nextSearch = viewSearchFor(nextView);
     if (routeView === nextSearch.view) return;
-
     void navigate({ search: nextSearch });
-  }, [currentView, isWorkspaceLoaded, navigate, routeView, routeViewAllowed, visibleViews]);
+  }, [currentView, isWorkspaceLoaded, navigate, routeView, routeViewAllowed, setCurrentView, visibleViews]);
 
   return null;
 };

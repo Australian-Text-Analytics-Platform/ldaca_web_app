@@ -66,6 +66,8 @@ describe('preferencesStore default language fields', () => {
     // Trimming is still applied so stray copy/paste whitespace doesn't leak.
     setDefaultTokenizerModel(' jieba ');
     expect(usePreferencesStore.getState().defaultTokenizerModel).toBe('jieba');
+    setDefaultTokenizerModel(' plain_words_en ');
+    expect(usePreferencesStore.getState().defaultTokenizerModel).toBe('plain_words_en');
   });
 
   it('setDefaultTokenizerModel clears on empty input', () => {

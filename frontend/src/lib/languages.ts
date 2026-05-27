@@ -61,7 +61,7 @@ export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
   {
     code: 'en',
     label: 'English',
-    recommendedModel: 'bert-base-uncased',
+    recommendedModel: 'plain_words_en',
     quotationSupported: true,
   },
   {

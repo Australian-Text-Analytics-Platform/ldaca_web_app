@@ -14,6 +14,7 @@ import {
 describe('SUPPORTED_LANGUAGES', () => {
   it('always includes English as the first option', () => {
     expect(SUPPORTED_LANGUAGES[0]?.code).toBe('en');
+    expect(SUPPORTED_LANGUAGES[0]?.recommendedModel).toBe('plain_words_en');
     expect(SUPPORTED_LANGUAGES[0]?.quotationSupported).toBe(true);
   });
 

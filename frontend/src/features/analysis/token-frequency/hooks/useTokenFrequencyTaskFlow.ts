@@ -17,6 +17,7 @@ interface AnalysisState {
   panelNodeIds: string[];
   panelSelectedNodes: WorkspaceNodeLike[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
+  tokenizerModel: string;
   stopWords: string;
   results: TokenFrequencyResponse | null;
   lastCompareNodeIds: string[];
@@ -63,6 +64,7 @@ export const useTokenFrequencyTaskFlow = ({
     panelNodeIds,
     panelSelectedNodes,
     effectiveNodeColumnSelections,
+    tokenizerModel,
     stopWords,
     results,
     lockedNodeNameMap,
@@ -127,6 +129,7 @@ export const useTokenFrequencyTaskFlow = ({
         node_ids: takeMostRecent(panelNodeIds, 2),
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
+        tokenizer_model: tokenizerModel,
       };
 
       try {
