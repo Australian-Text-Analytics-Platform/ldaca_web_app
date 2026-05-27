@@ -1,6 +1,6 @@
 [package]
 name = "ldaca-wordflow"
-version = "0.5.4"
+version = "0.5.5"
 description = "LDaCA Wordflow Desktop Application"
 authors = ["Chao Sun", "Senhui Guo", "Sydney Informatics Hub"]
 license = "Apache-2.0"
