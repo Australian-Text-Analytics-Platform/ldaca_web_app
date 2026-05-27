@@ -14,6 +14,7 @@ import type {
   TopicModelingEmbeddingCacheSizeResponse,
   TopicModelingRequestInput,
   TopicModelingRequestOutput,
+  TopicModelingResultUpdateRequest,
 } from '@/api/generated/types.gen';
 
 export type {
@@ -32,9 +33,7 @@ export type {
 
 export type TopicModelingRunRequest = TopicModelingRequestInput;
 
-export type TopicModelingResultUpdate = {
-  topic_size_value: number;
-};
+export type TopicModelingResultUpdate = TopicModelingResultUpdateRequest;
 
 export const topicModelingApi = {
   topicModeling: async (req: TopicModelingRunRequest, headers: Record<string, string> = {}) => {

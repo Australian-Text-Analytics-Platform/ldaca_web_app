@@ -16,27 +16,26 @@ import {
   listSnapshotsApiUsersMeSnapshotsGet,
   uploadSnapshotApiUsersMeSnapshotsPost,
 } from '@/api/generated/sdk.gen';
+import type {
+  SnapshotDeleteResponse as GeneratedSnapshotDeleteResponse,
+  SnapshotListItem as GeneratedSnapshotListItem,
+  SnapshotListResponse as GeneratedSnapshotListResponse,
+  SnapshotUploadResponse as GeneratedSnapshotUploadResponse,
+} from '@/api/generated/types.gen';
 
-export type SnapshotListItem = {
-  filename: string;
+export type SnapshotListItem = Omit<GeneratedSnapshotListItem, 'manifest'> & {
   manifest: SnapshotManifest;
-  /** On-disk bundle size in bytes. Used by the load dialog's size
-   * pill alongside the version chip (plan §5.7.2). */
-  size_bytes: number;
 };
 
-export type SnapshotListResponse = {
+export type SnapshotListResponse = Omit<GeneratedSnapshotListResponse, 'items'> & {
   items: SnapshotListItem[];
 };
 
-export type SnapshotUploadResponse = {
-  filename: string;
+export type SnapshotUploadResponse = Omit<GeneratedSnapshotUploadResponse, 'manifest'> & {
   manifest: SnapshotManifest;
 };
 
-export type SnapshotDeleteResponse = {
-  deleted: string[];
-};
+export type SnapshotDeleteResponse = GeneratedSnapshotDeleteResponse;
 
 export const snapshotsApi = {
   /** List snapshots for the current user, optionally filtered by tool. */
@@ -93,7 +92,7 @@ export const snapshotsApi = {
       path: { filename },
       throwOnError: true,
     });
-    return data as unknown as SnapshotDeleteResponse;
+    return data;
   },
 
   /** Batch delete for a tool. Without ``incompatibleWith``, deletes
@@ -108,6 +107,6 @@ export const snapshotsApi = {
       headers,
       query: { tool, incompatible_with: incompatibleWith ?? null },
       throwOnError: true,
-    }).then(({ data }) => data as unknown as SnapshotDeleteResponse);
+    }).then(({ data }) => data);
   },
 };

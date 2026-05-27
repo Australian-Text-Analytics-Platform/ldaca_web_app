@@ -10,6 +10,7 @@ import {
   type ConcordanceResultQuery,
   textApi,
 } from '@/lib/backend/text';
+import type { AnalysisTaskActionResponse } from '@/api/generated/types.gen';
 import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
@@ -59,7 +60,7 @@ interface ConcordanceLock {
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   resolveTaskId: () => Promise<string | null>;
-  detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) => Promise<void>;
+  detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) => Promise<AnalysisTaskActionResponse>;
   detachConcordanceDispersion: (
     nodeId: string,
     request: ConcordanceDispersionDetachRequest,

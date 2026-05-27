@@ -1077,6 +1077,124 @@
         "title": "Body_upload_workspace_zip_api_workspaces_upload_post",
         "type": "object"
       },
+      "CastNodeInfo": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "format_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format Used"
+          },
+          "new_type": {
+            "title": "New Type",
+            "type": "string"
+          },
+          "original_type": {
+            "title": "Original Type",
+            "type": "string"
+          },
+          "strict_used": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strict Used"
+          },
+          "target_type": {
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "column",
+          "original_type",
+          "new_type",
+          "target_type"
+        ],
+        "title": "CastNodeInfo",
+        "type": "object"
+      },
+      "CastNodeRequest": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "strict": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strict"
+          },
+          "target_type": {
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "column",
+          "target_type"
+        ],
+        "title": "CastNodeRequest",
+        "type": "object"
+      },
+      "CastNodeResponse": {
+        "properties": {
+          "cast_info": {
+            "$ref": "#/components/schemas/CastNodeInfo"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "node_id",
+          "cast_info",
+          "message"
+        ],
+        "title": "CastNodeResponse",
+        "type": "object"
+      },
       "ColumnDescribeResponse": {
         "description": "Response model for column describe statistics.",
         "properties": {
@@ -2504,7 +2622,11 @@
             "type": "integer"
           },
           "status": {
-            "default": "not_downloaded",
+            "enum": [
+              "downloaded",
+              "not_downloaded",
+              "conflict"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -2532,7 +2654,8 @@
           "name",
           "description",
           "size",
-          "sha256"
+          "sha256",
+          "status"
         ],
         "title": "DemoSnapshotEntry",
         "type": "object"
@@ -2559,6 +2682,13 @@
             "title": "Message"
           },
           "status": {
+            "enum": [
+              "imported",
+              "replaced",
+              "skipped_existing",
+              "skipped_conflict",
+              "failed"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -2856,6 +2986,7 @@
             "$ref": "#/components/schemas/FilesTaskMetadataResponse"
           },
           "state": {
+            "const": "running",
             "title": "State",
             "type": "string"
           }
@@ -3346,6 +3477,25 @@
         "title": "MoveFileRequest",
         "type": "object"
       },
+      "NodeActionResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message"
+        ],
+        "title": "NodeActionResponse",
+        "type": "object"
+      },
       "NodeDataFiltering": {
         "properties": {
           "column": {
@@ -3450,6 +3600,24 @@
         "title": "NodeDataSorting",
         "type": "object"
       },
+      "NodeOperationResponse": {
+        "properties": {
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "node_name": {
+            "title": "Node Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_name",
+          "node_id"
+        ],
+        "title": "NodeOperationResponse",
+        "type": "object"
+      },
       "NodeQueryPlanResponse": {
         "properties": {
           "plan": {
@@ -3511,6 +3679,15 @@
           },
           "method": {
             "default": "keyword",
+            "enum": [
+              "keyword",
+              "identifier",
+              "id",
+              "string",
+              "collection",
+              "file_format",
+              "all"
+            ],
             "title": "Method",
             "type": "string"
           },
@@ -3543,6 +3720,7 @@
             "type": "string"
           },
           "state": {
+            "const": "successful",
             "title": "State",
             "type": "string"
           }
@@ -3610,7 +3788,6 @@
             "type": "string"
           },
           "importable": {
-            "default": true,
             "title": "Importable",
             "type": "boolean"
           },
@@ -3644,7 +3821,12 @@
         },
         "required": [
           "id",
-          "title"
+          "title",
+          "types",
+          "importable",
+          "collections",
+          "file_formats",
+          "stats"
         ],
         "title": "OniSearchResult",
         "type": "object"
@@ -4437,6 +4619,19 @@
         "title": "QuotationResultQuery",
         "type": "object"
       },
+      "RenameColumnRequest": {
+        "properties": {
+          "new_name": {
+            "title": "New Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "new_name"
+        ],
+        "title": "RenameColumnRequest",
+        "type": "object"
+      },
       "ReplaceApplyResponse": {
         "properties": {
           "column_name": {
@@ -4622,6 +4817,12 @@
             "type": "array"
           },
           "status": {
+            "enum": [
+              "bundled",
+              "downloaded",
+              "partial",
+              "not_downloaded"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -4752,6 +4953,23 @@
           "chart_type"
         ],
         "title": "SequentialAnalysisPreferenceUpdateData",
+        "type": "object"
+      },
+      "SequentialAnalysisPreferenceUpdateRequest": {
+        "properties": {
+          "chart_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart Type"
+          }
+        },
+        "title": "SequentialAnalysisPreferenceUpdateRequest",
         "type": "object"
       },
       "SequentialAnalysisPreferenceUpdateResponse": {
@@ -5255,6 +5473,81 @@
         "title": "SliceRequest",
         "type": "object"
       },
+      "SnapshotDeleteResponse": {
+        "properties": {
+          "deleted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Deleted",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "SnapshotDeleteResponse",
+        "type": "object"
+      },
+      "SnapshotListItem": {
+        "properties": {
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "manifest": {
+            "additionalProperties": true,
+            "title": "Manifest",
+            "type": "object"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "manifest",
+          "size_bytes"
+        ],
+        "title": "SnapshotListItem",
+        "type": "object"
+      },
+      "SnapshotListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotListItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "SnapshotListResponse",
+        "type": "object"
+      },
+      "SnapshotUploadResponse": {
+        "properties": {
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "manifest": {
+            "additionalProperties": true,
+            "title": "Manifest",
+            "type": "object"
+          }
+        },
+        "required": [
+          "filename",
+          "manifest"
+        ],
+        "title": "SnapshotUploadResponse",
+        "type": "object"
+      },
       "SourceRowPagination": {
         "properties": {
           "has_next": {
@@ -5296,6 +5589,135 @@
           "has_prev"
         ],
         "title": "SourceRowPagination",
+        "type": "object"
+      },
+      "TaskCancelActionDataResponse": {
+        "properties": {
+          "stopped": {
+            "title": "Stopped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopped"
+        ],
+        "title": "TaskCancelActionDataResponse",
+        "type": "object"
+      },
+      "TaskCancelActionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskCancelActionDataResponse"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "data",
+          "message"
+        ],
+        "title": "TaskCancelActionResponse",
+        "type": "object"
+      },
+      "TaskClearActionDataResponse": {
+        "properties": {
+          "cleared_analysis": {
+            "title": "Cleared Analysis",
+            "type": "boolean"
+          },
+          "cleared_analysis_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cleared Analysis Ids",
+            "type": "array"
+          },
+          "cleared_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cleared Task Ids",
+            "type": "array"
+          },
+          "cleared_worker": {
+            "title": "Cleared Worker",
+            "type": "boolean"
+          },
+          "cleared_worker_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cleared Worker Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cleared_worker",
+          "cleared_analysis",
+          "cleared_worker_ids",
+          "cleared_analysis_ids",
+          "cleared_task_ids"
+        ],
+        "title": "TaskClearActionDataResponse",
+        "type": "object"
+      },
+      "TaskClearActionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskClearActionDataResponse"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "data",
+          "message"
+        ],
+        "title": "TaskClearActionResponse",
+        "type": "object"
+      },
+      "TaskListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "data",
+          "message"
+        ],
+        "title": "TaskListResponse",
         "type": "object"
       },
       "TokenFrequencyData": {
@@ -5351,6 +5773,37 @@
           "data"
         ],
         "title": "TokenFrequencyNodeResult",
+        "type": "object"
+      },
+      "TokenFrequencyPreferenceUpdateRequest": {
+        "properties": {
+          "stop_words": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Words"
+          },
+          "token_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Limit"
+          }
+        },
+        "title": "TokenFrequencyPreferenceUpdateRequest",
         "type": "object"
       },
       "TokenFrequencyRequest-Input": {
@@ -6562,6 +7015,19 @@
         "title": "TopicModelingResponse",
         "type": "object"
       },
+      "TopicModelingResultUpdateRequest": {
+        "properties": {
+          "topic_size_value": {
+            "title": "Topic Size Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "topic_size_value"
+        ],
+        "title": "TopicModelingResultUpdateRequest",
+        "type": "object"
+      },
       "TopicModelingTopic": {
         "properties": {
           "id": {
@@ -6948,6 +7414,36 @@
         "title": "VisibleGroupSelection",
         "type": "object"
       },
+      "WorkspaceActionResponse": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message"
+        ],
+        "title": "WorkspaceActionResponse",
+        "type": "object"
+      },
       "WorkspaceCreateRequest": {
         "properties": {
           "description": {
@@ -7050,6 +7546,7 @@
             "type": "string"
           },
           "leaf_nodes": {
+            "default": 0,
             "title": "Leaf Nodes",
             "type": "integer"
           },
@@ -7069,6 +7566,7 @@
             "type": "string"
           },
           "root_nodes": {
+            "default": 0,
             "title": "Root Nodes",
             "type": "integer"
           },
@@ -7080,9 +7578,7 @@
         "required": [
           "id",
           "name",
-          "total_nodes",
-          "root_nodes",
-          "leaf_nodes"
+          "total_nodes"
         ],
         "title": "WorkspaceInfo",
         "type": "object"
@@ -7311,6 +7807,47 @@
           "name"
         ],
         "title": "WorkspaceSummary",
+        "type": "object"
+      },
+      "WorkspaceTaskStartResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/FilesTaskMetadataResponse"
+          },
+          "state": {
+            "const": "running",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "metadata"
+        ],
+        "title": "WorkspaceTaskStartResponse",
+        "type": "object"
+      },
+      "WorkspaceUploadResponse": {
+        "properties": {
+          "state": {
+            "const": "successful",
+            "title": "State",
+            "type": "string"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceSummary"
+          }
+        },
+        "required": [
+          "state",
+          "workspace"
+        ],
+        "title": "WorkspaceUploadResponse",
         "type": "object"
       },
       "ldaca_wordflow__analysis__implementations__quotation__QuotationEngineConfig": {
@@ -9307,9 +9844,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Tasks Api Tasks Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TaskListResponse"
                 }
               }
             },
@@ -9369,9 +9904,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Cancel Task Api Tasks Cancel Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TaskCancelActionResponse"
                 }
               }
             },
@@ -9431,9 +9964,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Clear Tasks Api Tasks Clear Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TaskClearActionResponse"
                 }
               }
             },
@@ -9629,9 +10160,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Batch Delete Snapshots Api Users Me Snapshots Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SnapshotDeleteResponse"
                 }
               }
             },
@@ -9696,9 +10225,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Snapshots Api Users Me Snapshots Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SnapshotListResponse"
                 }
               }
             },
@@ -9757,9 +10284,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Upload Snapshot Api Users Me Snapshots Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SnapshotUploadResponse"
                 }
               }
             },
@@ -9819,9 +10344,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Snapshot Api Users Me Snapshots  Filename  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SnapshotDeleteResponse"
                 }
               }
             },
@@ -11231,7 +11754,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -11289,7 +11814,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -11338,7 +11865,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceTaskStartResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -11622,7 +12151,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -11818,7 +12349,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -11899,7 +12432,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FilterPreviewResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12009,7 +12544,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -12140,7 +12677,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FilterPreviewResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12197,7 +12736,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/NodeActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12592,9 +13133,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Cast Data",
-                "type": "object"
+                "$ref": "#/components/schemas/CastNodeRequest"
               }
             }
           },
@@ -12604,7 +13143,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CastNodeResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -12730,7 +13271,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -12795,9 +13338,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Payload",
-                "type": "object"
+                "$ref": "#/components/schemas/RenameColumnRequest"
               }
             }
           },
@@ -12807,7 +13348,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -13081,7 +13624,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTaskActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13665,7 +14210,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOperationResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -13823,7 +14370,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
               }
             },
             "description": "Successful Response"
@@ -14020,7 +14569,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTaskActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -14656,7 +15207,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOperationResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -15244,7 +15797,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -15539,8 +16094,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SequentialAnalysisPreferenceUpdateRequest"
                   },
                   {
                     "type": "null"
@@ -15606,7 +16160,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisClearResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -15897,8 +16453,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/TokenFrequencyPreferenceUpdateRequest"
                   },
                   {
                     "type": "null"
@@ -16484,16 +17039,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "anyOf": [
-                  {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Updates"
+                "$ref": "#/components/schemas/TopicModelingResultUpdateRequest"
               }
             }
           },
@@ -16563,7 +17109,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceActionResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -16622,7 +17170,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceUploadResponse"
+                }
               }
             },
             "description": "Successful Response"

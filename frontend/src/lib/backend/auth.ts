@@ -6,7 +6,6 @@ import {
 import type { AuthInfoResponse, GoogleOut } from '@/api/generated/types.gen';
 
 export type { AuthInfoResponse };
-export type GoogleAuthResponse = GoogleOut;
 
 const timeoutSignal = (timeoutMs?: number): AbortSignal | undefined => {
   if (!timeoutMs) return undefined;
@@ -14,7 +13,7 @@ const timeoutSignal = (timeoutMs?: number): AbortSignal | undefined => {
 };
 
 export const authApi = {
-  googleAuth: async (idToken: string): Promise<GoogleAuthResponse> => {
+  googleAuth: async (idToken: string): Promise<GoogleOut> => {
     const { data } = await googleAuthApiAuthGooglePost({
       body: { id_token: idToken },
       throwOnError: true,

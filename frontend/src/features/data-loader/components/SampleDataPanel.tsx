@@ -4,12 +4,11 @@ import { toast } from 'sonner';
 import { FolderPlus, Quote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { filesApi, type SampleDataCollectionView, type SampleDataCollectionStatus } from '@/lib/backend/files';
+import { filesApi, type SampleDataCollection } from '@/lib/backend/files';
 import {
   getSampleDataCatalogueApiFilesSampleDataCatalogueGetOptions,
   getSampleDataReadmeApiFilesSampleDataReadmeGetOptions,
 } from '@/api/generated/@tanstack/react-query.gen';
-import type { SampleDataCatalogueResponse as GeneratedSampleDataCatalogueResponse } from '@/api/generated/types.gen';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -35,40 +34,14 @@ const TOOL_LABELS: Record<string, string> = {
   'sequential-analysis': 'Sequential Analysis',
 };
 
-const SAMPLE_DATA_COLLECTION_STATUSES: SampleDataCollectionStatus[] = [
-  'bundled',
-  'downloaded',
-  'partial',
-  'not_downloaded',
-];
-
-const normalizeSampleDataStatus = (status: string): SampleDataCollectionStatus => (
-  SAMPLE_DATA_COLLECTION_STATUSES.includes(status as SampleDataCollectionStatus)
-    ? status as SampleDataCollectionStatus
-    : 'not_downloaded'
-);
-
-const normalizeSampleDataCatalogue = (
-  catalogue: GeneratedSampleDataCatalogueResponse | undefined,
-): { collections: SampleDataCollectionView[]; schema_version: number } | undefined => {
-  if (!catalogue) return undefined;
-  return {
-    ...catalogue,
-    collections: catalogue.collections.map((collection) => ({
-      ...collection,
-      status: normalizeSampleDataStatus(collection.status),
-    })),
-  };
-};
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function StatusChip({ status }: { status: SampleDataCollectionStatus }) {
-  const map: Record<SampleDataCollectionStatus, { label: string; className: string }> = {
+function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
+  const map: Record<SampleDataCollection['status'], { label: string; className: string }> = {
     bundled:        { label: '● Available',      className: 'text-green-600 dark:text-green-400' },
     downloaded:     { label: '✓ Downloaded',     className: 'text-green-600 dark:text-green-400' },
     partial:        { label: '⚠ Partial',        className: 'text-yellow-600 dark:text-yellow-400' },
@@ -78,7 +51,7 @@ function StatusChip({ status }: { status: SampleDataCollectionStatus }) {
   return <span className={cn('text-xs font-medium whitespace-nowrap', className)}>{label}</span>;
 }
 
-function readmePath(col: SampleDataCollectionView): string | null {
+function readmePath(col: SampleDataCollection): string | null {
   return col.files.find((f) => f.path.endsWith('README.md'))?.path ?? null;
 }
 
@@ -156,9 +129,9 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
     retry: 1,
     enabled: open,
   });
-  const catalogue = normalizeSampleDataCatalogue(data);
+  const catalogue = data;
 
-  const getChecked = (col: SampleDataCollectionView) => {
+  const getChecked = (col: SampleDataCollection) => {
     if (col.bundled) return true;
     return checked[col.id] ?? false;
   };

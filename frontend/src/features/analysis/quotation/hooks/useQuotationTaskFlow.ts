@@ -8,6 +8,7 @@ import type {
   QuotationDetachRequest,
   QuotationMaterializeRequest,
 } from '@/lib/backend/text';
+import type { AnalysisTaskActionResponse } from '@/api/generated/types.gen';
 import { textApi } from '@/lib/backend/text';
 import { getNodeIdentifier, restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
@@ -88,7 +89,7 @@ interface QuotationLock {
     nodeId: string,
     request: QuotationRequest,
   ) => Promise<QuotationAnalysisResponse>;
-  detachQuotation: (nodeId: string, request: QuotationDetachRequest) => Promise<void>;
+  detachQuotation: (nodeId: string, request: QuotationDetachRequest) => Promise<AnalysisTaskActionResponse>;
   materializeQuotation?: (
     nodeId: string,
     request: QuotationMaterializeRequest,

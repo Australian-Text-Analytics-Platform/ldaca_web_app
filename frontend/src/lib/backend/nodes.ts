@@ -29,14 +29,13 @@ import {
   createTokenizationApiWorkspacesNodesNodeIdTokenizationPost,
 } from '@/api/generated/sdk.gen';
 import type {
-  ColumnDescribeResponse,
-  ColumnOperationsResponse,
-  ColumnUniqueValuesResponse,
+  CastNodeRequest,
+  ConcatPreviewRequest,
+  ConcatRequest,
   FilterCondition as GeneratedFilterCondition,
-  FilterPreviewResponse,
   FilterRequest as GeneratedFilterRequest,
-  NodeDataResponse,
-  NodeQueryPlanResponse as QueryPlanResponse,
+  JoinNodesApiWorkspacesNodesJoinPostData,
+  JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostData,
   PolarsExpressionRequest,
   ReplaceRequest,
   SliceRequest,
@@ -83,11 +82,8 @@ export type FilterRequestPayload = Omit<GeneratedFilterRequest, 'conditions' | '
   logic?: string;
   new_node_name?: string;
 };
-type JoinNodesRequest = { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string };
-type JoinPreviewParams = { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string };
-type CastNodeRequest = { column: string; target_type: string; format?: string };
-type ConcatPreviewRequest = { node_ids: string[]; deduplicate?: boolean };
-type ConcatRequest = ConcatPreviewRequest & { new_node_name?: string };
+type JoinNodesRequest = JoinNodesApiWorkspacesNodesJoinPostData['query'];
+type JoinPreviewParams = Omit<JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostData['query'], 'page' | 'page_size'>;
 export type NodeDataParams = {
   page?: number;
   pageSize?: number;
@@ -105,7 +101,7 @@ export const nodesApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as NodeInfoResponse;
+    return data;
   },
   data: async (node: string, params: NodeDataParams = {}, headers: Record<string, string> = {}) => {
     const query = {
@@ -123,7 +119,7 @@ export const nodesApi = {
       query,
       throwOnError: true,
     });
-    return data as NodeDataResponse;
+    return data;
   },
   uniqueValues: async (node: string, col: string, headers: Record<string, string> = {}) => {
     const { data } = await getColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGet({
@@ -131,7 +127,7 @@ export const nodesApi = {
       path: { column_name: col, node_id: node },
       throwOnError: true,
     });
-    return data as ColumnUniqueValuesResponse;
+    return data;
   },
   describeColumn: async (node: string, col: string, headers: Record<string, string> = {}) => {
     const { data } = await describeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGet({
@@ -139,7 +135,7 @@ export const nodesApi = {
       path: { column_name: col, node_id: node },
       throwOnError: true,
     });
-    return data as ColumnDescribeResponse;
+    return data;
   },
   delete: async (node: string, headers: Record<string, string> = {}) => {
     const { data } = await deleteNodeApiWorkspacesNodesNodeIdDelete({
@@ -147,7 +143,7 @@ export const nodesApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
   rename: async (node: string, newName: string, headers: Record<string, string> = {}) => {
     const { data } = await updateNodeNameApiWorkspacesNodesNodeIdNamePut({
@@ -156,7 +152,7 @@ export const nodesApi = {
       query: { new_name: newName },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
   clone: async (node: string, headers: Record<string, string> = {}) => {
     const { data } = await cloneNodeApiWorkspacesNodesNodeIdClonePost({
@@ -164,7 +160,7 @@ export const nodesApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
   undo: async (node: string, headers: Record<string, string> = {}) => {
     const { data } = await undoNodeOperationApiWorkspacesNodesNodeIdUndoPost({
@@ -172,7 +168,7 @@ export const nodesApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as NodeInfoResponse;
+    return data;
   },
   redo: async (node: string, headers: Record<string, string> = {}) => {
     const { data } = await redoNodeOperationApiWorkspacesNodesNodeIdRedoPost({
@@ -180,7 +176,7 @@ export const nodesApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as NodeInfoResponse;
+    return data;
   },
   queryPlan: async (node: string, headers: Record<string, string> = {}) => {
     const { data } = await getNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGet({
@@ -188,7 +184,7 @@ export const nodesApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as QueryPlanResponse;
+    return data;
   },
   renameColumn: async (node: string, column: string, newName: string, headers: Record<string, string> = {}) => {
     const { data } = await renameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePut({
@@ -197,7 +193,7 @@ export const nodesApi = {
       path: { column_name: column, node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
   deleteColumn: async (node: string, column: string, headers: Record<string, string> = {}) => {
     const { data } = await deleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDelete({
@@ -205,7 +201,7 @@ export const nodesApi = {
       path: { column_name: column, node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
   createFromFile: async (
     filename: string,
@@ -222,7 +218,7 @@ export const nodesApi = {
       },
       throwOnError: true,
     });
-    return data as NodeInfoResponse;
+    return data;
   },
   join: async (req: JoinNodesRequest, headers: Record<string, string> = {}) => {
     const { data } = await joinNodesApiWorkspacesNodesJoinPost({
@@ -230,7 +226,7 @@ export const nodesApi = {
       query: req,
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
   joinPreview: async (
     req: JoinPreviewParams,
@@ -248,7 +244,7 @@ export const nodesApi = {
       },
       throwOnError: true,
     });
-    return data as FilterPreviewResponse;
+    return data;
   },
   concatPreview: async (
     req: ConcatPreviewRequest,
@@ -262,20 +258,20 @@ export const nodesApi = {
       query: { page, page_size: pageSize },
       throwOnError: true,
     });
-    return data as FilterPreviewResponse;
+    return data;
   },
   concat: async (req: ConcatRequest, headers: Record<string, string> = {}) => {
     const { data } = await concatNodesApiWorkspacesNodesConcatPost({ body: req, headers, throwOnError: true });
-    return data as Record<string, unknown>;
+    return data;
   },
   cast: async (node: string, req: CastNodeRequest, headers: Record<string, string> = {}) => {
     const { data } = await castNodeApiWorkspacesNodesNodeIdCastPost({
-      body: req as unknown as Record<string, unknown>,
+      body: req,
       headers,
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
   filter: async (node: string, req: FilterRequestPayload, headers: Record<string, string> = {}): Promise<void> => {
     await filterNodeApiWorkspacesNodesNodeIdFilterPost({
@@ -312,7 +308,7 @@ export const nodesApi = {
       path: { node_id: node },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
   columnOperations: async (
     node: string,
@@ -324,7 +320,7 @@ export const nodesApi = {
       path: { column_name: column, node_id: node },
       throwOnError: true,
     });
-    return data as ColumnOperationsResponse;
+    return data;
   },
   replaceTextPreview: async (
     node: string,

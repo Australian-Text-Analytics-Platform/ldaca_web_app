@@ -2,14 +2,13 @@ import { getConfigApiConfigGet, updateConfigApiConfigPost } from '@/api/generate
 import type { ConfigResponse, ConfigUpdate } from '@/api/generated/types.gen';
 
 export type { ConfigResponse };
-export type UpdateConfigRequest = ConfigUpdate;
 
 export const configApi = {
   getConfig: async (): Promise<ConfigResponse> => {
     const { data } = await getConfigApiConfigGet({ throwOnError: true });
     return data;
   },
-  updateConfig: async (data: UpdateConfigRequest): Promise<ConfigResponse> => {
+  updateConfig: async (data: ConfigUpdate): Promise<ConfigResponse> => {
     const response = await updateConfigApiConfigPost({ body: data, throwOnError: true });
     return response.data;
   },

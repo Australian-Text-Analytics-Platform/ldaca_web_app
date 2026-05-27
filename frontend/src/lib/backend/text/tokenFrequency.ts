@@ -6,6 +6,7 @@ import {
   updateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPost,
 } from '@/api/generated/sdk.gen';
 import type {
+  TokenFrequencyPreferenceUpdateRequest,
   TokenFrequencyRequestInput,
   TokenFrequencyRequestOutput,
 } from '@/api/generated/types.gen';
@@ -63,7 +64,7 @@ export const tokenFrequencyApi = {
 
   postTokenFrequenciesTaskResult: async (
     taskId: string,
-    reqUpdate: Record<string, unknown>,
+    reqUpdate: TokenFrequencyPreferenceUpdateRequest,
     headers: Record<string, string> = {},
   ) => {
     const { data } = await updateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPost({

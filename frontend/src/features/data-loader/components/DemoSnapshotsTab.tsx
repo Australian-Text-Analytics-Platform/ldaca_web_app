@@ -20,7 +20,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { FolderPlus, AlertTriangle } from 'lucide-react';
-import { filesApi, type DemoSnapshotEntryView } from '@/lib/backend/files';
+import { filesApi, type DemoSnapshotEntry } from '@/lib/backend/files';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -41,8 +41,8 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function StatusChip({ status }: { status: DemoSnapshotEntryView['status'] }) {
-  const map: Record<DemoSnapshotEntryView['status'], { label: string; className: string }> = {
+function StatusChip({ status }: { status: DemoSnapshotEntry['status'] }) {
+  const map: Record<DemoSnapshotEntry['status'], { label: string; className: string }> = {
     downloaded: { label: '✓ Downloaded', className: 'text-green-600 dark:text-green-400' },
     not_downloaded: { label: '○ Not downloaded', className: 'text-muted-foreground' },
     conflict: { label: '⚠ Conflict', className: 'text-amber-600 dark:text-amber-400' },
@@ -80,18 +80,18 @@ export const DemoSnapshotsTab: React.FC<Props> = ({
 
   const snapshots = catalogue?.snapshots ?? [];
 
-  const isRowToggleable = (s: DemoSnapshotEntryView): boolean => {
+  const isRowToggleable = (s: DemoSnapshotEntry): boolean => {
     if (s.status === 'downloaded') return false;
     if (s.status === 'conflict') return Boolean(replace[s.id]);
     return true;
   };
 
-  const toggleChecked = (s: DemoSnapshotEntryView) => {
+  const toggleChecked = (s: DemoSnapshotEntry) => {
     if (!isRowToggleable(s)) return;
     setChecked((prev) => ({ ...prev, [s.id]: !prev[s.id] }));
   };
 
-  const toggleReplace = (s: DemoSnapshotEntryView) => {
+  const toggleReplace = (s: DemoSnapshotEntry) => {
     setReplace((prev) => {
       const next = !prev[s.id];
       // Toggling replace off also unticks the row — keeps the

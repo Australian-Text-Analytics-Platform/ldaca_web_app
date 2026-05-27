@@ -10,6 +10,7 @@ import {
 import type {
   SequentialAnalysisDetachRequest,
   SequentialAnalysisDetachResponse,
+  SequentialAnalysisPreferenceUpdateRequest,
   SequentialAnalysisPreferenceUpdateResponse,
   SequentialAnalysisPreviewResponse,
   SequentialAnalysisRequestInput,
@@ -112,7 +113,7 @@ export const sequentialAnalysisApi = {
 
   postSequentialAnalysisTaskResult: async (
     taskId: string,
-    body: Record<string, unknown>,
+    body: SequentialAnalysisPreferenceUpdateRequest,
     headers: Record<string, string> = {},
   ): Promise<SequentialAnalysisPreferenceUpdateResponse> => {
     const { data } = await updateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPost({

@@ -10,13 +10,17 @@ import {
 
 import type { SourceRowPagination } from './shared';
 import type {
+  AnalysisTaskActionResponse,
   QuotationDetachRequest,
   QuotationMaterializeRequest,
   QuotationEngineConfigInput,
   QuotationRequestInput,
   QuotationRequestOutput,
   QuotationResultQuery,
+  QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetData,
 } from '@/api/generated/types.gen';
+
+type QuotationTaskResultQuery = QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetData['query'];
 
 export type {
   AnalysisTaskActionResponse,
@@ -66,13 +70,14 @@ export const quotationApi = {
     node: string,
     req: QuotationDetachRequest,
     headers: Record<string, string> = {},
-  ): Promise<void> => {
-    await detachQuotationApiWorkspacesNodesNodeIdQuotationDetachPost({
+  ): Promise<AnalysisTaskActionResponse> => {
+    const { data } = await detachQuotationApiWorkspacesNodesNodeIdQuotationDetachPost({
       body: req,
       headers,
       path: { node_id: node },
       throwOnError: true,
     });
+    return data;
   },
 
   quotationMaterialize: async (
@@ -101,17 +106,12 @@ export const quotationApi = {
   getQuotationTaskResult: async (
     taskId: string,
     headers: Record<string, string> = {},
-    params?: QuotationResultQuery,
+    params?: QuotationTaskResultQuery,
   ) => {
     const { data } = await quotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGet({
       headers,
       path: { task_id: taskId },
-      ...(params ? { query: params as unknown as {
-        page?: number | null;
-        page_size?: number | null;
-        sort_by?: string | null;
-        descending?: boolean | null;
-      } } : {}),
+      ...(params ? { query: params } : {}),
       throwOnError: true,
     });
     return data;

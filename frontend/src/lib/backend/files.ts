@@ -19,18 +19,21 @@ import {
 } from '@/api/generated/sdk.gen';
 import type {
   CreateFolderResponse,
-  DemoSnapshotEntry as GeneratedDemoSnapshotEntry,
-  DemoSnapshotImportResult as GeneratedDemoSnapshotImportResult,
-  DemoSnapshotsCatalogueResponse as GeneratedDemoSnapshotsCatalogueResponse,
   FilePreviewRequest,
-  FilePreviewResponse as GeneratedFilePreviewResponse,
   FileTreeNodeResponse,
-  FilesImportTaskStartResponse,
   OniSearchRequest,
-  OniSearchResponse,
-  OniSearchResult,
-  SampleDataCatalogueResponse as GeneratedSampleDataCatalogueResponse,
-  SampleDataCollection as GeneratedSampleDataCollection,
+} from '@/api/generated/types.gen';
+
+export type {
+  DemoSnapshotEntry,
+  DemoSnapshotImportResult,
+  DemoSnapshotsCatalogueResponse,
+  FilePreviewResponse,
+  FilesImportTaskStartResponse,
+  OniSearchResponse as LdacaSearchResponse,
+  OniSearchResult as LdacaSearchResult,
+  SampleDataCatalogueResponse,
+  SampleDataCollection,
 } from '@/api/generated/types.gen';
 
 const LDACA_API_TOKEN_HEADER = 'X-LDACA-API-Token';
@@ -55,78 +58,11 @@ export type FileTreeDirectory = Omit<FileTreeNodeResponse, 'children' | 'type'> 
 
 export type FileTreeNode = FileTreeFile | FileTreeDirectory;
 
-export type MoveFileResponse = CreateFolderResponse;
-
-export type UnifiedFilePreviewRequest = FilePreviewRequest;
-
-export type FilePreviewResult = Omit<
-  GeneratedFilePreviewResponse,
-  'file_type' | 'selected_sheet' | 'sheet_names'
-> & {
-  file_type: string | null;
-  selected_sheet: string | null;
-  sheet_names: string[] | null;
-};
-
-export type LdacaImportStartResponse = Omit<FilesImportTaskStartResponse, 'state'> & {
-  state: 'running';
-};
-
-export type LdacaSearchMethod = 'keyword' | 'identifier';
+export type LdacaSearchMethod = Extract<NonNullable<OniSearchRequest['method']>, 'keyword' | 'identifier'>;
 
 export type LdacaSearchRequest = Omit<OniSearchRequest, 'method' | 'query'> & {
   method: LdacaSearchMethod;
   query: string;
-};
-
-export type LdacaSearchResult = OniSearchResult & {
-  importable: boolean;
-  stats: Record<string, unknown>;
-  types: string[];
-};
-
-export type LdacaSearchResponse = Omit<OniSearchResponse, 'data' | 'state'> & {
-  data: LdacaSearchResult[];
-  state: 'successful';
-};
-
-export type SampleDataCollectionStatus = 'bundled' | 'downloaded' | 'partial' | 'not_downloaded';
-
-export type SampleDataCollectionView = Omit<GeneratedSampleDataCollection, 'status'> & {
-  status: SampleDataCollectionStatus;
-};
-
-export type SampleDataCatalogue = Omit<GeneratedSampleDataCatalogueResponse, 'collections'> & {
-  collections: SampleDataCollectionView[];
-};
-
-// ── Demo-snapshot catalogue ─────────────────────────────────────────────
-//
-// Parallel to the sample-data catalogue. Each entry is a single
-// ``.ldaca-snapshot`` bundle hosted under ``demo_snapshots/`` in the
-// sample-data repo. The frontend renders these as a second tab in the
-// import dialog; importing writes the bundle into the user's snapshot
-// folder so each tool's Load dialog discovers it automatically.
-
-export type DemoSnapshotStatus = 'downloaded' | 'not_downloaded' | 'conflict';
-
-export type DemoSnapshotEntryView = Omit<GeneratedDemoSnapshotEntry, 'status'> & {
-  status: DemoSnapshotStatus;
-};
-
-export type DemoSnapshotsCatalogue = Omit<GeneratedDemoSnapshotsCatalogueResponse, 'snapshots'> & {
-  snapshots: DemoSnapshotEntryView[];
-};
-
-export type DemoSnapshotImportStatus =
-  | 'imported'
-  | 'replaced'
-  | 'skipped_existing'
-  | 'skipped_conflict'
-  | 'failed';
-
-export type DemoSnapshotImportOutcome = Omit<GeneratedDemoSnapshotImportResult, 'status'> & {
-  status: DemoSnapshotImportStatus;
 };
 
 export const filesApi = {
@@ -158,7 +94,7 @@ export const filesApi = {
     sourcePath: string,
     targetDirectoryPath: string,
     headers: Record<string, string> = {},
-  ): Promise<MoveFileResponse> => {
+  ): Promise<CreateFolderResponse> => {
     const { data } = await moveFileApiFilesMovePost({
       body: { source_path: sourcePath, target_directory_path: targetDirectoryPath },
       headers,
@@ -186,9 +122,9 @@ export const filesApi = {
     return data as Blob;
   },
 
-  preview: async (body: UnifiedFilePreviewRequest, headers: Record<string, string> = {}) => {
+  preview: async (body: FilePreviewRequest, headers: Record<string, string> = {}) => {
     const { data } = await unifiedFilePreviewApiFilesPreviewPost({ body, headers, throwOnError: true });
-    return data as FilePreviewResult;
+    return data;
   },
 
   delete: async (fileName: string, headers: Record<string, string> = {}) => {
@@ -202,7 +138,7 @@ export const filesApi = {
 
   getSampleDataCatalogue: async (headers: Record<string, string> = {}) => {
     const { data } = await getSampleDataCatalogueApiFilesSampleDataCatalogueGet({ headers, throwOnError: true });
-    return data as SampleDataCatalogue;
+    return data;
   },
 
   getSampleDataReadme: async (path: string, headers: Record<string, string> = {}) => {
@@ -229,7 +165,7 @@ export const filesApi = {
       headers,
       throwOnError: true,
     });
-    return data as DemoSnapshotsCatalogue;
+    return data;
   },
 
   importDemoSnapshots: async (
@@ -250,7 +186,7 @@ export const filesApi = {
       headers: withLdacaApiToken(headers, ldacaApiToken),
       throwOnError: true,
     });
-    return data as LdacaSearchResponse;
+    return data;
   },
 
   searchLdaca: async (
@@ -263,7 +199,7 @@ export const filesApi = {
       headers: withLdacaApiToken(headers, ldacaApiToken),
       throwOnError: true,
     });
-    return data as LdacaSearchResponse;
+    return data;
   },
 
   importLdaca: async (url: string, headers: Record<string, string> = {}, ldacaApiToken?: string | null) => {
@@ -272,7 +208,7 @@ export const filesApi = {
       headers: withLdacaApiToken(headers, ldacaApiToken),
       throwOnError: true,
     });
-    return data as LdacaImportStartResponse;
+    return data;
   },
 
   clearTasks: async (

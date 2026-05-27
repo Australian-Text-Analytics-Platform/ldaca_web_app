@@ -80,13 +80,14 @@ export const concordanceApi = {
     node: string,
     req: ConcordanceDetachRequest,
     headers: Record<string, string> = {},
-  ): Promise<void> => {
-    await detachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPost({
+  ): Promise<AnalysisTaskActionResponse> => {
+    const { data } = await detachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPost({
       body: req,
       headers,
       path: { node_id: node },
       throwOnError: true,
     });
+    return data;
   },
 
   concordanceDispersionDetach: async (

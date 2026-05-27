@@ -32,13 +32,13 @@ export const workspacesApi = {
     return data;
   },
 
-  delete: async (id: string, headers: Record<string, string> = {}): Promise<Record<string, unknown>> => {
+  delete: async (id: string, headers: Record<string, string> = {}) => {
     const { data } = await deleteWorkspaceApiWorkspacesDeleteDelete({
       headers,
       query: { workspace_id: id },
       throwOnError: true,
     });
-    return data as Record<string, unknown>;
+    return data;
   },
 
   uploadZip: async (file: File, headers: Record<string, string> = {}) => {
@@ -55,7 +55,7 @@ export const workspacesApi = {
       headers,
       throwOnError: true,
     });
-    return data as { state: string; message: string; metadata: { task_id: string } };
+    return data;
   },
 
   downloadTaskArtifact: async (taskId: string, headers: Record<string, string> = {}) => {
@@ -129,7 +129,7 @@ export const workspacesApi = {
 
       try {
         const { data } = await setCurrentWorkspace();
-        return data as Record<string, unknown>;
+        return data;
       } catch (error) {
         const shouldRefreshAndRetry =
           workspaceId !== null &&
@@ -142,7 +142,7 @@ export const workspacesApi = {
 
         await listWorkspacesApiWorkspacesGet({ headers, throwOnError: true });
         const { data } = await setCurrentWorkspace();
-        return data as Record<string, unknown>;
+        return data;
       }
     },
   },

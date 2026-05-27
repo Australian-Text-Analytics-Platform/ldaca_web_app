@@ -585,6 +585,77 @@ export type BodyUploadWorkspaceZipApiWorkspacesUploadPost = {
 };
 
 /**
+ * CastNodeInfo
+ */
+export type CastNodeInfo = {
+    /**
+     * Column
+     */
+    column: string;
+    /**
+     * Format Used
+     */
+    format_used?: string | null;
+    /**
+     * New Type
+     */
+    new_type: string;
+    /**
+     * Original Type
+     */
+    original_type: string;
+    /**
+     * Strict Used
+     */
+    strict_used?: boolean | null;
+    /**
+     * Target Type
+     */
+    target_type: string;
+};
+
+/**
+ * CastNodeRequest
+ */
+export type CastNodeRequest = {
+    /**
+     * Column
+     */
+    column: string;
+    /**
+     * Format
+     */
+    format?: string | null;
+    /**
+     * Strict
+     */
+    strict?: boolean | null;
+    /**
+     * Target Type
+     */
+    target_type: string;
+};
+
+/**
+ * CastNodeResponse
+ */
+export type CastNodeResponse = {
+    cast_info: CastNodeInfo;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
  * ColumnDescribeResponse
  *
  * Response model for column describe statistics.
@@ -1377,7 +1448,7 @@ export type DemoSnapshotEntry = {
     /**
      * Status
      */
-    status?: string;
+    status: 'downloaded' | 'not_downloaded' | 'conflict';
     /**
      * Tool
      */
@@ -1407,7 +1478,7 @@ export type DemoSnapshotImportResult = {
     /**
      * Status
      */
-    status: string;
+    status: 'imported' | 'replaced' | 'skipped_existing' | 'skipped_conflict' | 'failed';
 };
 
 /**
@@ -1600,7 +1671,7 @@ export type FilesImportTaskStartResponse = {
     /**
      * State
      */
-    state: string;
+    state: 'running';
 };
 
 /**
@@ -1903,6 +1974,20 @@ export type MoveFileRequest = {
 };
 
 /**
+ * NodeActionResponse
+ */
+export type NodeActionResponse = {
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
  * NodeDataFiltering
  */
 export type NodeDataFiltering = {
@@ -1960,6 +2045,20 @@ export type NodeDataSorting = {
 };
 
 /**
+ * NodeOperationResponse
+ */
+export type NodeOperationResponse = {
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Node Name
+     */
+    node_name: string;
+};
+
+/**
  * NodeQueryPlanResponse
  */
 export type NodeQueryPlanResponse = {
@@ -1993,7 +2092,7 @@ export type OniSearchRequest = {
     /**
      * Method
      */
-    method?: string;
+    method?: 'keyword' | 'identifier' | 'id' | 'string' | 'collection' | 'file_format' | 'all';
     /**
      * Offset
      */
@@ -2019,7 +2118,7 @@ export type OniSearchResponse = {
     /**
      * State
      */
-    state: string;
+    state: 'successful';
 };
 
 /**
@@ -2035,7 +2134,7 @@ export type OniSearchResult = {
     /**
      * Collections
      */
-    collections?: Array<string>;
+    collections: Array<string>;
     /**
      * Crate Id
      */
@@ -2047,7 +2146,7 @@ export type OniSearchResult = {
     /**
      * File Formats
      */
-    file_formats?: Array<string>;
+    file_formats: Array<string>;
     /**
      * Id
      */
@@ -2055,7 +2154,7 @@ export type OniSearchResult = {
     /**
      * Importable
      */
-    importable?: boolean;
+    importable: boolean;
     /**
      * License
      */
@@ -2063,7 +2162,7 @@ export type OniSearchResult = {
     /**
      * Stats
      */
-    stats?: {
+    stats: {
         [key: string]: unknown;
     };
     /**
@@ -2073,7 +2172,7 @@ export type OniSearchResult = {
     /**
      * Types
      */
-    types?: Array<string>;
+    types: Array<string>;
 };
 
 /**
@@ -2477,6 +2576,16 @@ export type QuotationResultQuery = {
 };
 
 /**
+ * RenameColumnRequest
+ */
+export type RenameColumnRequest = {
+    /**
+     * New Name
+     */
+    new_name: string;
+};
+
+/**
  * ReplaceApplyResponse
  */
 export type ReplaceApplyResponse = {
@@ -2593,7 +2702,7 @@ export type SampleDataCollection = {
     /**
      * Status
      */
-    status: string;
+    status: 'bundled' | 'downloaded' | 'partial' | 'not_downloaded';
     /**
      * Total Size Bytes
      */
@@ -2672,6 +2781,16 @@ export type SequentialAnalysisPreferenceUpdateData = {
      * Chart Type
      */
     chart_type: 'line' | 'bar' | 'area';
+};
+
+/**
+ * SequentialAnalysisPreferenceUpdateRequest
+ */
+export type SequentialAnalysisPreferenceUpdateRequest = {
+    /**
+     * Chart Type
+     */
+    chart_type?: string | null;
 };
 
 /**
@@ -2924,6 +3043,62 @@ export type SliceRequest = {
 };
 
 /**
+ * SnapshotDeleteResponse
+ */
+export type SnapshotDeleteResponse = {
+    /**
+     * Deleted
+     */
+    deleted: Array<string>;
+};
+
+/**
+ * SnapshotListItem
+ */
+export type SnapshotListItem = {
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Manifest
+     */
+    manifest: {
+        [key: string]: unknown;
+    };
+    /**
+     * Size Bytes
+     */
+    size_bytes: number;
+};
+
+/**
+ * SnapshotListResponse
+ */
+export type SnapshotListResponse = {
+    /**
+     * Items
+     */
+    items: Array<SnapshotListItem>;
+};
+
+/**
+ * SnapshotUploadResponse
+ */
+export type SnapshotUploadResponse = {
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Manifest
+     */
+    manifest: {
+        [key: string]: unknown;
+    };
+};
+
+/**
  * SourceRowPagination
  */
 export type SourceRowPagination = {
@@ -2958,6 +3133,92 @@ export type SourceRowPagination = {
 };
 
 /**
+ * TaskCancelActionDataResponse
+ */
+export type TaskCancelActionDataResponse = {
+    /**
+     * Stopped
+     */
+    stopped: boolean;
+};
+
+/**
+ * TaskCancelActionResponse
+ */
+export type TaskCancelActionResponse = {
+    data: TaskCancelActionDataResponse;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
+ * TaskClearActionDataResponse
+ */
+export type TaskClearActionDataResponse = {
+    /**
+     * Cleared Analysis
+     */
+    cleared_analysis: boolean;
+    /**
+     * Cleared Analysis Ids
+     */
+    cleared_analysis_ids: Array<string>;
+    /**
+     * Cleared Task Ids
+     */
+    cleared_task_ids: Array<string>;
+    /**
+     * Cleared Worker
+     */
+    cleared_worker: boolean;
+    /**
+     * Cleared Worker Ids
+     */
+    cleared_worker_ids: Array<string>;
+};
+
+/**
+ * TaskClearActionResponse
+ */
+export type TaskClearActionResponse = {
+    data: TaskClearActionDataResponse;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
+ * TaskListResponse
+ */
+export type TaskListResponse = {
+    /**
+     * Data
+     */
+    data: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
  * TokenFrequencyData
  */
 export type TokenFrequencyData = {
@@ -2984,6 +3245,20 @@ export type TokenFrequencyNodeResult = {
      */
     data: Array<TokenFrequencyData>;
     metadata?: AnalysisTaskMetadata | null;
+};
+
+/**
+ * TokenFrequencyPreferenceUpdateRequest
+ */
+export type TokenFrequencyPreferenceUpdateRequest = {
+    /**
+     * Stop Words
+     */
+    stop_words?: Array<string> | null;
+    /**
+     * Token Limit
+     */
+    token_limit?: number | null;
 };
 
 /**
@@ -3565,6 +3840,16 @@ export type TopicModelingResponse = {
 };
 
 /**
+ * TopicModelingResultUpdateRequest
+ */
+export type TopicModelingResultUpdateRequest = {
+    /**
+     * Topic Size Value
+     */
+    topic_size_value: number;
+};
+
+/**
  * TopicModelingTopic
  */
 export type TopicModelingTopic = {
@@ -3779,6 +4064,24 @@ export type VisibleGroupSelection = {
 };
 
 /**
+ * WorkspaceActionResponse
+ */
+export type WorkspaceActionResponse = {
+    /**
+     * Id
+     */
+    id?: string | null;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * State
+     */
+    state: 'successful';
+};
+
+/**
  * WorkspaceCreateRequest
  */
 export type WorkspaceCreateRequest = {
@@ -3845,7 +4148,7 @@ export type WorkspaceInfo = {
     /**
      * Leaf Nodes
      */
-    leaf_nodes: number;
+    leaf_nodes?: number;
     /**
      * Modified At
      */
@@ -3857,7 +4160,7 @@ export type WorkspaceInfo = {
     /**
      * Root Nodes
      */
-    root_nodes: number;
+    root_nodes?: number;
     /**
      * Total Nodes
      */
@@ -3988,6 +4291,32 @@ export type WorkspaceSummary = {
      * Workspace Size Byte
      */
     workspace_size_Byte?: number;
+};
+
+/**
+ * WorkspaceTaskStartResponse
+ */
+export type WorkspaceTaskStartResponse = {
+    /**
+     * Message
+     */
+    message: string;
+    metadata: FilesTaskMetadataResponse;
+    /**
+     * State
+     */
+    state: 'running';
+};
+
+/**
+ * WorkspaceUploadResponse
+ */
+export type WorkspaceUploadResponse = {
+    /**
+     * State
+     */
+    state: 'successful';
+    workspace: WorkspaceSummary;
 };
 
 /**
@@ -5101,13 +5430,9 @@ export type ListTasksApiTasksGetError = ListTasksApiTasksGetErrors[keyof ListTas
 
 export type ListTasksApiTasksGetResponses = {
     /**
-     * Response List Tasks Api Tasks Get
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: TaskListResponse;
 };
 
 export type ListTasksApiTasksGetResponse = ListTasksApiTasksGetResponses[keyof ListTasksApiTasksGetResponses];
@@ -5141,13 +5466,9 @@ export type CancelTaskApiTasksCancelPostError = CancelTaskApiTasksCancelPostErro
 
 export type CancelTaskApiTasksCancelPostResponses = {
     /**
-     * Response Cancel Task Api Tasks Cancel Post
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: TaskCancelActionResponse;
 };
 
 export type CancelTaskApiTasksCancelPostResponse = CancelTaskApiTasksCancelPostResponses[keyof CancelTaskApiTasksCancelPostResponses];
@@ -5181,13 +5502,9 @@ export type ClearTasksApiTasksClearPostError = ClearTasksApiTasksClearPostErrors
 
 export type ClearTasksApiTasksClearPostResponses = {
     /**
-     * Response Clear Tasks Api Tasks Clear Post
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: TaskClearActionResponse;
 };
 
 export type ClearTasksApiTasksClearPostResponse = ClearTasksApiTasksClearPostResponses[keyof ClearTasksApiTasksClearPostResponses];
@@ -5293,13 +5610,9 @@ export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteError = BatchDeleteSnap
 
 export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteResponses = {
     /**
-     * Response Batch Delete Snapshots Api Users Me Snapshots Delete
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: SnapshotDeleteResponse;
 };
 
 export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteResponse = BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteResponses[keyof BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteResponses];
@@ -5333,13 +5646,9 @@ export type ListSnapshotsApiUsersMeSnapshotsGetError = ListSnapshotsApiUsersMeSn
 
 export type ListSnapshotsApiUsersMeSnapshotsGetResponses = {
     /**
-     * Response List Snapshots Api Users Me Snapshots Get
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: SnapshotListResponse;
 };
 
 export type ListSnapshotsApiUsersMeSnapshotsGetResponse = ListSnapshotsApiUsersMeSnapshotsGetResponses[keyof ListSnapshotsApiUsersMeSnapshotsGetResponses];
@@ -5368,13 +5677,9 @@ export type UploadSnapshotApiUsersMeSnapshotsPostError = UploadSnapshotApiUsersM
 
 export type UploadSnapshotApiUsersMeSnapshotsPostResponses = {
     /**
-     * Response Upload Snapshot Api Users Me Snapshots Post
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: SnapshotUploadResponse;
 };
 
 export type UploadSnapshotApiUsersMeSnapshotsPostResponse = UploadSnapshotApiUsersMeSnapshotsPostResponses[keyof UploadSnapshotApiUsersMeSnapshotsPostResponses];
@@ -5408,13 +5713,9 @@ export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteError = DeleteSnapsho
 
 export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteResponses = {
     /**
-     * Response Delete Snapshot Api Users Me Snapshots  Filename  Delete
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: SnapshotDeleteResponse;
 };
 
 export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteResponse = DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteResponses[keyof DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteResponses];
@@ -6152,8 +6453,10 @@ export type DeleteWorkspaceApiWorkspacesDeleteDeleteResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceActionResponse;
 };
+
+export type DeleteWorkspaceApiWorkspacesDeleteDeleteResponse = DeleteWorkspaceApiWorkspacesDeleteDeleteResponses[keyof DeleteWorkspaceApiWorkspacesDeleteDeleteResponses];
 
 export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutData = {
     body?: never;
@@ -6186,8 +6489,10 @@ export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceInfo;
 };
+
+export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutResponse = UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutResponses[keyof UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutResponses];
 
 export type StartWorkspaceDownloadApiWorkspacesDownloadPostData = {
     body?: never;
@@ -6215,8 +6520,10 @@ export type StartWorkspaceDownloadApiWorkspacesDownloadPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceTaskStartResponse;
 };
+
+export type StartWorkspaceDownloadApiWorkspacesDownloadPostResponse = StartWorkspaceDownloadApiWorkspacesDownloadPostResponses[keyof StartWorkspaceDownloadApiWorkspacesDownloadPostResponses];
 
 export type DownloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGetData = {
     body?: never;
@@ -6383,8 +6690,10 @@ export type RenameWorkspaceApiWorkspacesNamePutResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceInfo;
 };
+
+export type RenameWorkspaceApiWorkspacesNamePutResponse = RenameWorkspaceApiWorkspacesNamePutResponses[keyof RenameWorkspaceApiWorkspacesNamePutResponses];
 
 export type GetWorkspaceNodesApiWorkspacesNodesGetData = {
     body?: never;
@@ -6491,8 +6800,10 @@ export type ConcatNodesApiWorkspacesNodesConcatPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type ConcatNodesApiWorkspacesNodesConcatPostResponse = ConcatNodesApiWorkspacesNodesConcatPostResponses[keyof ConcatNodesApiWorkspacesNodesConcatPostResponses];
 
 export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostData = {
     body: ConcatPreviewRequest;
@@ -6529,8 +6840,10 @@ export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: FilterPreviewResponse;
 };
+
+export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostResponse = ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostResponses[keyof ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostResponses];
 
 export type JoinNodesApiWorkspacesNodesJoinPostData = {
     body?: never;
@@ -6583,8 +6896,10 @@ export type JoinNodesApiWorkspacesNodesJoinPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type JoinNodesApiWorkspacesNodesJoinPostResponse = JoinNodesApiWorkspacesNodesJoinPostResponses[keyof JoinNodesApiWorkspacesNodesJoinPostResponses];
 
 export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostData = {
     body?: never;
@@ -6641,8 +6956,10 @@ export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: FilterPreviewResponse;
 };
+
+export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostResponse = JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostResponses[keyof JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostResponses];
 
 export type DeleteNodeApiWorkspacesNodesNodeIdDeleteData = {
     body?: never;
@@ -6675,8 +6992,10 @@ export type DeleteNodeApiWorkspacesNodesNodeIdDeleteResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: NodeActionResponse;
 };
+
+export type DeleteNodeApiWorkspacesNodesNodeIdDeleteResponse = DeleteNodeApiWorkspacesNodesNodeIdDeleteResponses[keyof DeleteNodeApiWorkspacesNodesNodeIdDeleteResponses];
 
 export type GetNodeInfoApiWorkspacesNodesNodeIdGetData = {
     body?: never;
@@ -6869,12 +7188,7 @@ export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponse
 export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponse = SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponses[keyof SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponses];
 
 export type CastNodeApiWorkspacesNodesNodeIdCastPostData = {
-    /**
-     * Cast Data
-     */
-    body: {
-        [key: string]: unknown;
-    };
+    body: CastNodeRequest;
     headers?: {
         /**
          * Authorization
@@ -6904,8 +7218,10 @@ export type CastNodeApiWorkspacesNodesNodeIdCastPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: CastNodeResponse;
 };
+
+export type CastNodeApiWorkspacesNodesNodeIdCastPostResponse = CastNodeApiWorkspacesNodesNodeIdCastPostResponses[keyof CastNodeApiWorkspacesNodesNodeIdCastPostResponses];
 
 export type CloneNodeApiWorkspacesNodesNodeIdClonePostData = {
     body?: never;
@@ -6978,16 +7294,13 @@ export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteRespo
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
 
+export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteResponse = DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteResponses[keyof DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteResponses];
+
 export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutData = {
-    /**
-     * Payload
-     */
-    body: {
-        [key: string]: unknown;
-    };
+    body: RenameColumnRequest;
     headers?: {
         /**
          * Authorization
@@ -7021,8 +7334,10 @@ export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutResponse
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutResponse = RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutResponses[keyof RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutResponses];
 
 export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetData = {
     body?: never;
@@ -7175,8 +7490,10 @@ export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostRespon
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisTaskActionResponse;
 };
+
+export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostResponse = DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostResponses[keyof DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostResponses];
 
 export type ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetData = {
     body?: never;
@@ -7468,8 +7785,10 @@ export type FilterNodeApiWorkspacesNodesNodeIdFilterPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: NodeOperationResponse;
 };
+
+export type FilterNodeApiWorkspacesNodesNodeIdFilterPostResponse = FilterNodeApiWorkspacesNodesNodeIdFilterPostResponses[keyof FilterNodeApiWorkspacesNodesNodeIdFilterPostResponses];
 
 export type FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostData = {
     body: FilterRequest;
@@ -7552,8 +7871,10 @@ export type UpdateNodeNameApiWorkspacesNodesNodeIdNamePutResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceNodeInfo;
 };
+
+export type UpdateNodeNameApiWorkspacesNodesNodeIdNamePutResponse = UpdateNodeNameApiWorkspacesNodesNodeIdNamePutResponses[keyof UpdateNodeNameApiWorkspacesNodesNodeIdNamePutResponses];
 
 export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetData = {
     body?: never;
@@ -7658,8 +7979,10 @@ export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostResponses 
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisTaskActionResponse;
 };
+
+export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostResponse = DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostResponses[keyof DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostResponses];
 
 export type QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetData = {
     body?: never;
@@ -8001,8 +8324,10 @@ export type SliceNodeApiWorkspacesNodesNodeIdSlicePostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: NodeOperationResponse;
 };
+
+export type SliceNodeApiWorkspacesNodesNodeIdSlicePostResponse = SliceNodeApiWorkspacesNodesNodeIdSlicePostResponses[keyof SliceNodeApiWorkspacesNodesNodeIdSlicePostResponses];
 
 export type SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostData = {
     body: SliceRequest;
@@ -8307,8 +8632,10 @@ export type SaveWorkspaceApiWorkspacesSavePostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceActionResponse;
 };
+
+export type SaveWorkspaceApiWorkspacesSavePostResponse = SaveWorkspaceApiWorkspacesSavePostResponses[keyof SaveWorkspaceApiWorkspacesSavePostResponses];
 
 export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetData = {
     body?: never;
@@ -8453,9 +8780,7 @@ export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTas
     /**
      * Updates
      */
-    body: {
-        [key: string]: unknown;
-    } | null;
+    body: SequentialAnalysisPreferenceUpdateRequest | null;
     headers?: {
         /**
          * Authorization
@@ -8516,8 +8841,10 @@ export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponses = 
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AnalysisClearResponse;
 };
+
+export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponse = ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponses[keyof ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponses];
 
 export type CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostData = {
     body: TokenFrequencyRequestInput;
@@ -8659,9 +8986,7 @@ export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTa
     /**
      * Updates
      */
-    body: {
-        [key: string]: unknown;
-    } | null;
+    body: TokenFrequencyPreferenceUpdateRequest | null;
     headers?: {
         /**
          * Authorization
@@ -8996,12 +9321,7 @@ export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGe
 export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetResponse = TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetResponses[keyof TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetResponses];
 
 export type UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostData = {
-    /**
-     * Updates
-     */
-    body: {
-        [key: string]: unknown;
-    } | null;
+    body: TopicModelingResultUpdateRequest;
     headers?: {
         /**
          * Authorization
@@ -9067,8 +9387,10 @@ export type UnloadWorkspaceApiWorkspacesUnloadPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceActionResponse;
 };
+
+export type UnloadWorkspaceApiWorkspacesUnloadPostResponse = UnloadWorkspaceApiWorkspacesUnloadPostResponses[keyof UnloadWorkspaceApiWorkspacesUnloadPostResponses];
 
 export type UploadWorkspaceZipApiWorkspacesUploadPostData = {
     body: BodyUploadWorkspaceZipApiWorkspacesUploadPost;
@@ -9096,8 +9418,10 @@ export type UploadWorkspaceZipApiWorkspacesUploadPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: WorkspaceUploadResponse;
 };
+
+export type UploadWorkspaceZipApiWorkspacesUploadPostResponse = UploadWorkspaceZipApiWorkspacesUploadPostResponses[keyof UploadWorkspaceZipApiWorkspacesUploadPostResponses];
 
 export type GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetData = {
     body?: never;

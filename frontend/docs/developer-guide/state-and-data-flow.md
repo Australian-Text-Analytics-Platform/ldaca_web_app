@@ -14,11 +14,12 @@ base path, local dev backend port, then same-origin.
 `openapi.config.ts` configures hey-api from
 `openapi/ldaca-wordflow.openapi.json`. Regenerate the schema and generated SDK
 with `pnpm -C frontend openapi:generate` after backend API shape changes. The
-generated fetch client uses `src/api/generatedClientConfig.ts`, which preserves
-the existing API base discovery, credentials, auth headers, timeout behavior,
-and `ApiError` normalization. Keep handwritten domain modules such as
-`src/api/config.ts` and `src/api/preferences.ts` as the public API surface while
-moving their internals to generated calls incrementally.
+generated fetch client uses `src/lib/backend/generatedClientConfig.ts`, which
+preserves the existing API base discovery, credentials, auth headers, timeout
+behavior, and `ApiError` normalization. Keep `src/api/generated/**` generated
+only. Handwritten domain adapters belong under `src/lib/backend/**` and should
+import generated SDK functions and generated types instead of redefining backend
+contracts.
 
 MSW test infrastructure lives under `src/test/msw/` and is enabled from
 `src/test/setup.ts`. Add endpoint handlers or per-test `server.use(...)`
