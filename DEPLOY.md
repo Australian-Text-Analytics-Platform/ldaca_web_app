@@ -205,6 +205,8 @@ The working branch (any name — recent releases used `perf/cjk-tokeniser`, then
 
 > **Frontend bundle rule:** `build.tar.gz` inside the backend submodule is the **sole** source of frontend assets for both PyPI/uvx users and the Nectar deployment. Every `frontend/src/**` change — whether shipping in a release or hot-fixed onto a feature branch — is **invisible to users** until the bundle is rebuilt and committed. This applies equally to full releases and to feature branches deployed to Nectar before a release; see [Deploying a Feature Branch to Nectar](#deploying-a-feature-branch-to-nectar) below.
 
+> **Workspace-file compatibility is a compulsory, human-verified gate on every release** — see [step 3a](#3a-compulsory--workspace-file-compatibility-verification). It is most critical after a `polars-text` or `docworkspace` (i.e. backend serialization-layer) bump, because saved workspaces failing to load means lost user work.
+
 > **Version-source drift is guarded by CI.** Five files carry an independently-stamped version (workspace `pyproject.toml`, `backend/pyproject.toml`, `frontend/package.json`, `frontend/src-tauri/Cargo.toml`, `frontend/src-tauri/tauri.conf.json`). `npm run bump-version` writes all five in one pass; the `verify-versions` job in `.github/workflows/release.yml` re-checks them on every tag push and refuses to ship if any drift. (This guard exists because v0.4.3 shipped with three files at `0.4.2`, which is what triggered the v0.4.4 re-stamp.) Don't hand-edit version strings — always use the bumper.
 
 ### 1. Bump all version strings + write the CHANGELOG entry (do this first, before any build)
@@ -270,6 +272,35 @@ uvx --from dist/ldaca_wordflow-<VERSION>-py3-none-any.whl ldaca-wordflow --help
 ```
 
 If `uvx ty check` is already failing on unrelated, pre-existing issues, record that explicitly before releasing.
+
+#### 3a. COMPULSORY — Workspace-file compatibility verification
+
+**This check is mandatory on every release and requires human sign-off. It cannot be waived or fully automated.** Saved workspaces are the highest-stakes compatibility surface in the product: users keep long-lived workspace files, so a load regression means *lost user work*, not a cosmetic bug. The on-disk workspace format is governed primarily by **`polars-text`** (and secondarily `docworkspace`) — **not** the whole dependency tree — so a `polars-text` bump is the trigger to verify even when the Wordflow version is "only a patch". Automated tests do not cover real workspaces saved by *prior released* versions; a human must confirm.
+
+**Step 1 — Did the serialization layer move?**
+
+```bash
+cd /path/to/ldaca_wordflow
+git -C polars-text  log --oneline <PREV-polars-text-pin>..HEAD
+git -C docworkspace log --oneline <PREV-docworkspace-pin>..HEAD
+```
+
+If **neither** moved since the previous release: record "no serialization-layer change" in the release notes and the manual load-test below is optional — but you must still confirm the `workspace_format` value is unchanged.
+
+**Step 2 — If `polars-text`/`docworkspace` DID move: load a prior-version workspace.** Open a workspace **saved by the previous released version** in this build and confirm:
+- it loads with no `unknown variant 'XXX'`, dtype, or schema errors (the `unknown variant` symptom = a missing `polars-plan` feature gate in `polars-text` — see AGENTS.md "polars-text feature gates"),
+- every node renders, and
+- a re-save round-trips and re-opens cleanly.
+
+Keep a small corpus of prior-version workspace fixtures for this purpose.
+
+**Step 3 — Record the compatibility verdict (human sign-off).** A person must decide and write down, for this release:
+- `workspace_format` — bump it **only if** the on-disk format actually changed;
+- `risk_vs_prev` — `safe` | `caution` | `breaking`, with a one-line human note (e.g. "polars 1.40→1.6; workspaces from this version won't open in older releases").
+
+Do **not** derive this verdict from the `uv.lock` diff alone — the lock diff is a *signal* to investigate, never the final word (a dependency major isn't always breaking, and a minor sometimes is). Once the in-app compatibility manifest exists (see `DESKTOP_PACKAGING_PLAN`), this verdict is the value published into it; until then, record it in the CHANGELOG/release notes.
+
+> **Forward-incompatibility is the reason downgrade is dangerous:** a workspace saved by a newer format generally will **not** open in an older version. Flag any `workspace_format` bump prominently so downgrade guidance (and the future in-app downgrade warning) can key off it.
 
 ### 4. Publish the backend package repo
 
