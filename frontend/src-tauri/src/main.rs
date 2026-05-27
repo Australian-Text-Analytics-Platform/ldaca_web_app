@@ -165,23 +165,41 @@ fn strip_unc_prefix(path: &Path) -> PathBuf {
 /// First-launch setup progress, emitted to the frontend so the loading screen
 /// can show "creating env / installing / unpacking …" instead of a bare spinner.
 /// Shared by the slim (uv-install) and bundle (tarball-extract) variants.
-#[cfg(any(feature = "slim", feature = "bundle"))]
 #[derive(Clone, serde::Serialize)]
 struct SlimSetupEvent {
     phase: String,
     message: String,
 }
 
+/// Holds the most recent setup event. The setup thread starts emitting before
+/// the webview has mounted and attached its `slim-setup` listener, so the first
+/// event(s) are lost to a race — the frontend seeds past that by calling the
+/// `current_setup` command on mount.
+fn last_setup() -> &'static std::sync::Mutex<Option<SlimSetupEvent>> {
+    static CELL: std::sync::OnceLock<std::sync::Mutex<Option<SlimSetupEvent>>> =
+        std::sync::OnceLock::new();
+    CELL.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+/// Returns the most recent first-launch setup phase, or null when none exists
+/// (legacy bundled build, web build, or before setup starts). Lets the frontend
+/// recover the current phase even if it mounted after the first event fired.
+#[tauri::command]
+fn current_setup() -> Option<SlimSetupEvent> {
+    last_setup().lock().ok().and_then(|g| g.clone())
+}
+
 #[cfg(any(feature = "slim", feature = "bundle"))]
 fn emit_setup(app: &AppHandle, phase: &str, message: &str) {
     use tauri::Emitter;
-    let _ = app.emit(
-        "slim-setup",
-        SlimSetupEvent {
-            phase: phase.to_string(),
-            message: message.to_string(),
-        },
-    );
+    let event = SlimSetupEvent {
+        phase: phase.to_string(),
+        message: message.to_string(),
+    };
+    if let Ok(mut guard) = last_setup().lock() {
+        *guard = Some(event.clone());
+    }
+    let _ = app.emit("slim-setup", event);
 }
 
 /// Run a uv command with stdout+stderr piped, streaming each output line to the
@@ -404,8 +422,26 @@ fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Erro
     let file = std::fs::File::open(&archive)?;
     let decoder = zstd::Decoder::new(file)?;
     let mut tar = tar::Archive::new(decoder);
-    tar.set_preserve_permissions(true);
-    tar.unpack(&runtime_dir)?;
+    // Unpack entry-by-entry so we can stream a running count to the loading
+    // screen. First-launch extraction is slow on Windows (Defender scans every
+    // written file), so without progress the UI looks frozen for minutes.
+    let mut count = 0usize;
+    let mut last_tick = std::time::Instant::now();
+    for entry in tar.entries()? {
+        let mut entry = entry?;
+        entry.set_preserve_permissions(true);
+        entry.unpack_in(&runtime_dir)?;
+        count += 1;
+        if last_tick.elapsed() >= std::time::Duration::from_millis(1500) {
+            emit_setup(
+                app,
+                "extracting",
+                &format!("Unpacking the Python runtime… ({count} files)"),
+            );
+            last_tick = std::time::Instant::now();
+        }
+    }
+    println!("[bundle] extracted {count} entries");
 
     // Resolve the interpreter the same way the launch path does — the
     // managed-python real binary, NOT the venv launcher (its symlink is a
@@ -1329,7 +1365,8 @@ fn main() {
         .manage(backend_state)
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
-            download_to_downloads
+            download_to_downloads,
+            current_setup
         ])
         .setup(move |app| {
             let window = app
