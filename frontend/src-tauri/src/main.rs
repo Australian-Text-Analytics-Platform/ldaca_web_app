@@ -162,6 +162,318 @@ fn strip_unc_prefix(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
+/// First-launch setup progress, emitted to the frontend so the loading screen
+/// can show "creating env / installing / unpacking …" instead of a bare spinner.
+/// Shared by the slim (uv-install) and bundle (tarball-extract) variants.
+#[derive(Clone, serde::Serialize)]
+struct SlimSetupEvent {
+    phase: String,
+    message: String,
+}
+
+/// Holds the most recent setup event. The setup thread starts emitting before
+/// the webview has mounted and attached its `slim-setup` listener, so the first
+/// event(s) are lost to a race — the frontend seeds past that by calling the
+/// `current_setup` command on mount.
+fn last_setup() -> &'static std::sync::Mutex<Option<SlimSetupEvent>> {
+    static CELL: std::sync::OnceLock<std::sync::Mutex<Option<SlimSetupEvent>>> =
+        std::sync::OnceLock::new();
+    CELL.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+/// Returns the most recent first-launch setup phase, or null when none exists
+/// (legacy bundled build, web build, or before setup starts). Lets the frontend
+/// recover the current phase even if it mounted after the first event fired.
+#[tauri::command]
+fn current_setup() -> Option<SlimSetupEvent> {
+    last_setup().lock().ok().and_then(|g| g.clone())
+}
+
+#[cfg(any(feature = "slim", feature = "bundle"))]
+fn emit_setup(app: &AppHandle, phase: &str, message: &str) {
+    use tauri::Emitter;
+    let event = SlimSetupEvent {
+        phase: phase.to_string(),
+        message: message.to_string(),
+    };
+    if let Ok(mut guard) = last_setup().lock() {
+        *guard = Some(event.clone());
+    }
+    let _ = app.emit("slim-setup", event);
+}
+
+/// Run a uv command with stdout+stderr piped, streaming each output line to the
+/// frontend as a `slim-setup` event (so the loading screen shows live download /
+/// install progress) and echoing to the console. uv detects the non-TTY pipe and
+/// emits plain line-based logs rather than redrawing progress bars.
+#[cfg(feature = "slim")]
+fn run_uv_streaming(
+    app: &AppHandle,
+    mut command: Command,
+    phase: &str,
+) -> io::Result<std::process::ExitStatus> {
+    // Windows: suppress the console window each uv invocation would otherwise pop
+    // (a blank black terminal the user might close mid-install). The backend spawn
+    // sets this already; uv venv / uv pip install must too.
+    #[cfg(target_os = "windows")]
+    command.creation_flags(CREATE_NO_WINDOW);
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = command.spawn()?;
+
+    let mut readers: Vec<Box<dyn std::io::Read + Send>> = Vec::new();
+    if let Some(out) = child.stdout.take() {
+        readers.push(Box::new(out));
+    }
+    if let Some(err) = child.stderr.take() {
+        readers.push(Box::new(err));
+    }
+
+    let handles: Vec<_> = readers
+        .into_iter()
+        .map(|reader| {
+            let app = app.clone();
+            let phase = phase.to_string();
+            std::thread::spawn(move || {
+                for line in BufReader::new(reader).lines().map_while(Result::ok) {
+                    let text = line.trim_end();
+                    if text.is_empty() {
+                        continue;
+                    }
+                    println!("[slim/uv] {text}");
+                    emit_setup(&app, &phase, text);
+                }
+            })
+        })
+        .collect();
+
+    let status = child.wait()?;
+    for handle in handles {
+        let _ = handle.join();
+    }
+    Ok(status)
+}
+
+/// Slim variant only: ensure a Python runtime exists in the per-user data dir,
+/// installing it via the bundled `uv` on first launch. Sets LDACA_BACKEND_PYTHON
+/// and LDACA_BACKEND_RUNTIME so the normal `locate_backend_runtime` path picks it
+/// up unchanged. Idempotent: a `.ldaca-runtime-ready` marker short-circuits once
+/// the install has succeeded. Emits `slim-setup` events for the frontend.
+///
+/// Layout is shared with the `bundle` variant: the venv lives at
+/// `<data>/runtime/python` (so the existing `find_venv_site_packages` /
+/// `find_managed_python_home` helpers work for both), and the runtime ROOT
+/// `<data>/runtime` is what we export as LDACA_BACKEND_RUNTIME. Either variant
+/// reuses a runtime the other already provisioned at this path.
+#[cfg(feature = "slim")]
+fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let data_dir = app.path().app_data_dir()?;
+    let runtime_dir = data_dir.join("runtime");
+    let venv_dir = runtime_dir.join("python");
+
+    // polars[rtcompat] always installs the feature-limited `_polars_runtime_32`
+    // base build alongside the full-feature `_polars_runtime_compat`; only compat
+    // is ever loaded. Force compat so the pruned-away `_32` is never imported.
+    // Set on every launch (incl. the fast path below) since it's process-global
+    // and inherited by the spawned backend.
+    std::env::set_var("POLARS_FORCE_PKG", "compat");
+
+    #[cfg(windows)]
+    let python = venv_dir.join("Scripts").join("python.exe");
+    #[cfg(not(windows))]
+    let python = venv_dir.join("bin").join("python3");
+
+    let marker = runtime_dir.join(".ldaca-runtime-ready");
+
+    // Reuse a runtime already provisioned here (by this or the bundle variant).
+    // locate_python_binary prefers a managed-python real binary (bundle case)
+    // and otherwise falls back to the venv launcher (slim case).
+    if marker.exists() {
+        if let Some(existing) = locate_python_binary(&runtime_dir) {
+            println!("[slim] runtime present: {}", runtime_dir.display());
+            std::env::set_var("LDACA_BACKEND_PYTHON", &existing);
+            std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+            return Ok(());
+        }
+    }
+
+    // Clear any partial install or a pre-`python/`-layout runtime (older slim
+    // builds put the venv at the runtime root) so we always rebuild cleanly.
+    // User workspaces live elsewhere in the data dir, so this is safe.
+    if runtime_dir.exists() {
+        let _ = std::fs::remove_dir_all(&runtime_dir);
+    }
+
+    // Windows needs the .exe extension to execute the bundled binary.
+    #[cfg(windows)]
+    let uv = app.path().resolve("uv.exe", BaseDirectory::Resource)?;
+    #[cfg(not(windows))]
+    let uv = app.path().resolve("uv", BaseDirectory::Resource)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&uv) {
+            let mut perms = meta.permissions();
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(&uv, perms);
+        }
+    }
+
+    std::fs::create_dir_all(&runtime_dir)?;
+
+    emit_setup(app, "creating-env", "Creating the Python environment…");
+    println!("[slim] creating venv at {}", venv_dir.display());
+    let mut venv_cmd = Command::new(&uv);
+    venv_cmd.args(["venv", "--python", "3.14"]).arg(&venv_dir);
+    let status = run_uv_streaming(app, venv_cmd, "creating-env")?;
+    if !status.success() {
+        emit_setup(app, "error", "Failed to create the Python environment.");
+        return Err(make_error(format!("uv venv failed (exit {status})")));
+    }
+
+    emit_setup(
+        app,
+        "installing",
+        "Downloading and installing Wordflow — first launch only, this can take a few minutes…",
+    );
+    println!("[slim] installing ldaca-wordflow from PyPI (first launch — may take a few minutes)");
+    let mut install_cmd = Command::new(&uv);
+    install_cmd
+        .args(["pip", "install", "--python"])
+        .arg(&python)
+        .arg("ldaca-wordflow>=0.5,<0.6");
+    let status = run_uv_streaming(app, install_cmd, "installing")?;
+    if !status.success() {
+        emit_setup(app, "error", "Failed to install Wordflow from PyPI.");
+        return Err(make_error(format!("uv pip install failed (exit {status})")));
+    }
+
+    // Reclaim ~179 MB: drop the unused `_polars_runtime_32` CPU-variant build.
+    // compat (full feature set) is what loads; 32 is dead weight. Safe to delete
+    // because we force POLARS_FORCE_PKG=compat above so it's never imported.
+    if let Some(sp) = find_venv_site_packages(&runtime_dir) {
+        let dead = sp.join("_polars_runtime_32");
+        if dead.is_dir() {
+            emit_setup(app, "installing", "Trimming unused runtime files…");
+            match std::fs::remove_dir_all(&dead) {
+                Ok(()) => println!("[slim] pruned _polars_runtime_32 (~179 MB)"),
+                Err(e) => eprintln!("[slim] prune of _polars_runtime_32 failed: {e}"),
+            }
+        }
+    }
+
+    std::fs::write(&marker, "ready\n")?;
+    std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+    std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+    emit_setup(app, "ready", "Runtime ready — starting Wordflow…");
+    println!("[slim] runtime ready: {}", runtime_dir.display());
+    Ok(())
+}
+
+/// Bundle variant only: ensure the Python runtime exists in the per-user data
+/// dir by extracting the shipped `backend-runtime.tar.zst` on first launch.
+/// Mirrors `ensure_slim_runtime` but unpacks a pre-built, self-contained runtime
+/// (its own `managed-python/`) instead of installing from PyPI — offline + fast.
+/// Targets the SAME shared layout (`<data>/runtime/python`) so the two variants
+/// are interchangeable and reuse one runtime. The archive's top level is the
+/// runtime contents (`python/`, `managed-python/`, …), extracted into
+/// `<data>/runtime`.
+#[cfg(feature = "bundle")]
+fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let data_dir = app.path().app_data_dir()?;
+    let runtime_dir = data_dir.join("runtime");
+
+    // The shipped runtime has `_polars_runtime_32` pruned at packaging time;
+    // force the full-feature compat build that actually loads. Process-global,
+    // inherited by the spawned backend; set on every launch incl. the fast path.
+    std::env::set_var("POLARS_FORCE_PKG", "compat");
+
+    let marker = runtime_dir.join(".ldaca-runtime-ready");
+
+    // Reuse a runtime already provisioned here (by this or the slim variant).
+    // Resolve the interpreter via locate_python_binary — it prefers the
+    // managed-python REAL binary over the venv launcher, whose symlink points
+    // at the CI build path and is dangling after relocation to the data dir.
+    if marker.exists() {
+        if let Some(python) = locate_python_binary(&runtime_dir) {
+            println!("[bundle] runtime present: {}", runtime_dir.display());
+            std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+            std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+            return Ok(());
+        }
+    }
+
+    // Clear any partial/old extraction so we unpack cleanly. User workspaces
+    // live elsewhere in the data dir, so this only removes the runtime.
+    if runtime_dir.exists() {
+        let _ = std::fs::remove_dir_all(&runtime_dir);
+    }
+
+    let archive = app
+        .path()
+        .resolve("backend-runtime.tar.zst", BaseDirectory::Resource)?;
+    std::fs::create_dir_all(&runtime_dir)?;
+
+    emit_setup(app, "extracting", "Unpacking the Python runtime…");
+    println!(
+        "[bundle] extracting {} -> {}",
+        archive.display(),
+        runtime_dir.display()
+    );
+    let file = std::fs::File::open(&archive)?;
+    let decoder = zstd::Decoder::new(file)?;
+    let mut tar = tar::Archive::new(decoder);
+    // Unpack entry-by-entry so we can stream a running count to the loading
+    // screen. First-launch extraction is slow on Windows (Defender scans every
+    // written file), so without progress the UI looks frozen for minutes.
+    let mut count = 0usize;
+    let mut last_tick = std::time::Instant::now();
+    for entry in tar.entries()? {
+        let mut entry = entry?;
+        entry.set_preserve_permissions(true);
+        entry.unpack_in(&runtime_dir)?;
+        count += 1;
+        if last_tick.elapsed() >= std::time::Duration::from_millis(1500) {
+            emit_setup(
+                app,
+                "extracting",
+                &format!("Unpacking the Python runtime… ({count} files)"),
+            );
+            last_tick = std::time::Instant::now();
+        }
+    }
+    println!("[bundle] extracted {count} entries");
+
+    // Resolve the interpreter the same way the launch path does — the
+    // managed-python real binary, NOT the venv launcher (its symlink is a
+    // build-machine absolute path and is dangling after relocation).
+    let python = locate_python_binary(&runtime_dir).ok_or_else(|| {
+        emit_setup(app, "error", "Bundled runtime is missing its Python interpreter.");
+        make_error(format!(
+            "extracted runtime has no usable python under {}",
+            runtime_dir.display()
+        ))
+    })?;
+
+    // tar should preserve modes, but be defensive on unix so the interpreter
+    // is executable after extraction.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&python) {
+            let mut perms = meta.permissions();
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(&python, perms);
+        }
+    }
+
+    std::fs::write(&marker, "ready\n")?;
+    std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+    std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+    emit_setup(app, "ready", "Runtime ready — starting Wordflow…");
+    println!("[bundle] runtime ready: {}", runtime_dir.display());
+    Ok(())
+}
+
 fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std::error::Error>> {
     if let Some(python_override) = path_from_env("LDACA_BACKEND_PYTHON") {
         let runtime_dir = path_from_env("LDACA_BACKEND_RUNTIME")
@@ -1053,7 +1365,8 @@ fn main() {
         .manage(backend_state)
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
-            download_to_downloads
+            download_to_downloads,
+            current_setup
         ])
         .setup(move |app| {
             let window = app
@@ -1076,19 +1389,103 @@ fn main() {
                 backend_port = backend_port
             ))?;
 
-            let app_handle = app.handle();
-            let runtime = locate_backend_runtime(&app_handle)?;
-            let runtime_env = load_runtime_env(&runtime.root)?;
-            let process = spawn_backend_process(&runtime, backend_port, &runtime_env)?;
-            let backend_pid = process.pid();
-            write_pidfile(backend_pid);
-            let state: State<BackendState> = app.state();
-            *state.process.lock().unwrap() = Some(process);
+            // Legacy bundled variant: runtime ships inside the .app (loose tree),
+            // so locate + spawn synchronously and surface any failure immediately.
+            // Excluded for both slim and the new tarball `bundle` variant, which
+            // provision the runtime into the user data dir on a background thread.
+            #[cfg(not(any(feature = "slim", feature = "bundle")))]
+            {
+                let app_handle = app.handle();
+                let runtime = locate_backend_runtime(&app_handle)?;
+                let runtime_env = load_runtime_env(&runtime.root)?;
+                let process = spawn_backend_process(&runtime, backend_port, &runtime_env)?;
+                let backend_pid = process.pid();
+                write_pidfile(backend_pid);
+                let state: State<BackendState> = app.state();
+                *state.process.lock().unwrap() = Some(process);
 
-            println!(
-                "Backend launched at: {} (pid {}) – health polling delegated to frontend",
-                backend_url, backend_pid
-            );
+                println!(
+                    "Backend launched at: {} (pid {}) – health polling delegated to frontend",
+                    backend_url, backend_pid
+                );
+            }
+
+            // Slim variant: the runtime may not exist yet on first launch. Run the
+            // uv bootstrap + backend spawn on a background thread so the window
+            // appears immediately; the frontend's health-poll loading screen
+            // covers the gap until the backend is ready.
+            #[cfg(feature = "slim")]
+            {
+                let app_handle = app.handle().clone();
+                let backend_url_log = backend_url.clone();
+                std::thread::spawn(move || {
+                    if let Err(e) = ensure_slim_runtime(&app_handle) {
+                        eprintln!("[slim] runtime bootstrap failed: {e}");
+                        emit_setup(&app_handle, "error", &format!("Setup failed: {e}"));
+                        return;
+                    }
+                    let result = (|| -> Result<u32, Box<dyn std::error::Error>> {
+                        let runtime = locate_backend_runtime(&app_handle)?;
+                        let runtime_env = load_runtime_env(&runtime.root)?;
+                        let process =
+                            spawn_backend_process(&runtime, backend_port, &runtime_env)?;
+                        let pid = process.pid();
+                        write_pidfile(pid);
+                        if let Some(state) = app_handle.try_state::<BackendState>() {
+                            *state.process.lock().unwrap() = Some(process);
+                        }
+                        Ok(pid)
+                    })();
+                    match result {
+                        Ok(pid) => println!(
+                            "[slim] backend launched at: {} (pid {}) – health polling delegated to frontend",
+                            backend_url_log, pid
+                        ),
+                        Err(e) => {
+                            eprintln!("[slim] backend start failed: {e}");
+                            emit_setup(&app_handle, "error", &format!("Backend failed to start: {e}"));
+                        }
+                    }
+                });
+            }
+
+            // Bundle variant: same background-thread pattern as slim, but the
+            // runtime is provisioned by extracting the shipped tarball into the
+            // shared user-data runtime dir instead of installing from PyPI.
+            #[cfg(feature = "bundle")]
+            {
+                let app_handle = app.handle().clone();
+                let backend_url_log = backend_url.clone();
+                std::thread::spawn(move || {
+                    if let Err(e) = ensure_bundle_runtime(&app_handle) {
+                        eprintln!("[bundle] runtime bootstrap failed: {e}");
+                        emit_setup(&app_handle, "error", &format!("Setup failed: {e}"));
+                        return;
+                    }
+                    let result = (|| -> Result<u32, Box<dyn std::error::Error>> {
+                        let runtime = locate_backend_runtime(&app_handle)?;
+                        let runtime_env = load_runtime_env(&runtime.root)?;
+                        let process =
+                            spawn_backend_process(&runtime, backend_port, &runtime_env)?;
+                        let pid = process.pid();
+                        write_pidfile(pid);
+                        if let Some(state) = app_handle.try_state::<BackendState>() {
+                            *state.process.lock().unwrap() = Some(process);
+                        }
+                        Ok(pid)
+                    })();
+                    match result {
+                        Ok(pid) => println!(
+                            "[bundle] backend launched at: {} (pid {}) – health polling delegated to frontend",
+                            backend_url_log, pid
+                        ),
+                        Err(e) => {
+                            eprintln!("[bundle] backend start failed: {e}");
+                            emit_setup(&app_handle, "error", &format!("Backend failed to start: {e}"));
+                        }
+                    }
+                });
+            }
 
             // Don't block setup waiting for /health — the frontend already
             // polls the backend and shows a loading screen via useBackendHealth.

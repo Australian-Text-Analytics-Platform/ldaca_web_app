@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Suspense, lazy, type ReactNode } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
+import { useSlimSetup } from './hooks/useSlimSetup';
 import { usePreferencesInit } from './hooks/usePreferences';
 import { QueryProvider } from './providers/QueryProvider';
 import { WorkspaceProvider } from '@/features/workspace/common/WorkspaceProvider';
@@ -346,6 +347,8 @@ const App: React.FC = () => {
     void loadRemoteRegistry();
   }, []);
   const { ready: backendReady, error: backendError } = useBackendHealth();
+  // Slim desktop first-launch setup progress (null in web/bundled builds).
+  const slimSetup = useSlimSetup();
   // Read feedback-modal state from the shared UI store; the pre-auth and
   // post-auth paths both surface the same Send-feedback button so it'd be
   // surprising for them to maintain separate visibility state.
@@ -361,13 +364,26 @@ const App: React.FC = () => {
   let content: ReactNode;
 
   if (!backendReady) {
+    // During slim first-launch the shell installs the runtime via uv; surface
+    // that phase instead of a bare "checking /health" spinner.
+    const slimActive = slimSetup !== null && slimSetup.phase !== 'ready';
     content = (
       <>
         <BlockingScreen
-          title="Starting backend services"
-          description="Hang tight while we verify the backend is up and happy."
-          status="Checking /health…"
-          hint={backendError ? `Last error: ${backendError}` : 'If this takes more than ~30s, check the backend logs.'}
+          title={slimActive ? 'Setting up Wordflow' : 'Starting backend services'}
+          description={
+            slimActive
+              ? 'First launch installs the analysis runtime. This happens once — later launches start in seconds.'
+              : 'Hang tight while we verify the backend is up and happy.'
+          }
+          status={slimActive ? slimSetup!.message : 'Checking /health…'}
+          hint={
+            slimActive
+              ? 'Requires an internet connection on first launch.'
+              : backendError
+                ? `Last error: ${backendError}`
+                : 'If this takes more than ~30s, check the backend logs.'
+          }
           actions={(
             <button
               type="button"
