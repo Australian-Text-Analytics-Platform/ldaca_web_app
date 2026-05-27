@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - "v*"
+      # Exclude pre-release tags (e.g. v0.5.5-rc1): they shouldn't run the
+      # signed desktop + PyPI publish pipeline. They're used as lightweight
+      # source-only GitHub releases (e.g. to mint a Zenodo concept DOI).
+      - "!v*-*"
   workflow_dispatch:
     inputs:
       ref:
