@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+title: LDaCA Wordflow
+message: >-
+  If you use LDaCA Wordflow in your research, please cite it using the metadata
+  in this file.
+type: software
+authors:
+  - given-names: Senhui
+    family-names: Guo
+  - given-names: Chao
+    family-names: Sun
+  - given-names: Monika
+    family-names: Bednarek
+  - given-names: Sabastian
+    family-names: Haan
+  - given-names: Michael
+    family-names: Lynch
+  - given-names: Atiq Ur
+    family-names: Rehman
+repository-code: "https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow"
+url: "https://www.ldaca.edu.au"
+abstract: >-
+  LDaCA Wordflow is a text analytics application developed for the Language Data
+  Commons of Australia (LDaCA), providing stackable, single-purpose tools for
+  exploring and analysing language data.
+license: Apache-2.0
+# Concept DOI — resolves to the latest version on Zenodo (never changes). This
+# is the "all versions" DOI, distinct from each release's version-specific DOI.
+doi: 10.5281/zenodo.20408328

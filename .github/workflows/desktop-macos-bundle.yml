@@ -38,6 +38,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # Pinned uv release bundled into the .app (Resources/uv). The bundle variant
+  # ships uv too — not just slim — so in-app upgrades (uv pip install ==version
+  # into the extracted venv) work offline-first installs and later deltas alike.
+  UV_VERSION: "0.8.22"
+
 jobs:
   build-macos-bundle-apple-silicon:
     runs-on: macos-latest
@@ -136,6 +142,20 @@ jobs:
           tar -C "$runtime" -cf - . | zstd -19 -T0 -o "$out"
           ls -lh "$out"
 
+      - name: Download + stage pinned uv binary
+        shell: bash
+        working-directory: frontend/src-tauri
+        run: |
+          set -Eeuo pipefail
+          asset="uv-aarch64-apple-darwin.tar.gz"
+          url="https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${asset}"
+          echo "Downloading $url"
+          curl -fSL "$url" -o /tmp/uv.tar.gz
+          tar -xzf /tmp/uv.tar.gz -C /tmp
+          cp "/tmp/uv-aarch64-apple-darwin/uv" ./uv
+          chmod +x ./uv
+          ./uv --version
+
       - name: Import Apple code-signing certificate
         uses: Apple-Actions/import-codesign-certs@v7.0.0
         with:
@@ -167,6 +187,11 @@ jobs:
           # resource hash. Just strip xattrs/AppleDouble and sign the bundle.
           xattr -cr "$app"
           find "$app" -type f -name "._*" -delete
+
+          # Sign the bundled uv (a Resources Mach-O that Tauri's signer skips).
+          codesign --force --options runtime --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            "$app/Contents/Resources/uv"
 
           # codesign --force on a bundle won't re-sign an already-signed main
           # binary; strip Tauri's sig so the bundle sign re-creates it in-context.

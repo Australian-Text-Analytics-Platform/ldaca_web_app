@@ -7,6 +7,10 @@
 
 If you use LDaCA Wordflow in your research, please include the following statement (or an appropriate variation):
 
+Guo, S., Sun, C., Bednarek, M., Haan, S., Lynch, M. & Rehman, A. (2026), LDaCA Wordflow {{VERSION}} [Computer software]. https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/. DOI: 10.5281/zenodo.20408328
+
+The DOI above always resolves to the latest version of LDaCA Wordflow on Zenodo. The version you used is recorded above (LDaCA Wordflow {{VERSION}}); each release also has its own version-specific DOI on its Zenodo record if you need to cite an exact version.
+
 > This study has utilised **LDaCA Wordflow**, developed for the Language Data Commons of Australia (LDaCA), available at [https://www.ldaca.edu.au](https://www.ldaca.edu.au).
 
 Where relevant, please also cite specific tools, notebooks, datasets, or software releases used in your analysis (e.g. via provided DOIs or repository references). For the latest version or updates, please visit the [GitHub repository](https://github.com/Australian-Text-Analytics-Platform/Ldaca_Text_Analytics_Tools).
@@ -19,7 +23,7 @@ In addition, we kindly ask that you inform the LDaCA team of publications and gr
 
 LDaCA Wordflow and associated LDaCA tools were developed by the **Sydney Informatics Hub (SIH)** and **Sydney Corpus Lab** in collaboration with partners across the **Language Data Commons of Australia (LDaCA)**.
 
-LDaCA and its associated tools have received investment from the **Australian Research Data Commons (ARDC)**, which is enabled by the **National Collaborative Research Infrastructure Strategy (NCRIS)**.
+The Language Data Commons of Australia is a co-investment partnership with the **Australian Research Data Commons (ARDC)** through the **HASS and Indigenous Research Data Commons** (https://doi.org/10.47486/HIR001). The ARDC is enabled by the **Australian Government’s National Collaborative Research Infrastructure Strategy (NCRIS)**.
 
 ---
 

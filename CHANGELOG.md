@@ -3,6 +3,43 @@
 User-facing changes to the LDaCA Wordflow (previously "LDaCA Text Analytics Web Application") since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.5] — 2026-05-27
+
+A focused release: an update-available reminder across every platform, a desktop
+runtime that refreshes itself on reinstall, a concordance reliability fix, and
+clearer filter wording. No new analysis tools.
+
+**Workspace compatibility:** no serialization-layer change since v0.5.4
+(`polars-text` and `docworkspace` pins are unchanged), `workspace_format` is
+unchanged — workspaces saved by prior 0.5.x versions open unchanged. Risk: safe.
+
+### Added
+
+- **"Update available" reminder on every platform.** When a newer Wordflow
+  release is on PyPI, a dismissible banner tells you the new version and points
+  to https://sih.tools/wordflow to download (desktop) or launch (web/Binder). On
+  a shared/hosted server you can request an update via the feedback form. Driven
+  by a new backend `/api/version` endpoint, so it works in the desktop app, the
+  `uvx` local runner, and the web deployments alike.
+- **Citation metadata.** A `CITATION.cff` and the in-app citation reference now
+  carry the Zenodo concept DOI (always resolves to the latest version).
+
+### Changed
+
+- **Desktop: the runtime refreshes itself on reinstall.** Installing a newer
+  desktop build over an existing one now reconciles the bundled Python runtime
+  to the new version automatically on first launch — no manual reset needed.
+- **Plain-language filter hints.** The Filter help bubbles no longer use
+  "operator", "value", or "condition" — they describe choosing a column and how
+  to match it in everyday terms.
+
+### Fixed
+
+- **Analysis no longer locks up after you cancel a task.** Stopping a running
+  concordance (or other background analysis) used to break the shared worker
+  pool, so every later search failed with a pool error until the app was
+  restarted. The pool now rebuilds itself, and subsequent analyses run normally.
+
 ## [0.5.3] — 2026-05-25
 
 Re-stamps v0.5.2. The published v0.5.2 wheel was cut from a release-branch cherry-pick that skipped three commits from `dev` — the headline workspace-rename fix plus the folder-operations and user-supplied data-block-name features. v0.5.3 ships the content v0.5.2 was meant to ship. **If you installed v0.5.2, please upgrade to v0.5.3** — the rename fix and file-tree features described below are only present in v0.5.3. v0.5.2 has been yanked on PyPI; the desktop builds for v0.5.2 were never released.

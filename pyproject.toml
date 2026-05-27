@@ -1,6 +1,6 @@
 [project]
 name = "ldaca-wordflow-workspace"
-version = "0.5.4"
+version = "0.5.5"
 description = "LDaCA Wordflow Workspace"
 requires-python = ">=3.14"
 license = "Apache-2.0"

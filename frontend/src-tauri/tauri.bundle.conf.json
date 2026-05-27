@@ -1,6 +1,6 @@
 {
   "bundle": {
     "targets": ["app", "dmg"],
-    "resources": ["backend-runtime.tar.zst"]
+    "resources": ["backend-runtime.tar.zst", "uv"]
   }
 }

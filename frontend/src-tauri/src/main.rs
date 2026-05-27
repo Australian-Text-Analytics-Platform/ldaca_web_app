@@ -132,6 +132,83 @@ const BACKEND_HOST: &str = "127.0.0.1";
 const RUNTIME_MANIFEST: &str = "runtime-manifest.json";
 const BUNDLE_RUNTIME_DIR: &str = "backend-runtime";
 
+/// Per-user state file (sits beside the provisioned `runtime/` dir) recording
+/// which Wordflow version is installed. Lets the launch path detect when a newer
+/// app build has been installed over an older runtime and refresh it.
+const RUNTIME_STATE_FILE: &str = "runtime.json";
+/// Saved-workspace serialization format the shell is aware of. Bump whenever the
+/// docworkspace/polars on-disk format changes. Recorded in runtime.json.
+const WORKSPACE_FORMAT: u32 = 1;
+
+/// Persisted runtime state: which Wordflow version is installed in the per-user
+/// venv. Lives at `<app_data>/runtime/runtime.json`. There is no in-app
+/// upgrade — the runtime simply tracks the installed app build and is refreshed
+/// on launch whenever they differ (see `ensure_*_runtime`).
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct RuntimeState {
+    /// Version physically installed in the venv right now.
+    installed_version: String,
+    /// Workspace format the installed runtime speaks (mirrors WORKSPACE_FORMAT
+    /// at provision time).
+    #[serde(default)]
+    workspace_format: u32,
+}
+
+fn runtime_state_path(runtime_dir: &Path) -> PathBuf {
+    runtime_dir.join(RUNTIME_STATE_FILE)
+}
+
+fn read_runtime_state(runtime_dir: &Path) -> Option<RuntimeState> {
+    let data = std::fs::read_to_string(runtime_state_path(runtime_dir)).ok()?;
+    serde_json::from_str(&data).ok()
+}
+
+fn write_runtime_state(runtime_dir: &Path, state: &RuntimeState) {
+    match serde_json::to_string_pretty(state) {
+        Ok(s) => {
+            if let Err(e) = std::fs::write(runtime_state_path(runtime_dir), s) {
+                eprintln!("Could not write runtime.json: {e}");
+            }
+        }
+        Err(e) => eprintln!("Could not serialize runtime.json: {e}"),
+    }
+}
+
+/// True when runtime.json records the wanted version as installed.
+fn runtime_version_matches(runtime_dir: &Path, want: &str) -> bool {
+    read_runtime_state(runtime_dir)
+        .map(|s| s.installed_version == want)
+        .unwrap_or(false)
+}
+
+/// Windows-only: record the resolved per-user runtime dir in the registry so the
+/// MSI uninstaller can delete exactly that path. The MSI installs per-machine
+/// and its uninstaller runs elevated, where `%APPDATA%` would resolve to the
+/// wrong user — so the path must be captured here, at app runtime, under HKCU.
+#[cfg(target_os = "windows")]
+fn record_runtime_dir_registry(runtime_dir: &Path) {
+    let _ = std::process::Command::new("reg")
+        .args([
+            "add",
+            r"HKCU\Software\au.edu.ldaca.wordflow",
+            "/v",
+            "RuntimeDir",
+            "/t",
+            "REG_SZ",
+            "/d",
+            &runtime_dir.to_string_lossy(),
+            "/f",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+}
+
+/// The shell's own version (from tauri.conf.json). The provisioned runtime
+/// tracks this: a freshly-installed shell refreshes a runtime that doesn't match.
+fn shell_version(app: &AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
 fn make_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
     Box::new(io::Error::new(io::ErrorKind::Other, message.into()))
 }
@@ -206,7 +283,7 @@ fn emit_setup(app: &AppHandle, phase: &str, message: &str) {
 /// frontend as a `slim-setup` event (so the loading screen shows live download /
 /// install progress) and echoing to the console. uv detects the non-TTY pipe and
 /// emits plain line-based logs rather than redrawing progress bars.
-#[cfg(feature = "slim")]
+#[cfg(any(feature = "slim", feature = "bundle"))]
 fn run_uv_streaming(
     app: &AppHandle,
     mut command: Command,
@@ -253,56 +330,29 @@ fn run_uv_streaming(
     Ok(status)
 }
 
-/// Slim variant only: ensure a Python runtime exists in the per-user data dir,
-/// installing it via the bundled `uv` on first launch. Sets LDACA_BACKEND_PYTHON
-/// and LDACA_BACKEND_RUNTIME so the normal `locate_backend_runtime` path picks it
-/// up unchanged. Idempotent: a `.ldaca-runtime-ready` marker short-circuits once
-/// the install has succeeded. Emits `slim-setup` events for the frontend.
-///
-/// Layout is shared with the `bundle` variant: the venv lives at
-/// `<data>/runtime/python` (so the existing `find_venv_site_packages` /
-/// `find_managed_python_home` helpers work for both), and the runtime ROOT
-/// `<data>/runtime` is what we export as LDACA_BACKEND_RUNTIME. Either variant
-/// reuses a runtime the other already provisioned at this path.
-#[cfg(feature = "slim")]
-fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let data_dir = app.path().app_data_dir()?;
-    let runtime_dir = data_dir.join("runtime");
-    let venv_dir = runtime_dir.join("python");
-
-    // polars[rtcompat] always installs the feature-limited `_polars_runtime_32`
-    // base build alongside the full-feature `_polars_runtime_compat`; only compat
-    // is ever loaded. Force compat so the pruned-away `_32` is never imported.
-    // Set on every launch (incl. the fast path below) since it's process-global
-    // and inherited by the spawned backend.
-    std::env::set_var("POLARS_FORCE_PKG", "compat");
-
+/// Path to the venv's python launcher inside a provisioned runtime. uv targets
+/// this when installing/upgrading (`uv pip install --python <launcher>`). For
+/// the slim variant uv creates a valid, relocatable venv here; for the bundle
+/// variant `repair_bundle_venv` makes the extracted launcher resolvable. A
+/// dangling symlink reports `exists() == false`, which we use to detect a
+/// runtime that still needs (re)provisioning.
+#[cfg(any(feature = "slim", feature = "bundle"))]
+fn venv_launcher(runtime_dir: &Path) -> PathBuf {
+    let venv = runtime_dir.join("python");
     #[cfg(windows)]
-    let python = venv_dir.join("Scripts").join("python.exe");
+    {
+        venv.join("Scripts").join("python.exe")
+    }
     #[cfg(not(windows))]
-    let python = venv_dir.join("bin").join("python3");
-
-    let marker = runtime_dir.join(".ldaca-runtime-ready");
-
-    // Reuse a runtime already provisioned here (by this or the bundle variant).
-    // locate_python_binary prefers a managed-python real binary (bundle case)
-    // and otherwise falls back to the venv launcher (slim case).
-    if marker.exists() {
-        if let Some(existing) = locate_python_binary(&runtime_dir) {
-            println!("[slim] runtime present: {}", runtime_dir.display());
-            std::env::set_var("LDACA_BACKEND_PYTHON", &existing);
-            std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
-            return Ok(());
-        }
+    {
+        venv.join("bin").join("python3")
     }
+}
 
-    // Clear any partial install or a pre-`python/`-layout runtime (older slim
-    // builds put the venv at the runtime root) so we always rebuild cleanly.
-    // User workspaces live elsewhere in the data dir, so this is safe.
-    if runtime_dir.exists() {
-        let _ = std::fs::remove_dir_all(&runtime_dir);
-    }
-
+/// Resolve the bundled `uv` CLI shipped as a Tauri resource, ensuring it is
+/// executable on unix. Used by both variants for install/upgrade.
+#[cfg(any(feature = "slim", feature = "bundle"))]
+fn resolve_uv(app: &AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
     // Windows needs the .exe extension to execute the bundled binary.
     #[cfg(windows)]
     let uv = app.path().resolve("uv.exe", BaseDirectory::Resource)?;
@@ -317,120 +367,159 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
             let _ = std::fs::set_permissions(&uv, perms);
         }
     }
+    Ok(uv)
+}
 
-    std::fs::create_dir_all(&runtime_dir)?;
-
-    emit_setup(app, "creating-env", "Creating the Python environment…");
-    println!("[slim] creating venv at {}", venv_dir.display());
-    let mut venv_cmd = Command::new(&uv);
-    venv_cmd.args(["venv", "--python", "3.14"]).arg(&venv_dir);
-    let status = run_uv_streaming(app, venv_cmd, "creating-env")?;
-    if !status.success() {
-        emit_setup(app, "error", "Failed to create the Python environment.");
-        return Err(make_error(format!("uv venv failed (exit {status})")));
-    }
-
-    emit_setup(
-        app,
-        "installing",
-        "Downloading and installing Wordflow — first launch only, this can take a few minutes…",
-    );
-    println!("[slim] installing ldaca-wordflow from PyPI (first launch — may take a few minutes)");
-    let mut install_cmd = Command::new(&uv);
-    install_cmd
-        .args(["pip", "install", "--python"])
-        .arg(&python)
-        .arg("ldaca-wordflow>=0.5,<0.6");
-    let status = run_uv_streaming(app, install_cmd, "installing")?;
-    if !status.success() {
-        emit_setup(app, "error", "Failed to install Wordflow from PyPI.");
-        return Err(make_error(format!("uv pip install failed (exit {status})")));
-    }
-
-    // Reclaim ~179 MB: drop the unused `_polars_runtime_32` CPU-variant build.
-    // compat (full feature set) is what loads; 32 is dead weight. Safe to delete
-    // because we force POLARS_FORCE_PKG=compat above so it's never imported.
-    if let Some(sp) = find_venv_site_packages(&runtime_dir) {
+/// Reclaim ~179 MB: drop the unused `_polars_runtime_32` CPU-variant build.
+/// `compat` (full feature set) is what loads; `32` is dead weight. Safe to
+/// delete because we force POLARS_FORCE_PKG=compat so it's never imported. Run
+/// after every install/upgrade since uv reinstalls polars (and thus `_32`).
+#[cfg(any(feature = "slim", feature = "bundle"))]
+fn prune_dead_polars(runtime_dir: &Path, app: &AppHandle) {
+    if let Some(sp) = find_venv_site_packages(runtime_dir) {
         let dead = sp.join("_polars_runtime_32");
         if dead.is_dir() {
             emit_setup(app, "installing", "Trimming unused runtime files…");
             match std::fs::remove_dir_all(&dead) {
-                Ok(()) => println!("[slim] pruned _polars_runtime_32 (~179 MB)"),
-                Err(e) => eprintln!("[slim] prune of _polars_runtime_32 failed: {e}"),
+                Ok(()) => println!("[runtime] pruned _polars_runtime_32 (~179 MB)"),
+                Err(e) => eprintln!("[runtime] prune of _polars_runtime_32 failed: {e}"),
             }
         }
     }
-
-    std::fs::write(&marker, "ready\n")?;
-    std::env::set_var("LDACA_BACKEND_PYTHON", &python);
-    std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
-    emit_setup(app, "ready", "Runtime ready — starting Wordflow…");
-    println!("[slim] runtime ready: {}", runtime_dir.display());
-    Ok(())
 }
 
-/// Bundle variant only: ensure the Python runtime exists in the per-user data
-/// dir by extracting the shipped `backend-runtime.tar.zst` on first launch.
-/// Mirrors `ensure_slim_runtime` but unpacks a pre-built, self-contained runtime
-/// (its own `managed-python/`) instead of installing from PyPI — offline + fast.
-/// Targets the SAME shared layout (`<data>/runtime/python`) so the two variants
-/// are interchangeable and reuse one runtime. The archive's top level is the
-/// runtime contents (`python/`, `managed-python/`, …), extracted into
-/// `<data>/runtime`.
-#[cfg(feature = "bundle")]
-fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+/// Persist runtime.json after provisioning `want`.
+#[cfg(any(feature = "slim", feature = "bundle"))]
+fn save_runtime_state(runtime_dir: &Path, want: &str) {
+    let state = RuntimeState {
+        installed_version: want.to_string(),
+        workspace_format: WORKSPACE_FORMAT,
+    };
+    write_runtime_state(runtime_dir, &state);
+}
+
+/// Slim variant only: ensure the wanted Wordflow version is installed in the
+/// per-user data dir via the bundled `uv`. Sets LDACA_BACKEND_PYTHON and
+/// LDACA_BACKEND_RUNTIME so the normal `locate_backend_runtime` path picks it up
+/// unchanged. Version-aware: reuses the venv for an in-place delta up/downgrade
+/// (`uv pip install ==want`) and only rebuilds from scratch when there is no
+/// usable venv. Emits `slim-setup` events for the frontend.
+///
+/// Layout is shared with the `bundle` variant: the venv lives at
+/// `<data>/runtime/python` and the runtime ROOT `<data>/runtime` is exported as
+/// LDACA_BACKEND_RUNTIME. Either variant reuses a runtime the other provisioned.
+#[cfg(feature = "slim")]
+fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
     let runtime_dir = data_dir.join("runtime");
 
-    // The shipped runtime has `_polars_runtime_32` pruned at packaging time;
-    // force the full-feature compat build that actually loads. Process-global,
-    // inherited by the spawned backend; set on every launch incl. the fast path.
+    // polars[rtcompat] always installs the feature-limited `_polars_runtime_32`
+    // base build alongside the full-feature `_polars_runtime_compat`; only compat
+    // is ever loaded. Force compat so the pruned-away `_32` is never imported.
+    // Process-global, inherited by the spawned backend; set on every launch.
     std::env::set_var("POLARS_FORCE_PKG", "compat");
 
+    #[cfg(target_os = "windows")]
+    record_runtime_dir_registry(&runtime_dir);
+
+    let want = shell_version(app);
     let marker = runtime_dir.join(".ldaca-runtime-ready");
 
-    // Reuse a runtime already provisioned here (by this or the slim variant).
-    // Resolve the interpreter via locate_python_binary — it prefers the
-    // managed-python REAL binary over the venv launcher, whose symlink points
-    // at the CI build path and is dangling after relocation to the data dir.
-    if marker.exists() {
-        if let Some(python) = locate_python_binary(&runtime_dir) {
-            println!("[bundle] runtime present: {}", runtime_dir.display());
-            std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+    // Fast path: the correct version is already installed and usable.
+    if marker.exists() && runtime_version_matches(&runtime_dir, &want) {
+        if let Some(existing) = locate_python_binary(&runtime_dir) {
+            println!("[slim] runtime present at {} (v{want})", runtime_dir.display());
+            std::env::set_var("LDACA_BACKEND_PYTHON", &existing);
             std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
             return Ok(());
         }
     }
 
-    // Clear any partial/old extraction so we unpack cleanly. User workspaces
-    // live elsewhere in the data dir, so this only removes the runtime.
-    if runtime_dir.exists() {
-        let _ = std::fs::remove_dir_all(&runtime_dir);
+    let launcher = venv_launcher(&runtime_dir);
+    let uv = resolve_uv(app)?;
+
+    // Reuse an existing usable venv for an in-place up/downgrade; otherwise
+    // rebuild from scratch. A dangling launcher symlink reports !exists().
+    if !launcher.exists() {
+        // Clear any partial install or pre-`python/`-layout runtime (older slim
+        // builds put the venv at the runtime root). User workspaces live
+        // elsewhere (~/Documents/ldaca), so this only drops the runtime.
+        if runtime_dir.exists() {
+            let _ = std::fs::remove_dir_all(&runtime_dir);
+        }
+        std::fs::create_dir_all(&runtime_dir)?;
+
+        emit_setup(app, "creating-env", "Creating the Python environment…");
+        println!("[slim] creating venv at {}", runtime_dir.join("python").display());
+        let mut venv_cmd = Command::new(&uv);
+        venv_cmd
+            .args(["venv", "--python", "3.14"])
+            .arg(runtime_dir.join("python"));
+        let status = run_uv_streaming(app, venv_cmd, "creating-env")?;
+        if !status.success() {
+            emit_setup(app, "error", "Failed to create the Python environment.");
+            return Err(make_error(format!("uv venv failed (exit {status})")));
+        }
     }
 
-    let archive = app
-        .path()
-        .resolve("backend-runtime.tar.zst", BaseDirectory::Resource)?;
-    std::fs::create_dir_all(&runtime_dir)?;
+    emit_setup(
+        app,
+        "installing",
+        &format!("Installing Wordflow {want} — this can take a few minutes…"),
+    );
+    println!("[slim] installing ldaca-wordflow=={want}");
+    let mut install_cmd = Command::new(&uv);
+    install_cmd
+        .args(["pip", "install", "--python"])
+        .arg(&launcher)
+        .arg(format!("ldaca-wordflow=={want}"));
+    let status = run_uv_streaming(app, install_cmd, "installing")?;
+    if !status.success() {
+        emit_setup(app, "error", &format!("Failed to install Wordflow {want}."));
+        return Err(make_error(format!("uv pip install failed (exit {status})")));
+    }
 
-    emit_setup(app, "extracting", "Unpacking the Python runtime…");
+    prune_dead_polars(&runtime_dir, app);
+
+    let python = locate_python_binary(&runtime_dir).ok_or_else(|| {
+        make_error(format!(
+            "provisioned runtime has no usable python under {}",
+            runtime_dir.display()
+        ))
+    })?;
+    save_runtime_state(&runtime_dir, &want);
+    std::fs::write(&marker, "ready\n")?;
+    std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+    std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+    emit_setup(app, "ready", "Runtime ready — starting Wordflow…");
+    println!("[slim] runtime ready: {} (v{want})", runtime_dir.display());
+    Ok(())
+}
+
+/// Extract `backend-runtime.tar.zst` into the runtime dir, streaming a running
+/// file count to the loading screen (first-launch extraction is slow on Windows
+/// — Defender scans every written file — so without progress the UI looks
+/// frozen for minutes).
+#[cfg(feature = "bundle")]
+fn extract_bundle_archive(
+    app: &AppHandle,
+    archive: &Path,
+    runtime_dir: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "[bundle] extracting {} -> {}",
         archive.display(),
         runtime_dir.display()
     );
-    let file = std::fs::File::open(&archive)?;
+    let file = std::fs::File::open(archive)?;
     let decoder = zstd::Decoder::new(file)?;
     let mut tar = tar::Archive::new(decoder);
-    // Unpack entry-by-entry so we can stream a running count to the loading
-    // screen. First-launch extraction is slow on Windows (Defender scans every
-    // written file), so without progress the UI looks frozen for minutes.
     let mut count = 0usize;
     let mut last_tick = std::time::Instant::now();
     for entry in tar.entries()? {
         let mut entry = entry?;
         entry.set_preserve_permissions(true);
-        entry.unpack_in(&runtime_dir)?;
+        entry.unpack_in(runtime_dir)?;
         count += 1;
         if last_tick.elapsed() >= std::time::Duration::from_millis(1500) {
             emit_setup(
@@ -442,14 +531,143 @@ fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Erro
         }
     }
     println!("[bundle] extracted {count} entries");
+    Ok(())
+}
+
+/// Make the extracted venv usable by `uv` so in-app upgrades can install into
+/// it. The shipped `python/` venv was created on the CI build machine; its
+/// `pyvenv.cfg home` and `bin/python3` symlink point at absolute CI paths that
+/// don't exist here, so `uv pip install --python python/bin/python3` would fail.
+/// Repoint both at the bundled `managed-python`. (The launch path itself runs
+/// managed-python directly with PYTHONHOME set, so it never relied on this —
+/// only uv does.)
+#[cfg(feature = "bundle")]
+fn repair_bundle_venv(runtime_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let managed = find_managed_python_binary(runtime_dir)
+        .ok_or_else(|| make_error("repair_bundle_venv: no managed-python interpreter found"))?;
+    let venv = runtime_dir.join("python");
+
+    // pyvenv.cfg `home` is the directory CONTAINING the base interpreter.
+    let home = managed
+        .parent()
+        .ok_or_else(|| make_error("managed python has no parent dir"))?;
+    let cfg_path = venv.join("pyvenv.cfg");
+    let mut lines: Vec<String> = Vec::new();
+    if let Ok(existing) = std::fs::read_to_string(&cfg_path) {
+        for line in existing.lines() {
+            let key = line.split('=').next().map(str::trim).unwrap_or("");
+            match key {
+                "home" => lines.push(format!("home = {}", home.display())),
+                "executable" => lines.push(format!("executable = {}", managed.display())),
+                // `command` records the original `uv venv` invocation with a CI
+                // absolute path; drop it rather than rewrite.
+                "command" => {}
+                _ => lines.push(line.to_string()),
+            }
+        }
+    }
+    if !lines.iter().any(|l| l.trim_start().starts_with("home")) {
+        lines.push(format!("home = {}", home.display()));
+    }
+    std::fs::write(&cfg_path, format!("{}\n", lines.join("\n")))?;
+
+    // Unix: replace the dangling bin/python* symlinks with valid ones pointing
+    // at the managed interpreter (absolute — same machine now). On Windows the
+    // venv ships a real launcher exe that reads pyvenv.cfg `home`, so the cfg
+    // rewrite above is sufficient.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        for name in ["python3", "python"] {
+            let link = venv.join("bin").join(name);
+            let _ = std::fs::remove_file(&link);
+            symlink(&managed, &link)?;
+        }
+    }
+    Ok(())
+}
+
+/// Bundle variant only: ensure the wanted Wordflow version is installed in the
+/// per-user data dir. On first launch it extracts the shipped, self-contained
+/// `backend-runtime.tar.zst` (offline, fast) — which ships exactly the shell's
+/// version. In-app up/downgrades reuse that venv and run `uv pip install ==want`
+/// (delta) just like the slim variant, so the two converge after first launch.
+/// Targets the SAME shared layout (`<data>/runtime/python`).
+#[cfg(feature = "bundle")]
+fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let data_dir = app.path().app_data_dir()?;
+    let runtime_dir = data_dir.join("runtime");
+
+    // The shipped runtime has `_polars_runtime_32` pruned at packaging time;
+    // force the full-feature compat build that actually loads. Process-global,
+    // inherited by the spawned backend; set on every launch incl. the fast path.
+    std::env::set_var("POLARS_FORCE_PKG", "compat");
+
+    #[cfg(target_os = "windows")]
+    record_runtime_dir_registry(&runtime_dir);
+
+    let want = shell_version(app);
+    let bundled_version = shell_version(app); // the archive ships the shell version
+    let marker = runtime_dir.join(".ldaca-runtime-ready");
+
+    // Fast path: the correct version is already installed and usable.
+    if marker.exists() && runtime_version_matches(&runtime_dir, &want) {
+        if let Some(python) = locate_python_binary(&runtime_dir) {
+            println!("[bundle] runtime present at {} (v{want})", runtime_dir.display());
+            std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+            std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+            return Ok(());
+        }
+    }
+
+    // A dangling launcher symlink reports !exists(); that and a missing dir mean
+    // we need to extract the offline base. A repaired launcher means an existing
+    // venv we can upgrade in place.
+    let launcher = venv_launcher(&runtime_dir);
+    let mut just_extracted = false;
+    if !launcher.exists() {
+        // Clear any partial/old extraction so we unpack cleanly. User workspaces
+        // live elsewhere (~/Documents/ldaca), so this only removes the runtime.
+        if runtime_dir.exists() {
+            let _ = std::fs::remove_dir_all(&runtime_dir);
+        }
+        let archive = app
+            .path()
+            .resolve("backend-runtime.tar.zst", BaseDirectory::Resource)?;
+        std::fs::create_dir_all(&runtime_dir)?;
+        emit_setup(app, "extracting", "Unpacking the Python runtime…");
+        extract_bundle_archive(app, &archive, &runtime_dir)?;
+        repair_bundle_venv(&runtime_dir)?;
+        just_extracted = true;
+    }
+
+    // The bundled archive ships exactly `bundled_version`. Skip the network
+    // install only when a fresh extraction already provides the wanted version
+    // (the common offline first launch); otherwise install/upgrade via uv.
+    if !(just_extracted && want == bundled_version) {
+        let uv = resolve_uv(app)?;
+        emit_setup(app, "installing", &format!("Installing Wordflow {want}…"));
+        println!("[bundle] installing ldaca-wordflow=={want}");
+        let mut install_cmd = Command::new(&uv);
+        install_cmd
+            .args(["pip", "install", "--python"])
+            .arg(&launcher)
+            .arg(format!("ldaca-wordflow=={want}"));
+        let status = run_uv_streaming(app, install_cmd, "installing")?;
+        if !status.success() {
+            emit_setup(app, "error", &format!("Failed to install Wordflow {want}."));
+            return Err(make_error(format!("uv pip install failed (exit {status})")));
+        }
+    }
+
+    prune_dead_polars(&runtime_dir, app);
 
     // Resolve the interpreter the same way the launch path does — the
-    // managed-python real binary, NOT the venv launcher (its symlink is a
-    // build-machine absolute path and is dangling after relocation).
+    // managed-python real binary, NOT the venv launcher.
     let python = locate_python_binary(&runtime_dir).ok_or_else(|| {
         emit_setup(app, "error", "Bundled runtime is missing its Python interpreter.");
         make_error(format!(
-            "extracted runtime has no usable python under {}",
+            "runtime has no usable python under {}",
             runtime_dir.display()
         ))
     })?;
@@ -466,11 +684,12 @@ fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Erro
         }
     }
 
+    save_runtime_state(&runtime_dir, &want);
     std::fs::write(&marker, "ready\n")?;
     std::env::set_var("LDACA_BACKEND_PYTHON", &python);
     std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
     emit_setup(app, "ready", "Runtime ready — starting Wordflow…");
-    println!("[bundle] runtime ready: {}", runtime_dir.display());
+    println!("[bundle] runtime ready: {} (v{want})", runtime_dir.display());
     Ok(())
 }
 
