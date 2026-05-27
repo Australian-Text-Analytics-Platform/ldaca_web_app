@@ -266,11 +266,16 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
 
     let marker = runtime_dir.join(".ldaca-runtime-ready");
 
-    if marker.exists() && python.exists() {
-        println!("[slim] runtime present: {}", runtime_dir.display());
-        std::env::set_var("LDACA_BACKEND_PYTHON", &python);
-        std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
-        return Ok(());
+    // Reuse a runtime already provisioned here (by this or the bundle variant).
+    // locate_python_binary prefers a managed-python real binary (bundle case)
+    // and otherwise falls back to the venv launcher (slim case).
+    if marker.exists() {
+        if let Some(existing) = locate_python_binary(&runtime_dir) {
+            println!("[slim] runtime present: {}", runtime_dir.display());
+            std::env::set_var("LDACA_BACKEND_PYTHON", &existing);
+            std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+            return Ok(());
+        }
     }
 
     // Clear any partial install or a pre-`python/`-layout runtime (older slim
@@ -358,25 +363,25 @@ fn ensure_slim_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
 fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
     let runtime_dir = data_dir.join("runtime");
-    let venv_dir = runtime_dir.join("python");
 
     // The shipped runtime has `_polars_runtime_32` pruned at packaging time;
     // force the full-feature compat build that actually loads. Process-global,
     // inherited by the spawned backend; set on every launch incl. the fast path.
     std::env::set_var("POLARS_FORCE_PKG", "compat");
 
-    #[cfg(windows)]
-    let python = venv_dir.join("Scripts").join("python.exe");
-    #[cfg(not(windows))]
-    let python = venv_dir.join("bin").join("python3");
-
     let marker = runtime_dir.join(".ldaca-runtime-ready");
 
-    if marker.exists() && python.exists() {
-        println!("[bundle] runtime present: {}", runtime_dir.display());
-        std::env::set_var("LDACA_BACKEND_PYTHON", &python);
-        std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
-        return Ok(());
+    // Reuse a runtime already provisioned here (by this or the slim variant).
+    // Resolve the interpreter via locate_python_binary — it prefers the
+    // managed-python REAL binary over the venv launcher, whose symlink points
+    // at the CI build path and is dangling after relocation to the data dir.
+    if marker.exists() {
+        if let Some(python) = locate_python_binary(&runtime_dir) {
+            println!("[bundle] runtime present: {}", runtime_dir.display());
+            std::env::set_var("LDACA_BACKEND_PYTHON", &python);
+            std::env::set_var("LDACA_BACKEND_RUNTIME", &runtime_dir);
+            return Ok(());
+        }
     }
 
     // Clear any partial/old extraction so we unpack cleanly. User workspaces
@@ -402,13 +407,16 @@ fn ensure_bundle_runtime(app: &AppHandle) -> Result<(), Box<dyn std::error::Erro
     tar.set_preserve_permissions(true);
     tar.unpack(&runtime_dir)?;
 
-    if !python.exists() {
+    // Resolve the interpreter the same way the launch path does — the
+    // managed-python real binary, NOT the venv launcher (its symlink is a
+    // build-machine absolute path and is dangling after relocation).
+    let python = locate_python_binary(&runtime_dir).ok_or_else(|| {
         emit_setup(app, "error", "Bundled runtime is missing its Python interpreter.");
-        return Err(make_error(format!(
-            "extracted runtime has no python at {}",
-            python.display()
-        )));
-    }
+        make_error(format!(
+            "extracted runtime has no usable python under {}",
+            runtime_dir.display()
+        ))
+    })?;
 
     // tar should preserve modes, but be defensive on unix so the interpreter
     // is executable after extraction.
