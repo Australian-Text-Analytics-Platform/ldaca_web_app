@@ -13,11 +13,6 @@ name: Desktop macOS Build — Bundle (Apple Silicon)
 # proven, then retired.
 
 on:
-  # TEMPORARY (prototype): lets this workflow run while it lives only on the
-  # feature branch. Remove when promoting to main via PR (workflow_dispatch).
-  push:
-    branches:
-      - tauri/slim-dmg-prototype
   workflow_call:
     inputs:
       build-notes:

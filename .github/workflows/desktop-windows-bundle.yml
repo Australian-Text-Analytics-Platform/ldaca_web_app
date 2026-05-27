@@ -8,11 +8,6 @@ name: Desktop Windows Build — Bundle (x64)
 # legacy desktop-windows.yml and the macOS builds are intentionally untouched.
 
 on:
-  # TEMPORARY (prototype): run while the workflow lives only on the feature
-  # branch. Remove when promoting to the default branch (workflow_dispatch).
-  push:
-    branches:
-      - tauri/slim-dmg-prototype
   workflow_call:
     inputs:
       ref:
