@@ -5,9 +5,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Toaster } from 'sonner';
 import { LoadSnapshotDialog } from '../components/LoadSnapshotDialog';
-import * as snapshotsApiModule from '@/lib/backend/snapshots';
+import * as generatedSdk from '@/api/generated/sdk.gen';
 import * as compatModule from '../compat';
-import type { SnapshotListItem } from '@/lib/backend/snapshots';
+import type { SnapshotListItem } from '@/api/generated/types.gen';
 import type { SnapshotManifest } from '../types';
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -76,9 +76,9 @@ describe('LoadSnapshotDialog', () => {
 
   beforeEach(() => {
     vi.spyOn(compatModule, 'getCurrentAppVersion').mockReturnValue('v0.4.4');
-    listSpy = vi.spyOn(snapshotsApiModule.snapshotsApi, 'list');
-    deleteOneSpy = vi.spyOn(snapshotsApiModule.snapshotsApi, 'deleteOne');
-    deleteBatchSpy = vi.spyOn(snapshotsApiModule.snapshotsApi, 'deleteBatch');
+    listSpy = vi.spyOn(generatedSdk, 'listSnapshots');
+    deleteOneSpy = vi.spyOn(generatedSdk, 'deleteSnapshot');
+    deleteBatchSpy = vi.spyOn(generatedSdk, 'batchDeleteSnapshots');
   });
 
   afterEach(() => {
@@ -86,9 +86,9 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it('renders each saved snapshot with title, capture date, and size', async () => {
-    listSpy.mockResolvedValue({
+    listSpy.mockResolvedValue({ data: {
       items: [item('alpha'), item('beta')],
-    });
+    }, error: undefined });
 
     renderWithClient(
       <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
@@ -106,7 +106,7 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it('shows an empty-state message when no snapshots exist', async () => {
-    listSpy.mockResolvedValue({ items: [] });
+    listSpy.mockResolvedValue({ data: { items: [] }, error: undefined });
 
     renderWithClient(
       <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
@@ -118,12 +118,12 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it('marks incompatible snapshots with a badge and disabled Open button', async () => {
-    listSpy.mockResolvedValue({
+    listSpy.mockResolvedValue({ data: {
       items: [
         item('current', { tool_version: 'v0.4.4' }),
         item('old', { tool_version: 'v0.3.5' }),
       ],
-    });
+    }, error: undefined });
 
     renderWithClient(
       <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
@@ -140,12 +140,12 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it("adaptive batch button reads 'Delete stale' when incompatible snapshots exist", async () => {
-    listSpy.mockResolvedValue({
+    listSpy.mockResolvedValue({ data: {
       items: [
         item('current', { tool_version: 'v0.4.4' }),
         item('old', { tool_version: 'v0.3.5' }),
       ],
-    });
+    }, error: undefined });
 
     renderWithClient(
       <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
@@ -161,9 +161,9 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it("adaptive batch button reads 'Delete all' when only compatible snapshots exist", async () => {
-    listSpy.mockResolvedValue({
+    listSpy.mockResolvedValue({ data: {
       items: [item('a'), item('b'), item('c')],
-    });
+    }, error: undefined });
 
     renderWithClient(
       <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
@@ -176,8 +176,8 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it('per-row delete opens confirmation, then calls deleteOne on confirm', async () => {
-    listSpy.mockResolvedValue({ items: [item('foo')] });
-    deleteOneSpy.mockResolvedValue({ deleted: ['concordance-foo.ldaca-snapshot'] });
+    listSpy.mockResolvedValue({ data: { items: [item('foo')] }, error: undefined });
+    deleteOneSpy.mockResolvedValue({ data: { deleted: ['concordance-foo.ldaca-snapshot'] }, error: undefined });
 
     const user = userEvent.setup();
     renderWithClient(
@@ -196,21 +196,22 @@ describe('LoadSnapshotDialog', () => {
     await user.click(confirmBtn);
 
     await waitFor(() => {
-      expect(deleteOneSpy).toHaveBeenCalledWith(
-        'concordance-foo.ldaca-snapshot',
-        expect.any(Object),
-      );
+      expect(deleteOneSpy).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        path: { filename: 'concordance-foo.ldaca-snapshot' },
+        throwOnError: true,
+      });
     });
   });
 
   it('batch delete (stale) calls deleteBatch with incompatible_with version', async () => {
-    listSpy.mockResolvedValue({
+    listSpy.mockResolvedValue({ data: {
       items: [
         item('current', { tool_version: 'v0.4.4' }),
         item('old', { tool_version: 'v0.3.5' }),
       ],
-    });
-    deleteBatchSpy.mockResolvedValue({ deleted: ['concordance-old.ldaca-snapshot'] });
+    }, error: undefined });
+    deleteBatchSpy.mockResolvedValue({ data: { deleted: ['concordance-old.ldaca-snapshot'] }, error: undefined });
 
     const user = userEvent.setup();
     renderWithClient(
@@ -224,19 +225,19 @@ describe('LoadSnapshotDialog', () => {
     await user.click(await screen.findByRole('button', { name: /^delete stale$/i }));
 
     await waitFor(() => {
-      expect(deleteBatchSpy).toHaveBeenCalledWith(
-        'concordance',
-        'v0.4.4',
-        expect.any(Object),
-      );
+      expect(deleteBatchSpy).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        query: { tool: 'concordance', incompatible_with: 'v0.4.4' },
+        throwOnError: true,
+      });
     });
   });
 
   it('batch delete (all) calls deleteBatch without incompatible_with', async () => {
-    listSpy.mockResolvedValue({ items: [item('a'), item('b')] });
-    deleteBatchSpy.mockResolvedValue({
+    listSpy.mockResolvedValue({ data: { items: [item('a'), item('b')] }, error: undefined });
+    deleteBatchSpy.mockResolvedValue({ data: {
       deleted: ['concordance-a.ldaca-snapshot', 'concordance-b.ldaca-snapshot'],
-    });
+    }, error: undefined });
 
     const user = userEvent.setup();
     renderWithClient(
@@ -250,16 +251,16 @@ describe('LoadSnapshotDialog', () => {
     await user.click(await screen.findByRole('button', { name: /^delete all$/i }));
 
     await waitFor(() => {
-      expect(deleteBatchSpy).toHaveBeenCalledWith(
-        'concordance',
-        undefined,
-        expect.any(Object),
-      );
+      expect(deleteBatchSpy).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        query: { tool: 'concordance', incompatible_with: null },
+        throwOnError: true,
+      });
     });
   });
 
   it('Open click invokes onOpenSnapshot with the filename', async () => {
-    listSpy.mockResolvedValue({ items: [item('foo')] });
+    listSpy.mockResolvedValue({ data: { items: [item('foo')] }, error: undefined });
     const onOpen = vi.fn().mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
 
@@ -284,7 +285,7 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it('Open with no onOpenSnapshot handler shows a placeholder toast', async () => {
-    listSpy.mockResolvedValue({ items: [item('foo')] });
+    listSpy.mockResolvedValue({ data: { items: [item('foo')] }, error: undefined });
 
     const user = userEvent.setup();
     renderWithClient(

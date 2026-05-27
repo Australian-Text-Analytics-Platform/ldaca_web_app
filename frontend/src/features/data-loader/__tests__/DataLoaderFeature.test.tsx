@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
-import { filesApi } from '@/lib/backend/files';
+import { listLdacaFeaturedCollections } from '@/api/generated/sdk.gen';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 
 const {
@@ -14,6 +14,7 @@ const {
   mockRawFile,
   mockCreateFolder,
   mockMoveFile,
+  mockListLdacaFeaturedCollections,
 } = vi.hoisted(() => ({
   mockSetCurrentWorkspace: vi.fn(),
   mockUpdateWorkspaceDescription: vi.fn(),
@@ -21,6 +22,7 @@ const {
   mockRawFile: vi.fn(),
   mockCreateFolder: vi.fn(),
   mockMoveFile: vi.fn(),
+  mockListLdacaFeaturedCollections: vi.fn(),
 }));
 
 type MockWorkspaceState = {
@@ -130,16 +132,15 @@ const mockFileTree = [
   },
 ];
 
-vi.mock('@/lib/backend/files', () => ({
-  filesApi: {
-    raw: mockRawFile,
-    createFolder: mockCreateFolder,
-    moveFile: mockMoveFile,
-    importSampleData: vi.fn(),
-    getLdacaFeatured: vi.fn(async () => ({ state: 'successful', data: [], message: 'Loaded' })),
-    searchLdaca: vi.fn(async () => ({ state: 'successful', data: [], message: 'Searched' })),
-    importLdaca: vi.fn(),
-  },
+vi.mock('@/api/generated/sdk.gen', () => ({
+  getRawFile: mockRawFile,
+  createFolder: mockCreateFolder,
+  moveFile: mockMoveFile,
+  importSampleData: vi.fn(),
+  listLdacaFeaturedCollections: mockListLdacaFeaturedCollections,
+  searchLdacaCollections: vi.fn(async () => ({ data: { state: 'successful', data: [], message: 'Searched' } })),
+  importLdacaDataset: vi.fn(),
+  uploadWorkspaceZip: vi.fn(),
 }));
 
 vi.mock('@/hooks/useFiles', () => ({
@@ -170,13 +171,6 @@ vi.mock('@/components/help/InfoIcon', () => ({
   default: () => null,
 }));
 
-vi.mock('@/lib/backend/workspaces', () => ({
-  workspacesApi: {
-    uploadZip: vi.fn(),
-    downloadZip: vi.fn(),
-  },
-}));
-
 describe('DataLoaderFeature citation UI', () => {
   const getVisibleMatch = <T extends HTMLElement>(elements: T[]) => {
     return elements.at(-1) ?? elements[0]!;
@@ -196,9 +190,13 @@ describe('DataLoaderFeature citation UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHandleUploadFile.mockResolvedValue(true);
-    mockRawFile.mockResolvedValue('# ADO Citation\n\nReference text.');
-    mockCreateFolder.mockResolvedValue({ message: 'Folder created', path: 'new-folder' });
-    mockMoveFile.mockResolvedValue({ message: 'File moved', path: 'sample_data/Other/docs.csv' });
+    mockRawFile.mockResolvedValue({ data: '# ADO Citation\n\nReference text.', error: undefined });
+    mockCreateFolder.mockResolvedValue({ data: { message: 'Folder created', path: 'new-folder' }, error: undefined });
+    mockMoveFile.mockResolvedValue({ data: { message: 'File moved', path: 'sample_data/Other/docs.csv' }, error: undefined });
+    mockListLdacaFeaturedCollections.mockResolvedValue({
+      data: { state: 'successful', data: [], message: 'Loaded' },
+      error: undefined,
+    });
     usePreferencesStore.getState().setLdacaOniApiToken(null);
     mockWorkspaceState = {
       workspaces: [
@@ -227,7 +225,12 @@ describe('DataLoaderFeature citation UI', () => {
     await user.click(citationButtons[0]!);
 
     await waitFor(() => {
-      expect(mockRawFile).toHaveBeenCalledWith('sample_data/ADO/README.md', {});
+      expect(mockRawFile).toHaveBeenCalledWith({
+        headers: {},
+        parseAs: 'text',
+        query: { path: 'sample_data/ADO/README.md' },
+        throwOnError: true,
+      });
     });
     expect(screen.getByRole('heading', { name: 'Citation' })).toBeInTheDocument();
     expect(screen.getByText('ADO Citation')).toBeInTheDocument();
@@ -243,7 +246,11 @@ describe('DataLoaderFeature citation UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }));
 
     await waitFor(() => {
-      expect(mockCreateFolder).toHaveBeenCalledWith('', 'Research Notes', {});
+      expect(mockCreateFolder).toHaveBeenCalledWith({
+        body: { name: 'Research Notes', parent_path: '' },
+        headers: {},
+        throwOnError: true,
+      });
     });
   });
 
@@ -258,7 +265,11 @@ describe('DataLoaderFeature citation UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }));
 
     await waitFor(() => {
-      expect(mockCreateFolder).toHaveBeenCalledWith('sample_data/ADO', 'Transcripts', {});
+      expect(mockCreateFolder).toHaveBeenCalledWith({
+        body: { name: 'Transcripts', parent_path: 'sample_data/ADO' },
+        headers: {},
+        throwOnError: true,
+      });
     });
   });
 
@@ -288,11 +299,14 @@ describe('DataLoaderFeature citation UI', () => {
     fireEvent.drop(targetFolderRow, { dataTransfer });
 
     await waitFor(() => {
-      expect(mockMoveFile).toHaveBeenCalledWith(
-        'sample_data/ADO/docs.csv',
-        'sample_data/Other',
-        {},
-      );
+      expect(mockMoveFile).toHaveBeenCalledWith({
+        body: {
+          source_path: 'sample_data/ADO/docs.csv',
+          target_directory_path: 'sample_data/Other',
+        },
+        headers: {},
+        throwOnError: true,
+      });
     });
   });
 
@@ -324,11 +338,14 @@ describe('DataLoaderFeature citation UI', () => {
     fireEvent.drop(targetFileRow, { dataTransfer });
 
     await waitFor(() => {
-      expect(mockMoveFile).toHaveBeenCalledWith(
-        'sample_data/ADO/docs.csv',
-        'sample_data/Other',
-        {},
-      );
+      expect(mockMoveFile).toHaveBeenCalledWith({
+        body: {
+          source_path: 'sample_data/ADO/docs.csv',
+          target_directory_path: 'sample_data/Other',
+        },
+        headers: {},
+        throwOnError: true,
+      });
     });
   });
 
@@ -368,23 +385,26 @@ describe('DataLoaderFeature citation UI', () => {
 
   it('links LDaCA collection card titles to their portal pages', async () => {
     const user = userEvent.setup();
-    vi.mocked(filesApi.getLdacaFeatured).mockResolvedValueOnce({
-      state: 'successful',
-      data: [
-        {
-          id: 'arcp://name,hdl10.26180~23961609',
-          crate_id: 'arcp://name,hdl10.26180~23961609',
-          title: 'A COrpus of Oz Early English (COOEE)',
-          description: 'Historical English corpus',
-          types: ['Dataset'],
-          license: 'https://creativecommons.org/licenses/by/4.0/',
-          importable: true,
-          collections: [],
-          file_formats: [],
-          stats: {},
-        },
-      ],
-      message: 'Loaded',
+    vi.mocked(listLdacaFeaturedCollections).mockResolvedValueOnce({
+      data: {
+        state: 'successful',
+        data: [
+          {
+            id: 'arcp://name,hdl10.26180~23961609',
+            crate_id: 'arcp://name,hdl10.26180~23961609',
+            title: 'A COrpus of Oz Early English (COOEE)',
+            description: 'Historical English corpus',
+            types: ['Dataset'],
+            license: 'https://creativecommons.org/licenses/by/4.0/',
+            importable: true,
+            collections: [],
+            file_formats: [],
+            stats: {},
+          },
+        ],
+        message: 'Loaded',
+      },
+      error: undefined,
     });
 
     renderWithProviders(<DataLoaderFeature />);

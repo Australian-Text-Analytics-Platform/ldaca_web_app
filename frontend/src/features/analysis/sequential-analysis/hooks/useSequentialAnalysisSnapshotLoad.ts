@@ -9,7 +9,7 @@
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+import { downloadSnapshot } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
@@ -17,7 +17,9 @@ import {
   useSnapshotViewStore,
   type LoadedSnapshot,
 } from '@/features/snapshot-view';
-import type { SequentialAnalysisRequest } from '@/lib/backend/text';
+import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
+
+type SequentialAnalysisRequest = SequentialAnalysisRequestInput;
 
 /** Sequential-analysis-specific payload held by ``LoadedSnapshot.payload``.
  *
@@ -51,7 +53,13 @@ export function useSequentialAnalysisSnapshotLoad(): (filename: string) => Promi
   return useCallback(
     async (filename: string): Promise<void> => {
       const headers = getAuthHeaders();
-      const blob = await snapshotsApi.download(filename, headers);
+      const { data } = await downloadSnapshot({
+        headers,
+        parseAs: 'blob',
+        path: { filename },
+        throwOnError: true,
+      });
+      const blob = data as Blob;
       const bytes = new Uint8Array(await blob.arrayBuffer());
 
       const readResult = await readBundle(bytes);

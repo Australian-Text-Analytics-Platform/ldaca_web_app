@@ -4,10 +4,11 @@ import { toast } from 'sonner';
 import { FolderPlus, Quote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { filesApi, type SampleDataCollection } from '@/lib/backend/files';
+import { importSampleData } from '@/api/generated/sdk.gen';
+import type { SampleDataCollection } from '@/api/generated/types.gen';
 import {
-  getSampleDataCatalogueApiFilesSampleDataCatalogueGetOptions,
-  getSampleDataReadmeApiFilesSampleDataReadmeGetOptions,
+  getSampleDataCatalogueOptions,
+  getSampleDataReadmeOptions,
 } from '@/api/generated/@tanstack/react-query.gen';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -65,7 +66,8 @@ interface ReadmeViewerProps {
 
 const ReadmeViewer: React.FC<ReadmeViewerProps> = ({ path, collectionName, onClose }) => {
   const { data, isLoading, isError } = useQuery({
-    ...getSampleDataReadmeApiFilesSampleDataReadmeGetOptions({
+    ...getSampleDataReadmeOptions({
+      parseAs: 'text',
       query: { path: path ?? '' },
     }),
     enabled: path !== null,
@@ -124,7 +126,7 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
   const [viewingReadme, setViewingReadme] = useState<{ path: string; name: string } | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    ...getSampleDataCatalogueApiFilesSampleDataCatalogueGetOptions(),
+    ...getSampleDataCatalogueOptions(),
     staleTime: 30_000,
     retry: 1,
     enabled: open,
@@ -147,7 +149,11 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
     setImporting(true);
     const loadingToastId = toast.loading('Importing sample data…');
     try {
-      const result = await filesApi.importSampleData(selectedIds, authHeaders);
+      const { data: result } = await importSampleData({
+        body: { collection_ids: selectedIds },
+        headers: authHeaders,
+        throwOnError: true,
+      });
       toast.dismiss(loadingToastId);
       if (result.remote_download_started) {
         toast.success('Bundled datasets ready.');

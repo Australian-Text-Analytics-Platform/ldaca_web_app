@@ -9,12 +9,20 @@
  * ``lockedNodesSnapshot`` symbols, which freeze locked-node state at
  * Run time and are unrelated to view snapshots.
  */
-import type { CanonicalAnalysisTaskType } from '@/features/analysis/common/tasks/types';
+import type {
+  SnapshotManifest as GeneratedSnapshotManifest,
+  SnapshotPayloadEntryResult,
+  SnapshotPayloadEntryDispersionBins,
+  SnapshotPayloadEntrySourceProjection,
+  SnapshotPayloadEntrySettings,
+} from '@/api/generated/types.gen';
+
+export type SnapshotManifest = GeneratedSnapshotManifest;
 
 /** Tool key used in manifest and store slices. Mirrors the backend's
  * canonical task type strings so manifests speak the same language as
  * task records. */
-export type SnapshotToolKey = CanonicalAnalysisTaskType;
+export type SnapshotToolKey = SnapshotManifest['tool'];
 
 /** Snapshot bundle mode. ``demo`` is Mode 1 (v1). ``share`` is Mode 2a,
  * reserved here so manifests carry the field from day one; v1 never
@@ -32,115 +40,22 @@ export type ViewMode =
  * read these instead of pattern-matching on the mode string. This is
  * the central hook that makes Mode 2a a flip-the-bits exercise rather
  * than a sweep across every ``if`` site. */
-export interface SnapshotCapabilities {
-  /** Result-table pagination — always true on a loaded snapshot. */
-  canPaginate: boolean;
-  /** Sort / filter the result table client-side. Always true. */
-  canSortAndFilterResult: boolean;
-  /** Export the (snapshot's) result as CSV/parquet. Always true. */
-  canExport: boolean;
-  /** Browse / search source rows. Mode 2a only — false in v1 bundles. */
-  canFilterSourceRows: boolean;
-  /** Cross-tool jumps (e.g. token-freq → concordance). Reserved for
-   * multi-tool snapshots; always false in v1. */
-  canCrossJump: boolean;
-}
+export type SnapshotCapabilities = SnapshotManifest['capabilities'];
 
 /** Typed payload entry in the manifest's ``payloads`` array. New kinds
  * are added without bumping ``schema_version`` — loaders dispatch by
  * ``kind`` and ignore unknowns with a console warn. */
 export type SnapshotPayloadEntry =
-  | { kind: 'result'; path: string }
-  | { kind: 'dispersion-bins'; path: string }
-  | { kind: 'source-projection'; path: string; columns: string[] }
-  /** The captured tool-specific request blob (e.g. the
-   * ``ConcordanceAnalysisRequest`` that produced the result). JSON.
-   * Loaders parse it back into the tool's request type so the live
-   * ParameterPanel renders the captured search term / regex flag /
-   * context widths in read-only mode without inventing a parallel
-   * "frozen settings" data path. */
-  | { kind: 'settings'; path: string };
+  | SnapshotPayloadEntryResult
+  | SnapshotPayloadEntryDispersionBins
+  | SnapshotPayloadEntrySourceProjection
+  | SnapshotPayloadEntrySettings;
 
 /** Per-tool preview block (plan §2.3.1). Discriminated by ``tool``
  * so adding a new analytic tool means adding one arm here plus a
  * corresponding ``formatPreview()`` entry — the load dialog
  * inherits support automatically. */
-export type SnapshotPreview =
-  | {
-      tool: 'concordance';
-      searchTerm: string;
-      totalHits: number;
-      materialised: boolean;
-      displayColumns: string[];
-    }
-  | {
-      tool: 'quotation';
-      openPattern: string;
-      closePattern: string;
-      totalHits: number;
-      displayColumns: string[];
-    }
-  | {
-      tool: 'token_frequencies';
-      vocabSize: number;
-      topToken: string;
-      topTokenCount: number;
-      tokeniserId: string;
-    }
-  | {
-      tool: 'sequential_analysis';
-      seriesCount: number;
-      bucketCount: number;
-      chartType: string;
-    }
-  | {
-      tool: 'topic_modeling';
-      numTopics: number;
-      vocabSize: number;
-      embedder: string;
-      wordsPerTopic: number;
-    };
-
-/** Manifest written into ``manifest.json`` inside the bundle zip. */
-export interface SnapshotManifest {
-  /** Bundle-format version. Bumped on layout changes, not on
-   * additive payload kinds. */
-  schema_version: 1;
-  mode: SnapshotMode;
-  tool: SnapshotToolKey;
-  /** App version at capture time. For human reference. */
-  tool_version: string;
-  /** ISO-8601 UTC. */
-  captured_at: string;
-  /** User-chosen label shown in the snapshot's banner. */
-  title: string;
-  source: {
-    /** UUID at capture time, never re-engaged. */
-    workspace_id: string;
-    workspace_name: string;
-    node_ids: string[];
-    node_labels: string[];
-    /** Per-node row counts at capture time, positionally aligned with
-     * ``node_ids``. Optional for back-compat with bundles captured
-     * before this field landed — loaders that need a per-node figure
-     * fall back to splitting ``total_source_rows`` evenly across the
-     * nodes when this is missing. */
-    per_block_rows?: number[];
-    /** Sum of rows across the source nodes at capture. Recorded so
-     * loaders can cross-check against the mode's row cap. */
-    total_source_rows: number;
-  };
-  capabilities: SnapshotCapabilities;
-  /** Tool-specific preview stats — populated at capture so the load
-   * dialog can render summary rows without decoding parquet
-   * payloads. See ``SnapshotPreview`` for the per-tool shapes. */
-  preview: SnapshotPreview;
-  payloads: SnapshotPayloadEntry[];
-  /** Frozen node-id → colour map. Captured from ``useNodeColorsStore``
-   * at snapshot time; the loader hydrates this into the snapshot's
-   * own colour map, never writing back to the live store. */
-  node_colors: Record<string, string>;
-}
+export type SnapshotPreview = SnapshotManifest['preview'];
 
 /** A snapshot loaded into the store. The payload shape is per-tool and
  * filled in by each tool's capture/load code in Phase 1+; for now it

@@ -15,7 +15,7 @@
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+import { downloadSnapshot } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
@@ -26,8 +26,8 @@ import {
 import type {
   ConcordanceAnalysisRequest,
   ConcordanceDispersionBinsResponse,
-  ConcordanceResultEntry,
-} from '@/lib/backend/text/concordance';
+  ConcordanceNodeResult as ConcordanceResultEntry,
+} from '@/api/generated/types.gen';
 
 /** Concordance-specific payload held by ``LoadedSnapshot.payload``.
  * Mirrors the live UI's data shape so the live ParameterPanel +
@@ -74,7 +74,13 @@ export function useConcordanceSnapshotLoad(): (filename: string) => Promise<void
       const headers = getAuthHeaders();
 
       // Download bytes via Phase-0h endpoint.
-      const blob = await snapshotsApi.download(filename, headers);
+      const { data } = await downloadSnapshot({
+        headers,
+        parseAs: 'blob',
+        path: { filename },
+        throwOnError: true,
+      });
+      const blob = data as Blob;
       const bytes = new Uint8Array(await blob.arrayBuffer());
 
       // Decode zip + manifest. ``readBundle`` applies build-side

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
-import { type FilterPreviewResponse, type PolarsExpressionRequest, type PolarsExpressionApplyResponse, type PolarsExpressionContext } from '@/lib/backend/nodes';
+import type { FilterPreviewResponse, PolarsExpressionRequest, PolarsExpressionApplyResponse, PolarsExpressionContext } from '@/api/generated/types.gen';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';

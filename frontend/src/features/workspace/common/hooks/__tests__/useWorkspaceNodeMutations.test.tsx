@@ -5,56 +5,45 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------- API mocks ---------------------------------------------------
 
-const workspacesApiMock = vi.hoisted(() => ({
-  list: vi.fn(),
-  create: vi.fn(),
-  delete: vi.fn(),
-  uploadZip: vi.fn(),
-  startDownloadTask: vi.fn(),
-  downloadTaskArtifact: vi.fn(),
-  graph: vi.fn(),
-  save: vi.fn(),
-  updateName: vi.fn(),
-  updateDescription: vi.fn(),
-  current: { set: vi.fn() },
-}));
-
-const nodesApiMock = vi.hoisted(() => ({
-  rename: vi.fn(),
-  clone: vi.fn(),
-  delete: vi.fn(),
-  undo: vi.fn(),
-  redo: vi.fn(),
-  cast: vi.fn(),
-  renameColumn: vi.fn(),
-  deleteColumn: vi.fn(),
-  createFromFile: vi.fn(),
-  join: vi.fn(),
-  concat: vi.fn(),
-  concatPreview: vi.fn(),
-  filter: vi.fn(),
+const workspaceSdkMock = vi.hoisted(() => ({
+  addNodeToWorkspace: vi.fn(),
+  castNode: vi.fn(),
+  cloneNode: vi.fn(),
+  concatNodes: vi.fn(),
+  concatNodesPreview: vi.fn(),
+  createWorkspace: vi.fn(),
+  deleteNode: vi.fn(),
+  deleteNodeColumn: vi.fn(),
+  deleteWorkspace: vi.fn(),
+  detachConcordance: vi.fn(),
+  detachConcordanceDispersion: vi.fn(),
+  detachQuotation: vi.fn(),
+  filterNode: vi.fn(),
   filterPreview: vi.fn(),
-  slice: vi.fn(),
-  slicePreview: vi.fn(),
-  replaceText: vi.fn(),
-  replaceTextPreview: vi.fn(),
-  polarsExpressionPreview: vi.fn(),
+  getQuotation: vi.fn(),
+  joinNodes: vi.fn(),
+  listWorkspaces: vi.fn(),
+  materializeConcordance: vi.fn(),
+  materializeQuotation: vi.fn(),
   polarsExpressionApply: vi.fn(),
-}));
-
-const textApiMock = vi.hoisted(() => ({
-  concordanceDetach: vi.fn(),
-  concordanceMaterialize: vi.fn(),
-  quotation: vi.fn(),
-  quotationDetach: vi.fn(),
-  quotationMaterialize: vi.fn(),
+  polarsExpressionPreview: vi.fn(),
+  renameWorkspace: vi.fn(),
+  redoNodeOperation: vi.fn(),
+  renameNodeColumn: vi.fn(),
+  replaceApply: vi.fn(),
+  replacePreview: vi.fn(),
+  saveWorkspace: vi.fn(),
+  setCurrentWorkspace: vi.fn(),
+  sliceNode: vi.fn(),
+  slicePreview: vi.fn(),
+  undoNodeOperation: vi.fn(),
+  updateNodeName: vi.fn(),
+  updateWorkspaceDescription: vi.fn(),
 }));
 
 const fetchNodeInfoMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/backend/workspaces', () => ({ workspacesApi: workspacesApiMock }));
-vi.mock('@/lib/backend/nodes', () => ({ nodesApi: nodesApiMock }));
-vi.mock('@/lib/backend/text', () => ({ textApi: textApiMock }));
+vi.mock('@/api/generated/sdk.gen', () => workspaceSdkMock);
 vi.mock('@/lib/nodeInfo', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -127,15 +116,8 @@ const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => (
 
 describe('useWorkspaceNodeMutations', () => {
   beforeEach(() => {
-    Object.values(workspacesApiMock).forEach((value) => {
+    Object.values(workspaceSdkMock).forEach((value) => {
       if (typeof value === 'function') (value as ReturnType<typeof vi.fn>).mockReset();
-    });
-    workspacesApiMock.current.set.mockReset();
-    Object.values(nodesApiMock).forEach((value) => {
-      if (typeof value === 'function') (value as ReturnType<typeof vi.fn>).mockReset();
-    });
-    Object.values(textApiMock).forEach((value) => {
-      (value as ReturnType<typeof vi.fn>).mockReset();
     });
     fetchNodeInfoMock.mockReset();
   });
@@ -220,12 +202,12 @@ describe('useWorkspaceNodeMutations', () => {
   });
 
   describe('createWorkspace', () => {
-    it('calls workspacesApi.create with the auth headers and invalidates the workspaces list', async () => {
+    it('calls generated createWorkspace with the auth headers and invalidates the workspaces list', async () => {
       const queryClient = createTestClient();
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
       const startOperation = mkOperationFn();
       const endOperation = mkOperationFn();
-      workspacesApiMock.create.mockResolvedValue({ id: 'ws-new' });
+      workspaceSdkMock.createWorkspace.mockResolvedValue({ data: { id: 'ws-new' }, error: undefined });
 
       const { result } = renderHook(
         () =>
@@ -239,8 +221,10 @@ describe('useWorkspaceNodeMutations', () => {
         await result.current.actions.createWorkspace('My ws', 'desc');
       });
 
-      expect(workspacesApiMock.create).toHaveBeenCalledWith('My ws', 'desc', {
-        Authorization: 'Bearer test',
+      expect(workspaceSdkMock.createWorkspace).toHaveBeenCalledWith({
+        body: { name: 'My ws', description: 'desc' },
+        headers: { Authorization: 'Bearer test' },
+        throwOnError: true,
       });
       expect(startOperation).toHaveBeenCalledWith('createWorkspace');
       expect(endOperation).toHaveBeenCalledWith('createWorkspace');
@@ -251,7 +235,7 @@ describe('useWorkspaceNodeMutations', () => {
       const queryClient = createTestClient();
       const setOperationError = mkOperationError();
       const endOperation = mkOperationFn();
-      workspacesApiMock.create.mockRejectedValue(new Error('server down'));
+      workspaceSdkMock.createWorkspace.mockRejectedValue(new Error('server down'));
 
       const { result } = renderHook(
         () =>
@@ -278,7 +262,7 @@ describe('useWorkspaceNodeMutations', () => {
       // `['workspaces','current']` query cache — the selectionStore is
       // canonical and the server query is one-shot bootstrap.
       const queryClient = createTestClient();
-      workspacesApiMock.current.set.mockResolvedValue({ ok: true });
+      workspaceSdkMock.setCurrentWorkspace.mockResolvedValue({ data: { state: 'successful', id: 'ws-2' }, error: undefined });
       const setCurrentWorkspaceId = mkSetWorkspaceId();
       const clearSelection = mkClearSelection();
 
@@ -294,8 +278,10 @@ describe('useWorkspaceNodeMutations', () => {
         await result.current.actions.setCurrentWorkspace('ws-2');
       });
 
-      expect(workspacesApiMock.current.set).toHaveBeenCalledWith('ws-2', {
-        Authorization: 'Bearer test',
+      expect(workspaceSdkMock.setCurrentWorkspace).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        query: { workspace_id: 'ws-2' },
+        throwOnError: true,
       });
       expect(setCurrentWorkspaceId).toHaveBeenCalledWith('ws-2');
       expect(clearSelection).toHaveBeenCalled();
@@ -307,7 +293,7 @@ describe('useWorkspaceNodeMutations', () => {
       const queryClient = createTestClient();
       const setCurrentWorkspaceId = mkSetWorkspaceId();
       const clearSelection = mkClearSelection();
-      workspacesApiMock.delete.mockResolvedValue({ id: 'ws-1' });
+      workspaceSdkMock.deleteWorkspace.mockResolvedValue({ data: { id: 'ws-1' }, error: undefined });
 
       const { result } = renderHook(
         () =>
@@ -339,7 +325,7 @@ describe('useWorkspaceNodeMutations', () => {
       await expect(result.current.actions.deleteWorkspace('   ')).rejects.toThrow(
         /workspaceId is required/,
       );
-      expect(workspacesApiMock.delete).not.toHaveBeenCalled();
+      expect(workspaceSdkMock.deleteWorkspace).not.toHaveBeenCalled();
     });
   });
 
@@ -409,7 +395,7 @@ describe('useWorkspaceNodeMutations', () => {
     it('invalidates the workspace graph + node-data + node-schema keys on success', async () => {
       const queryClient = createTestClient();
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-      nodesApiMock.cast.mockResolvedValue({});
+      workspaceSdkMock.castNode.mockResolvedValue({ data: {}, error: undefined });
 
       const { result } = renderHook(
         () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
@@ -420,11 +406,12 @@ describe('useWorkspaceNodeMutations', () => {
         await result.current.actions.castColumn('node-1', 'col_a', 'integer');
       });
 
-      expect(nodesApiMock.cast).toHaveBeenCalledWith(
-        'node-1',
-        { column: 'col_a', target_type: 'integer', format: undefined },
-        { Authorization: 'Bearer test' },
-      );
+      expect(workspaceSdkMock.castNode).toHaveBeenCalledWith({
+        body: { column: 'col_a', target_type: 'integer', format: undefined },
+        headers: { Authorization: 'Bearer test' },
+        path: { node_id: 'node-1' },
+        throwOnError: true,
+      });
 
       const invalidatedKeys = invalidateSpy.mock.calls.map((call) => call[0]);
       expect(invalidatedKeys).toEqual(
@@ -441,7 +428,7 @@ describe('useWorkspaceNodeMutations', () => {
     it('clears selection only when the deleted node was the selected one', async () => {
       const queryClient = createTestClient();
       const clearSelection = mkClearSelection();
-      nodesApiMock.delete.mockResolvedValue({});
+      workspaceSdkMock.deleteNode.mockResolvedValue({ data: {}, error: undefined });
 
       const { result, rerender } = renderHook(
         (props: ReturnType<typeof buildHookArgs>) => useWorkspaceNodeMutations(props),
@@ -497,13 +484,13 @@ describe('useWorkspaceNodeMutations', () => {
           search_word: 'w',
         }),
       ).toThrow(/No workspace selected/);
-      expect(textApiMock.concordanceDetach).not.toHaveBeenCalled();
+      expect(workspaceSdkMock.detachConcordance).not.toHaveBeenCalled();
     });
 
-    it('detachConcordance forwards through textApi and invalidates the workspace graph', async () => {
+    it('detachConcordance forwards through generated SDK and invalidates the workspace graph', async () => {
       const queryClient = createTestClient();
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-      textApiMock.concordanceDetach.mockResolvedValue(undefined);
+      workspaceSdkMock.detachConcordance.mockResolvedValue({ data: {}, error: undefined });
 
       const { result } = renderHook(
         () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
@@ -518,11 +505,12 @@ describe('useWorkspaceNodeMutations', () => {
         });
       });
 
-      expect(textApiMock.concordanceDetach).toHaveBeenCalledWith(
-        'node-1',
-        { node_id: 'node-1', column: 'c', search_word: 'w' },
-        { Authorization: 'Bearer test' },
-      );
+      expect(workspaceSdkMock.detachConcordance).toHaveBeenCalledWith({
+        body: { node_id: 'node-1', column: 'c', search_word: 'w' },
+        headers: { Authorization: 'Bearer test' },
+        path: { node_id: 'node-1' },
+        throwOnError: true,
+      });
 
       const invalidatedKeys = invalidateSpy.mock.calls.map((call) => call[0]);
       expect(invalidatedKeys).toEqual(
@@ -530,12 +518,12 @@ describe('useWorkspaceNodeMutations', () => {
       );
     });
 
-    it('quotationSearch forwards through textApi.quotation without requiring a workspace', async () => {
+    it('quotationSearch forwards through generated SDK without requiring a workspace', async () => {
       // quotationSearch (and the materialize variants) deliberately don't
       // call ensureWorkspaceSelected — the backend route is node-scoped, so
       // a node id is enough.
       const queryClient = createTestClient();
-      textApiMock.quotation.mockResolvedValue({ rows: [] });
+      workspaceSdkMock.getQuotation.mockResolvedValue({ data: { rows: [] }, error: undefined });
 
       const { result } = renderHook(
         () =>
@@ -549,11 +537,12 @@ describe('useWorkspaceNodeMutations', () => {
         await result.current.actions.quotationSearch('node-1', { column: 'c' });
       });
 
-      expect(textApiMock.quotation).toHaveBeenCalledWith(
-        'node-1',
-        { column: 'c' },
-        { Authorization: 'Bearer test' },
-      );
+      expect(workspaceSdkMock.getQuotation).toHaveBeenCalledWith({
+        body: { column: 'c' },
+        headers: { Authorization: 'Bearer test' },
+        path: { node_id: 'node-1' },
+        throwOnError: true,
+      });
     });
   });
 });

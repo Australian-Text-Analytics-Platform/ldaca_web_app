@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceGroupedRow, ConcordanceResultEntry } from '@/lib/backend/text';
+import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/generated/types.gen';
 import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
 import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
@@ -26,6 +26,8 @@ import {
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_FREQ_COLUMNS,
 } from '../../generatedColumns';
+
+type ConcordanceGroupedRow = Record<string, unknown>[];
 
 /** Per-column alignment for the concordance table.
  *

@@ -10,10 +10,10 @@
 import { useCallback } from 'react';
 import JSZip from 'jszip';
 import type {
-  TokenFrequencyRequest,
+  TokenFrequencyRequestInput,
   TokenFrequencyResponse,
-} from '@/lib/backend/text';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+} from '@/api/generated/types.gen';
+import { uploadSnapshot } from '@/api/generated/sdk.gen';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,
@@ -26,6 +26,7 @@ import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelection
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
 const SETTINGS_PAYLOAD_PATH = 'settings.json';
+type TokenFrequencyRequest = TokenFrequencyRequestInput;
 
 export interface UseTokenFrequencySnapshotCaptureInput {
   workspaceId: string | null;
@@ -200,11 +201,14 @@ export function useTokenFrequencySnapshotCapture(
       }
       const bundleBytes = await zip.generateAsync({ type: 'uint8array' });
 
-      await snapshotsApi.upload(
-        new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
-        filename,
-        getAuthHeaders(),
-      );
+      await uploadSnapshot({
+        body: {
+          file: new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
+          filename,
+        },
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
     },
     [
       workspaceId,

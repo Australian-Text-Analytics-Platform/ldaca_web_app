@@ -18,10 +18,8 @@ vi.mock('../clearAnalysis', () => ({
   clearAnalysis: clearAnalysisMock,
 }));
 
-vi.mock('@/lib/backend/workspaces', () => ({
-  workspacesApi: {
-    cancelTask: cancelTaskMock,
-  },
+vi.mock('@/api/generated/sdk.gen', () => ({
+  cancelTask: cancelTaskMock,
 }));
 
 vi.mock('../useAnalysisHydration', () => ({
@@ -51,7 +49,7 @@ vi.mock('../tasks/useAnalysisTaskFlow', () => ({
 describe('useAnalysisFeature', () => {
   beforeEach(() => {
     cancelTaskMock.mockReset();
-    cancelTaskMock.mockResolvedValue({ state: 'successful' });
+    cancelTaskMock.mockResolvedValue({ data: { state: 'successful' }, error: undefined });
     clearAnalysisMock.mockReset();
     clearAnalysisMock.mockImplementation(async ({ onCleanup }) => {
       onCleanup(['task-1']);
@@ -106,6 +104,10 @@ describe('useAnalysisFeature', () => {
       await result.current.stopTask();
     });
 
-    expect(cancelTaskMock).toHaveBeenCalledWith({ task_id: 'task-1' }, headers);
+    expect(cancelTaskMock).toHaveBeenCalledWith({
+      headers,
+      query: { task_id: 'task-1' },
+      throwOnError: true,
+    });
   });
 });

@@ -1013,7 +1013,7 @@
         "title": "AuthMethod",
         "type": "object"
       },
-      "Body_google_auth_callback_api_auth_google_callback_post": {
+      "Body_google_auth_callback": {
         "properties": {
           "credential": {
             "title": "Credential",
@@ -1027,10 +1027,10 @@
         "required": [
           "credential"
         ],
-        "title": "Body_google_auth_callback_api_auth_google_callback_post",
+        "title": "Body_google_auth_callback",
         "type": "object"
       },
-      "Body_upload_file_api_files_upload_post": {
+      "Body_upload_file": {
         "properties": {
           "file": {
             "contentMediaType": "application/octet-stream",
@@ -1041,10 +1041,10 @@
         "required": [
           "file"
         ],
-        "title": "Body_upload_file_api_files_upload_post",
+        "title": "Body_upload_file",
         "type": "object"
       },
-      "Body_upload_snapshot_api_users_me_snapshots_post": {
+      "Body_upload_snapshot": {
         "properties": {
           "file": {
             "contentMediaType": "application/octet-stream",
@@ -1060,10 +1060,10 @@
           "file",
           "filename"
         ],
-        "title": "Body_upload_snapshot_api_users_me_snapshots_post",
+        "title": "Body_upload_snapshot",
         "type": "object"
       },
-      "Body_upload_workspace_zip_api_workspaces_upload_post": {
+      "Body_upload_workspace_zip": {
         "properties": {
           "file": {
             "contentMediaType": "application/octet-stream",
@@ -1074,7 +1074,7 @@
         "required": [
           "file"
         ],
-        "title": "Body_upload_workspace_zip_api_workspaces_upload_post",
+        "title": "Body_upload_workspace_zip",
         "type": "object"
       },
       "CastNodeInfo": {
@@ -2445,6 +2445,43 @@
           }
         },
         "title": "ConcordanceResultQuery",
+        "type": "object"
+      },
+      "ConcordanceSnapshotPreview": {
+        "properties": {
+          "displayColumns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Displaycolumns",
+            "type": "array"
+          },
+          "materialised": {
+            "title": "Materialised",
+            "type": "boolean"
+          },
+          "searchTerm": {
+            "title": "Searchterm",
+            "type": "string"
+          },
+          "tool": {
+            "const": "concordance",
+            "title": "Tool",
+            "type": "string"
+          },
+          "totalHits": {
+            "title": "Totalhits",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tool",
+          "searchTerm",
+          "totalHits",
+          "materialised",
+          "displayColumns"
+        ],
+        "title": "ConcordanceSnapshotPreview",
         "type": "object"
       },
       "ConfigResponse": {
@@ -4619,6 +4656,43 @@
         "title": "QuotationResultQuery",
         "type": "object"
       },
+      "QuotationSnapshotPreview": {
+        "properties": {
+          "closePattern": {
+            "title": "Closepattern",
+            "type": "string"
+          },
+          "displayColumns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Displaycolumns",
+            "type": "array"
+          },
+          "openPattern": {
+            "title": "Openpattern",
+            "type": "string"
+          },
+          "tool": {
+            "const": "quotation",
+            "title": "Tool",
+            "type": "string"
+          },
+          "totalHits": {
+            "title": "Totalhits",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tool",
+          "openPattern",
+          "closePattern",
+          "totalHits",
+          "displayColumns"
+        ],
+        "title": "QuotationSnapshotPreview",
+        "type": "object"
+      },
       "RenameColumnRequest": {
         "properties": {
           "new_name": {
@@ -5379,6 +5453,35 @@
         "title": "SequentialAnalysisResponse",
         "type": "object"
       },
+      "SequentialAnalysisSnapshotPreview": {
+        "properties": {
+          "bucketCount": {
+            "title": "Bucketcount",
+            "type": "integer"
+          },
+          "chartType": {
+            "title": "Charttype",
+            "type": "string"
+          },
+          "seriesCount": {
+            "title": "Seriescount",
+            "type": "integer"
+          },
+          "tool": {
+            "const": "sequential_analysis",
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "seriesCount",
+          "bucketCount",
+          "chartType"
+        ],
+        "title": "SequentialAnalysisSnapshotPreview",
+        "type": "object"
+      },
       "SetCurrentWorkspaceResponse": {
         "properties": {
           "id": {
@@ -5473,6 +5576,39 @@
         "title": "SliceRequest",
         "type": "object"
       },
+      "SnapshotCapabilities": {
+        "properties": {
+          "canCrossJump": {
+            "title": "Cancrossjump",
+            "type": "boolean"
+          },
+          "canExport": {
+            "title": "Canexport",
+            "type": "boolean"
+          },
+          "canFilterSourceRows": {
+            "title": "Canfiltersourcerows",
+            "type": "boolean"
+          },
+          "canPaginate": {
+            "title": "Canpaginate",
+            "type": "boolean"
+          },
+          "canSortAndFilterResult": {
+            "title": "Cansortandfilterresult",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canPaginate",
+          "canSortAndFilterResult",
+          "canExport",
+          "canFilterSourceRows",
+          "canCrossJump"
+        ],
+        "title": "SnapshotCapabilities",
+        "type": "object"
+      },
       "SnapshotDeleteResponse": {
         "properties": {
           "deleted": {
@@ -5496,9 +5632,7 @@
             "type": "string"
           },
           "manifest": {
-            "additionalProperties": true,
-            "title": "Manifest",
-            "type": "object"
+            "$ref": "#/components/schemas/SnapshotManifest"
           },
           "size_bytes": {
             "title": "Size Bytes",
@@ -5529,6 +5663,251 @@
         "title": "SnapshotListResponse",
         "type": "object"
       },
+      "SnapshotManifest": {
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/SnapshotCapabilities"
+          },
+          "captured_at": {
+            "title": "Captured At",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "demo",
+              "share"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "node_colors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Node Colors",
+            "type": "object"
+          },
+          "payloads": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SnapshotPayloadEntryResult"
+                },
+                {
+                  "$ref": "#/components/schemas/SnapshotPayloadEntryDispersionBins"
+                },
+                {
+                  "$ref": "#/components/schemas/SnapshotPayloadEntrySourceProjection"
+                },
+                {
+                  "$ref": "#/components/schemas/SnapshotPayloadEntrySettings"
+                }
+              ]
+            },
+            "title": "Payloads",
+            "type": "array"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConcordanceSnapshotPreview"
+              },
+              {
+                "$ref": "#/components/schemas/QuotationSnapshotPreview"
+              },
+              {
+                "$ref": "#/components/schemas/TokenFrequenciesSnapshotPreview"
+              },
+              {
+                "$ref": "#/components/schemas/SequentialAnalysisSnapshotPreview"
+              },
+              {
+                "$ref": "#/components/schemas/TopicModelingSnapshotPreview"
+              }
+            ],
+            "title": "Preview"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SnapshotSource"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tool": {
+            "enum": [
+              "topic_modeling",
+              "token_frequencies",
+              "sequential_analysis",
+              "concordance",
+              "quotation"
+            ],
+            "title": "Tool",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "mode",
+          "tool",
+          "tool_version",
+          "captured_at",
+          "title",
+          "source",
+          "capabilities",
+          "preview",
+          "payloads",
+          "node_colors"
+        ],
+        "title": "SnapshotManifest",
+        "type": "object"
+      },
+      "SnapshotPayloadEntryDispersionBins": {
+        "properties": {
+          "kind": {
+            "const": "dispersion-bins",
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path"
+        ],
+        "title": "SnapshotPayloadEntryDispersionBins",
+        "type": "object"
+      },
+      "SnapshotPayloadEntryResult": {
+        "properties": {
+          "kind": {
+            "const": "result",
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path"
+        ],
+        "title": "SnapshotPayloadEntryResult",
+        "type": "object"
+      },
+      "SnapshotPayloadEntrySettings": {
+        "properties": {
+          "kind": {
+            "const": "settings",
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path"
+        ],
+        "title": "SnapshotPayloadEntrySettings",
+        "type": "object"
+      },
+      "SnapshotPayloadEntrySourceProjection": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "kind": {
+            "const": "source-projection",
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "columns"
+        ],
+        "title": "SnapshotPayloadEntrySourceProjection",
+        "type": "object"
+      },
+      "SnapshotSource": {
+        "properties": {
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Node Ids",
+            "type": "array"
+          },
+          "node_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Node Labels",
+            "type": "array"
+          },
+          "per_block_rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Block Rows"
+          },
+          "total_source_rows": {
+            "title": "Total Source Rows",
+            "type": "integer"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          },
+          "workspace_name": {
+            "title": "Workspace Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "workspace_name",
+          "node_ids",
+          "node_labels",
+          "total_source_rows"
+        ],
+        "title": "SnapshotSource",
+        "type": "object"
+      },
       "SnapshotUploadResponse": {
         "properties": {
           "filename": {
@@ -5536,9 +5915,7 @@
             "type": "string"
           },
           "manifest": {
-            "additionalProperties": true,
-            "title": "Manifest",
-            "type": "object"
+            "$ref": "#/components/schemas/SnapshotManifest"
           }
         },
         "required": [
@@ -5718,6 +6095,40 @@
           "message"
         ],
         "title": "TaskListResponse",
+        "type": "object"
+      },
+      "TokenFrequenciesSnapshotPreview": {
+        "properties": {
+          "tokeniserId": {
+            "title": "Tokeniserid",
+            "type": "string"
+          },
+          "tool": {
+            "const": "token_frequencies",
+            "title": "Tool",
+            "type": "string"
+          },
+          "topToken": {
+            "title": "Toptoken",
+            "type": "string"
+          },
+          "topTokenCount": {
+            "title": "Toptokencount",
+            "type": "integer"
+          },
+          "vocabSize": {
+            "title": "Vocabsize",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tool",
+          "vocabSize",
+          "topToken",
+          "topTokenCount",
+          "tokeniserId"
+        ],
+        "title": "TokenFrequenciesSnapshotPreview",
         "type": "object"
       },
       "TokenFrequencyData": {
@@ -7028,6 +7439,40 @@
         "title": "TopicModelingResultUpdateRequest",
         "type": "object"
       },
+      "TopicModelingSnapshotPreview": {
+        "properties": {
+          "embedder": {
+            "title": "Embedder",
+            "type": "string"
+          },
+          "numTopics": {
+            "title": "Numtopics",
+            "type": "integer"
+          },
+          "tool": {
+            "const": "topic_modeling",
+            "title": "Tool",
+            "type": "string"
+          },
+          "vocabSize": {
+            "title": "Vocabsize",
+            "type": "integer"
+          },
+          "wordsPerTopic": {
+            "title": "Wordspertopic",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tool",
+          "numTopics",
+          "vocabSize",
+          "embedder",
+          "wordsPerTopic"
+        ],
+        "title": "TopicModelingSnapshotPreview",
+        "type": "object"
+      },
       "TopicModelingTopic": {
         "properties": {
           "id": {
@@ -7832,6 +8277,19 @@
         "title": "WorkspaceTaskStartResponse",
         "type": "object"
       },
+      "WorkspaceUiState": {
+        "properties": {
+          "node_colors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Node Colors",
+            "type": "object"
+          }
+        },
+        "title": "WorkspaceUiState",
+        "type": "object"
+      },
       "WorkspaceUploadResponse": {
         "properties": {
           "state": {
@@ -7931,7 +8389,7 @@
     "/": {
       "get": {
         "description": "Return API feature/index metadata.\n\nUsed by:\n- browser/manual root checks and basic service discovery\n\nWhy:\n- Provides a human-readable entrypoint summary for backend capabilities.",
-        "operationId": "root__get",
+        "operationId": "root",
         "responses": {
           "200": {
             "content": {
@@ -7948,7 +8406,7 @@
     "/api/admin/cleanup": {
       "get": {
         "description": "Trigger cleanup of expired session rows.\n\nUsed by:\n- admin maintenance actions\n\nWhy:\n- Allows manual session-store maintenance in addition to automatic cleanup.\n\nRefactor note:\n- Add `require_admin` dependency before wider deployment.",
-        "operationId": "admin_cleanup_api_admin_cleanup_get",
+        "operationId": "admin_cleanup",
         "parameters": [
           {
             "in": "header",
@@ -7997,7 +8455,7 @@
     "/api/admin/users": {
       "get": {
         "description": "List users with active-session counts.\n\nUsed by:\n- admin dashboard/user management views\n\nWhy:\n- Provides operational visibility into user and session activity.\n\nRefactor note:\n- Add `require_admin` dependency before wider deployment to avoid role drift.",
-        "operationId": "list_users_api_admin_users_get",
+        "operationId": "list_users",
         "parameters": [
           {
             "in": "header",
@@ -8046,7 +8504,7 @@
     "/api/auth/": {
       "get": {
         "description": "Main auth endpoint - tells frontend everything it needs to know.\n\nReturns:\n- In single-user mode: authenticated=True with root user info\n- In multi-user mode with valid token: authenticated=True with user info\n- In multi-user mode without token: authenticated=False with available auth methods\n\nUsed by:\n- frontend app bootstrap auth probe\n\nWhy:\n- Provides one canonical auth capability + identity payload per startup.",
-        "operationId": "get_auth_info_api_auth__get",
+        "operationId": "get_auth_info",
         "parameters": [
           {
             "in": "header",
@@ -8097,7 +8555,7 @@
     "/api/auth/cilogon/callback": {
       "get": {
         "description": "Handle the CILogon authorization code callback.\n\nCILogon redirects here after the user authenticates. We verify the CSRF\n``state``, exchange the authorization code for tokens, fetch the user's\nprofile from the userinfo endpoint, provision a local session, and\nredirect back to the SPA with the access token in the URL query string.",
-        "operationId": "cilogon_callback_api_auth_cilogon_callback_get",
+        "operationId": "cilogon_callback",
         "parameters": [
           {
             "in": "query",
@@ -8194,7 +8652,7 @@
     "/api/auth/cilogon/login": {
       "get": {
         "description": "Redirect the browser to the CILogon authorization endpoint.\n\nGenerates a random ``state`` for CSRF protection (stored as a short-lived\ncookie), builds the OIDC authorization URL from the discovery document,\nand redirects the user to CILogon to authenticate.",
-        "operationId": "cilogon_login_api_auth_cilogon_login_get",
+        "operationId": "cilogon_login",
         "responses": {
           "200": {
             "content": {
@@ -8215,7 +8673,7 @@
     "/api/auth/google": {
       "post": {
         "description": "Authenticate user via Google OAuth and create app session tokens.\n\nUsed by the frontend Google sign-in flow (JSON body variant). Delegates\nthe verification + provisioning logic to :func:`_verify_and_create_session`\nand shapes the response into ``GoogleOut``.",
-        "operationId": "google_auth_api_auth_google_post",
+        "operationId": "google_auth",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8258,12 +8716,12 @@
     "/api/auth/google/callback": {
       "post": {
         "description": "Handle the Google Identity Services redirect callback.\n\nGoogle POSTs the ID-token ``credential`` and a CSRF token here after the\nuser authenticates on Google's consent page (``ux_mode: 'redirect'``).\nWe verify the token, create/find the local user, issue a session, and\nredirect back to the SPA with the access token in the URL fragment.",
-        "operationId": "google_auth_callback_api_auth_google_callback_post",
+        "operationId": "google_auth_callback",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/Body_google_auth_callback_api_auth_google_callback_post"
+                "$ref": "#/components/schemas/Body_google_auth_callback"
               }
             }
           },
@@ -8299,7 +8757,7 @@
     "/api/auth/health": {
       "get": {
         "description": "Return authentication subsystem readiness metadata.\n\nUsed by:\n- health/status probes and diagnostics pages\n\nWhy:\n- Exposes auth mode and endpoint availability without authentication.",
-        "operationId": "auth_health_api_auth_health_get",
+        "operationId": "auth_health",
         "responses": {
           "200": {
             "content": {
@@ -8320,7 +8778,7 @@
     "/api/auth/logout": {
       "post": {
         "description": "Logout current user session (multi-user) or no-op (single-user).\n\nUsed by:\n- frontend sign-out action\n\nWhy:\n- Keeps logout behavior mode-aware while preserving shared endpoint contract.",
-        "operationId": "logout_api_auth_logout_post",
+        "operationId": "logout",
         "parameters": [
           {
             "in": "header",
@@ -8369,7 +8827,7 @@
     "/api/auth/me": {
       "get": {
         "description": "Return normalized current user profile fields.\n\nUsed by:\n- frontend profile/session widgets\n\nWhy:\n- Provides stable user response shape independent of DB row types.",
-        "operationId": "get_current_user_info_api_auth_me_get",
+        "operationId": "get_current_user_info",
         "parameters": [
           {
             "in": "header",
@@ -8420,7 +8878,7 @@
     "/api/auth/status": {
       "get": {
         "description": "Return minimal authenticated status payload.\n\nUsed by:\n- lightweight frontend auth status checks\n\nWhy:\n- Allows cheap auth verification without full `get_auth_info` metadata.",
-        "operationId": "auth_status_api_auth_status_get",
+        "operationId": "auth_status",
         "parameters": [
           {
             "in": "header",
@@ -8469,7 +8927,7 @@
     "/api/config/": {
       "get": {
         "description": "Return currently effective runtime configuration values.\n\nUsed by:\n- frontend settings/config panels and OAuth client bootstrap\n\nWhy:\n- Exposes backend mode, storage root, and Google OAuth client ID so the\n  frontend can initialize the login provider at runtime.",
-        "operationId": "get_config_api_config__get",
+        "operationId": "get_config",
         "responses": {
           "200": {
             "content": {
@@ -8490,7 +8948,7 @@
       },
       "post": {
         "description": "Update in-memory runtime configuration values.\n\nUsed by:\n- frontend config edit flow\n\nWhy:\n- Allows runtime overrides without process restart.\n\nRefactor note:\n- Current update is in-memory only; persist-or-reload strategy may be needed\n    for multi-process or restart-stable configuration behavior.",
-        "operationId": "update_config_api_config__post",
+        "operationId": "update_config",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8533,7 +8991,7 @@
     "/api/files/": {
       "get": {
         "description": "List user-visible files as a nested tree.\n\nUsed by:\n- frontend file browser panel\n\nWhy:\n- The frontend consumes the directory structure directly instead of\n  reconstructing it from a flat file listing.",
-        "operationId": "get_user_files_api_files__get",
+        "operationId": "get_user_files",
         "parameters": [
           {
             "in": "header",
@@ -8560,7 +9018,7 @@
                   "items": {
                     "$ref": "#/components/schemas/FileTreeNodeResponse"
                   },
-                  "title": "Response Get User Files Api Files  Get",
+                  "title": "Response Get User Files",
                   "type": "array"
                 }
               }
@@ -8588,7 +9046,7 @@
     "/api/files/demo-snapshots/catalogue": {
       "get": {
         "description": "Return the demo-snapshot catalogue, augmented with per-bundle status.\n\nFetches ``demo_snapshots/catalogue.json`` from the configured sample-data\nremote. Each entry is annotated with the user-specific status\n(``downloaded`` / ``conflict`` / ``not_downloaded``) so the frontend can\nrender conflict warnings without a second round-trip.\n\nReturns an empty list (not 404) when the catalogue is absent so the\nfrontend tab can render an empty-state instead of erroring out \u2014 the\nsample-data repo can ship without the demo-snapshots block until\nbundles are authored.",
-        "operationId": "get_demo_snapshots_catalogue_api_files_demo_snapshots_catalogue_get",
+        "operationId": "get_demo_snapshots_catalogue",
         "parameters": [
           {
             "in": "header",
@@ -8639,7 +9097,7 @@
     "/api/files/folders": {
       "post": {
         "description": "Create a folder inside the user's data directory.",
-        "operationId": "create_folder_api_files_folders_post",
+        "operationId": "create_folder",
         "parameters": [
           {
             "in": "header",
@@ -8700,7 +9158,7 @@
     "/api/files/import-demo-snapshots": {
       "post": {
         "description": "Download selected demo-snapshot bundles into the user's snapshot folder.\n\nBehaviour per bundle:\n  - ``not_downloaded`` \u2192 download, verify SHA, write to snapshot folder\n  - ``downloaded`` \u2192 skip (matching local copy already present)\n  - ``conflict`` \u2192 skip unless the bundle id is also in ``replace_ids``,\n    in which case the local copy is deleted and the bundle re-downloaded\n\nFailures (network, SHA mismatch, write error) are recorded per-entry as\n``failed`` so a partial run still reports what landed and what didn't.\nThe user's own snapshot saves are never touched unless explicitly\nopted in via ``replace_ids``.",
-        "operationId": "import_demo_snapshots_api_files_import_demo_snapshots_post",
+        "operationId": "import_demo_snapshots",
         "parameters": [
           {
             "in": "header",
@@ -8764,7 +9222,7 @@
     "/api/files/import-ldaca": {
       "post": {
         "description": "Submit background task to import LDaCA dataset from URL.\n\nUsed by:\n- frontend dataset import action\n\nWhy:\n- Runs network/download/import pipeline outside request-response lifecycle.",
-        "operationId": "import_ldaca_dataset_api_files_import_ldaca_post",
+        "operationId": "import_ldaca_dataset",
         "parameters": [
           {
             "in": "header",
@@ -8841,7 +9299,7 @@
     "/api/files/import-sample-data": {
       "post": {
         "description": "Import (or re-import) sample data for the current user on demand.\n\nPhase 1 (synchronous): copies bundled datasets (SCL, ADO/twitter) immediately.\nPhase 2 (background): downloads any missing or updated remote datasets\nif SAMPLE_DATA_REMOTE_URL is configured.\n\nIf request.collection_ids is non-empty, only those collections are downloaded\nremotely. An empty list means \"download all non-bundled collections\" (default).",
-        "operationId": "import_sample_data_api_files_import_sample_data_post",
+        "operationId": "import_sample_data",
         "parameters": [
           {
             "in": "header",
@@ -8904,7 +9362,7 @@
     "/api/files/ldaca/featured": {
       "get": {
         "description": "Return staff-picked LDaCA collections for the import dialog.",
-        "operationId": "list_ldaca_featured_collections_api_files_ldaca_featured_get",
+        "operationId": "list_ldaca_featured_collections",
         "parameters": [
           {
             "in": "header",
@@ -8971,7 +9429,7 @@
     "/api/files/ldaca/search": {
       "post": {
         "description": "Search LDaCA records through the backend ONI proxy.",
-        "operationId": "search_ldaca_collections_api_files_ldaca_search_post",
+        "operationId": "search_ldaca_collections",
         "parameters": [
           {
             "in": "header",
@@ -9048,7 +9506,7 @@
     "/api/files/move": {
       "post": {
         "description": "Move a file into another directory inside the user's data folder.",
-        "operationId": "move_file_api_files_move_post",
+        "operationId": "move_file",
         "parameters": [
           {
             "in": "header",
@@ -9109,7 +9567,7 @@
     "/api/files/preview": {
       "post": {
         "description": "Unified file preview endpoint.\n\n- Returns supported types based on extension.\n- Provides preview data (first few rows or page slice).\n- For Excel files, returns sheet_names and supports selecting sheet via payload.sheet_name.\n\nUsed by:\n- frontend file preview modal/table\n\nWhy:\n- Provides one format-aware preview API for heterogeneous file types.",
-        "operationId": "unified_file_preview_api_files_preview_post",
+        "operationId": "unified_file_preview",
         "parameters": [
           {
             "in": "header",
@@ -9170,7 +9628,7 @@
     "/api/files/raw": {
       "get": {
         "description": "Return raw UTF-8 text content for a file inside the user's data folder.",
-        "operationId": "get_raw_file_api_files_raw_get",
+        "operationId": "get_raw_file",
         "parameters": [
           {
             "description": "Path relative to the user's data directory",
@@ -9230,7 +9688,7 @@
     "/api/files/sample-data/catalogue": {
       "get": {
         "description": "Return the sample data catalogue augmented with per-collection status.",
-        "operationId": "get_sample_data_catalogue_api_files_sample_data_catalogue_get",
+        "operationId": "get_sample_data_catalogue",
         "parameters": [
           {
             "in": "header",
@@ -9281,7 +9739,7 @@
     "/api/files/sample-data/readme": {
       "get": {
         "description": "Proxy a README.md from the remote sample data repository.\n\nOnly .md files are permitted; path traversal is rejected.",
-        "operationId": "get_sample_data_readme_api_files_sample_data_readme_get",
+        "operationId": "get_sample_data_readme",
         "parameters": [
           {
             "description": "Relative path of the README inside the sample data repo",
@@ -9341,7 +9799,7 @@
     "/api/files/tasks": {
       "get": {
         "description": "List file-import worker tasks exposed via the files API.\n\nUsed by:\n- frontend import-task status polling\n\nWhy:\n    - Exposes file-import task status via explicit task types.",
-        "operationId": "list_files_tasks_api_files_tasks_get",
+        "operationId": "list_files_tasks",
         "parameters": [
           {
             "in": "header",
@@ -9392,7 +9850,7 @@
     "/api/files/tasks/clear": {
       "post": {
         "description": "Clear persisted file-import task records.\n\nUsed by:\n- frontend task-list cleanup actions\n\nWhy:\n- Removes completed/failed import task clutter while keeping artifacts.",
-        "operationId": "clear_files_tasks_api_files_tasks_clear_post",
+        "operationId": "clear_files_tasks",
         "parameters": [
           {
             "in": "query",
@@ -9475,7 +9933,7 @@
     "/api/files/upload": {
       "post": {
         "description": "Upload file to user's data folder",
-        "operationId": "upload_file_api_files_upload_post",
+        "operationId": "upload_file",
         "parameters": [
           {
             "in": "header",
@@ -9498,7 +9956,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_file_api_files_upload_post"
+                "$ref": "#/components/schemas/Body_upload_file"
               }
             }
           },
@@ -9536,7 +9994,7 @@
     "/api/files/{filename}": {
       "delete": {
         "description": "Delete user's file",
-        "operationId": "delete_file_api_files__filename__delete",
+        "operationId": "delete_file",
         "parameters": [
           {
             "in": "path",
@@ -9594,7 +10052,7 @@
       },
       "get": {
         "description": "Download user's file",
-        "operationId": "download_file_api_files__filename__get",
+        "operationId": "download_file",
         "parameters": [
           {
             "in": "path",
@@ -9652,7 +10110,7 @@
     "/api/files/{filename}/info": {
       "get": {
         "description": "Get detailed file information",
-        "operationId": "get_file_info_api_files__filename__info_get",
+        "operationId": "get_file_info",
         "parameters": [
           {
             "in": "path",
@@ -9711,7 +10169,7 @@
     },
     "/api/preferences/": {
       "get": {
-        "operationId": "get_preferences_api_preferences__get",
+        "operationId": "get_preferences",
         "parameters": [
           {
             "in": "header",
@@ -9759,7 +10217,7 @@
         ]
       },
       "put": {
-        "operationId": "update_preferences_api_preferences__put",
+        "operationId": "update_preferences",
         "parameters": [
           {
             "in": "header",
@@ -9820,7 +10278,7 @@
     "/api/tasks": {
       "get": {
         "description": "List tasks for current user.",
-        "operationId": "list_tasks_api_tasks_get",
+        "operationId": "list_tasks",
         "parameters": [
           {
             "in": "header",
@@ -9871,7 +10329,7 @@
     "/api/tasks/cancel": {
       "post": {
         "description": "Stop a running task and mark it as cancelled.\n\nUnlike ``/tasks/clear``, the task record is kept so the user can see the\ncancelled state in the task list and explicitly clear it afterwards.",
-        "operationId": "cancel_task_api_tasks_cancel_post",
+        "operationId": "cancel_task",
         "parameters": [
           {
             "in": "query",
@@ -9931,7 +10389,7 @@
     "/api/tasks/clear": {
       "post": {
         "description": "Clear a task and all associated caches by task id.\n\nIf the task is still running it is cancelled first.  Both the worker\ntask manager record and the analysis task manager record (including\nthe current-task-id mapping) are removed.",
-        "operationId": "clear_tasks_api_tasks_clear_post",
+        "operationId": "clear_tasks",
         "parameters": [
           {
             "in": "query",
@@ -9991,7 +10449,7 @@
     "/api/tasks/stream": {
       "get": {
         "description": "Unified SSE stream for task center.\n\nIncludes all user tasks from a single per-user task manager channel.\n\n    - frontend Task Center SSE subscriber\n\n    Why:\n    - Streams all per-user task updates through one connection.\n\n    Refactor note:\n    - Nested helper closures inside endpoint are sizeable; extraction to a small\n        streaming service object could improve testability.",
-        "operationId": "stream_tasks_api_tasks_stream_get",
+        "operationId": "stream_tasks",
         "parameters": [
           {
             "in": "query",
@@ -10056,7 +10514,7 @@
     "/api/text/default-stop-words": {
       "get": {
         "description": "Return bundled default stop words for a language.\n\nUsed by:\n- frontend token-frequency defaults loader (English fallback OK)\n- frontend topic-modelling post-fit stopword filter (passes\n  ``strict=true`` so unknown languages return ``[]`` instead of\n  silently substituting the English list \u2014 otherwise the filter\n  toggle would appear with English words on a Chinese run that\n  had no bundled zh list).\n\nWhy:\n- Provides deterministic language stop-word sets from packaged\n  resources. ``strict`` controls the unsupported-language behaviour:\n  ``False`` (default) keeps the legacy English fallback for\n  backwards compatibility; ``True`` returns an empty list.",
-        "operationId": "get_default_stop_words_api_text_default_stop_words_get",
+        "operationId": "get_default_stop_words",
         "parameters": [
           {
             "in": "query",
@@ -10111,7 +10569,7 @@
     "/api/users/me/snapshots": {
       "delete": {
         "description": "Batch delete. Without ``incompatible_with``, removes every\nsnapshot for ``tool``. With it, removes only those whose\n``manifest.tool_version`` is incompatible (MAJOR.MINOR mismatch).",
-        "operationId": "batch_delete_snapshots_api_users_me_snapshots_delete",
+        "operationId": "batch_delete_snapshots",
         "parameters": [
           {
             "in": "query",
@@ -10185,7 +10643,7 @@
       },
       "get": {
         "description": "List snapshots for the current user, optionally filtered by tool.",
-        "operationId": "list_snapshots_api_users_me_snapshots_get",
+        "operationId": "list_snapshots",
         "parameters": [
           {
             "in": "query",
@@ -10250,7 +10708,7 @@
       },
       "post": {
         "description": "Store a bundle uploaded from the frontend.\n\nValidates the filename, extracts the internal ``manifest.json`` to\nwrite the sidecar, auto-generates the ``.md`` description. Rejects\n409 on collision (the frontend pre-checks; this is defence-in-depth).",
-        "operationId": "upload_snapshot_api_users_me_snapshots_post",
+        "operationId": "upload_snapshot",
         "parameters": [
           {
             "in": "header",
@@ -10273,7 +10731,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_snapshot_api_users_me_snapshots_post"
+                "$ref": "#/components/schemas/Body_upload_snapshot"
               }
             }
           },
@@ -10311,7 +10769,7 @@
     "/api/users/me/snapshots/{filename}": {
       "delete": {
         "description": "Remove one snapshot (bundle + both sidecars).",
-        "operationId": "delete_snapshot_api_users_me_snapshots__filename__delete",
+        "operationId": "delete_snapshot",
         "parameters": [
           {
             "in": "path",
@@ -10369,7 +10827,7 @@
       },
       "get": {
         "description": "Stream a bundle's bytes back as ``application/zip``.",
-        "operationId": "download_snapshot_api_users_me_snapshots__filename__get",
+        "operationId": "download_snapshot",
         "parameters": [
           {
             "in": "path",
@@ -10427,7 +10885,7 @@
     "/api/users/me/snapshots/{filename}/description": {
       "get": {
         "description": "Return the ``.md`` sidecar content. Regenerates from manifest\nif the sidecar is missing \u2014 never returns 404 for a present\nbundle.",
-        "operationId": "get_snapshot_description_api_users_me_snapshots__filename__description_get",
+        "operationId": "get_snapshot_description",
         "parameters": [
           {
             "in": "path",
@@ -10485,7 +10943,7 @@
     "/api/workspaces/": {
       "get": {
         "description": "List all persisted workspaces visible to the current user.\n\nUsed by:\n- frontend workspace switcher/landing views\n\nWhy:\n- Provides fast summary metadata without loading full workspace graphs.",
-        "operationId": "list_workspaces_api_workspaces__get",
+        "operationId": "list_workspaces",
         "parameters": [
           {
             "in": "header",
@@ -10512,7 +10970,7 @@
                   "items": {
                     "$ref": "#/components/schemas/WorkspaceSummary"
                   },
-                  "title": "Response List Workspaces Api Workspaces  Get",
+                  "title": "Response List Workspaces",
                   "type": "array"
                 }
               }
@@ -10538,7 +10996,7 @@
       },
       "post": {
         "description": "Create a workspace and return normalized workspace metadata.\n\nUsed by:\n- frontend new-workspace dialog\n\nWhy:\n- Centralizes workspace-name validation and initialization metadata.",
-        "operationId": "create_workspace_api_workspaces__post",
+        "operationId": "create_workspace",
         "parameters": [
           {
             "in": "header",
@@ -10599,7 +11057,7 @@
     "/api/workspaces/ai-annotation": {
       "delete": {
         "description": "Clear stored AI annotation task state.",
-        "operationId": "clear_ai_annotation_api_workspaces_ai_annotation_delete",
+        "operationId": "clear_ai_annotation",
         "parameters": [
           {
             "in": "header",
@@ -10648,7 +11106,7 @@
       },
       "post": {
         "description": "Run AI annotation classification on selected nodes.\n\nCalls the OpenAI-compatible endpoint, stores results in\nthe analysis task manager, and returns paginated output.",
-        "operationId": "run_ai_annotation_api_workspaces_ai_annotation_post",
+        "operationId": "run_ai_annotation",
         "parameters": [
           {
             "in": "header",
@@ -10709,7 +11167,7 @@
     "/api/workspaces/ai-annotation/models": {
       "post": {
         "description": "List available models from an OpenAI-compatible endpoint.",
-        "operationId": "get_ai_annotation_models_api_workspaces_ai_annotation_models_post",
+        "operationId": "get_ai_annotation_models",
         "parameters": [
           {
             "in": "header",
@@ -10770,7 +11228,7 @@
     "/api/workspaces/ai-annotation/tasks/current": {
       "get": {
         "description": "Return current task IDs for AI annotation analysis.",
-        "operationId": "ai_annotation_current_tasks_api_workspaces_ai_annotation_tasks_current_get",
+        "operationId": "ai_annotation_current_tasks",
         "parameters": [
           {
             "in": "header",
@@ -10821,7 +11279,7 @@
     "/api/workspaces/ai-annotation/tasks/{task_id}/request": {
       "get": {
         "description": "Return stored request payload for an AI annotation task.",
-        "operationId": "ai_annotation_task_request_api_workspaces_ai_annotation_tasks__task_id__request_get",
+        "operationId": "ai_annotation_task_request",
         "parameters": [
           {
             "in": "path",
@@ -10881,7 +11339,7 @@
     "/api/workspaces/ai-annotation/tasks/{task_id}/result": {
       "get": {
         "description": "Read AI annotation result with optional pagination/sort overrides.",
-        "operationId": "ai_annotation_task_result_api_workspaces_ai_annotation_tasks__task_id__result_get",
+        "operationId": "ai_annotation_task_result",
         "parameters": [
           {
             "in": "path",
@@ -10986,7 +11444,7 @@
                       "type": "null"
                     }
                   ],
-                  "title": "Response Ai Annotation Task Result Api Workspaces Ai Annotation Tasks  Task Id  Result Get"
+                  "title": "Response Ai Annotation Task Result"
                 }
               }
             },
@@ -11011,7 +11469,7 @@
       },
       "post": {
         "description": "Read AI annotation result using POST body overrides.",
-        "operationId": "ai_annotation_task_result_post_api_workspaces_ai_annotation_tasks__task_id__result_post",
+        "operationId": "ai_annotation_task_result_post",
         "parameters": [
           {
             "in": "path",
@@ -11081,7 +11539,7 @@
     "/api/workspaces/concordance": {
       "post": {
         "description": "Run concordance immediately and store task metadata for retrieval.\n\nUsed by:\n- Frontend run route: `POST /workspaces/{id}/concordance`\n\nWhy:\n- Keeps API behavior aligned with other analyses by returning task-linked\n    responses while using shared concordance response builders.",
-        "operationId": "run_concordance_api_workspaces_concordance_post",
+        "operationId": "run_concordance",
         "parameters": [
           {
             "in": "header",
@@ -11142,7 +11600,7 @@
     "/api/workspaces/concordance/tasks/current": {
       "get": {
         "description": "Return current task IDs for concordance analysis.",
-        "operationId": "concordance_current_tasks_api_workspaces_concordance_tasks_current_get",
+        "operationId": "concordance_current_tasks",
         "parameters": [
           {
             "in": "header",
@@ -11193,7 +11651,7 @@
     "/api/workspaces/concordance/tasks/{task_id}/bins": {
       "get": {
         "description": "Return 100-bucket dispersion histogram for one materialised concordance node.\n\nUsed by:\n- Frontend dispersion summary plot, when a node has been materialised by\n  \"Process All\". The frontend re-aggregates these 100 buckets into a\n  smaller number of display bins (4, 5, 10, 20, 25, 50, 100) without\n  another network round-trip.\n\nWhy:\n- Server-side pre-binning collapses the response from one row per hit\n  (potentially tens of MB on large blocks) to ~100 rows per matched-text\n  term, regardless of corpus size.",
-        "operationId": "concordance_task_dispersion_bins_api_workspaces_concordance_tasks__task_id__bins_get",
+        "operationId": "concordance_task_dispersion_bins",
         "parameters": [
           {
             "in": "path",
@@ -11262,7 +11720,7 @@
     "/api/workspaces/concordance/tasks/{task_id}/request": {
       "get": {
         "description": "Return stored request payload for a concordance task.",
-        "operationId": "concordance_task_request_api_workspaces_concordance_tasks__task_id__request_get",
+        "operationId": "concordance_task_request",
         "parameters": [
           {
             "in": "path",
@@ -11322,7 +11780,7 @@
     "/api/workspaces/concordance/tasks/{task_id}/result": {
       "get": {
         "description": "Read concordance result with optional pagination/sort overrides.\n\nUsed by:\n- Frontend polling route: `GET /workspaces/{id}/concordance/tasks/{id}/result`\n\nWhy:\n- Hydrates saved concordance state while allowing query-time view changes.",
-        "operationId": "concordance_task_result_api_workspaces_concordance_tasks__task_id__result_get",
+        "operationId": "concordance_task_result",
         "parameters": [
           {
             "in": "path",
@@ -11505,7 +11963,7 @@
                       "type": "null"
                     }
                   ],
-                  "title": "Response Concordance Task Result Api Workspaces Concordance Tasks  Task Id  Result Get"
+                  "title": "Response Concordance Task Result"
                 }
               }
             },
@@ -11530,7 +11988,7 @@
       },
       "post": {
         "description": "Read concordance result using POST body overrides.\n\nUsed by:\n- Frontend state-sync route:\n    `POST /workspaces/{id}/concordance/tasks/{id}/result`\n\nWhy:\n- Preserves compatibility with clients that send result preferences in body\n    payloads instead of query parameters.",
-        "operationId": "concordance_task_result_post_api_workspaces_concordance_tasks__task_id__result_post",
+        "operationId": "concordance_task_result_post",
         "parameters": [
           {
             "in": "path",
@@ -11581,7 +12039,7 @@
                       "type": "null"
                     }
                   ],
-                  "title": "Response Concordance Task Result Post Api Workspaces Concordance Tasks  Task Id  Result Post"
+                  "title": "Response Concordance Task Result Post"
                 }
               }
             },
@@ -11607,7 +12065,7 @@
     },
     "/api/workspaces/current": {
       "get": {
-        "operationId": "get_current_workspace_api_workspaces_current_get",
+        "operationId": "get_current_workspace",
         "parameters": [
           {
             "in": "header",
@@ -11656,7 +12114,7 @@
       },
       "post": {
         "description": "Set or clear the current in-memory workspace for the user.\n\nUsed by:\n- frontend workspace selection flow\n\nWhy:\n- Ensures subsequent node/analysis operations target the intended workspace.",
-        "operationId": "set_current_workspace_api_workspaces_current_post",
+        "operationId": "set_current_workspace",
         "parameters": [
           {
             "in": "query",
@@ -11722,7 +12180,7 @@
     },
     "/api/workspaces/delete": {
       "delete": {
-        "operationId": "delete_workspace_api_workspaces_delete_delete",
+        "operationId": "delete_workspace",
         "parameters": [
           {
             "in": "query",
@@ -11781,7 +12239,7 @@
     },
     "/api/workspaces/description": {
       "put": {
-        "operationId": "update_workspace_description_api_workspaces_description_put",
+        "operationId": "update_workspace_description",
         "parameters": [
           {
             "in": "query",
@@ -11842,7 +12300,7 @@
     "/api/workspaces/download": {
       "post": {
         "description": "Start a background task to package the workspace as a ZIP archive.\n\nUsed by:\n- frontend Download button in Workspace Manager\n\nWhy:\n- Moves potentially slow ZIP compression into the Task Center so users can\n  track progress and the UI stays responsive.",
-        "operationId": "start_workspace_download_api_workspaces_download_post",
+        "operationId": "start_workspace_download",
         "parameters": [
           {
             "in": "header",
@@ -11893,7 +12351,7 @@
     "/api/workspaces/download/tasks/{task_id}/artifact": {
       "get": {
         "description": "Stream a completed workspace ZIP artifact and delete it after download.\n\nUsed by:\n- frontend auto-download on task completion\n\nWhy:\n- One-time artifact policy: the ZIP is deleted after the first successful\n  download to avoid unbounded disk usage.",
-        "operationId": "download_workspace_artifact_api_workspaces_download_tasks__task_id__artifact_get",
+        "operationId": "download_workspace_artifact",
         "parameters": [
           {
             "in": "path",
@@ -11951,7 +12409,7 @@
     "/api/workspaces/export": {
       "get": {
         "description": "Export one or more workspace nodes as downloadable file(s).\n\nIf multiple node_ids are provided, a ZIP archive is returned.\nSupported formats: csv, json, parquet, ipc, ndjson.",
-        "operationId": "export_nodes_api_workspaces_export_get",
+        "operationId": "export_nodes",
         "parameters": [
           {
             "in": "query",
@@ -12019,7 +12477,7 @@
     "/api/workspaces/graph": {
       "get": {
         "description": "Return workspace graph payload.\n\nUsed by:\n- frontend graph canvas initialization and refresh\n\nWhy:\n    - Exposes the workspace's native graph JSON; per-node entries are routed\n        through :func:`frontend_node_info` so the payload surfaces structured\n        ``tokenization`` metadata for the CustomNode inspector chip and\n        token-aware analyses.",
-        "operationId": "get_workspace_graph_api_workspaces_graph_get",
+        "operationId": "get_workspace_graph",
         "parameters": [
           {
             "in": "header",
@@ -12069,7 +12527,7 @@
     },
     "/api/workspaces/info": {
       "get": {
-        "operationId": "get_workspace_info_api_workspaces_info_get",
+        "operationId": "get_workspace_info",
         "parameters": [
           {
             "in": "header",
@@ -12119,7 +12577,7 @@
     },
     "/api/workspaces/name": {
       "put": {
-        "operationId": "rename_workspace_api_workspaces_name_put",
+        "operationId": "rename_workspace",
         "parameters": [
           {
             "in": "query",
@@ -12178,7 +12636,7 @@
     },
     "/api/workspaces/nodes": {
       "get": {
-        "operationId": "get_workspace_nodes_api_workspaces_nodes_get",
+        "operationId": "get_workspace_nodes",
         "parameters": [
           {
             "in": "header",
@@ -12227,7 +12685,7 @@
       },
       "post": {
         "description": "Add a data file as a new node to workspace.\n\nFiles are eagerly loaded into a Polars DataFrame, persisted as parquet under the workspace's `data/` folder,\nand then reloaded as a LazyFrame. This separates bulk data from `metadata.json` while keeping\nlazy processing semantics.",
-        "operationId": "add_node_to_workspace_api_workspaces_nodes_post",
+        "operationId": "add_node_to_workspace",
         "parameters": [
           {
             "in": "query",
@@ -12316,7 +12774,7 @@
     },
     "/api/workspaces/nodes/concat": {
       "post": {
-        "operationId": "concat_nodes_api_workspaces_nodes_concat_post",
+        "operationId": "concat_nodes",
         "parameters": [
           {
             "in": "header",
@@ -12376,7 +12834,7 @@
     },
     "/api/workspaces/nodes/concat/preview": {
       "post": {
-        "operationId": "concat_nodes_preview_api_workspaces_nodes_concat_preview_post",
+        "operationId": "concat_nodes_preview",
         "parameters": [
           {
             "in": "query",
@@ -12459,7 +12917,7 @@
     },
     "/api/workspaces/nodes/join": {
       "post": {
-        "operationId": "join_nodes_api_workspaces_nodes_join_post",
+        "operationId": "join_nodes",
         "parameters": [
           {
             "in": "query",
@@ -12571,7 +13029,7 @@
     },
     "/api/workspaces/nodes/join/preview": {
       "post": {
-        "operationId": "join_nodes_preview_api_workspaces_nodes_join_preview_post",
+        "operationId": "join_nodes_preview",
         "parameters": [
           {
             "in": "query",
@@ -12704,7 +13162,7 @@
     },
     "/api/workspaces/nodes/{node_id}": {
       "delete": {
-        "operationId": "delete_node_api_workspaces_nodes__node_id__delete",
+        "operationId": "delete_node",
         "parameters": [
           {
             "in": "path",
@@ -12761,7 +13219,7 @@
         ]
       },
       "get": {
-        "operationId": "get_node_info_api_workspaces_nodes__node_id__get",
+        "operationId": "get_node_info",
         "parameters": [
           {
             "in": "path",
@@ -12821,7 +13279,7 @@
     "/api/workspaces/nodes/{node_id}/ai-annotation/categories": {
       "get": {
         "description": "Return distinct category values from the annotation column of a node.",
-        "operationId": "get_ai_annotation_categories_api_workspaces_nodes__node_id__ai_annotation_categories_get",
+        "operationId": "get_ai_annotation_categories",
         "parameters": [
           {
             "in": "path",
@@ -12891,7 +13349,7 @@
     "/api/workspaces/nodes/{node_id}/ai-annotation/detach": {
       "post": {
         "description": "Run AI annotation on a node and detach the result as a new child node.\n\nClassifies texts using the OpenAI-compatible endpoint, writes the result\nas a parquet file, and adds it as a new node in the workspace.",
-        "operationId": "detach_ai_annotation_api_workspaces_nodes__node_id__ai_annotation_detach_post",
+        "operationId": "detach_ai_annotation",
         "parameters": [
           {
             "in": "path",
@@ -12961,7 +13419,7 @@
     "/api/workspaces/nodes/{node_id}/ai-annotation/providers": {
       "get": {
         "description": "Return distinct provider values from the annotation column of a node.",
-        "operationId": "get_ai_annotation_providers_api_workspaces_nodes__node_id__ai_annotation_providers_get",
+        "operationId": "get_ai_annotation_providers",
         "parameters": [
           {
             "in": "path",
@@ -13031,7 +13489,7 @@
     "/api/workspaces/nodes/{node_id}/ai-annotation/save": {
       "post": {
         "description": "Save AI annotation edits back to the source node.",
-        "operationId": "save_ai_annotation_api_workspaces_nodes__node_id__ai_annotation_save_post",
+        "operationId": "save_ai_annotation",
         "parameters": [
           {
             "in": "path",
@@ -13101,7 +13559,7 @@
     "/api/workspaces/nodes/{node_id}/cast": {
       "post": {
         "description": "Cast a single column data type in a node using Polars casting methods (in-place operation).\n\nArgs:\n    workspace_id: The workspace identifier\n    node_id: The node identifier to cast\n    cast_data: Dictionary with casting specifications:\n        - column: str - name of the column to cast\n        - target_type: str - target data type (e.g., \"integer\", \"float\", \"string\", \"datetime\", \"boolean\", \"categorical\")\n        - format: str (optional) - datetime format string for string to datetime conversion\n        Example: {\"column\": \"date_col\", \"target_type\": \"datetime\", \"format\": \"%Y-%m-%d\"}\n\nReturns:\n    Dictionary with the updated node information after casting",
-        "operationId": "cast_node_api_workspaces_nodes__node_id__cast_post",
+        "operationId": "cast_node",
         "parameters": [
           {
             "in": "path",
@@ -13170,7 +13628,7 @@
     },
     "/api/workspaces/nodes/{node_id}/clone": {
       "post": {
-        "operationId": "clone_node_api_workspaces_nodes__node_id__clone_post",
+        "operationId": "clone_node",
         "parameters": [
           {
             "in": "path",
@@ -13230,7 +13688,7 @@
     "/api/workspaces/nodes/{node_id}/columns/{column_name}": {
       "delete": {
         "description": "Delete a column from a node by delegating to DocWorkspace Node.drop.",
-        "operationId": "delete_node_column_api_workspaces_nodes__node_id__columns__column_name__delete",
+        "operationId": "delete_node_column",
         "parameters": [
           {
             "in": "path",
@@ -13297,7 +13755,7 @@
       },
       "put": {
         "description": "Rename a column by delegating to DocWorkspace Node.rename.",
-        "operationId": "rename_node_column_api_workspaces_nodes__node_id__columns__column_name__put",
+        "operationId": "rename_node_column",
         "parameters": [
           {
             "in": "path",
@@ -13376,7 +13834,7 @@
     "/api/workspaces/nodes/{node_id}/columns/{column_name}/describe": {
       "get": {
         "description": "Get descriptive statistics for a column using Polars describe with 'nearest' interpolation.",
-        "operationId": "describe_column_api_workspaces_nodes__node_id__columns__column_name__describe_get",
+        "operationId": "describe_column",
         "parameters": [
           {
             "in": "path",
@@ -13445,7 +13903,7 @@
     "/api/workspaces/nodes/{node_id}/columns/{column_name}/operations": {
       "get": {
         "description": "Return available no-arg Polars operations for a column, filtered by dtype.",
-        "operationId": "column_operations_api_workspaces_nodes__node_id__columns__column_name__operations_get",
+        "operationId": "column_operations",
         "parameters": [
           {
             "in": "path",
@@ -13513,7 +13971,7 @@
     },
     "/api/workspaces/nodes/{node_id}/columns/{column_name}/unique": {
       "get": {
-        "operationId": "get_column_unique_values_api_workspaces_nodes__node_id__columns__column_name__unique_get",
+        "operationId": "get_column_unique_values",
         "parameters": [
           {
             "in": "path",
@@ -13582,7 +14040,7 @@
     "/api/workspaces/nodes/{node_id}/concordance/detach": {
       "post": {
         "description": "Submit a background task to create a concordance-detached node.\n\nUsed by:\n- Frontend detach action:\n    `POST /workspaces/{id}/nodes/{node_id}/concordance/detach`\n\nWhy:\n- Runs potentially expensive row extraction out-of-band and returns task id\n    for progress tracking.",
-        "operationId": "detach_concordance_api_workspaces_nodes__node_id__concordance_detach_post",
+        "operationId": "detach_concordance",
         "parameters": [
           {
             "in": "path",
@@ -13652,7 +14110,7 @@
     "/api/workspaces/nodes/{node_id}/concordance/detach-options": {
       "get": {
         "description": "Return detachable concordance columns for one node.\n\nUsed by:\n- Frontend concordance detach dialog\n\nWhy:\n- Keeps mandatory generated concordance columns and optional metadata\n  columns aligned with backend detach behavior.",
-        "operationId": "concordance_detach_options_api_workspaces_nodes__node_id__concordance_detach_options_get",
+        "operationId": "concordance_detach_options",
         "parameters": [
           {
             "in": "path",
@@ -13721,7 +14179,7 @@
     "/api/workspaces/nodes/{node_id}/concordance/dispersion-detach": {
       "post": {
         "description": "Submit a per-document aggregated detach (dispersion view).\n\nOutput shape differs from the per-hit detach: one row per source document,\nmatched-text/L1/R1/freq columns become `List<T>`, plus a `CONC_extraction`\nstring column that joins each hit's character slice with newline + asterisk\nbullets in document-flow order. Used by the dispersion summary chart so the\nuser can pull a per-document view (optionally limited to bin-filtered hits)\ninto the workspace as a new data block.",
-        "operationId": "detach_concordance_dispersion_api_workspaces_nodes__node_id__concordance_dispersion_detach_post",
+        "operationId": "detach_concordance_dispersion",
         "parameters": [
           {
             "in": "path",
@@ -13791,7 +14249,7 @@
     "/api/workspaces/nodes/{node_id}/concordance/materialize": {
       "post": {
         "description": "Submit a background task that writes the full flattened occurrence parquet.\n\nUnlike detach, this does not add a node to the workspace. On completion the\nparent concordance analysis task's `materialized_paths` is updated so\nsubsequent pagination and detach reuse the cached parquet.",
-        "operationId": "materialize_concordance_api_workspaces_nodes__node_id__concordance_materialize_post",
+        "operationId": "materialize_concordance",
         "parameters": [
           {
             "in": "path",
@@ -13860,7 +14318,7 @@
     },
     "/api/workspaces/nodes/{node_id}/data": {
       "get": {
-        "operationId": "get_node_data_api_workspaces_nodes__node_id__data_get",
+        "operationId": "get_node_data",
         "parameters": [
           {
             "in": "path",
@@ -14007,7 +14465,7 @@
     },
     "/api/workspaces/nodes/{node_id}/expression/apply": {
       "post": {
-        "operationId": "polars_expression_apply_api_workspaces_nodes__node_id__expression_apply_post",
+        "operationId": "polars_expression_apply",
         "parameters": [
           {
             "in": "path",
@@ -14076,7 +14534,7 @@
     },
     "/api/workspaces/nodes/{node_id}/expression/preview": {
       "post": {
-        "operationId": "polars_expression_preview_api_workspaces_nodes__node_id__expression_preview_post",
+        "operationId": "polars_expression_preview",
         "parameters": [
           {
             "in": "path",
@@ -14168,7 +14626,7 @@
     },
     "/api/workspaces/nodes/{node_id}/filter": {
       "post": {
-        "operationId": "filter_node_api_workspaces_nodes__node_id__filter_post",
+        "operationId": "filter_node",
         "parameters": [
           {
             "in": "path",
@@ -14237,7 +14695,7 @@
     },
     "/api/workspaces/nodes/{node_id}/filter/preview": {
       "post": {
-        "operationId": "filter_preview_api_workspaces_nodes__node_id__filter_preview_post",
+        "operationId": "filter_preview",
         "parameters": [
           {
             "in": "path",
@@ -14329,7 +14787,7 @@
     },
     "/api/workspaces/nodes/{node_id}/name": {
       "put": {
-        "operationId": "update_node_name_api_workspaces_nodes__node_id__name_put",
+        "operationId": "update_node_name",
         "parameters": [
           {
             "in": "path",
@@ -14397,7 +14855,7 @@
     },
     "/api/workspaces/nodes/{node_id}/query-plan": {
       "get": {
-        "operationId": "get_node_query_plan_api_workspaces_nodes__node_id__query_plan_get",
+        "operationId": "get_node_query_plan",
         "parameters": [
           {
             "in": "path",
@@ -14457,7 +14915,7 @@
     "/api/workspaces/nodes/{node_id}/quotation": {
       "post": {
         "description": "Run quotation extraction on selected node and store latest task payload.\n\nUsed by:\n- frontend quotation run/search action\n\nWhy:\n- Produces immediate result payload and persists it as current quotation task.",
-        "operationId": "get_quotation_api_workspaces_nodes__node_id__quotation_post",
+        "operationId": "get_quotation",
         "parameters": [
           {
             "in": "path",
@@ -14527,7 +14985,7 @@
     "/api/workspaces/nodes/{node_id}/quotation/detach": {
       "post": {
         "description": "Submit background task to detach quotations into a new workspace node.\n\nUsed by:\n- frontend quotation detach action\n\nWhy:\n- Offloads potentially expensive extraction/materialization to worker tasks.",
-        "operationId": "detach_quotation_api_workspaces_nodes__node_id__quotation_detach_post",
+        "operationId": "detach_quotation",
         "parameters": [
           {
             "in": "path",
@@ -14597,7 +15055,7 @@
     "/api/workspaces/nodes/{node_id}/quotation/detach-options": {
       "get": {
         "description": "Return detachable quotation columns for one node.\n\nUsed by:\n- Frontend quotation detach dialog\n\nWhy:\n- Keeps mandatory generated quotation columns and optional source columns\n  aligned with backend detach behavior.",
-        "operationId": "quotation_detach_options_api_workspaces_nodes__node_id__quotation_detach_options_get",
+        "operationId": "quotation_detach_options",
         "parameters": [
           {
             "in": "path",
@@ -14666,7 +15124,7 @@
     "/api/workspaces/nodes/{node_id}/quotation/materialize": {
       "post": {
         "description": "Submit a background task that writes the full flattened quotation parquet.\n\nUnlike detach, this does not add a node to the workspace. On completion the\nparent quotation analysis task's `materialized_path` is updated so subsequent\npagination and detach reuse the cached parquet.",
-        "operationId": "materialize_quotation_api_workspaces_nodes__node_id__quotation_materialize_post",
+        "operationId": "materialize_quotation",
         "parameters": [
           {
             "in": "path",
@@ -14736,7 +15194,7 @@
     "/api/workspaces/nodes/{node_id}/redo": {
       "post": {
         "description": "Redo the latest undone in-memory execution plan change for a node.",
-        "operationId": "redo_node_operation_api_workspaces_nodes__node_id__redo_post",
+        "operationId": "redo_node_operation",
         "parameters": [
           {
             "in": "path",
@@ -14795,7 +15253,7 @@
     },
     "/api/workspaces/nodes/{node_id}/replace": {
       "post": {
-        "operationId": "replace_apply_api_workspaces_nodes__node_id__replace_post",
+        "operationId": "replace_apply",
         "parameters": [
           {
             "in": "path",
@@ -14864,7 +15322,7 @@
     },
     "/api/workspaces/nodes/{node_id}/replace/preview": {
       "post": {
-        "operationId": "replace_preview_api_workspaces_nodes__node_id__replace_preview_post",
+        "operationId": "replace_preview",
         "parameters": [
           {
             "in": "path",
@@ -14957,7 +15415,7 @@
     "/api/workspaces/nodes/{node_id}/sequential-analysis": {
       "post": {
         "description": "Run sequential analysis for one node and persist/update task payload.\n\nUsed by:\n- frontend sequential-analysis run action\n\nWhy:\n- Produces aggregated time-series counts and stores them as current task data.",
-        "operationId": "run_sequential_analysis_api_workspaces_nodes__node_id__sequential_analysis_post",
+        "operationId": "run_sequential_analysis",
         "parameters": [
           {
             "in": "path",
@@ -15026,7 +15484,7 @@
     "/api/workspaces/nodes/{node_id}/sequential-analysis/preview": {
       "post": {
         "description": "Run the aggregation server-side but skip task registration and\nconflict checks.\n\nUsed by:\n- Trends snapshot-capture dialog (\"Verify actual row count\") \u2014\n  ``include_data=false`` returns just the row count.\n- Trends snapshot capture itself \u2014 ``include_data=true`` returns\n  the full result (matching the regular endpoint's payload shape)\n  without disturbing the live task store. The captured rows ship\n  verbatim into the snapshot bundle.\n\nWhy a separate endpoint rather than a flag on the existing one:\nthe existing endpoint is task-aware (rejects conflicting requests,\ninherits chart_type, writes the result into the task store). All\nof that machinery is wrong for a snapshot capture or a preview \u2014\neach is a pure query for a specific captured config, not a\ncompeting analysis run.",
-        "operationId": "preview_sequential_analysis_api_workspaces_nodes__node_id__sequential_analysis_preview_post",
+        "operationId": "preview_sequential_analysis",
         "parameters": [
           {
             "in": "path",
@@ -15106,7 +15564,7 @@
     },
     "/api/workspaces/nodes/{node_id}/shape": {
       "get": {
-        "operationId": "get_node_shape_api_workspaces_nodes__node_id__shape_get",
+        "operationId": "get_node_shape",
         "parameters": [
           {
             "in": "path",
@@ -15165,7 +15623,7 @@
     },
     "/api/workspaces/nodes/{node_id}/slice": {
       "post": {
-        "operationId": "slice_node_api_workspaces_nodes__node_id__slice_post",
+        "operationId": "slice_node",
         "parameters": [
           {
             "in": "path",
@@ -15234,7 +15692,7 @@
     },
     "/api/workspaces/nodes/{node_id}/slice/preview": {
       "post": {
-        "operationId": "slice_preview_api_workspaces_nodes__node_id__slice_preview_post",
+        "operationId": "slice_preview",
         "parameters": [
           {
             "in": "path",
@@ -15326,7 +15784,7 @@
     },
     "/api/workspaces/nodes/{node_id}/tokenization": {
       "post": {
-        "operationId": "create_tokenization_api_workspaces_nodes__node_id__tokenization_post",
+        "operationId": "create_tokenization",
         "parameters": [
           {
             "in": "path",
@@ -15396,7 +15854,7 @@
     "/api/workspaces/nodes/{node_id}/undo": {
       "post": {
         "description": "Undo the latest in-memory execution plan change for a node.",
-        "operationId": "undo_node_operation_api_workspaces_nodes__node_id__undo_post",
+        "operationId": "undo_node_operation",
         "parameters": [
           {
             "in": "path",
@@ -15456,7 +15914,7 @@
     "/api/workspaces/quotation/tasks/current": {
       "get": {
         "description": "Return current task IDs for quotation analysis.",
-        "operationId": "quotation_current_tasks_api_workspaces_quotation_tasks_current_get",
+        "operationId": "quotation_current_tasks",
         "parameters": [
           {
             "in": "header",
@@ -15507,7 +15965,7 @@
     "/api/workspaces/quotation/tasks/{task_id}/request": {
       "get": {
         "description": "Return stored request payload for a quotation task.",
-        "operationId": "quotation_task_request_api_workspaces_quotation_tasks__task_id__request_get",
+        "operationId": "quotation_task_request",
         "parameters": [
           {
             "in": "path",
@@ -15567,7 +16025,7 @@
     "/api/workspaces/quotation/tasks/{task_id}/result": {
       "get": {
         "description": "Return stored quotation result, optionally recomputed for new page params.\n\nUsed by:\n- frontend polling route for quotation result panels\n\nWhy:\n- Supports cheap preference-only reads and on-demand page recomputation.",
-        "operationId": "quotation_task_result_api_workspaces_quotation_tasks__task_id__result_get",
+        "operationId": "quotation_task_result",
         "parameters": [
           {
             "in": "path",
@@ -15672,7 +16130,7 @@
                       "type": "null"
                     }
                   ],
-                  "title": "Response Quotation Task Result Api Workspaces Quotation Tasks  Task Id  Result Get"
+                  "title": "Response Quotation Task Result"
                 }
               }
             },
@@ -15697,7 +16155,7 @@
       },
       "post": {
         "description": "Persist quotation display preferences and optional page overrides.\n\nUsed by:\n- frontend preference updates for context length/sort/page controls\n\nWhy:\n- Lets UI tune quotation presentation without rerunning analysis creation.\n\nRefactor note:\n- Shares substantial logic with `quotation_task_result`; both could delegate\n  to a single internal read/update orchestrator.",
-        "operationId": "update_quotation_task_result_api_workspaces_quotation_tasks__task_id__result_post",
+        "operationId": "update_quotation_task_result",
         "parameters": [
           {
             "in": "path",
@@ -15748,7 +16206,7 @@
                       "$ref": "#/components/schemas/QuotationPreferenceUpdateResponse"
                     }
                   ],
-                  "title": "Response Update Quotation Task Result Api Workspaces Quotation Tasks  Task Id  Result Post"
+                  "title": "Response Update Quotation Task Result"
                 }
               }
             },
@@ -15774,7 +16232,7 @@
     },
     "/api/workspaces/save": {
       "post": {
-        "operationId": "save_workspace_api_workspaces_save_post",
+        "operationId": "save_workspace",
         "parameters": [
           {
             "in": "header",
@@ -15825,7 +16283,7 @@
     "/api/workspaces/sequential-analysis/tasks/current": {
       "get": {
         "description": "Return current task IDs for sequential-analysis.",
-        "operationId": "sequential_analysis_current_tasks_api_workspaces_sequential_analysis_tasks_current_get",
+        "operationId": "sequential_analysis_current_tasks",
         "parameters": [
           {
             "in": "header",
@@ -15875,7 +16333,7 @@
     "/api/workspaces/sequential-analysis/tasks/{task_id}/detach": {
       "post": {
         "description": "Create a filtered child node from selected sequential-analysis periods.",
-        "operationId": "detach_sequential_analysis_task_api_workspaces_sequential_analysis_tasks__task_id__detach_post",
+        "operationId": "detach_sequential_analysis_task",
         "parameters": [
           {
             "in": "path",
@@ -15944,7 +16402,7 @@
     "/api/workspaces/sequential-analysis/tasks/{task_id}/request": {
       "get": {
         "description": "Return stored request payload for a sequential-analysis task.",
-        "operationId": "sequential_analysis_task_request_api_workspaces_sequential_analysis_tasks__task_id__request_get",
+        "operationId": "sequential_analysis_task_request",
         "parameters": [
           {
             "in": "path",
@@ -16003,7 +16461,7 @@
     "/api/workspaces/sequential-analysis/tasks/{task_id}/result": {
       "get": {
         "description": "Return stored result payload for a sequential-analysis task.",
-        "operationId": "sequential_analysis_task_result_api_workspaces_sequential_analysis_tasks__task_id__result_get",
+        "operationId": "sequential_analysis_task_result",
         "parameters": [
           {
             "in": "path",
@@ -16060,7 +16518,7 @@
       },
       "post": {
         "description": "Persist display-only sequential analysis options on a saved task.\n\nUsed by:\n- frontend chart-type preference updates\n\nWhy:\n- Avoids recomputation when only chart presentation changes.\n\nRefactor note:\n- Mirrors preference update behavior in other analyses; a shared\n    task-preferences helper could reduce duplication.",
-        "operationId": "update_sequential_analysis_task_result_api_workspaces_sequential_analysis_tasks__task_id__result_post",
+        "operationId": "update_sequential_analysis_task_result",
         "parameters": [
           {
             "in": "path",
@@ -16137,7 +16595,7 @@
     "/api/workspaces/token-frequencies": {
       "delete": {
         "description": "Clear Token Frequency analysis state for a workspace.\n\nMirrors topic-modeling clear behavior by removing the currently tracked\nanalysis task link for the token frequency tab.",
-        "operationId": "clear_token_frequencies_api_workspaces_token_frequencies_delete",
+        "operationId": "clear_token_frequencies",
         "parameters": [
           {
             "in": "header",
@@ -16185,7 +16643,7 @@
       },
       "post": {
         "description": "Calculate and compare token frequencies across one or two nodes using polars-text",
-        "operationId": "calculate_token_frequencies_api_workspaces_token_frequencies_post",
+        "operationId": "calculate_token_frequencies",
         "parameters": [
           {
             "in": "header",
@@ -16245,7 +16703,7 @@
     "/api/workspaces/token-frequencies/tasks/current": {
       "get": {
         "description": "Return current task IDs for token-frequencies analysis.",
-        "operationId": "token_frequencies_current_tasks_api_workspaces_token_frequencies_tasks_current_get",
+        "operationId": "token_frequencies_current_tasks",
         "parameters": [
           {
             "in": "header",
@@ -16295,7 +16753,7 @@
     "/api/workspaces/token-frequencies/tasks/{task_id}/request": {
       "get": {
         "description": "Return stored request payload for a token-frequencies task.",
-        "operationId": "token_frequencies_task_request_api_workspaces_token_frequencies_tasks__task_id__request_get",
+        "operationId": "token_frequencies_task_request",
         "parameters": [
           {
             "in": "path",
@@ -16354,7 +16812,7 @@
     "/api/workspaces/token-frequencies/tasks/{task_id}/result": {
       "get": {
         "description": "Return normalized token-frequency result payload for one task.",
-        "operationId": "token_frequencies_task_result_api_workspaces_token_frequencies_tasks__task_id__result_get",
+        "operationId": "token_frequencies_task_result",
         "parameters": [
           {
             "in": "path",
@@ -16395,7 +16853,7 @@
                       "type": "null"
                     }
                   ],
-                  "title": "Response Token Frequencies Task Result Api Workspaces Token Frequencies Tasks  Task Id  Result Get"
+                  "title": "Response Token Frequencies Task Result"
                 }
               }
             },
@@ -16419,7 +16877,7 @@
       },
       "post": {
         "description": "Persist token-frequency preference overrides on an existing task.",
-        "operationId": "update_token_frequencies_task_result_api_workspaces_token_frequencies_tasks__task_id__result_post",
+        "operationId": "update_token_frequencies_task_result",
         "parameters": [
           {
             "in": "path",
@@ -16496,7 +16954,7 @@
     "/api/workspaces/topic-modeling": {
       "delete": {
         "description": "Clear stored topic-modeling task state for a workspace.\n\nUsed by:\n- Frontend clear action: `DELETE /workspaces/{id}/topic-modeling`\n\nWhy:\n- Removes stale result/task pointers before reruns and keeps UI state\n    aligned with backend task registries.",
-        "operationId": "clear_topic_modeling_results_api_workspaces_topic_modeling_delete",
+        "operationId": "clear_topic_modeling_results",
         "parameters": [
           {
             "in": "header",
@@ -16545,7 +17003,7 @@
       },
       "post": {
         "description": "Submit topic-modeling analysis as a worker-backed background task.\n\nUsed by:\n- Frontend run route: `POST /workspaces/{id}/topic-modeling`\n\nWhy:\n- Offloads heavy modeling work to worker processes and returns `task_id`\n    for progress/result polling.",
-        "operationId": "run_topic_modeling_api_workspaces_topic_modeling_post",
+        "operationId": "run_topic_modeling",
         "parameters": [
           {
             "in": "header",
@@ -16606,7 +17064,7 @@
     "/api/workspaces/topic-modeling/embedding-cache": {
       "delete": {
         "description": "Delete every DuckDB entry in the user's embedding cache.\n\nSweeps the canonical `user_cache/embeddings/` directory.\nReturns total bytes and file count freed so the UI can confirm the\nreclaim. Clearing forces the next topic-modelling run to re-encode all\ndocuments from scratch.",
-        "operationId": "clear_topic_modeling_embedding_cache_api_workspaces_topic_modeling_embedding_cache_delete",
+        "operationId": "clear_topic_modeling_embedding_cache",
         "parameters": [
           {
             "in": "header",
@@ -16657,7 +17115,7 @@
     "/api/workspaces/topic-modeling/embedding-cache/size": {
       "get": {
         "description": "Report current embedding-cache size and file count for the user.\n\nUsed by the frontend Clear-cache confirmation dialog so the user can see\n\"X MB will be freed\" before they confirm.",
-        "operationId": "get_topic_modeling_embedding_cache_size_api_workspaces_topic_modeling_embedding_cache_size_get",
+        "operationId": "get_topic_modeling_embedding_cache_size",
         "parameters": [
           {
             "in": "header",
@@ -16708,7 +17166,7 @@
     "/api/workspaces/topic-modeling/tasks/current": {
       "get": {
         "description": "Return current task IDs for topic-modeling analysis.",
-        "operationId": "topic_modeling_current_tasks_api_workspaces_topic_modeling_tasks_current_get",
+        "operationId": "topic_modeling_current_tasks",
         "parameters": [
           {
             "in": "header",
@@ -16759,7 +17217,7 @@
     "/api/workspaces/topic-modeling/tasks/{task_id}/detach": {
       "post": {
         "description": "Create detached nodes from artifact-backed topic-modeling outputs.\n\nUsed by:\n- Frontend detach route:\n    `POST /workspaces/{id}/topic-modeling/tasks/{task_id}/detach`\n\n    Why:\n    - Materializes user-selected columns and topic labels as reusable workspace\n        nodes without rerunning the model.",
-        "operationId": "detach_topic_modeling_api_workspaces_topic_modeling_tasks__task_id__detach_post",
+        "operationId": "detach_topic_modeling",
         "parameters": [
           {
             "in": "path",
@@ -16829,7 +17287,7 @@
     "/api/workspaces/topic-modeling/tasks/{task_id}/detach-options": {
       "get": {
         "description": "List detachable node/column options for a completed topic task.\n\nUsed by:\n- Frontend detach-options route:\n    `GET /workspaces/{id}/topic-modeling/tasks/{task_id}/detach-options`\n\nWhy:\n- Exposes artifact-backed node metadata so users can choose output columns safely.",
-        "operationId": "topic_modeling_detach_options_api_workspaces_topic_modeling_tasks__task_id__detach_options_get",
+        "operationId": "topic_modeling_detach_options",
         "parameters": [
           {
             "in": "path",
@@ -16889,7 +17347,7 @@
     "/api/workspaces/topic-modeling/tasks/{task_id}/request": {
       "get": {
         "description": "Return stored request payload for a topic-modeling task.",
-        "operationId": "topic_modeling_task_request_api_workspaces_topic_modeling_tasks__task_id__request_get",
+        "operationId": "topic_modeling_task_request",
         "parameters": [
           {
             "in": "path",
@@ -16949,7 +17407,7 @@
     "/api/workspaces/topic-modeling/tasks/{task_id}/result": {
       "get": {
         "description": "Return current status or final payload for a topic-modeling task.\n\nUsed by:\n- Frontend polling route:\n    `GET /workspaces/{id}/topic-modeling/tasks/{task_id}/result`\n\nWhy:\n- Normalizes task lifecycle states into one response contract for UI polling.",
-        "operationId": "topic_modeling_task_result_api_workspaces_topic_modeling_tasks__task_id__result_get",
+        "operationId": "topic_modeling_task_result",
         "parameters": [
           {
             "in": "path",
@@ -17007,7 +17465,7 @@
       },
       "post": {
         "description": "Re-aggregate a completed exact topic-modeling task without refitting.",
-        "operationId": "update_topic_modeling_task_result_api_workspaces_topic_modeling_tasks__task_id__result_post",
+        "operationId": "update_topic_modeling_task_result",
         "parameters": [
           {
             "in": "path",
@@ -17076,7 +17534,7 @@
     },
     "/api/workspaces/unload": {
       "post": {
-        "operationId": "unload_workspace_api_workspaces_unload_post",
+        "operationId": "unload_workspace",
         "parameters": [
           {
             "in": "query",
@@ -17137,7 +17595,7 @@
     "/api/workspaces/upload": {
       "post": {
         "description": "Upload a workspace ZIP archive and import it into user workspace storage.",
-        "operationId": "upload_workspace_zip_api_workspaces_upload_post",
+        "operationId": "upload_workspace_zip",
         "parameters": [
           {
             "in": "header",
@@ -17160,7 +17618,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_workspace_zip_api_workspaces_upload_post"
+                "$ref": "#/components/schemas/Body_upload_workspace_zip"
               }
             }
           },
@@ -17197,7 +17655,7 @@
     },
     "/api/workspaces/{workspace_id}/ui-state": {
       "get": {
-        "operationId": "get_workspace_ui_state_api_workspaces__workspace_id__ui_state_get",
+        "operationId": "get_workspace_ui_state",
         "parameters": [
           {
             "in": "path",
@@ -17230,9 +17688,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Workspace Ui State Api Workspaces  Workspace Id  Ui State Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WorkspaceUiState"
                 }
               }
             },
@@ -17256,7 +17712,7 @@
         ]
       },
       "put": {
-        "operationId": "put_workspace_ui_state_api_workspaces__workspace_id__ui_state_put",
+        "operationId": "put_workspace_ui_state",
         "parameters": [
           {
             "in": "path",
@@ -17288,21 +17744,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Payload",
-                "type": "object"
+                "$ref": "#/components/schemas/WorkspaceUiState"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Put Workspace Ui State Api Workspaces  Workspace Id  Ui State Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WorkspaceUiState"
                 }
               }
             },
@@ -17329,7 +17782,7 @@
     "/health": {
       "get": {
         "description": "Return lightweight health status for liveness probes.\n\nUsed by:\n- deployment health checks and uptime monitors\n\nWhy:\n- Gives a fast no-auth probe endpoint for runtime readiness checks.",
-        "operationId": "health_check_health_get",
+        "operationId": "health_check",
         "responses": {
           "200": {
             "content": {
@@ -17346,7 +17799,7 @@
     "/status": {
       "get": {
         "description": "Return detailed component/module status information.\n\nUsed by:\n- diagnostics pages and manual troubleshooting\n\nWhy:\n- Exposes richer operational metadata than `/health`.",
-        "operationId": "status_status_get",
+        "operationId": "status",
         "responses": {
           "200": {
             "content": {

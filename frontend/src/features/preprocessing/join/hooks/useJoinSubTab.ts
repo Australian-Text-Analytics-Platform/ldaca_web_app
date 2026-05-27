@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
-import { nodesApi } from '@/lib/backend/nodes';
+import { joinNodesPreview } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
@@ -264,18 +264,19 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     page: number;
     pageSize: number;
   }) => {
-    const response = await nodesApi.joinPreview(
-      {
+    const { data: response } = await joinNodesPreview({
+      headers: getAuthHeaders(),
+      query: {
         left_node_id: request.leftNodeId,
         right_node_id: request.rightNodeId,
         left_on: request.leftOn,
         right_on: request.rightOn,
         how: request.joinType,
+        page,
+        page_size: pageSize,
       },
-      page,
-      pageSize,
-      getAuthHeaders(),
-    );
+      throwOnError: true,
+    });
 
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],

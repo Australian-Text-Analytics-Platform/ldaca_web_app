@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm, useStore } from '@tanstack/react-form';
-import { type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '@/lib/backend/nodes';
+import type { SliceRequest as SliceRequestPayload, FilterPreviewResponse } from '@/api/generated/types.gen';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';

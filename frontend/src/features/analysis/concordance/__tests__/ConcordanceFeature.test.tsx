@@ -164,10 +164,6 @@ vi.mock('@/stores', () => ({
     selector({ currentView: 'concordance' }),
 }));
 
-vi.mock('@/lib/backend/text', () => ({
-  textApi: {},
-}));
-
 vi.mock('@/hooks/analysisTaskUtils', () => ({
   pruneTasksById: vi.fn((tasks) => tasks),
   getTaskTypeCandidates: (taskType: string) => [taskType],

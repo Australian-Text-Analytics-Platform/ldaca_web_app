@@ -20,7 +20,9 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { FolderPlus, AlertTriangle } from 'lucide-react';
-import { filesApi, type DemoSnapshotEntry } from '@/lib/backend/files';
+import { importDemoSnapshots } from '@/api/generated/sdk.gen';
+import { getDemoSnapshotsCatalogueOptions } from '@/api/generated/@tanstack/react-query.gen';
+import type { DemoSnapshotEntry } from '@/api/generated/types.gen';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -71,8 +73,7 @@ export const DemoSnapshotsTab: React.FC<Props> = ({
   const [importing, setImporting] = useState(false);
 
   const { data: catalogue, isLoading, isError, refetch } = useQuery({
-    queryKey: ['demo-snapshots-catalogue'],
-    queryFn: () => filesApi.getDemoSnapshotsCatalogue(authHeaders),
+    ...getDemoSnapshotsCatalogueOptions({ headers: authHeaders }),
     staleTime: 30_000,
     retry: 1,
     enabled,
@@ -113,7 +114,11 @@ export const DemoSnapshotsTab: React.FC<Props> = ({
     setImporting(true);
     const loadingToastId = toast.loading('Importing demo snapshots…');
     try {
-      const result = await filesApi.importDemoSnapshots(selectedIds, replaceIds, authHeaders);
+      const { data: result } = await importDemoSnapshots({
+        body: { snapshot_ids: selectedIds, replace_ids: replaceIds },
+        headers: authHeaders,
+        throwOnError: true,
+      });
       toast.dismiss(loadingToastId);
 
       const imported = result.results.filter((r) => r.status === 'imported' || r.status === 'replaced').length;

@@ -1,4 +1,4 @@
-import type { TokenFrequencyResponse } from '@/lib/backend/text';
+import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
 import { isNonEmptyString } from '../common';
 
 export type TokenFrequencyRow = { token: string; frequency: number };

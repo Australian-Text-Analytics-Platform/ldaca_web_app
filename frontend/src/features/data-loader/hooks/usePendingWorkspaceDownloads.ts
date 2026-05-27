@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { workspacesApi } from '@/lib/backend/workspaces';
+import { downloadWorkspaceArtifact, startWorkspaceDownload } from '@/api/generated/sdk.gen';
 import { saveBlob } from '@/lib/download';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 
@@ -41,7 +41,10 @@ export function usePendingWorkspaceDownloads({
     async (workspaceId: string, workspaceName: string) => {
       try {
         setStartingWorkspaceId(workspaceId);
-        const response = await workspacesApi.startDownloadTask(authHeaders);
+        const { data: response } = await startWorkspaceDownload({
+          headers: authHeaders,
+          throwOnError: true,
+        });
         const taskId = response?.metadata?.task_id;
         if (!taskId) throw new Error('No task ID returned');
         setPendingDownloads((prev) => ({ ...prev, [workspaceId]: { taskId, workspaceName } }));
@@ -63,7 +66,13 @@ export function usePendingWorkspaceDownloads({
       async (workspaceId: string, taskId: string, workspaceName: string) => {
         dismissPendingDownload(workspaceId);
         try {
-          const blob = await workspacesApi.downloadTaskArtifact(taskId, authHeaders);
+          const { data } = await downloadWorkspaceArtifact({
+            headers: authHeaders,
+            parseAs: 'blob',
+            path: { task_id: taskId },
+            throwOnError: true,
+          });
+          const blob = data as Blob;
           const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
           await saveBlob(blob, filename);
           notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);

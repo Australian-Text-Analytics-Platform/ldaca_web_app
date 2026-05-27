@@ -1,13 +1,24 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import {
+  concordanceDetachOptions,
+  concordanceTaskDispersionBins,
+  concordanceTaskRequest,
+  concordanceTaskResult,
+} from '@/api/generated/sdk.gen';
+import type {
+  ConcordanceAnalysisRequest,
+  ConcordanceAnalysisResponse,
+  ConcordanceDispersionBinRow,
+  ConcordanceNodeResult as ConcordanceResultEntry,
+} from '@/api/generated/types.gen';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useAuth } from '@/hooks/useAuth';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
-import { type ConcordanceAnalysisResponse, type ConcordanceDispersionBinRow, type ConcordanceGroupedRow, textApi } from '@/lib/backend/text';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,7 +57,6 @@ import { useConcordanceSnapshotCapture } from './hooks/useConcordanceSnapshotCap
 import { useConcordanceSnapshotLoad } from './hooks/useConcordanceSnapshotLoad';
 import { ConcordanceSnapshotBanner } from './components/ConcordanceSnapshotBanner';
 import type { ConcordanceSnapshotPayload } from './hooks/useConcordanceSnapshotLoad';
-import type { ConcordanceAnalysisRequest, ConcordanceResultEntry } from '@/lib/backend/text/concordance';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
@@ -72,6 +82,7 @@ import {
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];
 const ALL_CONC_COLS_SET = new Set<string>([...CORE_COLS, ...FREQ_COLS]);
+type ConcordanceGroupedRow = Record<string, unknown>[];
 
 
 
@@ -348,11 +359,12 @@ const ConcordanceFeature: React.FC = () => {
     void Promise.all(
       missing.map(async (nodeId) => {
         try {
-          const resp = await textApi.getConcordanceTaskDispersionBins(
-            effectiveTaskId,
-            nodeId,
-            authHeaders,
-          );
+          const { data: resp } = await concordanceTaskDispersionBins({
+            headers: authHeaders,
+            path: { task_id: effectiveTaskId },
+            query: { node_id: nodeId },
+            throwOnError: true,
+          });
           return [nodeId, resp.rows] as const;
         } catch (err) {
           console.error('Failed to fetch concordance dispersion bins', nodeId, err);
@@ -641,10 +653,22 @@ const ConcordanceFeature: React.FC = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef: concordanceResultsRef,
-    fetchResult: async (taskId, headers) =>
-      textApi.getConcordanceTaskResult(taskId, headers),
-    fetchRequest: async (taskId, headers) =>
-      textApi.getConcordanceTaskRequest(taskId, headers),
+    fetchResult: async (taskId, headers) => {
+      const { data } = await concordanceTaskResult({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
+    fetchRequest: async (taskId, headers) => {
+      const { data } = await concordanceTaskRequest({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
     onResultFetched: (resultData) => {
       if (resultData) {
         setResults(resultData as ConcordanceAnalysisResponse);
@@ -1265,7 +1289,12 @@ const ConcordanceFeature: React.FC = () => {
 
     try {
       const responses = await Promise.all(
-        nodes.map((node) => textApi.getConcordanceDetachOptions(node.nodeId, node.column, getAuthHeaders()))
+        nodes.map((node) => concordanceDetachOptions({
+          headers: getAuthHeaders(),
+          path: { node_id: node.nodeId },
+          query: { column: node.column },
+          throwOnError: true,
+        }).then(({ data }) => data))
       );
       const options = responses.flatMap((response) => response.data?.nodes ?? []);
       const initial: Record<string, string[]> = {};
@@ -1315,7 +1344,12 @@ const ConcordanceFeature: React.FC = () => {
     try {
       const responses = await Promise.all(
         nodes.map((node) =>
-          textApi.getConcordanceDetachOptions(node.nodeId, node.column, getAuthHeaders()),
+          concordanceDetachOptions({
+            headers: getAuthHeaders(),
+            path: { node_id: node.nodeId },
+            query: { column: node.column },
+            throwOnError: true,
+          }).then(({ data }) => data),
         ),
       );
       // Adapt the per-hit detach-options shape for dispersion: hide the

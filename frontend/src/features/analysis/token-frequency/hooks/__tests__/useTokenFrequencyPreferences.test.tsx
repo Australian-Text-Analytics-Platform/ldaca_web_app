@@ -3,18 +3,16 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { useTokenFrequencyPreferences } from '../useTokenFrequencyPreferences';
 
 const {
-  defaultStopWordsMock,
-  postTokenFrequenciesTaskResultMock,
+  getDefaultStopWordsMock,
+  updateTokenFrequenciesTaskResultMock,
 } = vi.hoisted(() => ({
-  defaultStopWordsMock: vi.fn(),
-  postTokenFrequenciesTaskResultMock: vi.fn(),
+  getDefaultStopWordsMock: vi.fn(),
+  updateTokenFrequenciesTaskResultMock: vi.fn(),
 }));
 
-vi.mock('@/lib/backend/text', () => ({
-  textApi: {
-    defaultStopWords: defaultStopWordsMock,
-    postTokenFrequenciesTaskResult: postTokenFrequenciesTaskResultMock,
-  },
+vi.mock('@/api/generated/sdk.gen', () => ({
+  getDefaultStopWords: getDefaultStopWordsMock,
+  updateTokenFrequenciesTaskResult: updateTokenFrequenciesTaskResultMock,
 }));
 
 const baseArgs = {
@@ -30,12 +28,12 @@ const baseArgs = {
 
 describe('useTokenFrequencyPreferences', () => {
   beforeEach(() => {
-    defaultStopWordsMock.mockReset();
-    postTokenFrequenciesTaskResultMock.mockReset();
+    getDefaultStopWordsMock.mockReset();
+    updateTokenFrequenciesTaskResultMock.mockReset();
   });
 
   it('requests default stop words for a single resolved language', async () => {
-    defaultStopWordsMock.mockResolvedValue({ stopwords: ['的', '了', '是'] });
+    getDefaultStopWordsMock.mockResolvedValue({ data: { stopwords: ['的', '了', '是'] }, error: undefined });
 
     const { result } = renderHook(() =>
       useTokenFrequencyPreferences({
@@ -49,17 +47,18 @@ describe('useTokenFrequencyPreferences', () => {
     });
 
     await waitFor(() => {
-      expect(defaultStopWordsMock).toHaveBeenCalledWith(
-        { Authorization: 'Bearer test' },
-        { language: 'zh', strict: true },
-      );
+      expect(getDefaultStopWordsMock).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        query: { language: 'zh', strict: true },
+        throwOnError: true,
+      });
     });
 
     expect(result.current.stopWords).toBe('的, 了, 是');
   });
 
   it('does not request default stop words when no languages are resolved', async () => {
-    defaultStopWordsMock.mockResolvedValue({ stopwords: ['the', 'and', 'of'] });
+    getDefaultStopWordsMock.mockResolvedValue({ data: { stopwords: ['the', 'and', 'of'] }, error: undefined });
 
     const { result } = renderHook(() =>
       useTokenFrequencyPreferences({
@@ -72,20 +71,20 @@ describe('useTokenFrequencyPreferences', () => {
       await result.current.handleFillDefaultStopWords();
     });
 
-    expect(defaultStopWordsMock).not.toHaveBeenCalled();
+    expect(getDefaultStopWordsMock).not.toHaveBeenCalled();
     expect(result.current.stopWords).toBe('');
   });
 
   it('merges per-language groups when multiple languages are requested', async () => {
-    defaultStopWordsMock.mockImplementation(
-      (_headers: unknown, options?: { language?: string; strict?: boolean }) => {
-        if (options?.language === 'en') {
-          return Promise.resolve({ stopwords: ['the', 'and', 'of'] });
+    getDefaultStopWordsMock.mockImplementation(
+      (options?: { query?: { language?: string; strict?: boolean } }) => {
+        if (options?.query?.language === 'en') {
+          return Promise.resolve({ data: { stopwords: ['the', 'and', 'of'] }, error: undefined });
         }
-        if (options?.language === 'zh') {
-          return Promise.resolve({ stopwords: ['的', '了', '是'] });
+        if (options?.query?.language === 'zh') {
+          return Promise.resolve({ data: { stopwords: ['的', '了', '是'] }, error: undefined });
         }
-        return Promise.resolve({ stopwords: [] });
+        return Promise.resolve({ data: { stopwords: [] }, error: undefined });
       },
     );
 
@@ -101,15 +100,17 @@ describe('useTokenFrequencyPreferences', () => {
     });
 
     await waitFor(() => {
-      expect(defaultStopWordsMock).toHaveBeenCalledWith(
-        { Authorization: 'Bearer test' },
-        { language: 'en', strict: true },
-      );
+      expect(getDefaultStopWordsMock).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        query: { language: 'en', strict: true },
+        throwOnError: true,
+      });
     });
-    expect(defaultStopWordsMock).toHaveBeenCalledWith(
-      { Authorization: 'Bearer test' },
-      { language: 'zh', strict: true },
-    );
+    expect(getDefaultStopWordsMock).toHaveBeenCalledWith({
+      headers: { Authorization: 'Bearer test' },
+      query: { language: 'zh', strict: true },
+      throwOnError: true,
+    });
 
     // The hook builds groups separated by ``\n\n`` for visual clarity,
     // then ``applyStopSetFromText`` normalises through the new

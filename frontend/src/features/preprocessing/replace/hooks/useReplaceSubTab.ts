@@ -6,7 +6,7 @@ import {
   type FilterPreviewResponse,
   type ReplaceApplyResponse,
   type ReplaceRequest,
-} from '@/lib/backend/nodes';
+} from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { mapColumnsToInfo } from '@/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';

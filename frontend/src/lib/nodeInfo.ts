@@ -15,8 +15,8 @@
  */
 import type { QueryClient } from '@tanstack/react-query';
 
-import { nodesApi } from '@/lib/backend/nodes';
-import type { NodeInfoResponse } from '@/lib/backend/nodes';
+import { getNodeInfo } from '@/api/generated/sdk.gen';
+import type { WorkspaceNodeInfo as NodeInfoResponse } from '@/api/generated/types.gen';
 import { queryKeys } from './queryKeys';
 
 export type NodeInfo = NodeInfoResponse;
@@ -53,7 +53,12 @@ const resolveHeaders = (args: NodeInfoQueryArgs): Record<string, string> =>
 export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
   queryKey: queryKeys.nodeInfo(args.workspaceId, args.nodeId),
   queryFn: async (): Promise<NodeInfo> => {
-    return nodesApi.info(args.nodeId, resolveHeaders(args));
+    const { data } = await getNodeInfo({
+      headers: resolveHeaders(args),
+      path: { node_id: args.nodeId },
+      throwOnError: true,
+    });
+    return data;
   },
 });
 
@@ -70,7 +75,7 @@ export type FetchNodeInfoArgs = {
 /**
  * Non-hook fetcher used by mutation success handlers, hydration callbacks,
  * and other async work outside React's render tree. Returns the cached
- * value when present (and fresh); otherwise runs `nodesApi.info` once,
+ * value when present (and fresh); otherwise runs `getNodeInfo` once,
  * caching the result for future hook subscriptions.
  */
 export const fetchNodeInfo = async ({

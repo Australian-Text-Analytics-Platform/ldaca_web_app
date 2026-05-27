@@ -4,7 +4,16 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useAuth } from '@/hooks/useAuth';
 import { takeMostRecent } from '@/utils/selectionUtils';
-import { textApi, type TopicModelingRequest, type TopicModelingResponse, type TopicModelingTopic } from '@/lib/backend/text';
+import {
+  topicModelingTaskRequest,
+  topicModelingTaskResult,
+  updateTopicModelingTaskResult,
+} from '@/api/generated/sdk.gen';
+import type {
+  TopicModelingRequestInput,
+  TopicModelingResponse,
+  TopicModelingTopic,
+} from '@/api/generated/types.gen';
 import {
   snapshotSourceNodes,
   useSnapshotBackedAnalysisState,
@@ -41,6 +50,7 @@ import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 20;
+type TopicModelingRequest = TopicModelingRequestInput;
 
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
@@ -162,10 +172,22 @@ const TopicModelingFeature: React.FC = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef,
-    fetchResult: async (taskId, headers) =>
-      (await textApi.getTopicModelingTaskResult(taskId, headers)) as TopicModelingResponse | null,
-    fetchRequest: async (taskId, headers) =>
-      textApi.getTopicModelingTaskRequest(taskId, headers),
+    fetchResult: async (taskId, headers) => {
+      const { data } = await topicModelingTaskResult({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
+    fetchRequest: async (taskId, headers) => {
+      const { data } = await topicModelingTaskRequest({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
     onResultFetched: (resultData) => {
       setResultSafely(resultData);
       if (resultData.state === 'failed') {
@@ -768,11 +790,12 @@ const TopicModelingFeature: React.FC = () => {
     setIsUpdatingExactTopicCount(true);
     setError(null);
     try {
-      const updated = await textApi.postTopicModelingTaskResult(
-        taskId,
-        { topic_size_value: value },
-        getAuthHeaders(),
-      );
+      const { data: updated } = await updateTopicModelingTaskResult({
+        body: { topic_size_value: value },
+        headers: getAuthHeaders(),
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
       // The slider is decoupled from the "Target Topic Number" parameter
       // input: it represents the post-fit display target only, so we just
       // swap in the new result and clear transient selection state. The

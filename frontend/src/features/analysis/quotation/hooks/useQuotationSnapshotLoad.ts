@@ -9,7 +9,7 @@
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+import { downloadSnapshot } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
@@ -19,8 +19,10 @@ import {
 } from '@/features/snapshot-view';
 import type {
   QuotationAnalysisResponse,
-  QuotationRequest,
-} from '@/lib/backend/text/quotation';
+  QuotationRequestInput,
+} from '@/api/generated/types.gen';
+
+type QuotationRequest = QuotationRequestInput;
 
 /** Materialise summary that mirrors the live ``materializeSummary``
  * React state — total hit count, unique documents with hits, and total
@@ -69,7 +71,13 @@ export function useQuotationSnapshotLoad(): (filename: string) => Promise<void> 
   return useCallback(
     async (filename: string): Promise<void> => {
       const headers = getAuthHeaders();
-      const blob = await snapshotsApi.download(filename, headers);
+      const { data } = await downloadSnapshot({
+        headers,
+        parseAs: 'blob',
+        path: { filename },
+        throwOnError: true,
+      });
+      const blob = data as Blob;
       const bytes = new Uint8Array(await blob.arrayBuffer());
 
       const readResult = await readBundle(bytes);

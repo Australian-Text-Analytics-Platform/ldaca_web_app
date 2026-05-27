@@ -1,6 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  quotationDetachOptions,
+  quotationTaskRequest,
+  quotationTaskResult,
+} from '@/api/generated/sdk.gen';
+import type {
+  QuotationAnalysisResponse,
+  QuotationEngineConfigInput,
+  QuotationEngineType,
+  QuotationMetadata,
+} from '@/api/generated/types.gen';
+import {
   SNAPSHOT_DISABLED_REASON,
   snapshotSourceNodes,
   useSnapshotBackedAnalysisState,
@@ -19,15 +30,6 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
-import { textApi } from '@/lib/backend/text';
-import type {
-  QuotationAnalysisResponse,
-  QuotationEngineConfig,
-  QuotationEngineType,
-  QuotationGroupedRow,
-  QuotationHitRow,
-  QuotationMetadata,
-} from '@/lib/backend/text';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -123,6 +125,9 @@ interface QuotationResultState {
 }
 
 const DEFAULT_PAGE_SIZE = 50;
+type QuotationEngineConfig = QuotationEngineConfigInput;
+type QuotationHitRow = Record<string, unknown>;
+type QuotationGroupedRow = QuotationHitRow[];
 
 type QuotationDisplayRow = QuotationHitRow & {
   __spans: { start: number; end: number; type: string }[];
@@ -369,10 +374,22 @@ const QuotationFeature: React.FC = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef: quotationResultRef,
-    fetchResult: async (taskId, headers) =>
-      textApi.getQuotationTaskResult(taskId, headers),
-    fetchRequest: async (taskId, headers) =>
-      textApi.getQuotationTaskRequest(taskId, headers),
+    fetchResult: async (taskId, headers) => {
+      const { data } = await quotationTaskResult({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
+    fetchRequest: async (taskId, headers) => {
+      const { data } = await quotationTaskRequest({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
     onResultFetched: (result, _taskId) => {
       if (!result) return;
       const targetNode =
@@ -787,7 +804,11 @@ const QuotationFeature: React.FC = () => {
       const headers = getAuthHeaders();
       const parentTaskId = await resolveTaskId();
       if (parentTaskId) {
-        const req = await textApi.getQuotationTaskRequest(parentTaskId, headers);
+        const { data: req } = await quotationTaskRequest({
+          headers,
+          path: { task_id: parentTaskId },
+          throwOnError: true,
+        });
         const reqObj = (req as Record<string, unknown>) ?? {};
         const path = typeof reqObj.materialized_path === 'string'
           ? (reqObj.materialized_path as string)
@@ -836,11 +857,12 @@ const QuotationFeature: React.FC = () => {
     if (!selection?.column) return;
 
     try {
-      const response = await textApi.getQuotationDetachOptions(
-        nodeId,
-        selection.column,
-        getAuthHeaders(),
-      );
+      const { data: response } = await quotationDetachOptions({
+        headers: getAuthHeaders(),
+        path: { node_id: nodeId },
+        query: { column: selection.column },
+        throwOnError: true,
+      });
       const nodes = response.data?.nodes ?? [];
       const initialSelections: Record<string, string[]> = {};
       nodes.forEach((node) => {

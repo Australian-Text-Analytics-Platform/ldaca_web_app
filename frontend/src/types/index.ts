@@ -7,14 +7,21 @@
  */
 
 export type { AuthInfoResponse, AuthMethod, User } from '@/api/generated/types.gen';
+import type { FileTreeNodeResponse } from '@/api/generated/types.gen';
 
 // ---------- Files ----------
 
-export type {
-  FileTreeFile,
-  FileTreeDirectory,
-  FileTreeNode,
-} from '../lib/backend/files';
+export type FileTreeFile = Omit<FileTreeNodeResponse, 'children' | 'size' | 'type'> & {
+  type: 'file';
+  size: number;
+};
+
+export type FileTreeDirectory = Omit<FileTreeNodeResponse, 'children' | 'type'> & {
+  type: 'directory';
+  children: FileTreeNode[];
+};
+
+export type FileTreeNode = FileTreeFile | FileTreeDirectory;
 
 // ---------- Workspace / Node ----------
 

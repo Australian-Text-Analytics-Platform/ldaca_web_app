@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { filesApi } from '@/lib/backend/files';
+import { createFolder } from '@/api/generated/sdk.gen';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -37,7 +37,11 @@ export function useFolderCreation({
 
     setCreatingFolder(true);
     try {
-      await filesApi.createFolder(createFolderParentPath, trimmedName, authHeaders);
+      await createFolder({
+        body: { parent_path: createFolderParentPath, name: trimmedName },
+        headers: authHeaders,
+        throwOnError: true,
+      });
       await refetchFiles();
       notify('success', `Folder "${trimmedName}" created.`);
       setCreateFolderOpen(false);

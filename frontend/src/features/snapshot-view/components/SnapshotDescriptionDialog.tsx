@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+import { getSnapshotDescription } from '@/api/generated/sdk.gen';
 
 export interface SnapshotDescriptionDialogProps {
   /** When non-null, the dialog is open and fetching this filename's
@@ -39,7 +39,15 @@ export const SnapshotDescriptionDialog: React.FC<SnapshotDescriptionDialogProps>
   const { getAuthHeaders } = useAuth();
   const { data: content, isLoading, isError } = useQuery({
     queryKey: ['snapshot-description', filename],
-    queryFn: () => snapshotsApi.getDescription(filename!, getAuthHeaders()),
+    queryFn: async () => {
+      const { data } = await getSnapshotDescription({
+        headers: getAuthHeaders(),
+        parseAs: 'text',
+        path: { filename: filename! },
+        throwOnError: true,
+      });
+      return data as string;
+    },
     enabled: filename !== null,
     staleTime: 60_000,
     retry: 1,

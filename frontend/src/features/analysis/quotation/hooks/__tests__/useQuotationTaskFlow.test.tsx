@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { QuotationAnalysisResponse } from '@/lib/backend/text';
+import type { QuotationAnalysisResponse } from '@/api/generated/types.gen';
 import { useQuotationTaskFlow } from '../useQuotationTaskFlow';
 
 const buildQuotationResponse = (): QuotationAnalysisResponse => ({

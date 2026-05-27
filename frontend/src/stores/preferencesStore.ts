@@ -18,12 +18,17 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { ResolvedUserPreferences, UserPreferencesUpdate } from '@/lib/backend/preferences';
-import { preferencesApi } from '@/lib/backend/preferences';
-import type { QuotationEngineConfig } from '@/lib/backend/text';
+import { getPreferences, updatePreferences } from '@/api/generated/sdk.gen';
+import type {
+  LdacaWordflowModelsQuotationEngineConfig,
+  QuotationPreferencesOutput,
+  UserPreferences,
+  UserPreferencesUpdate,
+} from '@/api/generated/types.gen';
 import type { ViewType } from '@/stores/uiStore';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = ['ai-annotator'];
+type QuotationEngineConfig = LdacaWordflowModelsQuotationEngineConfig;
 
 interface PreferencesState {
   hiddenViews: string[];
@@ -78,6 +83,48 @@ interface PreferencesActions {
 }
 
 type PreferencesStore = PreferencesState & PreferencesActions;
+
+type ResolvedQuotationPreferences = Omit<QuotationPreferencesOutput, 'engine' | 'last_remote_url'> & {
+  engine: QuotationEngineConfig;
+  last_remote_url: string;
+};
+
+type ResolvedUserPreferences = Omit<
+  UserPreferences,
+  | 'default_language'
+  | 'default_tokenizer_model'
+  | 'demo_snapshots_enabled'
+  | 'favorite_workspaces'
+  | 'hidden_views'
+  | 'ldaca_oni_api_token'
+  | 'quotation'
+> & {
+  hidden_views: string[];
+  favorite_workspaces: string[];
+  quotation: ResolvedQuotationPreferences;
+  default_language: string | null;
+  default_tokenizer_model: string | null;
+  ldaca_oni_api_token: string | null;
+  demo_snapshots_enabled: boolean;
+};
+
+const getAuthorizationHeaders = (headers?: Record<string, string>): { authorization?: string } | undefined => {
+  const authorization = headers?.Authorization ?? headers?.authorization;
+  return authorization ? { authorization } : undefined;
+};
+
+const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences => ({
+  hidden_views: data.hidden_views ?? [],
+  favorite_workspaces: data.favorite_workspaces ?? [],
+  quotation: {
+    engine: (data.quotation?.engine ?? { type: 'local' }) as QuotationEngineConfig,
+    last_remote_url: data.quotation?.last_remote_url ?? '',
+  },
+  default_language: data.default_language ?? null,
+  default_tokenizer_model: data.default_tokenizer_model ?? null,
+  ldaca_oni_api_token: data.ldaca_oni_api_token ?? null,
+  demo_snapshots_enabled: data.demo_snapshots_enabled ?? false,
+});
 
 function applyServerState(state: PreferencesState, data: ResolvedUserPreferences) {
   state.hiddenViews = data.hidden_views;
@@ -182,7 +229,11 @@ export const usePreferencesStore = create<PreferencesStore>()(
 
         loadFromBackend: async (headers) => {
           try {
-            const data = await preferencesApi.get(headers);
+            const { data: preferences } = await getPreferences({
+              headers: getAuthorizationHeaders(headers),
+              throwOnError: true,
+            });
+            const data = normalizePreferences(preferences);
             set((state) => {
               applyServerState(state, data);
             });
@@ -219,7 +270,11 @@ export const usePreferencesStore = create<PreferencesStore>()(
             demo_snapshots_enabled: state.demoSnapshotsEnabled,
           };
           try {
-            await preferencesApi.update(body, headers);
+            await updatePreferences({
+              body,
+              headers: getAuthorizationHeaders(headers),
+              throwOnError: true,
+            });
           } catch {
             // Silently fail — localStorage still has the latest state
           } finally {

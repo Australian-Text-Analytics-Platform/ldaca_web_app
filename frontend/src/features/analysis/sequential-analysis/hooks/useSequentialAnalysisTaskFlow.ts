@@ -1,13 +1,15 @@
 import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
+import { runSequentialAnalysis, updateSequentialAnalysisTaskResult } from '@/api/generated/sdk.gen';
+import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
 import {
-  type SequentialAnalysisRequest,
-  type SequentialCustomIntervalUnit,
-  type SequentialFrequency,
-  textApi,
-} from '@/lib/backend/text';
-import type { ChartConfig } from '@/components/ui/chart';
+  type ChartConfig,
+} from '@/components/ui/chart';
 import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
+
+type SequentialAnalysisRequest = SequentialAnalysisRequestInput;
+type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
+type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
 // Callers may rely on period_start and period_end being present on chart rows.
 export type SequentialAnalysisDatum = Record<string, unknown>;
@@ -209,7 +211,12 @@ export function useSequentialAnalysisTaskFlow({
         Object.keys(authHeaders).length > 0
           ? (authHeaders as Record<string, string>)
           : {};
-      const result = await textApi.sequentialAnalysis(nodeIdForAnalysis, request, headers);
+      const { data: result } = await runSequentialAnalysis({
+        body: request,
+        headers,
+        path: { node_id: nodeIdForAnalysis },
+        throwOnError: true,
+      });
       extractAndSetTaskId(result, setLocalTaskId);
       const enrichedResult = {
         ...result,
@@ -273,7 +280,12 @@ export function useSequentialAnalysisTaskFlow({
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return;
-      await textApi.postSequentialAnalysisTaskResult(taskId, { chart_type: value }, headers);
+      await updateSequentialAnalysisTaskResult({
+        body: { chart_type: value },
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
     } catch (error) {
       console.error('Failed to update sequential analysis chart type:', error);
     }

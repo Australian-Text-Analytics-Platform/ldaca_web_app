@@ -19,9 +19,7 @@ vi.mock('../useWorkspaceNodeMutations', () => ({
   useWorkspaceNodeMutations: useWorkspaceNodeMutationsMock,
 }));
 
-// Phase 4.8: text-analysis mutations now live in useWorkspaceNodeMutations
-// (which is mocked above). useWorkspaceInternal no longer imports
-// `@/lib/backend/text`, so no `vi.mock` for it is required here.
+// Text-analysis mutations live in useWorkspaceNodeMutations, which is mocked above.
 
 import { useWorkspaceInternal } from '../useWorkspaceInternal';
 

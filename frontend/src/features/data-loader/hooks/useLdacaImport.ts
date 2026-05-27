@@ -1,5 +1,27 @@
 import { useState } from 'react';
-import { filesApi, type LdacaSearchMethod, type LdacaSearchResult } from '@/lib/backend/files';
+import {
+  importLdacaDataset,
+  listLdacaFeaturedCollections,
+  searchLdacaCollections,
+} from '@/api/generated/sdk.gen';
+import type { OniSearchRequest, OniSearchResult as LdacaSearchResult } from '@/api/generated/types.gen';
+
+const LDACA_API_TOKEN_HEADER = 'X-LDACA-API-Token';
+
+type LdacaSearchMethod = Extract<NonNullable<OniSearchRequest['method']>, 'keyword' | 'identifier'>;
+
+type LdacaSearchRequest = Omit<OniSearchRequest, 'method' | 'query'> & {
+  method: LdacaSearchMethod;
+  query: string;
+};
+
+function withLdacaApiToken(
+  headers: Record<string, string> = {},
+  token?: string | null,
+): Record<string, string> {
+  const trimmed = token?.trim();
+  return trimmed ? { ...headers, [LDACA_API_TOKEN_HEADER]: trimmed } : headers;
+}
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -36,7 +58,10 @@ export function useLdacaImport({
     setFeaturedLoading(true);
     setErrorMessage(undefined);
     try {
-      const response = await filesApi.getLdacaFeatured(authHeaders, tokenOverride);
+      const { data: response } = await listLdacaFeaturedCollections({
+        headers: withLdacaApiToken(authHeaders, tokenOverride),
+        throwOnError: true,
+      });
       setFeaturedRecords(response.data);
       setFeaturedLoaded(true);
     } catch (error) {
@@ -71,16 +96,17 @@ export function useLdacaImport({
     setFileFormatFilter('all');
     setErrorMessage(undefined);
     try {
-      const response = await filesApi.searchLdaca(
-        {
-          method: searchMethod,
-          query: trimmedQuery,
-          limit: 25,
-          offset: 0,
-        },
-        authHeaders,
-        ldacaApiToken,
-      );
+      const request: LdacaSearchRequest = {
+        method: searchMethod,
+        query: trimmedQuery,
+        limit: 25,
+        offset: 0,
+      };
+      const { data: response } = await searchLdacaCollections({
+        body: request,
+        headers: withLdacaApiToken(authHeaders, ldacaApiToken),
+        throwOnError: true,
+      });
       setSearchResults(response.data);
     } catch (error) {
       const message = (error as Error).message || 'Failed to search LDaCA.';
@@ -97,7 +123,11 @@ export function useLdacaImport({
 
     setImportingId(target);
     try {
-      const response = await filesApi.importLdaca(target, authHeaders, ldacaApiToken);
+      const { data: response } = await importLdacaDataset({
+        body: { url: target },
+        headers: withLdacaApiToken(authHeaders, ldacaApiToken),
+        throwOnError: true,
+      });
 
       notify('success', response.message || 'LDaCA import started in background.');
       setSearchQuery('');

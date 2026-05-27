@@ -2,10 +2,11 @@
 
 ## API Client
 
-`src/api/http.ts` is the central HTTP wrapper. It builds query strings, handles
-JSON and `FormData`, applies timeouts, and normalizes failures into `ApiError`.
-Feature API modules should call the shared wrapper or the generated hey-api SDK
-instead of using `fetch` directly.
+`src/api/http.ts` is the legacy low-level HTTP wrapper. It builds query strings,
+handles JSON and `FormData`, applies timeouts, and normalizes failures into
+`ApiError`. New feature code should call generated hey-api SDK functions or
+generated TanStack Query helpers instead of using `fetch` or handwritten
+endpoint facades.
 
 `src/api/env.ts` resolves the base URL in this order: explicit override,
 Tauri-injected `window.__BACKEND_URL__`, Vite environment, backend-injected
@@ -17,9 +18,9 @@ with `pnpm -C frontend openapi:generate` after backend API shape changes. The
 generated fetch client uses `src/lib/backend/generatedClientConfig.ts`, which
 preserves the existing API base discovery, credentials, auth headers, timeout
 behavior, and `ApiError` normalization. Keep `src/api/generated/**` generated
-only. Handwritten domain adapters belong under `src/lib/backend/**` and should
-import generated SDK functions and generated types instead of redefining backend
-contracts.
+only. `src/lib/backend/**` is reserved for runtime infrastructure such as
+environment resolution and generated client configuration; backend request and
+response contracts should come from `src/api/generated/types.gen.ts`.
 
 MSW test infrastructure lives under `src/test/msw/` and is enabled from
 `src/test/setup.ts`. Add endpoint handlers or per-test `server.use(...)`

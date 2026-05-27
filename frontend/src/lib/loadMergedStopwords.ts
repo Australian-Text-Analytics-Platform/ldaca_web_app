@@ -26,7 +26,8 @@
  *   (post-trim, preserving original case so e.g. ``Inc`` and ``inc``
  *   stay distinct — matching how the existing textarea treats words).
  */
-import { textApi } from '@/lib/backend/text';
+import { getDefaultStopWords } from '@/api/generated/sdk.gen';
+import type { DefaultStopWordsResponse } from '@/api/generated/types.gen';
 
 export interface MergedStopwordsLanguageGroup {
   /** Normalised language code requested (matches what the backend saw). */
@@ -46,8 +47,6 @@ export interface MergedStopwordsResult {
 }
 
 const normaliseLanguageCode = (raw: string): string => raw.trim().toLowerCase();
-
-type DefaultStopWordsResponse = Awaited<ReturnType<typeof textApi.defaultStopWords>>;
 
 const extractStopwords = (
   payload: DefaultStopWordsResponse | undefined,
@@ -78,7 +77,14 @@ export async function loadMergedStopwords(args: {
 
   const headers = getAuthHeaders();
   const responses = await Promise.all(
-    ordered.map((language) => textApi.defaultStopWords(headers, { language, strict: true })),
+    ordered.map(async (language) => {
+      const { data } = await getDefaultStopWords({
+        headers,
+        query: { language, strict: true },
+        throwOnError: true,
+      });
+      return data;
+    }),
   );
 
   const byLanguage: MergedStopwordsLanguageGroup[] = ordered.map(

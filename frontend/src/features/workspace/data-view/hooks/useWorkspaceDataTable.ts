@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { nodesApi } from '@/lib/backend/nodes';
+import { getNodeQueryPlan } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 import type { FilterOperator } from '../types';
@@ -178,7 +178,11 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onRename: selectedNode?.id && renameNode ? (newName: string) => void renameNode(selectedNode.id, newName) : undefined,
     onQueryPlan: selectedNode?.id
       ? async () => {
-          const resp = await nodesApi.queryPlan(selectedNode.id, getAuthHeaders());
+          const { data: resp } = await getNodeQueryPlan({
+            headers: getAuthHeaders(),
+            path: { node_id: selectedNode.id },
+            throwOnError: true,
+          });
           return resp.plan ?? null;
         }
       : undefined,

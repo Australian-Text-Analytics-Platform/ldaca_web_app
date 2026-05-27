@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
 import { toast } from 'sonner';
-import {
-  type ConcordanceDispersionBinRow,
-  textApi,
-} from '@/lib/backend/text';
+import { concordanceTaskRequest } from '@/api/generated/sdk.gen';
+import type { ConcordanceDispersionBinRow } from '@/api/generated/types.gen';
 import type { AnalysisMaterializedEvent } from '@/stores/analysisStore';
 import { useMaterializeLifecycle } from '../../common/hooks/useMaterializeLifecycle';
 import type { PaginationState } from './useConcordanceTaskFlow';
@@ -94,7 +92,11 @@ export function useConcordanceMaterializedEvents({
       const headers = getAuthHeaders();
       const parentTaskId = await resolveTaskId();
       if (parentTaskId) {
-        const req = await textApi.getConcordanceTaskRequest(parentTaskId, headers);
+        const { data: req } = await concordanceTaskRequest({
+          headers,
+          path: { task_id: parentTaskId },
+          throwOnError: true,
+        });
         const reqObj = (req as Record<string, unknown>) ?? {};
         const paths = (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
         if (paths && typeof paths === 'object') {

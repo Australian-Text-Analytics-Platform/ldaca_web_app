@@ -1,6 +1,6 @@
 import React from 'react';
 
-import type { ConcordanceGroupedRow } from '@/lib/backend/text';
+type ConcordanceGroupedRow = Record<string, unknown>[];
 import {
   Tooltip,
   TooltipContent,

@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
-import type { ConcordanceAnalysisResponse, ConcordanceGroupedRow } from '@/lib/backend/text';
+import type { ConcordanceAnalysisResponse } from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
@@ -17,6 +17,7 @@ import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 import { ConcordanceDispersionNodeBlock } from './ConcordanceDispersionNodeBlock';
 
 type Section = { columns: string[]; color?: string; disabled?: boolean };
+type ConcordanceGroupedRow = Record<string, unknown>[];
 
 export type ConcordanceResultsPanelProps = {
   // Result + view orchestration

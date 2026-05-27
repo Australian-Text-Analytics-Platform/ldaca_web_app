@@ -17,13 +17,12 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import { concordanceApi } from '@/lib/backend/text/concordance';
+import { concordanceTaskDispersionBins, concordanceTaskResultPost, uploadSnapshot } from '@/api/generated/sdk.gen';
 import type {
   ConcordanceAnalysisRequest,
   ConcordanceAnalysisResponse,
   ConcordanceDispersionBinsResponse,
-} from '@/lib/backend/text/concordance';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+} from '@/api/generated/types.gen';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,
@@ -172,18 +171,19 @@ export function useConcordanceSnapshotCapture(
       const wasCombined = request?.combined === true;
 
       const [perNodeResult, combinedResult, ...binResults] = await Promise.all([
-        concordanceApi.postConcordanceTaskResult(
-          taskId,
-          { page_size: 'all', update_only: false, combined: false },
+        concordanceTaskResultPost({
+          body: { page_size: 'all', update_only: false, combined: false },
           headers,
-        ),
+          path: { task_id: taskId },
+          throwOnError: true,
+        }).then(({ data }) => data),
         wasCombined
-          ? concordanceApi
-              .postConcordanceTaskResult(
-                taskId,
-                { page_size: 'all', update_only: false, combined: true },
+          ? concordanceTaskResultPost({
+                body: { page_size: 'all', update_only: false, combined: true },
                 headers,
-              )
+                path: { task_id: taskId },
+                throwOnError: true,
+              }).then(({ data }) => data)
               .catch((err: unknown) => {
                 // Combined fetch is best-effort — if it fails, the
                 // snapshot still ships per-node entries.
@@ -192,8 +192,13 @@ export function useConcordanceSnapshotCapture(
               })
           : Promise.resolve(null),
         ...validNodeIds.map((id) =>
-          concordanceApi
-            .getConcordanceTaskDispersionBins(taskId, id, headers)
+          concordanceTaskDispersionBins({
+              headers,
+              path: { task_id: taskId },
+              query: { node_id: id },
+              throwOnError: true,
+            })
+            .then(({ data }) => data)
             .then(
               (bins) => ({ id, bins }) as { id: string; bins: ConcordanceDispersionBinsResponse },
               (err: unknown) => {
@@ -318,11 +323,14 @@ export function useConcordanceSnapshotCapture(
       // Upload via the Phase-0h endpoints. The backend extracts the
       // sidecar manifest + autogenerates the .md description sidecar
       // automatically.
-      await snapshotsApi.upload(
-        new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
-        filename,
+      await uploadSnapshot({
+        body: {
+          file: new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
+          filename,
+        },
         headers,
-      );
+        throwOnError: true,
+      });
     },
     [
       workspaceId,

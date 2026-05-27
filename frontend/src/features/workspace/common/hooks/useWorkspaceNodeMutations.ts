@@ -1,29 +1,62 @@
 import { useMemo } from 'react';
 import { type QueryClient, useMutation, isCancelledError } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { workspacesApi } from '@/lib/backend/workspaces';
 import {
-  nodesApi,
-  type FilterRequestPayload,
-  type SliceRequest,
-  type ReplaceRequest,
-  type PolarsExpressionRequest,
-  type NodeInfoResponse,
-} from '@/lib/backend/nodes';
-import {
-  textApi,
-  type ConcordanceDetachRequest,
-  type ConcordanceDispersionDetachRequest,
-  type ConcordanceMaterializeRequest,
-  type QuotationRequest,
-  type QuotationDetachRequest,
-  type QuotationMaterializeRequest,
-} from '@/lib/backend/text';
+  addNodeToWorkspace,
+  castNode,
+  cloneNode,
+  concatNodes,
+  concatNodesPreview,
+  createWorkspace,
+  deleteNode,
+  deleteNodeColumn,
+  deleteWorkspace,
+  detachConcordance,
+  detachConcordanceDispersion,
+  detachQuotation,
+  filterNode,
+  filterPreview,
+  getQuotation,
+  joinNodes,
+  listWorkspaces,
+  materializeConcordance,
+  materializeQuotation,
+  polarsExpressionApply,
+  polarsExpressionPreview,
+  renameWorkspace,
+  redoNodeOperation,
+  renameNodeColumn,
+  replaceApply,
+  replacePreview,
+  saveWorkspace,
+  setCurrentWorkspace,
+  sliceNode,
+  slicePreview,
+  undoNodeOperation,
+  updateNodeName,
+  updateWorkspaceDescription,
+} from '@/api/generated/sdk.gen';
+import type {
+  FilterRequest as FilterRequestPayload,
+  SliceRequest,
+  ReplaceRequest,
+  PolarsExpressionRequest,
+  WorkspaceNodeInfo as NodeInfoResponse,
+  ConcordanceDetachRequest,
+  ConcordanceDispersionDetachRequest,
+  ConcordanceMaterializeRequest,
+  QuotationRequestInput,
+  QuotationDetachRequest,
+  QuotationMaterializeRequest,
+} from '@/api/generated/types.gen';
+import { ApiError } from '@/lib/apiError';
 import { queryKeys } from '@/lib/queryKeys';
 import { type NodeSchemaResponse } from '@/types';
 import { type WorkspaceGraphResponse } from '@/types/api';
 import { fetchNodeInfo, invalidateNodeInfoQuery } from '@/lib/nodeInfo';
 import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
+
+type QuotationRequest = QuotationRequestInput;
 
 interface WorkspaceNodeMutationsParams {
   authHeaders: Record<string, string>;
@@ -62,8 +95,30 @@ export const useWorkspaceNodeMutations = ({
     queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
   };
 
+  const setCurrentWorkspaceOnServer = async (workspaceId: string | null) => {
+    const setCurrent = () =>
+      setCurrentWorkspace({
+        headers: authHeaders,
+        query: workspaceId === null ? undefined : { workspace_id: workspaceId },
+        throwOnError: true,
+      });
+
+    try {
+      const { data } = await setCurrent();
+      return data;
+    } catch (error) {
+      if (!(workspaceId !== null && error instanceof ApiError && error.status === 404)) {
+        throw error;
+      }
+
+      await listWorkspaces({ headers: authHeaders, throwOnError: true });
+      const { data } = await setCurrent();
+      return data;
+    }
+  };
+
   const setCurrentWorkspaceMutation = useMutation<Record<string, unknown>, Error, string | null, { previousId: string | null }>({
-    mutationFn: (workspaceId: string | null) => workspacesApi.current.set(workspaceId, authHeaders),
+    mutationFn: (workspaceId: string | null) => setCurrentWorkspaceOnServer(workspaceId),
     onMutate: async (workspaceId: string | null) => {
       startOperation('setCurrentWorkspace');
       const previousId = currentWorkspaceId;
@@ -118,7 +173,11 @@ export const useWorkspaceNodeMutations = ({
 
   const createWorkspaceMutation = useMutation({
     mutationFn: ({ name, description }: { name: string; description?: string }) =>
-      workspacesApi.create(name, description || '', authHeaders),
+      createWorkspace({
+        body: { name, description: description || '' },
+        headers: authHeaders,
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('createWorkspace');
     },
@@ -145,7 +204,11 @@ export const useWorkspaceNodeMutations = ({
       if (!workspaceId?.trim()) {
         throw new Error('workspaceId is required');
       }
-      return workspacesApi.delete(workspaceId, authHeaders);
+      return deleteWorkspace({
+        headers: authHeaders,
+        query: { workspace_id: workspaceId },
+        throwOnError: true,
+      }).then(({ data }) => data);
     },
     onMutate: () => {
       startOperation('deleteWorkspace');
@@ -169,7 +232,7 @@ export const useWorkspaceNodeMutations = ({
   const saveWorkspaceMutation = useMutation({
     mutationFn: () => {
       ensureWorkspaceSelected();
-      return workspacesApi.save(authHeaders);
+      return saveWorkspace({ headers: authHeaders, throwOnError: true }).then(({ data }) => data);
     },
     onMutate: () => startOperation('saveWorkspace'),
     onSuccess: () => {
@@ -184,7 +247,11 @@ export const useWorkspaceNodeMutations = ({
   const updateWorkspaceNameMutation = useMutation({
     mutationFn: (newName: string) => {
       ensureWorkspaceSelected();
-      return workspacesApi.updateName(newName, authHeaders);
+      return renameWorkspace({
+        headers: authHeaders,
+        query: { new_name: newName },
+        throwOnError: true,
+      }).then(({ data }) => data);
     },
     onMutate: () => startOperation('updateWorkspaceName'),
     onSuccess: () => {
@@ -201,7 +268,11 @@ export const useWorkspaceNodeMutations = ({
   const updateWorkspaceDescriptionMutation = useMutation({
     mutationFn: (description: string) => {
       ensureWorkspaceSelected();
-      return workspacesApi.updateDescription(description, authHeaders);
+      return updateWorkspaceDescription({
+        headers: authHeaders,
+        query: { description },
+        throwOnError: true,
+      }).then(({ data }) => data);
     },
     onMutate: () => startOperation('updateWorkspaceDescription'),
     onSuccess: () => {
@@ -217,7 +288,12 @@ export const useWorkspaceNodeMutations = ({
 
   const renameNodeMutation = useMutation({
     mutationFn: ({ nodeId, newName }: { nodeId: string; newName: string }) =>
-      nodesApi.rename(nodeId, newName, authHeaders),
+      updateNodeName({
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        query: { new_name: newName },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('renameNode');
     },
@@ -235,7 +311,11 @@ export const useWorkspaceNodeMutations = ({
 
   const copyNodeMutation = useMutation({
     mutationFn: ({ nodeId }: { nodeId: string }) =>
-      nodesApi.clone(nodeId, authHeaders),
+      cloneNode({
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('copyNode');
     },
@@ -254,7 +334,11 @@ export const useWorkspaceNodeMutations = ({
 
   const deleteNodeMutation = useMutation({
     mutationFn: ({ nodeId }: { nodeId: string }) =>
-      nodesApi.delete(nodeId, authHeaders),
+      deleteNode({
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('deleteNode');
     },
@@ -276,7 +360,11 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const undoNodeMutation = useMutation({
-    mutationFn: ({ nodeId }: { nodeId: string }) => nodesApi.undo(nodeId, authHeaders),
+    mutationFn: ({ nodeId }: { nodeId: string }) => undoNodeOperation({
+      headers: authHeaders,
+      path: { node_id: nodeId },
+      throwOnError: true,
+    }).then(({ data }) => data),
     onMutate: () => {
       startOperation('undoNode');
     },
@@ -296,7 +384,11 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const redoNodeMutation = useMutation({
-    mutationFn: ({ nodeId }: { nodeId: string }) => nodesApi.redo(nodeId, authHeaders),
+    mutationFn: ({ nodeId }: { nodeId: string }) => redoNodeOperation({
+      headers: authHeaders,
+      path: { node_id: nodeId },
+      throwOnError: true,
+    }).then(({ data }) => data),
     onMutate: () => {
       startOperation('redoNode');
     },
@@ -323,7 +415,15 @@ export const useWorkspaceNodeMutations = ({
       filename: string;
       sheetName?: string;
     }) =>
-      nodesApi.createFromFile(filename, undefined, authHeaders, sheetName),
+      addNodeToWorkspace({
+        headers: authHeaders,
+        query: {
+          filename,
+          mode: 'LazyFrame',
+          ...(sheetName ? { sheet_name: sheetName } : {}),
+        },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('createNode');
     },
@@ -378,7 +478,11 @@ export const useWorkspaceNodeMutations = ({
         how: joinType as 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross',
         new_node_name: newNodeName,
       };
-      return nodesApi.join(request, authHeaders);
+      return joinNodes({
+        headers: authHeaders,
+        query: request,
+        throwOnError: true,
+      }).then(({ data }) => data);
     },
     onMutate: () => {
       startOperation('joinNodes');
@@ -418,7 +522,11 @@ export const useWorkspaceNodeMutations = ({
 
   const concatNodesMutation = useMutation({
     mutationFn: ({ nodeIds, newNodeName, deduplicate }: { nodeIds: string[]; newNodeName?: string; deduplicate?: boolean }) =>
-      nodesApi.concat({ node_ids: nodeIds, new_node_name: newNodeName, deduplicate }, authHeaders),
+      concatNodes({
+        body: { node_ids: nodeIds, new_node_name: newNodeName, deduplicate },
+        headers: authHeaders,
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('concatNodes');
       const previousGraph = currentWorkspaceId
@@ -457,7 +565,12 @@ export const useWorkspaceNodeMutations = ({
 
   const filterNodeMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: FilterRequestPayload }) =>
-      nodesApi.filter(nodeId, request, authHeaders),
+      filterNode({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(() => undefined),
     onMutate: () => {
       startOperation('filterNode');
     },
@@ -475,7 +588,12 @@ export const useWorkspaceNodeMutations = ({
 
   const replaceTextMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: ReplaceRequest }) =>
-      nodesApi.replaceText(nodeId, request, authHeaders),
+      replaceApply({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('replaceText');
     },
@@ -497,7 +615,12 @@ export const useWorkspaceNodeMutations = ({
 
   const sliceNodeMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: SliceRequest }) =>
-      nodesApi.slice(nodeId, request, authHeaders),
+      sliceNode({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('sliceNode');
     },
@@ -515,7 +638,12 @@ export const useWorkspaceNodeMutations = ({
 
   const castNodeMutation = useMutation({
     mutationFn: ({ nodeId, column, targetType, format }: { nodeId: string; column: string; targetType: string; format?: string }) =>
-      nodesApi.cast(nodeId, { column, target_type: targetType, format }, authHeaders),
+      castNode({
+        body: { column, target_type: targetType, format },
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('castNode');
     },
@@ -536,7 +664,12 @@ export const useWorkspaceNodeMutations = ({
 
   const renameColumnMutation = useMutation({
     mutationFn: ({ nodeId, column, newName }: { nodeId: string; column: string; newName: string }) =>
-      nodesApi.renameColumn(nodeId, column, newName, authHeaders),
+      renameNodeColumn({
+        body: { new_name: newName },
+        headers: authHeaders,
+        path: { column_name: column, node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('renameColumn');
     },
@@ -558,7 +691,11 @@ export const useWorkspaceNodeMutations = ({
 
   const deleteColumnMutation = useMutation({
     mutationFn: ({ nodeId, column }: { nodeId: string; column: string }) =>
-      nodesApi.deleteColumn(nodeId, column, authHeaders),
+      deleteNodeColumn({
+        headers: authHeaders,
+        path: { column_name: column, node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: () => {
       startOperation('deleteColumn');
     },
@@ -589,7 +726,12 @@ export const useWorkspaceNodeMutations = ({
       workspaceId: string;
       nodeId: string;
       request: ConcordanceDetachRequest;
-    }) => textApi.concordanceDetach(nodeId, request, authHeaders),
+    }) => detachConcordance({
+      body: request,
+      headers: authHeaders,
+      path: { node_id: nodeId },
+      throwOnError: true,
+    }).then(({ data }) => data),
     onMutate: () => startOperation('detachConcordance'),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
@@ -610,7 +752,12 @@ export const useWorkspaceNodeMutations = ({
       nodeId: string;
       request: ConcordanceDispersionDetachRequest;
     }) =>
-      textApi.concordanceDispersionDetach(nodeId, request, authHeaders),
+      detachConcordanceDispersion({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => ({ task_id: data.metadata?.task_id ?? undefined })),
     onMutate: () => startOperation('detachConcordanceDispersion'),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
@@ -629,7 +776,12 @@ export const useWorkspaceNodeMutations = ({
     }: {
       nodeId: string;
       request: ConcordanceMaterializeRequest;
-    }) => textApi.concordanceMaterialize(nodeId, request, authHeaders),
+    }) => materializeConcordance({
+      body: request,
+      headers: authHeaders,
+      path: { node_id: nodeId },
+      throwOnError: true,
+    }).then(({ data }) => data),
     onMutate: () => startOperation('materializeConcordance'),
     onSuccess: () => {
       endOperation('materializeConcordance');
@@ -647,7 +799,12 @@ export const useWorkspaceNodeMutations = ({
     }: {
       nodeId: string;
       request: QuotationRequest;
-    }) => textApi.quotation(nodeId, request, authHeaders),
+    }) => getQuotation({
+      body: request,
+      headers: authHeaders,
+      path: { node_id: nodeId },
+      throwOnError: true,
+    }).then(({ data }) => data),
     onMutate: () => startOperation('quotation'),
     onSuccess: () => {
       endOperation('quotation');
@@ -666,7 +823,12 @@ export const useWorkspaceNodeMutations = ({
       workspaceId: string;
       nodeId: string;
       request: QuotationDetachRequest;
-    }) => textApi.quotationDetach(nodeId, request, authHeaders),
+    }) => detachQuotation({
+      body: request,
+      headers: authHeaders,
+      path: { node_id: nodeId },
+      throwOnError: true,
+    }).then(({ data }) => data),
     onMutate: () => startOperation('detachQuotation'),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
@@ -685,7 +847,12 @@ export const useWorkspaceNodeMutations = ({
     }: {
       nodeId: string;
       request: QuotationMaterializeRequest;
-    }) => textApi.quotationMaterialize(nodeId, request, authHeaders),
+    }) => materializeQuotation({
+      body: request,
+      headers: authHeaders,
+      path: { node_id: nodeId },
+      throwOnError: true,
+    }).then(({ data }) => data),
     onMutate: () => startOperation('materializeQuotation'),
     onSuccess: () => {
       endOperation('materializeQuotation');
@@ -750,23 +917,57 @@ export const useWorkspaceNodeMutations = ({
     concatNodes: (nodeIds: string[], newNodeName?: string, deduplicate?: boolean) =>
       concatNodesMutation.mutateAsync({ nodeIds, newNodeName, deduplicate }),
     concatPreview: (nodeIds: string[], page = 1, pageSize = 10, deduplicate?: boolean) =>
-      nodesApi.concatPreview({ node_ids: nodeIds, deduplicate }, page, pageSize, authHeaders),
+      concatNodesPreview({
+        body: { node_ids: nodeIds, deduplicate },
+        headers: authHeaders,
+        query: { page, page_size: pageSize },
+        throwOnError: true,
+      }).then(({ data }) => data),
     filterNode: (nodeId: string, request: FilterRequestPayload) =>
       filterNodeMutation.mutateAsync({ nodeId, request }),
     filterPreview: (nodeId: string, request: FilterRequestPayload, page = 1, pageSize = 10) =>
-      nodesApi.filterPreview(nodeId, request, page, pageSize, authHeaders),
+      filterPreview({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        query: { page, page_size: pageSize },
+        throwOnError: true,
+      }).then(({ data }) => data),
     sliceNode: (nodeId: string, request: SliceRequest) =>
       sliceNodeMutation.mutateAsync({ nodeId, request }),
     slicePreview: (nodeId: string, request: SliceRequest, page = 1, pageSize = 10) =>
-      nodesApi.slicePreview(nodeId, request, page, pageSize, authHeaders),
+      slicePreview({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        query: { page, page_size: pageSize },
+        throwOnError: true,
+      }).then(({ data }) => data),
     replaceText: (nodeId: string, request: ReplaceRequest) =>
       replaceTextMutation.mutateAsync({ nodeId, request }),
     replaceTextPreview: (nodeId: string, request: ReplaceRequest, page = 1, pageSize = 10) =>
-      nodesApi.replaceTextPreview(nodeId, request, page, pageSize, authHeaders),
+      replacePreview({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        query: { page, page_size: pageSize },
+        throwOnError: true,
+      }).then(({ data }) => data),
     polarsExpressionPreview: (nodeId: string, request: PolarsExpressionRequest, page = 1, pageSize = 10) =>
-      nodesApi.polarsExpressionPreview(nodeId, request, page, pageSize, authHeaders),
+      polarsExpressionPreview({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        query: { page, page_size: pageSize },
+        throwOnError: true,
+      }).then(({ data }) => data),
     polarsExpressionApply: (nodeId: string, request: PolarsExpressionRequest) =>
-      nodesApi.polarsExpressionApply(nodeId, request, authHeaders),
+      polarsExpressionApply({
+        body: request,
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
       castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
     renameColumn: (nodeId: string, column: string, newName: string) =>

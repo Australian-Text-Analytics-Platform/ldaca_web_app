@@ -1,4 +1,4 @@
-import { workspacesApi } from '@/lib/backend/workspaces';
+import { clearTasks } from '@/api/generated/sdk.gen';
 import { collectTaskIds } from '@/hooks/analysisTaskUtils';
 import {
   analysisServerRequestLockQueryKey,
@@ -41,7 +41,7 @@ export async function clearAnalysis({
 
     const settled = await Promise.allSettled(
       allTaskIds.map((taskId) =>
-        workspacesApi.clearTasks({ task_id: taskId }, headers),
+        clearTasks({ headers, query: { task_id: taskId }, throwOnError: true }),
       ),
     );
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TokenFrequencyResponse } from '@/lib/backend/text';
+import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
 import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '@/features/analysis/common/components/AnalysisRunningStateCard';

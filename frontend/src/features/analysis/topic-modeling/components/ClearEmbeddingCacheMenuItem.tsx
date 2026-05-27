@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { textApi } from '@/lib/backend/text';
+import {
+  clearTopicModelingEmbeddingCache,
+  getTopicModelingEmbeddingCacheSize,
+} from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -25,7 +28,10 @@ export const ClearEmbeddingCacheMenuItem: React.FC = () => {
     setStats(null);
     setOpen(true);
     try {
-      const resp = await textApi.getTopicModelingEmbeddingCacheSize(getAuthHeaders());
+      const { data: resp } = await getTopicModelingEmbeddingCacheSize({
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
       setStats(resp.data ?? null);
     } catch {
       // Leave stats null; dialog will show a generic warning without sizes.
@@ -35,7 +41,10 @@ export const ClearEmbeddingCacheMenuItem: React.FC = () => {
   const handleConfirm = async () => {
     setOpen(false);
     try {
-      const resp = await textApi.clearTopicModelingEmbeddingCache(getAuthHeaders());
+      const { data: resp } = await clearTopicModelingEmbeddingCache({
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
       const freed = resp.data?.bytes_freed ?? 0;
       const files = resp.data?.files_removed ?? 0;
       if (files === 0) {

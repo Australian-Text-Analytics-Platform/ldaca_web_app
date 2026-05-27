@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query';
-import { textApi } from '@/lib/backend/text';
+import { getDefaultStopWords } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -57,8 +57,14 @@ export const useDefaultStopwords = (
     queries: uniqueLanguages.map((language) => ({
       queryKey: queryKeys.defaultStopWords(language, strict),
       staleTime: 1000 * 60 * 60,
-      queryFn: async () =>
-        textApi.defaultStopWords(getAuthHeaders(), { language, strict }),
+      queryFn: async () => {
+        const { data } = await getDefaultStopWords({
+          headers: getAuthHeaders(),
+          query: { language, strict },
+          throwOnError: true,
+        });
+        return data;
+      },
     })),
   });
 

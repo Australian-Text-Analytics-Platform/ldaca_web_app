@@ -28,9 +28,9 @@ const useAuthMock = vi.hoisted(() => vi.fn(() => ({
 })));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: useAuthMock }));
 
-const nodesApiDataMock = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/backend/nodes', () => ({
-  nodesApi: { data: nodesApiDataMock },
+const getNodeDataMock = vi.hoisted(() => vi.fn());
+vi.mock('@/api/generated/sdk.gen', () => ({
+  getNodeData: getNodeDataMock,
 }));
 
 import { useNodePreviewWithRawFallback } from '../useNodePreviewWithRawFallback';
@@ -44,7 +44,7 @@ const lastCapturedOptions = (): CapturedOptions => {
 describe('useNodePreviewWithRawFallback', () => {
   beforeEach(() => {
     usePreprocessingPreviewMock.mockReset();
-    nodesApiDataMock.mockReset();
+    getNodeDataMock.mockReset();
     usePreprocessingPreviewMock.mockReturnValue({});
   });
 
@@ -137,16 +137,19 @@ describe('useNodePreviewWithRawFallback', () => {
       });
 
       expect(operationFetch).toHaveBeenCalledWith('node-1', { conditions: [] }, 2, 25);
-      expect(nodesApiDataMock).not.toHaveBeenCalled();
+      expect(getNodeDataMock).not.toHaveBeenCalled();
       expect(result).toEqual({ data: [{ a: 1 }], columns: ['a'], pagination: null });
     });
 
-    it('falls back to nodesApi.data when the payload is null', async () => {
+    it('falls back to getNodeData when the payload is null', async () => {
       const operationFetch = vi.fn();
-      nodesApiDataMock.mockResolvedValue({
-        data: [{ raw: 1 }],
-        columns: ['raw'],
-        pagination: null,
+      getNodeDataMock.mockResolvedValue({
+        data: {
+          data: [{ raw: 1 }],
+          columns: ['raw'],
+          pagination: null,
+        },
+        error: undefined,
       });
 
       renderHook(() =>
@@ -168,11 +171,12 @@ describe('useNodePreviewWithRawFallback', () => {
       });
 
       expect(operationFetch).not.toHaveBeenCalled();
-      expect(nodesApiDataMock).toHaveBeenCalledWith(
-        'node-1',
-        { page: 1, pageSize: 10 },
-        { Authorization: 'Bearer test' },
-      );
+      expect(getNodeDataMock).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        path: { node_id: 'node-1' },
+        query: { page: 1, page_size: 10 },
+        throwOnError: true,
+      });
       expect(result).toEqual({
         data: [{ raw: 1 }],
         columns: ['raw'],

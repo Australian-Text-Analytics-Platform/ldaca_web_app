@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
-import { nodesApi, type ColumnOperationsResponse } from '@/lib/backend/nodes';
+import { columnOperations } from '@/api/generated/sdk.gen';
+import type { ColumnOperationsResponse } from '@/api/generated/types.gen';
 import { useAuth } from '@/hooks/useAuth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -33,10 +34,13 @@ export const OperationPopover: React.FC<OperationPopoverProps> = ({
     if (!open) return;
     if (!nodeId || !column) return;
     let cancelled = false;
-    nodesApi
-      .columnOperations(nodeId, column, getAuthHeaders())
+    columnOperations({
+      headers: getAuthHeaders(),
+      path: { column_name: column, node_id: nodeId },
+      throwOnError: true,
+    })
       .then((res) => {
-        if (!cancelled) setOperations(res.operations);
+        if (!cancelled) setOperations(res.data.operations);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));

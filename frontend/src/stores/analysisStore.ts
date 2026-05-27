@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { ConcordanceAnalysisResponse } from '@/lib/backend/text';
+import type { ConcordanceAnalysisResponse } from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '../hooks/useAutoNodeColumns';
 
 /** Canonical task lifecycle states. */

@@ -4,8 +4,19 @@ import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelect
 import { useAuth } from '@/hooks/useAuth';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { type AiAnnotationNodeResult, type AiAnnotationResponse, textApi } from '@/lib/backend/text';
-import { nodesApi } from '@/lib/backend/nodes';
+import {
+  aiAnnotationTaskRequest,
+  aiAnnotationTaskResult,
+  aiAnnotationTaskResultPost,
+  detachAiAnnotation,
+  getAiAnnotationCategories,
+  getAiAnnotationModels,
+  getAiAnnotationProviders,
+  getNodeData,
+  runAiAnnotation,
+  saveAiAnnotation,
+} from '@/api/generated/sdk.gen';
+import type { AiAnnotationNodeResult, AiAnnotationResponse } from '@/api/generated/types.gen';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -273,8 +284,22 @@ const AiAnnotatorFeature: React.FC = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef: aiAnnotationResultRef,
-    fetchResult: async (taskId, headers) => textApi.getAiAnnotationTaskResult(taskId, headers),
-    fetchRequest: async (taskId, headers) => textApi.getAiAnnotationTaskRequest(taskId, headers),
+    fetchResult: async (taskId, headers) => {
+      const { data } = await aiAnnotationTaskResult({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
+    fetchRequest: async (taskId, headers) => {
+      const { data } = await aiAnnotationTaskRequest({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
     onResultFetched: (result, _fetchedTaskId) => {
       aiAnnotationResultRef.current = result;
       applyResponseResult(result ?? null);
@@ -330,14 +355,15 @@ const AiAnnotatorFeature: React.FC = () => {
     }
     setIsPaging(true);
     try {
-      const response = await textApi.postAiAnnotationTaskResult(
-        resolvedTaskId,
-        {
+      const { data: response } = await aiAnnotationTaskResultPost({
+        body: {
           page,
           page_size: pageSize,
         },
-        getAuthHeaders(),
-      );
+        headers: getAuthHeaders(),
+        path: { task_id: resolvedTaskId },
+        throwOnError: true,
+      });
       setLocalTaskId(response?.metadata?.task_id ?? resolvedTaskId);
       aiAnnotationResultRef.current = response ?? null;
       applyResponseResult(response ?? null);
@@ -355,10 +381,11 @@ const AiAnnotatorFeature: React.FC = () => {
     setIsLoadingModels(true);
     try {
       const baseUrl = resolveBaseUrl(endpointPreset, customBaseUrl);
-      const response = await textApi.aiAnnotationModels(
-        { base_url: baseUrl, api_key: apiKey.trim() || null },
-        getAuthHeaders(),
-      );
+      const { data: response } = await getAiAnnotationModels({
+        body: { base_url: baseUrl, api_key: apiKey.trim() || null },
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
       const models = response?.data?.models ?? [];
       setAvailableModels(models);
       const modelIds = models.map((m) => m.id);
@@ -404,9 +431,8 @@ const AiAnnotatorFeature: React.FC = () => {
 
     setIsDetaching(true);
     try {
-      const response = await textApi.aiAnnotationDetach(
-        selectedNodeId,
-        {
+      const { data: response } = await detachAiAnnotation({
+        body: {
           column: selectedColumn,
           new_node_name: buildDetachNodeName(
             String(displayedNodes[0]?.name || displayedNodes[0]?.id || selectedNodeId),
@@ -423,8 +449,10 @@ const AiAnnotatorFeature: React.FC = () => {
           seed: seed.trim() ? Number(seed) : null,
           batch_size: Number(batchSize) || 100,
         },
-        getAuthHeaders(),
-      );
+        headers: getAuthHeaders(),
+        path: { node_id: selectedNodeId },
+        throwOnError: true,
+      });
 
       const detachTaskId = (response as { metadata?: { task_id?: string } })?.metadata?.task_id;
       setStatusMessage(
@@ -450,8 +478,8 @@ const AiAnnotatorFeature: React.FC = () => {
 
     setIsRunning(true);
     try {
-      const response = await textApi.aiAnnotation(
-        {
+      const { data: response } = await runAiAnnotation({
+        body: {
           node_ids: [selectedNodeId],
           node_columns: { [selectedNodeId]: selectedColumn },
           annotation_column: aiAnnotationColumn.trim() ? aiAnnotationColumn : null,
@@ -468,8 +496,9 @@ const AiAnnotatorFeature: React.FC = () => {
           page_size: DEFAULT_PAGE_SIZE,
           descending: true,
         },
-        getAuthHeaders(),
-      );
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
 
       extractAndSetTaskId(response, setLocalTaskId);
       aiAnnotationResultRef.current = response ?? null;
@@ -606,7 +635,12 @@ const AiAnnotatorFeature: React.FC = () => {
   const loadReviewPage = async (nodeId: string, textCol: string, annotationCol: string, pg: number, pgSize: number) => {
     setIsReviewPaging(true);
     try {
-      const response = await nodesApi.data(nodeId, { page: pg, pageSize: pgSize }, getAuthHeaders());
+      const { data: response } = await getNodeData({
+        headers: getAuthHeaders(),
+        path: { node_id: nodeId },
+        query: { page: pg, page_size: pgSize },
+        throwOnError: true,
+      });
       const rows = response.data ?? [];
       const columns = response.columns ?? [];
       const pagination = response.pagination;
@@ -635,11 +669,12 @@ const AiAnnotatorFeature: React.FC = () => {
 
   const loadReviewProviders = async (nodeId: string, annotationCol: string) => {
     try {
-      const response = await textApi.aiAnnotationProviders(
-        nodeId,
-        annotationCol,
-        getAuthHeaders(),
-      );
+      const { data: response } = await getAiAnnotationProviders({
+        headers: getAuthHeaders(),
+        path: { node_id: nodeId },
+        query: { annotation_column: annotationCol },
+        throwOnError: true,
+      });
       const providers = response?.data?.providers ?? [];
       setReviewGlobalProviders(
         Array.from(new Set(providers.map((name) => String(name).trim()).filter(Boolean))),
@@ -654,11 +689,12 @@ const AiAnnotatorFeature: React.FC = () => {
 
   const loadReviewCategories = async (nodeId: string, annotationCol: string) => {
     try {
-      const response = await textApi.aiAnnotationCategories(
-        nodeId,
-        annotationCol,
-        getAuthHeaders(),
-      );
+      const { data: response } = await getAiAnnotationCategories({
+        headers: getAuthHeaders(),
+        path: { node_id: nodeId },
+        query: { annotation_column: annotationCol },
+        throwOnError: true,
+      });
       const categories = response?.data?.categories ?? [];
       setReviewGlobalCategories(
         Array.from(new Set(categories.map((name) => String(name).trim()).filter(Boolean))),
@@ -766,14 +802,15 @@ const AiAnnotatorFeature: React.FC = () => {
 
     setSavingReviewCells((prev) => ({ ...prev, [editKey]: true }));
     try {
-      await textApi.aiAnnotationSave(
-        reviewNodeId,
-        {
+      await saveAiAnnotation({
+        body: {
           annotation_column: reviewAnnotationColumn,
           edits: [{ row_index: rowIndex, provider: providerName, annotation: trimmedNextValue }],
         },
-        getAuthHeaders(),
-      );
+        headers: getAuthHeaders(),
+        path: { node_id: reviewNodeId },
+        throwOnError: true,
+      });
 
       setReviewData((prev) => {
         if (!prev) {

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+import { listSnapshots } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { LoadSnapshotDialog } from './LoadSnapshotDialog';
@@ -110,7 +110,14 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   //   - the Load button mounts only when ≥1 snapshot exists
   const { data: listData } = useQuery({
     queryKey: ['snapshots-list', tool],
-    queryFn: () => snapshotsApi.list(tool, getAuthHeaders()),
+    queryFn: async () => {
+      const { data } = await listSnapshots({
+        headers: getAuthHeaders(),
+        query: { tool },
+        throwOnError: true,
+      });
+      return data;
+    },
     enabled,
     staleTime: 10_000,
   });

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { filesApi } from '@/lib/backend/files';
+import { getRawFile, moveFile } from '@/api/generated/sdk.gen';
 import type { FileTreeDirectory } from '@/types';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
@@ -36,7 +36,11 @@ export function useFileBrowserActions({
 
   const handleMoveFile = async (sourcePath: string, targetDirectoryPath: string) => {
     try {
-      await filesApi.moveFile(sourcePath, targetDirectoryPath, authHeaders);
+      await moveFile({
+        body: { source_path: sourcePath, target_directory_path: targetDirectoryPath },
+        headers: authHeaders,
+        throwOnError: true,
+      });
       await refetchFiles();
       notify('success', `Moved ${sourcePath.split('/').at(-1)}.`);
     } catch (error) {
@@ -60,7 +64,13 @@ export function useFileBrowserActions({
     setCitationContent(null);
     setCitationLoading(true);
     try {
-      const rawContent = await filesApi.raw(readmePath, authHeaders);
+      const { data } = await getRawFile({
+        headers: authHeaders,
+        parseAs: 'text',
+        query: { path: readmePath },
+        throwOnError: true,
+      });
+      const rawContent = data as string;
       setCitationContent(rawContent);
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to load citation.');

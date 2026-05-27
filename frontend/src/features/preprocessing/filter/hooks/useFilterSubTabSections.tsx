@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { nodesApi } from '@/lib/backend/nodes';
+import { describeColumn, getColumnUniqueValues } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -294,7 +294,11 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       });
 
       try {
-        const response = await nodesApi.uniqueValues(selectedNodeId, column, getAuthHeaders());
+        const { data: response } = await getColumnUniqueValues({
+          headers: getAuthHeaders(),
+          path: { column_name: column, node_id: selectedNodeId },
+          throwOnError: true,
+        });
         const rawValues: unknown[] = Array.isArray(response?.unique_values) ? response.unique_values : [];
         const includeNullOption = dataType === 'categorical';
         const hasNullFromResponse = includeNullOption && Boolean(response?.has_null);
@@ -578,7 +582,11 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (!selectedNodeId || !currentWorkspaceId) return;
     
     try {
-      const describeData = await nodesApi.describeColumn(selectedNodeId, column, getAuthHeaders());
+      const { data: describeData } = await describeColumn({
+        headers: getAuthHeaders(),
+        path: { column_name: column, node_id: selectedNodeId },
+        throwOnError: true,
+      });
       
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;
@@ -620,7 +628,11 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (!selectedNodeId || !currentWorkspaceId) return;
 
     try {
-      const describeData = await nodesApi.describeColumn(selectedNodeId, column, getAuthHeaders());
+      const { data: describeData } = await describeColumn({
+        headers: getAuthHeaders(),
+        path: { column_name: column, node_id: selectedNodeId },
+        throwOnError: true,
+      });
 
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;

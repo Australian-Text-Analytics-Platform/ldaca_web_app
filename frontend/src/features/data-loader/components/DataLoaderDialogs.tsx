@@ -31,8 +31,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { LdacaSearchMethod, LdacaSearchResult } from '@/lib/backend/files';
+import type { OniSearchRequest, OniSearchResult as LdacaSearchResult } from '@/api/generated/types.gen';
 import type { FileTreeDirectory } from '@/types';
+
+type LdacaSearchMethod = Extract<NonNullable<OniSearchRequest['method']>, 'keyword' | 'identifier'>;
 
 const LDACA_SEARCH_METHOD_LABELS: Record<LdacaSearchMethod, string> = {
   keyword: 'Keyword',

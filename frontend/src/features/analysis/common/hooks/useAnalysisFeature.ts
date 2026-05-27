@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { textApi } from '@/lib/backend/text';
-import { workspacesApi } from '@/lib/backend/workspaces';
+import { cancelTask } from '@/api/generated/sdk.gen';
 import { collectTaskIds, resolveAnalysisTaskId } from '@/hooks/analysisTaskUtils';
 import { useAnalysisHydration, type HydrationState } from '../useAnalysisHydration';
 import { clearAnalysis } from '../clearAnalysis';
 import { useAnalysisTaskFlow } from '../tasks/useAnalysisTaskFlow';
+import { getCurrentAnalysisTask } from '../analysisTasksApi';
 import type {
   AnalysisTaskBannerState,
   AnalysisTaskFlowRefreshContext,
@@ -206,10 +206,7 @@ export function useAnalysisFeature<TResult = unknown>(
       ],
       fetchCurrentTaskId: async () => {
         const headers = cfg.getAuthHeaders();
-        const current = (await textApi.getAnalysisCurrent(
-          cfg.analysisType,
-          headers,
-        )) as Record<string, unknown>;
+        const current = (await getCurrentAnalysisTask(cfg.analysisType, headers)) as Record<string, unknown>;
         const raw = Array.isArray(current?.task_ids)
           ? (current.task_ids as string[])[0]
           : null;
@@ -453,7 +450,11 @@ export function useAnalysisFeature<TResult = unknown>(
 
     setIsStopping(true);
     try {
-      await workspacesApi.cancelTask({ task_id: taskId }, cfg.getAuthHeaders());
+      await cancelTask({
+        headers: cfg.getAuthHeaders(),
+        query: { task_id: taskId },
+        throwOnError: true,
+      });
       setIsRunning(false);
     } catch (error) {
       console.warn(`[${cfg.analysisType}] Failed to stop task ${taskId}:`, error);

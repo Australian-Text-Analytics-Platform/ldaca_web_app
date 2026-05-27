@@ -1,4 +1,4 @@
-import { nodesApi } from '@/lib/backend/nodes';
+import { getNodeData } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import type { PreviewPagination, PreviewRow } from '../types';
 import {
@@ -28,11 +28,11 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
   nodeId: string | null;
   /**
    * The operation-specific payload. When `null`, the hook falls back to
-   * `nodesApi.data` so the user always sees source rows even before they've
+  * `getNodeData` so the user always sees source rows even before they've
    * configured a valid operation.
    */
   operationPayload: P | null;
-  /** Operation-specific preview endpoint (e.g. `nodesApi.filterPreview`). */
+  /** Operation-specific preview endpoint (e.g. generated `filterPreview`). */
   operationFetch: (
     nodeId: string,
     payload: P,
@@ -57,7 +57,7 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
  *
  * Replaces ~5 hand-rolled copies of: request shape with `payload: null`,
  * a manual signature builder with `disabled`/`::raw`/`::<json>` branches,
- * and a fetcher that branches on `payload === null` to call `nodesApi.data`.
+ * and a fetcher that branches on `payload === null` to call `getNodeData`.
  */
 export const useNodePreviewWithRawFallback = <P>(
   opts: UseNodePreviewWithRawFallbackOptions<P>,
@@ -87,8 +87,14 @@ export const useNodePreviewWithRawFallback = <P>(
       if (req.payload) {
         return normaliseResponse(await operationFetch(req.nodeId, req.payload, page, pageSize));
       }
+      const { data } = await getNodeData({
+        headers: getAuthHeaders(),
+        path: { node_id: req.nodeId },
+        query: { page, page_size: pageSize },
+        throwOnError: true,
+      });
       return normaliseResponse(
-        await nodesApi.data(req.nodeId, { page, pageSize }, getAuthHeaders()),
+        data,
       );
     },
   });

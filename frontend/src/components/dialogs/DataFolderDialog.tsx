@@ -11,7 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { configApi } from '@/lib/backend/config';
+import { updateConfig } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -81,7 +81,7 @@ function DataFolderDialogContent({
         await setCurrentWorkspace(null);
       }
 
-      await configApi.updateConfig({ data_root: nextPath });
+      await updateConfig({ body: { data_root: nextPath }, throwOnError: true });
       toast.success('Working directory updated');
       await refreshAuth();
       await Promise.all([

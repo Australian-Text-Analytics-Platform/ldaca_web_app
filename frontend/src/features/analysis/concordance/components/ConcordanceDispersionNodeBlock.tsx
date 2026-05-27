@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceGroupedRow, ConcordanceResultEntry } from '@/lib/backend/text';
+import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/generated/types.gen';
 import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
 import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
@@ -35,6 +35,8 @@ import { ConcordanceDispersionCell } from './ConcordanceDispersionCell';
 import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
 import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
+
+type ConcordanceGroupedRow = Record<string, unknown>[];
 
 const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
 

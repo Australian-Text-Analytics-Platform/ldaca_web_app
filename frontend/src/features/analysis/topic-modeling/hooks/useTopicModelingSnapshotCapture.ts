@@ -15,8 +15,10 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import type { TopicModelingRequest, TopicModelingResponse } from '@/lib/backend/text';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+import type { TopicModelingRequestInput, TopicModelingResponse } from '@/api/generated/types.gen';
+
+type TopicModelingRequest = TopicModelingRequestInput;
+import { uploadSnapshot } from '@/api/generated/sdk.gen';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,
@@ -202,11 +204,14 @@ export function useTopicModelingSnapshotCapture(
       }
       const bundleBytes = await zip.generateAsync({ type: 'uint8array' });
 
-      await snapshotsApi.upload(
-        new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
-        filename,
-        getAuthHeaders(),
-      );
+      await uploadSnapshot({
+        body: {
+          file: new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
+          filename,
+        },
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
     },
     [
       workspaceId,

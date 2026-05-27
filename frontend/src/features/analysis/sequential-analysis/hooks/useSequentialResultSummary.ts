@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 
-import type { SequentialCustomIntervalUnit, SequentialFrequency } from '@/lib/backend/text';
+import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
+
+type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
+type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequestInput['custom_interval_unit']>;
 
 const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
   'minutes',

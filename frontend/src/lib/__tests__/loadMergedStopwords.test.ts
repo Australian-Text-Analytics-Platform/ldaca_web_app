@@ -1,21 +1,19 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { loadMergedStopwords } from '../loadMergedStopwords';
 
-const { defaultStopWordsMock } = vi.hoisted(() => ({
-  defaultStopWordsMock: vi.fn(),
+const { getDefaultStopWordsMock } = vi.hoisted(() => ({
+  getDefaultStopWordsMock: vi.fn(),
 }));
 
-vi.mock('@/lib/backend/text', () => ({
-  textApi: {
-    defaultStopWords: defaultStopWordsMock,
-  },
+vi.mock('@/api/generated/sdk.gen', () => ({
+  getDefaultStopWords: getDefaultStopWordsMock,
 }));
 
 const getAuthHeaders = () => ({ Authorization: 'Bearer test' });
 
 describe('loadMergedStopwords', () => {
   beforeEach(() => {
-    defaultStopWordsMock.mockReset();
+    getDefaultStopWordsMock.mockReset();
   });
 
   it('returns an empty result when no languages are supplied', async () => {
@@ -24,32 +22,33 @@ describe('loadMergedStopwords', () => {
       getAuthHeaders,
     });
     expect(result).toEqual({ byLanguage: [], merged: [] });
-    expect(defaultStopWordsMock).not.toHaveBeenCalled();
+    expect(getDefaultStopWordsMock).not.toHaveBeenCalled();
   });
 
   it('deduplicates language codes and fetches each unique language once', async () => {
-    defaultStopWordsMock.mockResolvedValue({ stopwords: ['the', 'and'] });
+    getDefaultStopWordsMock.mockResolvedValue({ data: { stopwords: ['the', 'and'] }, error: undefined });
     await loadMergedStopwords({
       languages: ['en', 'EN ', ' en', null, undefined, 'en'],
       getAuthHeaders,
     });
-    expect(defaultStopWordsMock).toHaveBeenCalledTimes(1);
-    expect(defaultStopWordsMock).toHaveBeenCalledWith(
-      { Authorization: 'Bearer test' },
-      { language: 'en', strict: true },
-    );
+    expect(getDefaultStopWordsMock).toHaveBeenCalledTimes(1);
+    expect(getDefaultStopWordsMock).toHaveBeenCalledWith({
+      headers: { Authorization: 'Bearer test' },
+      query: { language: 'en', strict: true },
+      throwOnError: true,
+    });
   });
 
   it('produces per-language groups and a deduplicated flat merge', async () => {
-    defaultStopWordsMock.mockImplementation(
-      (_headers: unknown, options?: { language?: string; strict?: boolean }) => {
-        if (options?.language === 'en') {
-          return Promise.resolve({ stopwords: ['the', 'and', 'shared'] });
+    getDefaultStopWordsMock.mockImplementation(
+      (options?: { query?: { language?: string; strict?: boolean } }) => {
+        if (options?.query?.language === 'en') {
+          return Promise.resolve({ data: { stopwords: ['the', 'and', 'shared'] }, error: undefined });
         }
-        if (options?.language === 'zh') {
-          return Promise.resolve({ stopwords: ['的', 'shared', '了'] });
+        if (options?.query?.language === 'zh') {
+          return Promise.resolve({ data: { stopwords: ['的', 'shared', '了'] }, error: undefined });
         }
-        return Promise.resolve({ stopwords: [] });
+        return Promise.resolve({ data: { stopwords: [] }, error: undefined });
       },
     );
 

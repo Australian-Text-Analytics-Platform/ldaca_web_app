@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/lib/backend/text';
+import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
+import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -64,6 +65,7 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
 const UNIFIED_WORDCLOUD_HEIGHT = 340;
+type TokenFrequencyRequest = TokenFrequencyRequestInput;
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
@@ -211,10 +213,22 @@ const TokenFrequencyFeature = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef,
-    fetchResult: (taskId, headers) =>
-      textApi.getTokenFrequenciesTaskResult(taskId, headers) as Promise<TokenFrequencyResponse>,
-    fetchRequest: async (taskId, headers) =>
-      textApi.getTokenFrequenciesTaskRequest(taskId, headers),
+    fetchResult: async (taskId, headers) => {
+      const { data } = await tokenFrequenciesTaskResult({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
+    fetchRequest: async (taskId, headers) => {
+      const { data } = await tokenFrequenciesTaskRequest({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
     onResultFetched: (result) => setResultSafely(result),
     onHydratedResult: (result) => {
       if (!result) return;

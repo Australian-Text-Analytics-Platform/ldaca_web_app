@@ -19,7 +19,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
-import { workspaceUiStateApi } from '@/lib/backend/workspaceUiState';
+import { getWorkspaceUiState, putWorkspaceUiState } from '@/api/generated/sdk.gen';
 
 /** Coalesce window for outbound PUTs. Long enough that picker + run
  * fall into the same write, short enough that the user doesn't lose
@@ -52,11 +52,14 @@ export function useWorkspaceUiStateSync(
     }
     let cancelled = false;
     hydratingRef.current = true;
-    workspaceUiStateApi
-      .get(currentWorkspaceId, getAuthHeaders())
+    getWorkspaceUiState({
+      headers: getAuthHeaders(),
+      path: { workspace_id: currentWorkspaceId },
+      throwOnError: true,
+    })
       .then((payload) => {
         if (cancelled) return;
-        const next = payload?.node_colors ?? {};
+        const next = payload.data.node_colors ?? {};
         hydrateColors(next);
         hydratedWorkspaceIdRef.current = currentWorkspaceId;
       })
@@ -106,8 +109,12 @@ export function useWorkspaceUiStateSync(
         pendingColorsRef.current = null;
         writeTimerRef.current = null;
         if (!currentWorkspaceId || !colors) return;
-        workspaceUiStateApi
-          .put(currentWorkspaceId, { node_colors: colors }, getAuthHeaders())
+        putWorkspaceUiState({
+          body: { node_colors: colors },
+          headers: getAuthHeaders(),
+          path: { workspace_id: currentWorkspaceId },
+          throwOnError: true,
+        })
           .catch((err) => {
             console.warn(
               `Failed to persist workspace ui_state for ${currentWorkspaceId}:`,

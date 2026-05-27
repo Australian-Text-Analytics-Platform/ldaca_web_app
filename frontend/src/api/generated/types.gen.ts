@@ -537,9 +537,9 @@ export type AuthMethod = {
 };
 
 /**
- * Body_google_auth_callback_api_auth_google_callback_post
+ * Body_google_auth_callback
  */
-export type BodyGoogleAuthCallbackApiAuthGoogleCallbackPost = {
+export type BodyGoogleAuthCallback = {
     /**
      * Credential
      */
@@ -551,9 +551,9 @@ export type BodyGoogleAuthCallbackApiAuthGoogleCallbackPost = {
 };
 
 /**
- * Body_upload_file_api_files_upload_post
+ * Body_upload_file
  */
-export type BodyUploadFileApiFilesUploadPost = {
+export type BodyUploadFile = {
     /**
      * File
      */
@@ -561,9 +561,9 @@ export type BodyUploadFileApiFilesUploadPost = {
 };
 
 /**
- * Body_upload_snapshot_api_users_me_snapshots_post
+ * Body_upload_snapshot
  */
-export type BodyUploadSnapshotApiUsersMeSnapshotsPost = {
+export type BodyUploadSnapshot = {
     /**
      * File
      */
@@ -575,9 +575,9 @@ export type BodyUploadSnapshotApiUsersMeSnapshotsPost = {
 };
 
 /**
- * Body_upload_workspace_zip_api_workspaces_upload_post
+ * Body_upload_workspace_zip
  */
-export type BodyUploadWorkspaceZipApiWorkspacesUploadPost = {
+export type BodyUploadWorkspaceZip = {
     /**
      * File
      */
@@ -1315,6 +1315,32 @@ export type ConcordanceResultQuery = {
      * Update Only
      */
     update_only?: boolean;
+};
+
+/**
+ * ConcordanceSnapshotPreview
+ */
+export type ConcordanceSnapshotPreview = {
+    /**
+     * Displaycolumns
+     */
+    displayColumns: Array<string>;
+    /**
+     * Materialised
+     */
+    materialised: boolean;
+    /**
+     * Searchterm
+     */
+    searchTerm: string;
+    /**
+     * Tool
+     */
+    tool: 'concordance';
+    /**
+     * Totalhits
+     */
+    totalHits: number;
 };
 
 /**
@@ -2576,6 +2602,32 @@ export type QuotationResultQuery = {
 };
 
 /**
+ * QuotationSnapshotPreview
+ */
+export type QuotationSnapshotPreview = {
+    /**
+     * Closepattern
+     */
+    closePattern: string;
+    /**
+     * Displaycolumns
+     */
+    displayColumns: Array<string>;
+    /**
+     * Openpattern
+     */
+    openPattern: string;
+    /**
+     * Tool
+     */
+    tool: 'quotation';
+    /**
+     * Totalhits
+     */
+    totalHits: number;
+};
+
+/**
  * RenameColumnRequest
  */
 export type RenameColumnRequest = {
@@ -2999,6 +3051,28 @@ export type SequentialAnalysisResponse = {
 };
 
 /**
+ * SequentialAnalysisSnapshotPreview
+ */
+export type SequentialAnalysisSnapshotPreview = {
+    /**
+     * Bucketcount
+     */
+    bucketCount: number;
+    /**
+     * Charttype
+     */
+    chartType: string;
+    /**
+     * Seriescount
+     */
+    seriesCount: number;
+    /**
+     * Tool
+     */
+    tool: 'sequential_analysis';
+};
+
+/**
  * SetCurrentWorkspaceResponse
  */
 export type SetCurrentWorkspaceResponse = {
@@ -3043,6 +3117,32 @@ export type SliceRequest = {
 };
 
 /**
+ * SnapshotCapabilities
+ */
+export type SnapshotCapabilities = {
+    /**
+     * Cancrossjump
+     */
+    canCrossJump: boolean;
+    /**
+     * Canexport
+     */
+    canExport: boolean;
+    /**
+     * Canfiltersourcerows
+     */
+    canFilterSourceRows: boolean;
+    /**
+     * Canpaginate
+     */
+    canPaginate: boolean;
+    /**
+     * Cansortandfilterresult
+     */
+    canSortAndFilterResult: boolean;
+};
+
+/**
  * SnapshotDeleteResponse
  */
 export type SnapshotDeleteResponse = {
@@ -3060,12 +3160,7 @@ export type SnapshotListItem = {
      * Filename
      */
     filename: string;
-    /**
-     * Manifest
-     */
-    manifest: {
-        [key: string]: unknown;
-    };
+    manifest: SnapshotManifest;
     /**
      * Size Bytes
      */
@@ -3083,6 +3178,142 @@ export type SnapshotListResponse = {
 };
 
 /**
+ * SnapshotManifest
+ */
+export type SnapshotManifest = {
+    capabilities: SnapshotCapabilities;
+    /**
+     * Captured At
+     */
+    captured_at: string;
+    /**
+     * Mode
+     */
+    mode: 'demo' | 'share';
+    /**
+     * Node Colors
+     */
+    node_colors: {
+        [key: string]: string;
+    };
+    /**
+     * Payloads
+     */
+    payloads: Array<SnapshotPayloadEntryResult | SnapshotPayloadEntryDispersionBins | SnapshotPayloadEntrySourceProjection | SnapshotPayloadEntrySettings>;
+    /**
+     * Preview
+     */
+    preview: ConcordanceSnapshotPreview | QuotationSnapshotPreview | TokenFrequenciesSnapshotPreview | SequentialAnalysisSnapshotPreview | TopicModelingSnapshotPreview;
+    /**
+     * Schema Version
+     */
+    schema_version: 1;
+    source: SnapshotSource;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Tool
+     */
+    tool: 'topic_modeling' | 'token_frequencies' | 'sequential_analysis' | 'concordance' | 'quotation';
+    /**
+     * Tool Version
+     */
+    tool_version: string;
+};
+
+/**
+ * SnapshotPayloadEntryDispersionBins
+ */
+export type SnapshotPayloadEntryDispersionBins = {
+    /**
+     * Kind
+     */
+    kind: 'dispersion-bins';
+    /**
+     * Path
+     */
+    path: string;
+};
+
+/**
+ * SnapshotPayloadEntryResult
+ */
+export type SnapshotPayloadEntryResult = {
+    /**
+     * Kind
+     */
+    kind: 'result';
+    /**
+     * Path
+     */
+    path: string;
+};
+
+/**
+ * SnapshotPayloadEntrySettings
+ */
+export type SnapshotPayloadEntrySettings = {
+    /**
+     * Kind
+     */
+    kind: 'settings';
+    /**
+     * Path
+     */
+    path: string;
+};
+
+/**
+ * SnapshotPayloadEntrySourceProjection
+ */
+export type SnapshotPayloadEntrySourceProjection = {
+    /**
+     * Columns
+     */
+    columns: Array<string>;
+    /**
+     * Kind
+     */
+    kind: 'source-projection';
+    /**
+     * Path
+     */
+    path: string;
+};
+
+/**
+ * SnapshotSource
+ */
+export type SnapshotSource = {
+    /**
+     * Node Ids
+     */
+    node_ids: Array<string>;
+    /**
+     * Node Labels
+     */
+    node_labels: Array<string>;
+    /**
+     * Per Block Rows
+     */
+    per_block_rows?: Array<number> | null;
+    /**
+     * Total Source Rows
+     */
+    total_source_rows: number;
+    /**
+     * Workspace Id
+     */
+    workspace_id: string;
+    /**
+     * Workspace Name
+     */
+    workspace_name: string;
+};
+
+/**
  * SnapshotUploadResponse
  */
 export type SnapshotUploadResponse = {
@@ -3090,12 +3321,7 @@ export type SnapshotUploadResponse = {
      * Filename
      */
     filename: string;
-    /**
-     * Manifest
-     */
-    manifest: {
-        [key: string]: unknown;
-    };
+    manifest: SnapshotManifest;
 };
 
 /**
@@ -3216,6 +3442,32 @@ export type TaskListResponse = {
      * State
      */
     state: 'successful';
+};
+
+/**
+ * TokenFrequenciesSnapshotPreview
+ */
+export type TokenFrequenciesSnapshotPreview = {
+    /**
+     * Tokeniserid
+     */
+    tokeniserId: string;
+    /**
+     * Tool
+     */
+    tool: 'token_frequencies';
+    /**
+     * Toptoken
+     */
+    topToken: string;
+    /**
+     * Toptokencount
+     */
+    topTokenCount: number;
+    /**
+     * Vocabsize
+     */
+    vocabSize: number;
 };
 
 /**
@@ -3850,6 +4102,32 @@ export type TopicModelingResultUpdateRequest = {
 };
 
 /**
+ * TopicModelingSnapshotPreview
+ */
+export type TopicModelingSnapshotPreview = {
+    /**
+     * Embedder
+     */
+    embedder: string;
+    /**
+     * Numtopics
+     */
+    numTopics: number;
+    /**
+     * Tool
+     */
+    tool: 'topic_modeling';
+    /**
+     * Vocabsize
+     */
+    vocabSize: number;
+    /**
+     * Wordspertopic
+     */
+    wordsPerTopic: number;
+};
+
+/**
  * TopicModelingTopic
  */
 export type TopicModelingTopic = {
@@ -4309,6 +4587,18 @@ export type WorkspaceTaskStartResponse = {
 };
 
 /**
+ * WorkspaceUiState
+ */
+export type WorkspaceUiState = {
+    /**
+     * Node Colors
+     */
+    node_colors?: {
+        [key: string]: string;
+    };
+};
+
+/**
  * WorkspaceUploadResponse
  */
 export type WorkspaceUploadResponse = {
@@ -4360,21 +4650,21 @@ export type LdacaWordflowModelsQuotationEngineConfig = {
     url?: string | null;
 };
 
-export type RootGetData = {
+export type RootData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/';
 };
 
-export type RootGetResponses = {
+export type RootResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type AdminCleanupApiAdminCleanupGetData = {
+export type AdminCleanupData = {
     body?: never;
     headers?: {
         /**
@@ -4387,23 +4677,23 @@ export type AdminCleanupApiAdminCleanupGetData = {
     url: '/api/admin/cleanup';
 };
 
-export type AdminCleanupApiAdminCleanupGetErrors = {
+export type AdminCleanupErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AdminCleanupApiAdminCleanupGetError = AdminCleanupApiAdminCleanupGetErrors[keyof AdminCleanupApiAdminCleanupGetErrors];
+export type AdminCleanupError = AdminCleanupErrors[keyof AdminCleanupErrors];
 
-export type AdminCleanupApiAdminCleanupGetResponses = {
+export type AdminCleanupResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ListUsersApiAdminUsersGetData = {
+export type ListUsersData = {
     body?: never;
     headers?: {
         /**
@@ -4416,23 +4706,23 @@ export type ListUsersApiAdminUsersGetData = {
     url: '/api/admin/users';
 };
 
-export type ListUsersApiAdminUsersGetErrors = {
+export type ListUsersErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListUsersApiAdminUsersGetError = ListUsersApiAdminUsersGetErrors[keyof ListUsersApiAdminUsersGetErrors];
+export type ListUsersError = ListUsersErrors[keyof ListUsersErrors];
 
-export type ListUsersApiAdminUsersGetResponses = {
+export type ListUsersResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetAuthInfoApiAuthGetData = {
+export type GetAuthInfoData = {
     body?: never;
     headers?: {
         /**
@@ -4445,25 +4735,25 @@ export type GetAuthInfoApiAuthGetData = {
     url: '/api/auth/';
 };
 
-export type GetAuthInfoApiAuthGetErrors = {
+export type GetAuthInfoErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetAuthInfoApiAuthGetError = GetAuthInfoApiAuthGetErrors[keyof GetAuthInfoApiAuthGetErrors];
+export type GetAuthInfoError = GetAuthInfoErrors[keyof GetAuthInfoErrors];
 
-export type GetAuthInfoApiAuthGetResponses = {
+export type GetAuthInfoResponses = {
     /**
      * Successful Response
      */
     200: AuthInfoResponse;
 };
 
-export type GetAuthInfoApiAuthGetResponse = GetAuthInfoApiAuthGetResponses[keyof GetAuthInfoApiAuthGetResponses];
+export type GetAuthInfoResponse = GetAuthInfoResponses[keyof GetAuthInfoResponses];
 
-export type CilogonCallbackApiAuthCilogonCallbackGetData = {
+export type CilogonCallbackData = {
     body?: never;
     path?: never;
     query?: {
@@ -4487,99 +4777,99 @@ export type CilogonCallbackApiAuthCilogonCallbackGetData = {
     url: '/api/auth/cilogon/callback';
 };
 
-export type CilogonCallbackApiAuthCilogonCallbackGetErrors = {
+export type CilogonCallbackErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CilogonCallbackApiAuthCilogonCallbackGetError = CilogonCallbackApiAuthCilogonCallbackGetErrors[keyof CilogonCallbackApiAuthCilogonCallbackGetErrors];
+export type CilogonCallbackError = CilogonCallbackErrors[keyof CilogonCallbackErrors];
 
-export type CilogonCallbackApiAuthCilogonCallbackGetResponses = {
+export type CilogonCallbackResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type CilogonLoginApiAuthCilogonLoginGetData = {
+export type CilogonLoginData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/api/auth/cilogon/login';
 };
 
-export type CilogonLoginApiAuthCilogonLoginGetResponses = {
+export type CilogonLoginResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GoogleAuthApiAuthGooglePostData = {
+export type GoogleAuthData = {
     body: GoogleIn;
     path?: never;
     query?: never;
     url: '/api/auth/google';
 };
 
-export type GoogleAuthApiAuthGooglePostErrors = {
+export type GoogleAuthErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GoogleAuthApiAuthGooglePostError = GoogleAuthApiAuthGooglePostErrors[keyof GoogleAuthApiAuthGooglePostErrors];
+export type GoogleAuthError = GoogleAuthErrors[keyof GoogleAuthErrors];
 
-export type GoogleAuthApiAuthGooglePostResponses = {
+export type GoogleAuthResponses = {
     /**
      * Successful Response
      */
     200: GoogleOut;
 };
 
-export type GoogleAuthApiAuthGooglePostResponse = GoogleAuthApiAuthGooglePostResponses[keyof GoogleAuthApiAuthGooglePostResponses];
+export type GoogleAuthResponse = GoogleAuthResponses[keyof GoogleAuthResponses];
 
-export type GoogleAuthCallbackApiAuthGoogleCallbackPostData = {
-    body: BodyGoogleAuthCallbackApiAuthGoogleCallbackPost;
+export type GoogleAuthCallbackData = {
+    body: BodyGoogleAuthCallback;
     path?: never;
     query?: never;
     url: '/api/auth/google/callback';
 };
 
-export type GoogleAuthCallbackApiAuthGoogleCallbackPostErrors = {
+export type GoogleAuthCallbackErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GoogleAuthCallbackApiAuthGoogleCallbackPostError = GoogleAuthCallbackApiAuthGoogleCallbackPostErrors[keyof GoogleAuthCallbackApiAuthGoogleCallbackPostErrors];
+export type GoogleAuthCallbackError = GoogleAuthCallbackErrors[keyof GoogleAuthCallbackErrors];
 
-export type GoogleAuthCallbackApiAuthGoogleCallbackPostResponses = {
+export type GoogleAuthCallbackResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type AuthHealthApiAuthHealthGetData = {
+export type AuthHealthData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/api/auth/health';
 };
 
-export type AuthHealthApiAuthHealthGetResponses = {
+export type AuthHealthResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type LogoutApiAuthLogoutPostData = {
+export type LogoutData = {
     body?: never;
     headers?: {
         /**
@@ -4592,23 +4882,23 @@ export type LogoutApiAuthLogoutPostData = {
     url: '/api/auth/logout';
 };
 
-export type LogoutApiAuthLogoutPostErrors = {
+export type LogoutErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type LogoutApiAuthLogoutPostError = LogoutApiAuthLogoutPostErrors[keyof LogoutApiAuthLogoutPostErrors];
+export type LogoutError = LogoutErrors[keyof LogoutErrors];
 
-export type LogoutApiAuthLogoutPostResponses = {
+export type LogoutResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetCurrentUserInfoApiAuthMeGetData = {
+export type GetCurrentUserInfoData = {
     body?: never;
     headers?: {
         /**
@@ -4621,25 +4911,25 @@ export type GetCurrentUserInfoApiAuthMeGetData = {
     url: '/api/auth/me';
 };
 
-export type GetCurrentUserInfoApiAuthMeGetErrors = {
+export type GetCurrentUserInfoErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetCurrentUserInfoApiAuthMeGetError = GetCurrentUserInfoApiAuthMeGetErrors[keyof GetCurrentUserInfoApiAuthMeGetErrors];
+export type GetCurrentUserInfoError = GetCurrentUserInfoErrors[keyof GetCurrentUserInfoErrors];
 
-export type GetCurrentUserInfoApiAuthMeGetResponses = {
+export type GetCurrentUserInfoResponses = {
     /**
      * Successful Response
      */
     200: UserResponse;
 };
 
-export type GetCurrentUserInfoApiAuthMeGetResponse = GetCurrentUserInfoApiAuthMeGetResponses[keyof GetCurrentUserInfoApiAuthMeGetResponses];
+export type GetCurrentUserInfoResponse = GetCurrentUserInfoResponses[keyof GetCurrentUserInfoResponses];
 
-export type AuthStatusApiAuthStatusGetData = {
+export type AuthStatusData = {
     body?: never;
     headers?: {
         /**
@@ -4652,64 +4942,64 @@ export type AuthStatusApiAuthStatusGetData = {
     url: '/api/auth/status';
 };
 
-export type AuthStatusApiAuthStatusGetErrors = {
+export type AuthStatusErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AuthStatusApiAuthStatusGetError = AuthStatusApiAuthStatusGetErrors[keyof AuthStatusApiAuthStatusGetErrors];
+export type AuthStatusError = AuthStatusErrors[keyof AuthStatusErrors];
 
-export type AuthStatusApiAuthStatusGetResponses = {
+export type AuthStatusResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetConfigApiConfigGetData = {
+export type GetConfigData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/api/config/';
 };
 
-export type GetConfigApiConfigGetResponses = {
+export type GetConfigResponses = {
     /**
      * Successful Response
      */
     200: ConfigResponse;
 };
 
-export type GetConfigApiConfigGetResponse = GetConfigApiConfigGetResponses[keyof GetConfigApiConfigGetResponses];
+export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
 
-export type UpdateConfigApiConfigPostData = {
+export type UpdateConfigData = {
     body: ConfigUpdate;
     path?: never;
     query?: never;
     url: '/api/config/';
 };
 
-export type UpdateConfigApiConfigPostErrors = {
+export type UpdateConfigErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateConfigApiConfigPostError = UpdateConfigApiConfigPostErrors[keyof UpdateConfigApiConfigPostErrors];
+export type UpdateConfigError = UpdateConfigErrors[keyof UpdateConfigErrors];
 
-export type UpdateConfigApiConfigPostResponses = {
+export type UpdateConfigResponses = {
     /**
      * Successful Response
      */
     200: ConfigResponse;
 };
 
-export type UpdateConfigApiConfigPostResponse = UpdateConfigApiConfigPostResponses[keyof UpdateConfigApiConfigPostResponses];
+export type UpdateConfigResponse = UpdateConfigResponses[keyof UpdateConfigResponses];
 
-export type GetUserFilesApiFilesGetData = {
+export type GetUserFilesData = {
     body?: never;
     headers?: {
         /**
@@ -4722,27 +5012,27 @@ export type GetUserFilesApiFilesGetData = {
     url: '/api/files/';
 };
 
-export type GetUserFilesApiFilesGetErrors = {
+export type GetUserFilesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetUserFilesApiFilesGetError = GetUserFilesApiFilesGetErrors[keyof GetUserFilesApiFilesGetErrors];
+export type GetUserFilesError = GetUserFilesErrors[keyof GetUserFilesErrors];
 
-export type GetUserFilesApiFilesGetResponses = {
+export type GetUserFilesResponses = {
     /**
-     * Response Get User Files Api Files  Get
+     * Response Get User Files
      *
      * Successful Response
      */
     200: Array<FileTreeNodeResponse>;
 };
 
-export type GetUserFilesApiFilesGetResponse = GetUserFilesApiFilesGetResponses[keyof GetUserFilesApiFilesGetResponses];
+export type GetUserFilesResponse = GetUserFilesResponses[keyof GetUserFilesResponses];
 
-export type GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetData = {
+export type GetDemoSnapshotsCatalogueData = {
     body?: never;
     headers?: {
         /**
@@ -4755,25 +5045,25 @@ export type GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetData = {
     url: '/api/files/demo-snapshots/catalogue';
 };
 
-export type GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetErrors = {
+export type GetDemoSnapshotsCatalogueErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetError = GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetErrors[keyof GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetErrors];
+export type GetDemoSnapshotsCatalogueError = GetDemoSnapshotsCatalogueErrors[keyof GetDemoSnapshotsCatalogueErrors];
 
-export type GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetResponses = {
+export type GetDemoSnapshotsCatalogueResponses = {
     /**
      * Successful Response
      */
     200: DemoSnapshotsCatalogueResponse;
 };
 
-export type GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetResponse = GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetResponses[keyof GetDemoSnapshotsCatalogueApiFilesDemoSnapshotsCatalogueGetResponses];
+export type GetDemoSnapshotsCatalogueResponse = GetDemoSnapshotsCatalogueResponses[keyof GetDemoSnapshotsCatalogueResponses];
 
-export type CreateFolderApiFilesFoldersPostData = {
+export type CreateFolderData = {
     body: CreateFolderRequest;
     headers?: {
         /**
@@ -4786,25 +5076,25 @@ export type CreateFolderApiFilesFoldersPostData = {
     url: '/api/files/folders';
 };
 
-export type CreateFolderApiFilesFoldersPostErrors = {
+export type CreateFolderErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CreateFolderApiFilesFoldersPostError = CreateFolderApiFilesFoldersPostErrors[keyof CreateFolderApiFilesFoldersPostErrors];
+export type CreateFolderError = CreateFolderErrors[keyof CreateFolderErrors];
 
-export type CreateFolderApiFilesFoldersPostResponses = {
+export type CreateFolderResponses = {
     /**
      * Successful Response
      */
     200: CreateFolderResponse;
 };
 
-export type CreateFolderApiFilesFoldersPostResponse = CreateFolderApiFilesFoldersPostResponses[keyof CreateFolderApiFilesFoldersPostResponses];
+export type CreateFolderResponse2 = CreateFolderResponses[keyof CreateFolderResponses];
 
-export type ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostData = {
+export type ImportDemoSnapshotsData = {
     body?: ImportDemoSnapshotsRequest;
     headers?: {
         /**
@@ -4817,25 +5107,25 @@ export type ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostData = {
     url: '/api/files/import-demo-snapshots';
 };
 
-export type ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostErrors = {
+export type ImportDemoSnapshotsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostError = ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostErrors[keyof ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostErrors];
+export type ImportDemoSnapshotsError = ImportDemoSnapshotsErrors[keyof ImportDemoSnapshotsErrors];
 
-export type ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostResponses = {
+export type ImportDemoSnapshotsResponses = {
     /**
      * Successful Response
      */
     200: ImportDemoSnapshotsResponse;
 };
 
-export type ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostResponse = ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostResponses[keyof ImportDemoSnapshotsApiFilesImportDemoSnapshotsPostResponses];
+export type ImportDemoSnapshotsResponse2 = ImportDemoSnapshotsResponses[keyof ImportDemoSnapshotsResponses];
 
-export type ImportLdacaDatasetApiFilesImportLdacaPostData = {
+export type ImportLdacaDatasetData = {
     body: LDaCaImportRequest;
     headers?: {
         /**
@@ -4852,25 +5142,25 @@ export type ImportLdacaDatasetApiFilesImportLdacaPostData = {
     url: '/api/files/import-ldaca';
 };
 
-export type ImportLdacaDatasetApiFilesImportLdacaPostErrors = {
+export type ImportLdacaDatasetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ImportLdacaDatasetApiFilesImportLdacaPostError = ImportLdacaDatasetApiFilesImportLdacaPostErrors[keyof ImportLdacaDatasetApiFilesImportLdacaPostErrors];
+export type ImportLdacaDatasetError = ImportLdacaDatasetErrors[keyof ImportLdacaDatasetErrors];
 
-export type ImportLdacaDatasetApiFilesImportLdacaPostResponses = {
+export type ImportLdacaDatasetResponses = {
     /**
      * Successful Response
      */
     200: FilesImportTaskStartResponse;
 };
 
-export type ImportLdacaDatasetApiFilesImportLdacaPostResponse = ImportLdacaDatasetApiFilesImportLdacaPostResponses[keyof ImportLdacaDatasetApiFilesImportLdacaPostResponses];
+export type ImportLdacaDatasetResponse = ImportLdacaDatasetResponses[keyof ImportLdacaDatasetResponses];
 
-export type ImportSampleDataApiFilesImportSampleDataPostData = {
+export type ImportSampleDataData = {
     body?: ImportSampleDataRequest;
     headers?: {
         /**
@@ -4883,25 +5173,25 @@ export type ImportSampleDataApiFilesImportSampleDataPostData = {
     url: '/api/files/import-sample-data';
 };
 
-export type ImportSampleDataApiFilesImportSampleDataPostErrors = {
+export type ImportSampleDataErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ImportSampleDataApiFilesImportSampleDataPostError = ImportSampleDataApiFilesImportSampleDataPostErrors[keyof ImportSampleDataApiFilesImportSampleDataPostErrors];
+export type ImportSampleDataError = ImportSampleDataErrors[keyof ImportSampleDataErrors];
 
-export type ImportSampleDataApiFilesImportSampleDataPostResponses = {
+export type ImportSampleDataResponses = {
     /**
      * Successful Response
      */
     200: ImportSampleDataResponse;
 };
 
-export type ImportSampleDataApiFilesImportSampleDataPostResponse = ImportSampleDataApiFilesImportSampleDataPostResponses[keyof ImportSampleDataApiFilesImportSampleDataPostResponses];
+export type ImportSampleDataResponse2 = ImportSampleDataResponses[keyof ImportSampleDataResponses];
 
-export type ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetData = {
+export type ListLdacaFeaturedCollectionsData = {
     body?: never;
     headers?: {
         /**
@@ -4918,25 +5208,25 @@ export type ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetData = {
     url: '/api/files/ldaca/featured';
 };
 
-export type ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetErrors = {
+export type ListLdacaFeaturedCollectionsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetError = ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetErrors[keyof ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetErrors];
+export type ListLdacaFeaturedCollectionsError = ListLdacaFeaturedCollectionsErrors[keyof ListLdacaFeaturedCollectionsErrors];
 
-export type ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetResponses = {
+export type ListLdacaFeaturedCollectionsResponses = {
     /**
      * Successful Response
      */
     200: OniSearchResponse;
 };
 
-export type ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetResponse = ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetResponses[keyof ListLdacaFeaturedCollectionsApiFilesLdacaFeaturedGetResponses];
+export type ListLdacaFeaturedCollectionsResponse = ListLdacaFeaturedCollectionsResponses[keyof ListLdacaFeaturedCollectionsResponses];
 
-export type SearchLdacaCollectionsApiFilesLdacaSearchPostData = {
+export type SearchLdacaCollectionsData = {
     body: OniSearchRequest;
     headers?: {
         /**
@@ -4953,25 +5243,25 @@ export type SearchLdacaCollectionsApiFilesLdacaSearchPostData = {
     url: '/api/files/ldaca/search';
 };
 
-export type SearchLdacaCollectionsApiFilesLdacaSearchPostErrors = {
+export type SearchLdacaCollectionsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SearchLdacaCollectionsApiFilesLdacaSearchPostError = SearchLdacaCollectionsApiFilesLdacaSearchPostErrors[keyof SearchLdacaCollectionsApiFilesLdacaSearchPostErrors];
+export type SearchLdacaCollectionsError = SearchLdacaCollectionsErrors[keyof SearchLdacaCollectionsErrors];
 
-export type SearchLdacaCollectionsApiFilesLdacaSearchPostResponses = {
+export type SearchLdacaCollectionsResponses = {
     /**
      * Successful Response
      */
     200: OniSearchResponse;
 };
 
-export type SearchLdacaCollectionsApiFilesLdacaSearchPostResponse = SearchLdacaCollectionsApiFilesLdacaSearchPostResponses[keyof SearchLdacaCollectionsApiFilesLdacaSearchPostResponses];
+export type SearchLdacaCollectionsResponse = SearchLdacaCollectionsResponses[keyof SearchLdacaCollectionsResponses];
 
-export type MoveFileApiFilesMovePostData = {
+export type MoveFileData = {
     body: MoveFileRequest;
     headers?: {
         /**
@@ -4984,25 +5274,25 @@ export type MoveFileApiFilesMovePostData = {
     url: '/api/files/move';
 };
 
-export type MoveFileApiFilesMovePostErrors = {
+export type MoveFileErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type MoveFileApiFilesMovePostError = MoveFileApiFilesMovePostErrors[keyof MoveFileApiFilesMovePostErrors];
+export type MoveFileError = MoveFileErrors[keyof MoveFileErrors];
 
-export type MoveFileApiFilesMovePostResponses = {
+export type MoveFileResponses = {
     /**
      * Successful Response
      */
     200: CreateFolderResponse;
 };
 
-export type MoveFileApiFilesMovePostResponse = MoveFileApiFilesMovePostResponses[keyof MoveFileApiFilesMovePostResponses];
+export type MoveFileResponse = MoveFileResponses[keyof MoveFileResponses];
 
-export type UnifiedFilePreviewApiFilesPreviewPostData = {
+export type UnifiedFilePreviewData = {
     body: FilePreviewRequest;
     headers?: {
         /**
@@ -5015,25 +5305,25 @@ export type UnifiedFilePreviewApiFilesPreviewPostData = {
     url: '/api/files/preview';
 };
 
-export type UnifiedFilePreviewApiFilesPreviewPostErrors = {
+export type UnifiedFilePreviewErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UnifiedFilePreviewApiFilesPreviewPostError = UnifiedFilePreviewApiFilesPreviewPostErrors[keyof UnifiedFilePreviewApiFilesPreviewPostErrors];
+export type UnifiedFilePreviewError = UnifiedFilePreviewErrors[keyof UnifiedFilePreviewErrors];
 
-export type UnifiedFilePreviewApiFilesPreviewPostResponses = {
+export type UnifiedFilePreviewResponses = {
     /**
      * Successful Response
      */
     200: FilePreviewResponse;
 };
 
-export type UnifiedFilePreviewApiFilesPreviewPostResponse = UnifiedFilePreviewApiFilesPreviewPostResponses[keyof UnifiedFilePreviewApiFilesPreviewPostResponses];
+export type UnifiedFilePreviewResponse = UnifiedFilePreviewResponses[keyof UnifiedFilePreviewResponses];
 
-export type GetRawFileApiFilesRawGetData = {
+export type GetRawFileData = {
     body?: never;
     headers?: {
         /**
@@ -5053,23 +5343,23 @@ export type GetRawFileApiFilesRawGetData = {
     url: '/api/files/raw';
 };
 
-export type GetRawFileApiFilesRawGetErrors = {
+export type GetRawFileErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetRawFileApiFilesRawGetError = GetRawFileApiFilesRawGetErrors[keyof GetRawFileApiFilesRawGetErrors];
+export type GetRawFileError = GetRawFileErrors[keyof GetRawFileErrors];
 
-export type GetRawFileApiFilesRawGetResponses = {
+export type GetRawFileResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetSampleDataCatalogueApiFilesSampleDataCatalogueGetData = {
+export type GetSampleDataCatalogueData = {
     body?: never;
     headers?: {
         /**
@@ -5082,25 +5372,25 @@ export type GetSampleDataCatalogueApiFilesSampleDataCatalogueGetData = {
     url: '/api/files/sample-data/catalogue';
 };
 
-export type GetSampleDataCatalogueApiFilesSampleDataCatalogueGetErrors = {
+export type GetSampleDataCatalogueErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetSampleDataCatalogueApiFilesSampleDataCatalogueGetError = GetSampleDataCatalogueApiFilesSampleDataCatalogueGetErrors[keyof GetSampleDataCatalogueApiFilesSampleDataCatalogueGetErrors];
+export type GetSampleDataCatalogueError = GetSampleDataCatalogueErrors[keyof GetSampleDataCatalogueErrors];
 
-export type GetSampleDataCatalogueApiFilesSampleDataCatalogueGetResponses = {
+export type GetSampleDataCatalogueResponses = {
     /**
      * Successful Response
      */
     200: SampleDataCatalogueResponse;
 };
 
-export type GetSampleDataCatalogueApiFilesSampleDataCatalogueGetResponse = GetSampleDataCatalogueApiFilesSampleDataCatalogueGetResponses[keyof GetSampleDataCatalogueApiFilesSampleDataCatalogueGetResponses];
+export type GetSampleDataCatalogueResponse = GetSampleDataCatalogueResponses[keyof GetSampleDataCatalogueResponses];
 
-export type GetSampleDataReadmeApiFilesSampleDataReadmeGetData = {
+export type GetSampleDataReadmeData = {
     body?: never;
     headers?: {
         /**
@@ -5120,23 +5410,23 @@ export type GetSampleDataReadmeApiFilesSampleDataReadmeGetData = {
     url: '/api/files/sample-data/readme';
 };
 
-export type GetSampleDataReadmeApiFilesSampleDataReadmeGetErrors = {
+export type GetSampleDataReadmeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetSampleDataReadmeApiFilesSampleDataReadmeGetError = GetSampleDataReadmeApiFilesSampleDataReadmeGetErrors[keyof GetSampleDataReadmeApiFilesSampleDataReadmeGetErrors];
+export type GetSampleDataReadmeError = GetSampleDataReadmeErrors[keyof GetSampleDataReadmeErrors];
 
-export type GetSampleDataReadmeApiFilesSampleDataReadmeGetResponses = {
+export type GetSampleDataReadmeResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ListFilesTasksApiFilesTasksGetData = {
+export type ListFilesTasksData = {
     body?: never;
     headers?: {
         /**
@@ -5149,25 +5439,25 @@ export type ListFilesTasksApiFilesTasksGetData = {
     url: '/api/files/tasks';
 };
 
-export type ListFilesTasksApiFilesTasksGetErrors = {
+export type ListFilesTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListFilesTasksApiFilesTasksGetError = ListFilesTasksApiFilesTasksGetErrors[keyof ListFilesTasksApiFilesTasksGetErrors];
+export type ListFilesTasksError = ListFilesTasksErrors[keyof ListFilesTasksErrors];
 
-export type ListFilesTasksApiFilesTasksGetResponses = {
+export type ListFilesTasksResponses = {
     /**
      * Successful Response
      */
     200: FilesTasksListResponse;
 };
 
-export type ListFilesTasksApiFilesTasksGetResponse = ListFilesTasksApiFilesTasksGetResponses[keyof ListFilesTasksApiFilesTasksGetResponses];
+export type ListFilesTasksResponse = ListFilesTasksResponses[keyof ListFilesTasksResponses];
 
-export type ClearFilesTasksApiFilesTasksClearPostData = {
+export type ClearFilesTasksData = {
     body?: never;
     headers?: {
         /**
@@ -5189,26 +5479,26 @@ export type ClearFilesTasksApiFilesTasksClearPostData = {
     url: '/api/files/tasks/clear';
 };
 
-export type ClearFilesTasksApiFilesTasksClearPostErrors = {
+export type ClearFilesTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ClearFilesTasksApiFilesTasksClearPostError = ClearFilesTasksApiFilesTasksClearPostErrors[keyof ClearFilesTasksApiFilesTasksClearPostErrors];
+export type ClearFilesTasksError = ClearFilesTasksErrors[keyof ClearFilesTasksErrors];
 
-export type ClearFilesTasksApiFilesTasksClearPostResponses = {
+export type ClearFilesTasksResponses = {
     /**
      * Successful Response
      */
     200: FilesTaskActionResponse;
 };
 
-export type ClearFilesTasksApiFilesTasksClearPostResponse = ClearFilesTasksApiFilesTasksClearPostResponses[keyof ClearFilesTasksApiFilesTasksClearPostResponses];
+export type ClearFilesTasksResponse = ClearFilesTasksResponses[keyof ClearFilesTasksResponses];
 
-export type UploadFileApiFilesUploadPostData = {
-    body: BodyUploadFileApiFilesUploadPost;
+export type UploadFileData = {
+    body: BodyUploadFile;
     headers?: {
         /**
          * Authorization
@@ -5220,25 +5510,25 @@ export type UploadFileApiFilesUploadPostData = {
     url: '/api/files/upload';
 };
 
-export type UploadFileApiFilesUploadPostErrors = {
+export type UploadFileErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UploadFileApiFilesUploadPostError = UploadFileApiFilesUploadPostErrors[keyof UploadFileApiFilesUploadPostErrors];
+export type UploadFileError = UploadFileErrors[keyof UploadFileErrors];
 
-export type UploadFileApiFilesUploadPostResponses = {
+export type UploadFileResponses = {
     /**
      * Successful Response
      */
     200: FileUploadResponse;
 };
 
-export type UploadFileApiFilesUploadPostResponse = UploadFileApiFilesUploadPostResponses[keyof UploadFileApiFilesUploadPostResponses];
+export type UploadFileResponse = UploadFileResponses[keyof UploadFileResponses];
 
-export type DeleteFileApiFilesFilenameDeleteData = {
+export type DeleteFileData = {
     body?: never;
     headers?: {
         /**
@@ -5256,25 +5546,25 @@ export type DeleteFileApiFilesFilenameDeleteData = {
     url: '/api/files/{filename}';
 };
 
-export type DeleteFileApiFilesFilenameDeleteErrors = {
+export type DeleteFileErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteFileApiFilesFilenameDeleteError = DeleteFileApiFilesFilenameDeleteErrors[keyof DeleteFileApiFilesFilenameDeleteErrors];
+export type DeleteFileError = DeleteFileErrors[keyof DeleteFileErrors];
 
-export type DeleteFileApiFilesFilenameDeleteResponses = {
+export type DeleteFileResponses = {
     /**
      * Successful Response
      */
     200: MessageResponse;
 };
 
-export type DeleteFileApiFilesFilenameDeleteResponse = DeleteFileApiFilesFilenameDeleteResponses[keyof DeleteFileApiFilesFilenameDeleteResponses];
+export type DeleteFileResponse = DeleteFileResponses[keyof DeleteFileResponses];
 
-export type DownloadFileApiFilesFilenameGetData = {
+export type DownloadFileData = {
     body?: never;
     headers?: {
         /**
@@ -5292,23 +5582,23 @@ export type DownloadFileApiFilesFilenameGetData = {
     url: '/api/files/{filename}';
 };
 
-export type DownloadFileApiFilesFilenameGetErrors = {
+export type DownloadFileErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DownloadFileApiFilesFilenameGetError = DownloadFileApiFilesFilenameGetErrors[keyof DownloadFileApiFilesFilenameGetErrors];
+export type DownloadFileError = DownloadFileErrors[keyof DownloadFileErrors];
 
-export type DownloadFileApiFilesFilenameGetResponses = {
+export type DownloadFileResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetFileInfoApiFilesFilenameInfoGetData = {
+export type GetFileInfoData = {
     body?: never;
     headers?: {
         /**
@@ -5326,25 +5616,25 @@ export type GetFileInfoApiFilesFilenameInfoGetData = {
     url: '/api/files/{filename}/info';
 };
 
-export type GetFileInfoApiFilesFilenameInfoGetErrors = {
+export type GetFileInfoErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetFileInfoApiFilesFilenameInfoGetError = GetFileInfoApiFilesFilenameInfoGetErrors[keyof GetFileInfoApiFilesFilenameInfoGetErrors];
+export type GetFileInfoError = GetFileInfoErrors[keyof GetFileInfoErrors];
 
-export type GetFileInfoApiFilesFilenameInfoGetResponses = {
+export type GetFileInfoResponses = {
     /**
      * Successful Response
      */
     200: FileInfoResponse;
 };
 
-export type GetFileInfoApiFilesFilenameInfoGetResponse = GetFileInfoApiFilesFilenameInfoGetResponses[keyof GetFileInfoApiFilesFilenameInfoGetResponses];
+export type GetFileInfoResponse = GetFileInfoResponses[keyof GetFileInfoResponses];
 
-export type GetPreferencesApiPreferencesGetData = {
+export type GetPreferencesData = {
     body?: never;
     headers?: {
         /**
@@ -5357,25 +5647,25 @@ export type GetPreferencesApiPreferencesGetData = {
     url: '/api/preferences/';
 };
 
-export type GetPreferencesApiPreferencesGetErrors = {
+export type GetPreferencesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetPreferencesApiPreferencesGetError = GetPreferencesApiPreferencesGetErrors[keyof GetPreferencesApiPreferencesGetErrors];
+export type GetPreferencesError = GetPreferencesErrors[keyof GetPreferencesErrors];
 
-export type GetPreferencesApiPreferencesGetResponses = {
+export type GetPreferencesResponses = {
     /**
      * Successful Response
      */
     200: UserPreferences;
 };
 
-export type GetPreferencesApiPreferencesGetResponse = GetPreferencesApiPreferencesGetResponses[keyof GetPreferencesApiPreferencesGetResponses];
+export type GetPreferencesResponse = GetPreferencesResponses[keyof GetPreferencesResponses];
 
-export type UpdatePreferencesApiPreferencesPutData = {
+export type UpdatePreferencesData = {
     body: UserPreferencesUpdate;
     headers?: {
         /**
@@ -5388,25 +5678,25 @@ export type UpdatePreferencesApiPreferencesPutData = {
     url: '/api/preferences/';
 };
 
-export type UpdatePreferencesApiPreferencesPutErrors = {
+export type UpdatePreferencesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdatePreferencesApiPreferencesPutError = UpdatePreferencesApiPreferencesPutErrors[keyof UpdatePreferencesApiPreferencesPutErrors];
+export type UpdatePreferencesError = UpdatePreferencesErrors[keyof UpdatePreferencesErrors];
 
-export type UpdatePreferencesApiPreferencesPutResponses = {
+export type UpdatePreferencesResponses = {
     /**
      * Successful Response
      */
     200: UserPreferences;
 };
 
-export type UpdatePreferencesApiPreferencesPutResponse = UpdatePreferencesApiPreferencesPutResponses[keyof UpdatePreferencesApiPreferencesPutResponses];
+export type UpdatePreferencesResponse = UpdatePreferencesResponses[keyof UpdatePreferencesResponses];
 
-export type ListTasksApiTasksGetData = {
+export type ListTasksData = {
     body?: never;
     headers?: {
         /**
@@ -5419,25 +5709,25 @@ export type ListTasksApiTasksGetData = {
     url: '/api/tasks';
 };
 
-export type ListTasksApiTasksGetErrors = {
+export type ListTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListTasksApiTasksGetError = ListTasksApiTasksGetErrors[keyof ListTasksApiTasksGetErrors];
+export type ListTasksError = ListTasksErrors[keyof ListTasksErrors];
 
-export type ListTasksApiTasksGetResponses = {
+export type ListTasksResponses = {
     /**
      * Successful Response
      */
     200: TaskListResponse;
 };
 
-export type ListTasksApiTasksGetResponse = ListTasksApiTasksGetResponses[keyof ListTasksApiTasksGetResponses];
+export type ListTasksResponse = ListTasksResponses[keyof ListTasksResponses];
 
-export type CancelTaskApiTasksCancelPostData = {
+export type CancelTaskData = {
     body?: never;
     headers?: {
         /**
@@ -5455,25 +5745,25 @@ export type CancelTaskApiTasksCancelPostData = {
     url: '/api/tasks/cancel';
 };
 
-export type CancelTaskApiTasksCancelPostErrors = {
+export type CancelTaskErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CancelTaskApiTasksCancelPostError = CancelTaskApiTasksCancelPostErrors[keyof CancelTaskApiTasksCancelPostErrors];
+export type CancelTaskError = CancelTaskErrors[keyof CancelTaskErrors];
 
-export type CancelTaskApiTasksCancelPostResponses = {
+export type CancelTaskResponses = {
     /**
      * Successful Response
      */
     200: TaskCancelActionResponse;
 };
 
-export type CancelTaskApiTasksCancelPostResponse = CancelTaskApiTasksCancelPostResponses[keyof CancelTaskApiTasksCancelPostResponses];
+export type CancelTaskResponse = CancelTaskResponses[keyof CancelTaskResponses];
 
-export type ClearTasksApiTasksClearPostData = {
+export type ClearTasksData = {
     body?: never;
     headers?: {
         /**
@@ -5491,25 +5781,25 @@ export type ClearTasksApiTasksClearPostData = {
     url: '/api/tasks/clear';
 };
 
-export type ClearTasksApiTasksClearPostErrors = {
+export type ClearTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ClearTasksApiTasksClearPostError = ClearTasksApiTasksClearPostErrors[keyof ClearTasksApiTasksClearPostErrors];
+export type ClearTasksError = ClearTasksErrors[keyof ClearTasksErrors];
 
-export type ClearTasksApiTasksClearPostResponses = {
+export type ClearTasksResponses = {
     /**
      * Successful Response
      */
     200: TaskClearActionResponse;
 };
 
-export type ClearTasksApiTasksClearPostResponse = ClearTasksApiTasksClearPostResponses[keyof ClearTasksApiTasksClearPostResponses];
+export type ClearTasksResponse = ClearTasksResponses[keyof ClearTasksResponses];
 
-export type StreamTasksApiTasksStreamGetData = {
+export type StreamTasksData = {
     body?: never;
     headers?: {
         /**
@@ -5527,23 +5817,23 @@ export type StreamTasksApiTasksStreamGetData = {
     url: '/api/tasks/stream';
 };
 
-export type StreamTasksApiTasksStreamGetErrors = {
+export type StreamTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type StreamTasksApiTasksStreamGetError = StreamTasksApiTasksStreamGetErrors[keyof StreamTasksApiTasksStreamGetErrors];
+export type StreamTasksError = StreamTasksErrors[keyof StreamTasksErrors];
 
-export type StreamTasksApiTasksStreamGetResponses = {
+export type StreamTasksResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetDefaultStopWordsApiTextDefaultStopWordsGetData = {
+export type GetDefaultStopWordsData = {
     body?: never;
     path?: never;
     query?: {
@@ -5559,25 +5849,25 @@ export type GetDefaultStopWordsApiTextDefaultStopWordsGetData = {
     url: '/api/text/default-stop-words';
 };
 
-export type GetDefaultStopWordsApiTextDefaultStopWordsGetErrors = {
+export type GetDefaultStopWordsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetDefaultStopWordsApiTextDefaultStopWordsGetError = GetDefaultStopWordsApiTextDefaultStopWordsGetErrors[keyof GetDefaultStopWordsApiTextDefaultStopWordsGetErrors];
+export type GetDefaultStopWordsError = GetDefaultStopWordsErrors[keyof GetDefaultStopWordsErrors];
 
-export type GetDefaultStopWordsApiTextDefaultStopWordsGetResponses = {
+export type GetDefaultStopWordsResponses = {
     /**
      * Successful Response
      */
     200: DefaultStopWordsResponse;
 };
 
-export type GetDefaultStopWordsApiTextDefaultStopWordsGetResponse = GetDefaultStopWordsApiTextDefaultStopWordsGetResponses[keyof GetDefaultStopWordsApiTextDefaultStopWordsGetResponses];
+export type GetDefaultStopWordsResponse = GetDefaultStopWordsResponses[keyof GetDefaultStopWordsResponses];
 
-export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteData = {
+export type BatchDeleteSnapshotsData = {
     body?: never;
     headers?: {
         /**
@@ -5599,25 +5889,25 @@ export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteData = {
     url: '/api/users/me/snapshots';
 };
 
-export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteErrors = {
+export type BatchDeleteSnapshotsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteError = BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteErrors[keyof BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteErrors];
+export type BatchDeleteSnapshotsError = BatchDeleteSnapshotsErrors[keyof BatchDeleteSnapshotsErrors];
 
-export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteResponses = {
+export type BatchDeleteSnapshotsResponses = {
     /**
      * Successful Response
      */
     200: SnapshotDeleteResponse;
 };
 
-export type BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteResponse = BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteResponses[keyof BatchDeleteSnapshotsApiUsersMeSnapshotsDeleteResponses];
+export type BatchDeleteSnapshotsResponse = BatchDeleteSnapshotsResponses[keyof BatchDeleteSnapshotsResponses];
 
-export type ListSnapshotsApiUsersMeSnapshotsGetData = {
+export type ListSnapshotsData = {
     body?: never;
     headers?: {
         /**
@@ -5635,26 +5925,26 @@ export type ListSnapshotsApiUsersMeSnapshotsGetData = {
     url: '/api/users/me/snapshots';
 };
 
-export type ListSnapshotsApiUsersMeSnapshotsGetErrors = {
+export type ListSnapshotsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListSnapshotsApiUsersMeSnapshotsGetError = ListSnapshotsApiUsersMeSnapshotsGetErrors[keyof ListSnapshotsApiUsersMeSnapshotsGetErrors];
+export type ListSnapshotsError = ListSnapshotsErrors[keyof ListSnapshotsErrors];
 
-export type ListSnapshotsApiUsersMeSnapshotsGetResponses = {
+export type ListSnapshotsResponses = {
     /**
      * Successful Response
      */
     200: SnapshotListResponse;
 };
 
-export type ListSnapshotsApiUsersMeSnapshotsGetResponse = ListSnapshotsApiUsersMeSnapshotsGetResponses[keyof ListSnapshotsApiUsersMeSnapshotsGetResponses];
+export type ListSnapshotsResponse = ListSnapshotsResponses[keyof ListSnapshotsResponses];
 
-export type UploadSnapshotApiUsersMeSnapshotsPostData = {
-    body: BodyUploadSnapshotApiUsersMeSnapshotsPost;
+export type UploadSnapshotData = {
+    body: BodyUploadSnapshot;
     headers?: {
         /**
          * Authorization
@@ -5666,25 +5956,25 @@ export type UploadSnapshotApiUsersMeSnapshotsPostData = {
     url: '/api/users/me/snapshots';
 };
 
-export type UploadSnapshotApiUsersMeSnapshotsPostErrors = {
+export type UploadSnapshotErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UploadSnapshotApiUsersMeSnapshotsPostError = UploadSnapshotApiUsersMeSnapshotsPostErrors[keyof UploadSnapshotApiUsersMeSnapshotsPostErrors];
+export type UploadSnapshotError = UploadSnapshotErrors[keyof UploadSnapshotErrors];
 
-export type UploadSnapshotApiUsersMeSnapshotsPostResponses = {
+export type UploadSnapshotResponses = {
     /**
      * Successful Response
      */
     200: SnapshotUploadResponse;
 };
 
-export type UploadSnapshotApiUsersMeSnapshotsPostResponse = UploadSnapshotApiUsersMeSnapshotsPostResponses[keyof UploadSnapshotApiUsersMeSnapshotsPostResponses];
+export type UploadSnapshotResponse = UploadSnapshotResponses[keyof UploadSnapshotResponses];
 
-export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteData = {
+export type DeleteSnapshotData = {
     body?: never;
     headers?: {
         /**
@@ -5702,25 +5992,25 @@ export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteData = {
     url: '/api/users/me/snapshots/{filename}';
 };
 
-export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteErrors = {
+export type DeleteSnapshotErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteError = DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteErrors[keyof DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteErrors];
+export type DeleteSnapshotError = DeleteSnapshotErrors[keyof DeleteSnapshotErrors];
 
-export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteResponses = {
+export type DeleteSnapshotResponses = {
     /**
      * Successful Response
      */
     200: SnapshotDeleteResponse;
 };
 
-export type DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteResponse = DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteResponses[keyof DeleteSnapshotApiUsersMeSnapshotsFilenameDeleteResponses];
+export type DeleteSnapshotResponse = DeleteSnapshotResponses[keyof DeleteSnapshotResponses];
 
-export type DownloadSnapshotApiUsersMeSnapshotsFilenameGetData = {
+export type DownloadSnapshotData = {
     body?: never;
     headers?: {
         /**
@@ -5738,23 +6028,23 @@ export type DownloadSnapshotApiUsersMeSnapshotsFilenameGetData = {
     url: '/api/users/me/snapshots/{filename}';
 };
 
-export type DownloadSnapshotApiUsersMeSnapshotsFilenameGetErrors = {
+export type DownloadSnapshotErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DownloadSnapshotApiUsersMeSnapshotsFilenameGetError = DownloadSnapshotApiUsersMeSnapshotsFilenameGetErrors[keyof DownloadSnapshotApiUsersMeSnapshotsFilenameGetErrors];
+export type DownloadSnapshotError = DownloadSnapshotErrors[keyof DownloadSnapshotErrors];
 
-export type DownloadSnapshotApiUsersMeSnapshotsFilenameGetResponses = {
+export type DownloadSnapshotResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGetData = {
+export type GetSnapshotDescriptionData = {
     body?: never;
     headers?: {
         /**
@@ -5772,23 +6062,23 @@ export type GetSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGetData 
     url: '/api/users/me/snapshots/{filename}/description';
 };
 
-export type GetSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGetErrors = {
+export type GetSnapshotDescriptionErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGetError = GetSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGetErrors[keyof GetSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGetErrors];
+export type GetSnapshotDescriptionError = GetSnapshotDescriptionErrors[keyof GetSnapshotDescriptionErrors];
 
-export type GetSnapshotDescriptionApiUsersMeSnapshotsFilenameDescriptionGetResponses = {
+export type GetSnapshotDescriptionResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ListWorkspacesApiWorkspacesGetData = {
+export type ListWorkspacesData = {
     body?: never;
     headers?: {
         /**
@@ -5801,27 +6091,27 @@ export type ListWorkspacesApiWorkspacesGetData = {
     url: '/api/workspaces/';
 };
 
-export type ListWorkspacesApiWorkspacesGetErrors = {
+export type ListWorkspacesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListWorkspacesApiWorkspacesGetError = ListWorkspacesApiWorkspacesGetErrors[keyof ListWorkspacesApiWorkspacesGetErrors];
+export type ListWorkspacesError = ListWorkspacesErrors[keyof ListWorkspacesErrors];
 
-export type ListWorkspacesApiWorkspacesGetResponses = {
+export type ListWorkspacesResponses = {
     /**
-     * Response List Workspaces Api Workspaces  Get
+     * Response List Workspaces
      *
      * Successful Response
      */
     200: Array<WorkspaceSummary>;
 };
 
-export type ListWorkspacesApiWorkspacesGetResponse = ListWorkspacesApiWorkspacesGetResponses[keyof ListWorkspacesApiWorkspacesGetResponses];
+export type ListWorkspacesResponse = ListWorkspacesResponses[keyof ListWorkspacesResponses];
 
-export type CreateWorkspaceApiWorkspacesPostData = {
+export type CreateWorkspaceData = {
     body: WorkspaceCreateRequest;
     headers?: {
         /**
@@ -5834,25 +6124,25 @@ export type CreateWorkspaceApiWorkspacesPostData = {
     url: '/api/workspaces/';
 };
 
-export type CreateWorkspaceApiWorkspacesPostErrors = {
+export type CreateWorkspaceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CreateWorkspaceApiWorkspacesPostError = CreateWorkspaceApiWorkspacesPostErrors[keyof CreateWorkspaceApiWorkspacesPostErrors];
+export type CreateWorkspaceError = CreateWorkspaceErrors[keyof CreateWorkspaceErrors];
 
-export type CreateWorkspaceApiWorkspacesPostResponses = {
+export type CreateWorkspaceResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceInfo;
 };
 
-export type CreateWorkspaceApiWorkspacesPostResponse = CreateWorkspaceApiWorkspacesPostResponses[keyof CreateWorkspaceApiWorkspacesPostResponses];
+export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
 
-export type ClearAiAnnotationApiWorkspacesAiAnnotationDeleteData = {
+export type ClearAiAnnotationData = {
     body?: never;
     headers?: {
         /**
@@ -5865,25 +6155,25 @@ export type ClearAiAnnotationApiWorkspacesAiAnnotationDeleteData = {
     url: '/api/workspaces/ai-annotation';
 };
 
-export type ClearAiAnnotationApiWorkspacesAiAnnotationDeleteErrors = {
+export type ClearAiAnnotationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ClearAiAnnotationApiWorkspacesAiAnnotationDeleteError = ClearAiAnnotationApiWorkspacesAiAnnotationDeleteErrors[keyof ClearAiAnnotationApiWorkspacesAiAnnotationDeleteErrors];
+export type ClearAiAnnotationError = ClearAiAnnotationErrors[keyof ClearAiAnnotationErrors];
 
-export type ClearAiAnnotationApiWorkspacesAiAnnotationDeleteResponses = {
+export type ClearAiAnnotationResponses = {
     /**
      * Successful Response
      */
     200: AnalysisClearResponse;
 };
 
-export type ClearAiAnnotationApiWorkspacesAiAnnotationDeleteResponse = ClearAiAnnotationApiWorkspacesAiAnnotationDeleteResponses[keyof ClearAiAnnotationApiWorkspacesAiAnnotationDeleteResponses];
+export type ClearAiAnnotationResponse = ClearAiAnnotationResponses[keyof ClearAiAnnotationResponses];
 
-export type RunAiAnnotationApiWorkspacesAiAnnotationPostData = {
+export type RunAiAnnotationData = {
     body: AiAnnotationRequest;
     headers?: {
         /**
@@ -5896,25 +6186,25 @@ export type RunAiAnnotationApiWorkspacesAiAnnotationPostData = {
     url: '/api/workspaces/ai-annotation';
 };
 
-export type RunAiAnnotationApiWorkspacesAiAnnotationPostErrors = {
+export type RunAiAnnotationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RunAiAnnotationApiWorkspacesAiAnnotationPostError = RunAiAnnotationApiWorkspacesAiAnnotationPostErrors[keyof RunAiAnnotationApiWorkspacesAiAnnotationPostErrors];
+export type RunAiAnnotationError = RunAiAnnotationErrors[keyof RunAiAnnotationErrors];
 
-export type RunAiAnnotationApiWorkspacesAiAnnotationPostResponses = {
+export type RunAiAnnotationResponses = {
     /**
      * Successful Response
      */
     200: AiAnnotationResponse;
 };
 
-export type RunAiAnnotationApiWorkspacesAiAnnotationPostResponse = RunAiAnnotationApiWorkspacesAiAnnotationPostResponses[keyof RunAiAnnotationApiWorkspacesAiAnnotationPostResponses];
+export type RunAiAnnotationResponse = RunAiAnnotationResponses[keyof RunAiAnnotationResponses];
 
-export type GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostData = {
+export type GetAiAnnotationModelsData = {
     body: AiAnnotationModelsRequest;
     headers?: {
         /**
@@ -5927,25 +6217,25 @@ export type GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostData = {
     url: '/api/workspaces/ai-annotation/models';
 };
 
-export type GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostErrors = {
+export type GetAiAnnotationModelsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostError = GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostErrors[keyof GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostErrors];
+export type GetAiAnnotationModelsError = GetAiAnnotationModelsErrors[keyof GetAiAnnotationModelsErrors];
 
-export type GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostResponses = {
+export type GetAiAnnotationModelsResponses = {
     /**
      * Successful Response
      */
     200: AiAnnotationModelsResponse;
 };
 
-export type GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostResponse = GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostResponses[keyof GetAiAnnotationModelsApiWorkspacesAiAnnotationModelsPostResponses];
+export type GetAiAnnotationModelsResponse = GetAiAnnotationModelsResponses[keyof GetAiAnnotationModelsResponses];
 
-export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetData = {
+export type AiAnnotationCurrentTasksData = {
     body?: never;
     headers?: {
         /**
@@ -5958,25 +6248,25 @@ export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetData
     url: '/api/workspaces/ai-annotation/tasks/current';
 };
 
-export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetErrors = {
+export type AiAnnotationCurrentTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetError = AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetErrors[keyof AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetErrors];
+export type AiAnnotationCurrentTasksError = AiAnnotationCurrentTasksErrors[keyof AiAnnotationCurrentTasksErrors];
 
-export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetResponses = {
+export type AiAnnotationCurrentTasksResponses = {
     /**
      * Successful Response
      */
     200: CurrentAnalysisTasksResponse;
 };
 
-export type AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetResponse = AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetResponses[keyof AiAnnotationCurrentTasksApiWorkspacesAiAnnotationTasksCurrentGetResponses];
+export type AiAnnotationCurrentTasksResponse = AiAnnotationCurrentTasksResponses[keyof AiAnnotationCurrentTasksResponses];
 
-export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetData = {
+export type AiAnnotationTaskRequestData = {
     body?: never;
     headers?: {
         /**
@@ -5994,25 +6284,25 @@ export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGe
     url: '/api/workspaces/ai-annotation/tasks/{task_id}/request';
 };
 
-export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetErrors = {
+export type AiAnnotationTaskRequestErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetError = AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetErrors[keyof AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetErrors];
+export type AiAnnotationTaskRequestError = AiAnnotationTaskRequestErrors[keyof AiAnnotationTaskRequestErrors];
 
-export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetResponses = {
+export type AiAnnotationTaskRequestResponses = {
     /**
      * Successful Response
      */
     200: AiAnnotationRequest;
 };
 
-export type AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetResponse = AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetResponses[keyof AiAnnotationTaskRequestApiWorkspacesAiAnnotationTasksTaskIdRequestGetResponses];
+export type AiAnnotationTaskRequestResponse = AiAnnotationTaskRequestResponses[keyof AiAnnotationTaskRequestResponses];
 
-export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetData = {
+export type AiAnnotationTaskResultData = {
     body?: never;
     headers?: {
         /**
@@ -6047,27 +6337,27 @@ export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetD
     url: '/api/workspaces/ai-annotation/tasks/{task_id}/result';
 };
 
-export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetErrors = {
+export type AiAnnotationTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetError = AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetErrors[keyof AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetErrors];
+export type AiAnnotationTaskResultError = AiAnnotationTaskResultErrors[keyof AiAnnotationTaskResultErrors];
 
-export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetResponses = {
+export type AiAnnotationTaskResultResponses = {
     /**
-     * Response Ai Annotation Task Result Api Workspaces Ai Annotation Tasks  Task Id  Result Get
+     * Response Ai Annotation Task Result
      *
      * Successful Response
      */
     200: AiAnnotationResponse | null;
 };
 
-export type AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetResponse = AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetResponses[keyof AiAnnotationTaskResultApiWorkspacesAiAnnotationTasksTaskIdResultGetResponses];
+export type AiAnnotationTaskResultResponse = AiAnnotationTaskResultResponses[keyof AiAnnotationTaskResultResponses];
 
-export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostData = {
+export type AiAnnotationTaskResultPostData = {
     body: AiAnnotationResultQuery;
     headers?: {
         /**
@@ -6085,25 +6375,25 @@ export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResult
     url: '/api/workspaces/ai-annotation/tasks/{task_id}/result';
 };
 
-export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostErrors = {
+export type AiAnnotationTaskResultPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostError = AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostErrors[keyof AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostErrors];
+export type AiAnnotationTaskResultPostError = AiAnnotationTaskResultPostErrors[keyof AiAnnotationTaskResultPostErrors];
 
-export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostResponses = {
+export type AiAnnotationTaskResultPostResponses = {
     /**
      * Successful Response
      */
     200: AiAnnotationResponse;
 };
 
-export type AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostResponse = AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostResponses[keyof AiAnnotationTaskResultPostApiWorkspacesAiAnnotationTasksTaskIdResultPostResponses];
+export type AiAnnotationTaskResultPostResponse = AiAnnotationTaskResultPostResponses[keyof AiAnnotationTaskResultPostResponses];
 
-export type RunConcordanceApiWorkspacesConcordancePostData = {
+export type RunConcordanceData = {
     body: ConcordanceAnalysisRequest;
     headers?: {
         /**
@@ -6116,25 +6406,25 @@ export type RunConcordanceApiWorkspacesConcordancePostData = {
     url: '/api/workspaces/concordance';
 };
 
-export type RunConcordanceApiWorkspacesConcordancePostErrors = {
+export type RunConcordanceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RunConcordanceApiWorkspacesConcordancePostError = RunConcordanceApiWorkspacesConcordancePostErrors[keyof RunConcordanceApiWorkspacesConcordancePostErrors];
+export type RunConcordanceError = RunConcordanceErrors[keyof RunConcordanceErrors];
 
-export type RunConcordanceApiWorkspacesConcordancePostResponses = {
+export type RunConcordanceResponses = {
     /**
      * Successful Response
      */
     200: ConcordanceAnalysisResponse;
 };
 
-export type RunConcordanceApiWorkspacesConcordancePostResponse = RunConcordanceApiWorkspacesConcordancePostResponses[keyof RunConcordanceApiWorkspacesConcordancePostResponses];
+export type RunConcordanceResponse = RunConcordanceResponses[keyof RunConcordanceResponses];
 
-export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetData = {
+export type ConcordanceCurrentTasksData = {
     body?: never;
     headers?: {
         /**
@@ -6147,25 +6437,25 @@ export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetData =
     url: '/api/workspaces/concordance/tasks/current';
 };
 
-export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetErrors = {
+export type ConcordanceCurrentTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetError = ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetErrors[keyof ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetErrors];
+export type ConcordanceCurrentTasksError = ConcordanceCurrentTasksErrors[keyof ConcordanceCurrentTasksErrors];
 
-export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetResponses = {
+export type ConcordanceCurrentTasksResponses = {
     /**
      * Successful Response
      */
     200: CurrentAnalysisTasksResponse;
 };
 
-export type ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetResponse = ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetResponses[keyof ConcordanceCurrentTasksApiWorkspacesConcordanceTasksCurrentGetResponses];
+export type ConcordanceCurrentTasksResponse = ConcordanceCurrentTasksResponses[keyof ConcordanceCurrentTasksResponses];
 
-export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetData = {
+export type ConcordanceTaskDispersionBinsData = {
     body?: never;
     headers?: {
         /**
@@ -6188,25 +6478,25 @@ export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBins
     url: '/api/workspaces/concordance/tasks/{task_id}/bins';
 };
 
-export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetErrors = {
+export type ConcordanceTaskDispersionBinsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetError = ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetErrors[keyof ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetErrors];
+export type ConcordanceTaskDispersionBinsError = ConcordanceTaskDispersionBinsErrors[keyof ConcordanceTaskDispersionBinsErrors];
 
-export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetResponses = {
+export type ConcordanceTaskDispersionBinsResponses = {
     /**
      * Successful Response
      */
     200: ConcordanceDispersionBinsResponse;
 };
 
-export type ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetResponse = ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetResponses[keyof ConcordanceTaskDispersionBinsApiWorkspacesConcordanceTasksTaskIdBinsGetResponses];
+export type ConcordanceTaskDispersionBinsResponse = ConcordanceTaskDispersionBinsResponses[keyof ConcordanceTaskDispersionBinsResponses];
 
-export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetData = {
+export type ConcordanceTaskRequestData = {
     body?: never;
     headers?: {
         /**
@@ -6224,25 +6514,25 @@ export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetD
     url: '/api/workspaces/concordance/tasks/{task_id}/request';
 };
 
-export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetErrors = {
+export type ConcordanceTaskRequestErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetError = ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetErrors[keyof ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetErrors];
+export type ConcordanceTaskRequestError = ConcordanceTaskRequestErrors[keyof ConcordanceTaskRequestErrors];
 
-export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetResponses = {
+export type ConcordanceTaskRequestResponses = {
     /**
      * Successful Response
      */
     200: ConcordanceRequest;
 };
 
-export type ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetResponse = ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetResponses[keyof ConcordanceTaskRequestApiWorkspacesConcordanceTasksTaskIdRequestGetResponses];
+export type ConcordanceTaskRequestResponse = ConcordanceTaskRequestResponses[keyof ConcordanceTaskRequestResponses];
 
-export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetData = {
+export type ConcordanceTaskResultData = {
     body?: never;
     headers?: {
         /**
@@ -6297,27 +6587,27 @@ export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetDat
     url: '/api/workspaces/concordance/tasks/{task_id}/result';
 };
 
-export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetErrors = {
+export type ConcordanceTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetError = ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetErrors[keyof ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetErrors];
+export type ConcordanceTaskResultError = ConcordanceTaskResultErrors[keyof ConcordanceTaskResultErrors];
 
-export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetResponses = {
+export type ConcordanceTaskResultResponses = {
     /**
-     * Response Concordance Task Result Api Workspaces Concordance Tasks  Task Id  Result Get
+     * Response Concordance Task Result
      *
      * Successful Response
      */
     200: ConcordanceAnalysisResponse | null;
 };
 
-export type ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetResponse = ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetResponses[keyof ConcordanceTaskResultApiWorkspacesConcordanceTasksTaskIdResultGetResponses];
+export type ConcordanceTaskResultResponse = ConcordanceTaskResultResponses[keyof ConcordanceTaskResultResponses];
 
-export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostData = {
+export type ConcordanceTaskResultPostData = {
     body: ConcordanceResultQuery;
     headers?: {
         /**
@@ -6335,27 +6625,27 @@ export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPo
     url: '/api/workspaces/concordance/tasks/{task_id}/result';
 };
 
-export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostErrors = {
+export type ConcordanceTaskResultPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostError = ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostErrors[keyof ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostErrors];
+export type ConcordanceTaskResultPostError = ConcordanceTaskResultPostErrors[keyof ConcordanceTaskResultPostErrors];
 
-export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostResponses = {
+export type ConcordanceTaskResultPostResponses = {
     /**
-     * Response Concordance Task Result Post Api Workspaces Concordance Tasks  Task Id  Result Post
+     * Response Concordance Task Result Post
      *
      * Successful Response
      */
     200: ConcordanceAnalysisResponse | null;
 };
 
-export type ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostResponse = ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostResponses[keyof ConcordanceTaskResultPostApiWorkspacesConcordanceTasksTaskIdResultPostResponses];
+export type ConcordanceTaskResultPostResponse = ConcordanceTaskResultPostResponses[keyof ConcordanceTaskResultPostResponses];
 
-export type GetCurrentWorkspaceApiWorkspacesCurrentGetData = {
+export type GetCurrentWorkspaceData = {
     body?: never;
     headers?: {
         /**
@@ -6368,25 +6658,25 @@ export type GetCurrentWorkspaceApiWorkspacesCurrentGetData = {
     url: '/api/workspaces/current';
 };
 
-export type GetCurrentWorkspaceApiWorkspacesCurrentGetErrors = {
+export type GetCurrentWorkspaceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetCurrentWorkspaceApiWorkspacesCurrentGetError = GetCurrentWorkspaceApiWorkspacesCurrentGetErrors[keyof GetCurrentWorkspaceApiWorkspacesCurrentGetErrors];
+export type GetCurrentWorkspaceError = GetCurrentWorkspaceErrors[keyof GetCurrentWorkspaceErrors];
 
-export type GetCurrentWorkspaceApiWorkspacesCurrentGetResponses = {
+export type GetCurrentWorkspaceResponses = {
     /**
      * Successful Response
      */
     200: CurrentWorkspaceResponse;
 };
 
-export type GetCurrentWorkspaceApiWorkspacesCurrentGetResponse = GetCurrentWorkspaceApiWorkspacesCurrentGetResponses[keyof GetCurrentWorkspaceApiWorkspacesCurrentGetResponses];
+export type GetCurrentWorkspaceResponse = GetCurrentWorkspaceResponses[keyof GetCurrentWorkspaceResponses];
 
-export type SetCurrentWorkspaceApiWorkspacesCurrentPostData = {
+export type SetCurrentWorkspaceData = {
     body?: never;
     headers?: {
         /**
@@ -6404,25 +6694,25 @@ export type SetCurrentWorkspaceApiWorkspacesCurrentPostData = {
     url: '/api/workspaces/current';
 };
 
-export type SetCurrentWorkspaceApiWorkspacesCurrentPostErrors = {
+export type SetCurrentWorkspaceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SetCurrentWorkspaceApiWorkspacesCurrentPostError = SetCurrentWorkspaceApiWorkspacesCurrentPostErrors[keyof SetCurrentWorkspaceApiWorkspacesCurrentPostErrors];
+export type SetCurrentWorkspaceError = SetCurrentWorkspaceErrors[keyof SetCurrentWorkspaceErrors];
 
-export type SetCurrentWorkspaceApiWorkspacesCurrentPostResponses = {
+export type SetCurrentWorkspaceResponses = {
     /**
      * Successful Response
      */
     200: SetCurrentWorkspaceResponse;
 };
 
-export type SetCurrentWorkspaceApiWorkspacesCurrentPostResponse = SetCurrentWorkspaceApiWorkspacesCurrentPostResponses[keyof SetCurrentWorkspaceApiWorkspacesCurrentPostResponses];
+export type SetCurrentWorkspaceResponse2 = SetCurrentWorkspaceResponses[keyof SetCurrentWorkspaceResponses];
 
-export type DeleteWorkspaceApiWorkspacesDeleteDeleteData = {
+export type DeleteWorkspaceData = {
     body?: never;
     headers?: {
         /**
@@ -6440,25 +6730,25 @@ export type DeleteWorkspaceApiWorkspacesDeleteDeleteData = {
     url: '/api/workspaces/delete';
 };
 
-export type DeleteWorkspaceApiWorkspacesDeleteDeleteErrors = {
+export type DeleteWorkspaceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteWorkspaceApiWorkspacesDeleteDeleteError = DeleteWorkspaceApiWorkspacesDeleteDeleteErrors[keyof DeleteWorkspaceApiWorkspacesDeleteDeleteErrors];
+export type DeleteWorkspaceError = DeleteWorkspaceErrors[keyof DeleteWorkspaceErrors];
 
-export type DeleteWorkspaceApiWorkspacesDeleteDeleteResponses = {
+export type DeleteWorkspaceResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceActionResponse;
 };
 
-export type DeleteWorkspaceApiWorkspacesDeleteDeleteResponse = DeleteWorkspaceApiWorkspacesDeleteDeleteResponses[keyof DeleteWorkspaceApiWorkspacesDeleteDeleteResponses];
+export type DeleteWorkspaceResponse = DeleteWorkspaceResponses[keyof DeleteWorkspaceResponses];
 
-export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutData = {
+export type UpdateWorkspaceDescriptionData = {
     body?: never;
     headers?: {
         /**
@@ -6476,25 +6766,25 @@ export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutData = {
     url: '/api/workspaces/description';
 };
 
-export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutErrors = {
+export type UpdateWorkspaceDescriptionErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutError = UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutErrors[keyof UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutErrors];
+export type UpdateWorkspaceDescriptionError = UpdateWorkspaceDescriptionErrors[keyof UpdateWorkspaceDescriptionErrors];
 
-export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutResponses = {
+export type UpdateWorkspaceDescriptionResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceInfo;
 };
 
-export type UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutResponse = UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutResponses[keyof UpdateWorkspaceDescriptionApiWorkspacesDescriptionPutResponses];
+export type UpdateWorkspaceDescriptionResponse = UpdateWorkspaceDescriptionResponses[keyof UpdateWorkspaceDescriptionResponses];
 
-export type StartWorkspaceDownloadApiWorkspacesDownloadPostData = {
+export type StartWorkspaceDownloadData = {
     body?: never;
     headers?: {
         /**
@@ -6507,25 +6797,25 @@ export type StartWorkspaceDownloadApiWorkspacesDownloadPostData = {
     url: '/api/workspaces/download';
 };
 
-export type StartWorkspaceDownloadApiWorkspacesDownloadPostErrors = {
+export type StartWorkspaceDownloadErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type StartWorkspaceDownloadApiWorkspacesDownloadPostError = StartWorkspaceDownloadApiWorkspacesDownloadPostErrors[keyof StartWorkspaceDownloadApiWorkspacesDownloadPostErrors];
+export type StartWorkspaceDownloadError = StartWorkspaceDownloadErrors[keyof StartWorkspaceDownloadErrors];
 
-export type StartWorkspaceDownloadApiWorkspacesDownloadPostResponses = {
+export type StartWorkspaceDownloadResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceTaskStartResponse;
 };
 
-export type StartWorkspaceDownloadApiWorkspacesDownloadPostResponse = StartWorkspaceDownloadApiWorkspacesDownloadPostResponses[keyof StartWorkspaceDownloadApiWorkspacesDownloadPostResponses];
+export type StartWorkspaceDownloadResponse = StartWorkspaceDownloadResponses[keyof StartWorkspaceDownloadResponses];
 
-export type DownloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGetData = {
+export type DownloadWorkspaceArtifactData = {
     body?: never;
     headers?: {
         /**
@@ -6543,23 +6833,23 @@ export type DownloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGet
     url: '/api/workspaces/download/tasks/{task_id}/artifact';
 };
 
-export type DownloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGetErrors = {
+export type DownloadWorkspaceArtifactErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DownloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGetError = DownloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGetErrors[keyof DownloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGetErrors];
+export type DownloadWorkspaceArtifactError = DownloadWorkspaceArtifactErrors[keyof DownloadWorkspaceArtifactErrors];
 
-export type DownloadWorkspaceArtifactApiWorkspacesDownloadTasksTaskIdArtifactGetResponses = {
+export type DownloadWorkspaceArtifactResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ExportNodesApiWorkspacesExportGetData = {
+export type ExportNodesData = {
     body?: never;
     headers?: {
         /**
@@ -6581,23 +6871,23 @@ export type ExportNodesApiWorkspacesExportGetData = {
     url: '/api/workspaces/export';
 };
 
-export type ExportNodesApiWorkspacesExportGetErrors = {
+export type ExportNodesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ExportNodesApiWorkspacesExportGetError = ExportNodesApiWorkspacesExportGetErrors[keyof ExportNodesApiWorkspacesExportGetErrors];
+export type ExportNodesError = ExportNodesErrors[keyof ExportNodesErrors];
 
-export type ExportNodesApiWorkspacesExportGetResponses = {
+export type ExportNodesResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetWorkspaceGraphApiWorkspacesGraphGetData = {
+export type GetWorkspaceGraphData = {
     body?: never;
     headers?: {
         /**
@@ -6610,25 +6900,25 @@ export type GetWorkspaceGraphApiWorkspacesGraphGetData = {
     url: '/api/workspaces/graph';
 };
 
-export type GetWorkspaceGraphApiWorkspacesGraphGetErrors = {
+export type GetWorkspaceGraphErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetWorkspaceGraphApiWorkspacesGraphGetError = GetWorkspaceGraphApiWorkspacesGraphGetErrors[keyof GetWorkspaceGraphApiWorkspacesGraphGetErrors];
+export type GetWorkspaceGraphError = GetWorkspaceGraphErrors[keyof GetWorkspaceGraphErrors];
 
-export type GetWorkspaceGraphApiWorkspacesGraphGetResponses = {
+export type GetWorkspaceGraphResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceGraphResponse;
 };
 
-export type GetWorkspaceGraphApiWorkspacesGraphGetResponse = GetWorkspaceGraphApiWorkspacesGraphGetResponses[keyof GetWorkspaceGraphApiWorkspacesGraphGetResponses];
+export type GetWorkspaceGraphResponse = GetWorkspaceGraphResponses[keyof GetWorkspaceGraphResponses];
 
-export type GetWorkspaceInfoApiWorkspacesInfoGetData = {
+export type GetWorkspaceInfoData = {
     body?: never;
     headers?: {
         /**
@@ -6641,25 +6931,25 @@ export type GetWorkspaceInfoApiWorkspacesInfoGetData = {
     url: '/api/workspaces/info';
 };
 
-export type GetWorkspaceInfoApiWorkspacesInfoGetErrors = {
+export type GetWorkspaceInfoErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetWorkspaceInfoApiWorkspacesInfoGetError = GetWorkspaceInfoApiWorkspacesInfoGetErrors[keyof GetWorkspaceInfoApiWorkspacesInfoGetErrors];
+export type GetWorkspaceInfoError = GetWorkspaceInfoErrors[keyof GetWorkspaceInfoErrors];
 
-export type GetWorkspaceInfoApiWorkspacesInfoGetResponses = {
+export type GetWorkspaceInfoResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceInfo;
 };
 
-export type GetWorkspaceInfoApiWorkspacesInfoGetResponse = GetWorkspaceInfoApiWorkspacesInfoGetResponses[keyof GetWorkspaceInfoApiWorkspacesInfoGetResponses];
+export type GetWorkspaceInfoResponse = GetWorkspaceInfoResponses[keyof GetWorkspaceInfoResponses];
 
-export type RenameWorkspaceApiWorkspacesNamePutData = {
+export type RenameWorkspaceData = {
     body?: never;
     headers?: {
         /**
@@ -6677,25 +6967,25 @@ export type RenameWorkspaceApiWorkspacesNamePutData = {
     url: '/api/workspaces/name';
 };
 
-export type RenameWorkspaceApiWorkspacesNamePutErrors = {
+export type RenameWorkspaceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RenameWorkspaceApiWorkspacesNamePutError = RenameWorkspaceApiWorkspacesNamePutErrors[keyof RenameWorkspaceApiWorkspacesNamePutErrors];
+export type RenameWorkspaceError = RenameWorkspaceErrors[keyof RenameWorkspaceErrors];
 
-export type RenameWorkspaceApiWorkspacesNamePutResponses = {
+export type RenameWorkspaceResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceInfo;
 };
 
-export type RenameWorkspaceApiWorkspacesNamePutResponse = RenameWorkspaceApiWorkspacesNamePutResponses[keyof RenameWorkspaceApiWorkspacesNamePutResponses];
+export type RenameWorkspaceResponse = RenameWorkspaceResponses[keyof RenameWorkspaceResponses];
 
-export type GetWorkspaceNodesApiWorkspacesNodesGetData = {
+export type GetWorkspaceNodesData = {
     body?: never;
     headers?: {
         /**
@@ -6708,25 +6998,25 @@ export type GetWorkspaceNodesApiWorkspacesNodesGetData = {
     url: '/api/workspaces/nodes';
 };
 
-export type GetWorkspaceNodesApiWorkspacesNodesGetErrors = {
+export type GetWorkspaceNodesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetWorkspaceNodesApiWorkspacesNodesGetError = GetWorkspaceNodesApiWorkspacesNodesGetErrors[keyof GetWorkspaceNodesApiWorkspacesNodesGetErrors];
+export type GetWorkspaceNodesError = GetWorkspaceNodesErrors[keyof GetWorkspaceNodesErrors];
 
-export type GetWorkspaceNodesApiWorkspacesNodesGetResponses = {
+export type GetWorkspaceNodesResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodesResponse;
 };
 
-export type GetWorkspaceNodesApiWorkspacesNodesGetResponse = GetWorkspaceNodesApiWorkspacesNodesGetResponses[keyof GetWorkspaceNodesApiWorkspacesNodesGetResponses];
+export type GetWorkspaceNodesResponse = GetWorkspaceNodesResponses[keyof GetWorkspaceNodesResponses];
 
-export type AddNodeToWorkspaceApiWorkspacesNodesPostData = {
+export type AddNodeToWorkspaceData = {
     body?: never;
     headers?: {
         /**
@@ -6756,25 +7046,25 @@ export type AddNodeToWorkspaceApiWorkspacesNodesPostData = {
     url: '/api/workspaces/nodes';
 };
 
-export type AddNodeToWorkspaceApiWorkspacesNodesPostErrors = {
+export type AddNodeToWorkspaceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AddNodeToWorkspaceApiWorkspacesNodesPostError = AddNodeToWorkspaceApiWorkspacesNodesPostErrors[keyof AddNodeToWorkspaceApiWorkspacesNodesPostErrors];
+export type AddNodeToWorkspaceError = AddNodeToWorkspaceErrors[keyof AddNodeToWorkspaceErrors];
 
-export type AddNodeToWorkspaceApiWorkspacesNodesPostResponses = {
+export type AddNodeToWorkspaceResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type AddNodeToWorkspaceApiWorkspacesNodesPostResponse = AddNodeToWorkspaceApiWorkspacesNodesPostResponses[keyof AddNodeToWorkspaceApiWorkspacesNodesPostResponses];
+export type AddNodeToWorkspaceResponse = AddNodeToWorkspaceResponses[keyof AddNodeToWorkspaceResponses];
 
-export type ConcatNodesApiWorkspacesNodesConcatPostData = {
+export type ConcatNodesData = {
     body: ConcatRequest;
     headers?: {
         /**
@@ -6787,25 +7077,25 @@ export type ConcatNodesApiWorkspacesNodesConcatPostData = {
     url: '/api/workspaces/nodes/concat';
 };
 
-export type ConcatNodesApiWorkspacesNodesConcatPostErrors = {
+export type ConcatNodesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConcatNodesApiWorkspacesNodesConcatPostError = ConcatNodesApiWorkspacesNodesConcatPostErrors[keyof ConcatNodesApiWorkspacesNodesConcatPostErrors];
+export type ConcatNodesError = ConcatNodesErrors[keyof ConcatNodesErrors];
 
-export type ConcatNodesApiWorkspacesNodesConcatPostResponses = {
+export type ConcatNodesResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type ConcatNodesApiWorkspacesNodesConcatPostResponse = ConcatNodesApiWorkspacesNodesConcatPostResponses[keyof ConcatNodesApiWorkspacesNodesConcatPostResponses];
+export type ConcatNodesResponse = ConcatNodesResponses[keyof ConcatNodesResponses];
 
-export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostData = {
+export type ConcatNodesPreviewData = {
     body: ConcatPreviewRequest;
     headers?: {
         /**
@@ -6827,25 +7117,25 @@ export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostData = {
     url: '/api/workspaces/nodes/concat/preview';
 };
 
-export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostErrors = {
+export type ConcatNodesPreviewErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostError = ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostErrors[keyof ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostErrors];
+export type ConcatNodesPreviewError = ConcatNodesPreviewErrors[keyof ConcatNodesPreviewErrors];
 
-export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostResponses = {
+export type ConcatNodesPreviewResponses = {
     /**
      * Successful Response
      */
     200: FilterPreviewResponse;
 };
 
-export type ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostResponse = ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostResponses[keyof ConcatNodesPreviewApiWorkspacesNodesConcatPreviewPostResponses];
+export type ConcatNodesPreviewResponse = ConcatNodesPreviewResponses[keyof ConcatNodesPreviewResponses];
 
-export type JoinNodesApiWorkspacesNodesJoinPostData = {
+export type JoinNodesData = {
     body?: never;
     headers?: {
         /**
@@ -6883,25 +7173,25 @@ export type JoinNodesApiWorkspacesNodesJoinPostData = {
     url: '/api/workspaces/nodes/join';
 };
 
-export type JoinNodesApiWorkspacesNodesJoinPostErrors = {
+export type JoinNodesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type JoinNodesApiWorkspacesNodesJoinPostError = JoinNodesApiWorkspacesNodesJoinPostErrors[keyof JoinNodesApiWorkspacesNodesJoinPostErrors];
+export type JoinNodesError = JoinNodesErrors[keyof JoinNodesErrors];
 
-export type JoinNodesApiWorkspacesNodesJoinPostResponses = {
+export type JoinNodesResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type JoinNodesApiWorkspacesNodesJoinPostResponse = JoinNodesApiWorkspacesNodesJoinPostResponses[keyof JoinNodesApiWorkspacesNodesJoinPostResponses];
+export type JoinNodesResponse = JoinNodesResponses[keyof JoinNodesResponses];
 
-export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostData = {
+export type JoinNodesPreviewData = {
     body?: never;
     headers?: {
         /**
@@ -6943,25 +7233,25 @@ export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostData = {
     url: '/api/workspaces/nodes/join/preview';
 };
 
-export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostErrors = {
+export type JoinNodesPreviewErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostError = JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostErrors[keyof JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostErrors];
+export type JoinNodesPreviewError = JoinNodesPreviewErrors[keyof JoinNodesPreviewErrors];
 
-export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostResponses = {
+export type JoinNodesPreviewResponses = {
     /**
      * Successful Response
      */
     200: FilterPreviewResponse;
 };
 
-export type JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostResponse = JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostResponses[keyof JoinNodesPreviewApiWorkspacesNodesJoinPreviewPostResponses];
+export type JoinNodesPreviewResponse = JoinNodesPreviewResponses[keyof JoinNodesPreviewResponses];
 
-export type DeleteNodeApiWorkspacesNodesNodeIdDeleteData = {
+export type DeleteNodeData = {
     body?: never;
     headers?: {
         /**
@@ -6979,25 +7269,25 @@ export type DeleteNodeApiWorkspacesNodesNodeIdDeleteData = {
     url: '/api/workspaces/nodes/{node_id}';
 };
 
-export type DeleteNodeApiWorkspacesNodesNodeIdDeleteErrors = {
+export type DeleteNodeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteNodeApiWorkspacesNodesNodeIdDeleteError = DeleteNodeApiWorkspacesNodesNodeIdDeleteErrors[keyof DeleteNodeApiWorkspacesNodesNodeIdDeleteErrors];
+export type DeleteNodeError = DeleteNodeErrors[keyof DeleteNodeErrors];
 
-export type DeleteNodeApiWorkspacesNodesNodeIdDeleteResponses = {
+export type DeleteNodeResponses = {
     /**
      * Successful Response
      */
     200: NodeActionResponse;
 };
 
-export type DeleteNodeApiWorkspacesNodesNodeIdDeleteResponse = DeleteNodeApiWorkspacesNodesNodeIdDeleteResponses[keyof DeleteNodeApiWorkspacesNodesNodeIdDeleteResponses];
+export type DeleteNodeResponse = DeleteNodeResponses[keyof DeleteNodeResponses];
 
-export type GetNodeInfoApiWorkspacesNodesNodeIdGetData = {
+export type GetNodeInfoData = {
     body?: never;
     headers?: {
         /**
@@ -7015,25 +7305,25 @@ export type GetNodeInfoApiWorkspacesNodesNodeIdGetData = {
     url: '/api/workspaces/nodes/{node_id}';
 };
 
-export type GetNodeInfoApiWorkspacesNodesNodeIdGetErrors = {
+export type GetNodeInfoErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetNodeInfoApiWorkspacesNodesNodeIdGetError = GetNodeInfoApiWorkspacesNodesNodeIdGetErrors[keyof GetNodeInfoApiWorkspacesNodesNodeIdGetErrors];
+export type GetNodeInfoError = GetNodeInfoErrors[keyof GetNodeInfoErrors];
 
-export type GetNodeInfoApiWorkspacesNodesNodeIdGetResponses = {
+export type GetNodeInfoResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type GetNodeInfoApiWorkspacesNodesNodeIdGetResponse = GetNodeInfoApiWorkspacesNodesNodeIdGetResponses[keyof GetNodeInfoApiWorkspacesNodesNodeIdGetResponses];
+export type GetNodeInfoResponse = GetNodeInfoResponses[keyof GetNodeInfoResponses];
 
-export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetData = {
+export type GetAiAnnotationCategoriesData = {
     body?: never;
     headers?: {
         /**
@@ -7056,25 +7346,25 @@ export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategor
     url: '/api/workspaces/nodes/{node_id}/ai-annotation/categories';
 };
 
-export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetErrors = {
+export type GetAiAnnotationCategoriesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetError = GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetErrors[keyof GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetErrors];
+export type GetAiAnnotationCategoriesError = GetAiAnnotationCategoriesErrors[keyof GetAiAnnotationCategoriesErrors];
 
-export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetResponses = {
+export type GetAiAnnotationCategoriesResponses = {
     /**
      * Successful Response
      */
     200: AiAnnotationCategoriesResponse;
 };
 
-export type GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetResponse = GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetResponses[keyof GetAiAnnotationCategoriesApiWorkspacesNodesNodeIdAiAnnotationCategoriesGetResponses];
+export type GetAiAnnotationCategoriesResponse = GetAiAnnotationCategoriesResponses[keyof GetAiAnnotationCategoriesResponses];
 
-export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostData = {
+export type DetachAiAnnotationData = {
     body: AiAnnotationDetachRequest;
     headers?: {
         /**
@@ -7092,25 +7382,25 @@ export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostData
     url: '/api/workspaces/nodes/{node_id}/ai-annotation/detach';
 };
 
-export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostErrors = {
+export type DetachAiAnnotationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostError = DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostErrors[keyof DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostErrors];
+export type DetachAiAnnotationError = DetachAiAnnotationErrors[keyof DetachAiAnnotationErrors];
 
-export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostResponses = {
+export type DetachAiAnnotationResponses = {
     /**
      * Successful Response
      */
     200: AiAnnotationDetachResponse;
 };
 
-export type DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostResponse = DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostResponses[keyof DetachAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationDetachPostResponses];
+export type DetachAiAnnotationResponse = DetachAiAnnotationResponses[keyof DetachAiAnnotationResponses];
 
-export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetData = {
+export type GetAiAnnotationProvidersData = {
     body?: never;
     headers?: {
         /**
@@ -7133,25 +7423,25 @@ export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvider
     url: '/api/workspaces/nodes/{node_id}/ai-annotation/providers';
 };
 
-export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetErrors = {
+export type GetAiAnnotationProvidersErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetError = GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetErrors[keyof GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetErrors];
+export type GetAiAnnotationProvidersError = GetAiAnnotationProvidersErrors[keyof GetAiAnnotationProvidersErrors];
 
-export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetResponses = {
+export type GetAiAnnotationProvidersResponses = {
     /**
      * Successful Response
      */
     200: AiAnnotationProvidersResponse;
 };
 
-export type GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetResponse = GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetResponses[keyof GetAiAnnotationProvidersApiWorkspacesNodesNodeIdAiAnnotationProvidersGetResponses];
+export type GetAiAnnotationProvidersResponse = GetAiAnnotationProvidersResponses[keyof GetAiAnnotationProvidersResponses];
 
-export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostData = {
+export type SaveAiAnnotationData = {
     body: AiAnnotationSaveRequest;
     headers?: {
         /**
@@ -7169,25 +7459,25 @@ export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostData = {
     url: '/api/workspaces/nodes/{node_id}/ai-annotation/save';
 };
 
-export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostErrors = {
+export type SaveAiAnnotationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostError = SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostErrors[keyof SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostErrors];
+export type SaveAiAnnotationError = SaveAiAnnotationErrors[keyof SaveAiAnnotationErrors];
 
-export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponses = {
+export type SaveAiAnnotationResponses = {
     /**
      * Successful Response
      */
     200: AiAnnotationSaveResponse;
 };
 
-export type SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponse = SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponses[keyof SaveAiAnnotationApiWorkspacesNodesNodeIdAiAnnotationSavePostResponses];
+export type SaveAiAnnotationResponse = SaveAiAnnotationResponses[keyof SaveAiAnnotationResponses];
 
-export type CastNodeApiWorkspacesNodesNodeIdCastPostData = {
+export type CastNodeData = {
     body: CastNodeRequest;
     headers?: {
         /**
@@ -7205,25 +7495,25 @@ export type CastNodeApiWorkspacesNodesNodeIdCastPostData = {
     url: '/api/workspaces/nodes/{node_id}/cast';
 };
 
-export type CastNodeApiWorkspacesNodesNodeIdCastPostErrors = {
+export type CastNodeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CastNodeApiWorkspacesNodesNodeIdCastPostError = CastNodeApiWorkspacesNodesNodeIdCastPostErrors[keyof CastNodeApiWorkspacesNodesNodeIdCastPostErrors];
+export type CastNodeError = CastNodeErrors[keyof CastNodeErrors];
 
-export type CastNodeApiWorkspacesNodesNodeIdCastPostResponses = {
+export type CastNodeResponses = {
     /**
      * Successful Response
      */
     200: CastNodeResponse;
 };
 
-export type CastNodeApiWorkspacesNodesNodeIdCastPostResponse = CastNodeApiWorkspacesNodesNodeIdCastPostResponses[keyof CastNodeApiWorkspacesNodesNodeIdCastPostResponses];
+export type CastNodeResponse2 = CastNodeResponses[keyof CastNodeResponses];
 
-export type CloneNodeApiWorkspacesNodesNodeIdClonePostData = {
+export type CloneNodeData = {
     body?: never;
     headers?: {
         /**
@@ -7241,25 +7531,25 @@ export type CloneNodeApiWorkspacesNodesNodeIdClonePostData = {
     url: '/api/workspaces/nodes/{node_id}/clone';
 };
 
-export type CloneNodeApiWorkspacesNodesNodeIdClonePostErrors = {
+export type CloneNodeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CloneNodeApiWorkspacesNodesNodeIdClonePostError = CloneNodeApiWorkspacesNodesNodeIdClonePostErrors[keyof CloneNodeApiWorkspacesNodesNodeIdClonePostErrors];
+export type CloneNodeError = CloneNodeErrors[keyof CloneNodeErrors];
 
-export type CloneNodeApiWorkspacesNodesNodeIdClonePostResponses = {
+export type CloneNodeResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type CloneNodeApiWorkspacesNodesNodeIdClonePostResponse = CloneNodeApiWorkspacesNodesNodeIdClonePostResponses[keyof CloneNodeApiWorkspacesNodesNodeIdClonePostResponses];
+export type CloneNodeResponse = CloneNodeResponses[keyof CloneNodeResponses];
 
-export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteData = {
+export type DeleteNodeColumnData = {
     body?: never;
     headers?: {
         /**
@@ -7281,25 +7571,25 @@ export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteData 
     url: '/api/workspaces/nodes/{node_id}/columns/{column_name}';
 };
 
-export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteErrors = {
+export type DeleteNodeColumnErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteError = DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteErrors[keyof DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteErrors];
+export type DeleteNodeColumnError = DeleteNodeColumnErrors[keyof DeleteNodeColumnErrors];
 
-export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteResponses = {
+export type DeleteNodeColumnResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteResponse = DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteResponses[keyof DeleteNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDeleteResponses];
+export type DeleteNodeColumnResponse = DeleteNodeColumnResponses[keyof DeleteNodeColumnResponses];
 
-export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutData = {
+export type RenameNodeColumnData = {
     body: RenameColumnRequest;
     headers?: {
         /**
@@ -7321,25 +7611,25 @@ export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutData = {
     url: '/api/workspaces/nodes/{node_id}/columns/{column_name}';
 };
 
-export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutErrors = {
+export type RenameNodeColumnErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutError = RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutErrors[keyof RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutErrors];
+export type RenameNodeColumnError = RenameNodeColumnErrors[keyof RenameNodeColumnErrors];
 
-export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutResponses = {
+export type RenameNodeColumnResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutResponse = RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutResponses[keyof RenameNodeColumnApiWorkspacesNodesNodeIdColumnsColumnNamePutResponses];
+export type RenameNodeColumnResponse = RenameNodeColumnResponses[keyof RenameNodeColumnResponses];
 
-export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetData = {
+export type DescribeColumnData = {
     body?: never;
     headers?: {
         /**
@@ -7361,25 +7651,25 @@ export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetDa
     url: '/api/workspaces/nodes/{node_id}/columns/{column_name}/describe';
 };
 
-export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetErrors = {
+export type DescribeColumnErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetError = DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetErrors[keyof DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetErrors];
+export type DescribeColumnError = DescribeColumnErrors[keyof DescribeColumnErrors];
 
-export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetResponses = {
+export type DescribeColumnResponses = {
     /**
      * Successful Response
      */
     200: ColumnDescribeResponse;
 };
 
-export type DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetResponse = DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetResponses[keyof DescribeColumnApiWorkspacesNodesNodeIdColumnsColumnNameDescribeGetResponses];
+export type DescribeColumnResponse = DescribeColumnResponses[keyof DescribeColumnResponses];
 
-export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetData = {
+export type ColumnOperationsData = {
     body?: never;
     headers?: {
         /**
@@ -7401,25 +7691,25 @@ export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsG
     url: '/api/workspaces/nodes/{node_id}/columns/{column_name}/operations';
 };
 
-export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetErrors = {
+export type ColumnOperationsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetError = ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetErrors[keyof ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetErrors];
+export type ColumnOperationsError = ColumnOperationsErrors[keyof ColumnOperationsErrors];
 
-export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetResponses = {
+export type ColumnOperationsResponses = {
     /**
      * Successful Response
      */
     200: ColumnOperationsResponse;
 };
 
-export type ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetResponse = ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetResponses[keyof ColumnOperationsApiWorkspacesNodesNodeIdColumnsColumnNameOperationsGetResponses];
+export type ColumnOperationsResponse2 = ColumnOperationsResponses[keyof ColumnOperationsResponses];
 
-export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetData = {
+export type GetColumnUniqueValuesData = {
     body?: never;
     headers?: {
         /**
@@ -7441,25 +7731,25 @@ export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUnique
     url: '/api/workspaces/nodes/{node_id}/columns/{column_name}/unique';
 };
 
-export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetErrors = {
+export type GetColumnUniqueValuesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetError = GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetErrors[keyof GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetErrors];
+export type GetColumnUniqueValuesError = GetColumnUniqueValuesErrors[keyof GetColumnUniqueValuesErrors];
 
-export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetResponses = {
+export type GetColumnUniqueValuesResponses = {
     /**
      * Successful Response
      */
     200: ColumnUniqueValuesResponse;
 };
 
-export type GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetResponse = GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetResponses[keyof GetColumnUniqueValuesApiWorkspacesNodesNodeIdColumnsColumnNameUniqueGetResponses];
+export type GetColumnUniqueValuesResponse = GetColumnUniqueValuesResponses[keyof GetColumnUniqueValuesResponses];
 
-export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostData = {
+export type DetachConcordanceData = {
     body: ConcordanceDetachRequest;
     headers?: {
         /**
@@ -7477,25 +7767,25 @@ export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostData =
     url: '/api/workspaces/nodes/{node_id}/concordance/detach';
 };
 
-export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostErrors = {
+export type DetachConcordanceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostError = DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostErrors[keyof DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostErrors];
+export type DetachConcordanceError = DetachConcordanceErrors[keyof DetachConcordanceErrors];
 
-export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostResponses = {
+export type DetachConcordanceResponses = {
     /**
      * Successful Response
      */
     200: AnalysisTaskActionResponse;
 };
 
-export type DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostResponse = DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostResponses[keyof DetachConcordanceApiWorkspacesNodesNodeIdConcordanceDetachPostResponses];
+export type DetachConcordanceResponse = DetachConcordanceResponses[keyof DetachConcordanceResponses];
 
-export type ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetData = {
+export type ConcordanceDetachOptionsData = {
     body?: never;
     headers?: {
         /**
@@ -7518,25 +7808,25 @@ export type ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOpt
     url: '/api/workspaces/nodes/{node_id}/concordance/detach-options';
 };
 
-export type ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetErrors = {
+export type ConcordanceDetachOptionsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetError = ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetErrors[keyof ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetErrors];
+export type ConcordanceDetachOptionsError = ConcordanceDetachOptionsErrors[keyof ConcordanceDetachOptionsErrors];
 
-export type ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetResponses = {
+export type ConcordanceDetachOptionsResponses = {
     /**
      * Successful Response
      */
     200: ConcordanceDetachOptionsResponse;
 };
 
-export type ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetResponse = ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetResponses[keyof ConcordanceDetachOptionsApiWorkspacesNodesNodeIdConcordanceDetachOptionsGetResponses];
+export type ConcordanceDetachOptionsResponse2 = ConcordanceDetachOptionsResponses[keyof ConcordanceDetachOptionsResponses];
 
-export type DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostData = {
+export type DetachConcordanceDispersionData = {
     body: ConcordanceDispersionDetachRequest;
     headers?: {
         /**
@@ -7554,25 +7844,25 @@ export type DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDisper
     url: '/api/workspaces/nodes/{node_id}/concordance/dispersion-detach';
 };
 
-export type DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostErrors = {
+export type DetachConcordanceDispersionErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostError = DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostErrors[keyof DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostErrors];
+export type DetachConcordanceDispersionError = DetachConcordanceDispersionErrors[keyof DetachConcordanceDispersionErrors];
 
-export type DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostResponses = {
+export type DetachConcordanceDispersionResponses = {
     /**
      * Successful Response
      */
     200: AnalysisTaskActionResponse;
 };
 
-export type DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostResponse = DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostResponses[keyof DetachConcordanceDispersionApiWorkspacesNodesNodeIdConcordanceDispersionDetachPostResponses];
+export type DetachConcordanceDispersionResponse = DetachConcordanceDispersionResponses[keyof DetachConcordanceDispersionResponses];
 
-export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostData = {
+export type MaterializeConcordanceData = {
     body: ConcordanceMaterializeRequest;
     headers?: {
         /**
@@ -7590,25 +7880,25 @@ export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterialize
     url: '/api/workspaces/nodes/{node_id}/concordance/materialize';
 };
 
-export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostErrors = {
+export type MaterializeConcordanceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostError = MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostErrors[keyof MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostErrors];
+export type MaterializeConcordanceError = MaterializeConcordanceErrors[keyof MaterializeConcordanceErrors];
 
-export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostResponses = {
+export type MaterializeConcordanceResponses = {
     /**
      * Successful Response
      */
     200: AnalysisTaskActionResponse;
 };
 
-export type MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostResponse = MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostResponses[keyof MaterializeConcordanceApiWorkspacesNodesNodeIdConcordanceMaterializePostResponses];
+export type MaterializeConcordanceResponse = MaterializeConcordanceResponses[keyof MaterializeConcordanceResponses];
 
-export type GetNodeDataApiWorkspacesNodesNodeIdDataGetData = {
+export type GetNodeDataData = {
     body?: never;
     headers?: {
         /**
@@ -7655,25 +7945,25 @@ export type GetNodeDataApiWorkspacesNodesNodeIdDataGetData = {
     url: '/api/workspaces/nodes/{node_id}/data';
 };
 
-export type GetNodeDataApiWorkspacesNodesNodeIdDataGetErrors = {
+export type GetNodeDataErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetNodeDataApiWorkspacesNodesNodeIdDataGetError = GetNodeDataApiWorkspacesNodesNodeIdDataGetErrors[keyof GetNodeDataApiWorkspacesNodesNodeIdDataGetErrors];
+export type GetNodeDataError = GetNodeDataErrors[keyof GetNodeDataErrors];
 
-export type GetNodeDataApiWorkspacesNodesNodeIdDataGetResponses = {
+export type GetNodeDataResponses = {
     /**
      * Successful Response
      */
     200: NodeDataResponse;
 };
 
-export type GetNodeDataApiWorkspacesNodesNodeIdDataGetResponse = GetNodeDataApiWorkspacesNodesNodeIdDataGetResponses[keyof GetNodeDataApiWorkspacesNodesNodeIdDataGetResponses];
+export type GetNodeDataResponse = GetNodeDataResponses[keyof GetNodeDataResponses];
 
-export type PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostData = {
+export type PolarsExpressionApplyData = {
     body: PolarsExpressionRequest;
     headers?: {
         /**
@@ -7691,25 +7981,25 @@ export type PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostData
     url: '/api/workspaces/nodes/{node_id}/expression/apply';
 };
 
-export type PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostErrors = {
+export type PolarsExpressionApplyErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostError = PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostErrors[keyof PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostErrors];
+export type PolarsExpressionApplyError = PolarsExpressionApplyErrors[keyof PolarsExpressionApplyErrors];
 
-export type PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostResponses = {
+export type PolarsExpressionApplyResponses = {
     /**
      * Successful Response
      */
     200: PolarsExpressionApplyResponse;
 };
 
-export type PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostResponse = PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostResponses[keyof PolarsExpressionApplyApiWorkspacesNodesNodeIdExpressionApplyPostResponses];
+export type PolarsExpressionApplyResponse2 = PolarsExpressionApplyResponses[keyof PolarsExpressionApplyResponses];
 
-export type PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostData = {
+export type PolarsExpressionPreviewData = {
     body: PolarsExpressionRequest;
     headers?: {
         /**
@@ -7736,25 +8026,25 @@ export type PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPost
     url: '/api/workspaces/nodes/{node_id}/expression/preview';
 };
 
-export type PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostErrors = {
+export type PolarsExpressionPreviewErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostError = PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostErrors[keyof PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostErrors];
+export type PolarsExpressionPreviewError = PolarsExpressionPreviewErrors[keyof PolarsExpressionPreviewErrors];
 
-export type PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostResponses = {
+export type PolarsExpressionPreviewResponses = {
     /**
      * Successful Response
      */
     200: FilterPreviewResponse;
 };
 
-export type PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostResponse = PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostResponses[keyof PolarsExpressionPreviewApiWorkspacesNodesNodeIdExpressionPreviewPostResponses];
+export type PolarsExpressionPreviewResponse = PolarsExpressionPreviewResponses[keyof PolarsExpressionPreviewResponses];
 
-export type FilterNodeApiWorkspacesNodesNodeIdFilterPostData = {
+export type FilterNodeData = {
     body: FilterRequest;
     headers?: {
         /**
@@ -7772,25 +8062,25 @@ export type FilterNodeApiWorkspacesNodesNodeIdFilterPostData = {
     url: '/api/workspaces/nodes/{node_id}/filter';
 };
 
-export type FilterNodeApiWorkspacesNodesNodeIdFilterPostErrors = {
+export type FilterNodeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type FilterNodeApiWorkspacesNodesNodeIdFilterPostError = FilterNodeApiWorkspacesNodesNodeIdFilterPostErrors[keyof FilterNodeApiWorkspacesNodesNodeIdFilterPostErrors];
+export type FilterNodeError = FilterNodeErrors[keyof FilterNodeErrors];
 
-export type FilterNodeApiWorkspacesNodesNodeIdFilterPostResponses = {
+export type FilterNodeResponses = {
     /**
      * Successful Response
      */
     200: NodeOperationResponse;
 };
 
-export type FilterNodeApiWorkspacesNodesNodeIdFilterPostResponse = FilterNodeApiWorkspacesNodesNodeIdFilterPostResponses[keyof FilterNodeApiWorkspacesNodesNodeIdFilterPostResponses];
+export type FilterNodeResponse = FilterNodeResponses[keyof FilterNodeResponses];
 
-export type FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostData = {
+export type FilterPreviewData = {
     body: FilterRequest;
     headers?: {
         /**
@@ -7817,25 +8107,25 @@ export type FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostData = {
     url: '/api/workspaces/nodes/{node_id}/filter/preview';
 };
 
-export type FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostErrors = {
+export type FilterPreviewErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostError = FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostErrors[keyof FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostErrors];
+export type FilterPreviewError = FilterPreviewErrors[keyof FilterPreviewErrors];
 
-export type FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostResponses = {
+export type FilterPreviewResponses = {
     /**
      * Successful Response
      */
     200: FilterPreviewResponse;
 };
 
-export type FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostResponse = FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostResponses[keyof FilterPreviewApiWorkspacesNodesNodeIdFilterPreviewPostResponses];
+export type FilterPreviewResponse2 = FilterPreviewResponses[keyof FilterPreviewResponses];
 
-export type UpdateNodeNameApiWorkspacesNodesNodeIdNamePutData = {
+export type UpdateNodeNameData = {
     body?: never;
     headers?: {
         /**
@@ -7858,25 +8148,25 @@ export type UpdateNodeNameApiWorkspacesNodesNodeIdNamePutData = {
     url: '/api/workspaces/nodes/{node_id}/name';
 };
 
-export type UpdateNodeNameApiWorkspacesNodesNodeIdNamePutErrors = {
+export type UpdateNodeNameErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateNodeNameApiWorkspacesNodesNodeIdNamePutError = UpdateNodeNameApiWorkspacesNodesNodeIdNamePutErrors[keyof UpdateNodeNameApiWorkspacesNodesNodeIdNamePutErrors];
+export type UpdateNodeNameError = UpdateNodeNameErrors[keyof UpdateNodeNameErrors];
 
-export type UpdateNodeNameApiWorkspacesNodesNodeIdNamePutResponses = {
+export type UpdateNodeNameResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type UpdateNodeNameApiWorkspacesNodesNodeIdNamePutResponse = UpdateNodeNameApiWorkspacesNodesNodeIdNamePutResponses[keyof UpdateNodeNameApiWorkspacesNodesNodeIdNamePutResponses];
+export type UpdateNodeNameResponse = UpdateNodeNameResponses[keyof UpdateNodeNameResponses];
 
-export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetData = {
+export type GetNodeQueryPlanData = {
     body?: never;
     headers?: {
         /**
@@ -7894,25 +8184,25 @@ export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetData = {
     url: '/api/workspaces/nodes/{node_id}/query-plan';
 };
 
-export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetErrors = {
+export type GetNodeQueryPlanErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetError = GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetErrors[keyof GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetErrors];
+export type GetNodeQueryPlanError = GetNodeQueryPlanErrors[keyof GetNodeQueryPlanErrors];
 
-export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetResponses = {
+export type GetNodeQueryPlanResponses = {
     /**
      * Successful Response
      */
     200: NodeQueryPlanResponse;
 };
 
-export type GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetResponse = GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetResponses[keyof GetNodeQueryPlanApiWorkspacesNodesNodeIdQueryPlanGetResponses];
+export type GetNodeQueryPlanResponse = GetNodeQueryPlanResponses[keyof GetNodeQueryPlanResponses];
 
-export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostData = {
+export type GetQuotationData = {
     body: QuotationRequestInput;
     headers?: {
         /**
@@ -7930,25 +8220,25 @@ export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostData = {
     url: '/api/workspaces/nodes/{node_id}/quotation';
 };
 
-export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostErrors = {
+export type GetQuotationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostError = GetQuotationApiWorkspacesNodesNodeIdQuotationPostErrors[keyof GetQuotationApiWorkspacesNodesNodeIdQuotationPostErrors];
+export type GetQuotationError = GetQuotationErrors[keyof GetQuotationErrors];
 
-export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostResponses = {
+export type GetQuotationResponses = {
     /**
      * Successful Response
      */
     200: QuotationAnalysisResponse;
 };
 
-export type GetQuotationApiWorkspacesNodesNodeIdQuotationPostResponse = GetQuotationApiWorkspacesNodesNodeIdQuotationPostResponses[keyof GetQuotationApiWorkspacesNodesNodeIdQuotationPostResponses];
+export type GetQuotationResponse = GetQuotationResponses[keyof GetQuotationResponses];
 
-export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostData = {
+export type DetachQuotationData = {
     body: QuotationDetachRequest;
     headers?: {
         /**
@@ -7966,25 +8256,25 @@ export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostData = {
     url: '/api/workspaces/nodes/{node_id}/quotation/detach';
 };
 
-export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostErrors = {
+export type DetachQuotationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostError = DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostErrors[keyof DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostErrors];
+export type DetachQuotationError = DetachQuotationErrors[keyof DetachQuotationErrors];
 
-export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostResponses = {
+export type DetachQuotationResponses = {
     /**
      * Successful Response
      */
     200: AnalysisTaskActionResponse;
 };
 
-export type DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostResponse = DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostResponses[keyof DetachQuotationApiWorkspacesNodesNodeIdQuotationDetachPostResponses];
+export type DetachQuotationResponse = DetachQuotationResponses[keyof DetachQuotationResponses];
 
-export type QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetData = {
+export type QuotationDetachOptionsData = {
     body?: never;
     headers?: {
         /**
@@ -8007,25 +8297,25 @@ export type QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptions
     url: '/api/workspaces/nodes/{node_id}/quotation/detach-options';
 };
 
-export type QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetErrors = {
+export type QuotationDetachOptionsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetError = QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetErrors[keyof QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetErrors];
+export type QuotationDetachOptionsError = QuotationDetachOptionsErrors[keyof QuotationDetachOptionsErrors];
 
-export type QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetResponses = {
+export type QuotationDetachOptionsResponses = {
     /**
      * Successful Response
      */
     200: QuotationDetachOptionsResponse;
 };
 
-export type QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetResponse = QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetResponses[keyof QuotationDetachOptionsApiWorkspacesNodesNodeIdQuotationDetachOptionsGetResponses];
+export type QuotationDetachOptionsResponse2 = QuotationDetachOptionsResponses[keyof QuotationDetachOptionsResponses];
 
-export type MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostData = {
+export type MaterializeQuotationData = {
     body: QuotationMaterializeRequest;
     headers?: {
         /**
@@ -8043,25 +8333,25 @@ export type MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePost
     url: '/api/workspaces/nodes/{node_id}/quotation/materialize';
 };
 
-export type MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostErrors = {
+export type MaterializeQuotationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostError = MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostErrors[keyof MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostErrors];
+export type MaterializeQuotationError = MaterializeQuotationErrors[keyof MaterializeQuotationErrors];
 
-export type MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostResponses = {
+export type MaterializeQuotationResponses = {
     /**
      * Successful Response
      */
     200: AnalysisTaskActionResponse;
 };
 
-export type MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostResponse = MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostResponses[keyof MaterializeQuotationApiWorkspacesNodesNodeIdQuotationMaterializePostResponses];
+export type MaterializeQuotationResponse = MaterializeQuotationResponses[keyof MaterializeQuotationResponses];
 
-export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostData = {
+export type RedoNodeOperationData = {
     body?: never;
     headers?: {
         /**
@@ -8079,25 +8369,25 @@ export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostData = {
     url: '/api/workspaces/nodes/{node_id}/redo';
 };
 
-export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostErrors = {
+export type RedoNodeOperationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostError = RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostErrors[keyof RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostErrors];
+export type RedoNodeOperationError = RedoNodeOperationErrors[keyof RedoNodeOperationErrors];
 
-export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostResponses = {
+export type RedoNodeOperationResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostResponse = RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostResponses[keyof RedoNodeOperationApiWorkspacesNodesNodeIdRedoPostResponses];
+export type RedoNodeOperationResponse = RedoNodeOperationResponses[keyof RedoNodeOperationResponses];
 
-export type ReplaceApplyApiWorkspacesNodesNodeIdReplacePostData = {
+export type ReplaceApplyData = {
     body: ReplaceRequest;
     headers?: {
         /**
@@ -8115,25 +8405,25 @@ export type ReplaceApplyApiWorkspacesNodesNodeIdReplacePostData = {
     url: '/api/workspaces/nodes/{node_id}/replace';
 };
 
-export type ReplaceApplyApiWorkspacesNodesNodeIdReplacePostErrors = {
+export type ReplaceApplyErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ReplaceApplyApiWorkspacesNodesNodeIdReplacePostError = ReplaceApplyApiWorkspacesNodesNodeIdReplacePostErrors[keyof ReplaceApplyApiWorkspacesNodesNodeIdReplacePostErrors];
+export type ReplaceApplyError = ReplaceApplyErrors[keyof ReplaceApplyErrors];
 
-export type ReplaceApplyApiWorkspacesNodesNodeIdReplacePostResponses = {
+export type ReplaceApplyResponses = {
     /**
      * Successful Response
      */
     200: ReplaceApplyResponse;
 };
 
-export type ReplaceApplyApiWorkspacesNodesNodeIdReplacePostResponse = ReplaceApplyApiWorkspacesNodesNodeIdReplacePostResponses[keyof ReplaceApplyApiWorkspacesNodesNodeIdReplacePostResponses];
+export type ReplaceApplyResponse2 = ReplaceApplyResponses[keyof ReplaceApplyResponses];
 
-export type ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostData = {
+export type ReplacePreviewData = {
     body: ReplaceRequest;
     headers?: {
         /**
@@ -8160,25 +8450,25 @@ export type ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostData = {
     url: '/api/workspaces/nodes/{node_id}/replace/preview';
 };
 
-export type ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostErrors = {
+export type ReplacePreviewErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostError = ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostErrors[keyof ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostErrors];
+export type ReplacePreviewError = ReplacePreviewErrors[keyof ReplacePreviewErrors];
 
-export type ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostResponses = {
+export type ReplacePreviewResponses = {
     /**
      * Successful Response
      */
     200: FilterPreviewResponse;
 };
 
-export type ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostResponse = ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostResponses[keyof ReplacePreviewApiWorkspacesNodesNodeIdReplacePreviewPostResponses];
+export type ReplacePreviewResponse = ReplacePreviewResponses[keyof ReplacePreviewResponses];
 
-export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostData = {
+export type RunSequentialAnalysisData = {
     body: SequentialAnalysisRequestInput;
     headers?: {
         /**
@@ -8196,25 +8486,25 @@ export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostD
     url: '/api/workspaces/nodes/{node_id}/sequential-analysis';
 };
 
-export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostErrors = {
+export type RunSequentialAnalysisErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostError = RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostErrors[keyof RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostErrors];
+export type RunSequentialAnalysisError = RunSequentialAnalysisErrors[keyof RunSequentialAnalysisErrors];
 
-export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostResponses = {
+export type RunSequentialAnalysisResponses = {
     /**
      * Successful Response
      */
     200: SequentialAnalysisResponse;
 };
 
-export type RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostResponse = RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostResponses[keyof RunSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPostResponses];
+export type RunSequentialAnalysisResponse = RunSequentialAnalysisResponses[keyof RunSequentialAnalysisResponses];
 
-export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostData = {
+export type PreviewSequentialAnalysisData = {
     body: SequentialAnalysisRequestInput;
     headers?: {
         /**
@@ -8239,25 +8529,25 @@ export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisP
     url: '/api/workspaces/nodes/{node_id}/sequential-analysis/preview';
 };
 
-export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostErrors = {
+export type PreviewSequentialAnalysisErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostError = PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostErrors[keyof PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostErrors];
+export type PreviewSequentialAnalysisError = PreviewSequentialAnalysisErrors[keyof PreviewSequentialAnalysisErrors];
 
-export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostResponses = {
+export type PreviewSequentialAnalysisResponses = {
     /**
      * Successful Response
      */
     200: SequentialAnalysisPreviewResponse;
 };
 
-export type PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostResponse = PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostResponses[keyof PreviewSequentialAnalysisApiWorkspacesNodesNodeIdSequentialAnalysisPreviewPostResponses];
+export type PreviewSequentialAnalysisResponse = PreviewSequentialAnalysisResponses[keyof PreviewSequentialAnalysisResponses];
 
-export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetData = {
+export type GetNodeShapeData = {
     body?: never;
     headers?: {
         /**
@@ -8275,25 +8565,25 @@ export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetData = {
     url: '/api/workspaces/nodes/{node_id}/shape';
 };
 
-export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetErrors = {
+export type GetNodeShapeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetError = GetNodeShapeApiWorkspacesNodesNodeIdShapeGetErrors[keyof GetNodeShapeApiWorkspacesNodesNodeIdShapeGetErrors];
+export type GetNodeShapeError = GetNodeShapeErrors[keyof GetNodeShapeErrors];
 
-export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetResponses = {
+export type GetNodeShapeResponses = {
     /**
      * Successful Response
      */
     200: NodeShapeResponse;
 };
 
-export type GetNodeShapeApiWorkspacesNodesNodeIdShapeGetResponse = GetNodeShapeApiWorkspacesNodesNodeIdShapeGetResponses[keyof GetNodeShapeApiWorkspacesNodesNodeIdShapeGetResponses];
+export type GetNodeShapeResponse = GetNodeShapeResponses[keyof GetNodeShapeResponses];
 
-export type SliceNodeApiWorkspacesNodesNodeIdSlicePostData = {
+export type SliceNodeData = {
     body: SliceRequest;
     headers?: {
         /**
@@ -8311,25 +8601,25 @@ export type SliceNodeApiWorkspacesNodesNodeIdSlicePostData = {
     url: '/api/workspaces/nodes/{node_id}/slice';
 };
 
-export type SliceNodeApiWorkspacesNodesNodeIdSlicePostErrors = {
+export type SliceNodeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SliceNodeApiWorkspacesNodesNodeIdSlicePostError = SliceNodeApiWorkspacesNodesNodeIdSlicePostErrors[keyof SliceNodeApiWorkspacesNodesNodeIdSlicePostErrors];
+export type SliceNodeError = SliceNodeErrors[keyof SliceNodeErrors];
 
-export type SliceNodeApiWorkspacesNodesNodeIdSlicePostResponses = {
+export type SliceNodeResponses = {
     /**
      * Successful Response
      */
     200: NodeOperationResponse;
 };
 
-export type SliceNodeApiWorkspacesNodesNodeIdSlicePostResponse = SliceNodeApiWorkspacesNodesNodeIdSlicePostResponses[keyof SliceNodeApiWorkspacesNodesNodeIdSlicePostResponses];
+export type SliceNodeResponse = SliceNodeResponses[keyof SliceNodeResponses];
 
-export type SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostData = {
+export type SlicePreviewData = {
     body: SliceRequest;
     headers?: {
         /**
@@ -8356,25 +8646,25 @@ export type SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostData = {
     url: '/api/workspaces/nodes/{node_id}/slice/preview';
 };
 
-export type SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostErrors = {
+export type SlicePreviewErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostError = SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostErrors[keyof SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostErrors];
+export type SlicePreviewError = SlicePreviewErrors[keyof SlicePreviewErrors];
 
-export type SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostResponses = {
+export type SlicePreviewResponses = {
     /**
      * Successful Response
      */
     200: FilterPreviewResponse;
 };
 
-export type SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostResponse = SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostResponses[keyof SlicePreviewApiWorkspacesNodesNodeIdSlicePreviewPostResponses];
+export type SlicePreviewResponse = SlicePreviewResponses[keyof SlicePreviewResponses];
 
-export type CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostData = {
+export type CreateTokenizationData = {
     body: TokeniseColumnRequest;
     headers?: {
         /**
@@ -8392,25 +8682,25 @@ export type CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostData = {
     url: '/api/workspaces/nodes/{node_id}/tokenization';
 };
 
-export type CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostErrors = {
+export type CreateTokenizationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostError = CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostErrors[keyof CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostErrors];
+export type CreateTokenizationError = CreateTokenizationErrors[keyof CreateTokenizationErrors];
 
-export type CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostResponses = {
+export type CreateTokenizationResponses = {
     /**
      * Successful Response
      */
     200: TokeniseColumnResponse;
 };
 
-export type CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostResponse = CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostResponses[keyof CreateTokenizationApiWorkspacesNodesNodeIdTokenizationPostResponses];
+export type CreateTokenizationResponse = CreateTokenizationResponses[keyof CreateTokenizationResponses];
 
-export type UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostData = {
+export type UndoNodeOperationData = {
     body?: never;
     headers?: {
         /**
@@ -8428,25 +8718,25 @@ export type UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostData = {
     url: '/api/workspaces/nodes/{node_id}/undo';
 };
 
-export type UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostErrors = {
+export type UndoNodeOperationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostError = UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostErrors[keyof UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostErrors];
+export type UndoNodeOperationError = UndoNodeOperationErrors[keyof UndoNodeOperationErrors];
 
-export type UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostResponses = {
+export type UndoNodeOperationResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostResponse = UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostResponses[keyof UndoNodeOperationApiWorkspacesNodesNodeIdUndoPostResponses];
+export type UndoNodeOperationResponse = UndoNodeOperationResponses[keyof UndoNodeOperationResponses];
 
-export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetData = {
+export type QuotationCurrentTasksData = {
     body?: never;
     headers?: {
         /**
@@ -8459,25 +8749,25 @@ export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetData = {
     url: '/api/workspaces/quotation/tasks/current';
 };
 
-export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetErrors = {
+export type QuotationCurrentTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetError = QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetErrors[keyof QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetErrors];
+export type QuotationCurrentTasksError = QuotationCurrentTasksErrors[keyof QuotationCurrentTasksErrors];
 
-export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetResponses = {
+export type QuotationCurrentTasksResponses = {
     /**
      * Successful Response
      */
     200: CurrentAnalysisTasksResponse;
 };
 
-export type QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetResponse = QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetResponses[keyof QuotationCurrentTasksApiWorkspacesQuotationTasksCurrentGetResponses];
+export type QuotationCurrentTasksResponse = QuotationCurrentTasksResponses[keyof QuotationCurrentTasksResponses];
 
-export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetData = {
+export type QuotationTaskRequestData = {
     body?: never;
     headers?: {
         /**
@@ -8495,25 +8785,25 @@ export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetData 
     url: '/api/workspaces/quotation/tasks/{task_id}/request';
 };
 
-export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetErrors = {
+export type QuotationTaskRequestErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetError = QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetErrors[keyof QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetErrors];
+export type QuotationTaskRequestError = QuotationTaskRequestErrors[keyof QuotationTaskRequestErrors];
 
-export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetResponses = {
+export type QuotationTaskRequestResponses = {
     /**
      * Successful Response
      */
     200: QuotationRequestOutput;
 };
 
-export type QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetResponse = QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetResponses[keyof QuotationTaskRequestApiWorkspacesQuotationTasksTaskIdRequestGetResponses];
+export type QuotationTaskRequestResponse = QuotationTaskRequestResponses[keyof QuotationTaskRequestResponses];
 
-export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetData = {
+export type QuotationTaskResultData = {
     body?: never;
     headers?: {
         /**
@@ -8548,27 +8838,27 @@ export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetData = 
     url: '/api/workspaces/quotation/tasks/{task_id}/result';
 };
 
-export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetErrors = {
+export type QuotationTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetError = QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetErrors[keyof QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetErrors];
+export type QuotationTaskResultError = QuotationTaskResultErrors[keyof QuotationTaskResultErrors];
 
-export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetResponses = {
+export type QuotationTaskResultResponses = {
     /**
-     * Response Quotation Task Result Api Workspaces Quotation Tasks  Task Id  Result Get
+     * Response Quotation Task Result
      *
      * Successful Response
      */
     200: QuotationAnalysisResponse | null;
 };
 
-export type QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetResponse = QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetResponses[keyof QuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultGetResponses];
+export type QuotationTaskResultResponse = QuotationTaskResultResponses[keyof QuotationTaskResultResponses];
 
-export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostData = {
+export type UpdateQuotationTaskResultData = {
     body: QuotationResultQuery;
     headers?: {
         /**
@@ -8586,27 +8876,27 @@ export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPost
     url: '/api/workspaces/quotation/tasks/{task_id}/result';
 };
 
-export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostErrors = {
+export type UpdateQuotationTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostError = UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostErrors[keyof UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostErrors];
+export type UpdateQuotationTaskResultError = UpdateQuotationTaskResultErrors[keyof UpdateQuotationTaskResultErrors];
 
-export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostResponses = {
+export type UpdateQuotationTaskResultResponses = {
     /**
-     * Response Update Quotation Task Result Api Workspaces Quotation Tasks  Task Id  Result Post
+     * Response Update Quotation Task Result
      *
      * Successful Response
      */
     200: QuotationAnalysisResponse | QuotationPreferenceUpdateResponse;
 };
 
-export type UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostResponse = UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostResponses[keyof UpdateQuotationTaskResultApiWorkspacesQuotationTasksTaskIdResultPostResponses];
+export type UpdateQuotationTaskResultResponse = UpdateQuotationTaskResultResponses[keyof UpdateQuotationTaskResultResponses];
 
-export type SaveWorkspaceApiWorkspacesSavePostData = {
+export type SaveWorkspaceData = {
     body?: never;
     headers?: {
         /**
@@ -8619,25 +8909,25 @@ export type SaveWorkspaceApiWorkspacesSavePostData = {
     url: '/api/workspaces/save';
 };
 
-export type SaveWorkspaceApiWorkspacesSavePostErrors = {
+export type SaveWorkspaceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SaveWorkspaceApiWorkspacesSavePostError = SaveWorkspaceApiWorkspacesSavePostErrors[keyof SaveWorkspaceApiWorkspacesSavePostErrors];
+export type SaveWorkspaceError = SaveWorkspaceErrors[keyof SaveWorkspaceErrors];
 
-export type SaveWorkspaceApiWorkspacesSavePostResponses = {
+export type SaveWorkspaceResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceActionResponse;
 };
 
-export type SaveWorkspaceApiWorkspacesSavePostResponse = SaveWorkspaceApiWorkspacesSavePostResponses[keyof SaveWorkspaceApiWorkspacesSavePostResponses];
+export type SaveWorkspaceResponse = SaveWorkspaceResponses[keyof SaveWorkspaceResponses];
 
-export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetData = {
+export type SequentialAnalysisCurrentTasksData = {
     body?: never;
     headers?: {
         /**
@@ -8650,25 +8940,25 @@ export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCu
     url: '/api/workspaces/sequential-analysis/tasks/current';
 };
 
-export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetErrors = {
+export type SequentialAnalysisCurrentTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetError = SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetErrors[keyof SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetErrors];
+export type SequentialAnalysisCurrentTasksError = SequentialAnalysisCurrentTasksErrors[keyof SequentialAnalysisCurrentTasksErrors];
 
-export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetResponses = {
+export type SequentialAnalysisCurrentTasksResponses = {
     /**
      * Successful Response
      */
     200: CurrentAnalysisTasksResponse;
 };
 
-export type SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetResponse = SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetResponses[keyof SequentialAnalysisCurrentTasksApiWorkspacesSequentialAnalysisTasksCurrentGetResponses];
+export type SequentialAnalysisCurrentTasksResponse = SequentialAnalysisCurrentTasksResponses[keyof SequentialAnalysisCurrentTasksResponses];
 
-export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostData = {
+export type DetachSequentialAnalysisTaskData = {
     body: SequentialAnalysisDetachRequest;
     headers?: {
         /**
@@ -8686,25 +8976,25 @@ export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTask
     url: '/api/workspaces/sequential-analysis/tasks/{task_id}/detach';
 };
 
-export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostErrors = {
+export type DetachSequentialAnalysisTaskErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostError = DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostErrors[keyof DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostErrors];
+export type DetachSequentialAnalysisTaskError = DetachSequentialAnalysisTaskErrors[keyof DetachSequentialAnalysisTaskErrors];
 
-export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostResponses = {
+export type DetachSequentialAnalysisTaskResponses = {
     /**
      * Successful Response
      */
     200: SequentialAnalysisDetachResponse;
 };
 
-export type DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostResponse = DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostResponses[keyof DetachSequentialAnalysisTaskApiWorkspacesSequentialAnalysisTasksTaskIdDetachPostResponses];
+export type DetachSequentialAnalysisTaskResponse = DetachSequentialAnalysisTaskResponses[keyof DetachSequentialAnalysisTaskResponses];
 
-export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetData = {
+export type SequentialAnalysisTaskRequestData = {
     body?: never;
     headers?: {
         /**
@@ -8722,25 +9012,25 @@ export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTas
     url: '/api/workspaces/sequential-analysis/tasks/{task_id}/request';
 };
 
-export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetErrors = {
+export type SequentialAnalysisTaskRequestErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetError = SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetErrors[keyof SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetErrors];
+export type SequentialAnalysisTaskRequestError = SequentialAnalysisTaskRequestErrors[keyof SequentialAnalysisTaskRequestErrors];
 
-export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetResponses = {
+export type SequentialAnalysisTaskRequestResponses = {
     /**
      * Successful Response
      */
     200: SequentialAnalysisRequestOutput;
 };
 
-export type SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetResponse = SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetResponses[keyof SequentialAnalysisTaskRequestApiWorkspacesSequentialAnalysisTasksTaskIdRequestGetResponses];
+export type SequentialAnalysisTaskRequestResponse = SequentialAnalysisTaskRequestResponses[keyof SequentialAnalysisTaskRequestResponses];
 
-export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetData = {
+export type SequentialAnalysisTaskResultData = {
     body?: never;
     headers?: {
         /**
@@ -8758,25 +9048,25 @@ export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTask
     url: '/api/workspaces/sequential-analysis/tasks/{task_id}/result';
 };
 
-export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetErrors = {
+export type SequentialAnalysisTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetError = SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetErrors[keyof SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetErrors];
+export type SequentialAnalysisTaskResultError = SequentialAnalysisTaskResultErrors[keyof SequentialAnalysisTaskResultErrors];
 
-export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetResponses = {
+export type SequentialAnalysisTaskResultResponses = {
     /**
      * Successful Response
      */
     200: SequentialAnalysisResponse;
 };
 
-export type SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetResponse = SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetResponses[keyof SequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultGetResponses];
+export type SequentialAnalysisTaskResultResponse = SequentialAnalysisTaskResultResponses[keyof SequentialAnalysisTaskResultResponses];
 
-export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostData = {
+export type UpdateSequentialAnalysisTaskResultData = {
     /**
      * Updates
      */
@@ -8797,25 +9087,25 @@ export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTas
     url: '/api/workspaces/sequential-analysis/tasks/{task_id}/result';
 };
 
-export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostErrors = {
+export type UpdateSequentialAnalysisTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostError = UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostErrors[keyof UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostErrors];
+export type UpdateSequentialAnalysisTaskResultError = UpdateSequentialAnalysisTaskResultErrors[keyof UpdateSequentialAnalysisTaskResultErrors];
 
-export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostResponses = {
+export type UpdateSequentialAnalysisTaskResultResponses = {
     /**
      * Successful Response
      */
     200: SequentialAnalysisPreferenceUpdateResponse;
 };
 
-export type UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostResponse = UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostResponses[keyof UpdateSequentialAnalysisTaskResultApiWorkspacesSequentialAnalysisTasksTaskIdResultPostResponses];
+export type UpdateSequentialAnalysisTaskResultResponse = UpdateSequentialAnalysisTaskResultResponses[keyof UpdateSequentialAnalysisTaskResultResponses];
 
-export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteData = {
+export type ClearTokenFrequenciesData = {
     body?: never;
     headers?: {
         /**
@@ -8828,25 +9118,25 @@ export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteData = {
     url: '/api/workspaces/token-frequencies';
 };
 
-export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteErrors = {
+export type ClearTokenFrequenciesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteError = ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteErrors[keyof ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteErrors];
+export type ClearTokenFrequenciesError = ClearTokenFrequenciesErrors[keyof ClearTokenFrequenciesErrors];
 
-export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponses = {
+export type ClearTokenFrequenciesResponses = {
     /**
      * Successful Response
      */
     200: AnalysisClearResponse;
 };
 
-export type ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponse = ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponses[keyof ClearTokenFrequenciesApiWorkspacesTokenFrequenciesDeleteResponses];
+export type ClearTokenFrequenciesResponse = ClearTokenFrequenciesResponses[keyof ClearTokenFrequenciesResponses];
 
-export type CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostData = {
+export type CalculateTokenFrequenciesData = {
     body: TokenFrequencyRequestInput;
     headers?: {
         /**
@@ -8859,25 +9149,25 @@ export type CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostData = {
     url: '/api/workspaces/token-frequencies';
 };
 
-export type CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostErrors = {
+export type CalculateTokenFrequenciesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostError = CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostErrors[keyof CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostErrors];
+export type CalculateTokenFrequenciesError = CalculateTokenFrequenciesErrors[keyof CalculateTokenFrequenciesErrors];
 
-export type CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostResponses = {
+export type CalculateTokenFrequenciesResponses = {
     /**
      * Successful Response
      */
     200: TokenFrequencyResponse;
 };
 
-export type CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostResponse = CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostResponses[keyof CalculateTokenFrequenciesApiWorkspacesTokenFrequenciesPostResponses];
+export type CalculateTokenFrequenciesResponse = CalculateTokenFrequenciesResponses[keyof CalculateTokenFrequenciesResponses];
 
-export type TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetData = {
+export type TokenFrequenciesCurrentTasksData = {
     body?: never;
     headers?: {
         /**
@@ -8890,25 +9180,25 @@ export type TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurren
     url: '/api/workspaces/token-frequencies/tasks/current';
 };
 
-export type TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetErrors = {
+export type TokenFrequenciesCurrentTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetError = TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetErrors[keyof TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetErrors];
+export type TokenFrequenciesCurrentTasksError = TokenFrequenciesCurrentTasksErrors[keyof TokenFrequenciesCurrentTasksErrors];
 
-export type TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetResponses = {
+export type TokenFrequenciesCurrentTasksResponses = {
     /**
      * Successful Response
      */
     200: CurrentAnalysisTasksResponse;
 };
 
-export type TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetResponse = TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetResponses[keyof TokenFrequenciesCurrentTasksApiWorkspacesTokenFrequenciesTasksCurrentGetResponses];
+export type TokenFrequenciesCurrentTasksResponse = TokenFrequenciesCurrentTasksResponses[keyof TokenFrequenciesCurrentTasksResponses];
 
-export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetData = {
+export type TokenFrequenciesTaskRequestData = {
     body?: never;
     headers?: {
         /**
@@ -8926,25 +9216,25 @@ export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdR
     url: '/api/workspaces/token-frequencies/tasks/{task_id}/request';
 };
 
-export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetErrors = {
+export type TokenFrequenciesTaskRequestErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetError = TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetErrors[keyof TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetErrors];
+export type TokenFrequenciesTaskRequestError = TokenFrequenciesTaskRequestErrors[keyof TokenFrequenciesTaskRequestErrors];
 
-export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetResponses = {
+export type TokenFrequenciesTaskRequestResponses = {
     /**
      * Successful Response
      */
     200: TokenFrequencyRequestOutput;
 };
 
-export type TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetResponse = TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetResponses[keyof TokenFrequenciesTaskRequestApiWorkspacesTokenFrequenciesTasksTaskIdRequestGetResponses];
+export type TokenFrequenciesTaskRequestResponse = TokenFrequenciesTaskRequestResponses[keyof TokenFrequenciesTaskRequestResponses];
 
-export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetData = {
+export type TokenFrequenciesTaskResultData = {
     body?: never;
     headers?: {
         /**
@@ -8962,27 +9252,27 @@ export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdRe
     url: '/api/workspaces/token-frequencies/tasks/{task_id}/result';
 };
 
-export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetErrors = {
+export type TokenFrequenciesTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetError = TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetErrors[keyof TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetErrors];
+export type TokenFrequenciesTaskResultError = TokenFrequenciesTaskResultErrors[keyof TokenFrequenciesTaskResultErrors];
 
-export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetResponses = {
+export type TokenFrequenciesTaskResultResponses = {
     /**
-     * Response Token Frequencies Task Result Api Workspaces Token Frequencies Tasks  Task Id  Result Get
+     * Response Token Frequencies Task Result
      *
      * Successful Response
      */
     200: TokenFrequencyResponse | null;
 };
 
-export type TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetResponse = TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetResponses[keyof TokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultGetResponses];
+export type TokenFrequenciesTaskResultResponse = TokenFrequenciesTaskResultResponses[keyof TokenFrequenciesTaskResultResponses];
 
-export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostData = {
+export type UpdateTokenFrequenciesTaskResultData = {
     /**
      * Updates
      */
@@ -9003,25 +9293,25 @@ export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTa
     url: '/api/workspaces/token-frequencies/tasks/{task_id}/result';
 };
 
-export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostErrors = {
+export type UpdateTokenFrequenciesTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostError = UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostErrors[keyof UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostErrors];
+export type UpdateTokenFrequenciesTaskResultError = UpdateTokenFrequenciesTaskResultErrors[keyof UpdateTokenFrequenciesTaskResultErrors];
 
-export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostResponses = {
+export type UpdateTokenFrequenciesTaskResultResponses = {
     /**
      * Successful Response
      */
     200: AnalysisClearResponse;
 };
 
-export type UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostResponse = UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostResponses[keyof UpdateTokenFrequenciesTaskResultApiWorkspacesTokenFrequenciesTasksTaskIdResultPostResponses];
+export type UpdateTokenFrequenciesTaskResultResponse = UpdateTokenFrequenciesTaskResultResponses[keyof UpdateTokenFrequenciesTaskResultResponses];
 
-export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteData = {
+export type ClearTopicModelingResultsData = {
     body?: never;
     headers?: {
         /**
@@ -9034,25 +9324,25 @@ export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteData = {
     url: '/api/workspaces/topic-modeling';
 };
 
-export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteErrors = {
+export type ClearTopicModelingResultsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteError = ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteErrors[keyof ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteErrors];
+export type ClearTopicModelingResultsError = ClearTopicModelingResultsErrors[keyof ClearTopicModelingResultsErrors];
 
-export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteResponses = {
+export type ClearTopicModelingResultsResponses = {
     /**
      * Successful Response
      */
     200: AnalysisClearResponse;
 };
 
-export type ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteResponse = ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteResponses[keyof ClearTopicModelingResultsApiWorkspacesTopicModelingDeleteResponses];
+export type ClearTopicModelingResultsResponse = ClearTopicModelingResultsResponses[keyof ClearTopicModelingResultsResponses];
 
-export type RunTopicModelingApiWorkspacesTopicModelingPostData = {
+export type RunTopicModelingData = {
     body: TopicModelingRequestInput;
     headers?: {
         /**
@@ -9065,25 +9355,25 @@ export type RunTopicModelingApiWorkspacesTopicModelingPostData = {
     url: '/api/workspaces/topic-modeling';
 };
 
-export type RunTopicModelingApiWorkspacesTopicModelingPostErrors = {
+export type RunTopicModelingErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RunTopicModelingApiWorkspacesTopicModelingPostError = RunTopicModelingApiWorkspacesTopicModelingPostErrors[keyof RunTopicModelingApiWorkspacesTopicModelingPostErrors];
+export type RunTopicModelingError = RunTopicModelingErrors[keyof RunTopicModelingErrors];
 
-export type RunTopicModelingApiWorkspacesTopicModelingPostResponses = {
+export type RunTopicModelingResponses = {
     /**
      * Successful Response
      */
     200: TopicModelingResponse;
 };
 
-export type RunTopicModelingApiWorkspacesTopicModelingPostResponse = RunTopicModelingApiWorkspacesTopicModelingPostResponses[keyof RunTopicModelingApiWorkspacesTopicModelingPostResponses];
+export type RunTopicModelingResponse = RunTopicModelingResponses[keyof RunTopicModelingResponses];
 
-export type ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteData = {
+export type ClearTopicModelingEmbeddingCacheData = {
     body?: never;
     headers?: {
         /**
@@ -9096,25 +9386,25 @@ export type ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingC
     url: '/api/workspaces/topic-modeling/embedding-cache';
 };
 
-export type ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteErrors = {
+export type ClearTopicModelingEmbeddingCacheErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteError = ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteErrors[keyof ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteErrors];
+export type ClearTopicModelingEmbeddingCacheError = ClearTopicModelingEmbeddingCacheErrors[keyof ClearTopicModelingEmbeddingCacheErrors];
 
-export type ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteResponses = {
+export type ClearTopicModelingEmbeddingCacheResponses = {
     /**
      * Successful Response
      */
     200: TopicModelingEmbeddingCacheClearResponse;
 };
 
-export type ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteResponse = ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteResponses[keyof ClearTopicModelingEmbeddingCacheApiWorkspacesTopicModelingEmbeddingCacheDeleteResponses];
+export type ClearTopicModelingEmbeddingCacheResponse = ClearTopicModelingEmbeddingCacheResponses[keyof ClearTopicModelingEmbeddingCacheResponses];
 
-export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetData = {
+export type GetTopicModelingEmbeddingCacheSizeData = {
     body?: never;
     headers?: {
         /**
@@ -9127,25 +9417,25 @@ export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddin
     url: '/api/workspaces/topic-modeling/embedding-cache/size';
 };
 
-export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetErrors = {
+export type GetTopicModelingEmbeddingCacheSizeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetError = GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetErrors[keyof GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetErrors];
+export type GetTopicModelingEmbeddingCacheSizeError = GetTopicModelingEmbeddingCacheSizeErrors[keyof GetTopicModelingEmbeddingCacheSizeErrors];
 
-export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetResponses = {
+export type GetTopicModelingEmbeddingCacheSizeResponses = {
     /**
      * Successful Response
      */
     200: TopicModelingEmbeddingCacheSizeResponse;
 };
 
-export type GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetResponse = GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetResponses[keyof GetTopicModelingEmbeddingCacheSizeApiWorkspacesTopicModelingEmbeddingCacheSizeGetResponses];
+export type GetTopicModelingEmbeddingCacheSizeResponse = GetTopicModelingEmbeddingCacheSizeResponses[keyof GetTopicModelingEmbeddingCacheSizeResponses];
 
-export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetData = {
+export type TopicModelingCurrentTasksData = {
     body?: never;
     headers?: {
         /**
@@ -9158,25 +9448,25 @@ export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetDa
     url: '/api/workspaces/topic-modeling/tasks/current';
 };
 
-export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetErrors = {
+export type TopicModelingCurrentTasksErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetError = TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetErrors[keyof TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetErrors];
+export type TopicModelingCurrentTasksError = TopicModelingCurrentTasksErrors[keyof TopicModelingCurrentTasksErrors];
 
-export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetResponses = {
+export type TopicModelingCurrentTasksResponses = {
     /**
      * Successful Response
      */
     200: CurrentAnalysisTasksResponse;
 };
 
-export type TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetResponse = TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetResponses[keyof TopicModelingCurrentTasksApiWorkspacesTopicModelingTasksCurrentGetResponses];
+export type TopicModelingCurrentTasksResponse = TopicModelingCurrentTasksResponses[keyof TopicModelingCurrentTasksResponses];
 
-export type DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostData = {
+export type DetachTopicModelingData = {
     body: TopicModelingDetachRequest;
     headers?: {
         /**
@@ -9194,25 +9484,25 @@ export type DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostDa
     url: '/api/workspaces/topic-modeling/tasks/{task_id}/detach';
 };
 
-export type DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostErrors = {
+export type DetachTopicModelingErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostError = DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostErrors[keyof DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostErrors];
+export type DetachTopicModelingError = DetachTopicModelingErrors[keyof DetachTopicModelingErrors];
 
-export type DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostResponses = {
+export type DetachTopicModelingResponses = {
     /**
      * Successful Response
      */
     200: TopicModelingDetachResponse;
 };
 
-export type DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostResponse = DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostResponses[keyof DetachTopicModelingApiWorkspacesTopicModelingTasksTaskIdDetachPostResponses];
+export type DetachTopicModelingResponse = DetachTopicModelingResponses[keyof DetachTopicModelingResponses];
 
-export type TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetData = {
+export type TopicModelingDetachOptionsData = {
     body?: never;
     headers?: {
         /**
@@ -9230,25 +9520,25 @@ export type TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetac
     url: '/api/workspaces/topic-modeling/tasks/{task_id}/detach-options';
 };
 
-export type TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetErrors = {
+export type TopicModelingDetachOptionsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetError = TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetErrors[keyof TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetErrors];
+export type TopicModelingDetachOptionsError = TopicModelingDetachOptionsErrors[keyof TopicModelingDetachOptionsErrors];
 
-export type TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetResponses = {
+export type TopicModelingDetachOptionsResponses = {
     /**
      * Successful Response
      */
     200: TopicModelingDetachOptionsResponse;
 };
 
-export type TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetResponse = TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetResponses[keyof TopicModelingDetachOptionsApiWorkspacesTopicModelingTasksTaskIdDetachOptionsGetResponses];
+export type TopicModelingDetachOptionsResponse2 = TopicModelingDetachOptionsResponses[keyof TopicModelingDetachOptionsResponses];
 
-export type TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetData = {
+export type TopicModelingTaskRequestData = {
     body?: never;
     headers?: {
         /**
@@ -9266,25 +9556,25 @@ export type TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequest
     url: '/api/workspaces/topic-modeling/tasks/{task_id}/request';
 };
 
-export type TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetErrors = {
+export type TopicModelingTaskRequestErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetError = TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetErrors[keyof TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetErrors];
+export type TopicModelingTaskRequestError = TopicModelingTaskRequestErrors[keyof TopicModelingTaskRequestErrors];
 
-export type TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetResponses = {
+export type TopicModelingTaskRequestResponses = {
     /**
      * Successful Response
      */
     200: TopicModelingRequestOutput;
 };
 
-export type TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetResponse = TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetResponses[keyof TopicModelingTaskRequestApiWorkspacesTopicModelingTasksTaskIdRequestGetResponses];
+export type TopicModelingTaskRequestResponse = TopicModelingTaskRequestResponses[keyof TopicModelingTaskRequestResponses];
 
-export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetData = {
+export type TopicModelingTaskResultData = {
     body?: never;
     headers?: {
         /**
@@ -9302,25 +9592,25 @@ export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGe
     url: '/api/workspaces/topic-modeling/tasks/{task_id}/result';
 };
 
-export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetErrors = {
+export type TopicModelingTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetError = TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetErrors[keyof TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetErrors];
+export type TopicModelingTaskResultError = TopicModelingTaskResultErrors[keyof TopicModelingTaskResultErrors];
 
-export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetResponses = {
+export type TopicModelingTaskResultResponses = {
     /**
      * Successful Response
      */
     200: TopicModelingResponse;
 };
 
-export type TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetResponse = TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetResponses[keyof TopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultGetResponses];
+export type TopicModelingTaskResultResponse = TopicModelingTaskResultResponses[keyof TopicModelingTaskResultResponses];
 
-export type UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostData = {
+export type UpdateTopicModelingTaskResultData = {
     body: TopicModelingResultUpdateRequest;
     headers?: {
         /**
@@ -9338,25 +9628,25 @@ export type UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdRe
     url: '/api/workspaces/topic-modeling/tasks/{task_id}/result';
 };
 
-export type UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostErrors = {
+export type UpdateTopicModelingTaskResultErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostError = UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostErrors[keyof UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostErrors];
+export type UpdateTopicModelingTaskResultError = UpdateTopicModelingTaskResultErrors[keyof UpdateTopicModelingTaskResultErrors];
 
-export type UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostResponses = {
+export type UpdateTopicModelingTaskResultResponses = {
     /**
      * Successful Response
      */
     200: TopicModelingResponse;
 };
 
-export type UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostResponse = UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostResponses[keyof UpdateTopicModelingTaskResultApiWorkspacesTopicModelingTasksTaskIdResultPostResponses];
+export type UpdateTopicModelingTaskResultResponse = UpdateTopicModelingTaskResultResponses[keyof UpdateTopicModelingTaskResultResponses];
 
-export type UnloadWorkspaceApiWorkspacesUnloadPostData = {
+export type UnloadWorkspaceData = {
     body?: never;
     headers?: {
         /**
@@ -9374,26 +9664,26 @@ export type UnloadWorkspaceApiWorkspacesUnloadPostData = {
     url: '/api/workspaces/unload';
 };
 
-export type UnloadWorkspaceApiWorkspacesUnloadPostErrors = {
+export type UnloadWorkspaceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UnloadWorkspaceApiWorkspacesUnloadPostError = UnloadWorkspaceApiWorkspacesUnloadPostErrors[keyof UnloadWorkspaceApiWorkspacesUnloadPostErrors];
+export type UnloadWorkspaceError = UnloadWorkspaceErrors[keyof UnloadWorkspaceErrors];
 
-export type UnloadWorkspaceApiWorkspacesUnloadPostResponses = {
+export type UnloadWorkspaceResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceActionResponse;
 };
 
-export type UnloadWorkspaceApiWorkspacesUnloadPostResponse = UnloadWorkspaceApiWorkspacesUnloadPostResponses[keyof UnloadWorkspaceApiWorkspacesUnloadPostResponses];
+export type UnloadWorkspaceResponse = UnloadWorkspaceResponses[keyof UnloadWorkspaceResponses];
 
-export type UploadWorkspaceZipApiWorkspacesUploadPostData = {
-    body: BodyUploadWorkspaceZipApiWorkspacesUploadPost;
+export type UploadWorkspaceZipData = {
+    body: BodyUploadWorkspaceZip;
     headers?: {
         /**
          * Authorization
@@ -9405,25 +9695,25 @@ export type UploadWorkspaceZipApiWorkspacesUploadPostData = {
     url: '/api/workspaces/upload';
 };
 
-export type UploadWorkspaceZipApiWorkspacesUploadPostErrors = {
+export type UploadWorkspaceZipErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UploadWorkspaceZipApiWorkspacesUploadPostError = UploadWorkspaceZipApiWorkspacesUploadPostErrors[keyof UploadWorkspaceZipApiWorkspacesUploadPostErrors];
+export type UploadWorkspaceZipError = UploadWorkspaceZipErrors[keyof UploadWorkspaceZipErrors];
 
-export type UploadWorkspaceZipApiWorkspacesUploadPostResponses = {
+export type UploadWorkspaceZipResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceUploadResponse;
 };
 
-export type UploadWorkspaceZipApiWorkspacesUploadPostResponse = UploadWorkspaceZipApiWorkspacesUploadPostResponses[keyof UploadWorkspaceZipApiWorkspacesUploadPostResponses];
+export type UploadWorkspaceZipResponse = UploadWorkspaceZipResponses[keyof UploadWorkspaceZipResponses];
 
-export type GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetData = {
+export type GetWorkspaceUiStateData = {
     body?: never;
     headers?: {
         /**
@@ -9441,35 +9731,26 @@ export type GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetData = {
     url: '/api/workspaces/{workspace_id}/ui-state';
 };
 
-export type GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetErrors = {
+export type GetWorkspaceUiStateErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetError = GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetErrors[keyof GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetErrors];
+export type GetWorkspaceUiStateError = GetWorkspaceUiStateErrors[keyof GetWorkspaceUiStateErrors];
 
-export type GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetResponses = {
+export type GetWorkspaceUiStateResponses = {
     /**
-     * Response Get Workspace Ui State Api Workspaces  Workspace Id  Ui State Get
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: WorkspaceUiState;
 };
 
-export type GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetResponse = GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetResponses[keyof GetWorkspaceUiStateApiWorkspacesWorkspaceIdUiStateGetResponses];
+export type GetWorkspaceUiStateResponse = GetWorkspaceUiStateResponses[keyof GetWorkspaceUiStateResponses];
 
-export type PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutData = {
-    /**
-     * Payload
-     */
-    body?: {
-        [key: string]: unknown;
-    };
+export type PutWorkspaceUiStateData = {
+    body: WorkspaceUiState;
     headers?: {
         /**
          * Authorization
@@ -9486,50 +9767,46 @@ export type PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutData = {
     url: '/api/workspaces/{workspace_id}/ui-state';
 };
 
-export type PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutErrors = {
+export type PutWorkspaceUiStateErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutError = PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutErrors[keyof PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutErrors];
+export type PutWorkspaceUiStateError = PutWorkspaceUiStateErrors[keyof PutWorkspaceUiStateErrors];
 
-export type PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutResponses = {
+export type PutWorkspaceUiStateResponses = {
     /**
-     * Response Put Workspace Ui State Api Workspaces  Workspace Id  Ui State Put
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: WorkspaceUiState;
 };
 
-export type PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutResponse = PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutResponses[keyof PutWorkspaceUiStateApiWorkspacesWorkspaceIdUiStatePutResponses];
+export type PutWorkspaceUiStateResponse = PutWorkspaceUiStateResponses[keyof PutWorkspaceUiStateResponses];
 
-export type HealthCheckHealthGetData = {
+export type HealthCheckData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/health';
 };
 
-export type HealthCheckHealthGetResponses = {
+export type HealthCheckResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type StatusStatusGetData = {
+export type StatusData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/status';
 };
 
-export type StatusStatusGetResponses = {
+export type StatusResponses = {
     /**
      * Successful Response
      */

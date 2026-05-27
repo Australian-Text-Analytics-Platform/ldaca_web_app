@@ -7,7 +7,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from 'react';
-import type { ConcordanceAnalysisResponse, ConcordanceResultQuery } from '@/lib/backend/text';
+import type { ConcordanceAnalysisResponse, ConcordanceResultQuery } from '@/api/generated/types.gen';
 
 type Params = {
   viewMode: 'separated' | 'combined';

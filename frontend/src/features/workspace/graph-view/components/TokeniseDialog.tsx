@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
-import { nodesApi } from '@/lib/backend/nodes';
+import { createTokenization } from '@/api/generated/sdk.gen';
 import { findLanguage, SUPPORTED_LANGUAGES } from '@/lib/languages';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 
@@ -142,15 +142,16 @@ function TokeniseDialogForm({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const result = await nodesApi.tokeniseColumn(
-        nodeId,
-        {
+      const { data: result } = await createTokenization({
+        body: {
           source_column: sourceColumn,
           model: model.trim(),
           language: language || null,
         },
-        getAuthHeaders(),
-      );
+        headers: getAuthHeaders(),
+        path: { node_id: nodeId },
+        throwOnError: true,
+      });
       if (result.is_new) {
         toast.success(`Tokenised "${sourceColumn}" using ${model.trim()}`);
       } else {

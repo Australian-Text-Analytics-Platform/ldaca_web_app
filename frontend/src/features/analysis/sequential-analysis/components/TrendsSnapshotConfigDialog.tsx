@@ -44,8 +44,8 @@ import {
 } from '@/components/ui/select';
 import {
   SNAPSHOT_FINEST_FREQUENCIES,
-} from '@/lib/backend/text';
-import { nodesApi } from '@/lib/backend/nodes';
+} from '../trendsSnapshotConfig';
+import { getColumnUniqueValues } from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 import type { SnapshotToolKey } from '@/features/snapshot-view';
@@ -120,7 +120,7 @@ interface Props {
   availableGroupByColumns: string[];
   /** Workspace + node identifiers — used by the dialog to fetch real
    * unique-value counts for ticked group-by columns via
-   * ``nodesApi.uniqueValues``. The result feeds the estimator's
+  * ``getColumnUniqueValues``. The result feeds the estimator's
    * cardinality product so the row count is accurate within a
    * factor of the time-bucket estimate. Without these the estimator
    * falls back to a flat assumption of 10 distinct values per column. */
@@ -171,7 +171,14 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
   const cardinalityQueries = useQueries({
     queries: config.groupByColumns.map((col) => ({
       queryKey: queryKeys.columnUniqueValues(workspaceId ?? '', nodeId, col),
-      queryFn: () => nodesApi.uniqueValues(nodeId, col, getAuthHeaders()),
+      queryFn: async () => {
+        const { data } = await getColumnUniqueValues({
+          headers: getAuthHeaders(),
+          path: { column_name: col, node_id: nodeId },
+          throwOnError: true,
+        });
+        return data;
+      },
       enabled: Boolean(workspaceId && nodeId && col),
       staleTime: 5 * 60_000,
     })),

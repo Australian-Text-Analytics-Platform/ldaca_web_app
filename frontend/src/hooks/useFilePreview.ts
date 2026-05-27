@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { filesApi } from '../lib/backend/files';
+import { unifiedFilePreview } from '@/api/generated/sdk.gen';
 import { queryKeys } from '../lib/queryKeys';
 import { useAuth } from './useAuth';
 
@@ -25,16 +25,17 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
     queryFn: async () => {
       if (!filename) throw new Error('No filename provided');
       const headers = getAuthHeaders();
-      const response = await filesApi.preview(
-        {
+      const { data } = await unifiedFilePreview({
+        body: {
           filename,
           page,
           page_size: pageSize,
           payload: selectedSheet ? { sheet_name: selectedSheet } : undefined,
         },
-        headers
-      );
-      return response;
+        headers,
+        throwOnError: true,
+      });
+      return data;
     },
     enabled: !!filename && isOpen,
     placeholderData: keepPreviousData,

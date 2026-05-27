@@ -14,9 +14,8 @@
  */
 import { create } from 'zustand';
 
-import { authApi } from '@/lib/backend/auth';
-import { configApi, type ConfigResponse } from '@/lib/backend/config';
-import type { AuthInfoResponse } from '@/types';
+import { getAuthInfo, getConfig, googleAuth, logout as logoutSession } from '@/api/generated/sdk.gen';
+import type { AuthInfoResponse, ConfigResponse } from '@/api/generated/types.gen';
 
 const AUTH_INFO_TIMEOUT_MS = 7000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -95,6 +94,8 @@ const buildAuthHeaders = (): Record<string, string> => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+const timeoutSignal = (timeoutMs: number): AbortSignal => AbortSignal.timeout(timeoutMs);
+
 export const useAuthStore = create<AuthStore>((set, get) => ({
   authInfo: null,
   config: null,
@@ -117,11 +118,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     inFlight = (async () => {
       try {
         if (!get().config) {
-          const config = await configApi.getConfig();
+          const { data: config } = await getConfig({ throwOnError: true });
           set({ config });
         }
 
-        const info = await authApi.info(buildAuthHeaders(), { timeoutMs: AUTH_INFO_TIMEOUT_MS });
+        const { data: info } = await getAuthInfo({
+          headers: buildAuthHeaders(),
+          signal: timeoutSignal(AUTH_INFO_TIMEOUT_MS),
+          throwOnError: true,
+        });
         bootstrapAttempts = 0;
         refreshFailures = 0;
         set({ authInfo: info, phase: { status: 'ready', info } });
@@ -204,7 +209,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
 
     try {
-      const response = await authApi.googleAuth(idToken);
+      const { data: response } = await googleAuth({
+        body: { id_token: idToken },
+        throwOnError: true,
+      });
       persistToken(response.access_token);
       await get().runAuthFetch('bootstrap');
     } catch (error) {
@@ -217,7 +225,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (!get().config?.multi_user_mode) return;
 
     try {
-      await authApi.logout(buildAuthHeaders());
+      await logoutSession({ headers: buildAuthHeaders(), throwOnError: true });
     } catch (err) {
       console.error('Logout error:', err);
     } finally {

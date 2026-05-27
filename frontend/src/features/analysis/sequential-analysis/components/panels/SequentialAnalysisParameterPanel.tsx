@@ -16,10 +16,12 @@ import {
 } from '@/components/ui/select';
 
 import type {
-  SequentialCustomIntervalUnit,
-  SequentialFrequency,
-} from '@/lib/backend/text';
+  SequentialAnalysisRequestInput,
+} from '@/api/generated/types.gen';
 import { UniqueValueCount } from '../UniqueValueCount';
+
+type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
+type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequestInput['custom_interval_unit']>;
 
 interface ColumnLike {
   name: string;

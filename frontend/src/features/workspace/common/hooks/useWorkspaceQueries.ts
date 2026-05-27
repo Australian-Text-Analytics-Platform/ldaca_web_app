@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { workspacesApi } from '@/lib/backend/workspaces';
-import { nodesApi } from '@/lib/backend/nodes';
+import { getCurrentWorkspace, getNodeData, getWorkspaceGraph, listWorkspaces } from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
 import type { GraphNode, NodeDataResponse } from '@/types/api';
 import { type PaginationState } from './types';
@@ -45,14 +44,20 @@ export const useWorkspaceQueries = ({
 }: WorkspaceQueriesParams) => {
   const workspacesQuery = useQuery({
     queryKey: queryKeys.workspaces,
-    queryFn: () => workspacesApi.list(authHeaders),
+    queryFn: async () => {
+      const { data } = await listWorkspaces({ headers: authHeaders, throwOnError: true });
+      return data;
+    },
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
 
   const currentWorkspaceQuery = useQuery({
     queryKey: queryKeys.currentWorkspace,
-    queryFn: () => workspacesApi.current.get(authHeaders),
+    queryFn: async () => {
+      const { data } = await getCurrentWorkspace({ headers: authHeaders, throwOnError: true });
+      return data.id ?? null;
+    },
     enabled: isAuthenticated,
     staleTime: 60 * 1000,
   });
@@ -61,7 +66,10 @@ export const useWorkspaceQueries = ({
     queryKey: currentWorkspaceId
       ? queryKeys.workspaceGraph(currentWorkspaceId)
       : ['workspaces', 'graph'],
-    queryFn: () => workspacesApi.graph(authHeaders),
+    queryFn: async () => {
+      const { data } = await getWorkspaceGraph({ headers: authHeaders, throwOnError: true });
+      return data;
+    },
     enabled: isAuthenticated && !!currentWorkspaceId,
     refetchOnWindowFocus: false,
     staleTime: 30 * 1000,
@@ -81,15 +89,20 @@ export const useWorkspaceQueries = ({
     queryFn: () => {
       if (!currentWorkspaceId || !selectedNodeId) throw new Error('Missing workspace or node ID');
       const { currentPage, pageSize, sortBy, descending, filterColumn, filterValue, filterOp } = getPaginationForNode(selectedNodeId);
-      return nodesApi.data(selectedNodeId, {
-        page: currentPage,
-        pageSize,
-        sortBy,
-        descending,
-        filterColumn,
-        filterValue,
-        filterOp,
-      }, authHeaders);
+      return getNodeData({
+        headers: authHeaders,
+        path: { node_id: selectedNodeId },
+        query: {
+          page: currentPage,
+          page_size: pageSize,
+          sort_by: sortBy ?? undefined,
+          descending: descending ?? false,
+          filter_column: filterColumn ?? undefined,
+          filter_value: filterValue ?? undefined,
+          filter_op: filterOp ?? 'contains',
+        },
+        throwOnError: true,
+      }).then(({ data }) => data);
     },
     enabled: isAuthenticated && !!currentWorkspaceId && !!selectedNodeId,
     staleTime: 30 * 1000,

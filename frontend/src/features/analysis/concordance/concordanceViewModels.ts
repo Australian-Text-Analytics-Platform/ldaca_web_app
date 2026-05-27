@@ -1,12 +1,13 @@
 import type {
   ConcordanceDispersionBinRow,
-  ConcordanceGroupedRow,
-  ConcordanceHitRow,
-} from '@/lib/backend/text';
+} from '@/api/generated/types.gen';
 import {
   CONCORDANCE_COLUMN_KEYS,
   CONCORDANCE_CORE_COLUMNS,
 } from '../generatedColumns';
+
+type ConcordanceHitRow = Record<string, unknown>;
+type ConcordanceGroupedRow = ConcordanceHitRow[];
 
 export type ConcordanceDispersionRow = Record<string, unknown> & {
   CONC_dispersion: ConcordanceGroupedRow;

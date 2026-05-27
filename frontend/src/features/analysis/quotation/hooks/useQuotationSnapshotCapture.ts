@@ -8,12 +8,11 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import { quotationApi } from '@/lib/backend/text/quotation';
+import { updateQuotationTaskResult, uploadSnapshot } from '@/api/generated/sdk.gen';
 import type {
   QuotationAnalysisResponse,
-  QuotationRequest,
-} from '@/lib/backend/text/quotation';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+  QuotationRequestInput,
+} from '@/api/generated/types.gen';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,
@@ -26,6 +25,7 @@ import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelection
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
 const SETTINGS_PAYLOAD_PATH = 'settings.json';
+type QuotationRequest = QuotationRequestInput;
 
 export interface UseQuotationSnapshotCaptureInput {
   workspaceId: string | null;
@@ -141,11 +141,12 @@ export function useQuotationSnapshotCapture(
       // Fetch the full result via the page_size: 'all' path. Backend
       // caps at SNAPSHOT_ALL_PAGE_SIZE_CAP (see
       // backend/api/workspaces/analyses/quotation.py).
-      const fullResult = await quotationApi.postQuotationTaskResult(
-        taskId,
-        { page_size: 'all', update_only: false },
+      const { data: fullResult } = await updateQuotationTaskResult({
+        body: { page_size: 'all', update_only: false },
         headers,
-      );
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
       if (!('columns' in fullResult)) {
         throw captureError(
           'no-result',
@@ -223,11 +224,14 @@ export function useQuotationSnapshotCapture(
       }
       const bundleBytes = await zip.generateAsync({ type: 'uint8array' });
 
-      await snapshotsApi.upload(
-        new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
-        filename,
+      await uploadSnapshot({
+        body: {
+          file: new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
+          filename,
+        },
         headers,
-      );
+        throwOnError: true,
+      });
     },
     [
       workspaceId,

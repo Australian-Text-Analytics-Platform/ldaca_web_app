@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { filesApi } from '../lib/backend/files';
+import { deleteFile, downloadFile, getUserFiles, uploadFile } from '@/api/generated/sdk.gen';
 import { saveBlob } from '../lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '../lib/queryKeys';
@@ -16,7 +16,10 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
 
   const filesQuery = useQuery<FileTreeNode[]>({
     queryKey: queryKeys.files,
-    queryFn: () => filesApi.list(authHeaders),
+    queryFn: async () => {
+      const { data } = await getUserFiles({ headers: authHeaders, throwOnError: true });
+      return data as FileTreeNode[];
+    },
     enabled,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -27,12 +30,16 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const invalidateFiles = () => queryClient.invalidateQueries({ queryKey: queryKeys.files });
 
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => filesApi.upload(file, authHeaders),
+    mutationFn: (file: File) => uploadFile({ body: { file }, headers: authHeaders, throwOnError: true }),
     onSuccess: invalidateFiles,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (filename: string) => filesApi.delete(filename, authHeaders),
+    mutationFn: (filename: string) => deleteFile({
+      headers: authHeaders,
+      path: { filename },
+      throwOnError: true,
+    }),
     onSuccess: invalidateFiles,
   });
 
@@ -63,7 +70,13 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
 
   const handleDownloadFile = async (filename: string) => {
     try {
-      const blob = await filesApi.download(filename, authHeaders);
+      const { data } = await downloadFile({
+        headers: authHeaders,
+        parseAs: 'blob',
+        path: { filename },
+        throwOnError: true,
+      });
+      const blob = data as Blob;
       await saveBlob(new Blob([blob]), filename);
       return true;
     } catch (error) {

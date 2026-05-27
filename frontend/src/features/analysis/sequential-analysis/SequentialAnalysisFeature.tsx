@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import {
+  previewSequentialAnalysis,
+  sequentialAnalysisTaskRequest,
+  sequentialAnalysisTaskResult,
+} from '@/api/generated/sdk.gen';
+import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import { useSchemaManagement } from '@/hooks/useSchemaManagement';
-import {
-  type SequentialCustomIntervalUnit,
-  type SequentialFrequency,
-  textApi,
-} from '@/lib/backend/text';
 import {
   snapshotSourceNodes,
   useSnapshotBackedAnalysisState,
@@ -86,6 +87,8 @@ const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
   'days',
   'weeks',
 ];
+type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
+type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequestInput['custom_interval_unit']>;
 
 const isCustomIntervalUnit = (value: unknown): value is SequentialCustomIntervalUnit =>
   typeof value === 'string' &&
@@ -249,10 +252,22 @@ const SequentialAnalysisFeature = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef,
-    fetchResult: async (taskId, headers) =>
-      textApi.getSequentialAnalysisTaskResult(taskId, headers),
-    fetchRequest: async (taskId, headers) =>
-      textApi.getSequentialAnalysisTaskRequest(taskId, headers),
+    fetchResult: async (taskId, headers) => {
+      const { data } = await sequentialAnalysisTaskResult({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
+    fetchRequest: async (taskId, headers) => {
+      const { data } = await sequentialAnalysisTaskRequest({
+        headers,
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
+      return data;
+    },
     onResultFetched: (resultData) => {
       if (!resultData) return;
       setDetachNodeName('');
@@ -935,7 +950,13 @@ const SequentialAnalysisFeature = () => {
       ?? '';
     if (!nodeId) return 0;
     const req = buildCaptureRequest(activeTimeColumn, derivedColumnType, config);
-    const result = await textApi.sequentialAnalysisPreview(nodeId, req, getAuthHeaders());
+    const { data: result } = await previewSequentialAnalysis({
+      body: req,
+      headers: getAuthHeaders(),
+      path: { node_id: nodeId },
+      query: { include_data: false },
+      throwOnError: true,
+    });
     return typeof result?.total_records === 'number' ? result.total_records : 0;
   };
 

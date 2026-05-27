@@ -9,7 +9,7 @@
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+import { downloadSnapshot } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
@@ -18,9 +18,11 @@ import {
   type LoadedSnapshot,
 } from '@/features/snapshot-view';
 import type {
-  TokenFrequencyRequest,
+  TokenFrequencyRequestInput,
   TokenFrequencyResponse,
-} from '@/lib/backend/text';
+} from '@/api/generated/types.gen';
+
+type TokenFrequencyRequest = TokenFrequencyRequestInput;
 
 /** Token-frequency-specific payload held by ``LoadedSnapshot.payload``.
  *
@@ -52,7 +54,13 @@ export function useTokenFrequencySnapshotLoad(): (filename: string) => Promise<v
   return useCallback(
     async (filename: string): Promise<void> => {
       const headers = getAuthHeaders();
-      const blob = await snapshotsApi.download(filename, headers);
+      const { data } = await downloadSnapshot({
+        headers,
+        parseAs: 'blob',
+        path: { filename },
+        throwOnError: true,
+      });
+      const blob = data as Blob;
       const bytes = new Uint8Array(await blob.arrayBuffer());
 
       const readResult = await readBundle(bytes);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { textApi } from '@/lib/backend/text';
+import { detachSequentialAnalysisTask } from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
 import type { SequentialAnalysisDatum } from './useSequentialAnalysisTaskFlow';
 
@@ -101,15 +101,16 @@ export function useSequentialAnalysisDetach({
 
     setIsDetaching(true);
     try {
-      await textApi.sequentialAnalysisDetach(
-        taskId,
-        {
+      await detachSequentialAnalysisTask({
+        body: {
           selected_periods: selectedPeriods,
           ...(visibleGroups ? { visible_groups: visibleGroups } : {}),
           new_node_name: newNodeName,
         },
-        getAuthHeaders(),
-      );
+        headers: getAuthHeaders(),
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) }),

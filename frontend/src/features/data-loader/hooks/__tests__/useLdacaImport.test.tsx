@@ -1,14 +1,17 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { filesApi, type LdacaSearchResult } from '@/lib/backend/files';
+import {
+  importLdacaDataset,
+  listLdacaFeaturedCollections,
+  searchLdacaCollections,
+} from '@/api/generated/sdk.gen';
+import type { OniSearchResult as LdacaSearchResult } from '@/api/generated/types.gen';
 import { useLdacaImport } from '../useLdacaImport';
 
-vi.mock('@/lib/backend/files', () => ({
-  filesApi: {
-    getLdacaFeatured: vi.fn(),
-    searchLdaca: vi.fn(),
-    importLdaca: vi.fn(),
-  },
+vi.mock('@/api/generated/sdk.gen', () => ({
+  listLdacaFeaturedCollections: vi.fn(),
+  searchLdacaCollections: vi.fn(),
+  importLdacaDataset: vi.fn(),
 }));
 
 const cooeeRecord: LdacaSearchResult = {
@@ -32,20 +35,29 @@ describe('useLdacaImport', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(filesApi.getLdacaFeatured).mockResolvedValue({
-      state: 'successful',
-      data: [cooeeRecord],
-      message: 'loaded',
+    vi.mocked(listLdacaFeaturedCollections).mockResolvedValue({
+      data: {
+        state: 'successful',
+        data: [cooeeRecord],
+        message: 'loaded',
+      },
+      error: undefined,
     });
-    vi.mocked(filesApi.searchLdaca).mockResolvedValue({
-      state: 'successful',
-      data: [cooeeRecord],
-      message: 'searched',
+    vi.mocked(searchLdacaCollections).mockResolvedValue({
+      data: {
+        state: 'successful',
+        data: [cooeeRecord],
+        message: 'searched',
+      },
+      error: undefined,
     });
-    vi.mocked(filesApi.importLdaca).mockResolvedValue({
-      state: 'running',
-      message: 'LDaCA import started',
-      metadata: { task_id: 'task-1' },
+    vi.mocked(importLdacaDataset).mockResolvedValue({
+      data: {
+        state: 'running',
+        message: 'LDaCA import started',
+        metadata: { task_id: 'task-1' },
+      },
+      error: undefined,
     });
   });
 
@@ -57,7 +69,10 @@ describe('useLdacaImport', () => {
     act(() => result.current.setLdacaImportOpen(true));
 
     await waitFor(() => expect(result.current.featuredRecords).toEqual([cooeeRecord]));
-    expect(filesApi.getLdacaFeatured).toHaveBeenCalledWith(authHeaders, ldacaApiToken);
+    expect(listLdacaFeaturedCollections).toHaveBeenCalledWith({
+      headers: { ...authHeaders, 'X-LDACA-API-Token': ldacaApiToken },
+      throwOnError: true,
+    });
   });
 
   it('searches with the selected method and query', async () => {
@@ -75,16 +90,16 @@ describe('useLdacaImport', () => {
       await result.current.handleLdacaSearch();
     });
 
-    expect(filesApi.searchLdaca).toHaveBeenCalledWith(
-      {
+    expect(searchLdacaCollections).toHaveBeenCalledWith({
+      body: {
         method: 'identifier',
         query: 'https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26180~23961609',
         limit: 25,
         offset: 0,
       },
-      authHeaders,
-      ldacaApiToken,
-    );
+      headers: { ...authHeaders, 'X-LDACA-API-Token': ldacaApiToken },
+      throwOnError: true,
+    });
     expect(result.current.searchResults).toEqual([cooeeRecord]);
     expect(result.current.hasSearched).toBe(true);
   });
@@ -99,7 +114,11 @@ describe('useLdacaImport', () => {
       await result.current.handleLdacaImport(cooeeRecord.id);
     });
 
-    expect(filesApi.importLdaca).toHaveBeenCalledWith(cooeeRecord.id, authHeaders, ldacaApiToken);
+    expect(importLdacaDataset).toHaveBeenCalledWith({
+      body: { url: cooeeRecord.id },
+      headers: { ...authHeaders, 'X-LDACA-API-Token': ldacaApiToken },
+      throwOnError: true,
+    });
     expect(notify).toHaveBeenCalledWith('success', 'LDaCA import started');
     expect(refetchFiles).toHaveBeenCalled();
     expect(result.current.ldacaImportOpen).toBe(false);

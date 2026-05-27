@@ -2,11 +2,15 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
 import {
-  textApi,
-  type TopicModelingRequest,
+  detachTopicModeling,
+  runTopicModeling,
+  topicModelingDetachOptions,
+} from '@/api/generated/sdk.gen';
+import {
+  type TopicModelingRequestInput,
   type TopicModelingResponse,
   type TopicModelingDetachRequest,
-} from '@/lib/backend/text';
+} from '@/api/generated/types.gen';
 import { queryKeys } from '@/lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import { useDetachColumnsState } from '@/features/analysis/common/hooks/useDetachColumnsState';
@@ -16,6 +20,7 @@ import { takeMostRecent } from '@/utils/selectionUtils';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 20;
+type TopicModelingRequest = TopicModelingRequestInput;
 
 interface TopicModelingState {
   currentWorkspaceId: string | null;
@@ -167,7 +172,11 @@ export function useTopicModelingTaskFlow({
         /* best effort lock */
       }
 
-      const res = await textApi.topicModeling(req, getAuthHeaders());
+      const { data: res } = await runTopicModeling({
+        body: req,
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
       extractAndSetTaskId(res, setLocalTaskId);
       setResultSafely(res);
 
@@ -196,7 +205,11 @@ export function useTopicModelingTaskFlow({
 
     try {
       setIsDetachLoading(true);
-      const resp = await textApi.getTopicModelingDetachOptions(taskId, getAuthHeaders());
+      const { data: resp } = await topicModelingDetachOptions({
+        headers: getAuthHeaders(),
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
       const nodes = resp?.data?.nodes ?? [];
       setDetachNodeOptions(nodes);
       const initialSelections: Record<string, string[]> = {};
@@ -257,7 +270,12 @@ export function useTopicModelingTaskFlow({
           ? { topic_meanings_override: topicMeaningsOverride }
           : {}),
       };
-      const resp = await textApi.topicModelingDetach(taskId, payload, getAuthHeaders());
+      const { data: resp } = await detachTopicModeling({
+        body: payload,
+        headers: getAuthHeaders(),
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
       if (resp?.state !== 'successful') {
         throw new Error(resp?.message || 'Topic detach failed');
       }

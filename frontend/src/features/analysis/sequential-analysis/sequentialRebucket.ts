@@ -26,7 +26,9 @@
  * No external date library — Date + UTC accessors are sufficient.
  */
 import type { ChartConfig } from '@/components/ui/chart';
-import type { SequentialFrequency } from '@/lib/backend/text';
+import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
+
+type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
 
 export type SnapshotFinestFrequency = Exclude<SequentialFrequency, 'custom'>;
 

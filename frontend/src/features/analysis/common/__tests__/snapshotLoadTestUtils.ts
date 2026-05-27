@@ -2,7 +2,7 @@ import { act } from '@testing-library/react';
 import JSZip from 'jszip';
 import { vi } from 'vitest';
 
-import * as snapshotsApiModule from '@/lib/backend/snapshots';
+import * as generatedSdk from '@/api/generated/sdk.gen';
 import {
   useSnapshotViewStore,
   type SnapshotManifest,
@@ -65,7 +65,11 @@ export async function buildJsonBundleBlob(
 }
 
 export function mockSnapshotDownload() {
-  return vi.spyOn(snapshotsApiModule.snapshotsApi, 'download');
+  const spy = vi.spyOn(generatedSdk, 'downloadSnapshot');
+  const mockResolvedValue = spy.mockResolvedValue.bind(spy);
+  spy.mockResolvedValue = ((value: Blob) =>
+    mockResolvedValue({ data: value, error: undefined })) as unknown as typeof spy.mockResolvedValue;
+  return spy;
 }
 
 export function resetSnapshotStore() {

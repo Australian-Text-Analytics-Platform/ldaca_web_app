@@ -20,8 +20,8 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import { textApi, type SequentialAnalysisRequest } from '@/lib/backend/text';
-import { snapshotsApi } from '@/lib/backend/snapshots';
+import { previewSequentialAnalysis, uploadSnapshot } from '@/api/generated/sdk.gen';
+import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,
@@ -38,6 +38,7 @@ import type { TrendsSnapshotConfig } from '../trendsSnapshotConfig';
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
 const SETTINGS_PAYLOAD_PATH = 'settings.json';
+type SequentialAnalysisRequest = SequentialAnalysisRequestInput;
 
 export interface UseSequentialAnalysisSnapshotCaptureInput {
   workspaceId: string | null;
@@ -183,12 +184,13 @@ export function useSequentialAnalysisSnapshotCapture(
       // stays intact and unmodified.
       const captureRequest = buildCaptureRequest(timeColumn, columnType, config);
       const headers = getAuthHeaders();
-      const captureResult = await textApi.sequentialAnalysisPreview(
-        nodeId,
-        captureRequest,
+      const { data: captureResult } = await previewSequentialAnalysis({
+        body: captureRequest,
         headers,
-        true,
-      );
+        path: { node_id: nodeId },
+        query: { include_data: true },
+        throwOnError: true,
+      });
 
       const capturedRows = Array.isArray(captureResult.data)
         ? (captureResult.data as Array<Record<string, unknown>>).length
@@ -261,11 +263,14 @@ export function useSequentialAnalysisSnapshotCapture(
       }
       const bundleBytes = await zip.generateAsync({ type: 'uint8array' });
 
-      await snapshotsApi.upload(
-        new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
-        filename,
-        getAuthHeaders(),
-      );
+      await uploadSnapshot({
+        body: {
+          file: new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),
+          filename,
+        },
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
     },
     [
       workspaceId,

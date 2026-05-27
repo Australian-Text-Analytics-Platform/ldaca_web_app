@@ -1,23 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { textApi } from '@/lib/backend/text';
 import { queryKeys } from '@/lib/queryKeys';
+import {
+  getAnalysisTaskRequest,
+  getCurrentAnalysisTask,
+  type ServerLockAnalysisType,
+} from '../analysisTasksApi';
 
-export type ServerLockAnalysisType =
-  | 'token_frequencies'
-  | 'quotation_analysis'
-  | 'concordance_analysis'
-  | 'ai_annotation'
-  | 'topic_modeling'
-  | 'sequential_analysis';
-
-const ANALYSIS_REQUEST_FN: Record<ServerLockAnalysisType, (taskId: string, headers: Record<string, string>) => Promise<unknown>> = {
-  token_frequencies: textApi.getTokenFrequenciesTaskRequest,
-  quotation_analysis: textApi.getQuotationTaskRequest,
-  concordance_analysis: textApi.getConcordanceTaskRequest,
-  ai_annotation: textApi.getAiAnnotationTaskRequest,
-  topic_modeling: textApi.getTopicModelingTaskRequest,
-  sequential_analysis: textApi.getSequentialAnalysisTaskRequest,
-};
+export type { ServerLockAnalysisType };
 
 export const analysisServerRequestLockQueryKey = (
   analysisType: ServerLockAnalysisType,
@@ -43,7 +32,7 @@ export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAut
         };
       }
 
-      const current = await textApi.getAnalysisCurrent(analysisType, getAuthHeaders());
+      const current = await getCurrentAnalysisTask(analysisType, getAuthHeaders());
       const taskIds = (current as Record<string, unknown>)?.task_ids;
       const currentTaskId = Array.isArray(taskIds)
         ? taskIds.find((id) => typeof id === 'string' && id.length > 0) ?? null
@@ -53,7 +42,7 @@ export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAut
       let serverRequest: Record<string, unknown> | null = null;
 
       if (currentTaskId) {
-        const request = await ANALYSIS_REQUEST_FN[analysisType](currentTaskId, getAuthHeaders());
+        const request = await getAnalysisTaskRequest(analysisType, currentTaskId, getAuthHeaders());
         serverRequest = request && typeof request === 'object' ? (request as Record<string, unknown>) : null;
       }
 

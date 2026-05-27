@@ -15,7 +15,8 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
-import { snapshotsApi, type SnapshotListItem } from '@/lib/backend/snapshots';
+import { batchDeleteSnapshots, deleteSnapshot, listSnapshots } from '@/api/generated/sdk.gen';
+import type { SnapshotListItem } from '@/api/generated/types.gen';
 import { formatBytes } from '@/lib/utils';
 import { getCurrentAppVersion, isCompatibleSnapshot } from '../compat';
 import type { SnapshotToolKey } from '../types';
@@ -73,7 +74,14 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['snapshots-list', tool],
-    queryFn: () => snapshotsApi.list(tool, getAuthHeaders()),
+    queryFn: async () => {
+      const { data } = await listSnapshots({
+        headers: getAuthHeaders(),
+        query: { tool },
+        throwOnError: true,
+      });
+      return data;
+    },
     enabled: open,
     staleTime: 10_000,
   });
@@ -104,8 +112,14 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
 
   // Per-snapshot delete mutation.
   const deleteOneMutation = useMutation({
-    mutationFn: (filename: string) =>
-      snapshotsApi.deleteOne(filename, getAuthHeaders()),
+    mutationFn: async (filename: string) => {
+      const { data } = await deleteSnapshot({
+        headers: getAuthHeaders(),
+        path: { filename },
+        throwOnError: true,
+      });
+      return data;
+    },
     onSuccess: (_res, filename) => {
       toast.success(`Snapshot deleted.`);
       void queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
@@ -122,12 +136,14 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
   // Batch delete mutation. The variant decides whether to send
   // `incompatible_with` for the stale-only path.
   const deleteBatchMutation = useMutation({
-    mutationFn: ({ variant }: { variant: 'stale' | 'all' }) =>
-      snapshotsApi.deleteBatch(
-        tool,
-        variant === 'stale' ? currentVersion : undefined,
-        getAuthHeaders(),
-      ),
+    mutationFn: async ({ variant }: { variant: 'stale' | 'all' }) => {
+      const { data } = await batchDeleteSnapshots({
+        headers: getAuthHeaders(),
+        query: { tool, incompatible_with: variant === 'stale' ? currentVersion : null },
+        throwOnError: true,
+      });
+      return data;
+    },
     onSuccess: (res) => {
       const n = res.deleted.length;
       toast.success(`Deleted ${n} snapshot${n === 1 ? '' : 's'}.`);

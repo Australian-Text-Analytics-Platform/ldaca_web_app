@@ -1,4 +1,4 @@
-import type { ConcordanceAnalysisRequest } from '@/lib/backend/text';
+import type { ConcordanceAnalysisRequest } from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 
 export interface TokenFrequencyAnalysisParams {

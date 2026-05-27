@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { concordanceTaskResultPost, runConcordance } from '@/api/generated/sdk.gen';
 import {
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
@@ -8,9 +9,8 @@ import {
   type ConcordanceDispersionDetachRequest,
   type ConcordanceMaterializeRequest,
   type ConcordanceResultQuery,
-  textApi,
-} from '@/lib/backend/text';
-import type { AnalysisTaskActionResponse } from '@/api/generated/types.gen';
+  type AnalysisTaskActionResponse,
+} from '@/api/generated/types.gen';
 import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
@@ -135,7 +135,12 @@ export function useConcordanceTaskFlow({
     const headers = getAuthHeaders();
     const taskId = await resolveTaskId();
     if (!taskId) return null;
-    const response = await textApi.postConcordanceTaskResult(taskId, body, headers) as ConcordanceAnalysisResponse;
+    const { data: response } = await concordanceTaskResultPost({
+      body,
+      headers,
+      path: { task_id: taskId },
+      throwOnError: true,
+    });
     if (response) {
       setResults(response);
     }
@@ -239,7 +244,11 @@ export function useConcordanceTaskFlow({
         request.sort_by = requestedSortBy;
       }
 
-      const response = await textApi.concordance(request, authHeaders);
+      const { data: response } = await runConcordance({
+        body: request,
+        headers: authHeaders,
+        throwOnError: true,
+      });
       setResults(response);
       extractAndSetTaskId(response, setLocalTaskId);
 

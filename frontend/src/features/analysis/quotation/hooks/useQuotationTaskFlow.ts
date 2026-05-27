@@ -1,19 +1,21 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
+import { updateQuotationTaskResult } from '@/api/generated/sdk.gen';
 import type {
   QuotationAnalysisResponse,
-  QuotationRequest,
+  QuotationRequestInput,
   QuotationResultQuery,
-  QuotationEngineConfig,
+  QuotationEngineConfigInput,
   QuotationDetachRequest,
   QuotationMaterializeRequest,
-} from '@/lib/backend/text';
-import type { AnalysisTaskActionResponse } from '@/api/generated/types.gen';
-import { textApi } from '@/lib/backend/text';
+  AnalysisTaskActionResponse,
+} from '@/api/generated/types.gen';
 import { getNodeIdentifier, restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 
 const DEFAULT_PAGE_SIZE = 50;
+type QuotationRequest = QuotationRequestInput;
+type QuotationEngineConfig = QuotationEngineConfigInput;
 
 type EngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
 
@@ -205,11 +207,12 @@ export function useQuotationTaskFlow({
     if (!currentWorkspaceId) return;
     const taskId = await resolveTaskId();
     if (!taskId) return;
-    await textApi.postQuotationTaskResult(
-      taskId,
-      { context_length: value, update_only: true },
-      getAuthHeaders(),
-    );
+    await updateQuotationTaskResult({
+      body: { context_length: value, update_only: true },
+      headers: getAuthHeaders(),
+      path: { task_id: taskId },
+      throwOnError: true,
+    });
   };
 
   const fetchQuotations = async (
@@ -305,11 +308,12 @@ export function useQuotationTaskFlow({
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return null;
-      const response = await textApi.postQuotationTaskResult(
-        taskId,
-        payload,
-        getAuthHeaders(),
-      );
+      const { data: response } = await updateQuotationTaskResult({
+        body: payload,
+        headers: getAuthHeaders(),
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
       if (!response || !('columns' in response)) return null;
       applyContextLengthPreferenceFromResult(response);
       updateResultState(nodeId, column, response);

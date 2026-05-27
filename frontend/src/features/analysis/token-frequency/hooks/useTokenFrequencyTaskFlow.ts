@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
-import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/lib/backend/text';
+import { calculateTokenFrequencies } from '@/api/generated/sdk.gen';
+import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/features/analysis/token-frequency/tokenFrequencyHelpers';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
 import { takeMostRecent } from '@/utils/selectionUtils';
+
+type TokenFrequencyRequest = TokenFrequencyRequestInput;
 
 interface AnalysisState {
   currentWorkspaceId: string | null;
@@ -141,7 +144,11 @@ export const useTokenFrequencyTaskFlow = ({
         /* best effort lock */
       }
 
-      const response = await textApi.tokenFrequencies(request, getAuthHeaders());
+      const { data: response } = await calculateTokenFrequencies({
+        body: request,
+        headers: getAuthHeaders(),
+        throwOnError: true,
+      });
       setResultsSafely(response);
 
       extractAndSetTaskId(response, setLocalTaskId);

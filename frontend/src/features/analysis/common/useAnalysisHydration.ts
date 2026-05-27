@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { clampDisplayTokenLimit } from './utils';
-import { textApi } from '@/lib/backend/text';
+import { getCurrentAnalysisTask } from './analysisTasksApi';
 import { isNetworkError } from '@/lib/apiError';
 
 /**
@@ -118,7 +118,7 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
           taskId = await resolveTaskId();
         } else if (analysisKey && getAuthHeaders) {
           try {
-            const current = await textApi.getAnalysisCurrent(analysisKey, getAuthHeaders()) as Record<string, unknown>;
+            const current = await getCurrentAnalysisTask(analysisKey, getAuthHeaders()) as Record<string, unknown>;
             const currentTaskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
             taskId = typeof currentTaskId === 'string' && currentTaskId.trim().length > 0 ? currentTaskId : null;
           } catch {

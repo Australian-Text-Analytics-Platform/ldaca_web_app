@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import type { ConcordanceAnalysisResponse, ConcordanceResultEntry } from '@/lib/backend/text';
+import type {
+  ConcordanceAnalysisResponse,
+  ConcordanceNodeResult as ConcordanceResultEntry,
+} from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 

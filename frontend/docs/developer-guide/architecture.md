@@ -36,8 +36,9 @@ and auth bootstrap before mounting the workspace shell.
 
 ## Data Flow
 
-1. API modules call the backend through `httpRequest()` or generated hey-api
-   SDK functions wrapped by stable domain adapters.
+1. Feature code calls the backend through generated hey-api SDK functions,
+   generated TanStack Query helpers, and generated types. Runtime support for
+   the generated client lives under `src/lib/backend/`.
 2. TanStack Query owns server state and cache invalidation.
 3. Zustand owns client state that is not purely server-derived.
 4. `WorkspaceProvider` composes workspace queries, selection, status, and

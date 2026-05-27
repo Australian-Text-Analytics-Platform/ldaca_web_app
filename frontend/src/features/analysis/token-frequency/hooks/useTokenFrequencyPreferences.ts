@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TokenFrequencyResponse } from '@/lib/backend/text';
-import { textApi } from '@/lib/backend/text';
+import { updateTokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
+import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
 
@@ -137,7 +137,12 @@ export const useTokenFrequencyPreferences = ({
       }
       if (Object.keys(payload).length === 0) return;
 
-      await textApi.postTokenFrequenciesTaskResult(taskId, payload, getAuthHeaders());
+      await updateTokenFrequenciesTaskResult({
+        body: payload,
+        headers: getAuthHeaders(),
+        path: { task_id: taskId },
+        throwOnError: true,
+      });
     },
     [persistEnabled, currentWorkspaceId, resolveTokenFrequencyTaskId, maxTokenLimitInput, getAuthHeaders],
   );

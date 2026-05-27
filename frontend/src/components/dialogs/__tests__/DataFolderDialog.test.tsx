@@ -17,10 +17,8 @@ vi.mock('sonner', () => ({
   }),
 }));
 
-vi.mock('@/lib/backend/config', () => ({
-  configApi: {
-    updateConfig: (...args: unknown[]) => updateConfig(...args),
-  },
+vi.mock('@/api/generated/sdk.gen', () => ({
+  updateConfig: (...args: unknown[]) => updateConfig(...args),
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -47,7 +45,7 @@ describe('DataFolderDialog', () => {
     vi.clearAllMocks();
     refreshAuth.mockResolvedValue(undefined);
     setCurrentWorkspace.mockResolvedValue(undefined);
-    updateConfig.mockResolvedValue({ data_root: '/tmp/updated', multi_user_mode: false });
+    updateConfig.mockResolvedValue({ data: { data_root: '/tmp/updated', multi_user_mode: false } });
   });
 
   it('unloads the active workspace before changing directories and refreshes workspace and file lists after', async () => {
@@ -76,7 +74,7 @@ describe('DataFolderDialog', () => {
     });
 
     expect(setCurrentWorkspace).toHaveBeenCalledWith(null);
-    expect(updateConfig).toHaveBeenCalledWith({ data_root: '/tmp/updated' });
+    expect(updateConfig).toHaveBeenCalledWith({ body: { data_root: '/tmp/updated' }, throwOnError: true });
 
     expect(setCurrentWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(updateConfig.mock.invocationCallOrder[0]!);
     expect(updateConfig.mock.invocationCallOrder[0]!).toBeLessThan(refreshAuth.mock.invocationCallOrder[0]!);
