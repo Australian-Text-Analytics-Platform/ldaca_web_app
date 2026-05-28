@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Settings2, Copy, Check, Sparkles } from 'lucide-react';
+import { Settings2, Copy, Check } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,57 +15,6 @@ import { type WorkspaceNode } from '@/types';
 import { cn } from '@/lib/utils';
 import { DEFAULT_GREY_PAIR } from '@/lib/color';
 import type { NodeVisualInfo } from '@/lib/nodeVisualState';
-import TokeniseDialog from './TokeniseDialog';
-import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
-import { queryKeys } from '@/lib/queryKeys';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-
-/**
- * Encapsulates the TanStack Query + workspace-context dependencies the
- * tokenise dialog needs to invalidate the node-info cache after a
- * successful POST. Rendered only when ``open`` is true so existing
- * CustomNode tests don't need to wrap with a QueryClientProvider /
- * WorkspaceProvider just to render the card.
- */
-function TokeniseDialogContainer({
-  open,
-  onClose,
-  nodeId,
-  nodeName,
-  columns,
-}: {
-  open: boolean;
-  onClose: () => void;
-  nodeId: string;
-  nodeName: string;
-  columns: string[];
-}) {
-  const queryClient = useQueryClient();
-  const { currentWorkspaceId } = useWorkspaceData();
-  return (
-    <TokeniseDialog
-      open={open}
-      onClose={onClose}
-      nodeId={nodeId}
-      nodeName={nodeName}
-      columns={columns}
-      onSuccess={() => {
-        if (currentWorkspaceId && nodeId) {
-          invalidateNodeInfoQuery(queryClient, currentWorkspaceId, nodeId);
-          // The graph payload carries `tokenization` per-node (used by the
-          // concordance tokens-mode auto-pick, language inference, and
-          // the inspector chip). Skipping this invalidation leaves the
-          // graph cache stale until its 30 s staleTime elapses, so the
-          // Tokens radio reads pre-tokenise data even though node-info
-          // is fresh.
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.workspaceGraph(currentWorkspaceId),
-          });
-        }
-      }}
-    />
-  );
-}
 
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
@@ -106,7 +54,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const [newName, setNewName] = useState('');
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showTokeniseDialog, setShowTokeniseDialog] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -240,21 +187,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     ? `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`
     : null;
 
-  const tokenizationSummary = ((): { label: string; tooltip: string } | null => {
-    const tokenization = node?.tokenization;
-    if (!tokenization || typeof tokenization !== 'object') return null;
-    const entries = Object.entries(tokenization);
-    if (entries.length === 0) return null;
-    const [source, meta] = entries[0]!;
-    const extraCount = entries.length - 1;
-    return {
-      label: `tokens: ${source} · ${meta.model}${extraCount > 0 ? ` + ${extraCount} more` : ''}`,
-      tooltip: entries
-        .map(([key, entry]) => `${key}: ${entry.model}`)
-        .join('\n'),
-    };
-  })();
-
   const menuButtonClassName = 'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
 
   const nodeActionControls = (
@@ -287,20 +219,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
             >
               Clone
             </button>
-
-            {/* Tokenise a string column on this node. */}
-            {Array.isArray(node?.columns) && node.columns.length > 0 ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMenu(false);
-                  setShowTokeniseDialog(true);
-                }}
-                className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
-              >
-                Tokenise…
-              </button>
-            ) : null}
 
             <button
               onClick={handleUndoNode}
@@ -349,19 +267,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     </AlertDialog>
   );
 
-  // Mount the dialog (and its TanStack-Query / workspace-context hooks)
-  // only when the user actually opens it — keeps CustomNode tests that
-  // don't exercise tokenise from needing to wrap providers.
-  const tokeniseDialog = showTokeniseDialog && node?.node_id ? (
-    <TokeniseDialogContainer
-      open={showTokeniseDialog}
-      onClose={() => setShowTokeniseDialog(false)}
-      nodeId={node.node_id}
-      nodeName={nodeName}
-      columns={Array.isArray(node.columns) ? node.columns : []}
-    />
-  ) : null;
-
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
     const compactClasses = 'flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out shadow-md';
@@ -406,7 +311,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         {deleteDialog}
-        {tokeniseDialog}
       </div>
     );
   }
@@ -504,22 +408,12 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         ) : (
           <div className="font-mono text-xs text-gray-400 italic">Shape unavailable</div>
         )}
-        {tokenizationSummary ? (
-          <div
-            className="flex items-center gap-1 font-mono text-xs text-indigo-700"
-            title={tokenizationSummary.tooltip}
-          >
-            <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
-            <span className="truncate">{tokenizationSummary.label}</span>
-          </div>
-        ) : null}
       </div>
 
       {/* Passive handles so backend edges can attach; UI connections remain disabled by parent ReactFlow props */}
       <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       {deleteDialog}
-      {tokeniseDialog}
     </div>
   );
 };

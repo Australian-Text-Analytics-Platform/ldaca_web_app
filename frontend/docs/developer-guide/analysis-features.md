@@ -45,6 +45,23 @@ comparison, applies stop words and token limits, and exports result tables.
 Pairwise keyness treats the second selected node as the study corpus and the
 first as the reference corpus.
 
+Each selected node card renders a tokenizer model selector next to the text
+column selector. Selecting a document column persists `Node.document` through
+`PUT /workspaces/nodes/{node_id}/document-column`; other document-oriented
+analysis selectors use the same endpoint instead of mutating node metadata in
+their submit routes. The tokenizer selector samples the first page of the
+selected column via `GET /workspaces/nodes/{node_id}/data`, runs MediaPipe
+Language Detector in the browser, normalizes the result to ISO 639-1, and fetches
+the backend tokenizer inventory from `GET /workspaces/tokenizer-models` when the
+dropdown opens. Models whose backend-provided `languages` include the detected
+code are rendered first in a recommended group. Choosing a model calls
+`PUT /workspaces/nodes/{node_id}/tokenization-preference`, so token frequency
+requests rely on `Node.tokenization` metadata rather than sending frontend-owned
+model maps. Choosing the placeholder model clears that column's tokenization
+preference; choosing the placeholder column clears `Node.document`. Default
+stop-word filling is client-side: saved ISO 639-1 language metadata is converted
+to ISO 639-3 before reading the matching `stopword` package list.
+
 ## Concordance
 
 Concordance supports regex and token modes, metadata columns, table and

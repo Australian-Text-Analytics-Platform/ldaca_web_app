@@ -1420,20 +1420,6 @@ export type CurrentWorkspaceResponse = {
 };
 
 /**
- * DefaultStopWordsResponse
- */
-export type DefaultStopWordsResponse = {
-    /**
-     * Error
-     */
-    error?: string | null;
-    /**
-     * Stopwords
-     */
-    stopwords: Array<string>;
-};
-
-/**
  * DemoSnapshotEntry
  *
  * A single demo-snapshot bundle in the catalogue.
@@ -2071,6 +2057,16 @@ export type NodeDataSorting = {
 };
 
 /**
+ * NodeDocumentColumnUpdateRequest
+ */
+export type NodeDocumentColumnUpdateRequest = {
+    /**
+     * Document Column
+     */
+    document_column?: string | null;
+};
+
+/**
  * NodeOperationResponse
  */
 export type NodeOperationResponse = {
@@ -2105,6 +2101,24 @@ export type NodeShapeResponse = {
         number | null,
         number | null
     ];
+};
+
+/**
+ * NodeTokenizationPreferenceRequest
+ */
+export type NodeTokenizationPreferenceRequest = {
+    /**
+     * Language
+     */
+    language?: string | null;
+    /**
+     * Model
+     */
+    model?: string | null;
+    /**
+     * Source Column
+     */
+    source_column: string;
 };
 
 /**
@@ -3528,6 +3542,12 @@ export type TokenFrequencyRequestInput = {
      */
     node_ids: Array<string>;
     /**
+     * Node Tokenizer Models
+     */
+    node_tokenizer_models?: {
+        [key: string]: string;
+    } | null;
+    /**
      * Stop Words
      */
     stop_words?: Array<string> | null;
@@ -3567,6 +3587,14 @@ export type TokenFrequencyRequestOutput = {
      * List of node IDs to analyze (1 or 2)
      */
     node_ids: Array<string>;
+    /**
+     * Node Tokenizer Models
+     *
+     * Map of node_id to tokenizer model ID for raw text token-frequency analysis
+     */
+    node_tokenizer_models?: {
+        [key: string]: string;
+    } | null;
     /**
      * Stop Words
      *
@@ -3712,44 +3740,31 @@ export type TokenStatisticsData = {
 };
 
 /**
- * TokeniseColumnRequest
- *
- * Body for ``POST /nodes/{node_id}/tokenization``.
+ * TokenizerModelInfo
  */
-export type TokeniseColumnRequest = {
+export type TokenizerModelInfo = {
     /**
-     * Language
+     * Label
      */
-    language?: string | null;
+    label: string;
+    /**
+     * Languages
+     */
+    languages: Array<string>;
     /**
      * Model
      */
     model: string;
-    /**
-     * Source Column
-     */
-    source_column: string;
 };
 
 /**
- * TokeniseColumnResponse
- *
- * Result of a tokenise request — reports whether a new column was
- * created or an existing one replaced.
+ * TokenizerModelsResponse
  */
-export type TokeniseColumnResponse = {
+export type TokenizerModelsResponse = {
     /**
-     * Column
+     * Models
      */
-    column: string;
-    /**
-     * Is New
-     */
-    is_new: boolean;
-    /**
-     * Replaced Column
-     */
-    replaced_column?: string | null;
+    models: Array<TokenizerModelInfo>;
 };
 
 /**
@@ -5842,40 +5857,6 @@ export type StreamTasksResponses = {
      */
     200: unknown;
 };
-
-export type GetDefaultStopWordsData = {
-    body?: never;
-    path?: never;
-    query?: {
-        /**
-         * Language
-         */
-        language?: string;
-        /**
-         * Strict
-         */
-        strict?: boolean;
-    };
-    url: '/api/text/default-stop-words';
-};
-
-export type GetDefaultStopWordsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetDefaultStopWordsError = GetDefaultStopWordsErrors[keyof GetDefaultStopWordsErrors];
-
-export type GetDefaultStopWordsResponses = {
-    /**
-     * Successful Response
-     */
-    200: DefaultStopWordsResponse;
-};
-
-export type GetDefaultStopWordsResponse = GetDefaultStopWordsResponses[keyof GetDefaultStopWordsResponses];
 
 export type BatchDeleteSnapshotsData = {
     body?: never;
@@ -7973,6 +7954,42 @@ export type GetNodeDataResponses = {
 
 export type GetNodeDataResponse = GetNodeDataResponses[keyof GetNodeDataResponses];
 
+export type SetNodeDocumentColumnData = {
+    body: NodeDocumentColumnUpdateRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/nodes/{node_id}/document-column';
+};
+
+export type SetNodeDocumentColumnErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetNodeDocumentColumnError = SetNodeDocumentColumnErrors[keyof SetNodeDocumentColumnErrors];
+
+export type SetNodeDocumentColumnResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type SetNodeDocumentColumnResponse = SetNodeDocumentColumnResponses[keyof SetNodeDocumentColumnResponses];
+
 export type PolarsExpressionApplyData = {
     body: PolarsExpressionRequest;
     headers?: {
@@ -8674,8 +8691,8 @@ export type SlicePreviewResponses = {
 
 export type SlicePreviewResponse = SlicePreviewResponses[keyof SlicePreviewResponses];
 
-export type CreateTokenizationData = {
-    body: TokeniseColumnRequest;
+export type SetNodeTokenizationPreferenceData = {
+    body: NodeTokenizationPreferenceRequest;
     headers?: {
         /**
          * Authorization
@@ -8689,26 +8706,26 @@ export type CreateTokenizationData = {
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/tokenization';
+    url: '/api/workspaces/nodes/{node_id}/tokenization-preference';
 };
 
-export type CreateTokenizationErrors = {
+export type SetNodeTokenizationPreferenceErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CreateTokenizationError = CreateTokenizationErrors[keyof CreateTokenizationErrors];
+export type SetNodeTokenizationPreferenceError = SetNodeTokenizationPreferenceErrors[keyof SetNodeTokenizationPreferenceErrors];
 
-export type CreateTokenizationResponses = {
+export type SetNodeTokenizationPreferenceResponses = {
     /**
      * Successful Response
      */
-    200: TokeniseColumnResponse;
+    200: WorkspaceNodeInfo;
 };
 
-export type CreateTokenizationResponse = CreateTokenizationResponses[keyof CreateTokenizationResponses];
+export type SetNodeTokenizationPreferenceResponse = SetNodeTokenizationPreferenceResponses[keyof SetNodeTokenizationPreferenceResponses];
 
 export type UndoNodeOperationData = {
     body?: never;
@@ -9320,6 +9337,37 @@ export type UpdateTokenFrequenciesTaskResultResponses = {
 };
 
 export type UpdateTokenFrequenciesTaskResultResponse = UpdateTokenFrequenciesTaskResultResponses[keyof UpdateTokenFrequenciesTaskResultResponses];
+
+export type GetTokenizerModelsData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/tokenizer-models';
+};
+
+export type GetTokenizerModelsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetTokenizerModelsError = GetTokenizerModelsErrors[keyof GetTokenizerModelsErrors];
+
+export type GetTokenizerModelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: TokenizerModelsResponse;
+};
+
+export type GetTokenizerModelsResponse = GetTokenizerModelsResponses[keyof GetTokenizerModelsResponses];
 
 export type ClearTopicModelingResultsData = {
     body?: never;

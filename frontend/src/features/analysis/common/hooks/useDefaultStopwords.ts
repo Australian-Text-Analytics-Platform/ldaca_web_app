@@ -1,14 +1,9 @@
-import { useQueries } from '@tanstack/react-query';
-import { getDefaultStopWords } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
-import { queryKeys } from '@/lib/queryKeys';
+import { resolveMergedStopwords } from '@/lib/loadMergedStopwords';
 
 export interface DefaultStopwordsLanguageGroup {
-  /** Normalised language code that was actually requested. */
+  /** Normalised ISO 639-1 language code that was resolved. */
   language: string;
-  /** Words returned by the backend for this language, in source order
-   *  with surrounding whitespace trimmed. Empty when the backend has
-   *  no list and ``strict`` suppressed the English fallback. */
+  /** Words returned for this language, in source order with surrounding whitespace trimmed. */
   words: string[];
 }
 
@@ -30,82 +25,33 @@ interface UseDefaultStopwordsResult {
 }
 
 /**
- * Cached fetch of the bundled stop-word lists for one or more
- * languages. Mirrors the multi-language behaviour token-frequency uses
- * via ``loadMergedStopwords`` but as a React hook so topic-modelling
- * (and any future analysis) can subscribe reactively.
+ * Client-side lookup of the default stop-word lists for one or more languages.
+ * Mirrors the multi-language behaviour token-frequency uses via
+ * ``loadMergedStopwords`` but as a React hook so topic-modelling (and any
+ * future analysis) can subscribe reactively.
  *
  * The single-language call site that existed before this refactor —
  * ``useDefaultStopwords('zh', ...)`` — now passes ``['zh']``. Empty /
  * ``null`` entries in the array are skipped during normalisation, so
  * placeholder-during-render states stay safe.
  *
- * Caching: each unique ``(language, strict)`` pair gets its own
- * 1-hour-stale TanStack Query entry keyed via
- * ``queryKeys.defaultStopWords``, so two analyses asking for ZH at
- * the same time hit the backend once.
+ * The ``strict`` option is retained for call-site compatibility. Unsupported
+ * languages are ignored because there is no backend fallback after the default
+ * stopword endpoint was removed.
  */
 export const useDefaultStopwords = (
   languages: ReadonlyArray<string | null | undefined>,
   { strict = true }: { strict?: boolean } = {},
 ): UseDefaultStopwordsResult => {
-  const { getAuthHeaders } = useAuth();
-
-  const uniqueLanguages = normalizeLanguages(languages);
-
-  const queryResults = useQueries({
-    queries: uniqueLanguages.map((language) => ({
-      queryKey: queryKeys.defaultStopWords(language, strict),
-      staleTime: 1000 * 60 * 60,
-      queryFn: async () => {
-        const { data } = await getDefaultStopWords({
-          headers: getAuthHeaders(),
-          query: { language, strict },
-          throwOnError: true,
-        });
-        return data;
-      },
-    })),
-  });
-
-  const byLanguage = uniqueLanguages.map((language, index) => {
-    const raw = queryResults[index]?.data?.stopwords;
-    const words = Array.isArray(raw)
-      ? raw.map((word) => String(word).trim()).filter(Boolean)
-      : [];
-    return { language, words };
-  });
-
-  const stopwords = new Set<string>();
-  for (const group of byLanguage) {
-    for (const word of group.words) stopwords.add(word);
-  }
-
-  const isLoading =
-    uniqueLanguages.length > 0 && queryResults.some((q) => q.isLoading);
-  const isError =
-    uniqueLanguages.length > 0 && queryResults.some((q) => q.isError);
+  void strict;
+  const { byLanguage, merged } = resolveMergedStopwords(languages);
+  const stopwords = new Set(merged);
 
   return {
     stopwords,
     byLanguage,
-    available: uniqueLanguages.length > 0 && stopwords.size > 0,
-    isLoading,
-    isError,
+    available: byLanguage.length > 0 && stopwords.size > 0,
+    isLoading: false,
+    isError: false,
   };
 };
-
-function normalizeLanguages(
-  languages: ReadonlyArray<string | null | undefined>,
-): string[] {
-  const seen = new Set<string>();
-  const ordered: string[] = [];
-  for (const candidate of languages) {
-    if (typeof candidate !== 'string') continue;
-    const code = candidate.trim().toLowerCase();
-    if (!code || seen.has(code)) continue;
-    seen.add(code);
-    ordered.push(code);
-  }
-  return ordered;
-}

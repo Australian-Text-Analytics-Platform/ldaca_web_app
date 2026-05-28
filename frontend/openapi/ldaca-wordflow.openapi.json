@@ -2589,33 +2589,6 @@
         "title": "CurrentWorkspaceResponse",
         "type": "object"
       },
-      "DefaultStopWordsResponse": {
-        "properties": {
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "stopwords": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Stopwords",
-            "type": "array"
-          }
-        },
-        "required": [
-          "stopwords"
-        ],
-        "title": "DefaultStopWordsResponse",
-        "type": "object"
-      },
       "DemoSnapshotEntry": {
         "description": "A single demo-snapshot bundle in the catalogue.",
         "properties": {
@@ -3637,6 +3610,23 @@
         "title": "NodeDataSorting",
         "type": "object"
       },
+      "NodeDocumentColumnUpdateRequest": {
+        "properties": {
+          "document_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Column"
+          }
+        },
+        "title": "NodeDocumentColumnUpdateRequest",
+        "type": "object"
+      },
       "NodeOperationResponse": {
         "properties": {
           "node_id": {
@@ -3703,6 +3693,41 @@
           "shape"
         ],
         "title": "NodeShapeResponse",
+        "type": "object"
+      },
+      "NodeTokenizationPreferenceRequest": {
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "source_column": {
+            "title": "Source Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_column"
+        ],
+        "title": "NodeTokenizationPreferenceRequest",
         "type": "object"
       },
       "OniSearchRequest": {
@@ -6227,13 +6252,16 @@
             "node1",
             "node2"
           ],
+          "node_tokenizer_models": {
+            "node1": "native:plain_words_en",
+            "node2": "huggingface:bert-base-uncased"
+          },
           "stop_words": [
             "the",
             "and",
             "or"
           ],
-          "token_limit": 50,
-          "tokenizer_model": "plain_words_en"
+          "token_limit": 50
         },
         "properties": {
           "node_columns": {
@@ -6249,6 +6277,20 @@
             },
             "title": "Node Ids",
             "type": "array"
+          },
+          "node_tokenizer_models": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Tokenizer Models"
           },
           "stop_words": {
             "anyOf": [
@@ -6320,6 +6362,21 @@
             },
             "title": "Node Ids",
             "type": "array"
+          },
+          "node_tokenizer_models": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Map of node_id to tokenizer model ID for raw text token-frequency analysis",
+            "title": "Node Tokenizer Models"
           },
           "stop_words": {
             "anyOf": [
@@ -6679,64 +6736,46 @@
         "title": "TokenStatisticsData",
         "type": "object"
       },
-      "TokeniseColumnRequest": {
-        "description": "Body for ``POST /nodes/{node_id}/tokenization``.",
+      "TokenizerModelInfo": {
         "properties": {
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
           },
           "model": {
             "title": "Model",
             "type": "string"
-          },
-          "source_column": {
-            "title": "Source Column",
-            "type": "string"
           }
         },
         "required": [
-          "source_column",
-          "model"
+          "model",
+          "label",
+          "languages"
         ],
-        "title": "TokeniseColumnRequest",
+        "title": "TokenizerModelInfo",
         "type": "object"
       },
-      "TokeniseColumnResponse": {
-        "description": "Result of a tokenise request \u2014 reports whether a new column was\ncreated or an existing one replaced.",
+      "TokenizerModelsResponse": {
         "properties": {
-          "column": {
-            "title": "Column",
-            "type": "string"
-          },
-          "is_new": {
-            "title": "Is New",
-            "type": "boolean"
-          },
-          "replaced_column": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Replaced Column"
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/TokenizerModelInfo"
+            },
+            "title": "Models",
+            "type": "array"
           }
         },
         "required": [
-          "column",
-          "is_new"
+          "models"
         ],
-        "title": "TokeniseColumnResponse",
+        "title": "TokenizerModelsResponse",
         "type": "object"
       },
       "TopicMeaningOverrideItem": {
@@ -10532,61 +10571,6 @@
         "tags": [
           "task_streaming",
           "task_streaming"
-        ]
-      }
-    },
-    "/api/text/default-stop-words": {
-      "get": {
-        "description": "Return bundled default stop words for a language.\n\nUsed by:\n- frontend token-frequency defaults loader (English fallback OK)\n- frontend topic-modelling post-fit stopword filter (passes\n  ``strict=true`` so unknown languages return ``[]`` instead of\n  silently substituting the English list \u2014 otherwise the filter\n  toggle would appear with English words on a Chinese run that\n  had no bundled zh list).\n\nWhy:\n- Provides deterministic language stop-word sets from packaged\n  resources. ``strict`` controls the unsupported-language behaviour:\n  ``False`` (default) keeps the legacy English fallback for\n  backwards compatibility; ``True`` returns an empty list.",
-        "operationId": "get_default_stop_words",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "language",
-            "required": false,
-            "schema": {
-              "default": "english",
-              "title": "Language",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "strict",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "Strict",
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DefaultStopWordsResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Default Stop Words",
-        "tags": [
-          "text_analysis",
-          "text_analysis"
         ]
       }
     },
@@ -14487,6 +14471,75 @@
         ]
       }
     },
+    "/api/workspaces/nodes/{node_id}/document-column": {
+      "put": {
+        "operationId": "set_node_document_column",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeDocumentColumnUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Node Document Column",
+        "tags": [
+          "workspace_management",
+          "nodes"
+        ]
+      }
+    },
     "/api/workspaces/nodes/{node_id}/expression/apply": {
       "post": {
         "operationId": "polars_expression_apply",
@@ -15806,9 +15859,9 @@
         ]
       }
     },
-    "/api/workspaces/nodes/{node_id}/tokenization": {
-      "post": {
-        "operationId": "create_tokenization",
+    "/api/workspaces/nodes/{node_id}/tokenization-preference": {
+      "put": {
+        "operationId": "set_node_tokenization_preference",
         "parameters": [
           {
             "in": "path",
@@ -15840,7 +15893,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TokeniseColumnRequest"
+                "$ref": "#/components/schemas/NodeTokenizationPreferenceRequest"
               }
             }
           },
@@ -15851,7 +15904,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokeniseColumnResponse"
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
                 }
               }
             },
@@ -15868,10 +15921,10 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Create Tokenization",
+        "summary": "Set Node Tokenization Preference",
         "tags": [
           "workspace_management",
-          "tokenization"
+          "nodes"
         ]
       }
     },
@@ -16972,6 +17025,56 @@
         "summary": "Update Token Frequencies Task Result",
         "tags": [
           "workspace_management"
+        ]
+      }
+    },
+    "/api/workspaces/tokenizer-models": {
+      "get": {
+        "operationId": "get_tokenizer_models",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenizerModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tokenizer Models",
+        "tags": [
+          "workspace_management",
+          "nodes"
         ]
       }
     },

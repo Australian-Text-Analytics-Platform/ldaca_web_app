@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
+import { setNodeTokenizationPreference, tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
 import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -55,17 +56,75 @@ import {
   useNodeColorManagement,
 } from '../common';
 import { pruneTasksById } from '@/hooks/analysisTaskUtils';
-import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
+import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores/uiStore';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import {
+  updateWorkspaceNodeInfoCache,
+  usePersistNodeDocumentColumn,
+} from '@/features/analysis/common/hooks/usePersistNodeDocumentColumn';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
 const UNIFIED_WORDCLOUD_HEIGHT = 340;
 type TokenFrequencyRequest = TokenFrequencyRequestInput;
+
+function extractNodeTokenizerModels(
+  settings: Record<string, unknown> | null | undefined,
+  nodeIds: readonly string[],
+): Record<string, string> {
+  const models: Record<string, string> = {};
+  const rawNodeModels = settings?.node_tokenizer_models;
+  if (rawNodeModels && typeof rawNodeModels === 'object' && !Array.isArray(rawNodeModels)) {
+    for (const [nodeId, model] of Object.entries(rawNodeModels as Record<string, unknown>)) {
+      if (typeof model === 'string' && model.trim()) {
+        models[nodeId] = model.trim();
+      }
+    }
+  }
+  const fallbackModel = typeof settings?.tokenizer_model === 'string' ? settings.tokenizer_model.trim() : '';
+  if (fallbackModel) {
+    for (const nodeId of nodeIds) {
+      models[nodeId] = models[nodeId] ?? fallbackModel;
+    }
+  }
+  return models;
+}
+
+function readNodeColumnTokenizerModel(node: WorkspaceNodeLike | undefined, column: string): string {
+  if (!node || !column) return '';
+  const tokenization = node.tokenization;
+  if (!tokenization || typeof tokenization !== 'object' || Array.isArray(tokenization)) return '';
+  const meta = (tokenization as Record<string, unknown>)[column];
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return '';
+  const model = (meta as Record<string, unknown>).model;
+  return typeof model === 'string' ? model.trim() : '';
+}
+
+function readNodeColumnTokenizerLanguage(node: WorkspaceNodeLike | undefined, column: string): string {
+  if (!node || !column) return '';
+  const tokenization = node.tokenization;
+  if (!tokenization || typeof tokenization !== 'object' || Array.isArray(tokenization)) return '';
+  const meta = (tokenization as Record<string, unknown>)[column];
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return '';
+  const language = (meta as Record<string, unknown>).language;
+  return typeof language === 'string' ? language.trim().toLowerCase() : '';
+}
+
+function deriveNodeTokenizerModels(
+  nodes: readonly WorkspaceNodeLike[],
+  selections: readonly { nodeId: string; column: string }[],
+): Record<string, string> {
+  const models: Record<string, string> = {};
+  for (const selection of selections) {
+    const node = nodes.find((candidate, index) => getNodeIdentifier(candidate, index) === selection.nodeId);
+    const model = readNodeColumnTokenizerModel(node, selection.column);
+    if (model) models[selection.nodeId] = model;
+  }
+  return models;
+}
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
@@ -86,6 +145,7 @@ const TokenFrequencyFeature = () => {
     workspaceId: currentWorkspace?.id ?? null,
     getAuthHeaders,
     allowedDataTypes: ['string'],
+    docTypeOnly: true,
     maxNodes: 2,
   });
   // The frequency tool is strictly pairwise (keyness statistics are defined
@@ -296,6 +356,16 @@ const TokenFrequencyFeature = () => {
     return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
   }, [inSnapshotMode, loadedSnapshot, isLocked, activeNodeColumnSelections, nodeColumnSelections]);
 
+  const effectiveTokenizerModelsByNode = useMemo(() => {
+    if (inSnapshotMode && loadedSnapshot?.payload.settings) {
+      return extractNodeTokenizerModels(
+        loadedSnapshot.payload.settings as unknown as Record<string, unknown>,
+        loadedSnapshot.payload.settings.node_ids ?? loadedSnapshot.manifest.source.node_ids,
+      );
+    }
+    return deriveNodeTokenizerModels(panelSelectedNodes, effectiveNodeColumnSelections);
+  }, [inSnapshotMode, loadedSnapshot, panelSelectedNodes, effectiveNodeColumnSelections]);
+
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,
   // every render hands a fresh function ref to the sections, busting
@@ -309,12 +379,9 @@ const TokenFrequencyFeature = () => {
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
-  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
-  const defaultTokenizerModel = usePreferencesStore((state) => state.defaultTokenizerModel);
-  // All distinct languages across the currently-selected corpora, in
-  // selection order. "Apply Stop Words" merges the bundled lists for
-  // every language present so a side-by-side EN/ZH comparison fills
-  // both stoplists at once.
+  // All distinct saved tokenizer languages across the currently-selected
+  // corpora, in selection order. Fill Default uses only languages that
+  // came from the selected column's tokenization metadata.
   const defaultStopWordsLanguages = useMemo(() => {
     const seen = new Set<string>();
     const ordered: string[] = [];
@@ -324,22 +391,13 @@ const TokenFrequencyFeature = () => {
           (id) => typeof id === 'string' && id === selection.nodeId,
         ),
       );
-      const code = effectiveNodeLanguage({
-        node: node ?? null,
-        defaultLanguage,
-      });
+      const code = readNodeColumnTokenizerLanguage(node, selection.column);
       if (!code || seen.has(code)) continue;
       seen.add(code);
       ordered.push(code);
     }
-    if (ordered.length === 0) {
-      const fallback = effectiveNodeLanguage({ defaultLanguage });
-      return fallback ? [fallback] : [];
-    }
     return ordered;
-  }, [effectiveNodeColumnSelections, panelSelectedNodes, defaultLanguage]);
-
-  const tokenFrequencyTokenizerModel = (defaultTokenizerModel ?? '').trim();
+  }, [effectiveNodeColumnSelections, panelSelectedNodes]);
 
   const {
     stopWords,
@@ -399,7 +457,7 @@ const TokenFrequencyFeature = () => {
       panelNodeIds: orderedPanelNodeIds,
       panelSelectedNodes,
       effectiveNodeColumnSelections,
-      tokenizerModel: tokenFrequencyTokenizerModel,
+      tokenizerModelsByNode: effectiveTokenizerModelsByNode,
       stopWords,
       results,
       lockedNodeNameMap,
@@ -619,6 +677,12 @@ const TokenFrequencyFeature = () => {
 
   const hasIncompleteSelections = effectiveNodeColumnSelections.some((selection) => !selection.column);
   const displayNodeCount = panelSelectedNodes.length;
+  const selectedNodeIdsWithColumns = orderedPanelNodeIds.filter((nodeId) =>
+    effectiveNodeColumnSelections.some((selection) => selection.nodeId === nodeId && selection.column),
+  );
+  const missingTokenizerModelNodeIds = selectedNodeIdsWithColumns.filter(
+    (nodeId) => !(effectiveTokenizerModelsByNode[nodeId] ?? '').trim(),
+  );
 
   const baseActionState = getAnalysisActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
@@ -629,18 +693,52 @@ const TokenFrequencyFeature = () => {
     hasActiveTask,
     allowRunWhenLocked: false,
   });
-  const hasTokenizerModel = Boolean(tokenFrequencyTokenizerModel);
+  const hasTokenizerModel = missingTokenizerModelNodeIds.length === 0;
   const actionState = {
     ...baseActionState,
     runDisabled: baseActionState.runDisabled || !hasTokenizerModel,
     runDisabledReason: !hasTokenizerModel
-      ? 'Set a tokenizer model in preferences before running token frequency'
+      ? 'Select a tokenizer model for each data block'
       : baseActionState.runDisabledReason,
   };
+
+  const persistDocumentColumn = usePersistNodeDocumentColumn({
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+  });
+
+  const persistTokenizerPreference = useCallback(
+    async (nodeId: string, column: string, model: string, language: string | null) => {
+      if (!currentWorkspaceId) return;
+      try {
+        const { data } = await setNodeTokenizationPreference({
+          path: { node_id: nodeId },
+          body: {
+            source_column: column,
+            model: model.trim() || null,
+            language: model.trim() ? language : null,
+          },
+          headers: getAuthHeaders(),
+          throwOnError: true,
+        });
+        updateWorkspaceNodeInfoCache(queryClient, currentWorkspaceId, data);
+      } catch {
+        toast.error('Could not save the tokenizer model for this column.');
+      }
+    },
+    [currentWorkspaceId, getAuthHeaders, queryClient],
+  );
 
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked || inSnapshotMode) return;
     setNodeColumnSelection(nodeId, column);
+    void persistDocumentColumn(nodeId, column);
+  };
+
+  const handleTokenizerModelChange = (nodeId: string, column: string, model: string, language: string | null) => {
+    if (isLocked || inSnapshotMode) return;
+    if (!column) return;
+    void persistTokenizerPreference(nodeId, column, model, language);
   };
 
   const { getColumnInfos } = useNodeColumnInfos({
@@ -667,18 +765,25 @@ const TokenFrequencyFeature = () => {
       (id) => effectiveNodeColumnSelections.some((s) => s.nodeId === id && s.column),
     );
     if (orderedIds.length === 0) return null;
-    if (!tokenFrequencyTokenizerModel) return null;
     const nodeColumns: Record<string, string> = {};
     for (const sel of effectiveNodeColumnSelections) {
       if (sel.column) nodeColumns[sel.nodeId] = sel.column;
     }
+    const nodeTokenizerModels: Record<string, string> = {};
+    for (const nodeId of orderedIds) {
+      const model = (effectiveTokenizerModelsByNode[nodeId] ?? '').trim();
+      if (!model) return null;
+      nodeTokenizerModels[nodeId] = model;
+    }
+    const uniqueModels = [...new Set(Object.values(nodeTokenizerModels))];
     const req: TokenFrequencyRequest = {
       node_ids: orderedIds,
       node_columns: nodeColumns,
-      tokenizer_model: tokenFrequencyTokenizerModel,
+      node_tokenizer_models: nodeTokenizerModels,
+      tokenizer_model: uniqueModels.length === 1 ? uniqueModels[0] : undefined,
     };
     return req;
-  }, [inSnapshotMode, orderedPanelNodeIds, effectiveNodeColumnSelections, tokenFrequencyTokenizerModel]);
+  }, [inSnapshotMode, orderedPanelNodeIds, effectiveNodeColumnSelections, effectiveTokenizerModelsByNode]);
 
   // Order ``selectedNodes`` reference-first so the manifest's
   // ``node_ids`` list matches the captured request's ordering. The
@@ -825,6 +930,24 @@ const TokenFrequencyFeature = () => {
         }}
         getColorForNode={getColorForNode}
         computeDisplayName={computeDisplayName}
+        renderTokenizerModelSelector={({ nodeId, column }) => (
+          <TokenizerModelSelector
+            workspaceId={currentWorkspaceId}
+            nodeId={nodeId}
+            column={column}
+            value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
+            onChange={(model, detectedLanguage) =>
+              handleTokenizerModelChange(nodeId, column, model, detectedLanguage)
+            }
+            getAuthHeaders={getAuthHeaders}
+            disabled={isLocked || inSnapshotMode}
+            disabledReason={
+              inSnapshotMode
+                ? 'Viewing a saved snapshot — tokenizer models are frozen.'
+                : 'Clear results first to change tokenizer models'
+            }
+          />
+        )}
       />
 
       <TokenFrequencyResultsPanel

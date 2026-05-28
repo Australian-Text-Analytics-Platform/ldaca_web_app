@@ -1,10 +1,7 @@
-/** Curated language list for UI selectors and tokenizer inventory. */
-export interface LanguageModelOption {
-  /** Tokenizer model ID — what gets sent to the backend. */
-  model: string;
-  /** Human label shown in model pickers. */
-  label: string;
-}
+import type { TokenizerModelInfo } from '@/api/generated/types.gen';
+
+/** Curated language list for UI selectors. */
+export type LanguageModelOption = TokenizerModelInfo;
 
 export interface LanguageOption {
   code: string;
@@ -15,8 +12,6 @@ export interface LanguageOption {
    * indicator in tool menus.
    */
   quotationSupported: boolean;
-  /** Predefined tokenizer models known to support this language. */
-  models?: ReadonlyArray<LanguageModelOption>;
 }
 
 export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
@@ -24,47 +19,57 @@ export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
     code: 'en',
     label: 'English',
     quotationSupported: true,
-    models: [
-      { model: 'native:plain_words_en', label: 'Plain words (English)' },
-      { model: 'huggingface:bert-base-uncased', label: 'BERT base uncased' },
-    ],
   },
   {
     code: 'zh',
     label: 'Chinese',
     quotationSupported: false,
-    models: [
-      { model: 'lindera:cc-cedict', label: 'CC-CEDICT' },
-      { model: 'lindera:jieba', label: 'Jieba' },
-    ],
   },
   {
     code: 'ja',
     label: 'Japanese',
     quotationSupported: false,
-    models: [
-      { model: 'lindera:ja-ipadic', label: 'IPADIC' },
-      { model: 'lindera:ja-ipadic-neologd', label: 'IPADIC Neologd' },
-      { model: 'lindera:ja-unidic', label: 'UniDic' },
-    ],
   },
   {
     code: 'ko',
     label: 'Korean',
     quotationSupported: false,
-    models: [{ model: 'lindera:ko-dic', label: 'ko-dic' }],
-  },
-  {
-    code: 'multi',
-    label: 'Other / Multilingual',
-    quotationSupported: false,
   },
 ] as const;
 
-export function findLanguage(code: string | null | undefined): LanguageOption | null {
+export function normaliseIso6391LanguageCode(code: string | null | undefined): string | null {
   if (typeof code !== 'string') return null;
-  const normalised = code.trim().toLowerCase();
+  const trimmed = code.trim().toLowerCase();
+  if (!trimmed) return null;
+  const primary = trimmed.split(/[-_]/, 1)[0];
+  return primary && /^[a-z]{2}$/.test(primary) ? primary : null;
+}
+
+export function findLanguage(code: string | null | undefined): LanguageOption | null {
+  const normalised = normaliseIso6391LanguageCode(code);
+  if (!normalised) return null;
   return SUPPORTED_LANGUAGES.find((l) => l.code === normalised) ?? null;
+}
+
+export function partitionTokenizerModelsForLanguage(
+  models: readonly LanguageModelOption[],
+  code: string | null | undefined,
+): { recommended: LanguageModelOption[]; other: LanguageModelOption[] } {
+  const normalised = normaliseIso6391LanguageCode(code);
+  if (!normalised) {
+    return { recommended: [], other: [...models] };
+  }
+  const recommended = models.filter((option) => option.languages.includes(normalised));
+  const other = models.filter((option) => !option.languages.includes(normalised));
+  return { recommended, other };
+}
+
+export function orderedTokenizerModelsForLanguage(
+  models: readonly LanguageModelOption[],
+  code: string | null | undefined,
+): readonly LanguageModelOption[] {
+  const { recommended, other } = partitionTokenizerModelsForLanguage(models, code);
+  return [...recommended, ...other];
 }
 
 export function languageLabel(code: string | null | undefined): string {

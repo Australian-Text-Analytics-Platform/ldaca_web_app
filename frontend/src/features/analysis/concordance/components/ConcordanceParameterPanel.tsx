@@ -274,7 +274,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                     readOnly,
                     tokensModeAvailable
                       ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                      : 'Run Tokenise on this column first - tokens-mode walks the tokenization column for word-aware (CJK-friendly) context.',
+                      : 'Tokens mode needs legacy cached tokens for this selected column.',
                   )}
                 >
                   <button

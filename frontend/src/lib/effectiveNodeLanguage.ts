@@ -8,8 +8,8 @@
  * Resolution order:
  *   1. ``explicit`` — caller-supplied string (e.g. selector value).
  *   2. ``node.tokenization[*].language`` — language tagged on any tokenization
- *      spec registered on this node. The Tokenise operation records
- *      this, so once a user has tokenised, the corpus language is known.
+ *      spec registered on this node. Legacy cached token metadata records
+ *      this, so tokenized corpora retain a language hint.
  *   3. ``defaultLanguage`` — per-user preference from the store.
  *   4. ``"en"`` — global fallback so existing English flows stay quiet.
  */

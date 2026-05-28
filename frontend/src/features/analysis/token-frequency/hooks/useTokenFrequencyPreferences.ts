@@ -20,9 +20,9 @@ type UseTokenFrequencyPreferencesParams = {
   resolveTokenFrequencyTaskId: () => Promise<string | null>;
   /**
    * Resolved language codes for the currently-selected corpora, one per
-   * unique language. "Apply Stop Words" fetches all of these and merges
-    * them so a multi-language comparison (e.g. EN + ZH) fills both stop
-    * lists at once.
+    * unique language. "Apply Stop Words" loads all matching local stopword
+    * lists and merges them so a multi-language comparison (e.g. EN + ZH)
+    * fills both lists at once.
    */
   defaultStopWordsLanguages?: ReadonlyArray<string | null | undefined>;
   backendTokenLimit: number | null;
@@ -357,7 +357,6 @@ export const useTokenFrequencyPreferences = ({
 
       const { byLanguage, merged } = await loadMergedStopwords({
         languages: defaultStopWordsLanguages!,
-        getAuthHeaders,
       });
       if (merged.length === 0) {
         console.error('Default stop words returned an empty list');

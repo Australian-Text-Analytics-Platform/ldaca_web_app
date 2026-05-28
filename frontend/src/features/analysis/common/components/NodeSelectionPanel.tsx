@@ -8,6 +8,11 @@ import { NodeColumnSelector, NodeSelectionList } from '.';
 import type { NodeSelectionRenderArgs } from '.';
 import { useNodeColumnOptions } from '../useNodeColumnOptions';
 
+export interface NodeSelectionColumnAddonArgs extends NodeSelectionRenderArgs {
+  column: string;
+  columns: string[];
+}
+
 const CLEAR_SELECTION_VALUE = '__ldaca__clear__';
 
 const STATUS_VARIANT_STYLES: Record<'info' | 'warning' | 'error', string> = {
@@ -46,6 +51,7 @@ interface NodeSelectionPanelProps {
   statusVariant?: 'info' | 'warning' | 'error';
   headerAddon?: ReactNode; // optional element rendered next to the header label
   renderExtraNodeContent?: (args: NodeSelectionRenderArgs) => React.ReactNode;
+  renderColumnControlAddon?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
 }
 
 /** Shared node + text-column + color selection panel reused across analysis tabs */
@@ -75,6 +81,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   statusVariant = 'warning',
   headerAddon,
   renderExtraNodeContent,
+  renderColumnControlAddon,
 }) => {
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
@@ -118,13 +125,19 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     return null;
   };
 
-  const renderColumnSelector = ({ node, nodeId, index }: NodeSelectionRenderArgs) => {
+  const renderColumnSelector = (args: NodeSelectionRenderArgs) => {
+    const { node, nodeId, index } = args;
     if (!showColumnPicker) return null;
     const options = columnOptions[nodeId];
     const columns = options?.columns ?? [];
     const selection = columnSelectionsByNode.get(nodeId);
     const selectValue = selection?.column && selection.column.length > 0 ? selection.column : CLEAR_SELECTION_VALUE;
-    return (
+    const addon = renderColumnControlAddon?.({
+      ...args,
+      column: selection?.column ?? '',
+      columns,
+    });
+    const selector = (
       <NodeColumnSelector
         columns={columns}
         value={selectValue}
@@ -143,6 +156,13 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
           onColumnChange(nodeId, nextValue ?? '');
         }}
       />
+    );
+    if (!addon) return selector;
+    return (
+      <div className="grid items-end gap-2 md:grid-cols-2">
+        {selector}
+        <div className="min-w-0">{addon}</div>
+      </div>
     );
   };
 

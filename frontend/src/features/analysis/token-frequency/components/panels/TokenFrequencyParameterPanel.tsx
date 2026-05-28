@@ -1,4 +1,4 @@
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import NodeSelectionPanel, { type NodeSelectionColumnAddonArgs } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
 import { TokensColumnMismatchNotice } from '@/features/analysis/common/components/TokensColumnMismatchNotice';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
@@ -33,6 +33,7 @@ type TokenFrequencyParameterPanelProps = {
   onStudyNodeChange: (nodeId: string) => void;
   getColorForNode: (nodeId: string, index?: number) => string;
   computeDisplayName: (nodeId: string) => string;
+  renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
   lockedMessage?: string;
   snapshot?: {
     tool: SnapshotToolKey;
@@ -67,6 +68,7 @@ export const TokenFrequencyParameterPanel = ({
   onStudyNodeChange,
   getColorForNode,
   computeDisplayName,
+  renderTokenizerModelSelector,
   lockedMessage = ANALYSIS_LOCKED_MESSAGE,
   snapshot,
 }: TokenFrequencyParameterPanelProps) => {
@@ -185,6 +187,7 @@ export const TokenFrequencyParameterPanel = ({
         allowedDataTypes={['string']}
         originalCount={displayNodeCount}
         lockedMessage={lockedMessage}
+        renderColumnControlAddon={renderTokenizerModelSelector}
       />
       <TokensColumnMismatchNotice
         nodes={panelSelectedNodes}

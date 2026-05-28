@@ -30,14 +30,11 @@ const collectTokensSources = (tokenization: unknown): string[] => {
 /**
  * Inline notice that surfaces when the user has selected a text column for
  * analysis that *doesn't* have a tokenization spec, but the node does
- * carry tokenization for some *other* column. Without this, running the
- * analysis silently falls back to live-tokenisation on every run — fast on
- * Latin-script corpora, painfully slow on CJK ones. The notice nudges the
- * user to tokenise the selected column before running.
+ * carry legacy cached tokens for some *other* column.
  *
  * Only inspects the first selection — analyses cap their input at one or two
  * nodes and the first is enough to detect the mismatch pattern (typically a
- * user clicked Tokenise on the wrong column).
+ * user previously cached tokens for a different column).
  */
 export const TokensColumnMismatchNotice: React.FC<TokensColumnMismatchNoticeProps> = ({
   nodes,
@@ -72,9 +69,8 @@ export const TokensColumnMismatchNotice: React.FC<TokensColumnMismatchNoticeProp
           <code>{src}</code>
         </React.Fragment>
       ))}
-      . Running on <code>{mismatch.selectedColumn}</code> will tokenise live each
-      time — slow for CJK corpora. Tokenise <code>{mismatch.selectedColumn}</code>{' '}
-      from the column header first for a faster, cached path.
+      . Select one of those columns to reuse legacy cached tokens; otherwise this
+      analysis will use the live text/tokenizer settings for <code>{mismatch.selectedColumn}</code>.
     </div>
   );
 };

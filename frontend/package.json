@@ -33,6 +33,7 @@
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/view": "^6.43.0",
+    "@mediapipe/tasks-text": "^0.10.35",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -67,6 +68,7 @@
     "dagre": "^0.8.5",
     "hyparquet": "^1.25.8",
     "immer": "^11.1.4",
+    "iso-639-3": "^3.0.1",
     "jszip": "^3.10.1",
     "katex": "^0.16.38",
     "lucide-react": "^0.577.0",
@@ -82,6 +84,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "sonner": "^2.0.7",
+    "stopword": "^3.1.5",
     "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.11"
   },

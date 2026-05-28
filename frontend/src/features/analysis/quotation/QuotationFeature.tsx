@@ -102,6 +102,7 @@ import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { renderQuotationDetailText } from './components/quotationDetailText';
+import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 
 interface QuotationResultState {
   groupedRows: QuotationGroupedRow[];
@@ -204,6 +205,10 @@ const QuotationFeature: React.FC = () => {
     allowedDataTypes: ['string'],
     maxNodes: 1,
     docTypeOnly: true,
+  });
+  const persistDocumentColumn = usePersistNodeDocumentColumn({
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
   });
 
   const engineConfig = usePreferencesStore((state) => state.quotationEngine);
@@ -726,6 +731,7 @@ const QuotationFeature: React.FC = () => {
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
+    void persistDocumentColumn(nodeId, column);
   };
 
   const [hoverState, setHoverState] = useState<QuotationHoverState | null>(null);

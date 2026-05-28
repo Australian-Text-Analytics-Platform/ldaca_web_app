@@ -268,7 +268,7 @@ export const TokenFrequencyResultsPanel = ({
                 <HelpIcon
                   targetKey="analysis.token-frequency.stop-words"
                   label="About default stop words"
-                  tooltip="Fill Default loads the bundled English stop-word list shipped with the app. You can edit that list before or after applying it. Click to open the tutorial."
+                  tooltip="Fill Default uses the saved language for each selected column to load matching default stop words. You can edit the list before or after applying it. Click to open the tutorial."
                   className="h-5 w-5 text-muted-foreground"
                 />
               </div>

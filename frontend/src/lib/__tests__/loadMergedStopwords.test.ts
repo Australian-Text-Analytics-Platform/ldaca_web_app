@@ -1,69 +1,33 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { loadMergedStopwords } from '../loadMergedStopwords';
 
-const { getDefaultStopWordsMock } = vi.hoisted(() => ({
-  getDefaultStopWordsMock: vi.fn(),
-}));
-
-vi.mock('@/api/generated/sdk.gen', () => ({
-  getDefaultStopWords: getDefaultStopWordsMock,
-}));
-
-const getAuthHeaders = () => ({ Authorization: 'Bearer test' });
-
 describe('loadMergedStopwords', () => {
-  beforeEach(() => {
-    getDefaultStopWordsMock.mockReset();
-  });
-
   it('returns an empty result when no languages are supplied', async () => {
-    const result = await loadMergedStopwords({
-      languages: [],
-      getAuthHeaders,
-    });
+    const result = await loadMergedStopwords({ languages: [] });
+
     expect(result).toEqual({ byLanguage: [], merged: [] });
-    expect(getDefaultStopWordsMock).not.toHaveBeenCalled();
   });
 
-  it('deduplicates language codes and fetches each unique language once', async () => {
-    getDefaultStopWordsMock.mockResolvedValue({ data: { stopwords: ['the', 'and'] }, error: undefined });
-    await loadMergedStopwords({
-      languages: ['en', 'EN ', ' en', null, undefined, 'en'],
-      getAuthHeaders,
-    });
-    expect(getDefaultStopWordsMock).toHaveBeenCalledTimes(1);
-    expect(getDefaultStopWordsMock).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer test' },
-      query: { language: 'en', strict: true },
-      throwOnError: true,
-    });
+  it('deduplicates normalised language codes before resolving stopwords', async () => {
+    const result = await loadMergedStopwords({ languages: ['en', 'EN ', ' en-AU', null, undefined, 'en'] });
+
+    expect(result.byLanguage).toHaveLength(1);
+    expect(result.byLanguage[0]?.language).toBe('en');
+    expect(result.byLanguage[0]?.words).toContain('about');
+    expect(result.merged).toContain('about');
   });
 
   it('produces per-language groups and a deduplicated flat merge', async () => {
-    getDefaultStopWordsMock.mockImplementation(
-      (options?: { query?: { language?: string; strict?: boolean } }) => {
-        if (options?.query?.language === 'en') {
-          return Promise.resolve({ data: { stopwords: ['the', 'and', 'shared'] }, error: undefined });
-        }
-        if (options?.query?.language === 'zh') {
-          return Promise.resolve({ data: { stopwords: ['的', 'shared', '了'] }, error: undefined });
-        }
-        return Promise.resolve({ data: { stopwords: [] }, error: undefined });
-      },
-    );
+    const result = await loadMergedStopwords({ languages: ['en', 'zh'] });
 
-    const result = await loadMergedStopwords({
-      languages: ['en', 'zh'],
-      getAuthHeaders,
-    });
-
-    expect(result.byLanguage).toEqual([
-      { language: 'en', words: ['the', 'and', 'shared'] },
-      { language: 'zh', words: ['的', 'shared', '了'] },
-    ]);
-    // ``shared`` appears in both lists but only once in the flat merge,
-    // preserving the first-occurrence order across groups.
-    expect(result.merged).toEqual(['the', 'and', 'shared', '的', '了']);
+    expect(result.byLanguage.map((group) => group.language)).toEqual(['en', 'zh']);
+    expect(result.merged.indexOf('about')).toBeGreaterThanOrEqual(0);
+    expect(result.merged.indexOf('的')).toBeGreaterThan(result.merged.indexOf('about'));
   });
 
+  it('ignores unsupported language codes', async () => {
+    const result = await loadMergedStopwords({ languages: ['xx'] });
+
+    expect(result).toEqual({ byLanguage: [], merged: [] });
+  });
 });

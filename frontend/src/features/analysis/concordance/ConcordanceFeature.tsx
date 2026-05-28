@@ -67,6 +67,7 @@ import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
 import { ConcordanceDispersionDetachDialog } from './components/ConcordanceDispersionDetachDialog';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
+import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import {
   DISPERSION_DEFAULT_BIN_COUNT,
   type DispersionDisplayBinCount,
@@ -107,6 +108,10 @@ const ConcordanceFeature: React.FC = () => {
 
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
+  const persistDocumentColumn = usePersistNodeDocumentColumn({
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+  });
   const {
     isLocked,
     lockWithSnapshots,
@@ -1134,7 +1139,10 @@ const ConcordanceFeature: React.FC = () => {
 
 
 
-  const handleColumnChange = (nodeId: string, column: string) => setNodeColumnSelection(nodeId, column);
+  const handleColumnChange = (nodeId: string, column: string) => {
+    setNodeColumnSelection(nodeId, column);
+    void persistDocumentColumn(nodeId, column);
+  };
 
   useEffect(() => {
     if (!shouldAutoSearch) {

@@ -17,7 +17,7 @@ interface AnalysisState {
   panelNodeIds: string[];
   panelSelectedNodes: WorkspaceNodeLike[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
-  tokenizerModel: string;
+  tokenizerModelsByNode: Record<string, string>;
   stopWords: string;
   results: TokenFrequencyResponse | null;
   lastCompareNodeIds: string[];
@@ -64,7 +64,7 @@ export const useTokenFrequencyTaskFlow = ({
     panelNodeIds,
     panelSelectedNodes,
     effectiveNodeColumnSelections,
-    tokenizerModel,
+    tokenizerModelsByNode,
     stopWords,
     results,
     lockedNodeNameMap,
@@ -101,15 +101,19 @@ export const useTokenFrequencyTaskFlow = ({
     }
     if (runningRef.current) return;
 
-    const tokenizerModelId = tokenizerModel.trim();
-    if (!tokenizerModelId) {
-      toast.error('Set a tokenizer model before running token frequency.');
-      return;
-    }
-
     const incompleteSelections = effectiveNodeColumnSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
       toast.error('Please select a text column for all selected data blocks.');
+      return;
+    }
+
+    const requestNodeIds = takeMostRecent(panelNodeIds, 2);
+    const missingTokenizerModels = requestNodeIds.filter((nodeId) => {
+      const model = (tokenizerModelsByNode[nodeId] ?? '').trim();
+      return !model;
+    });
+    if (missingTokenizerModels.length > 0) {
+      toast.error('Select a tokenizer model for each selected data block.');
       return;
     }
 
@@ -132,10 +136,9 @@ export const useTokenFrequencyTaskFlow = ({
       });
 
       const request: TokenFrequencyRequest = {
-        node_ids: takeMostRecent(panelNodeIds, 2),
+        node_ids: requestNodeIds,
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
-        tokenizer_model: tokenizerModelId,
       };
 
       try {

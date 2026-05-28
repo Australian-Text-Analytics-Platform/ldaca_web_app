@@ -80,7 +80,12 @@ function buildTokenFrequencyPreview(
       }
     }
   }
-  const tokeniserId = request?.tokenizer_model ?? '(unspecified)';
+  const nodeTokenizerModels = request?.node_tokenizer_models ?? {};
+  const tokeniserId = request?.tokenizer_model
+    ?? (Object.entries(nodeTokenizerModels)
+      .map(([nodeId, model]) => `${nodeId}: ${model}`)
+      .join(', ')
+      || '(unspecified)');
   return {
     tool: 'token_frequencies',
     vocabSize,

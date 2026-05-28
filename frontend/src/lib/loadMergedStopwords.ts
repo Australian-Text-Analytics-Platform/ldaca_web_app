@@ -1,39 +1,36 @@
 /**
- * Fetch the bundled default stop-word lists for one or more languages
+ * Load client-side default stop-word lists for one or more saved language codes
  * and combine them into a single user-facing payload.
  *
  * Used by:
- * - Token-frequency's "Apply Stop Words" action, which now spans both
- *   selected corpora's languages (so an English/Chinese side-by-side
- *   comparison fills with both stoplists merged into one textarea).
- * - Future topic-modelling stopword UI — same shape applies once we
- *   surface a "currently-applied stopwords" view there.
+ * - Token-frequency's "Apply Stop Words" action, which spans the saved
+ *   tokenizer languages for selected corpora so multilingual comparisons fill
+ *   with all relevant stoplists merged into one textarea.
+ * - Future topic-modelling stopword UI — same shape applies once we surface a
+ *   "currently-applied stopwords" view there.
  *
  * Why:
- * - Centralises the "fetch N stoplists, dedupe by surface form, keep
+ * - Centralises the "resolve N stoplists, dedupe by surface form, keep
  *   per-language groups for display" logic so individual analyses don't
- *   re-implement the merge each time, and so behaviour stays consistent
- *   across tools (same dedup rules, same ordering).
+ *   re-implement the merge each time, and so behaviour stays consistent across
+ *   tools (same dedup rules, same ordering).
  *
  * Behaviour:
- * - Input languages are normalised (trim + lowercase) and deduplicated
- *   in input order. A single repeated language hits the backend once.
- * - Per-language fetches run in parallel via ``Promise.all``. A single
- *   language failure short-circuits the whole call so callers can
- *   surface one error rather than partial data; if you need per-language
- *   resilience, wrap the call in ``Promise.allSettled`` upstream.
+ * - Input languages are normalised (trim + lowercase + remove region suffix)
+ *   and deduplicated in input order after ISO 639-1 to ISO 639-3 conversion.
+ * - Unsupported languages are ignored so a missing third-party stopword list
+ *   does not block lists that are available.
  * - ``merged`` deduplicates across languages on exact surface form
  *   (post-trim, preserving original case so e.g. ``Inc`` and ``inc``
  *   stay distinct — matching how the existing textarea treats words).
  */
-import { getDefaultStopWords } from '@/api/generated/sdk.gen';
-import type { DefaultStopWordsResponse } from '@/api/generated/types.gen';
+import { iso6393 } from 'iso-639-3';
+import * as stopwordLists from 'stopword';
 
 export interface MergedStopwordsLanguageGroup {
-  /** Normalised language code requested (matches what the backend saw). */
+  /** Normalised ISO 639-1 language code resolved from node metadata. */
   language: string;
-  /** The words the backend returned for this language, trimmed but
-   *  otherwise verbatim. Empty when the request returned no entries. */
+  /** The words returned for this language, trimmed but otherwise verbatim. */
   words: string[];
 }
 
@@ -46,53 +43,53 @@ export interface MergedStopwordsResult {
   merged: string[];
 }
 
-const normaliseLanguageCode = (raw: string): string => raw.trim().toLowerCase();
+type StopwordExports = Record<string, unknown>;
 
-const extractStopwords = (
-  payload: DefaultStopWordsResponse | undefined,
-): string[] => {
-  if (!payload) return [];
-  return Array.isArray(payload.stopwords) ? payload.stopwords : [];
+const stopwordExports = stopwordLists as StopwordExports;
+
+const normaliseLanguageCode = (raw: string): string => raw.trim().toLowerCase().split(/[-_]/)[0] ?? '';
+
+const iso6393ByIso6391 = new Map(
+  iso6393
+    .filter((language) => language.iso6391 && language.iso6393)
+    .map((language) => [language.iso6391, language.iso6393] as const),
+);
+
+const resolveStopwordLanguageCode = (language: string): string | null => {
+  const normalised = normaliseLanguageCode(language);
+  if (!normalised) return null;
+  if (normalised.length === 3) return normalised;
+  return iso6393ByIso6391.get(normalised) ?? null;
 };
 
-export async function loadMergedStopwords(args: {
-  languages: ReadonlyArray<string | null | undefined>;
-  getAuthHeaders: () => Record<string, string>;
-}): Promise<MergedStopwordsResult> {
-  const { languages, getAuthHeaders } = args;
+const getStopwordList = (iso6393Code: string): string[] => {
+  const list = stopwordExports[iso6393Code];
+  if (!Array.isArray(list)) return [];
+  return list.map((word) => String(word).trim()).filter(Boolean);
+};
 
+export function resolveMergedStopwords(
+  languages: ReadonlyArray<string | null | undefined>,
+): MergedStopwordsResult {
   const seen = new Set<string>();
-  const ordered: string[] = [];
+  const ordered: { language: string; stopwordLanguage: string }[] = [];
   for (const candidate of languages) {
     if (typeof candidate !== 'string') continue;
-    const code = normaliseLanguageCode(candidate);
-    if (!code || seen.has(code)) continue;
-    seen.add(code);
-    ordered.push(code);
+    const language = normaliseLanguageCode(candidate);
+    const stopwordLanguage = resolveStopwordLanguageCode(language);
+    if (!language || !stopwordLanguage || seen.has(stopwordLanguage)) continue;
+    seen.add(stopwordLanguage);
+    ordered.push({ language, stopwordLanguage });
   }
 
   if (ordered.length === 0) {
     return { byLanguage: [], merged: [] };
   }
 
-  const headers = getAuthHeaders();
-  const responses = await Promise.all(
-    ordered.map(async (language) => {
-      const { data } = await getDefaultStopWords({
-        headers,
-        query: { language, strict: true },
-        throwOnError: true,
-      });
-      return data;
-    }),
-  );
-
   const byLanguage: MergedStopwordsLanguageGroup[] = ordered.map(
-    (language, index) => ({
+    ({ language, stopwordLanguage }) => ({
       language,
-      words: extractStopwords(responses[index])
-        .map((word) => String(word).trim())
-        .filter(Boolean),
+      words: getStopwordList(stopwordLanguage),
     }),
   );
 
@@ -107,4 +104,10 @@ export async function loadMergedStopwords(args: {
   }
 
   return { byLanguage, merged };
+}
+
+export async function loadMergedStopwords(args: {
+  languages: ReadonlyArray<string | null | undefined>;
+}): Promise<MergedStopwordsResult> {
+  return resolveMergedStopwords(args.languages);
 }

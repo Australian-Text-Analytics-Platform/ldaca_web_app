@@ -48,6 +48,7 @@ import { TopicModelingResultsPanel } from './components/panels/TopicModelingResu
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
+import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 20;
 type TopicModelingRequest = TopicModelingRequestInput;
@@ -76,6 +77,10 @@ const TopicModelingFeature: React.FC = () => {
     allowedDataTypes: ['string'],
     maxNodes: 2,
     docTypeOnly: true,
+  });
+  const persistDocumentColumn = usePersistNodeDocumentColumn({
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
   });
 
   // Snapshot view state hooks. Hoisted early so the effective-value
@@ -510,6 +515,7 @@ const TopicModelingFeature: React.FC = () => {
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked || inSnapshotMode) return;
     setNodeColumnSelection(nodeId, column);
+    void persistDocumentColumn(nodeId, column);
   };
 
   const nodeDocCounts = useMemo(
@@ -573,7 +579,7 @@ const TopicModelingFeature: React.FC = () => {
   // first corpus's language.
   //
   // Resolution order per node (via ``effectiveNodeLanguage``):
-  // 1. ``node.tokenization[*].language`` — set by Tokenise; authoritative
+  // 1. ``node.tokenization[*].language`` — set by legacy cached tokens; authoritative
   // 2. user preferences ``defaultLanguage``
   // 3. ``en`` — global fallback
   //
