@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { getColumnUniqueValues } from '@/api/generated/sdk.gen';
@@ -14,7 +13,7 @@ interface UniqueValueCountProps {
  * Rendered by: SequentialAnalysisParameterPanel to show cardinality hints for candidate group-by columns because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
  */
-export const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId, columnName }) => {
+export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValueCountProps) {
   const { getAuthHeaders } = useAuth();
 
   const { data, isLoading, error } = useQuery({
@@ -49,4 +48,4 @@ export const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId,
       {data.unique_count} unique{data.has_null ? ' + null' : ''}
     </span>
   );
-};
+}

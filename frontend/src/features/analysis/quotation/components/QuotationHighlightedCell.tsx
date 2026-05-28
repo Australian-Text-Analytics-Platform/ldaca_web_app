@@ -46,14 +46,14 @@ const choosePriorityType = (types: string[]): QuotationHighlightType => {
  * capture the parent's `setHoverState` directly.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const QuotationHighlightedCell: React.FC<QuotationHighlightedCellProps> = ({
+export function QuotationHighlightedCell({
   text,
   row,
   cellKey,
   contextLength,
   hoverState,
   onHoverChange,
-}) => {
+}: QuotationHighlightedCellProps) {
   if (typeof text !== 'string' || !text.length) {
     return <>{text ?? ''}</>;
   }

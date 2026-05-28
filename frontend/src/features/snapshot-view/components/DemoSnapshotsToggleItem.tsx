@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Camera } from 'lucide-react';
 import { DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -14,7 +14,7 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
  * Rendered by: Sidebar component, index module, DemoSnapshotsToggleItem tests (rg call sites/imports).
  * Why: because the sidebar needs a menu item that toggles demo snapshot mode without changing the current workspace route.
  */
-export const DemoSnapshotsToggleItem: React.FC = () => {
+export function DemoSnapshotsToggleItem() {
   const enabled = usePreferencesStore((s) => s.demoSnapshotsEnabled);
   const setEnabled = usePreferencesStore((s) => s.setDemoSnapshotsEnabled);
 
@@ -31,4 +31,4 @@ export const DemoSnapshotsToggleItem: React.FC = () => {
       Enable demo snapshots
     </DropdownMenuCheckboxItem>
   );
-};
+}

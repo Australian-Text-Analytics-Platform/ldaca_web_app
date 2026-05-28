@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderOpen, Info, Quote, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -65,12 +65,12 @@ interface DecoratedItem {
  * Rendered by: compat module, index module, SnapshotActions component (rg call sites/imports) because feature headers need a shared loader for compatible saved bundles.
  * Flow: the user chooses a bundle, entries are queried, a mutation parses the selected payload, and feature state hydrates from it.
  */
-export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
+export function LoadSnapshotDialog({
   open,
   onOpenChange,
   tool,
   onOpenSnapshot,
-}) => {
+}: LoadSnapshotDialogProps) {
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
   const [descriptionFor, setDescriptionFor] = useState<{ filename: string; title: string } | null>(
@@ -415,4 +415,4 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
       />
     </>
   );
-};
+}

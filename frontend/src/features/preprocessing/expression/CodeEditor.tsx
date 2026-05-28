@@ -61,7 +61,7 @@ interface CodeEditorProps {
  * Flow: pass controlled value/events into CodeMirror, apply the shared Python extensions,
  * and mirror disabled/min-height styling from preprocessing forms.
  */
-export const CodeEditor: React.FC<CodeEditorProps> = ({
+export function CodeEditor({
   value,
   onChange,
   onBlur,
@@ -69,7 +69,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   disabled = false,
   minHeight = '3.5rem',
   className = '',
-}) => {
+}: CodeEditorProps) {
   return (
     <div className={className}>
       <CodeMirror
@@ -94,4 +94,4 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       />
     </div>
   );
-};
+}

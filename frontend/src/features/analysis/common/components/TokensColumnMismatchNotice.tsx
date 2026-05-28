@@ -40,11 +40,11 @@ const collectTokenizerModelSources = (tokenizerModels: unknown): string[] => {
  * Used by: token-frequency and concordance parameter panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const TokensColumnMismatchNotice: React.FC<TokensColumnMismatchNoticeProps> = ({
+export function TokensColumnMismatchNotice({
   nodes,
   selections,
   className,
-}) => {
+}: TokensColumnMismatchNoticeProps) {
   const mismatch = useMemo(() => {
     const first = selections[0];
     if (!first?.column || !first.nodeId) return null;

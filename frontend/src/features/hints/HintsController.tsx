@@ -102,7 +102,7 @@ function ScrollEffect({ hintId, target }: { hintId: string; target: Element }) {
  * Flow: derive hint conditions, poll for an eligible anchor, suppress dismissed hints, scroll
  * the target once, and render highlight/bubble actions for the active hint.
  */
-export const HintsController: React.FC = () => {
+export function HintsController() {
   const { conditions, context } = useHintConditions();
   const { dismissedHints, hintsEnabled, dismissHint } = useHintsStore(
     useShallow((s) => ({
@@ -213,6 +213,6 @@ export const HintsController: React.FC = () => {
       />
     </>
   );
-};
+}
 
 export default HintsController;

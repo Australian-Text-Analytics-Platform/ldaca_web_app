@@ -57,7 +57,7 @@ const Fallback = () => (
  * isolated behind a shared error boundary.
  * Rendered by: App inside the workspace content pane because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
  */
-export const ViewRouter: React.FC = () => {
+export function ViewRouter() {
   const currentView = useUIStore((state) => state.currentView);
   const FeatureComponent = VIEW_COMPONENTS[currentView];
   return (
@@ -69,4 +69,4 @@ export const ViewRouter: React.FC = () => {
       </ErrorBoundary>
     </div>
   );
-};
+}

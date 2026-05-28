@@ -74,7 +74,7 @@ const createTestClient = () =>
  * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
  * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
-const wrapWithClient = (client: QueryClient): React.FC<{ children: React.ReactNode }> => {
+const wrapWithClient = (client: QueryClient) => {
     /**
    * Provides the caller's QueryClient to the mutation hook render.
      * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.

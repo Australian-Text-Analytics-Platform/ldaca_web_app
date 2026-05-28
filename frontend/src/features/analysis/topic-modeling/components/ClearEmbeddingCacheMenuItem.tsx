@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -20,7 +20,7 @@ import { formatBytes } from '@/lib/utils';
  * business logic that previously lived in the layout Sidebar component.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const ClearEmbeddingCacheMenuItem: React.FC = () => {
+export function ClearEmbeddingCacheMenuItem() {
   const { getAuthHeaders } = useAuth();
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<{ bytes: number; files: number } | null>(null);
@@ -91,4 +91,4 @@ export const ClearEmbeddingCacheMenuItem: React.FC = () => {
       />
     </>
   );
-};
+}

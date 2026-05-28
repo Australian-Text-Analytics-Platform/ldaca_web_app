@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -17,13 +17,13 @@ export interface NodeColorPickerProps {
  * Used by: NodeSelectionList colour controls because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
+export function NodeColorPicker({
   color,
   palette,
   onChange,
   triggerClassName,
   'aria-label': ariaLabel = 'Select color',
-}) => {
+}: NodeColorPickerProps) {
   const [hexInput, setHexInput] = useState(color.toUpperCase());
   const [hexEditing, setHexEditing] = useState(false);
   const displayedHex = hexEditing ? hexInput : color.toUpperCase();
@@ -100,6 +100,6 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-};
+}
 
 export default NodeColorPicker;

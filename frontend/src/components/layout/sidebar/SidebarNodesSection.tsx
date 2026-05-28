@@ -22,11 +22,11 @@ type SidebarNodesSectionProps = {
  * Why: sidebar node rows should use the same colour semantics as the graph while marking fresh nodes visibly.
  * Flow: derive fill from visual state, apply fresh-node outline when needed, then render the checkmark only for selected/focus states.
  */
-const NodeCheckIcon: React.FC<{
+function NodeCheckIcon({ state, pair, isFresh }: {
   state: NodeVisualState;
   pair: ColorPair;
   isFresh: boolean;
-}> = ({ state, pair, isFresh }) => {
+}) {
   const isUnselected = state === 'unselected';
   const fill = state === 'active' ? pair.X : state === 'focus' ? pair.Y : 'transparent';
   return (
@@ -42,7 +42,7 @@ const NodeCheckIcon: React.FC<{
       {!isUnselected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
     </span>
   );
-};
+}
 
 /**
  * Called by: SidebarNodesSection row rendering to build data-block tooltips because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
@@ -75,12 +75,12 @@ const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
  * Rendered by: Sidebar's Data Blocks section because graph selection and fresh-node acknowledgement must stay aligned.
  * Flow: read colour/current-view/fresh state, order selected nodes first, then render counts, clear action, and toggleable node rows.
  */
-const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
+function SidebarNodesSection({
   nodes,
   selectedNodeIds,
   onToggleNodeSelection,
   onClearSelection,
-}) => {
+}: SidebarNodesSectionProps) {
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
 
@@ -183,6 +183,6 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
       </div>
     </div>
   );
-};
+}
 
 export default SidebarNodesSection;

@@ -74,12 +74,12 @@ const formatMetadataValue = (value: unknown): string => {
  * Used by: concordance and quotation result row detail flows because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const RowDetailPanel: React.FC<RowDetailPanelProps> = ({
+export function RowDetailPanel({
   open,
   onOpenChange,
   payload,
   customization,
-}) => {
+}: RowDetailPanelProps) {
   if (!payload) return null;
 
   const { record, textColumn, fullText, excludeMetadataColumns } = payload;

@@ -14,7 +14,7 @@ import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
 
 const FeedbackPanel = lazy(() => import('@/components/panels/FeedbackPanel'));
 
-const App: React.FC = () => {
+function App() {
   useEffect(() => {
     void loadRemoteRegistry();
   }, []);
@@ -66,10 +66,10 @@ const App: React.FC = () => {
       <Toaster />
     </>
   );
-};
+}
 
 /** Auth gating: blocks on bootstrapping, shows login, or renders the workspace shell. */
-const AuthGate: React.FC = () => {
+function AuthGate() {
   const {
     phase,
     isAuthenticated,
@@ -124,6 +124,6 @@ const AuthGate: React.FC = () => {
   }
 
   return <WorkspaceShell />;
-};
+}
 
 export default App;

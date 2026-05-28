@@ -106,11 +106,11 @@ const resolveDocUrl = (requestedFile: string): string => {
  * Why: all help/reference entry points need one markdown viewer that works for bundled, remote, modal, and standalone docs.
  * Flow: resolve the active document target, fetch markdown with build placeholders, sync anchors and zoom state, then render markdown navigation controls.
  */
-const DocumentView: React.FC<{
+function DocumentView({ docType, onClose, target }: {
   docType: DocumentType;
   onClose?: () => void;
   target?: DocumentTarget | null;
-}> = ({ docType, onClose, target }) => {
+}) {
   const config = DOC_CONFIG[docType];
   const [content, setContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -306,6 +306,6 @@ const DocumentView: React.FC<{
       </main>
     </div>
   );
-};
+}
 
 export default DocumentView;

@@ -50,7 +50,7 @@ export interface AnalysisFeatureHeaderProps {
  * Used by: concordance parameter panel snapshot header because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
+export function AnalysisFeatureHeader({
   tool,
   title,
   infoKey,
@@ -63,7 +63,7 @@ export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
   saveSnapshotDisabledReason,
   onOpenSnapshot,
   snapshotNodeLabels,
-}) => {
+}: AnalysisFeatureHeaderProps) {
   return (
     <CardHeader className="space-y-0 pb-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">

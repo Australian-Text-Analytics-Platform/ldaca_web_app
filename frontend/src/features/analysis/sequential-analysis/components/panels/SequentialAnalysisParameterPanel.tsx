@@ -1,4 +1,3 @@
-import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 
 import HelpIcon from '@/components/help/HelpIcon';
@@ -134,7 +133,7 @@ export interface SequentialAnalysisParameterPanelProps {
  * orchestration state.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParameterPanelProps> = ({
+export function SequentialAnalysisParameterPanel({
   selectedNodes,
   nodeColumnSelections,
   timeCompatibleColumns,
@@ -169,7 +168,7 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
   defaultPalette,
   onColorChange,
   lockedMessage = ANALYSIS_LOCKED_MESSAGE,
-}) => {
+}: SequentialAnalysisParameterPanelProps) {
   return (
   <>
     <NodeSelectionPanel
@@ -379,4 +378,4 @@ export const SequentialAnalysisParameterPanel: React.FC<SequentialAnalysisParame
     </div>
   </>
   );
-};
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { useAuth } from '@/hooks/useAuth';
@@ -160,7 +160,7 @@ const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
-const AiAnnotatorFeature: React.FC = () => {
+function AiAnnotatorFeature() {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
@@ -1728,6 +1728,6 @@ const AiAnnotatorFeature: React.FC = () => {
       })() : null}
     </div>
   );
-};
+}
 
 export default AiAnnotatorFeature;

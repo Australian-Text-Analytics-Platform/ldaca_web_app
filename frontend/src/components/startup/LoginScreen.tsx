@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 import logo from '@/logo.png';
 import CILogonLogin from '@/components/CILogonLogin';
@@ -18,7 +18,7 @@ interface LoginScreenProps {
  * Rendered by: App while auth state requires interactive login because provider widgets should fail inside the card, not the app shell.
  * Flow: inspect enabled auth methods, choose the provider label and button, wrap OAuth UI in ErrorBoundary, then render the branded sign-in card.
  */
-export const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error, authMethods = [] }) => {
+export function LoginScreen({ isLoading, error, authMethods = [] }: LoginScreenProps) {
   const hasCILogon = authMethods.some((m) => m.name === 'cilogon' && m.enabled);
   const hasGoogle = authMethods.some((m) => m.name === 'google' && m.enabled);
   const providerLabel = hasCILogon ? 'CILogon' : hasGoogle ? 'a Google account' : 'your institutional account';
@@ -52,6 +52,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error, auth
       </div>
     </div>
   );
-};
+}
 
 export default LoginScreen;

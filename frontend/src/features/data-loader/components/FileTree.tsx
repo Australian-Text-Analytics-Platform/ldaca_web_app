@@ -51,7 +51,7 @@ export type FileTreeProps = {
  * Flow: build rows from the browser tree, attach move/drop/create-folder handlers, and expose
  * add/preview/delete/download actions for selected files.
  */
-export const FileTree: React.FC<FileTreeProps> = ({
+export function FileTree({
   nodes,
   selectedFile,
   loadingFiles,
@@ -65,7 +65,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onCreateFolderInside,
   onOpenCitation,
   onMoveFile,
-}) => {
+}: FileTreeProps) {
   const [draggingFilePath, setDraggingFilePath] = useState<string | null>(null);
   const [fileMoveTarget, setFileMoveTarget] = useState<FileMoveTarget | null>(null);
 

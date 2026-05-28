@@ -141,7 +141,7 @@ interface DateTimePickerFieldProps {
  * Flow: split ISO values into date/time draft state, keep both inputs synchronized, normalize
  * blur/Tab behavior, and emit UTC ISO strings.
  */
-export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value, onChange, placeholder = ISO_PLACEHOLDER, disabled = false }) => {
+export function DateTimePickerField({ value, onChange, placeholder = ISO_PLACEHOLDER, disabled = false }: DateTimePickerFieldProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = React.useState(false);
   const parsedValue = value ? parseIsoToLocalDate(value) : null;

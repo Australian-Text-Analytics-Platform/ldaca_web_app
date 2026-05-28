@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { WorkspaceControls } from './WorkspaceControls';
 import { InsetCard } from './InsetCard';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
@@ -12,7 +12,7 @@ import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
  * Why: graph and table panes need resize feedback without rerendering expensive children on every pointer move.
  * Flow: connect split refs to graph/table panes, imperatively resize during drag, then render controls, graph, splitter, and data table.
  */
-const WorkspaceView: React.FC = () => {
+function WorkspaceView() {
   const topRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { containerRef, value: ratio, isDragging, splitterProps } = useResizableSplit({
@@ -68,6 +68,6 @@ const WorkspaceView: React.FC = () => {
       </InsetCard>
     </div>
   );
-};
+}
 
 export default WorkspaceView;

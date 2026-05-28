@@ -18,11 +18,11 @@ interface HighlightRingProps {
    * Flow: measure the target on every tick/resize/scroll, store viewport-relative bounds, and
    * render an overlay only while the anchor is still attached.
    */
-export const HighlightRing: React.FC<HighlightRingProps> = ({
+export function HighlightRing({
   target,
   tick,
   className,
-}) => {
+}: HighlightRingProps) {
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   useEffect(() => {
@@ -74,6 +74,6 @@ export const HighlightRing: React.FC<HighlightRingProps> = ({
       className={cn('motion-safe:animate-pulse', className)}
     />
   );
-};
+}
 
 export default HighlightRing;

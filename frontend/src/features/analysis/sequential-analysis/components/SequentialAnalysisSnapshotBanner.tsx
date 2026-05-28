@@ -1,4 +1,3 @@
-import React from 'react';
 import { Camera, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,7 +9,7 @@ import { useSnapshotViewStore } from '@/features/snapshot-view';
  * components for the design rationale.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const SequentialAnalysisSnapshotBanner: React.FC = () => {
+export function SequentialAnalysisSnapshotBanner() {
   const snapshot = useSnapshotViewStore((s) => s.snapshots.sequential_analysis);
   const exitSnapshot = useSnapshotViewStore((s) => s.exitSnapshot);
 
@@ -53,4 +52,4 @@ export const SequentialAnalysisSnapshotBanner: React.FC = () => {
       </CardContent>
     </Card>
   );
-};
+}

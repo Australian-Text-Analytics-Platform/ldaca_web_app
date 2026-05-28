@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Calculator, Loader2, X } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -23,9 +23,9 @@ export type { AggregateSubTabProps } from './hooks/useAggregateSubTab';
  * content by selection so builder state resets when the active source changes.
  * Rendered by: DataPreprocessingFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
-export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
+export function AggregateSubTab(props: AggregateSubTabProps) {
   return <AggregateSubTabContent key={getAggregateSelectionKey(props)} {...props} />;
-};
+}
 
 /**
  * Derives the reset key for the aggregate builder from the most recent source
@@ -48,7 +48,7 @@ const getAggregateSelectionKey = (props: AggregateSubTabProps): string => {
  * Flow: split hook config into selection/builder/preview/apply props, render expression and
  * visual-builder modes, and keep table/apply controls tied to hook state.
  */
-const AggregateSubTabContent: React.FC<AggregateSubTabProps> = (props) => {
+function AggregateSubTabContent(props: AggregateSubTabProps) {
   const { isLoading } = props;
   const {
     nodeSelection,

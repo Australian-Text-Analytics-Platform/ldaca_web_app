@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/hooks/useAuth';
 import { REFRESH_CHIP_DELAY_MS } from '@/config/timings';
@@ -11,7 +11,7 @@ import { formatAttemptLabel, formatTimestamp } from './authPhaseCopy';
  * Why: degraded auth refreshes need one global retry surface without threading auth phase through every view.
  * Flow: delay the refreshing chip, derive degraded banner copy from auth phase, then render retry banner/chip or nothing.
  */
-export const RefreshStatusBanner: React.FC = () => {
+export function RefreshStatusBanner() {
   const { phase, refreshAuth } = useAuth();
   const [refreshChipReady, setRefreshChipReady] = useState(false);
 
@@ -61,4 +61,4 @@ export const RefreshStatusBanner: React.FC = () => {
       )}
     </div>
   );
-};
+}

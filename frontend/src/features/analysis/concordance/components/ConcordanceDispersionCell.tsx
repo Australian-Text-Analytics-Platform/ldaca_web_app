@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 type ConcordanceGroupedRow = Record<string, unknown>[];
 import {
@@ -37,7 +37,7 @@ const getNumericIndex = (value: unknown): number | null => {
  * Rendered by: ConcordanceDispersionNodeBlock and dispersion-cell tests as the compact per-document hit map because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const ConcordanceDispersionCell: React.FC<Props> = ({
+export function ConcordanceDispersionCell({
   hits,
   textLength,
   barWidthPercent = 100,
@@ -45,7 +45,7 @@ export const ConcordanceDispersionCell: React.FC<Props> = ({
   matchedTextColors,
   lowercaseMatches = false,
   hiddenMatchedTexts,
-}) => {
+}: Props) {
   const fallbackLength = hits.reduce((max, hit) => {
     const endIndex = getNumericIndex(hit[CONCORDANCE_COLUMN_KEYS.endIdx]);
     return endIndex === null ? max : Math.max(max, endIndex);
@@ -107,4 +107,4 @@ export const ConcordanceDispersionCell: React.FC<Props> = ({
       </div>
     </TooltipProvider>
   );
-};
+}

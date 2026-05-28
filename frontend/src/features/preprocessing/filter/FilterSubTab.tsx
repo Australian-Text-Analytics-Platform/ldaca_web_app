@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Filter, Loader2, Plus } from 'lucide-react';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,7 @@ import type { FilterConditionWithId } from '../types';
  * Flow: read grouped configs from the hook, render selection/condition/preview panels, and send
  * condition edits/apply requests through hook actions.
  */
-export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
+export function FilterSubTab(props: FilterSubTabProps) {
   const {
     selectionPanel,
     schemaState,
@@ -183,6 +183,6 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
       />
     </div>
   );
-};
+}
 
 export default FilterSubTab;

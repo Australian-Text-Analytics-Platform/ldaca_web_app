@@ -90,7 +90,7 @@ export type ConcordanceParameterPanelProps = {
  * Rendered by: ConcordanceFeature to own concordance parameters and header snapshot controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps> = ({
+export function ConcordanceParameterPanel({
   panelSelectedNodes,
   effectiveNodeColumnSelections,
   handleColumnChange,
@@ -131,7 +131,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   snapshotNodeLabels,
   readOnly = false,
   renderTokenizerModelSelector,
-}) => {
+}: ConcordanceParameterPanelProps) {
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
     if (actionState.runDisabledReason) return actionState.runDisabledReason;

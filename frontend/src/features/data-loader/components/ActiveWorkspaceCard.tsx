@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { LogOut, Plus, RefreshCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ export type ActiveWorkspaceCardProps = {
  * active-workspace controls, gate unsafe unloads while tasks run, then forward
  * save/rename/create events to parent actions.
  */
-export const ActiveWorkspaceCard: React.FC<ActiveWorkspaceCardProps> = ({
+export function ActiveWorkspaceCard({
   currentWorkspace,
   nodeCount,
   busy,
@@ -41,7 +41,7 @@ export const ActiveWorkspaceCard: React.FC<ActiveWorkspaceCardProps> = ({
   onUpdateDescription,
   onSave,
   onUnload,
-}) => {
+}: ActiveWorkspaceCardProps) {
   const hasWorkspaceSelected = Boolean(currentWorkspace);
   const workspaceKey = currentWorkspace?.id ?? currentWorkspace?.unique_id ?? null;
 
@@ -220,6 +220,6 @@ export const ActiveWorkspaceCard: React.FC<ActiveWorkspaceCardProps> = ({
       </CardContent>
     </Card>
   );
-};
+}
 
 export default ActiveWorkspaceCard;

@@ -20,7 +20,7 @@
  * SnapshotActions; the Trends feature's `handleSaveSnapshot` closure
  * reads its config state and runs the capture flow.
  */
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { AlertTriangle, FolderPlus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -142,14 +142,16 @@ interface Props {
 }
 
 /** Rendered by: SequentialAnalysisFeature through SnapshotActions saveDialog to control the trends snapshot shell because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface. */
-export const TrendsSnapshotConfigDialog: React.FC<Props> = ({ open, ...contentProps }) => (
-  <Dialog open={open} onOpenChange={contentProps.onOpenChange}>
-    {open ? <TrendsSnapshotConfigDialogContent key={contentProps.defaultName} {...contentProps} /> : null}
-  </Dialog>
-);
+export function TrendsSnapshotConfigDialog({ open, ...contentProps }: Props) {
+  return (
+    <Dialog open={open} onOpenChange={contentProps.onOpenChange}>
+      {open ? <TrendsSnapshotConfigDialogContent key={contentProps.defaultName} {...contentProps} /> : null}
+    </Dialog>
+  );
+}
 
 // Rendered by: TrendsSnapshotConfigDialog when open because snapshot saves need isolated estimate, dry-run, and validation state. Flow: read snapshot config props, query group cardinalities, derive row estimates, then render save controls.
-const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
+function TrendsSnapshotConfigDialogContent({
   onOpenChange,
   tool,
   existingFilenames,
@@ -164,7 +166,7 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
   nodeRowCount,
   yearsSpanHint,
   dryRunRowCount,
-}) => {
+}: Omit<Props, 'open'>) {
   const { getAuthHeaders } = useAuth();
 
   // Fetch real unique-value counts for the ticked group-by columns.
@@ -543,4 +545,4 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
         </DialogFooter>
       </DialogContent>
   );
-};
+}

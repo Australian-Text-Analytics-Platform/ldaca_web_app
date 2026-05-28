@@ -32,14 +32,14 @@ const statusStyles: Record<NonNullable<AnalysisTaskBannerProps['status']>, { car
  * Used by: task-backed analysis feature screens because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-const AnalysisTaskBanner: React.FC<AnalysisTaskBannerProps> = ({
+function AnalysisTaskBanner({
   analysisName,
   status = 'running',
   taskId,
   message,
   className,
   children,
-}) => {
+}: AnalysisTaskBannerProps) {
   const styles = statusStyles[status] ?? statusStyles.running;
   const trimmedMessage = message?.trim();
 

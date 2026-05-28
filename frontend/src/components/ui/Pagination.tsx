@@ -67,12 +67,12 @@ interface PaginationJumpProps {
  * Why: compact table pagers need an exact-page popover without assuming every backend can report total pages.
  * Flow: manage popover/input/error state, handle outside click and focus reset, validate page input, then call onPageChange and close.
  */
-export const PaginationJump: React.FC<PaginationJumpProps> = ({
+export function PaginationJump({
   totalPages,
   onPageChange,
   triggerClassName,
   showPageLabel = true,
-}) => {
+}: PaginationJumpProps) {
   const [open, setOpen] = React.useState(false)
   const [value, setValue] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)

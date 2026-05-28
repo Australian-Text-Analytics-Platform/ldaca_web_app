@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Layers, Loader2, Plus } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -24,7 +24,7 @@ export type { ConcatSubTabProps } from './hooks/useConcatSubTab';
  * Flow: collect selected nodes/schema analysis from its hook, render node ordering and mismatch
  * guidance, preview concatenation results, then expose apply controls.
  */
-export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
+export function ConcatSubTab(props: ConcatSubTabProps) {
   const {
     selectionPanel,
     form,
@@ -184,6 +184,6 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
       />
     </div>
   );
-};
+}
 
 export default ConcatSubTab;

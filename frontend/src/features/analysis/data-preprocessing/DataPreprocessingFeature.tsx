@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucide-react';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -22,7 +22,7 @@ type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggrega
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
-const DataPreprocessingFeature: React.FC = () => {
+function DataPreprocessingFeature() {
   const { selectedNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId, nodes: workspaceNodes = [] } = useWorkspaceData();
   const {
@@ -194,6 +194,6 @@ const DataPreprocessingFeature: React.FC = () => {
       </AlertDialog>
     </div>
   );
-};
+}
 
 export default DataPreprocessingFeature;

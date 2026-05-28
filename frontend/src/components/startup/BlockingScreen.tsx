@@ -18,7 +18,7 @@ type BlockingScreenProps = {
  * Why: startup and auth gates share the same shell while callers own the precise copy and recovery actions.
  * Flow: render optional logo and copy, show spinner/status/hint, then add error details and caller-supplied actions when present.
  */
-const BlockingScreen: React.FC<BlockingScreenProps> = ({
+function BlockingScreen({
   title,
   description,
   status = 'Loading…',
@@ -26,7 +26,7 @@ const BlockingScreen: React.FC<BlockingScreenProps> = ({
   error,
   actions,
   showLogo = true,
-}) => {
+}: BlockingScreenProps) {
   return (
     <div className="min-h-dvh bg-linear-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-xl text-center space-y-4 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
@@ -58,6 +58,6 @@ const BlockingScreen: React.FC<BlockingScreenProps> = ({
       </div>
     </div>
   );
-};
+}
 
 export default BlockingScreen;

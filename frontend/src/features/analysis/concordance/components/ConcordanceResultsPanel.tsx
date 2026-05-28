@@ -1,4 +1,4 @@
-import React, { type Dispatch, type SetStateAction, type RefObject } from 'react';
+import { type Dispatch, type SetStateAction, type RefObject } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
@@ -122,7 +122,7 @@ export type ConcordanceResultsPanelProps = {
  * Rendered by: ConcordanceFeature to coordinate table and dispersion result blocks because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = ({
+export function ConcordanceResultsPanel({
   results,
   resultsRef,
   resultsViewportRef,
@@ -182,7 +182,7 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
   openDetachDialog,
   onDispersionDetach,
   readOnly = false,
-}) => {
+}: ConcordanceResultsPanelProps) {
   const showDispersion = concordanceView === 'dispersion';
 
   return (
@@ -434,4 +434,4 @@ export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = (
       </CardContent>
     </Card>
   );
-};
+}

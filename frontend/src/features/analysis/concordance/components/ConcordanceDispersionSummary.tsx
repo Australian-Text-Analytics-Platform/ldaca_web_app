@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -131,7 +131,7 @@ const stripSeriesKey = (key: string): { text: string; source: string | null } =>
  * Rendered by: ConcordanceDispersionNodeBlock to build the dispersion chart and export payload because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const ConcordanceDispersionSummary: React.FC<Props> = ({
+export function ConcordanceDispersionSummary({
   rows,
   textColumn,
   binCount,
@@ -150,7 +150,7 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
   onBinCountChange,
   selection,
   onLegendCountsChange,
-}) => {
+}: Props) {
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
 
@@ -516,4 +516,4 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
       />
     </div>
   );
-};
+}

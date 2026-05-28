@@ -97,7 +97,7 @@ function computePosition(
  * Flow: compute position from target and tick, render text/actions/dismiss controls, and
  * remeasure when the anchor or viewport changes.
  */
-export const HintBubble: React.FC<HintBubbleProps> = ({
+export function HintBubble({
   hint,
   target,
   tick,
@@ -105,7 +105,7 @@ export const HintBubble: React.FC<HintBubbleProps> = ({
   onDismissSession,
   onLearnMore,
   onAction,
-}) => {
+}: HintBubbleProps) {
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<Position | null>(null);
 
@@ -234,6 +234,6 @@ export const HintBubble: React.FC<HintBubbleProps> = ({
       </div>
     </div>
   );
-};
+}
 
 export default HintBubble;

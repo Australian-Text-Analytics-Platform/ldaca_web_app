@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { AlertCircle, Loader2, Plus, Shuffle } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -23,12 +23,12 @@ export type { SliceSubTabProps } from './hooks/useSliceSubTab';
  * inner form reset naturally for each source data block.
  * Rendered by: DataPreprocessingFeature module, PreviewTable component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
-export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
+export function SliceSubTab(props: SliceSubTabProps) {
   const selectedNodeLabel = deriveNodeLabel(props.selectedNode) || props.selectedNodeId || '';
   const selectedNodeKey = `${props.selectedNodeId ?? ''}:${selectedNodeLabel}`;
 
   return <SliceSubTabContent key={selectedNodeKey} {...props} />;
-};
+}
 
 /**
  * Renders the Sample Rows tab UI around `useSliceSubTab` state for slice and
@@ -37,7 +37,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
  * Flow: render slice/random-sample controls from hook state, show mode-specific fields and
  * preview table, then expose apply actions.
  */
-const SliceSubTabContent: React.FC<SliceSubTabProps> = (props) => {
+function SliceSubTabContent(props: SliceSubTabProps) {
   const {
     selectionPanel,
     form,
@@ -252,6 +252,6 @@ const SliceSubTabContent: React.FC<SliceSubTabProps> = (props) => {
       />
     </div>
   );
-};
+}
 
 export default SliceSubTab;

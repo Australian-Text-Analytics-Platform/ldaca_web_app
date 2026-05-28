@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useQuery } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -34,11 +34,11 @@ export interface SnapshotDescriptionDialogProps {
  * Why: because snapshot loaders and sample panels need a compact metadata surface before users decide to inspect or load a snapshot.
  * Flow: fetch the markdown sidecar, render loading/error fallbacks, then show the parsed description in a modal.
  */
-export const SnapshotDescriptionDialog: React.FC<SnapshotDescriptionDialogProps> = ({
+export function SnapshotDescriptionDialog({
   filename,
   title,
   onClose,
-}) => {
+}: SnapshotDescriptionDialogProps) {
   const { getAuthHeaders } = useAuth();
   const { data: content, isLoading, isError } = useQuery({
     queryKey: ['snapshot-description', filename],
@@ -102,4 +102,4 @@ export const SnapshotDescriptionDialog: React.FC<SnapshotDescriptionDialogProps>
       </DialogContent>
     </Dialog>
   );
-};
+}

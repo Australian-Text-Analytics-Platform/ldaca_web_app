@@ -1,4 +1,4 @@
-import React from 'react';
+
 import {
   Table,
   TableBody,
@@ -123,7 +123,7 @@ export type ConcordanceTableNodeBlockProps = {
  * Rendered by: ConcordanceResultsPanel for each table-oriented concordance result block because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps> = ({
+export function ConcordanceTableNodeBlock({
   nodeKey,
   nodeData,
   context,
@@ -152,7 +152,7 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
   setCombinedPage,
   openDetachDialog,
   readOnly = false,
-}) => {
+}: ConcordanceTableNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const effectiveNodeId = actualNodeId || requestNodeId;
   const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
@@ -545,4 +545,4 @@ export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps>
       </AnalysisPagination>
     </div>
   );
-};
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -18,11 +18,11 @@ interface DatetimeFormatPanelProps {
  * form only when the dialog is visible.
  * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
  */
-export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
+export function DatetimeFormatPanel({
   open,
   onClose,
   ...contentProps
-}) => {
+}: DatetimeFormatPanelProps) {
   return (
     <Dialog
       open={open}
@@ -35,7 +35,7 @@ export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
       {open && <DatetimeFormatPanelContent {...contentProps} onClose={onClose} />}
     </Dialog>
   );
-};
+}
 
 /**
  * Datetime format form used inside `DatetimeFormatPanel`. It lets users accept

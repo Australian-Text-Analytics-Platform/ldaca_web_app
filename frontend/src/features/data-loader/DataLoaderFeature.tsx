@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Loader2, FolderPlus, Upload, Download as DownloadIcon, RefreshCcw } from 'lucide-react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
@@ -43,7 +43,7 @@ import { getWorkspaceId } from './utils/format';
  * changes while tasks are active, then render the workspace, file tree, sample
  * data, preview, and dialog panels with the handlers they need.
  */
-export const DataLoaderFeature: React.FC = () => {
+function DataLoaderFeature() {
   const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
   const { dataFolder, getAuthHeaders } = useAuth({ autoStart: true });
@@ -565,6 +565,6 @@ export const DataLoaderFeature: React.FC = () => {
       />
     </div>
   );
-};
+}
 
 export default DataLoaderFeature;

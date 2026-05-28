@@ -57,13 +57,13 @@ type MetadataColumnSelectorProps = {
  * Used by: concordance, quotation, and AI annotation result tables because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const MetadataColumnSelector: React.FC<MetadataColumnSelectorProps> = ({
+export function MetadataColumnSelector({
   availableColumns,
   selectedColumns,
   onSelectedColumnsChange,
   sections,
   disabledReason,
-}) => {
+}: MetadataColumnSelectorProps) {
   const normalizedAvailableColumns = normalizeMetadataColumns(availableColumns);
   const normalizedSelectedColumns = normalizeMetadataColumns(selectedColumns).filter((column) =>
     normalizedAvailableColumns.includes(column),

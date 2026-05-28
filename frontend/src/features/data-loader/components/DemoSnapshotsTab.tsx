@@ -16,7 +16,7 @@
  * On a successful import we invalidate every ``snapshots-list`` query
  * so each tool's Load button picks up the new bundles immediately.
  */
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { FolderPlus, AlertTriangle } from 'lucide-react';
@@ -79,11 +79,11 @@ interface Props {
    * Flow: fetch demo snapshot metadata, render category/description/import controls, and keep
    * per-snapshot import state so users see which sample is loading.
    */
-export const DemoSnapshotsTab: React.FC<Props> = ({
+export function DemoSnapshotsTab({
   authHeaders,
   onImportComplete,
   enabled,
-}) => {
+}: Props) {
   const queryClient = useQueryClient();
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [replace, setReplace] = useState<Record<string, boolean>>({});
@@ -299,4 +299,4 @@ export const DemoSnapshotsTab: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+}

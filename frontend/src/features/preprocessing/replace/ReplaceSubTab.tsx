@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Search } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -24,7 +24,7 @@ export type { ReplaceSubTabProps } from './hooks/useReplaceSubTab';
  * Flow: render target column/find-replace controls, show preview output, and delegate
  * apply/preview actions to the replace hook.
  */
-export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
+export function ReplaceSubTab(props: ReplaceSubTabProps) {
   const {
     activeNodeId,
     hasSelection,
@@ -224,6 +224,6 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
       />
     </div>
   );
-};
+}
 
 export default ReplaceSubTab;

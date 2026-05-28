@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Camera, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { useSnapshotViewStore } from '@/features/snapshot-view';
  * the user returns to whatever was on screen before Open was clicked.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const ConcordanceSnapshotBanner: React.FC = () => {
+export function ConcordanceSnapshotBanner() {
   const snapshot = useSnapshotViewStore((s) => s.snapshots.concordance);
   const exitSnapshot = useSnapshotViewStore((s) => s.exitSnapshot);
 
@@ -57,4 +57,4 @@ export const ConcordanceSnapshotBanner: React.FC = () => {
       </CardContent>
     </Card>
   );
-};
+}

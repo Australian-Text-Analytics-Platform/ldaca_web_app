@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -93,14 +93,14 @@ function validateName(
  * Rendered by: index module, SaveSnapshotDialog tests, SnapshotActions component (rg call sites/imports) because save buttons need one dialog to collect metadata before capture.
  * Flow: the user names a snapshot, the capture callback builds the bundle, and the dialog surfaces success or failure.
  */
-export const SaveSnapshotDialog: React.FC<SaveSnapshotDialogProps> = ({
+export function SaveSnapshotDialog({
   open,
   onOpenChange,
   tool,
   existingFilenames,
   defaultName,
   onSave,
-}) => {
+}: SaveSnapshotDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -212,4 +212,4 @@ export const SaveSnapshotDialog: React.FC<SaveSnapshotDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-};
+}

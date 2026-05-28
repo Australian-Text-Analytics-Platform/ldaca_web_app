@@ -85,7 +85,7 @@ const CHART_HEIGHT_PX = 400;
  * Rendered by: SequentialAnalysisResultsPanel to show the chart and detach/selection controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const SequentialChart: React.FC<SequentialChartProps> = ({
+export function SequentialChart({
   chartType,
   xAxisType = 'category',
   chartData,
@@ -105,7 +105,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
   onDetach,
   containerRef,
   readOnly = false,
-}) => {
+}: SequentialChartProps) {
   const toggleKey = onToggleKey;
   const visibleKeys = groupKeys.filter((key) => !hiddenKeys.has(key));
   const hasSelection = selectedPeriodIndices.size > 0;

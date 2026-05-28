@@ -180,7 +180,7 @@ export type ConcordanceDispersionNodeBlockProps = {
  * Rendered by: ConcordanceResultsPanel for each concordance dispersion result block because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeBlockProps> = ({
+export function ConcordanceDispersionNodeBlock({
   nodeKey,
   nodeData,
   context,
@@ -226,7 +226,7 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
   handleMaterialize,
   setCombinedPage,
   readOnly = false,
-}) => {
+}: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
   const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';

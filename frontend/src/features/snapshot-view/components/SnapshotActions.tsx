@@ -96,14 +96,14 @@ function buildDefaultName(nodeLabels: string[] | undefined): string {
  * Rendered by: index module, SaveSnapshotDialog component, useConcordanceSnapshotLoad hook (rg call sites/imports) because analysis headers need one action slot for save/load workflows.
  * Flow: mode and capability checks choose available actions, then save/load/description dialogs run the selected snapshot workflow.
  */
-export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
+export function SnapshotActions({
   tool,
   onSave,
   disabledReason,
   onOpenSnapshot,
   nodeLabels,
   saveDialog,
-}) => {
+}: SnapshotActionsProps) {
   const enabled = usePreferencesStore((s) => s.demoSnapshotsEnabled);
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();

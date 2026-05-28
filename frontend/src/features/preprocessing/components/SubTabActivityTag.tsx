@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Loader2 } from 'lucide-react';
 
 import { Tag } from '@/components/ui/tag';
@@ -19,7 +19,7 @@ interface Props {
  * snippet that lived in 7 sub-tab components.
  * Rendered by: JoinSubTab module, ConcatSubTab module, FilterSubTab module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
-export const SubTabActivityTag: React.FC<Props> = ({ active, verb }) => {
+export function SubTabActivityTag({ active, verb }: Props) {
   if (!active) return null;
   return (
     <Tag tone="muted">
@@ -27,4 +27,4 @@ export const SubTabActivityTag: React.FC<Props> = ({ active, verb }) => {
       {verb}…
     </Tag>
   );
-};
+}

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Camera, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,7 +9,7 @@ import { useSnapshotViewStore } from '@/features/snapshot-view';
  * rationale.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const TopicModelingSnapshotBanner: React.FC = () => {
+export function TopicModelingSnapshotBanner() {
   const snapshot = useSnapshotViewStore((s) => s.snapshots.topic_modeling);
   const exitSnapshot = useSnapshotViewStore((s) => s.exitSnapshot);
 
@@ -53,4 +52,4 @@ export const TopicModelingSnapshotBanner: React.FC = () => {
       </CardContent>
     </Card>
   );
-};
+}

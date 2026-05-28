@@ -27,7 +27,7 @@ export interface NodeColumnSelectorProps {
  * Used by: NodeSelectionPanel and feature-specific column selection controls because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const NodeColumnSelector: React.FC<NodeColumnSelectorProps> = ({
+export function NodeColumnSelector({
   columns,
   value,
   onChange,
@@ -42,7 +42,7 @@ export const NodeColumnSelector: React.FC<NodeColumnSelectorProps> = ({
   className,
   triggerClassName,
   labelClassName,
-}) => {
+}: NodeColumnSelectorProps) {
   if (!columns.length) {
     return (
       <div className={cn('rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive', className)}>

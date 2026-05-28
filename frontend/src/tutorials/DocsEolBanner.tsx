@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 import { useRegistryStore } from './registryStore';
 
@@ -17,7 +17,7 @@ const DISMISS_STORAGE_KEY = 'ldaca.docs.eol.dismissedFor';
  * Used by: src/App.tsx because docs consumers need one registry path for bundled, cached, and remote documentation targets.
  * Flow: validate registry input, merge local and remote metadata, then expose the documentation entries to UI consumers.
  */
-export const DocsEolBanner: React.FC = () => {
+export function DocsEolBanner() {
   const meta = useRegistryStore((s) => s.meta);
   const [dismissedFor, setDismissedFor] = useState<string | null>(() => {
     if (typeof localStorage === 'undefined') return null;
@@ -50,6 +50,7 @@ export const DocsEolBanner: React.FC = () => {
     }
   };
 
+
   return (
     <div className="pointer-events-none fixed left-1/2 top-4 z-50 flex -translate-x-1/2 flex-col gap-2">
       <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-lg">
@@ -68,4 +69,4 @@ export const DocsEolBanner: React.FC = () => {
       </div>
     </div>
   );
-};
+}

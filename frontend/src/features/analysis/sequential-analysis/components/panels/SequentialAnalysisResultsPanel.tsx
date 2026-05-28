@@ -76,7 +76,7 @@ export interface SequentialAnalysisResultsPanelProps {
  * machinery from `useSequentialAnalysisTaskFlow` as props.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const SequentialAnalysisResultsPanel: React.FC<SequentialAnalysisResultsPanelProps> = ({
+export function SequentialAnalysisResultsPanel({
   resultsSummary,
   summary,
   counts,
@@ -104,7 +104,8 @@ export const SequentialAnalysisResultsPanel: React.FC<SequentialAnalysisResultsP
   onDetach,
   containerRef,
   readOnly = false,
-}) => (
+}: SequentialAnalysisResultsPanelProps) {
+  return (
   <Card className="mt-6">
     <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
@@ -257,4 +258,5 @@ export const SequentialAnalysisResultsPanel: React.FC<SequentialAnalysisResultsP
       />
     </CardContent>
   </Card>
-);
+  );
+}

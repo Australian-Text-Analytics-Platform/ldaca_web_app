@@ -44,7 +44,7 @@ export type WorkspaceManagerCardProps = {
  * Flow: render the workspace list and controls, capture rename/delete/save/upload events, and
  * hand mutations to parent hooks while reflecting busy states.
  */
-export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
+export function WorkspaceManagerCard({
   workspaces,
   currentWorkspaceId,
   busy,
@@ -56,7 +56,7 @@ export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
   onRefresh,
   onLoadWorkspace,
   onDeleteWorkspace,
-}) => {
+}: WorkspaceManagerCardProps) {
   const zipInputRef = useRef<HTMLInputElement | null>(null);
   // Selecting only the two action functions; reading the full state would
   // re-render this card every time the `syncing` flag flips during the

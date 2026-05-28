@@ -274,7 +274,7 @@ export type DataLoaderDialogsProps = {
  * Flow: render each modal from hook-owned state, wire form fields to hook setters, then
  * delegate confirmations/import/search actions back to DataLoaderFeature hooks.
  */
-export const DataLoaderDialogs: React.FC<DataLoaderDialogsProps> = ({
+export function DataLoaderDialogs({
   noWorkspaceAlert,
   workspaceNameAlert,
   folderNameAlert,
@@ -282,7 +282,7 @@ export const DataLoaderDialogs: React.FC<DataLoaderDialogsProps> = ({
   ldacaImport,
   createFolder,
   citation,
-}) => {
+}: DataLoaderDialogsProps) {
   const [tokenDialogOpen, setTokenDialogOpen] = React.useState(false);
   const [tokenDraft, setTokenDraft] = React.useState('');
   const [tokenError, setTokenError] = React.useState<string | undefined>();

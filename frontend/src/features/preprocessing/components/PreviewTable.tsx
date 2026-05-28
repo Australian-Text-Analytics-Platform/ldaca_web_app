@@ -57,7 +57,7 @@ function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow, unkno
  * Flow: build server-table columns from preview rows, wire pagination/page-size controls,
  * render loading/error/empty states, and show the table body when preview data arrives.
  */
-export const PreviewTable: React.FC<PreviewTableProps> = ({
+export function PreviewTable({
   title,
   description,
   columns,
@@ -73,7 +73,7 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
   onPageChange,
   loadingBadge,
   documentColumn,
-}) => {
+}: PreviewTableProps) {
   const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
   const columnsToRender =
     columns.length > 0

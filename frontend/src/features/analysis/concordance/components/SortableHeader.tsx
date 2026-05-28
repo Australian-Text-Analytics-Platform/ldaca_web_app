@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { TableHead } from '@/components/ui/table';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 
@@ -15,14 +15,14 @@ type Props = {
  * Rendered by: ConcordanceTableNodeBlock as the concordance table's reusable sortable header affordance because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const SortableHeader: React.FC<Props> = ({
+export function SortableHeader({
   columnKey,
   label,
   paginationKey,
   requestNodeId,
   nodePagination,
   onSort,
-}) => {
+}: Props) {
   const nodeState = nodePagination[paginationKey] ?? { sortBy: '', descending: false };
   const isSorted = nodeState.sortBy === columnKey;
   const sortIcon = isSorted ? (nodeState.descending ? '▼' : '▲') : '▲▼';
@@ -40,4 +40,4 @@ export const SortableHeader: React.FC<Props> = ({
       </div>
     </TableHead>
   );
-};
+}

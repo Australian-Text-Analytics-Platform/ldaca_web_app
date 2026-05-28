@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import { useFilePreview } from '../../hooks/useFilePreview';
 import { SUPPORTED_LANGUAGES } from '@/lib/languages';
@@ -24,7 +24,7 @@ interface AddFilePanelProps {
  * Flow: combine open state with filename presence, mirror close events to the
  * caller, then mount the dialog content only for a concrete file.
  */
-export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onClose, onConfirm }) => {
+export function AddFilePanel({ filename, open, onClose, onConfirm }: AddFilePanelProps) {
   const isOpen = open && Boolean(filename);
 
   return (
@@ -39,7 +39,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
       )}
     </Dialog>
   );
-};
+}
 
 /**
  * File-add dialog body. Shows preview rows, optional Excel sheet selection,

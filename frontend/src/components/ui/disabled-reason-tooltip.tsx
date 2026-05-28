@@ -38,13 +38,13 @@ export interface DisabledReasonTooltipProps {
  * pointer events for normal tooltip triggers.
  * Flow: return children unchanged without a reason, otherwise wrap them in a span trigger and render TooltipProvider/TooltipContent with side and delay options.
  */
-export const DisabledReasonTooltip: React.FC<DisabledReasonTooltipProps> = ({
+export function DisabledReasonTooltip({
   reason,
   side = 'top',
   className,
   delayDuration = 0,
   children,
-}) => {
+}: DisabledReasonTooltipProps) {
   if (!reason) return <>{children}</>;
   const wrapperClass = ['inline-flex', className].filter(Boolean).join(' ');
   return (

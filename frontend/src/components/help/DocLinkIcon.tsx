@@ -1,4 +1,3 @@
-import React from 'react';
 import { CircleHelp, Info, Quote, AlertTriangle, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -81,13 +80,13 @@ export interface DocLinkIconProps {
  * Why: help, info, warning, and reference affordances share registry lookup, missing-target feedback, and modal dispatch.
  * Flow: choose the icon config, resolve label and tooltip text, open the registry target or toast when missing, then render the icon button.
  */
-export const DocLinkIcon: React.FC<DocLinkIconProps> = ({
+export function DocLinkIcon({
   kind,
   targetKey,
   label,
   tooltip,
   className,
-}) => {
+}: DocLinkIconProps) {
   const config = CONFIG[kind];
   const resolvedLabel = label ?? config.defaultLabel;
   const tooltipText = tooltip ?? resolvedLabel;
@@ -120,6 +119,6 @@ export const DocLinkIcon: React.FC<DocLinkIconProps> = ({
       <TooltipContent side="top">{tooltipText}</TooltipContent>
     </Tooltip>
   );
-};
+}
 
 export default DocLinkIcon;

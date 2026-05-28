@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Loader2, Merge, Plus } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -24,7 +24,7 @@ export type { JoinSubTabProps } from './hooks/useJoinSubTab';
  * Flow: consume join hook sections, render node/column selection, join type controls, preview
  * results, and apply state in one tab surface.
  */
-export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
+export function JoinSubTab(props: JoinSubTabProps) {
   const {
     selectionPanel,
     sharedColumnsNotice,
@@ -177,4 +177,4 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
       </div>
     </div>
   );
-};
+}

@@ -25,13 +25,13 @@ interface OperationPopoverProps {
  * Flow: keep the operation menu open around a selected token, add operations from the dropdown,
  * and expose removal controls for existing operations.
  */
-export const OperationPopover: React.FC<OperationPopoverProps> = ({
+export function OperationPopover({
   nodeId,
   column,
   onSelect,
   disabled,
   children,
-}) => {
+}: OperationPopoverProps) {
   const { getAuthHeaders } = useAuth();
   const [open, setOpen] = useState(false);
   const [operations, setOperations] = useState<ColumnOperationsResponse['operations'] | null>(null);
@@ -152,4 +152,4 @@ export const OperationPopover: React.FC<OperationPopoverProps> = ({
       </PopoverContent>
     </Popover>
   );
-};
+}

@@ -75,13 +75,13 @@ const taskLabel = (task: SidebarTaskRecord): string => {
  * Rendered by: Sidebar's Tasks section because task stream health and recent job state need to stay visible beside navigation.
  * Flow: sort tasks by priority and timestamp, manage expanded rows, then render connection status, retry action, and task details.
  */
-const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
+function SidebarTasksSection({
   tasks,
   isConnected,
   isConnecting,
   connectionError,
   onReconnect,
-}) => {
+}: SidebarTasksSectionProps) {
   const sortedTasks = Array.isArray(tasks)
     ? tasks
         .slice()

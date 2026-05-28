@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Select,
   SelectContent,
@@ -25,14 +24,14 @@ interface Props {
  * Used by: concordance and quotation parameter/result footers because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const PageSizeSelect: React.FC<Props> = ({
+export function PageSizeSelect({
   value,
   onChange,
   options = PAGE_SIZE_OPTIONS_DEFAULT,
   label = 'Documents per batch',
   triggerClassName = 'h-9 w-20',
   className = 'ml-auto flex items-center gap-2',
-}) => {
+}: Props) {
   return (
     <div className={className}>
       <span className="whitespace-nowrap text-sm text-muted-foreground">{label}</span>
@@ -50,4 +49,4 @@ export const PageSizeSelect: React.FC<Props> = ({
       </Select>
     </div>
   );
-};
+}

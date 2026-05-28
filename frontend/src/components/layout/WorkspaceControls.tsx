@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -26,7 +26,7 @@ const MIN_BATCH_DELETE_COUNT = 3;
  * Rendered by: WorkspaceView above the graph canvas because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
  * Flow: read workspace and selection state, prepare selected-delete metadata, manage rename/delete dialogs, then render toolbar controls.
  */
-export const WorkspaceControls: React.FC = () => {
+export function WorkspaceControls() {
   const { currentWorkspace, workspaceGraph } = useWorkspaceData();
   const { renameWorkspace, deleteNode, clearSelection } = useWorkspaceActions();
   const { selectedNodeIds } = useWorkspaceSelection();
@@ -229,4 +229,4 @@ export const WorkspaceControls: React.FC = () => {
       </AlertDialog>
     </div>
   );
-};
+}

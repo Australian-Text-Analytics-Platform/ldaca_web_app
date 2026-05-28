@@ -93,7 +93,7 @@ export interface WorkspaceColumnHeaderProps {
  * Why: because the table needs one header surface for sort, filter, rename, cast, and delete controls on each column.
  * Flow: render the label and sort affordance, then expose per-column actions through dropdown controls.
  */
-export const WorkspaceColumnHeader: React.FC<WorkspaceColumnHeaderProps> = ({
+export function WorkspaceColumnHeader({
   column,
   colInst,
   currentType,
@@ -120,7 +120,7 @@ export const WorkspaceColumnHeader: React.FC<WorkspaceColumnHeaderProps> = ({
   onCancelRename,
   onTypeChange,
   onRequestDelete,
-}) => {
+}: WorkspaceColumnHeaderProps) {
   const isPinnedLeft = colInst.getIsPinned() === 'left';
 
   return (
@@ -310,4 +310,4 @@ export const WorkspaceColumnHeader: React.FC<WorkspaceColumnHeaderProps> = ({
       )}
     </div>
   );
-};
+}

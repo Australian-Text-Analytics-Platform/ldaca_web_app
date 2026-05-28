@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -58,7 +58,7 @@ type TopicModelingRequest = TopicModelingRequestInput;
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
-const TopicModelingFeature: React.FC = () => {
+function TopicModelingFeature() {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
@@ -1064,6 +1064,6 @@ const TopicModelingFeature: React.FC = () => {
       )}
       </div>
   );
-};
+}
 
 export default TopicModelingFeature;

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 
 import { useUIStore } from '@/stores';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -28,24 +28,26 @@ interface ModalSlotProps {
  * Why: every document modal should share the same lazy viewer chrome while differing only by target and colour.
  * Flow: open the dialog, render the hidden title, lazy-load DocumentView, then show the spinner fallback until the chunk is ready.
  */
-const ModalSlot: React.FC<ModalSlotProps> = ({ open, onClose, target, docType, title, spinnerColor }) => (
-  <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-    <DialogContent className={DIALOG_CONTENT_CLASS}>
-      <DialogTitle className="sr-only">{title}</DialogTitle>
-      <div className="flex-1 overflow-y-auto">
-        <Suspense
-          fallback={
-            <div className={FALLBACK_BASE}>
-              <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${spinnerColor}`} />
-            </div>
-          }
-        >
-          <DocumentView docType={docType} onClose={onClose} target={target} />
-        </Suspense>
-      </div>
-    </DialogContent>
-  </Dialog>
-);
+function ModalSlot({ open, onClose, target, docType, title, spinnerColor }: ModalSlotProps) {
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className={DIALOG_CONTENT_CLASS}>
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        <div className="flex-1 overflow-y-auto">
+          <Suspense
+            fallback={
+              <div className={FALLBACK_BASE}>
+                <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${spinnerColor}`} />
+              </div>
+            }
+          >
+            <DocumentView docType={docType} onClose={onClose} target={target} />
+          </Suspense>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /**
  * Hosts the four lazy-loaded help/info/warning/reference modals for the app
@@ -54,7 +56,7 @@ const ModalSlot: React.FC<ModalSlotProps> = ({ open, onClose, target, docType, t
  * Rendered by: App next to the workspace shell so help icons can open one of four modal targets without mounting viewers eagerly.
  * Flow: read modal open states, targets, and close actions from UI store, then render one ModalSlot for each document type.
  */
-export const DocumentModalHost: React.FC = () => {
+export function DocumentModalHost() {
   const tutorialModal = useUIStore((s) => s.modals.tutorial);
   const warningModal = useUIStore((s) => s.modals.warning);
   const infoModal = useUIStore((s) => s.modals.info);
@@ -104,4 +106,4 @@ export const DocumentModalHost: React.FC = () => {
       />
     </>
   );
-};
+}

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
 import { CodeEditor } from '@/features/preprocessing/expression/CodeEditor';
@@ -37,7 +37,7 @@ const CONTEXT_LABELS: Record<string, string> = {
  * context without hard-coding them into every tab panel.
  * Rendered by: preprocessing/PolarsExpressionSubTab module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
-const CodeHint: React.FC<{ context: string }> = ({ context }) => {
+function CodeHint({ context }: { context: string }) {
   const hints: Record<string, string> = {
     filter: 'A boolean Polars expression.\nExample: pl.col("age") > 18',
     with_columns:
@@ -54,7 +54,7 @@ const CodeHint: React.FC<{ context: string }> = ({ context }) => {
       {hints[context] ?? ''}
     </p>
   );
-};
+}
 
 /**
  * Renders the general Polars-expression preprocessing tab. It delegates request
@@ -63,7 +63,7 @@ const CodeHint: React.FC<{ context: string }> = ({ context }) => {
  * Flow: manage expression tabs and shared context, render editors/preview table, evaluate
  * expressions for preview, and apply column/sort/group operations through hook actions.
  */
-export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (props) => {
+export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const { isLoading } = props;
   const {
     effectiveNode,
@@ -450,4 +450,4 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
       />
     </div>
   );
-};
+}

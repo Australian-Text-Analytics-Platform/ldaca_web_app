@@ -32,11 +32,13 @@ interface QueryProviderProps {
 
 /** Wraps the SPA with the shared query client and devtools during local development. */
 /** Used by: src/App.tsx because those importers need shared behavior from one implementation rather than divergent local copies. */
-export const QueryProvider: React.FC<QueryProviderProps> = ({ children }) => (
-  <QueryClientProvider client={queryClient}>
-    {children}
-    {process.env.NODE_ENV === 'development' && (
-      <ReactQueryDevtools initialIsOpen={false} buttonPosition="top-left" />
-    )}
-  </QueryClientProvider>
-);
+export function QueryProvider({ children }: QueryProviderProps) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition="top-left" />
+      )}
+    </QueryClientProvider>
+  );
+}

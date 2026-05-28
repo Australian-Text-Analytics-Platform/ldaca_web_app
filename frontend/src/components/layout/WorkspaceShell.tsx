@@ -20,7 +20,7 @@ const FeedbackPanel = lazy(() => import('@/components/panels/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 const HintsController = lazy(() => import('@/features/hints/HintsController'));
 
-export const WorkspaceShell: React.FC = () => {
+export function WorkspaceShell() {
   const { feedbackOpen, closeModal } = useUIStore(
     useShallow((state) => ({
       feedbackOpen: state.modals.feedback,
@@ -185,4 +185,4 @@ export const WorkspaceShell: React.FC = () => {
       </WorkspaceProvider>
     </QueryProvider>
   );
-};
+}

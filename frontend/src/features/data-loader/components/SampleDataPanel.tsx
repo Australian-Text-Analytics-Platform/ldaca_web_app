@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { FolderPlus, Quote } from 'lucide-react';
@@ -86,7 +86,7 @@ interface ReadmeViewerProps {
  * Flow: load README markdown for a snapshot, show loading/error states, and render fetched text
  * only after the request resolves.
  */
-const ReadmeViewer: React.FC<ReadmeViewerProps> = ({ path, collectionName, onClose }) => {
+function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
   const { data, isLoading, isError } = useQuery({
     ...getSampleDataReadmeOptions({
       parseAs: 'text',
@@ -132,7 +132,7 @@ const ReadmeViewer: React.FC<ReadmeViewerProps> = ({ path, collectionName, onClo
       </DialogContent>
     </Dialog>
   );
-};
+}
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ interface Props {
  * Flow: request available sample categories, render snapshot tabs and description dialog, then
  * delegate imports so the Data Loader can refresh files afterward.
  */
-export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete }) => {
+export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
   const [open, setOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [importing, setImporting] = useState(false);
@@ -341,4 +341,4 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
       />
     </>
   );
-};
+}

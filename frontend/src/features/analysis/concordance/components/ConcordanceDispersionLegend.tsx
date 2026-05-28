@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 type Props = {
   matchedTexts: string[];
@@ -31,14 +31,14 @@ const DEFAULT_COLOR = '#0284c7';
  * Rendered by: ConcordanceDispersionNodeBlock to show matched-text visibility controls and bin counts because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
-export const ConcordanceDispersionLegend: React.FC<Props> = ({
+export function ConcordanceDispersionLegend({
   matchedTexts,
   matchedTextColors,
   hiddenMatchedTexts,
   onToggle,
   totals,
   selectedTotals,
-}) => {
+}: Props) {
   if (matchedTexts.length === 0) return null;
   const hasSelection = !!selectedTotals;
   return (
@@ -72,4 +72,4 @@ export const ConcordanceDispersionLegend: React.FC<Props> = ({
       })}
     </div>
   );
-};
+}

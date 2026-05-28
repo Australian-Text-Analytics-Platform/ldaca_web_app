@@ -35,7 +35,7 @@ export interface NodeSelectionListProps {
  * Used by: NodeSelectionPanel and shared node-selection tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
+export function NodeSelectionList({
   nodes = [],
   nodeIds,
   nodeColors,
@@ -50,7 +50,7 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
   emptyState,
   className,
   cardClassName,
-}) => {
+}: NodeSelectionListProps) {
   const derivedNodeIds =
     nodeIds && nodeIds.length === nodes.length
       ? nodeIds

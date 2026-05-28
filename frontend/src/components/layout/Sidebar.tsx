@@ -112,7 +112,7 @@ const NAV_ITEMS: NavItem[] = [
  * Why: navigation, data selection, task status, feedback, and working-directory actions need one persistent shell surface.
  * Flow: select global/workspace/task state, wire logout/settings/dialog handlers, compute split sections and visible nav items, then render sidebar chrome.
  */
-const Sidebar: React.FC = () => {
+function Sidebar() {
   const {
     currentView,
     visibleViews,
@@ -514,6 +514,6 @@ const Sidebar: React.FC = () => {
       )}
     </SidebarRoot>
   );
-};
+}
 
 export default Sidebar;

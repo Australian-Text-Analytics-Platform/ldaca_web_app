@@ -37,7 +37,7 @@ interface FilterValueChecklistProps {
  * Flow: filter and rank option labels by search query, render select-all/null/value checkboxes,
  * and emit value arrays that preserve backend primitive types.
  */
-export const FilterValueChecklist: React.FC<FilterValueChecklistProps> = ({
+export function FilterValueChecklist({
   idPrefix,
   options,
   selectedKeys,
@@ -50,7 +50,7 @@ export const FilterValueChecklist: React.FC<FilterValueChecklistProps> = ({
   onSelectAll,
   onClearAll,
   onRetry,
-}) => {
+}: FilterValueChecklistProps) {
   const filteredOptions = options.filter((option) => matchChecklistOption(option.label, searchQuery));
 
   const hasActiveSearch = searchQuery.trim().length > 0;

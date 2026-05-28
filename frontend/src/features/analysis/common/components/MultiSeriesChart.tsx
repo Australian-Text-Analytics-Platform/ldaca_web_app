@@ -127,7 +127,7 @@ const ACTIVE_DOT_RADIUS = 5;
  * Used by: concordance dispersion and sequential analysis chart panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const MultiSeriesChart: React.FC<MultiSeriesChartProps> = ({
+export function MultiSeriesChart({
   data,
   xKey,
   series,
@@ -144,7 +144,7 @@ export const MultiSeriesChart: React.FC<MultiSeriesChartProps> = ({
   connectNulls = false,
   interactive = false,
   suppressOverflowWarning = false,
-}) => {
+}: MultiSeriesChartProps) {
   const chartConfig = useMemo<ChartConfig>(() => {
     const cfg: ChartConfig = {};
     for (const s of series) {

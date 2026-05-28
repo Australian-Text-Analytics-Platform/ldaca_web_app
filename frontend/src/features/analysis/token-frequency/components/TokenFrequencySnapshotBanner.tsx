@@ -1,4 +1,3 @@
-import React from 'react';
 import { Camera, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,7 +8,7 @@ import { useSnapshotViewStore } from '@/features/snapshot-view';
  * and quotation banners — see those components for design rationale.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export const TokenFrequencySnapshotBanner: React.FC = () => {
+export function TokenFrequencySnapshotBanner() {
   const snapshot = useSnapshotViewStore((s) => s.snapshots.token_frequencies);
   const exitSnapshot = useSnapshotViewStore((s) => s.exitSnapshot);
 
@@ -52,4 +51,4 @@ export const TokenFrequencySnapshotBanner: React.FC = () => {
       </CardContent>
     </Card>
   );
-};
+}

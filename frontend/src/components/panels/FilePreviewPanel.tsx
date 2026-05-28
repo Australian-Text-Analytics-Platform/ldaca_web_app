@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useFilePreview } from '../../hooks/useFilePreview';
 import { FilePreviewContent } from './FilePreviewContent';
 import { CardFooter } from '../ui/card';
@@ -22,7 +22,7 @@ interface FilePreviewPanelProps {
  * Flow: read preview hook data, derive previous/next availability, then render
  * via FilePreviewContent with a paginated footer.
  */
-export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, open, onClose }) => {
+export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelProps) {
   const {
     previewData,
     columns,
@@ -101,6 +101,6 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
       footer={footer}
     />
   );
-};
+}
 
 export default FilePreviewPanel;

@@ -61,7 +61,7 @@ interface NodeSelectionPanelProps {
  * Used by: analysis parameter panels that choose workspace data blocks because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
+function NodeSelectionPanel({
   selectedNodes,
   nodeColumnSelections,
   onColumnChange,
@@ -88,7 +88,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   headerAddon,
   renderExtraNodeContent,
   renderColumnControlAddon,
-}) => {
+}: NodeSelectionPanelProps) {
   /** Called by: renderColumnSelector while labeling each node's column control because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
