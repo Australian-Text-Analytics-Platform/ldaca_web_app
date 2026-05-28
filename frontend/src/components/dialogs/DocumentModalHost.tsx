@@ -55,24 +55,24 @@ const ModalSlot: React.FC<ModalSlotProps> = ({ open, onClose, target, docType, t
  * Flow: read modal open states, targets, and close actions from UI store, then render one ModalSlot for each document type.
  */
 export const DocumentModalHost: React.FC = () => {
-  const tutorialModal = useUIStore((s) => s.modals.tutorialModal);
-  const warningModal = useUIStore((s) => s.modals.warningModal);
-  const infoModal = useUIStore((s) => s.modals.infoModal);
-  const referenceModal = useUIStore((s) => s.modals.referenceModal);
-  const tutorialTarget = useUIStore((s) => s.tutorialTarget);
-  const warningTarget = useUIStore((s) => s.warningTarget);
-  const infoTarget = useUIStore((s) => s.infoTarget);
-  const referenceTarget = useUIStore((s) => s.referenceTarget);
-  const closeTutorialModal = useUIStore((s) => s.closeTutorialModal);
-  const closeWarningModal = useUIStore((s) => s.closeWarningModal);
-  const closeInfoModal = useUIStore((s) => s.closeInfoModal);
-  const closeReferenceModal = useUIStore((s) => s.closeReferenceModal);
+  const tutorialModal = useUIStore((s) => s.modals.tutorial);
+  const warningModal = useUIStore((s) => s.modals.warning);
+  const infoModal = useUIStore((s) => s.modals.info);
+  const referenceModal = useUIStore((s) => s.modals.reference);
+  const tutorialTarget = useUIStore((s) => s.modalTargets.tutorial);
+  const warningTarget = useUIStore((s) => s.modalTargets.warning);
+  const infoTarget = useUIStore((s) => s.modalTargets.info);
+  const referenceTarget = useUIStore((s) => s.modalTargets.reference);
+  const closeTutorial = () => useUIStore.getState().closeModal('tutorial');
+  const closeWarning = () => useUIStore.getState().closeModal('warning');
+  const closeInfo = () => useUIStore.getState().closeModal('info');
+  const closeReference = () => useUIStore.getState().closeModal('reference');
 
   return (
     <>
       <ModalSlot
         open={tutorialModal}
-        onClose={closeTutorialModal}
+        onClose={closeTutorial}
         target={tutorialTarget}
         docType="tutorial"
         title="Tutorial"
@@ -80,7 +80,7 @@ export const DocumentModalHost: React.FC = () => {
       />
       <ModalSlot
         open={warningModal}
-        onClose={closeWarningModal}
+        onClose={closeWarning}
         target={warningTarget}
         docType="warning"
         title="Warning"
@@ -88,7 +88,7 @@ export const DocumentModalHost: React.FC = () => {
       />
       <ModalSlot
         open={infoModal}
-        onClose={closeInfoModal}
+        onClose={closeInfo}
         target={infoTarget}
         docType="information"
         title="Information"
@@ -96,7 +96,7 @@ export const DocumentModalHost: React.FC = () => {
       />
       <ModalSlot
         open={referenceModal}
-        onClose={closeReferenceModal}
+        onClose={closeReference}
         target={referenceTarget}
         docType="reference"
         title="Reference"

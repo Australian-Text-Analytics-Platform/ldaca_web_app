@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getCurrentWorkspace, getNodeData, getWorkspaceGraph, listWorkspaces } from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
-import type { GraphNode, NodeDataResponse } from '@/types/api';
+import type { WorkspaceNodeInfo as GraphNode, NodeDataResponse } from '@/api';
 import { type PaginationState } from './types';
 
 // Frozen module-scope fallback so every "no node selected" render shares

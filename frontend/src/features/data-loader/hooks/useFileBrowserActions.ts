@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getRawFile, moveFile } from '@/api/generated/sdk.gen';
-import type { FileTreeDirectory } from '@/types';
+import type { FileTreeDirectory } from '@/features/data-loader/types';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 

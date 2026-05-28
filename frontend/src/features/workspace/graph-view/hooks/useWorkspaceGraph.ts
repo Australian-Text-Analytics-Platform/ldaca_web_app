@@ -12,7 +12,7 @@ import {
 } from '@xyflow/react';
 
 import CustomNode from '@/features/workspace/graph-view/components/CustomNode';
-import type { GraphNode, GraphEdge } from '@/types/api';
+import type { WorkspaceNodeInfo as GraphNode, WorkspaceGraphEdge as GraphEdge } from '@/api';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';

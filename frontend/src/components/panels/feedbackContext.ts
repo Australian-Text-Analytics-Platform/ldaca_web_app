@@ -1,5 +1,6 @@
 import { useUIStore } from '../../stores/uiStore';
 import { isTauri } from '@/lib/isTauri';
+import { DEPLOYMENT_ID, APP_VERSION, APP_BUILD } from '@/config/env';
 
 /** Qualtrics endpoint used by `FeedbackPanel` when embedding the project survey. */
 export const SURVEY_BASE_URL = 'https://sydney.au1.qualtrics.com/jfe/form/SV_0HrF3tzJBz3lQk6';
@@ -12,7 +13,7 @@ export const SURVEY_BASE_URL = 'https://sydney.au1.qualtrics.com/jfe/form/SV_0Hr
  * Flow: prefer the build deployment id, classify Tauri by platform, then label local or hosted web origins from the hostname.
  */
 export const resolveDeployment = (): string => {
-  const fromBuild = (import.meta.env.VITE_DEPLOYMENT_ID as string | undefined)?.trim();
+  const fromBuild = DEPLOYMENT_ID.trim() || undefined;
   if (fromBuild) return fromBuild;
   if (isTauri()) {
     const ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '').toLowerCase();
@@ -47,8 +48,8 @@ export interface FeedbackContext {
 export const captureFeedbackContext = (
   overrides: Partial<Pick<FeedbackContext, 'user_role'>> = {},
 ): FeedbackContext => ({
-  app_version: (import.meta.env.VITE_APP_VERSION as string | undefined) ?? '',
-  app_build: (import.meta.env.VITE_APP_BUILD as string | undefined) ?? '',
+  app_version: APP_VERSION,
+  app_build: APP_BUILD,
   deployment: resolveDeployment(),
   feature: useUIStore.getState().currentView ?? '',
   user_role: overrides.user_role ?? 'anonymous',

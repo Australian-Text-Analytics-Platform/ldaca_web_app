@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { type WorkspaceNode } from '@/types';
+import { type WorkspaceNode } from '@/features/workspace/data-view/types';
 import { cn } from '@/lib/utils';
 import { DEFAULT_GREY_PAIR } from '@/lib/color';
 import type { NodeVisualInfo } from '@/lib/nodeVisualState';

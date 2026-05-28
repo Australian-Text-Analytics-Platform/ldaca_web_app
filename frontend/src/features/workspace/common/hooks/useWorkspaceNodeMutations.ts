@@ -51,8 +51,8 @@ import type {
 } from '@/api/generated/types.gen';
 import { ApiError } from '@/lib/apiError';
 import { queryKeys } from '@/lib/queryKeys';
-import { type NodeSchemaResponse } from '@/types';
-import { type WorkspaceGraphResponse } from '@/types/api';
+import { type NodeSchemaResponse } from '@/features/workspace/data-view/types';
+import { type WorkspaceGraphResponse } from '@/api';
 import { fetchNodeInfo, invalidateNodeInfoQuery } from '@/lib/nodeInfo';
 import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
 

@@ -1,4 +1,4 @@
-import { type NodeSchemaResponse } from '@/types';
+import { type NodeSchemaResponse } from '@/features/workspace/data-view/types';
 
 // Canonical implementation lives in `@/utils/columnTypes`. Re-exported
 // here so workspace/data-view call sites can keep their existing import.

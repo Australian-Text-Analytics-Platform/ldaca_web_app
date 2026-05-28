@@ -1,29 +1,17 @@
 import { GoogleLogin as OAuthGoogleLogin } from '@react-oauth/google';
 import { getApiBase } from '@/lib/backend/env';
+import { AuthProviderCard } from '@/components/startup/AuthProviderCard';
 
 interface GoogleLoginProps {
   isLoading?: boolean;
   error?: string | null;
 }
 
-/**
- * Redirect-mode Google sign-in button used by `LoginScreen` when Google auth
- * is enabled. It exists to delegate OAuth completion to the backend callback
- * while preserving the login card's loading/error presentation.
- * Why: redirect mode keeps credential exchange server-side while the login card still owns status messaging.
- * Flow: build the backend callback URI, configure the Google OAuth widget for redirect mode, then render supplied error or loading feedback.
- */
-function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
+export default function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
   const loginUri = `${getApiBase()}/auth/google/callback`;
 
   return (
-    <div className="space-y-4">
-      {error && (
-        <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-          {error}
-        </div>
-      )}
-
+    <AuthProviderCard isLoading={isLoading} error={error}>
       <OAuthGoogleLogin
         onSuccess={() => {/* redirect mode handled server-side */}}
         ux_mode="redirect"
@@ -33,15 +21,6 @@ function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
         shape="rectangular"
         theme="outline"
       />
-
-      {isLoading && (
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-          <span className="text-sm text-gray-600">Signing in...</span>
-        </div>
-      )}
-    </div>
+    </AuthProviderCard>
   );
 }
-
-export default GoogleLogin;

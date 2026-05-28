@@ -7,7 +7,7 @@
  */
 
 export { useUIStore } from './uiStore';
-export type { ViewType } from './uiStore';
+export type { ViewType, ModalKind, ModalTarget } from './uiStore';
 
 export { useSelectionStore } from './selectionStore';
 

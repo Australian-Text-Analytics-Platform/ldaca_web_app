@@ -111,12 +111,12 @@ export const HintsController: React.FC = () => {
       dismissHint: s.dismissHint,
     })),
   );
-  const { sessionDismissedHints, sessionDismissHint, openTutorialTarget, setLastUploadedFilePath } =
+  const { sessionDismissedHints, sessionDismissHint, openModal, setLastUploadedFilePath } =
     useUIStore(
       useShallow((s) => ({
         sessionDismissedHints: s.sessionDismissedHints,
         sessionDismissHint: s.sessionDismissHint,
-        openTutorialTarget: s.openTutorialTarget,
+        openModal: s.openModal,
         setLastUploadedFilePath: s.setLastUploadedFilePath,
       })),
     );
@@ -188,7 +188,7 @@ export const HintsController: React.FC = () => {
   const handleLearnMore = hint.learnMoreTarget
     ? () => {
         const target = getTutorialTarget(hint.learnMoreTarget!);
-        if (target) openTutorialTarget(target);
+        if (target) openModal('tutorial', target);
       }
     : undefined;
   const handleAction = hint.action

@@ -1,4 +1,4 @@
-import type { FileTreeDirectory, FileTreeFile, FileTreeNode } from '@/types';
+import type { FileTreeDirectory, FileTreeFile, FileTreeNode } from '@/features/data-loader/types';
 
 export const README_FILENAME = 'README.md';
 export const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';

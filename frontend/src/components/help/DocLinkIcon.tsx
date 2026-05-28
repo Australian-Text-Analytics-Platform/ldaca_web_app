@@ -32,7 +32,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     missingMessage: 'No anchor found for this help item.',
     getTarget: getTutorialTarget,
     /** Called by: DocLinkIcon handleClick for tutorial-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-    openTarget: (target) => useUIStore.getState().openTutorialTarget(target),
+    openTarget: (target) => useUIStore.getState().openModal('tutorial', target),
   },
   info: {
     Icon: Info,
@@ -41,7 +41,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     missingMessage: 'No anchor found for this information item.',
     getTarget: getInfoTarget,
     /** Called by: DocLinkIcon handleClick for information-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-    openTarget: (target) => useUIStore.getState().openInfoTarget(target),
+    openTarget: (target) => useUIStore.getState().openModal('info', target),
   },
   reference: {
     Icon: Quote,
@@ -50,7 +50,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     missingMessage: 'No anchor found for this reference item.',
     getTarget: getReferenceTarget,
     /** Called by: DocLinkIcon handleClick for reference-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-    openTarget: (target) => useUIStore.getState().openReferenceTarget(target),
+    openTarget: (target) => useUIStore.getState().openModal('reference', target),
   },
   warning: {
     Icon: AlertTriangle,
@@ -62,7 +62,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     /** Called by: DocLinkIcon handleClick for future warning-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
     getTarget: () => null,
     /** Called by: DocLinkIcon handleClick for future warning documentation targets because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-    openTarget: (target) => useUIStore.getState().openWarningTarget(target),
+    openTarget: (target) => useUIStore.getState().openModal('warning', target),
   },
 };
 

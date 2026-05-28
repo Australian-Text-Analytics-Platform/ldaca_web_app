@@ -1,3 +1,5 @@
+import { BACKEND_PORT, BACKEND_API_BASE } from '@/config/env';
+
 /**
  * Centralized environment and API base URL detection for browser, served SPA,
  * test, and Tauri desktop contexts. Every API client consumes this module so
@@ -28,12 +30,8 @@ export type ApiEnvOptions = {
 /** Resolves the dev backend port used when the SPA is served separately from FastAPI. */
 /** Called by: getApiBase in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 function getBackendPort(): string {
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    const port = import.meta.env.VITE_BACKEND_PORT;
-    if (port && port.trim()) {
-      return port.trim();
-    }
-  }
+  const port = BACKEND_PORT.trim();
+  if (port) return port;
   return '8001';
 }
 
@@ -53,11 +51,9 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
   }
 
   // 3. Build-time env var override (e.g. VITE_BACKEND_API_BASE=http://host/api)
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    const explicit = import.meta.env.VITE_BACKEND_API_BASE;
-    if (explicit && explicit.trim()) {
-      return explicit.replace(/\/$/, '');
-    }
+  const explicit = BACKEND_API_BASE.trim();
+  if (explicit) {
+    return explicit.replace(/\/$/, '');
   }
 
   if (typeof window === 'undefined') return '/api';

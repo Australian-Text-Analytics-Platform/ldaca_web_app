@@ -1,13 +1,15 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import logo from '../logo.png';
-import { toast } from 'sonner';
 import 'katex/dist/katex.min.css';
 import { BUNDLED_FILES } from '@/tutorials/bundledRegistry';
+import { APP_VERSION, APP_BUILD_DATE, APP_BUILD, DOCS_BASE_URL } from '@/config/env';
+import { useZoom } from '@/hooks/useZoom';
+import { useDocumentAnchor } from '@/hooks/useDocumentAnchor';
 
 export type DocumentTarget = {
   file: string;
@@ -84,7 +86,7 @@ const resolveDocUrl = (requestedFile: string): string => {
   if (BUNDLED_FILES.has(requestedFile)) {
     return resolveLocalDocUrl(requestedFile);
   }
-  const remoteBase = import.meta.env.VITE_DOCS_BASE_URL?.trim();
+  const remoteBase = DOCS_BASE_URL?.trim();
   if (remoteBase) {
     try {
       const baseWithSlash = remoteBase.endsWith('/') ? remoteBase : `${remoteBase}/`;
@@ -113,7 +115,6 @@ const DocumentView: React.FC<{
   const [content, setContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [zoom, setZoom] = useState<number>(1);
   const [navigationState, setNavigationState] = useState<NavigationState>(() => ({
     propTarget: target,
     currentTarget: target ?? null,
@@ -122,16 +123,10 @@ const DocumentView: React.FC<{
     ? target
     : navigationState.currentTarget;
   const activeAnchor = currentTarget?.anchor ?? null;
-  const missingAnchorRef = useRef<string | null>(null);
 
-  /** Called by: DocumentView zoom controls to keep scale within readable bounds because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-  const clamp = (v: number) => Math.min(2, Math.max(0.5, v));
-  /** Called by: DocumentView Zoom in button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
-  const zoomIn = () => setZoom((z) => clamp(parseFloat((z + 0.1).toFixed(2))));
-  /** Called by: DocumentView Zoom out button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
-  const zoomOut = () => setZoom((z) => clamp(parseFloat((z - 0.1).toFixed(2))));
-  /** Called by: DocumentView reset button and keyboard reset action because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
-  const zoomReset = () => setZoom(1);
+  const { zoom, zoomIn, zoomOut, zoomReset } = useZoom({ keyboardShortcuts: true });
+
+  useDocumentAnchor({ activeAnchor, loading, error });
 
   useEffect(() => {
     let cancelled = false;
@@ -153,9 +148,9 @@ const DocumentView: React.FC<{
         // build date without manual edits per release. Inserted via
         // Vite's `define` (see vite.config.ts).
         const rendered = text
-          .replace(/\{\{\s*VERSION\s*\}\}/g, import.meta.env.VITE_APP_VERSION ?? '')
-          .replace(/\{\{\s*BUILD_DATE\s*\}\}/g, import.meta.env.VITE_APP_BUILD_DATE ?? '')
-          .replace(/\{\{\s*BUILD\s*\}\}/g, import.meta.env.VITE_APP_BUILD ?? '');
+          .replace(/\{\{\s*VERSION\s*\}\}/g, APP_VERSION)
+          .replace(/\{\{\s*BUILD_DATE\s*\}\}/g, APP_BUILD_DATE)
+          .replace(/\{\{\s*BUILD\s*\}\}/g, APP_BUILD);
         if (!cancelled) setContent(rendered);
       } catch (err: unknown) {
         if (!cancelled) {
@@ -169,31 +164,6 @@ const DocumentView: React.FC<{
     load();
     return () => { cancelled = true; };
   }, [currentTarget?.file, config.defaultFile]);
-
-  useEffect(() => {
-    if (!activeAnchor || loading || error) return;
-    const anchorElement = document.getElementById(activeAnchor);
-    if (!anchorElement) {
-      // Anchor was removed or never rendered (e.g. raw <a id> stripped
-      // during markdown parsing). Keep the modal open and surface the
-      // document at the top — a missing in-page target shouldn't deny
-      // the user the surrounding tutorial. Toast once per anchor so
-      // repeated re-renders don't spam.
-      if (missingAnchorRef.current !== activeAnchor) {
-        missingAnchorRef.current = activeAnchor;
-        toast('Help section not found — showing top of document.');
-      }
-      return;
-    }
-    missingAnchorRef.current = null;
-    anchorElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    const highlightTarget = anchorElement.closest('p, li, section, h2, h3, h4, h5') ?? anchorElement;
-    highlightTarget.classList.add('tutorial-highlight');
-    const timeoutId = window.setTimeout(() => {
-      highlightTarget.classList.remove('tutorial-highlight');
-    }, 3500);
-    return () => window.clearTimeout(timeoutId);
-  }, [activeAnchor, error, loading]);
 
   /**
    * Markdown render overrides used by `ReactMarkdown` for safe image sizing and in-modal doc links.
@@ -254,23 +224,6 @@ const DocumentView: React.FC<{
       );
     },
   };
-
-  useEffect(() => {
-    /** Called by: DocumentView keyboard listener to mirror header zoom bounds because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
-    const clampZoom = (v: number) => Math.min(2, Math.max(0.5, v));
-    /**
-     * Called by: the window keydown listener registered by DocumentView because the interaction needs a single handler that validates state, runs the action, and updates feedback.
-      * Flow: detect Ctrl/Cmd zoom keys, clamp zoom in/out or reset, then ignore unrelated keyboard events.
-     */
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom((z) => clampZoom(parseFloat((z + 0.1).toFixed(2)))); }
-      else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom((z) => clampZoom(parseFloat((z - 0.1).toFixed(2)))); }
-      else if (e.key === '0') { e.preventDefault(); setZoom(1); }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50">

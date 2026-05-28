@@ -118,8 +118,7 @@ const Sidebar: React.FC = () => {
     visibleViews,
     setCurrentView,
     setViewVisibility,
-    openFeedbackModal,
-    openTutorialTarget,
+    openModal,
     resetSessionDismissedHints,
   } = useUIStore(
     useShallow(({
@@ -127,16 +126,14 @@ const Sidebar: React.FC = () => {
       visibleViews,
       setCurrentView,
       setViewVisibility,
-      openFeedbackModal,
-      openTutorialTarget,
+      openModal,
       resetSessionDismissedHints,
     }) => ({
       currentView,
       visibleViews,
       setCurrentView,
       setViewVisibility,
-      openFeedbackModal,
-      openTutorialTarget,
+      openModal,
       resetSessionDismissedHints,
     }))
   );
@@ -491,7 +488,7 @@ const Sidebar: React.FC = () => {
             <Button
               variant="ghost"
               className="flex-1 justify-center"
-              onClick={() => openTutorialTarget(tutorialIndexTarget)}
+              onClick={() => openModal('tutorial', tutorialIndexTarget)}
             >
               <BookOpen className="h-4 w-4" />
               <span>Tutorial</span>
@@ -499,7 +496,7 @@ const Sidebar: React.FC = () => {
             <Button
               variant="ghost"
               className="flex-1 justify-center"
-              onClick={openFeedbackModal}
+              onClick={() => openModal('feedback')}
             >
               <MessageSquare className="h-4 w-4" />
               <span>Feedback</span>

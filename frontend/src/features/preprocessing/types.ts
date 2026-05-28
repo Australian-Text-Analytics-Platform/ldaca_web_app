@@ -67,7 +67,7 @@ export interface FilterConditionWithId {
   [key: string]: ConditionValue | string | boolean | undefined;
 }
 
-export type { NodeDataPagination as PreviewPagination } from '@/types/api';
+export { type NodeDataPagination as PreviewPagination } from '@/features/workspace/data-view/types';
 
 export type PreviewRow = Record<string, unknown>;
 

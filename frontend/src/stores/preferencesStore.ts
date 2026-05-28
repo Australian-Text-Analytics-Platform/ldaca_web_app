@@ -48,6 +48,8 @@ interface PreferencesState {
   hydrated: boolean;
   /** True while a backend sync is in-flight */
   syncing: boolean;
+  /** Most recent error from syncing or loading preferences */
+  lastSyncError: string | null;
 }
 
 interface PreferencesActions {
@@ -154,6 +156,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
         demoSnapshotsEnabled: false,
         hydrated: false,
         syncing: false,
+        lastSyncError: null,
 
         /** Hides or reveals optional views while keeping Data Loader always reachable. */
         /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
@@ -260,11 +263,12 @@ export const usePreferencesStore = create<PreferencesStore>()(
             const data = normalizePreferences(preferences);
             set((state) => {
               applyServerState(state, data);
+              state.lastSyncError = null;
             });
-          } catch {
-            // Backend unavailable — keep localStorage state; mark hydrated so UI isn't blocked
+          } catch (e) {
             set((state) => {
               state.hydrated = true;
+              state.lastSyncError = e instanceof Error ? e.message : String(e);
             });
           }
         },
@@ -304,8 +308,10 @@ export const usePreferencesStore = create<PreferencesStore>()(
               headers: getAuthorizationHeaders(headers),
               throwOnError: true,
             });
-          } catch {
-            // Silently fail — localStorage still has the latest state
+          } catch (e) {
+            set((s) => {
+              s.lastSyncError = e instanceof Error ? e.message : String(e);
+            });
           } finally {
             set((s) => {
               s.syncing = false;

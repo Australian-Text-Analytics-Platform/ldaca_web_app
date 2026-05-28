@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import type { NodeSchemaResponse } from '@/types';
+import type { NodeSchemaResponse } from '@/features/workspace/data-view/types';
 
 import { extractColumnTypes, normalizeTypeName } from '../services/schemaMutations';
 
