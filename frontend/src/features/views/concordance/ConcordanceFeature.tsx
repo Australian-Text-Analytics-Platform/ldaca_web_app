@@ -17,13 +17,13 @@ import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWork
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useAuth } from '@/hooks/useAuth';
-import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
-import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
-import type { MultiSeriesChartType } from '@/features/analysis/common/components/MultiSeriesChart';
+import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
+import type { MultiSeriesChartType } from '@/features/views/common/components/MultiSeriesChart';
 import {
   hasLockedParameterDiff,
   resetAnalysisSelectionAfterClear,
@@ -37,7 +37,7 @@ import {
   executeAnalysisRunOrUpdate,
 } from '../common';
 import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
-import { pruneTasksById } from '@/hooks/analysisTaskUtils';
+import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
 import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -64,7 +64,7 @@ import { highlightMatchInText } from '../common/components/highlightText';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
 import { ConcordanceDispersionDetachDialog } from './components/ConcordanceDispersionDetachDialog';
-import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
+import type { DetachDialogNodeOption } from '../common/components/DetachColumnsDialog';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import {
   usePersistNodeDocumentColumn,
@@ -79,7 +79,7 @@ import {
   CONCORDANCE_COLUMN_KEYS,
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_FREQ_COLUMNS,
-} from '../generatedColumns';
+} from '../common/generatedColumns';
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];

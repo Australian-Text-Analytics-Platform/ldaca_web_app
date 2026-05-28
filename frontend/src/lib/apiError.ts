@@ -64,6 +64,6 @@ export function formatErrorDetail(detail: unknown): string | null {
 }
 
 /** Lets callers identify fetch-level failures without coupling to TypeError text. */
-/** Used by: src/features/analysis/common/useAnalysisHydration.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Used by: src/features/views/common/useAnalysisHydration.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 export const isNetworkError = (error: unknown): boolean =>
   error instanceof ApiError && error.code === 'NETWORK';

@@ -1,8 +1,8 @@
-import { useFilePreview } from '../../hooks/useFilePreview';
+import { useFilePreview } from '../hooks/useFilePreview';
 import { FilePreviewContent } from './FilePreviewContent';
-import { CardFooter } from '../ui/card';
-import { Button } from '../ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface FilePreviewPanelProps {
   filename: string | null;

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { DetachDialogNodeOption } from '../../components/DetachColumnsDialog';
+import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 
 export interface UseDetachColumnsStateResult {
   /** Per-node-id list of columns currently checked. */

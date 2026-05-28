@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { inferDatetimeFormat } from '../../utils/datetimeFormatInfer';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { inferDatetimeFormat } from '../utils/datetimeFormatInfer';
 
 interface DatetimeFormatPanelProps {
   open: boolean;

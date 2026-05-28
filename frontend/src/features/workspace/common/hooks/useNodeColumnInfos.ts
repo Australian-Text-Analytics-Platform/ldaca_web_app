@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { useAuth } from './useAuth';
-import { type ColumnInfo, mapColumnsToInfo } from '../utils/columnTypes';
-import { nodeInfoQueryOptions } from '../lib/nodeInfo';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { type ColumnInfo, mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
+import { nodeInfoQueryOptions } from '@/lib/nodeInfo';
 
 export type NodeLike = Record<string, unknown> & {
   id?: string;
@@ -46,7 +46,7 @@ export interface UseNodeColumnInfosResult {
  * everywhere else in the app.
  */
 /**
- * Used by: src/features/analysis/ai-annotator/AiAnnotatorFeature.tsx, src/features/analysis/common/useAnalysisLockMachine.ts, src/features/analysis/concordance/ConcordanceFeature.tsx and 3 other importers because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/features/views/ai-annotator/AiAnnotatorFeature.tsx, src/features/views/common/useAnalysisLockMachine.ts, src/features/views/concordance/ConcordanceFeature.tsx and 3 other importers because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: resolve node ids, issue node-info queries, build a typed column cache, then return a fallback-aware getter and loading flag.
  */
 export const useNodeColumnInfos = (params: {

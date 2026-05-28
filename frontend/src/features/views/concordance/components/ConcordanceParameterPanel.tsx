@@ -3,17 +3,17 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play, Square, Trash2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
-import { AnalysisFeatureHeader } from '@/features/analysis/common/components/AnalysisFeatureHeader';
+import { AnalysisFeatureHeader } from '@/features/views/common/components/AnalysisFeatureHeader';
 import NodeSelectionPanel, {
   type NodeSelectionColumnAddonArgs,
-} from '@/features/analysis/common/components/NodeSelectionPanel';
+} from '@/features/views/common/components/NodeSelectionPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { SNAPSHOT_DISABLED_REASON, snapshotDisabledReason } from '@/features/snapshot-view';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
-import { TokensColumnMismatchNotice } from '@/features/analysis/common/components/TokensColumnMismatchNotice';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
+import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
 import type { AnalysisActionState, NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
-import type { ColumnInfo } from '@/utils/columnTypes';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { PageSizeSelect } from '../../common/components/PageSizeSelect';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 

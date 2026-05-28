@@ -54,7 +54,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { type NodeSchemaResponse } from '@/features/workspace/data-view/types';
 import { type WorkspaceGraphResponse } from '@/api';
 import { fetchNodeInfo, invalidateNodeInfoQuery } from '@/lib/nodeInfo';
-import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
+import { normalizeSchemaFromInfo } from '@/features/workspace/common/hooks/useSchemaManagement';
 
 type QuotationRequest = QuotationRequestInput;
 

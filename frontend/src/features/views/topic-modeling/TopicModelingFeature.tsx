@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
-import { useAuth } from '@/hooks/useAuth';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   topicModelingTaskRequest,
   topicModelingTaskResult,
@@ -19,11 +19,11 @@ import { useTopicModelingSnapshotCapture } from './hooks/useTopicModelingSnapsho
 import { useTopicModelingSnapshotLoad } from './hooks/useTopicModelingSnapshotLoad';
 import type { TopicModelingSnapshotPayload } from './hooks/useTopicModelingSnapshotLoad';
 import { TopicModelingSnapshotBanner } from './components/TopicModelingSnapshotBanner';
-import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
-import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
-import { pruneTasksById } from '@/hooks/analysisTaskUtils';
+import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
+import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import {
   hasLockedParameterDiff,
   getNodeIdentifier,

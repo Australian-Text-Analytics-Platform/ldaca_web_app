@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { describeColumn, getColumnUniqueValues } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
   Select,
   SelectContent,
@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
-} from '@/features/analysis/common/components/NodeSelectionPanel';
+} from '@/features/views/common/components/NodeSelectionPanel';
 import { DateTimePickerField } from '../../utils/dateTimeUtils';
 import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from '../../utils/typeUtils';
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';

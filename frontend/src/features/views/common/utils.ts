@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '@/hooks/useSchemaManagement';
+import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '@/features/workspace/common/hooks/useSchemaManagement';
 
 /** Default result row limit used by analysis panels when preferences are absent. */
 export const DEFAULT_TOKEN_LIMIT = 25;

@@ -6,7 +6,7 @@ import {
   clearTopicModelingEmbeddingCache,
   getTopicModelingEmbeddingCacheSize,
 } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatBytes } from '@/lib/utils';

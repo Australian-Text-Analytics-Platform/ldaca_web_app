@@ -1,16 +1,16 @@
 import NodeSelectionPanel, {
   type NodeSelectionColumnAddonArgs,
-} from '@/features/analysis/common/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
-import { TokensColumnMismatchNotice } from '@/features/analysis/common/components/TokensColumnMismatchNotice';
+} from '@/features/views/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
+import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
-import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
+import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
+import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import type { SnapshotToolKey } from '@/features/snapshot-view';
 import type {
   WorkspaceNodeLike,
   NodeColumnSource,
-} from '@/features/analysis/common/nodeSelectionTypes';
+} from '@/features/views/common/nodeSelectionTypes';
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
 

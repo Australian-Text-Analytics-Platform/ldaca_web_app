@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';
-import { useAutoNodeColumns } from '@/hooks/useAutoNodeColumns';
-import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '@/hooks/useSchemaManagement';
+import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
+import { useAutoNodeColumns } from '@/features/workspace/common/hooks/useAutoNodeColumns';
+import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '@/features/workspace/common/hooks/useSchemaManagement';
 
 export interface AnalysisLockConfig {
   allowedDataTypes: string[];

@@ -133,7 +133,7 @@ const writePersisted = (key: string | undefined, value: number) => {
 
 /** Provides state, DOM refs, keyboard handlers, and pointer handlers for resizable panes. */
 /**
- * Used by: src/App.tsx, src/components/layout/WorkspaceView.tsx, src/features/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/App.tsx, src/components/layout/WorkspaceView.tsx, src/features/views/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: initialize persisted split value, clamp pointer and keyboard updates, capture splitter events, then expose value, drag state, refs, and ARIA props.
  */
 export function useResizableSplit({

@@ -1,5 +1,5 @@
 import type { ConcordanceDispersionBinRow } from '@/api/generated/types.gen';
-import { CONCORDANCE_COLUMN_KEYS, CONCORDANCE_CORE_COLUMNS } from '../generatedColumns';
+import { CONCORDANCE_COLUMN_KEYS, CONCORDANCE_CORE_COLUMNS } from '../common/generatedColumns';
 
 type ConcordanceHitRow = Record<string, unknown>;
 type ConcordanceGroupedRow = ConcordanceHitRow[];

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
-import { useAuth } from '@/hooks/useAuth';
-import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import {
   aiAnnotationTaskRequest,
@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
-import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
+import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import { useUIStore } from '@/stores/uiStore';
 import {
   getNodeIdentifier,
@@ -39,11 +39,11 @@ import {
   resetAnalysisSelectionAfterClear,
   useNodeColorManagement,
 } from '../common';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
+import { AnalysisPagination } from '@/features/views/common/components/AnalysisPagination';
 import {
   Table,
   TableBody,
@@ -63,7 +63,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { normalizeTypeName } from '@/utils/columnTypes';
+import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
 import { MetadataColumnSelector } from '../common/components/MetadataColumnSelector';
 
 type EndpointPreset = 'openai' | 'lmstudio' | 'custom';

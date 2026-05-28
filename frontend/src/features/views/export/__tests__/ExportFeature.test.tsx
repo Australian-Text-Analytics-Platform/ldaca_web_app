@@ -33,7 +33,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useAuth', () => ({
+vi.mock('@/features/auth/hooks/useAuth', () => ({
   // Supplies stable auth headers for expected fetch arguments.
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useAuth: () => ({

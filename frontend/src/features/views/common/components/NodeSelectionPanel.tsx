@@ -266,6 +266,6 @@ function NodeSelectionPanel({
 export type {
   NodeColumnSelection,
   WorkspaceNodeLike,
-} from '@/features/analysis/common/nodeSelectionTypes';
+} from '@/features/views/common/nodeSelectionTypes';
 
 export default NodeSelectionPanel;

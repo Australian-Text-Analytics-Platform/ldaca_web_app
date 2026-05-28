@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getOperatorsForType, normalizeTypeName as normalizePreprocessingType } from '../typeUtils';
-import { normalizeTypeName as normalizeSharedType } from '@/utils/columnTypes';
+import { normalizeTypeName as normalizeSharedType } from '@/features/workspace/data-view/utils/columnTypes';
 
 describe('preprocessing type utils', () => {
   it('normalizes list string dtype to list_string', () => {

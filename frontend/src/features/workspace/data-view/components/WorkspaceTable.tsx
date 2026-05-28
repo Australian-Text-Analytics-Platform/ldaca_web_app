@@ -23,10 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { DatetimeFormatPanel } from '@/components/panels/DatetimeFormatPanel';
+import { DatetimeFormatPanel } from '@/features/views/common/components/DatetimeFormatPanel';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { RowDetailPanel } from '@/features/analysis/common/components/RowDetailPanel';
-import { useRowDetailDialog } from '@/features/analysis/common/components/useRowDetailDialog';
+import { RowDetailPanel } from '@/features/views/common/components/RowDetailPanel';
+import { useRowDetailDialog } from '@/features/views/common/components/useRowDetailDialog';
 import { ServerTablePagination } from './ServerTablePagination';
 import { WorkspaceColumnHeader } from './WorkspaceColumnHeader';
 import type { DataRow, FilterOperator, PaginationInfo } from '../types';

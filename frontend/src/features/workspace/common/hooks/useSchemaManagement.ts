@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { normalizeTypeName } from '../utils/columnTypes';
-import { fetchNodeInfo } from '../lib/nodeInfo';
-import { queryKeys } from '../lib/queryKeys';
+import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
+import { fetchNodeInfo } from '@/lib/nodeInfo';
+import { queryKeys } from '@/lib/queryKeys';
 
 export interface NodeSnapshot {
   id: string;
@@ -17,7 +17,7 @@ export interface NodeSnapshot {
  * `{ column: canonicalType }` map regardless of backend wire format.
  */
 /**
- * Used by: src/features/analysis/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: accept array or object schema payloads, normalize type names, and default malformed values to string columns.
  */
 export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
@@ -71,7 +71,7 @@ export async function createNodeSnapshot(
 
 /** Builds resilient node snapshots for multi-node analysis requests, falling back per-node on fetch failure. */
 /**
- * Used by: src/features/analysis/common/useAnalysisLockMachine.ts, src/features/analysis/common/utils.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/features/views/common/useAnalysisLockMachine.ts, src/features/views/common/utils.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: fetch snapshots concurrently, catch per-node failures, and substitute empty fallback snapshots so one bad node does not abort the batch.
  */
 export async function createNodeSnapshots(
@@ -100,7 +100,7 @@ export async function createNodeSnapshots(
 
 /** Narrows each snapshot to the selected analysis column while keeping a first-column fallback. */
 /**
- * Used by: src/features/analysis/common/useAnalysisLockMachine.ts, src/features/analysis/common/utils.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/features/views/common/useAnalysisLockMachine.ts, src/features/views/common/utils.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: choose each snapshot's selected column when present, fall back to its first valid column, then return narrowed snapshot copies for task submission.
  */
 export function applySelectedColumnsToSnapshots<T extends { id: string; columns?: string[] }>(
@@ -173,7 +173,7 @@ interface SchemaManagementConfig {
  * @returns Schema state and utilities
  */
 /**
- * Used by: src/features/analysis/sequential-analysis/SequentialAnalysisFeature.tsx, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: fetch live schema while unlocked, preserve locked schema during runs, merge node payload fallbacks, then expose effective schema and column options.
  */
 export function useSchemaManagement(config: SchemaManagementConfig) {

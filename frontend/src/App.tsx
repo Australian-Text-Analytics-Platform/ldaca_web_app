@@ -1,18 +1,18 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useBackendHealth } from '@/hooks/useBackendHealth';
 import { useUIStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
-import { getBlockingCopy } from '@/components/startup/authPhaseCopy';
-import BlockingScreen from '@/components/startup/BlockingScreen';
-import { LoginScreen } from '@/components/startup/LoginScreen';
+import { getBlockingCopy } from '@/features/auth/authPhaseCopy';
+import BlockingScreen from '@/features/auth/components/BlockingScreen';
+import { LoginScreen } from '@/features/auth/components/LoginScreen';
 import { LAG_HINT_DELAY_MS } from '@/config/timings';
 import { loadRemoteRegistry } from '@/tutorials/remoteRegistry';
 import { DocsEolBanner } from '@/tutorials/DocsEolBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
 
-const FeedbackPanel = lazy(() => import('@/components/panels/FeedbackPanel'));
+const FeedbackPanel = lazy(() => import('@/features/feedback/components/FeedbackPanel'));
 
 function App() {
   useEffect(() => {

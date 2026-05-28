@@ -30,7 +30,7 @@ import {
   MANIFEST_FILE_NAME,
   type SnapshotManifest,
 } from '@/features/snapshot-view';
-import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import { SNAPSHOT_ROW_HARD_CAP } from '../components/TrendsSnapshotConfigDialog';
 import type { TrendsSnapshotConfig } from '../trendsSnapshotConfig';
 

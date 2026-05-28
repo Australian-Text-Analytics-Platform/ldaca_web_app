@@ -4,32 +4,32 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useUIStore, type ViewType } from '@/stores';
 
 /** Lazy data-loader chunk consumed by `VIEW_COMPONENTS` to keep startup lightweight. */
-const DataLoaderFeature = lazy(() => import('@/features/data-loader/DataLoaderFeature'));
+const DataLoaderFeature = lazy(() => import('@/features/views/data-loader/DataLoaderFeature'));
 /** Lazy preprocessing chunk consumed by `VIEW_COMPONENTS` when the filter view is active. */
 const DataPreprocessingFeature = lazy(
-  () => import('@/features/analysis/data-preprocessing/DataPreprocessingFeature'),
+  () => import('@/features/views/preprocessing/DataPreprocessingFeature'),
 );
 /** Lazy concordance chunk consumed by `VIEW_COMPONENTS` when concordance is selected. */
-const ConcordanceFeature = lazy(() => import('@/features/analysis/concordance/ConcordanceFeature'));
+const ConcordanceFeature = lazy(() => import('@/features/views/concordance/ConcordanceFeature'));
 /** Lazy quotation chunk consumed by `VIEW_COMPONENTS` when quotation analysis is selected. */
-const QuotationFeature = lazy(() => import('@/features/analysis/quotation/QuotationFeature'));
+const QuotationFeature = lazy(() => import('@/features/views/quotation/QuotationFeature'));
 /** Lazy topic-modeling chunk consumed by `VIEW_COMPONENTS` when topic modeling is selected. */
 const TopicModelingFeature = lazy(
-  () => import('@/features/analysis/topic-modeling/TopicModelingFeature'),
+  () => import('@/features/views/topic-modeling/TopicModelingFeature'),
 );
 /** Lazy sequential-analysis chunk consumed by `VIEW_COMPONENTS` when trends analysis is selected. */
 const SequentialAnalysisFeature = lazy(
-  () => import('@/features/analysis/sequential-analysis/SequentialAnalysisFeature'),
+  () => import('@/features/views/sequential-analysis/SequentialAnalysisFeature'),
 );
 /** Lazy export chunk consumed by `VIEW_COMPONENTS` when export tools are selected. */
-const ExportFeature = lazy(() => import('@/features/analysis/export/ExportFeature'));
+const ExportFeature = lazy(() => import('@/features/views/export/ExportFeature'));
 /** Lazy token-frequency chunk consumed by `VIEW_COMPONENTS` when frequency analysis is selected. */
 const TokenFrequencyFeature = lazy(
-  () => import('@/features/analysis/token-frequency/TokenFrequencyFeature'),
+  () => import('@/features/views/token-frequency/TokenFrequencyFeature'),
 );
 /** Lazy AI annotator chunk consumed by `VIEW_COMPONENTS` when the optional annotator view is visible. */
 const AiAnnotatorFeature = lazy(
-  () => import('@/features/analysis/ai-annotator/AiAnnotatorFeature'),
+  () => import('@/features/views/ai-annotator/AiAnnotatorFeature'),
 );
 
 /**

@@ -1,5 +1,5 @@
 import type { TaskItem } from '@/stores/analysisStore';
-import type { AnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
+import type { AnalysisTaskStatus } from '@/features/views/common/useAnalysisTaskStatus';
 
 export type CanonicalAnalysisTaskType =
   | 'topic_modeling'

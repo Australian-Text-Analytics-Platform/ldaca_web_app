@@ -14,14 +14,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FilterSubTab } from '../../preprocessing/filter/FilterSubTab';
-import { JoinSubTab } from '../../preprocessing/join/JoinSubTab';
-import { ConcatSubTab } from '../../preprocessing/concat/ConcatSubTab';
-import { SliceSubTab } from '../../preprocessing/slice/SliceSubTab';
-import { AggregateSubTab } from '../../preprocessing/aggregate/AggregateSubTab';
-import { ReplaceSubTab } from '../../preprocessing/replace/ReplaceSubTab';
+import { FilterSubTab } from './filter/FilterSubTab';
+import { JoinSubTab } from './join/JoinSubTab';
+import { ConcatSubTab } from './concat/ConcatSubTab';
+import { SliceSubTab } from './slice/SliceSubTab';
+import { AggregateSubTab } from './aggregate/AggregateSubTab';
+import { ReplaceSubTab } from './replace/ReplaceSubTab';
 import InfoIcon from '@/components/help/InfoIcon';
-import { PolarsExpressionSubTab } from '../../preprocessing/expression/PolarsExpressionSubTab';
+import { PolarsExpressionSubTab } from './expression/PolarsExpressionSubTab';
 
 type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
 

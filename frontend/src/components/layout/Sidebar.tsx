@@ -27,7 +27,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorkspaceTaskInbox';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { useHintsStore } from '@/stores/hintsStore';
@@ -35,7 +35,7 @@ import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
-import { ClearEmbeddingCacheMenuItem } from '@/features/analysis/topic-modeling/components/ClearEmbeddingCacheMenuItem';
+import { ClearEmbeddingCacheMenuItem } from '@/features/views/topic-modeling/components/ClearEmbeddingCacheMenuItem';
 import { DemoSnapshotsToggleItem } from '@/features/snapshot-view/components/DemoSnapshotsToggleItem';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';

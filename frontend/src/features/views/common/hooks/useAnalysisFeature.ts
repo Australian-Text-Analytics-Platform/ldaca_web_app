@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { cancelTask } from '@/api/generated/sdk.gen';
-import { collectTaskIds, resolveAnalysisTaskId } from '@/hooks/analysisTaskUtils';
+import { collectTaskIds, resolveAnalysisTaskId } from '@/features/views/common/analysisTaskUtils';
 import { useAnalysisHydration, type HydrationState } from '../useAnalysisHydration';
 import { clearAnalysis } from '../clearAnalysis';
 import { useAnalysisTaskFlow } from '../tasks/useAnalysisTaskFlow';
@@ -15,7 +15,7 @@ import {
   analysisServerRequestLockQueryKey,
   type ServerLockAnalysisType,
 } from './useAnalysisServerRequestLock';
-import type { AnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
+import type { AnalysisTaskStatus } from '@/features/views/common/useAnalysisTaskStatus';
 
 interface CachedServerLock {
   hasServerRequest: boolean;

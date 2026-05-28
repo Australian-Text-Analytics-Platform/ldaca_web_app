@@ -1,5 +1,5 @@
 import { clearTasks } from '@/api/generated/sdk.gen';
-import { collectTaskIds } from '@/hooks/analysisTaskUtils';
+import { collectTaskIds } from '@/features/views/common/analysisTaskUtils';
 import {
   analysisServerRequestLockQueryKey,
   type ServerLockAnalysisType,

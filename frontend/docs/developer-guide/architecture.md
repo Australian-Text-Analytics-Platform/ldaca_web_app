@@ -27,9 +27,15 @@ and auth bootstrap before mounting the workspace shell.
 - `src/providers/`: app-level providers such as the singleton QueryClient.
 - `src/stores/`: Zustand stores for auth, UI, selection, preferences, tasks,
   and node colors.
-- `src/features/`: feature-first UI modules for loader, preprocessing,
-  analysis, workspace graph/table, hints, and snapshots.
-- `src/hooks/`: shared hooks that are not feature-specific.
+- `src/features/`: feature-first UI modules — `auth`, `feedback`, `hints`,
+  `snapshot-view`, `workspace`, and `views` (sidebar-tab features).
+- `src/features/views/`: all left-sidebar view tabs (data-loader,
+  preprocessing, token-frequency, concordance, sequential-analysis,
+  topic-modeling, quotation, ai-annotator, export) plus `views/common/` for
+  shared analysis code.
+- `src/hooks/`: globally shared hooks that are not feature-specific (e.g.
+  `useBackendHealth`, `usePreferences`, `useResizableSplit`). Feature-specific
+  hooks live in the owning feature module.
 - `src/tutorials/`: bundled and remote documentation registries used by help,
   info, and reference icons.
 - `src-tauri/`: Rust desktop shell and Tauri configuration.

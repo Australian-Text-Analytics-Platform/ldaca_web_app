@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { insertItemAt, moveItemTo, removeItemAt } from './tokenIndexMath';
 
-import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   type FilterPreviewResponse,
   type PolarsExpressionRequest,
   type PolarsExpressionApplyResponse,
 } from '@/api/generated/types.gen';
-import { mapColumnsToInfo, type ColumnInfo } from '@/utils/columnTypes';
+import { mapColumnsToInfo, type ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import type { PreviewPagination, PreviewRow } from '../../types';
 

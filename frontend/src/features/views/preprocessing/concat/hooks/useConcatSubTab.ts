@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
-} from '@/features/analysis/common/components/NodeSelectionPanel';
+} from '@/features/views/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   ConcatNodeSummary,
@@ -20,7 +20,7 @@ import {
   extractNodeDtypes,
   getNodeKey,
 } from '../../utils/nodeMetadata';
-import { dedupeNodeIds, takeMostRecent } from '@/utils/selectionUtils';
+import { dedupeNodeIds, takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 const DEFAULT_CONCAT_PALETTE = [
   '#2563eb',

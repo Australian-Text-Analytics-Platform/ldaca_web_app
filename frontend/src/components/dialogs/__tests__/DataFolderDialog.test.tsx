@@ -25,7 +25,7 @@ vi.mock('@/api/generated/sdk.gen', () => ({
   updateConfig: (...args: unknown[]) => updateConfig(...args),
 }));
 
-vi.mock('@/hooks/useAuth', () => ({
+vi.mock('@/features/auth/hooks/useAuth', () => ({
   /** Used by: DataFolderDialog tests to supply auth state and refresh behavior because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useAuth: () => ({
     dataFolder: '/tmp/original',

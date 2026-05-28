@@ -1,5 +1,5 @@
-import { useAnalysisStore, isPendingTaskState, isTerminalTaskState } from '../stores/analysisStore';
-import type { TaskItem } from '../stores/analysisStore';
+import { useAnalysisStore, isPendingTaskState, isTerminalTaskState } from '@/stores/analysisStore';
+import type { TaskItem } from '@/stores/analysisStore';
 import { getTaskTypeCandidates } from './analysisTaskUtils';
 
 /** Normalizes backend timestamp variants so streamed and fetched tasks sort together. */
@@ -54,7 +54,7 @@ export interface AnalysisTaskStatus {
 
 /** Summarizes the latest task state for an analysis feature's banners and result panels. */
 /**
- * Used by: src/features/analysis/common/hooks/useMaterializeLifecycle.ts, src/features/analysis/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/features/views/common/hooks/useMaterializeLifecycle.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: expand task-type aliases, filter and sort stored tasks by timestamp/event order, then expose active, terminal, and banner task summaries.
  */
 export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTaskStatus => {

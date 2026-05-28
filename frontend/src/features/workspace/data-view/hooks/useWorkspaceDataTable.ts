@@ -5,7 +5,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { getNodeQueryPlan } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 import type { FilterOperator } from '../types';
 import { getNodeDocumentColumn } from '../utils/documentColumn';

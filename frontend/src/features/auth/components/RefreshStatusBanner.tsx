@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { REFRESH_CHIP_DELAY_MS } from '@/config/timings';
-import { formatAttemptLabel, formatTimestamp } from './authPhaseCopy';
+import { formatAttemptLabel, formatTimestamp } from '../authPhaseCopy';
 
 /**
  * Top-of-screen auth recovery status used by the app shell while background

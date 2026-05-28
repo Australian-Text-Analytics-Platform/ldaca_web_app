@@ -3,11 +3,11 @@ import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
 import { calculateTokenFrequencies } from '@/api/generated/sdk.gen';
 import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
-import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
+import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 import {
   resolveTokenFrequencyNodeContext,
   type TokenFrequencyAnalysisParams,
-} from '@/features/analysis/token-frequency/tokenFrequencyHelpers';
+} from '@/features/views/token-frequency/tokenFrequencyHelpers';
 import {
   restoreAnalysisLockFromRequest,
   extractAndSetTaskId,
@@ -15,7 +15,7 @@ import {
 } from '../../common';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 type TokenFrequencyRequest = TokenFrequencyRequestInput;
 

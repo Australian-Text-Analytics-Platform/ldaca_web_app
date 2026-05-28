@@ -1,5 +1,5 @@
-import type { ColumnInfo } from '@/utils/columnTypes';
-import { filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '@/utils/columnTypes';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
+import { filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
 import type { NodeColumnSource, WorkspaceNodeLike } from './nodeSelectionTypes';
 import { getNodeIdentifier } from './nodeSelectionTypes';
 

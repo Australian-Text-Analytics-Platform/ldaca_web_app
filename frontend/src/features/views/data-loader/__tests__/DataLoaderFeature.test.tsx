@@ -91,7 +91,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useAuth', () => ({
+vi.mock('@/features/auth/hooks/useAuth', () => ({
   // Provides deterministic auth/data-folder context for generated API calls.
   // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   useAuth: () => ({
@@ -177,7 +177,7 @@ vi.mock('@/hooks/useFiles', () => ({
   }),
 }));
 
-vi.mock('@/components/panels', () => ({
+vi.mock('@/features/views/data-loader/components', () => ({
   // The panel internals are covered elsewhere; this suite only needs Data
   // Loader wiring and file/workspace controls.
   // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.

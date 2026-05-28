@@ -6,8 +6,8 @@ import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
 import { AppliedStopwordsDialog } from '../results/AppliedStopwordsDialog';
-import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
-import { AnalysisRunningStateCard } from '@/features/analysis/common/components/AnalysisRunningStateCard';
+import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
+import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
 type TopicModelingTopic = {

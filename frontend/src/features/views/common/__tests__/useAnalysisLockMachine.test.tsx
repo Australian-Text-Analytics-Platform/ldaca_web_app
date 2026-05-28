@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useAnalysisLockCore } from '@/features/analysis/common/useAnalysisLockMachine';
+import { useAnalysisLockCore } from '@/features/views/common/useAnalysisLockMachine';
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   /** Called by: useAnalysisLockCore under test to derive active selections because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */

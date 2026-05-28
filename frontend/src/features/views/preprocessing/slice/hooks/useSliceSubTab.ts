@@ -7,7 +7,7 @@ import type {
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
-} from '@/features/analysis/common/components/NodeSelectionPanel';
+} from '@/features/views/common/components/NodeSelectionPanel';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';

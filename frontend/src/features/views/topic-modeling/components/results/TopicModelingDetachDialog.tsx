@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import {
   DetachColumnsDialog,
   type DetachDialogNodeOption,
-} from '@/features/analysis/components/DetachColumnsDialog';
+} from '@/features/views/common/components/DetachColumnsDialog';
 
 type Props = {
   open: boolean;

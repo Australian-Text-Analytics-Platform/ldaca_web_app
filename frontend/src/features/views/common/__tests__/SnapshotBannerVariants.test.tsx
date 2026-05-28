@@ -3,11 +3,11 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ConcordanceSnapshotBanner } from '@/features/analysis/concordance/components/ConcordanceSnapshotBanner';
-import { QuotationSnapshotBanner } from '@/features/analysis/quotation/components/QuotationSnapshotBanner';
-import { SequentialAnalysisSnapshotBanner } from '@/features/analysis/sequential-analysis/components/SequentialAnalysisSnapshotBanner';
-import { TokenFrequencySnapshotBanner } from '@/features/analysis/token-frequency/components/TokenFrequencySnapshotBanner';
-import { TopicModelingSnapshotBanner } from '@/features/analysis/topic-modeling/components/TopicModelingSnapshotBanner';
+import { ConcordanceSnapshotBanner } from '@/features/views/concordance/components/ConcordanceSnapshotBanner';
+import { QuotationSnapshotBanner } from '@/features/views/quotation/components/QuotationSnapshotBanner';
+import { SequentialAnalysisSnapshotBanner } from '@/features/views/sequential-analysis/components/SequentialAnalysisSnapshotBanner';
+import { TokenFrequencySnapshotBanner } from '@/features/views/token-frequency/components/TokenFrequencySnapshotBanner';
+import { TopicModelingSnapshotBanner } from '@/features/views/topic-modeling/components/TopicModelingSnapshotBanner';
 import {
   DEMO_SNAPSHOT_MODE,
   useSnapshotViewStore,

@@ -58,7 +58,7 @@ const TYPE_RULES: Array<[(s: string) => boolean, string]> = [
  * `'string'` for unknown/missing input — most components render strings
  * safely, so this is the least-surprising default.
  */
-/** Used by: src/features/analysis/ai-annotator/AiAnnotatorFeature.tsx, src/features/analysis/common/useNodeColumnOptions.ts, src/features/analysis/sequential-analysis/SequentialAnalysisFeature.tsx and 6 other importers because the utility needs local normalization steps before returning a shared result. */
+/** Used by: src/features/views/ai-annotator/AiAnnotatorFeature.tsx, src/features/views/common/useNodeColumnOptions.ts, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx and 6 other importers because the utility needs local normalization steps before returning a shared result. */
 export const normalizeTypeName = (type?: string | null): string => {
   if (!type || typeof type !== 'string') return 'string';
   const s = type.toLowerCase();
@@ -91,7 +91,7 @@ const extractTypeFromSchemaEntry = (entry: unknown): string | undefined => {
  * because the generic `columns` list is the weakest evidence.
  */
 /**
- * Used by: src/features/analysis/common/useNodeColumnOptions.ts, src/features/preprocessing/aggregate/hooks/useAggregateSubTab.ts, src/features/preprocessing/replace/hooks/useReplaceSubTab.ts and 2 other importers because the utility needs local normalization steps before returning a shared result.
+ * Used by: src/features/views/common/useNodeColumnOptions.ts, src/features/views/preprocessing/aggregate/hooks/useAggregateSubTab.ts, src/features/views/preprocessing/replace/hooks/useReplaceSubTab.ts and 2 other importers because the utility needs local normalization steps before returning a shared result.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
@@ -157,7 +157,7 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
  * Narrow `columns` to entries whose `dataType` appears in `allowedTypes`.
  * If `allowedTypes` is empty the list is returned as-is (no-op filter).
  */
-/** Used by: src/features/analysis/common/useNodeColumnOptions.ts, src/hooks/useAutoNodeColumns.ts because the utility needs local normalization steps before returning a shared result. */
+/** Used by: src/features/views/common/useNodeColumnOptions.ts, src/hooks/useAutoNodeColumns.ts because the utility needs local normalization steps before returning a shared result. */
 export const filterColumnsByType = (
   columns: ColumnInfo[],
   allowedTypes: string[],

@@ -11,7 +11,7 @@ import type { PendingConcordance } from '@/stores/analysisStore';
 import type { HydrationState } from '../../common/useAnalysisHydration';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 /** Detects whether incoming token-frequency handoffs would replace visible results. */
 /**

@@ -35,7 +35,7 @@ export interface ServerTableOptions<TData> {
 
 /** Creates a TanStack Table instance whose sort/filter/page state drives backend queries. */
 /**
- * Used by: src/features/preprocessing/components/PreviewTable.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/features/views/preprocessing/components/PreviewTable.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: initialize controlled or internal sorting/filter state, bridge table change callbacks, then build a manual TanStack table for backend paging.
  */
 export function useServerTable<TData>({

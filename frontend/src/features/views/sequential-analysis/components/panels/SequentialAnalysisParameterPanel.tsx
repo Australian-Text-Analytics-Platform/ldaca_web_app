@@ -1,8 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react';
 
 import HelpIcon from '@/components/help/HelpIcon';
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
+import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';

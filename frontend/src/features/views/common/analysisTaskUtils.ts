@@ -1,4 +1,4 @@
-import type { TaskItem } from '../stores/analysisStore';
+import type { TaskItem } from '@/stores/analysisStore';
 
 const CANONICAL_TASK_TYPE_MAP = {
   topic_modeling: 'topic_modeling',
@@ -23,7 +23,7 @@ const normalizeTaskTypeKey = (taskType: string): string => {
 };
 
 /** Returns all task-type aliases a UI feature should watch for one logical analysis. */
-/** Used by: src/features/analysis/common/tasks/policies.ts, src/features/analysis/common/tasks/useAnalysisTaskFlow.ts, src/hooks/useAnalysisTaskStatus.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Used by: src/features/views/common/tasks/policies.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts, src/hooks/useAnalysisTaskStatus.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const getTaskTypeCandidates = (taskType: string): string[] => {
   const canonical = normalizeTaskTypeKey(taskType);
   const aliases = Object.entries(CANONICAL_TASK_TYPE_MAP)
@@ -33,7 +33,7 @@ export const getTaskTypeCandidates = (taskType: string): string[] => {
 };
 
 /** Builds a stable key for deduping repeated task-state events from task streams. */
-/** Used by: src/features/analysis/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Used by: src/features/views/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const normalizeTaskDedupeKey = (
   taskId: string | null | undefined,
   state: string | null | undefined,
@@ -58,7 +58,7 @@ const normalizeTaskId = (value: unknown): string | null => {
 };
 
 /** Collects unique valid task ids from local state, route params, or server responses. */
-/** Used by: src/features/analysis/common/clearAnalysis.ts, src/features/analysis/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Used by: src/features/views/common/clearAnalysis.ts, src/features/views/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const collectTaskIds = (candidateIds: Array<string | null | undefined>): string[] => {
   const ids = candidateIds
     .map((value) => normalizeTaskId(value))
@@ -74,7 +74,7 @@ interface ResolveAnalysisTaskIdOptions {
 
 /** Resolves the best task id for cleanup/result-fetch flows, falling back to a server lookup. */
 /**
- * Used by: src/features/analysis/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/features/views/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: prefer valid local candidate ids, optionally fetch the current server task id, normalize it, then notify the resolver callback.
  */
 export const resolveAnalysisTaskId = async ({
@@ -104,7 +104,7 @@ export const resolveAnalysisTaskId = async ({
 };
 
 /** Removes completed/cleared tasks from the Zustand task list after task cleanup succeeds. */
-/** Used by: src/features/analysis/concordance/ConcordanceFeature.tsx, src/features/analysis/token-frequency/TokenFrequencyFeature.tsx, src/features/analysis/topic-modeling/TopicModelingFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Used by: src/features/views/concordance/ConcordanceFeature.tsx, src/features/views/token-frequency/TokenFrequencyFeature.tsx, src/features/views/topic-modeling/TopicModelingFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const pruneTasksById = <T extends Pick<TaskItem, 'task_id'>>(
   tasks: T[],
   taskIds: string[],

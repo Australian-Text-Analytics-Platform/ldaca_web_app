@@ -17,7 +17,7 @@ import {
   MANIFEST_FILE_NAME,
   type SnapshotManifest,
 } from '@/features/snapshot-view';
-import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
 const SETTINGS_PAYLOAD_PATH = 'settings.json';

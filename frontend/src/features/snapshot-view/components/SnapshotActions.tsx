@@ -4,7 +4,7 @@ import { Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { listSnapshots } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { LoadSnapshotDialog } from './LoadSnapshotDialog';
 import { SaveSnapshotDialog } from './SaveSnapshotDialog';

@@ -1,6 +1,6 @@
 import { Calculator, Loader2, X } from 'lucide-react';
 
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';

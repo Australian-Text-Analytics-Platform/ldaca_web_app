@@ -1,6 +1,6 @@
-import type { ColumnInfo } from '@/utils/columnTypes';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 
-export type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
+export type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
 export interface WorkspaceNodeLike extends Record<string, unknown> {
   id?: string;

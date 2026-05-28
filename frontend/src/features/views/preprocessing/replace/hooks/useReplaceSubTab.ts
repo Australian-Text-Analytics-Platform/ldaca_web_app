@@ -1,14 +1,14 @@
 import { useState } from 'react';
 
-import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   type FilterPreviewResponse,
   type ReplaceApplyResponse,
   type ReplaceRequest,
 } from '@/api/generated/types.gen';
-import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
-import { mapColumnsToInfo } from '@/utils/columnTypes';
+import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
+import { mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 
 const SINGLE_NODE_PALETTE = ['#2563eb'];

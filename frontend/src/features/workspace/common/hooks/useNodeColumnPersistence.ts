@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import columnPersistence from '../utils/columnPersistence';
+import columnPersistence from '@/features/workspace/data-view/utils/columnPersistence';
 
 export interface NodeColumnSelection {
   nodeId: string;

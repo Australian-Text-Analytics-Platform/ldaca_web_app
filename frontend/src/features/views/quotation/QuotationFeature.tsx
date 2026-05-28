@@ -22,15 +22,15 @@ import { useQuotationSnapshotLoad } from './hooks/useQuotationSnapshotLoad';
 import type { QuotationSnapshotPayload } from './hooks/useQuotationSnapshotLoad';
 import { QuotationSnapshotBanner } from './components/QuotationSnapshotBanner';
 
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
+import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
-import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
-import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
+import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
+import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { effectiveNodeLanguage, isEnglish } from '@/lib/effectiveNodeLanguage';
 import { Button } from '@/components/ui/button';
@@ -70,9 +70,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
+import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ArrowUpDown, Loader2, Plus } from 'lucide-react';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   getNodeIdentifier,
   getServerEngineConfig,
@@ -88,10 +88,10 @@ import {
   type WorkspaceNodeLike,
 } from '../common';
 
-import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
+import { AnalysisPagination } from '@/features/views/common/components/AnalysisPagination';
 import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
-import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
+import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../common/generatedColumns';
 import {
   DEFAULT_CONTEXT_LENGTH,
   MAX_CONTEXT_LENGTH,
@@ -103,7 +103,7 @@ import {
   QuotationHighlightedCell,
   type QuotationHoverState,
 } from './components/QuotationHighlightedCell';
-import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
+import type { DetachDialogNodeOption } from '../common/components/DetachColumnsDialog';
 import { MetadataColumnSelector } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';

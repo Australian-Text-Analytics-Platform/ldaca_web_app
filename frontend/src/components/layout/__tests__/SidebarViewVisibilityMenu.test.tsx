@@ -62,7 +62,7 @@ vi.mock('@/features/workspace/task-stream/useWorkspaceTaskInbox', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useAuth', () => ({
+vi.mock('@/features/auth/hooks/useAuth', () => ({
   /**
    * Returns the mutable auth fixture used by sidebar account and action controls.
    * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.

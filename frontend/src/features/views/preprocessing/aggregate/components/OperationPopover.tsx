@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 
 import { columnOperations } from '@/api/generated/sdk.gen';
 import type { ColumnOperationsResponse } from '@/api/generated/types.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';

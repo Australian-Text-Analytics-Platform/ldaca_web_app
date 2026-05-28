@@ -9,8 +9,8 @@ import {
   MultiSeriesChart,
   type MultiSeriesChartSeries,
   type MultiSeriesChartXAxisConfig,
-} from '@/features/analysis/common/components/MultiSeriesChart';
-import { acceptPlaceholderOnTab } from '@/features/preprocessing/utils/placeholderTabFill';
+} from '@/features/views/common/components/MultiSeriesChart';
+import { acceptPlaceholderOnTab } from '@/features/views/preprocessing/utils/placeholderTabFill';
 import type {
   SequentialAnalysisDatum,
   ChartTypeOption,

@@ -1,8 +1,8 @@
 import React from 'react';
 import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
 import HelpIcon from '@/components/help/HelpIcon';
-import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
-import { AnalysisRunningStateCard } from '@/features/analysis/common/components/AnalysisRunningStateCard';
+import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
+import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

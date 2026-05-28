@@ -6,7 +6,7 @@ import { TokenFrequencyUnifiedTokenSection } from '../TokenFrequencyUnifiedToken
 import type {
   NodeResultView,
   TokenFrequencyStatisticsEntry,
-} from '@/features/analysis/token-frequency/tokenFrequencyAdapters';
+} from '@/features/views/token-frequency/tokenFrequencyAdapters';
 
 vi.mock('@/components/help/HelpIcon', () => ({
   /** Used by: HelpIcon mock module factory so layout assertions can ignore tutorial wiring because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { EXTENDED_PALETTE, UNASSIGNED_NODE_COLOR } from '@/features/analysis/common/palette';
+import { EXTENDED_PALETTE, UNASSIGNED_NODE_COLOR } from '@/features/views/common/palette';
 import { useNodeColorsStore } from '../nodeColorsStore';
 
 describe('useNodeColorsStore — assigned-only paths', () => {

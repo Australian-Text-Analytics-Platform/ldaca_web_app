@@ -1,6 +1,6 @@
 import { Loader2, Merge, Plus } from 'lucide-react';
 
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';

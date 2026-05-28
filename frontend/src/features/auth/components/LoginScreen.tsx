@@ -1,6 +1,6 @@
 import logo from '@/logo.png';
-import CILogonLogin from '@/components/CILogonLogin';
-import GoogleLogin from '@/components/GoogleLogin';
+import CILogonLogin from '@/features/auth/components/CILogonLogin';
+import GoogleLogin from '@/features/auth/components/GoogleLogin';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 interface LoginScreenProps {

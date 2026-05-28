@@ -1,4 +1,4 @@
-import type { NodeLike } from '@/hooks/useNodeColumnInfos';
+import type { NodeLike } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 
 /** Finds the backend-declared document column so text-analysis tools prefer the intended text field. */
 export const extractDocumentColumn = (node: NodeLike): string => {

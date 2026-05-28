@@ -10,7 +10,7 @@ import * as compatModule from '../compat';
 import type { SnapshotListItem } from '@/api/generated/types.gen';
 import type { SnapshotManifest } from '../types';
 
-vi.mock('@/hooks/useAuth', () => ({
+vi.mock('@/features/auth/hooks/useAuth', () => ({
   /**
    * Supplies deterministic auth context for generated snapshot SDK calls.
    * Used by: test mock object in snapshot-view/LoadSnapshotDialog.

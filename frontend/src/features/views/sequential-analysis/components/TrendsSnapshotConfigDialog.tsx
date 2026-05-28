@@ -45,7 +45,7 @@ import {
 import { SNAPSHOT_FINEST_FREQUENCIES } from '../trendsSnapshotConfig';
 import { getColumnUniqueValues } from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { SnapshotToolKey } from '@/features/snapshot-view';
 import type { SnapshotFinestFrequency, TrendsSnapshotConfig } from '../trendsSnapshotConfig';
 

@@ -370,7 +370,7 @@ const buildCompositeSvg = (
  * Use this when you need to bundle the chart with other files (e.g. a ZIP).
  */
 /**
- * Used by: src/features/analysis/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Used by: src/features/views/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 export const buildChartBlob = async (
@@ -404,7 +404,7 @@ export const buildChartBlob = async (
 };
 
 /** Build and immediately save a chart image, with browser/Tauri toast handling. */
-/** Used by: src/features/analysis/concordance/components/ConcordanceDispersionSummary.tsx, src/features/analysis/sequential-analysis/SequentialAnalysisFeature.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Used by: src/features/views/concordance/components/ConcordanceDispersionSummary.tsx, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 export const downloadChartAs = async (
   svg: SVGSVGElement,
   options: DownloadChartOptions,
@@ -414,7 +414,7 @@ export const downloadChartAs = async (
 };
 
 /** Finds the chart SVG inside a feature panel while ignoring icon SVGs inside controls. */
-/** Used by: src/features/analysis/concordance/components/ConcordanceDispersionSummary.tsx, src/features/analysis/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/analysis/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Used by: src/features/views/concordance/components/ConcordanceDispersionSummary.tsx, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/views/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 export const findSvgInContainer = (container: HTMLElement): SVGSVGElement | null => {
   const svgs = container.querySelectorAll<SVGSVGElement>('svg');
   return Array.from(svgs).find((svg) => !svg.closest('button')) ?? null;

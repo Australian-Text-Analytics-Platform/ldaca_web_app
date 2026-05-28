@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { QUOTATION_COLUMN_KEYS } from '../../generatedColumns';
+import { QUOTATION_COLUMN_KEYS } from '../../common/generatedColumns';
 import {
   buildUnderlineStyle,
   hexToRgba,

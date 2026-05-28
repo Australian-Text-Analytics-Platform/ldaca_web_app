@@ -25,7 +25,7 @@
  */
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { AUTO_ASSIGN_PALETTE } from '@/features/analysis/common/palette';
+import { AUTO_ASSIGN_PALETTE } from '@/features/views/common/palette';
 
 type ColorMap = Record<string, string>;
 

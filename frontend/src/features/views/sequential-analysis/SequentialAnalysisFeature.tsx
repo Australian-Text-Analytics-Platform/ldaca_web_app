@@ -10,9 +10,9 @@ import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
-import { useSchemaManagement } from '@/hooks/useSchemaManagement';
+import { useSchemaManagement } from '@/features/workspace/common/hooks/useSchemaManagement';
 import { snapshotSourceNodes, useSnapshotBackedAnalysisState } from '@/features/snapshot-view';
 import {
   buildCaptureRequest,
@@ -33,13 +33,13 @@ import {
 import { useSequentialAnalysisSnapshotLoad } from './hooks/useSequentialAnalysisSnapshotLoad';
 import type { SequentialAnalysisSnapshotPayload } from './hooks/useSequentialAnalysisSnapshotLoad';
 import { SequentialAnalysisSnapshotBanner } from './components/SequentialAnalysisSnapshotBanner';
-import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 
-import { normalizeSchemaFromInfo } from '@/hooks/useSchemaManagement';
+import { normalizeSchemaFromInfo } from '@/features/workspace/common/hooks/useSchemaManagement';
 import { fetchNodeInfo } from '@/lib/nodeInfo';
-import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
-import { normalizeTypeName } from '@/utils/columnTypes';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
+import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   hasLockedParameterDiff,
   normalizeStringArray,

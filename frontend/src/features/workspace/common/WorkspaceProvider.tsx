@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceInternal } from './hooks/useWorkspaceInternal';
 import { useWorkspaceUiStateSync } from './hooks/useWorkspaceUiStateSync';
 import {

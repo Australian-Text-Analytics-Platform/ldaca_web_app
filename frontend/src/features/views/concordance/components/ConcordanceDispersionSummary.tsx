@@ -15,7 +15,7 @@ import {
   MultiSeriesChart,
   type MultiSeriesChartSeries,
   type MultiSeriesChartType,
-} from '@/features/analysis/common/components/MultiSeriesChart';
+} from '@/features/views/common/components/MultiSeriesChart';
 import {
   buildDispersionBins,
   buildDispersionBinsFromBinned,

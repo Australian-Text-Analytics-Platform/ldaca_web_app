@@ -7,7 +7,7 @@ import { WorkspaceProvider } from '@/features/workspace/common/WorkspaceProvider
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import Sidebar from '@/components/layout/Sidebar';
 import { InsetCard } from '@/components/layout/InsetCard';
-import { RefreshStatusBanner } from '@/components/startup/RefreshStatusBanner';
+import { RefreshStatusBanner } from '@/features/auth/components/RefreshStatusBanner';
 import { useUIStore } from '@/stores';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -16,7 +16,7 @@ import { DocumentModalHost } from '@/components/dialogs/DocumentModalHost';
 import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
 import { ViewRouter } from '@/components/layout/ViewRouter';
 
-const FeedbackPanel = lazy(() => import('@/components/panels/FeedbackPanel'));
+const FeedbackPanel = lazy(() => import('@/features/feedback/components/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 const HintsController = lazy(() => import('@/features/hints/HintsController'));
 

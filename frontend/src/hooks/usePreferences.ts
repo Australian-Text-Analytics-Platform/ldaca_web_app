@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 /**
  * Coalesce rapid preference changes into a single backend write. Hand-tuned:

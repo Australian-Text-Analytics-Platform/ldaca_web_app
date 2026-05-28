@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { batchDeleteSnapshots, deleteSnapshot, listSnapshots } from '@/api/generated/sdk.gen';
 import type { SnapshotListItem } from '@/api/generated/types.gen';
 import { formatBytes } from '@/lib/utils';

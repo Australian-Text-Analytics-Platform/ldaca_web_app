@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteFile, downloadFile, getUserFiles, uploadFile } from '@/api/generated/sdk.gen';
-import { saveBlob } from '../lib/download';
-import { type FileTreeNode } from '@/features/data-loader/types';
-import { queryKeys } from '../lib/queryKeys';
+import { saveBlob } from '@/lib/download';
+import { type FileTreeNode } from '../types';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface UseFilesProps {
   authHeaders?: Record<string, string>;
@@ -13,7 +13,7 @@ interface UseFilesProps {
 
 /** Coordinates user file tree loading plus upload/delete/download actions for data-loader panels. */
 /**
- * Used by: src/features/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/features/views/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: fetch the file tree, wire upload/delete mutations to cache invalidation, then expose selection and file actions for data-loader panels.
  */
 export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {}) => {

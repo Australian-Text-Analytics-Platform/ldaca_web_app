@@ -35,7 +35,7 @@ import type {
   OniSearchRequest,
   OniSearchResult as LdacaSearchResult,
 } from '@/api/generated/types.gen';
-import type { FileTreeDirectory } from '@/features/data-loader/types';
+import type { FileTreeDirectory } from '@/features/views/data-loader/types';
 
 type LdacaSearchMethod = Extract<NonNullable<OniSearchRequest['method']>, 'keyword' | 'identifier'>;
 

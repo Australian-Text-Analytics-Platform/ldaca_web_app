@@ -13,11 +13,11 @@ import {
 } from '@/api/generated/types.gen';
 import { queryKeys } from '@/lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
-import { useDetachColumnsState } from '@/features/analysis/common/hooks/useDetachColumnsState';
-import type { DetachDialogNodeOption } from '@/features/analysis/components/DetachColumnsDialog';
-import { buildSamplingAutoNodeName } from '@/features/preprocessing/utils/autoNodeNames';
-import { takeMostRecent } from '@/utils/selectionUtils';
-import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
+import { useDetachColumnsState } from '@/features/views/common/hooks/useDetachColumnsState';
+import type { DetachDialogNodeOption } from '@/features/views/common/components/DetachColumnsDialog';
+import { buildSamplingAutoNodeName } from '@/features/views/preprocessing/utils/autoNodeNames';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
+import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 20;
 type TopicModelingRequest = TopicModelingRequestInput;

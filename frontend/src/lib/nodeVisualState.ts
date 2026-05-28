@@ -22,7 +22,7 @@
  * most-common N for the parent view and defers the per-sub-tab refinement
  * to a future store. See "Open questions" in the strategy doc.
  */
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import type { ViewType } from '@/stores/uiStore';
 import { type ColorPair, colorPairFor } from './color';
 

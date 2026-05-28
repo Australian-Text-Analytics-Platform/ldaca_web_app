@@ -1,6 +1,6 @@
 // Canonical implementation lives in `@/utils/columnTypes`. Re-exported
 // here so preprocessing call sites can keep their existing import.
-export { normalizeTypeName } from '@/utils/columnTypes';
+export { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
 
 /**
  * Supplies condition operators for the Filter tab based on normalized dtype.

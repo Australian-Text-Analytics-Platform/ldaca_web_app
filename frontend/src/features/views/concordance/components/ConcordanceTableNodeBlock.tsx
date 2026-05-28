@@ -11,10 +11,10 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/generated/types.gen';
-import { AnalysisTableScrollArea } from '@/features/analysis/common/components/AnalysisTableScrollArea';
-import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
+import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
+import { AnalysisPagination } from '@/features/views/common/components/AnalysisPagination';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { getNodeIdentifier } from '../../common';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
@@ -24,7 +24,7 @@ import {
   CONCORDANCE_COLUMN_KEYS,
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_FREQ_COLUMNS,
-} from '../../generatedColumns';
+} from '../../common/generatedColumns';
 
 type ConcordanceGroupedRow = Record<string, unknown>[];
 

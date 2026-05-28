@@ -10,7 +10,7 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { downloadSnapshot } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
   DEMO_SNAPSHOT_MODE,
   readBundle,

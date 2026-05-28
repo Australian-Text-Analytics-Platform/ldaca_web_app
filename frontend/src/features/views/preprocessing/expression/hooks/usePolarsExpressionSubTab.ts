@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
 import type {
   FilterPreviewResponse,
   PolarsExpressionRequest,
@@ -8,7 +8,7 @@ import type {
   PolarsExpressionContext,
 } from '@/api/generated/types.gen';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
 import { deriveNodeLabel } from '../../utils/nodeMetadata';
 

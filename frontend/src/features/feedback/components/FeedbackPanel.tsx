@@ -1,7 +1,7 @@
 import { type FC } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
-import { useAuth } from '../../hooks/useAuth';
-import { SURVEY_BASE_URL, buildSurveyUrl, captureFeedbackContext } from './feedbackContext';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { SURVEY_BASE_URL, buildSurveyUrl, captureFeedbackContext } from '../feedbackContext';
 
 interface FeedbackPanelProps {
   open: boolean;

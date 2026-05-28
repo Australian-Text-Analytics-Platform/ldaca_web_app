@@ -7,10 +7,10 @@ import {
   makeSnapshotManifest,
   mockSnapshotDownload,
   resetSnapshotStore,
-} from '@/features/analysis/common/__tests__/snapshotLoadTestUtils';
+} from '@/features/views/common/__tests__/snapshotLoadTestUtils';
 import { useSequentialAnalysisSnapshotLoad } from '../hooks/useSequentialAnalysisSnapshotLoad';
 
-vi.mock('@/hooks/useAuth', () => ({
+vi.mock('@/features/auth/hooks/useAuth', () => ({
   // Supplies the auth hook contract without requiring login state in snapshot-load tests.
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useAuth: () => ({

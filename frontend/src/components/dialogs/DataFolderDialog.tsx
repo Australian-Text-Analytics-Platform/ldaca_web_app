@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { updateConfig } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { queryKeys } from '@/lib/queryKeys';

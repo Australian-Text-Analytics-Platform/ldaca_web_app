@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
-import { useFilePreview } from '../../hooks/useFilePreview';
+import { useFilePreview } from '../hooks/useFilePreview';
 import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { FilePreviewContent } from './FilePreviewContent';
-import { CardFooter } from '../ui/card';
-import { Button } from '../ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Dialog } from '../ui/dialog';
+import { CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog } from '@/components/ui/dialog';
 
 interface AddFilePanelProps {
   filename: string | null;

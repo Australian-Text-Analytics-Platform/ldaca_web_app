@@ -77,7 +77,7 @@ const getStopwordList = (iso6393Code: string): string[] => {
 
 /** Resolves and deduplicates stopwords synchronously for callers/tests that already have languages. */
 /**
- * Used by: src/features/analysis/common/hooks/useDefaultStopwords.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Used by: src/features/views/common/hooks/useDefaultStopwords.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 export function resolveMergedStopwords(
@@ -119,7 +119,7 @@ export function resolveMergedStopwords(
 }
 
 /** Async facade for UI actions that may later load stopword sources dynamically. */
-/** Used by: src/features/analysis/token-frequency/hooks/useTokenFrequencyPreferences.ts, src/lib/__tests__/loadMergedStopwords.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/features/views/token-frequency/hooks/useTokenFrequencyPreferences.ts, src/lib/__tests__/loadMergedStopwords.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 // eslint-disable-next-line @typescript-eslint/require-await
 export async function loadMergedStopwords(args: {
   languages: ReadonlyArray<string | null | undefined>;

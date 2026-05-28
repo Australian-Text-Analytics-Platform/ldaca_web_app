@@ -11,7 +11,7 @@
 
 export interface PaginationState {
   /** 1-based, to match the existing ``NodePaginationState`` in
-   * ``features/analysis/common/tasks/types``. */
+   * ``features/views/common/tasks/types``. */
   currentPage: number;
   pageSize: number;
   sortBy?: string;

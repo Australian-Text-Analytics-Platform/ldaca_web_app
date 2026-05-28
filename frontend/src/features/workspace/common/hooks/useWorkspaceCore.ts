@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { useUIStore } from '@/stores/uiStore';
 import { type PaginationMap, type PaginationState, createDefaultPagination } from './types';

@@ -32,7 +32,7 @@ const useAuthMock = vi.hoisted(() =>
     getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
   })),
 );
-vi.mock('@/hooks/useAuth', () => ({ useAuth: useAuthMock }));
+vi.mock('@/features/auth/hooks/useAuth', () => ({ useAuth: useAuthMock }));
 
 const getNodeDataMock = vi.hoisted(() => vi.fn());
 vi.mock('@/api/generated/sdk.gen', () => ({

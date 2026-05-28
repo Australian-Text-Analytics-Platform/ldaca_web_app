@@ -3,10 +3,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ConcordanceDetachDialog } from '@/features/analysis/concordance/components/ConcordanceDetachDialog';
-import type { DetachDialogNodeOption } from '@/features/analysis/components/DetachColumnsDialog';
-import { QuotationDetachDialog } from '@/features/analysis/quotation/components/QuotationDetachDialog';
-import { TopicModelingDetachDialog } from '@/features/analysis/topic-modeling/components/results/TopicModelingDetachDialog';
+import { ConcordanceDetachDialog } from '@/features/views/concordance/components/ConcordanceDetachDialog';
+import type { DetachDialogNodeOption } from '@/features/views/common/components/DetachColumnsDialog';
+import { QuotationDetachDialog } from '@/features/views/quotation/components/QuotationDetachDialog';
+import { TopicModelingDetachDialog } from '@/features/views/topic-modeling/components/results/TopicModelingDetachDialog';
 
 interface DetachDialogProps {
   open: boolean;

@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { FileTreeDirectory, FileTreeFile, FileTreeNode } from '@/features/data-loader/types';
+import type { FileTreeDirectory, FileTreeFile, FileTreeNode } from '@/features/views/data-loader/types';
 import {
   FILE_DRAG_MIME_TYPE,
   countFilesInNode,

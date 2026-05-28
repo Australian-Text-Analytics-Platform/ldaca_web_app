@@ -1,5 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import { useAnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
+import { useAnalysisTaskStatus } from '@/features/views/common/useAnalysisTaskStatus';
 
 type TerminalState = 'successful' | 'failed' | 'cancelled';
 

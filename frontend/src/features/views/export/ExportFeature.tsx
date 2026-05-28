@@ -3,7 +3,7 @@ import { Download } from 'lucide-react';
 import type { WorkspaceNodeInfo as GraphNode } from '@/api';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { getApiBase } from '@/lib/backend/env';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { saveBlob } from '@/lib/download';
 import { isTauri } from '@/lib/isTauri';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
-import { useNodeColorManagement } from '@/features/analysis/common';
+import { useNodeColorManagement } from '@/features/views/common';
 
 type DownloadStatus = 'idle' | 'downloading';
 

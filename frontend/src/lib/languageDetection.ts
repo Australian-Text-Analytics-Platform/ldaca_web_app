@@ -23,7 +23,7 @@ async function getLanguageDetector(): Promise<MediaPipeLanguageDetector> {
 }
 
 /** Guesses an ISO 639-1 language code from user text for language-aware tool defaults. */
-/** Used by: src/features/analysis/common/components/TokenizerModelSelector.tsx, src/features/analysis/common/components/__tests__/TokenizerModelSelector.behaviour.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/features/views/common/components/TokenizerModelSelector.tsx, src/features/views/common/components/__tests__/TokenizerModelSelector.behaviour.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 export async function detectLanguageIso6391(text: string): Promise<string | null> {
   const sample = text.replace(/\s+/g, ' ').trim().slice(0, MAX_DETECTION_CHARS);
   if (!sample) return null;

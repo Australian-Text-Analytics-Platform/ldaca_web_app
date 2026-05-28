@@ -11,12 +11,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import HelpIcon from '@/components/help/HelpIcon';
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
-import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
-import type { ColumnInfo } from '@/utils/columnTypes';
-import type { NodeLike } from '@/hooks/useNodeColumnInfos';
-import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
+import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
+import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
+import type { NodeLike } from '@/features/workspace/common/hooks/useNodeColumnInfos';
+import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import type { SnapshotToolKey } from '@/features/snapshot-view';
 
 export type CorpusSample = {

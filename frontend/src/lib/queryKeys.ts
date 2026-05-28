@@ -9,7 +9,7 @@
  * a new cached query needs targeted invalidation.
  */
 /**
- * Used by: src/components/dialogs/DataFolderDialog.tsx, src/components/dialogs/__tests__/DataFolderDialog.test.tsx, src/features/analysis/common/components/TokenizerModelSelector.tsx and 14 other importers because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/components/dialogs/DataFolderDialog.tsx, src/components/dialogs/__tests__/DataFolderDialog.test.tsx, src/features/views/common/components/TokenizerModelSelector.tsx and 14 other importers because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 export const queryKeys = {

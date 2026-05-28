@@ -2,19 +2,19 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
 import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { snapshotSourceNodes, useSnapshotBackedAnalysisState } from '@/features/snapshot-view';
 import { useTokenFrequencySnapshotCapture } from './hooks/useTokenFrequencySnapshotCapture';
 import { useTokenFrequencySnapshotLoad } from './hooks/useTokenFrequencySnapshotLoad';
 import type { TokenFrequencySnapshotPayload } from './hooks/useTokenFrequencySnapshotLoad';
 import { TokenFrequencySnapshotBanner } from './components/TokenFrequencySnapshotBanner';
-import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 
-import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';
+import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import {
   DEFAULT_TOKEN_LIMIT,
   parseAnalysisNodeRequest,
@@ -59,7 +59,7 @@ import {
   useSafeResult,
   useNodeColorManagement,
 } from '../common';
-import { pruneTasksById } from '@/hooks/analysisTaskUtils';
+import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
 import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
@@ -68,7 +68,7 @@ import { useUIStore } from '@/stores/uiStore';
 import {
   usePersistNodeDocumentColumn,
   usePersistNodeTokenizationPreference,
-} from '@/features/analysis/common/hooks/usePersistNodeDocumentColumn';
+} from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;

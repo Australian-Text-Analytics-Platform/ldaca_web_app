@@ -14,7 +14,7 @@ import {
 import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
-import { takeMostRecent } from '@/utils/selectionUtils';
+import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 export type PaginationState = Record<string, NodePaginationState>;
 

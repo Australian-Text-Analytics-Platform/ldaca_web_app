@@ -58,7 +58,7 @@ export function findLanguage(code: string | null | undefined): LanguageOption | 
 
 /** Splits tokenizer models into language-matching recommendations and secondary choices. */
 /**
- * Used by: src/features/analysis/common/components/TokenizerModelSelector.tsx, src/lib/__tests__/languages.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/features/views/common/components/TokenizerModelSelector.tsx, src/lib/__tests__/languages.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: normalize the language code, return all models as secondary when unknown, otherwise partition by model language support.
  */
 export function partitionTokenizerModelsForLanguage(
@@ -85,7 +85,7 @@ export function orderedTokenizerModelsForLanguage(
 }
 
 /** Provides display text for saved language codes without forcing every caller to handle fallback. */
-/** Used by: src/features/analysis/topic-modeling/components/results/AppliedStopwordsDialog.tsx, src/lib/__tests__/languages.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/features/views/topic-modeling/components/results/AppliedStopwordsDialog.tsx, src/lib/__tests__/languages.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 export function languageLabel(code: string | null | undefined): string {
   const found = findLanguage(code);
   if (found) return found.label;

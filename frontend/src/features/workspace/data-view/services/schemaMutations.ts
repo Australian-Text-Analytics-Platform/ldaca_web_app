@@ -2,7 +2,7 @@ import { type NodeSchemaResponse } from '@/features/workspace/data-view/types';
 
 // Canonical implementation lives in `@/utils/columnTypes`. Re-exported
 // here so workspace/data-view call sites can keep their existing import.
-export { normalizeTypeName } from '@/utils/columnTypes';
+export { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
 
 export const DATA_TYPES = [
   { value: 'string', label: 'string' },

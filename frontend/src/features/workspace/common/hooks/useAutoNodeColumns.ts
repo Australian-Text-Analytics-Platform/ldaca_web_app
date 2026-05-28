@@ -4,8 +4,8 @@ import {
   filterColumnsByType,
   mapColumnsToInfo,
   normalizeTypeName,
-} from '../utils/columnTypes';
-import columnPersistence from '../utils/columnPersistence';
+} from '@/features/workspace/data-view/utils/columnTypes';
+import columnPersistence from '@/features/workspace/data-view/utils/columnPersistence';
 import type { NodeLike } from './useNodeColumnInfos';
 import { extractDocumentColumn } from '@/lib/documentColumn';
 import { useNodeColumnPersistence } from './useNodeColumnPersistence';

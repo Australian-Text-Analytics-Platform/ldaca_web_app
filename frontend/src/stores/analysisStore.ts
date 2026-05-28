@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { ConcordanceAnalysisResponse } from '@/api/generated/types.gen';
-import type { NodeColumnSelection } from '../hooks/useAutoNodeColumns';
+import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
 /** Canonical task lifecycle states. */
 export type TaskState =
@@ -30,15 +30,15 @@ export const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>([
 ]);
 
 /** Lets hooks treat queued/submitted variants as one pending bucket. */
-/** Used by: src/features/data-loader/DataLoaderFeature.tsx, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
+/** Used by: src/features/views/data-loader/DataLoaderFeature.tsx, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
 export const isPendingTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && PENDING_TASK_STATES.has(state));
 /** Lets task banners detect active worker execution. */
-/** Used by: src/features/data-loader/DataLoaderFeature.tsx because store consumers need the action and state contract documented at the mutation boundary. */
+/** Used by: src/features/views/data-loader/DataLoaderFeature.tsx because store consumers need the action and state contract documented at the mutation boundary. */
 export const isRunningTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && RUNNING_TASK_STATES.has(state));
 /** Lets polling/result hooks stop watching states that cannot transition further. */
-/** Used by: src/features/analysis/common/tasks/policies.ts, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
+/** Used by: src/features/views/common/tasks/policies.ts, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
 export const isTerminalTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && TERMINAL_TASK_STATES.has(state));
 

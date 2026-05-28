@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { queryKeys } from '@/lib/queryKeys';
 import type { TaskItem } from '@/stores/analysisStore';

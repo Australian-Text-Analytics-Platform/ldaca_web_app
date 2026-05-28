@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { unifiedFilePreview } from '@/api/generated/sdk.gen';
-import { queryKeys } from '../lib/queryKeys';
-import { useAuth } from './useAuth';
+import { queryKeys } from '@/lib/queryKeys';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 /** Manages paginated file preview state for the data-loader preview dialog. */
 /**

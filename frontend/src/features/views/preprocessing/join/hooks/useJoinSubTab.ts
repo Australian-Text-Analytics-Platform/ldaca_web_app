@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from 'react';
 
 import { joinNodesPreview } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
-} from '@/features/analysis/common/components/NodeSelectionPanel';
+} from '@/features/views/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   JoinPreviewRequestPayload,
@@ -20,7 +20,7 @@ import {
   extractNodeColumns,
   getNodeKey,
 } from '../../utils/nodeMetadata';
-import { dedupeNodeIds, takeMostRecent } from '@/utils/selectionUtils';
+import { dedupeNodeIds, takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { MAX_JOIN_NODES } from '../../types';
 
 const DEFAULT_JOIN_PALETTE = ['#2563eb', '#dc2626'];

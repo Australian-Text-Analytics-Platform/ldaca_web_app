@@ -1,5 +1,5 @@
-import type { AuthPhase } from '@/hooks/useAuth';
-import { REFRESH_FAILURE_THRESHOLD } from '@/hooks/useAuth';
+import type { AuthPhase } from '@/features/auth/hooks/useAuth';
+import { REFRESH_FAILURE_THRESHOLD } from '@/features/auth/hooks/useAuth';
 
 export interface BlockingCopy {
   title: string;

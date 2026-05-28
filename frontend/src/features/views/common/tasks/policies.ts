@@ -1,4 +1,4 @@
-import { getTaskTypeCandidates } from '@/hooks/analysisTaskUtils';
+import { getTaskTypeCandidates } from '@/features/views/common/analysisTaskUtils';
 import { isTerminalTaskState } from '@/stores/analysisStore';
 
 export { isTerminalTaskState };

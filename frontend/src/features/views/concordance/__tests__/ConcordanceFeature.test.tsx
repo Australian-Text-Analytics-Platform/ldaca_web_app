@@ -31,7 +31,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/features/analysis/common/components/NodeSelectionPanel', () => ({
+vi.mock('@/features/views/common/components/NodeSelectionPanel', () => ({
   /** Replaces node-selection chrome so tests focus on concordance orchestration. */
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => <div data-testid="node-selection-panel" />,
@@ -49,7 +49,7 @@ vi.mock('@/components/help/InfoIcon', () => ({
   default: () => <span data-testid="info-icon" />,
 }));
 
-vi.mock('@/features/analysis/common/components/AnalysisTaskBanner', () => ({
+vi.mock('@/features/views/common/components/AnalysisTaskBanner', () => ({
   /** Removes lifecycle banner rendering so button and handoff assertions stay focused. */
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => null,
@@ -170,7 +170,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useAuth', () => ({
+vi.mock('@/features/auth/hooks/useAuth', () => ({
   /** Provides auth shape expected by generated API calls without real credentials. */
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useAuth: () => ({

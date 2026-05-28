@@ -1,5 +1,5 @@
 import { getNodeData } from '@/api/generated/sdk.gen';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { PreviewPagination, PreviewRow } from '../types';
 import {
   usePreprocessingPreview,

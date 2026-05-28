@@ -1,7 +1,7 @@
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
-import { CodeEditor } from '@/features/preprocessing/expression/CodeEditor';
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import { CodeEditor } from '@/features/views/preprocessing/expression/CodeEditor';
+import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
