@@ -42,7 +42,13 @@ export interface ConcordanceSnapshotPayload {
   settings?: ConcordanceAnalysisRequest;
 }
 
+/** Classifies snapshot-load failures so the dialog can show precise recovery messages. */
+/**
+ * Used by: useConcordanceSnapshotLoad hook exports or same-file callers because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+ */
 export class ConcordanceSnapshotLoadError extends Error {
+  /** Captures the user-facing message plus machine-readable failure reason. */
+  // Called by: ConcordanceSnapshotLoadError when this analysis object handles its lifecycle work because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
   constructor(
     message: string,
     public readonly reason: string,
@@ -57,6 +63,10 @@ export class ConcordanceSnapshotLoadError extends Error {
  * success the store is populated and the view mode flips; on
  * failure throws (the load dialog surfaces the message as a
  * destructive toast). */
+/**
+ * Used by: SnapshotActions.tsx, ConcordanceFeature.tsx, useConcordanceSnapshotCapture.ts, and related files because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+ * Flow: download the snapshot bundle, locate the manifest and payload files, hydrate request/result state, then surface contextual load errors.
+ */
 export function useConcordanceSnapshotLoad(): (filename: string) => Promise<void> {
   const { getAuthHeaders } = useAuth();
   const loadSnapshotIntoStore = useSnapshotViewStore((s) => s.loadSnapshot);
@@ -95,6 +105,9 @@ export function useConcordanceSnapshotLoad(): (filename: string) => Promise<void
 
       // Dispatch payloads by manifest ``kind`` (not file path — paths
       // are advisory and a future bundle may use different ones).
+      /**
+       * Called by: useConcordanceSnapshotLoad during this analysis workflow because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+       */
       const findPath = (kind: string): string | null =>
         manifest.payloads.find((p) => p.kind === kind)?.path ?? null;
 

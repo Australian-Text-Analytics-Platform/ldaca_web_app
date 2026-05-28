@@ -5,9 +5,12 @@ import { cn } from '@/lib/utils';
 import { AlertCircle, CheckCircle, ChevronDown, Clock, Square, XCircle } from 'lucide-react';
 import type { SidebarTaskRecord } from './types';
 
+/** Task states treated as attention-worthy in the sidebar task list. */
 const PROBLEMATIC_STATES = new Set(['failed', 'cancelled']);
+/** Task states considered live/in-progress for sorting and status display. */
 const ACTIVE_STATES = new Set(['pending', 'queued', 'submitted', 'running']);
 
+/** Display metadata consumed by task rows to keep icon, label, and color consistent. */
 const STATUS_META: Record<string, { icon: typeof Clock; className: string; label: string }> = {
   running: { icon: Clock, className: 'text-amber-600', label: 'Running' },
   successful: { icon: CheckCircle, className: 'text-green-600', label: 'Successful' },
@@ -25,6 +28,7 @@ type SidebarTasksSectionProps = {
   onReconnect: () => void;
 };
 
+/** Called by: SidebarTasksSection sorting and expanded timestamp formatting because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const normalizeTimestamp = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -38,15 +42,18 @@ const normalizeTimestamp = (value: unknown): number => {
   return 0;
 };
 
+/** Called by: SidebarTasksSection expanded task detail rows because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const formatTimestamp = (value: unknown): string => {
   const timestamp = normalizeTimestamp(value);
   if (!timestamp) return 'Not recorded';
   return new Date(timestamp).toLocaleString();
 };
 
+/** Called by: SidebarTasksSection task sorting because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const taskTimestamp = (task: SidebarTaskRecord): number =>
   normalizeTimestamp(task.finished_at ?? task.started_at ?? task.created_at ?? 0);
 
+/** Called by: SidebarTasksSection task sorting because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const taskPriority = (task: SidebarTaskRecord): number => {
   const state = String(task.state ?? '').toLowerCase();
   if (PROBLEMATIC_STATES.has(state)) return 0;
@@ -55,11 +62,19 @@ const taskPriority = (task: SidebarTaskRecord): number => {
   return 3;
 };
 
+/** Called by: SidebarTasksSection row rendering and accessibility labels because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 const taskLabel = (task: SidebarTaskRecord): string => {
   const typeLabel = task.task_type?.replace(/_/g, ' ') || 'task';
   return task.name ? `${typeLabel}: ${task.name}` : typeLabel;
 };
 
+/**
+ * Task stream section used inside the sidebar. It shows connection health,
+ * prioritizes active/problematic jobs, and lets users expand rows for backend
+ * task timing/progress details.
+ * Rendered by: Sidebar's Tasks section because task stream health and recent job state need to stay visible beside navigation.
+ * Flow: sort tasks by priority and timestamp, manage expanded rows, then render connection status, retry action, and task details.
+ */
 const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
   tasks,
   isConnected,
@@ -79,6 +94,7 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
 
   const [expandedTaskIds, setExpandedTaskIds] = React.useState<Set<string>>(() => new Set());
 
+  /** Called by: SidebarTasksSection task row click and keyboard handlers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const toggleExpanded = (taskId: string) => {
     setExpandedTaskIds((prev) => {
       const next = new Set(prev);
@@ -91,6 +107,7 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
     });
   };
 
+  /** Called by: SidebarTasksSection row rendering for task status icons and labels because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
   const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? STATUS_META['default']!;
 
   const connectionLabel = connectionError

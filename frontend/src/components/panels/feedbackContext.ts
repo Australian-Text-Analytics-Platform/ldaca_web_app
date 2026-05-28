@@ -1,8 +1,16 @@
 import { useUIStore } from '../../stores/uiStore';
 import { isTauri } from '@/lib/isTauri';
 
+/** Qualtrics endpoint used by `FeedbackPanel` when embedding the project survey. */
 export const SURVEY_BASE_URL = 'https://sydney.au1.qualtrics.com/jfe/form/SV_0HrF3tzJBz3lQk6';
 
+/**
+ * Resolves the deployment label attached to survey submissions. It helps the
+ * feedback form distinguish desktop builds, local development, and hosted web
+ * instances without requiring callers to know environment details.
+ * Called by: captureFeedbackContext when FeedbackPanel opens the survey because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Flow: prefer the build deployment id, classify Tauri by platform, then label local or hosted web origins from the hostname.
+ */
 export const resolveDeployment = (): string => {
   const fromBuild = (import.meta.env.VITE_DEPLOYMENT_ID as string | undefined)?.trim();
   if (fromBuild) return fromBuild;
@@ -30,6 +38,12 @@ export interface FeedbackContext {
   submitted_at: string;
 }
 
+/**
+ * Captures app/build/view context for `FeedbackPanel` just before the survey is
+ * opened, giving Qualtrics enough metadata to route feedback to the right area.
+ * Called by: FeedbackPanel before building the iframe URL because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Flow: read build metadata and current view, resolve deployment, merge user-role overrides, then stamp the submission timestamp.
+ */
 export const captureFeedbackContext = (
   overrides: Partial<Pick<FeedbackContext, 'user_role'>> = {},
 ): FeedbackContext => ({
@@ -41,6 +55,10 @@ export const captureFeedbackContext = (
   submitted_at: new Date().toISOString(),
 });
 
+/**
+ * Encodes captured feedback metadata into the Qualtrics URL consumed by the iframe.
+ * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
+ */
 export const buildSurveyUrl = (base: string, ctx: FeedbackContext): string => {
   const url = new URL(base);
   for (const [key, value] of Object.entries(ctx)) {

@@ -20,6 +20,12 @@ const orderedHintRegistry = [...hintRegistry]
   )
   .map(({ hint }) => hint);
 
+/**
+ * Resolves the DOM element a hint should point at. It exists so registry
+ * entries can either provide dynamic anchor logic or use the shared
+ * `data-hint-id` convention consumed by `pickActiveHint`.
+ * Used by: local callers in hints/HintsController module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 function resolveAnchor(
   hint: HintDefinition,
   ctx: HintResolverContext,
@@ -31,6 +37,13 @@ function resolveAnchor(
   );
 }
 
+/**
+ * Chooses the first eligible hint for the current app state. The controller
+ * calls this on render/poll ticks to combine condition flags, dismissal state,
+ * and live DOM availability into a single active coach mark.
+ * Used by: local callers in hints/HintsController module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Flow: walk hints in registry order, skip dismissed or inactive conditions, resolve the DOM anchor, and return the first visible target.
+ */
 function pickActiveHint(
   conditions: ReturnType<typeof useHintConditions>['conditions'],
   context: HintResolverContext,
@@ -48,6 +61,11 @@ function pickActiveHint(
   return null;
 }
 
+/**
+ * Keeps polling from churning React state when the same hint still targets the
+ * same element. Used only by `HintsController` before committing active state.
+ * Used by: local callers in hints/HintsController module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 function sameActiveHint(
   left: { hint: HintDefinition; target: Element } | null,
   right: { hint: HintDefinition; target: Element } | null,
@@ -60,6 +78,7 @@ function sameActiveHint(
 /**
  * Side-effect component: scrolls the target into view exactly when the active
  * hint identity (or its target element) changes \u2014 not on every poll tick.
+ * Rendered by: hints/HintsController module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
 function ScrollEffect({ hintId, target }: { hintId: string; target: Element }) {
   useEffect(() => {
@@ -79,6 +98,9 @@ function ScrollEffect({ hintId, target }: { hintId: string; target: Element }) {
  * Mount once near the root of the authenticated UI (e.g. inside
  * `WorkspaceShell`). Renders nothing until a registered hint becomes
  * eligible.
+ * Rendered by: App module, HighlightRing module, conditions module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: derive hint conditions, poll for an eligible anchor, suppress dismissed hints, scroll
+ * the target once, and render highlight/bubble actions for the active hint.
  */
 export const HintsController: React.FC = () => {
   const { conditions, context } = useHintConditions();
@@ -108,6 +130,10 @@ export const HintsController: React.FC = () => {
   useEffect(() => {
     if (!hintsEnabled) return;
 
+        /**
+         * Picks the currently eligible hint and nudges overlays to remeasure.
+         * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+         */
     const syncActiveHint = () => {
       const persistent = new Set(dismissedHints);
       const next = pickActiveHint(conditions, context, persistent, sessionDismissedHints);
@@ -131,6 +157,10 @@ export const HintsController: React.FC = () => {
 
   const { hint, target } = active;
 
+    /**
+     * Permanently dismisses a hint and clears upload state for upload-driven hints.
+     * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handleDismissPermanent = () => {
     dismissHint(hint.id);
     if (
@@ -140,6 +170,10 @@ export const HintsController: React.FC = () => {
       setLastUploadedFilePath(null);
     }
   };
+    /**
+     * Session-dismisses a hint and clears upload state so it does not reopen.
+     * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handleDismissSession = () => {
     sessionDismissHint(hint.id);
     if (

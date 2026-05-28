@@ -71,6 +71,7 @@ const FREQUENCY_LABELS: Record<SnapshotFinestFrequency, string> = {
 
 const INVALID_NAME_CHARS = /[/\\:*?"<>|]/g;
 
+/** Used by: validateName and handleSave to sanitize user-entered snapshot labels before filename creation because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 function sanitiseName(raw: string): string {
   return raw.replace(INVALID_NAME_CHARS, '_').trim();
 }
@@ -80,6 +81,7 @@ interface NameValidation {
   error: string | null;
 }
 
+/** Used by: TrendsSnapshotConfigDialogContent to validate snapshot names before save because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 function validateName(
   rawName: string,
   tool: SnapshotToolKey,
@@ -139,12 +141,14 @@ interface Props {
   dryRunRowCount?: (config: TrendsSnapshotConfig) => Promise<number>;
 }
 
+/** Rendered by: SequentialAnalysisFeature through SnapshotActions saveDialog to control the trends snapshot shell because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface. */
 export const TrendsSnapshotConfigDialog: React.FC<Props> = ({ open, ...contentProps }) => (
   <Dialog open={open} onOpenChange={contentProps.onOpenChange}>
     {open ? <TrendsSnapshotConfigDialogContent key={contentProps.defaultName} {...contentProps} /> : null}
   </Dialog>
 );
 
+// Rendered by: TrendsSnapshotConfigDialog when open because snapshot saves need isolated estimate, dry-run, and validation state. Flow: read snapshot config props, query group cardinalities, derive row estimates, then render save controls.
 const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
   onOpenChange,
   tool,
@@ -171,6 +175,7 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
   const cardinalityQueries = useQueries({
     queries: config.groupByColumns.map((col) => ({
       queryKey: queryKeys.columnUniqueValues(workspaceId ?? '', nodeId, col),
+      // Used by: TrendsSnapshotConfigDialogContent cardinality query to reflect selected group columns in estimates because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
       queryFn: async () => {
         const { data } = await getColumnUniqueValues({
           headers: getAuthHeaders(),
@@ -196,6 +201,10 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
   // Pure-JS estimator: corpus time-span × buckets-per-year × cardinality
   // product. Cardinalities default to 10 for any ticked column not yet
   // resolved by ``cardinalityByColumn``.
+    /**
+   * Used by: TrendsSnapshotConfigDialogContent cap warnings to estimate the captured snapshot row count because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   */
   const estimateRowCount = (cfg: TrendsSnapshotConfig): number => {
     if (nodeRowCount <= 0) return 0;
     if (columnType === 'numeric') {
@@ -249,6 +258,7 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
   const isEstimateClose = estimatedRows > SNAPSHOT_ROW_HARD_CAP / 2;
   const canDryRun = isEstimateClose && Boolean(dryRunRowCount);
 
+  // Called by: TrendsSnapshotConfigDialogContent dry-run button when the client estimate is near the snapshot cap because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleDryRun = async () => {
     if (!dryRunRowCount) return;
     setIsEstimating(true);
@@ -263,10 +273,12 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
     }
   };
 
+  // Called by: TrendsSnapshotConfigDialogContent datetime frequency Select to update captured granularity because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleFinestFrequency = (value: SnapshotFinestFrequency) => {
     onConfigChange({ ...config, finestFrequency: value });
   };
 
+  // Called by: TrendsSnapshotConfigDialogContent numeric interval input to apply positive bin widths because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleNumericInterval = (raw: string) => {
     const parsed = Number(raw);
     if (Number.isFinite(parsed) && parsed > 0) {
@@ -274,6 +286,7 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
     }
   };
 
+  // Called by: TrendsSnapshotConfigDialogContent numeric origin input to align numeric snapshot bins because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleNumericOrigin = (raw: string) => {
     if (raw.trim() === '') {
       onConfigChange({ ...config, numericOrigin: null });
@@ -285,6 +298,7 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
     }
   };
 
+  // Called by: TrendsSnapshotConfigDialogContent group-by checkboxes while enforcing the viewer dimension cap because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const toggleGroupColumn = (col: string) => {
     const next = config.groupByColumns.includes(col)
       ? config.groupByColumns.filter((c) => c !== col)
@@ -293,6 +307,7 @@ const TrendsSnapshotConfigDialogContent: React.FC<Omit<Props, 'open'>> = ({
     onConfigChange({ ...config, groupByColumns: next });
   };
 
+  // Called by: TrendsSnapshotConfigDialogContent Save button after validation succeeds because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleSave = async () => {
     if (!nameValidation.ok || isOverCap || isSaving) return;
     setIsSaving(true);

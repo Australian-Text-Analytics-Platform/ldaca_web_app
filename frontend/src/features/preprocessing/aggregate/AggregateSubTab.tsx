@@ -18,10 +18,21 @@ import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggreg
 
 export type { AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
+/**
+ * Entry component for the computed-column builder. It exists to key the inner
+ * content by selection so builder state resets when the active source changes.
+ * Rendered by: DataPreprocessingFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ */
 export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
   return <AggregateSubTabContent key={getAggregateSelectionKey(props)} {...props} />;
 };
 
+/**
+ * Derives the reset key for the aggregate builder from the most recent source
+ * node. Only `AggregateSubTab` uses it to remount the content on selection
+ * changes.
+ * Used by: local callers in preprocessing/AggregateSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const getAggregateSelectionKey = (props: AggregateSubTabProps): string => {
   const [selectedNode] = takeMostRecent(props.selectedNodes, 1);
   if (selectedNode) {
@@ -30,6 +41,13 @@ const getAggregateSelectionKey = (props: AggregateSubTabProps): string => {
   return props.selectedNodeId || 'none';
 };
 
+/**
+ * Renders the computed-column builder UI. It consumes `useAggregateSubTab` so
+ * layout remains separate from expression/token state and apply/preview logic.
+ * Rendered by: preprocessing/AggregateSubTab module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: split hook config into selection/builder/preview/apply props, render expression and
+ * visual-builder modes, and keep table/apply controls tied to hook state.
+ */
 const AggregateSubTabContent: React.FC<AggregateSubTabProps> = (props) => {
   const { isLoading } = props;
   const {

@@ -30,6 +30,8 @@ interface QueryProviderProps {
   children: React.ReactNode;
 }
 
+/** Wraps the SPA with the shared query client and devtools during local development. */
+/** Used by: src/App.tsx because those importers need shared behavior from one implementation rather than divergent local copies. */
 export const QueryProvider: React.FC<QueryProviderProps> = ({ children }) => (
   <QueryClientProvider client={queryClient}>
     {children}

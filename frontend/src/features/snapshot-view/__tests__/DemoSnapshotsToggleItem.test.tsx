@@ -4,6 +4,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/compon
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { DemoSnapshotsToggleItem } from '../components/DemoSnapshotsToggleItem';
 
+/**
+ * Hosts the menu item inside an open Radix dropdown for interaction tests.
+ * Used by: Vitest setup or assertions in snapshot-view/DemoSnapshotsToggleItem.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 function Harness() {
   return (
     <DropdownMenu open>

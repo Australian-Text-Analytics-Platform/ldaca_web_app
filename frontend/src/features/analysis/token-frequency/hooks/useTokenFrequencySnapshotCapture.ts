@@ -51,12 +51,21 @@ export interface CaptureError extends Error {
   reason: string;
 }
 
+/** Creates a typed snapshot capture error for UI callers that branch on reason. */
+/**
+ * Called by: useTokenFrequencySnapshotCapture hook during this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ */
 function captureError(reason: string, message: string): CaptureError {
   const err = new Error(message) as CaptureError;
   err.reason = reason;
   return err;
 }
 
+/** Summarizes a token-frequency result for the snapshot manifest preview card. */
+/**
+ * Called by: useTokenFrequencySnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
+ */
 function buildTokenFrequencyPreview(
   resp: TokenFrequencyResponse,
   request: TokenFrequencyRequest | null,
@@ -95,6 +104,11 @@ function buildTokenFrequencyPreview(
   };
 }
 
+/** Returns the save-snapshot callback used by the token-frequency parameter panel. */
+/**
+ * Used by: useTokenFrequencySnapshotLoad.ts, compat.ts, TokenFrequencyFeature.tsx because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
+ */
 export function useTokenFrequencySnapshotCapture(
   input: UseTokenFrequencySnapshotCaptureInput,
 ) {

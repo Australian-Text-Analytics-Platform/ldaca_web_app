@@ -16,11 +16,15 @@ import { Button } from '@/components/ui/button';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import HelpIcon from '@/components/help/HelpIcon';
 
+/** Minimum selection size that makes the graph batch-delete affordance intentional. */
 const MIN_BATCH_DELETE_COUNT = 3;
 
 /**
- * Separated controls component focused only on workspace controls
- * Removed view mode toggle since both views are now shown vertically
+ * Workspace graph toolbar used above the graph pane. It centralizes workspace
+ * rename, help, and batch-delete controls so the graph feature can focus on
+ * node rendering and selection state.
+ * Rendered by: WorkspaceView above the graph canvas because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+ * Flow: read workspace and selection state, prepare selected-delete metadata, manage rename/delete dialogs, then render toolbar controls.
  */
 export const WorkspaceControls: React.FC = () => {
   const { currentWorkspace, workspaceGraph } = useWorkspaceData();
@@ -38,6 +42,7 @@ export const WorkspaceControls: React.FC = () => {
   const selectedCount = selectedNodeIds?.length ?? 0;
   const canBatchDelete = selectedCount >= MIN_BATCH_DELETE_COUNT;
 
+  /** Builds the confirmation list for selected graph nodes, placing cascade roots last. */
   const selectedForDelete = (() => {
     if (!workspaceGraph || !selectedNodeIds || selectedNodeIds.length === 0) return [];
     const idSet = new Set(selectedNodeIds);
@@ -55,6 +60,7 @@ export const WorkspaceControls: React.FC = () => {
     });
   })();
 
+  /** Called by: the WorkspaceControls batch-delete confirmation action because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const handleBatchDelete = async () => {
     if (!canBatchDelete || isDeleting) return;
     setIsDeleting(true);
@@ -72,6 +78,7 @@ export const WorkspaceControls: React.FC = () => {
     }
   };
 
+  /** Called by: WorkspaceControls inline rename input blur and keyboard handlers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const handleRenameCommit = async () => {
     if (!isEditing) {
       return;
@@ -94,6 +101,7 @@ export const WorkspaceControls: React.FC = () => {
     }
   };
 
+  /** Called by: the WorkspaceControls Rename button onClick prop because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const startRename = () => {
     if (!currentWorkspaceName) {
       return;

@@ -5,10 +5,11 @@ import { REFRESH_CHIP_DELAY_MS } from '@/config/timings';
 import { formatAttemptLabel, formatTimestamp } from './authPhaseCopy';
 
 /**
- * Top-of-screen banner + chip for "we're trying to refresh your session"
- * states. Hidden when auth is healthy. Self-contained: reads useAuth and
- * owns the timer that gates the chip's visibility (avoids flashes for
- * sub-second refreshes).
+ * Top-of-screen auth recovery status used by the app shell while background
+ * session refreshes fail or run long. It reads `useAuth` directly so every
+ * route gets the same retry affordance without prop-drilling auth state.
+ * Why: degraded auth refreshes need one global retry surface without threading auth phase through every view.
+ * Flow: delay the refreshing chip, derive degraded banner copy from auth phase, then render retry banner/chip or nothing.
  */
 export const RefreshStatusBanner: React.FC = () => {
   const { phase, refreshAuth } = useAuth();

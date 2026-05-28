@@ -9,6 +9,7 @@ const { cancelTaskMock, clearAnalysisMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
+  /** Called by: useAnalysisFeature under test when it requests a query client because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useQueryClient: () => ({
     invalidateQueries: vi.fn(async () => undefined),
   }),
@@ -23,6 +24,7 @@ vi.mock('@/api/generated/sdk.gen', () => ({
 }));
 
 vi.mock('../useAnalysisHydration', () => ({
+  /** Called by: useAnalysisFeature under test while keeping hydration inert because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useAnalysisHydration: () => ({
     hydrateFromServer: vi.fn(async () => undefined),
     hydrationState: { status: 'idle' as const },
@@ -30,6 +32,7 @@ vi.mock('../useAnalysisHydration', () => ({
 }));
 
 vi.mock('../tasks/useAnalysisTaskFlow', () => ({
+  /** Called by: useAnalysisFeature under test to provide empty task-flow state because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useAnalysisTaskFlow: () => ({
     status: {
       tasks: [],
@@ -64,6 +67,7 @@ describe('useAnalysisFeature', () => {
         analysisType: 'sequential_analysis',
         taskType: 'sequential_analysis',
         workspaceId: 'workspace-1',
+        /** Called by: useAnalysisFeature clear plumbing if auth headers are needed because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
         getAuthHeaders: () => ({}),
         isTabActive: true,
         resultRef: { current: null },
@@ -91,6 +95,7 @@ describe('useAnalysisFeature', () => {
         analysisType: 'sequential_analysis',
         taskType: 'sequential_analysis',
         workspaceId: 'workspace-1',
+        /** Called by: stopTask before forwarding headers to cancelTask because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
         getAuthHeaders: () => headers,
         isTabActive: true,
         resultRef: { current: { metadata: { task_id: 'task-1' } } },

@@ -13,6 +13,10 @@ const DISMISS_STORAGE_KEY = 'ldaca.docs.eol.dismissedFor';
  * Dismissable per docs version: dismissing for `v0.3` doesn't suppress
  * the banner once a future build talks to a different docs version.
  */
+/**
+ * Used by: src/App.tsx because docs consumers need one registry path for bundled, cached, and remote documentation targets.
+ * Flow: validate registry input, merge local and remote metadata, then expose the documentation entries to UI consumers.
+ */
 export const DocsEolBanner: React.FC = () => {
   const meta = useRegistryStore((s) => s.meta);
   const [dismissedFor, setDismissedFor] = useState<string | null>(() => {
@@ -34,6 +38,8 @@ export const DocsEolBanner: React.FC = () => {
   if (!isPastEol || !eolDate) return null;
   if (version && dismissedFor === version) return null;
 
+  /** Persists dismissal by docs version so future retired versions can warn again. */
+  /** Used by: DocsEolBanner callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const dismiss = () => {
     const key = version ?? eolDate;
     setDismissedFor(key);

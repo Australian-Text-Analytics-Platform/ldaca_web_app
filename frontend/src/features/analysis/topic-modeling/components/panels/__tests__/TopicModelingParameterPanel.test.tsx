@@ -6,21 +6,29 @@ import { TopicModelingParameterPanel } from '../TopicModelingParameterPanel';
 import { sanitizeMinTopicSizeInput } from '../minTopicSize';
 
 vi.mock('../../../../../../components/help/HelpIcon', () => ({
+  // Used by: HelpIcon mock module factory so tests focus on parameter behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => null,
 }));
 
 vi.mock('../../../../../../components/help/InfoIcon', () => ({
+  // Used by: InfoIcon mock module factory so tests focus on parameter behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => null,
 }));
 
 vi.mock('../../../../../../components/NodeSelectionPanel', () => ({
+  // Used by: NodeSelectionPanel mock module factory to provide a stable marker because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => <div data-testid="node-selection-panel" />,
 }));
 
 vi.mock('../../../../common/components/AnalysisCardLayout', () => ({
+  // Used by: AnalysisCardLayout mock module factory to preserve children under test because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   AnalysisCardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+/**
+ * Used by: focused TopicModelingParameterPanel tests because the shared fixture keeps required props stable while each test overrides only the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 const baseProps = {
   selectedNodes: [],
   nodeColumnSelections: [],
@@ -29,6 +37,7 @@ const baseProps = {
   onNodeColorChange: vi.fn(),
   defaultPalette: [],
   isLocked: false,
+  // Used by: baseProps to supply an empty schema unless a test overrides column options because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   getNodeColumns: () => [],
   actionState: { runDisabled: false, clearDisabled: false, runLabel: 'Run Analysis' },
   corpusSamples: [],

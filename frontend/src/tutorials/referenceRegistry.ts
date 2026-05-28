@@ -3,7 +3,6 @@
  */
 
 import {
-  REFERENCE_INDEX_TARGET,
   type BundledReferenceKey,
   type DocTarget,
 } from './bundledRegistry';
@@ -13,7 +12,7 @@ export type ReferenceTarget = DocTarget;
 
 export type ReferenceTargetKey = BundledReferenceKey;
 
+/** Resolves reference-page links for HelpIcon and modal callers. */
+/** Used by: src/components/help/DocLinkIcon.tsx because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
 export const getReferenceTarget = (key: string): ReferenceTarget | null =>
   getDocTarget('reference', key);
-
-export const referenceIndexTarget: ReferenceTarget = REFERENCE_INDEX_TARGET;

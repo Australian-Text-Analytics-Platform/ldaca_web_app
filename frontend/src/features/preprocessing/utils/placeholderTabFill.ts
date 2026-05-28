@@ -6,7 +6,15 @@ interface PlaceholderTabFillArgs {
   setValue: (value: string) => void;
 }
 
+/**
+ * Restores the caret after a placeholder is accepted without moving focus.
+ * Used by: local callers in preprocessing/placeholderTabFill module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const scheduleCaretRestore = (input: HTMLInputElement, value: string) => {
+    /**
+     * Repositions the caret only if focus remains in the accepted input.
+     * Called by: scheduleCaretRestore internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const restore = () => {
     if (document.activeElement !== input) {
       return;
@@ -22,6 +30,12 @@ const scheduleCaretRestore = (input: HTMLInputElement, value: string) => {
   setTimeout(restore, 0);
 };
 
+/**
+ * Lets generated-name fields accept their placeholder with Tab. Preprocessing
+ * forms use this so users can quickly adopt suggested output names.
+ * Used by: JoinSubTab module, ConcatSubTab module, SliceSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: ignore modified Tab presses and non-empty fields, copy a trimmed placeholder into state, then restore the caret after React updates.
+ */
 export const acceptPlaceholderOnTab = ({ event, value, setValue }: PlaceholderTabFillArgs) => {
   if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
     return;

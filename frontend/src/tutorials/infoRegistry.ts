@@ -3,7 +3,6 @@
  */
 
 import {
-  INFO_INDEX_TARGET,
   type BundledInfoKey,
   type DocTarget,
 } from './bundledRegistry';
@@ -13,7 +12,7 @@ export type InfoTarget = DocTarget;
 
 export type InfoTargetKey = BundledInfoKey;
 
+/** Resolves information-page links for HelpIcon and modal callers. */
+/** Used by: src/components/help/DocLinkIcon.tsx because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
 export const getInfoTarget = (key: string): InfoTarget | null =>
   getDocTarget('info', key);
-
-export const infoIndexTarget: InfoTarget = INFO_INDEX_TARGET;

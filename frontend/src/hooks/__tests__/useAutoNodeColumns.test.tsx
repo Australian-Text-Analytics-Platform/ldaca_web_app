@@ -8,10 +8,14 @@ import { useAutoNodeColumns } from '../useAutoNodeColumns';
 // Helpers
 // ---------------------------------------------------------------------
 
+/** Builds node-like fixtures while preserving each test's explicit metadata shape. */
+/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 const buildNode = (overrides: Partial<NodeLike> & { id: string }): NodeLike => ({
   ...overrides,
 });
 
+/** Mirrors the production column-persistence key for direct sessionStorage assertions. */
+/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 const STORAGE_KEY = (workspaceId: string, scope = 'analysis') =>
   `ldaca:column-pref:v1:${workspaceId}:${scope}`;
 
@@ -191,6 +195,8 @@ describe('useAutoNodeColumns', () => {
             }),
           ],
           workspaceId: 'ws-doc',
+          /** Returns exposed columns so auto-selection can prefer the document column. */
+          /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getNodeColumns: () => ['col_a', 'col_b', 'doc_col'],
         }),
       );
@@ -208,6 +214,8 @@ describe('useAutoNodeColumns', () => {
             buildNode({ id: 'n1', columns: ['first', 'second'] }),
           ],
           workspaceId: 'ws-first',
+          /** Returns columns for the first-column fallback path. */
+          /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getNodeColumns: () => ['first', 'second'],
         }),
       );
@@ -223,6 +231,8 @@ describe('useAutoNodeColumns', () => {
           selectedNodes: [buildNode({ id: 'n1', columns: ['first', 'second'] })],
           workspaceId: 'ws-doctype',
           docTypeOnly: true,
+          /** Returns non-document columns so docTypeOnly leaves selection blank. */
+          /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getNodeColumns: () => ['first', 'second'],
         }),
       );
@@ -242,6 +252,8 @@ describe('useAutoNodeColumns', () => {
           ],
           workspaceId: 'ws-locked',
           isLocked: true,
+          /** Supplies a selectable column that should be ignored while locked. */
+          /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getNodeColumns: () => ['col_a'],
         }),
       );
@@ -258,6 +270,8 @@ describe('useAutoNodeColumns', () => {
           selectedNodes: [buildNode({ id: 'n1' })],
           workspaceId: 'ws-types',
           allowedDataTypes: ['datetime'],
+          /** Returns typed columns so the hook can filter options by allowed data type. */
+          /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getNodeColumns: () => [
             { name: 'created_at', dataType: 'datetime' },
             { name: 'category', dataType: 'string' },
@@ -277,6 +291,8 @@ describe('useAutoNodeColumns', () => {
           selectedNodes: [buildNode({ id: 'n1' })],
           workspaceId: 'ws-no-match',
           allowedDataTypes: ['datetime'],
+          /** Returns only mismatched types to exercise the filtered-out flag. */
+          /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getNodeColumns: () => [
             { name: 'category', dataType: 'string' },
             { name: 'priority', dataType: 'integer' },
@@ -305,6 +321,8 @@ describe('useAutoNodeColumns', () => {
           ],
           maxNodes: 2,
           workspaceId: 'ws-max',
+          /** Reads each node's own columns so max-node trimming is the only variable. */
+          /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getNodeColumns: (n) => (n.columns as string[]) ?? [],
         }),
       );

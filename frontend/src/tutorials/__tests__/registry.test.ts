@@ -9,6 +9,8 @@ import {
   loadRemoteRegistry,
 } from '../remoteRegistry';
 
+/** Resets the merged docs registry so remote-cache tests do not leak entries across cases. */
+/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 const resetStore = () => {
   useRegistryStore.setState({
     registry: {
@@ -144,6 +146,8 @@ describe('loadRemoteRegistry — network path', () => {
     vi.stubEnv('VITE_DOCS_BASE_URL', 'https://docs.example.com/v0.3');
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
+      /** Returns a remote registry payload so the loader can merge and cache it. */
+      /** Called by: mocked fetch responses in these tests because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
       json: () =>
         Promise.resolve({
           tutorial: {
@@ -200,6 +204,8 @@ describe('loadRemoteRegistry — network path', () => {
     vi.stubEnv('VITE_DOCS_BASE_URL', 'https://docs.example.com/v0.3');
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
+      /** Returns an empty remote registry so repeated loads can share one in-flight request. */
+      /** Called by: mocked fetch responses in these tests because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
       json: () => Promise.resolve({ tutorial: {} }),
     });
     vi.stubGlobal('fetch', fetchSpy);

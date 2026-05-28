@@ -21,24 +21,10 @@ interface ConfirmDialogProps {
 }
 
 /**
- * Reusable confirmation dialog component using shadcn alert-dialog
- * 
- * @example
- * ```tsx
- * const [dialogOpen, setDialogOpen] = useState(false);
- * 
- * <ConfirmDialog
- *   open={dialogOpen}
- *   onOpenChange={setDialogOpen}
- *   title="Delete File"
- *   description="Are you sure you want to delete this file? This action cannot be undone."
- *   onConfirm={() => {
- *     // Handle confirmation
- *     setDialogOpen(false);
- *   }}
- *   variant="destructive"
- * />
- * ```
+ * Reusable confirmation dialog used by features that need a small shadcn
+ * alert-dialog without duplicating title, description, and action wiring.
+ * Why: feature confirmations share the same AlertDialog shell while callers provide copy, variant, and action.
+ * Flow: render title, description, cancel, and confirm slots, then apply destructive confirm styling when requested.
  */
 export function ConfirmDialog({
   open,

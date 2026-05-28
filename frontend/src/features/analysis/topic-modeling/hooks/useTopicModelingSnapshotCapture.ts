@@ -53,12 +53,21 @@ export interface CaptureError extends Error {
   reason: string;
 }
 
+/** Creates typed capture errors so snapshot UI can show precise failure reasons. */
+/**
+ * Called by: useTopicModelingSnapshotCapture hook during this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ */
 function captureError(reason: string, message: string): CaptureError {
   const err = new Error(message) as CaptureError;
   err.reason = reason;
   return err;
 }
 
+/** Builds the topic-modeling preview block shown in snapshot load dialogs. */
+/**
+ * Called by: useTopicModelingSnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+   * Flow: count topics, collect unique representative words as a vocabulary proxy, set the model label and words-per-topic, then return preview metadata.
+ */
 function buildTopicModelingPreview(
   result: TopicModelingResponse,
   request: TopicModelingRequest | null,
@@ -93,6 +102,11 @@ function buildTopicModelingPreview(
   };
 }
 
+/** Returns the callback that packages the current topic-modeling result into a snapshot bundle. */
+/**
+ * Used by: TopicModelingFeature.tsx, useTopicModelingSnapshotLoad.ts because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
+ */
 export function useTopicModelingSnapshotCapture(
   input: UseTopicModelingSnapshotCaptureInput,
 ) {

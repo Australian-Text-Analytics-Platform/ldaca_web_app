@@ -118,6 +118,10 @@ export type ConcordanceResultsPanelProps = {
   readOnly?: boolean;
 };
 
+/**
+ * Rendered by: ConcordanceFeature to coordinate table and dispersion result blocks because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const ConcordanceResultsPanel: React.FC<ConcordanceResultsPanelProps> = ({
   results,
   resultsRef,

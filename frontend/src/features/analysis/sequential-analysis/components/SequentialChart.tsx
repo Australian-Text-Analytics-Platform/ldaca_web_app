@@ -30,6 +30,7 @@ const TIMESTAMP_HEURISTIC_THRESHOLD = 1e11;
 
 const NUMERIC_X_KEY = '__x_numeric__';
 
+// Used by: SequentialChart numeric-axis data mapping to convert row periods into Recharts x-coordinates because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
 const toNumericX = (row: SequentialAnalysisDatum): number => {
   const raw = row.period_start ?? row.time_period;
   if (typeof raw === 'number') return raw;
@@ -40,6 +41,7 @@ const toNumericX = (row: SequentialAnalysisDatum): number => {
   return Number.isNaN(asNumber) ? Number.NaN : asNumber;
 };
 
+// Used by: SequentialChart numeric x-axis config to format timestamp-like ticks as dates because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
 const formatNumericTick = (value: unknown): string => {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return '';
@@ -79,6 +81,10 @@ interface SequentialChartProps {
 
 const CHART_HEIGHT_PX = 400;
 
+/**
+ * Rendered by: SequentialAnalysisResultsPanel to show the chart and detach/selection controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const SequentialChart: React.FC<SequentialChartProps> = ({
   chartType,
   xAxisType = 'category',

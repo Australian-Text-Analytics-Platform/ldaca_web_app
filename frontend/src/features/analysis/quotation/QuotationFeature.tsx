@@ -140,6 +140,10 @@ type QuotationDisplayRow = QuotationHitRow & {
  * component) needs to call this before the component's own helper
  * declarations would be in scope. No closure deps — just shape
  * massaging plus the ``QUOTATION_COLUMN_KEYS`` constants. */
+/**
+ * Called by: QuotationFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
 function buildQuotationResultState(
   result: QuotationAnalysisResponse,
   column: string,
@@ -147,6 +151,10 @@ function buildQuotationResultState(
   const groupedRows = result.data;
   const rows = groupedRows.flatMap((group) => group).map((row) => {
     const spans: { start: number; end: number; type: string }[] = [];
+    // Collects backend span offsets into the display row shape used by highlighted cells.
+    /**
+     * Called by: buildQuotationResultState during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+     */
     const addSpan = (start?: unknown, end?: unknown, type?: string) => {
       if (!type) return;
       const s = Number(start);
@@ -177,6 +185,11 @@ function buildQuotationResultState(
   };
 }
 
+/** Renders the quotation extraction workflow, including live runs and saved snapshot views. */
+/**
+ * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
 const QuotationFeature: React.FC = () => {
   const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
@@ -351,6 +364,11 @@ const QuotationFeature: React.FC = () => {
       : resolvedEnginePayload.rawUrl
     : '';
 
+  // Opens the shared error dialog with a fallback message for unexpected quotation failures.
+  /**
+   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const showErrorDialog = (message: string) => {
     setErrorDialogMessage(message || 'An unexpected error occurred.');
     setErrorDialogOpen(true);
@@ -377,6 +395,8 @@ const QuotationFeature: React.FC = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef: quotationResultRef,
+    // Loads the latest quotation result for polling and task resumption.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
       const { data } = await quotationTaskResult({
         headers,
@@ -385,6 +405,8 @@ const QuotationFeature: React.FC = () => {
       });
       return data;
     },
+    // Retrieves the submitted quotation request so hydration can restore engine and selection state.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
       const { data } = await quotationTaskRequest({
         headers,
@@ -393,6 +415,8 @@ const QuotationFeature: React.FC = () => {
       });
       return data;
     },
+    // Applies freshly fetched results to the active node table after lifecycle polling finishes.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onResultFetched: (result, _taskId) => {
       if (!result) return;
       const targetNode =
@@ -406,6 +430,8 @@ const QuotationFeature: React.FC = () => {
       }
       setHasLoaded(true);
     },
+    // Rebuilds result state from a cached task payload when the quotation tab hydrates.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onHydratedResult: async (resultPayload) => {
       const res = resultPayload;
       if (!res) return;
@@ -417,6 +443,8 @@ const QuotationFeature: React.FC = () => {
       updateResultState(nodeId, column, res);
       setHasLoaded(true);
     },
+    // Restores saved request settings, materialization metadata, and the analysis lock after reload.
+    // Called by: useAnalysisFeature hydration because quotation restores must reapply engine settings, selected node/column, materialized path, and context length before rendering results. Flow: unwrap request data, normalize remote engine state, restore selection/materialization, then lock the submitted node.
     onHydratedRequest: async (requestPayload) => {
       const requestData = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown> | null;
       if (!requestData) return;
@@ -465,6 +493,8 @@ const QuotationFeature: React.FC = () => {
         /* ignore */
       }
     },
+    // Clears quotation-specific state after the shared lifecycle deletes the task result.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onCleared: () => {
       setIsClearing(false);
       setHasLoaded(false);
@@ -475,6 +505,10 @@ const QuotationFeature: React.FC = () => {
     },
   });
 
+  // Applies persisted context-length preferences returned with quotation task results.
+  /**
+   * Called by: QuotationFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const applyContextLengthPreferenceFromResult = (payload: QuotationAnalysisResponse | Record<string, unknown>) => {
     const prefs = payload?.preferences as Record<string, unknown> | undefined;
     const prefValue = Number(prefs?.context_length ?? prefs?.contextLength);
@@ -486,6 +520,11 @@ const QuotationFeature: React.FC = () => {
     setContextLengthInput(String(normalized));
   };
 
+  // Validates and optionally persists the context-length input used by quotation text clipping.
+  /**
+   * Called by: QuotationFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const applyContextLengthInput = async () => {
     const trimmed = contextLengthInput.trim();
     if (!trimmed.length) {
@@ -523,10 +562,18 @@ const QuotationFeature: React.FC = () => {
     }
   };
 
+  // Commits context-length edits when focus leaves the input.
+  /**
+   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleContextLengthBlur = () => {
     void applyContextLengthInput();
   };
 
+  // Lets Enter commit context-length edits without submitting surrounding controls.
+  /**
+   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleContextLengthKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -689,6 +736,8 @@ const QuotationFeature: React.FC = () => {
           ? resolvedEnginePayload.normalizedUrl
           : null,
     },
+    // Extracts comparable server-side engine parameters from the stored task request.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getServerParams: (request) => {
       const { type: serverEngineType, url: serverEngineUrl } = getServerEngineConfig(
         request,
@@ -725,6 +774,10 @@ const QuotationFeature: React.FC = () => {
     }
   }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns, setNodeColumnSelections]);
 
+  // Updates the selected text column and persists it as the document column preference.
+  /**
+   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
@@ -733,6 +786,10 @@ const QuotationFeature: React.FC = () => {
 
   const [hoverState, setHoverState] = useState<QuotationHoverState | null>(null);
 
+  // Stores normalized quotation results and matching pagination/sort state for one node.
+  /**
+   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   */
   const updateResultState = (nodeId: string, column: string, result: QuotationAnalysisResponse): QuotationResultState => {
     const normalized = buildQuotationResultState(result, column);
     setResultsByNode((prev) => ({ ...prev, [nodeId]: normalized }));
@@ -746,6 +803,7 @@ const QuotationFeature: React.FC = () => {
       },
     }));
     return normalized;
+    // Saves a validated engine configuration from the dialog before closing it.
   };
 
   const {
@@ -847,6 +905,10 @@ const QuotationFeature: React.FC = () => {
     onTerminalSuccess: handleQuotationMaterializeSuccess,
   });
 
+  // Saves a validated engine configuration from the dialog before closing it.
+  /**
+   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleEngineDialogSave = () => {
     const payload = buildEngineRequest();
     if (!payload) {
@@ -855,6 +917,11 @@ const QuotationFeature: React.FC = () => {
     closeEngineDialog();
   };
 
+  // Loads available detach-column options before showing the quotation detach dialog.
+  /**
+   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const openDetachDialog = async (nodeId: string) => {
     const selection = activeSelections.find((item) => item.nodeId === nodeId);
     if (!selection?.column) return;
@@ -881,6 +948,10 @@ const QuotationFeature: React.FC = () => {
     }
   };
 
+  // Confirms the pending detach operation with the user's selected source columns.
+  /**
+   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleDetachConfirm = async () => {
     if (!pendingDetachNodeId) return;
     const selectedColumns = selectedDetachColumns[pendingDetachNodeId] || [];
@@ -891,6 +962,10 @@ const QuotationFeature: React.FC = () => {
     setSelectedDetachColumns({});
   };
 
+  // Runs a fresh quotation analysis or updates a locked task depending on parameter changes.
+  /**
+   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleRunOrUpdate = async () => {
     // Promote pending per-tab temp colours to assigned — Run is the
     // commit trigger per the node-colour strategy doc.
@@ -903,6 +978,7 @@ const QuotationFeature: React.FC = () => {
   };
 
   // ----- Snapshot capture + load wiring -----
+  // Applies page-size changes to live task results or local snapshot state as appropriate.
   const getQuotationNodeRowCount = useCallback((node: WorkspaceNodeLike) => {
     const shape = node.shape as unknown;
     if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];
@@ -997,6 +1073,10 @@ const QuotationFeature: React.FC = () => {
   // Snapshot-mode wrappers for page / sort: bump the dedicated
   // ``snapshotNodeState`` slot so ``resultsByNode`` re-slices on the
   // next render. No backend roundtrip.
+  /**
+   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   */
   const effHandlePageChange = (newPage: number) => {
     if (!inSnapshotMode) {
       handlePageChange(newPage);
@@ -1018,6 +1098,11 @@ const QuotationFeature: React.FC = () => {
     }));
   };
 
+  // Applies page-size changes to live task results or local snapshot state as appropriate.
+  /**
+   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   */
   const effHandlePageSizeChange = (newSize: number) => {
     if (!inSnapshotMode) {
       handlePageSizeChange(newSize);
@@ -1039,6 +1124,11 @@ const QuotationFeature: React.FC = () => {
     }));
   };
 
+  // Applies column sorting to live task results or snapshot-local pagination state.
+  /**
+   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   */
   const effHandleSort = (nodeId: string, columnName: string) => {
     if (!inSnapshotMode) {
       handleSort(nodeId, columnName);
@@ -1213,14 +1303,20 @@ const QuotationFeature: React.FC = () => {
               .filter((s) => s.length > 0),
           }}
           actions={{
+            // Routes the Run button through live quotation execution only outside snapshot mode.
+            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
             onRun: () => {
               if (inSnapshotMode) return;
               void handleRunOrUpdate();
             },
+            // Stops the active quotation task from the shared layout action.
+            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
             onStop: () => {
               if (inSnapshotMode) return;
               void stopTask();
             },
+            // Clears live quotation state and backend results from the shared layout action.
+            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
             onClear: async () => {
               if (inSnapshotMode) return;
               if (!currentWorkspaceId) return;
@@ -1608,6 +1704,8 @@ const QuotationFeature: React.FC = () => {
               value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quote] ?? ''),
             },
           ],
+          // Reuses the quotation detail renderer to show highlighted source text in the row panel.
+          // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
           renderDocumentText: (text, record) => renderQuotationDetailText(text, record),
         } : undefined}
       />

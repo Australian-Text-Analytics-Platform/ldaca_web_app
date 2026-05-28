@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TopicModelingBubbleChartSection } from '../TopicModelingBubbleChartSection';
 
 vi.mock('../TopicSelectionPanel', () => ({
+  // Used by: TopicSelectionPanel mock module factory so the test focuses on tooltip layering because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   TopicSelectionPanel: () => <div data-testid="topic-selection-panel" />,
 }));
 

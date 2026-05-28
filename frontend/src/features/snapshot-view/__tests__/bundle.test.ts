@@ -7,10 +7,21 @@ import {
 } from '../bundle';
 import type { SnapshotManifest } from '../types';
 
+/**
+ * Encodes fixture text into bundle payload bytes.
+ * Used by: Vitest setup or assertions in snapshot-view/bundle.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 function bytes(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
+/**
+ * Builds a valid demo manifest fixture with optional overrides.
+ * Used by: Vitest setup or assertions in snapshot-view/bundle.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: defaults define payload/source/capability blocks, then each test overrides the field under assertion.
+ */
 function demoManifest(
   overrides: Partial<SnapshotManifest> = {},
 ): SnapshotManifest {

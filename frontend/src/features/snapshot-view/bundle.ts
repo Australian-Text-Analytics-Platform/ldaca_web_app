@@ -60,7 +60,11 @@ export type BundleReadResult =
   | { ok: true; bundle: LoadedBundle }
   | { ok: false; error: BundleReadError };
 
-/** Write a bundle as a zip ``Uint8Array``. */
+/**
+ * Write a bundle as a zip ``Uint8Array``.
+ * Used by: index module, bundle tests (rg call sites/imports) because capture flows need one writer that keeps manifest and payload bytes together.
+ * Flow: create a zip, emit manifest JSON first, verify every declared payload has bytes, add payload blobs, then generate the archive bytes.
+ */
 export async function writeBundle(input: BundleWriteInput): Promise<Uint8Array> {
   const zip = new JSZip();
   zip.file(MANIFEST_FILE_NAME, emitManifestJson(input.manifest));
@@ -83,10 +87,14 @@ export async function writeBundle(input: BundleWriteInput): Promise<Uint8Array> 
   return await zip.generateAsync({ type: 'uint8array' });
 }
 
-/** Read a bundle. Returns a discriminated result so call sites stay
+/**
+ * Read a bundle. Returns a discriminated result so call sites stay
  * exhaustive. Build-side capability gating is applied here — the
  * returned manifest's capabilities reflect what the build actually
- * supports, with degradations listed for user-visible reporting. */
+ * supports, with degradations listed for user-visible reporting.
+ * Used by: index module, useSequentialAnalysisSnapshotLoad hook, bundle tests (rg call sites/imports) because load flows need one reader that validates zip structure before hydration.
+ * Flow: open the zip, require and parse the manifest, apply build capability gating, then read each gated payload path into a byte map.
+ */
 export async function readBundle(
   data: Uint8Array | ArrayBuffer,
   buildSupport: BuildSupport = V1_BUILD_SUPPORT,
@@ -135,9 +143,13 @@ export async function readBundle(
   };
 }
 
-/** Decode a parquet payload's bytes into row records. Tools call this
+/**
+ * Decode a parquet payload's bytes into row records. Tools call this
  * with the result-payload bytes when they need rows in hand; until
- * then the bytes sit unparsed in ``payloadBytes``. */
+ * then the bytes sit unparsed in ``payloadBytes``.
+ * Used by: index module (rg call sites/imports) because snapshot views defer row decoding until a tool actually needs rows.
+ * Flow: slice the exact parquet bytes from the typed-array view, hand them to hyparquet, and return decoded row records.
+ */
 export async function decodeResultParquet(
   bytes: Uint8Array,
 ): Promise<Array<Record<string, unknown>>> {
@@ -150,8 +162,12 @@ export async function decodeResultParquet(
   return await parquetQuery({ file: buf });
 }
 
-/** Convenience: find the ``result`` payload entry in a manifest.
- * Manifest parse guarantees this exists. */
+/**
+ * Convenience: find the ``result`` payload entry in a manifest.
+ * Manifest parse guarantees this exists.
+ * Used by: index module, bundle tests (rg call sites/imports) because payload consumers need the typed result entry without repeating manifest searches.
+ * Flow: search manifest payload entries for the required result payload, guard hand-built test manifests, then return the narrowed entry type.
+ */
 export function findResultPayload(
   manifest: SnapshotManifest,
 ): Extract<SnapshotPayloadEntry, { kind: 'result' }> {

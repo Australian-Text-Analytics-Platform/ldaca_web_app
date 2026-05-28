@@ -18,6 +18,11 @@ import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 
 export type { SliceSubTabProps } from './hooks/useSliceSubTab';
 
+/**
+ * Re-keys the Sample Rows tab when the selected node changes. This lets the
+ * inner form reset naturally for each source data block.
+ * Rendered by: DataPreprocessingFeature module, PreviewTable component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ */
 export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
   const selectedNodeLabel = deriveNodeLabel(props.selectedNode) || props.selectedNodeId || '';
   const selectedNodeKey = `${props.selectedNodeId ?? ''}:${selectedNodeLabel}`;
@@ -25,6 +30,13 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
   return <SliceSubTabContent key={selectedNodeKey} {...props} />;
 };
 
+/**
+ * Renders the Sample Rows tab UI around `useSliceSubTab` state for slice and
+ * random-sample modes.
+ * Rendered by: preprocessing/SliceSubTab module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: render slice/random-sample controls from hook state, show mode-specific fields and
+ * preview table, then expose apply actions.
+ */
 const SliceSubTabContent: React.FC<SliceSubTabProps> = (props) => {
   const {
     selectionPanel,

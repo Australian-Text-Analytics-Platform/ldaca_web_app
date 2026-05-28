@@ -10,6 +10,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 type HighlightSpan = { start: number; end: number; types: string[] };
 
+// Used by: renderQuotationDetailText to build stacked underline decorations for the full-text detail view because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
 const buildUnderlineStyle = (types: string[]): React.CSSProperties => {
   if (!types.length) return {};
   const decorations = types.map(() => 'underline').join(' ');
@@ -25,9 +26,10 @@ const buildUnderlineStyle = (types: string[]): React.CSSProperties => {
 };
 
 /**
- * Render quotation-highlighted full text for the detail panel.
+ * Called by: QuotationFeature detail panel renderDocumentText to render highlighted full text because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Shows speaker (blue), quote (green), and verb (purple) spans
  * with underline decorations and inline label badges. No clipping.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const renderQuotationDetailText = (
   text: string,
@@ -36,6 +38,7 @@ export const renderQuotationDetailText = (
   if (typeof text !== 'string' || !text.length) return text ?? '';
 
   const spans: HighlightSpan[] = [];
+  // Used by: renderQuotationDetailText to convert quotation span columns into detail-view highlight ranges because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const addSpan = (start?: unknown, end?: unknown, type?: string) => {
     if (
       type &&

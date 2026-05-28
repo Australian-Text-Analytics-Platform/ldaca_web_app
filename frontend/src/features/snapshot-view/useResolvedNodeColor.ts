@@ -23,7 +23,9 @@ import type { SnapshotToolKey } from './types';
  * ``undefined`` if no colour is assigned. Subscribes to whichever
  * store is the source of truth so the component re-renders when the
  * colour changes (live mode) or when the snapshot is swapped
- * (snapshot mode). */
+ * (snapshot mode).  * Used by: index module, useResolvedNodeColor tests (rg call sites/imports).
+ * Why: because snapshot graph rendering needs captured source colors when live workspace color state is unavailable.
+ */
 export function useResolvedNodeColor(
   tool: SnapshotToolKey,
   nodeId: string,

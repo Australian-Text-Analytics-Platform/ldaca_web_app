@@ -8,12 +8,16 @@
  */
 export const DEFAULT_LANGUAGE = 'en';
 
+/** Normalizes optional language inputs from node metadata, controls, and preferences. */
+/** Called by: DEFAULT_LANGUAGE and effectiveNodeLanguage in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 function normalise(value: string | null | undefined): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim().toLowerCase();
   return trimmed || null;
 }
 
+/** Resolves the language a tool should use for node-sensitive defaults. */
+/** Used by: src/features/analysis/concordance/ConcordanceFeature.tsx, src/features/analysis/quotation/QuotationFeature.tsx, src/features/analysis/topic-modeling/TopicModelingFeature.tsx and 1 other importers because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 export function effectiveNodeLanguage(args: {
   explicit?: string | null;
   defaultLanguage?: string | null;
@@ -26,6 +30,8 @@ export function effectiveNodeLanguage(args: {
   return DEFAULT_LANGUAGE;
 }
 
+/** Lets English-only tools keep simple capability checks at their call sites. */
+/** Used by: src/features/analysis/quotation/QuotationFeature.tsx, src/lib/__tests__/effectiveNodeLanguage.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 export function isEnglish(language: string): boolean {
   return normalise(language) === DEFAULT_LANGUAGE;
 }

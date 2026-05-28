@@ -24,6 +24,12 @@ export interface LockedNodesSnapshot {
   shape?: [number | null, number | null] | number[];
 }
 
+/**
+ * Owns the local lock snapshot state that lets analysis tabs freeze selections
+ * while results are displayed or restored from an existing backend task.
+ * Used by: useAnalysisLockMachine and unit tests for analysis lock state because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
 export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
   const {
     allowedDataTypes,
@@ -77,11 +83,18 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     return map;
   })();
 
+  /** Called by: clear flows, toggleLock, and invalid snapshot restoration because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
   const unlockSelection = () => {
     setIsLocked(false);
     setLockedNodesSnapshot([]);
   };
 
+  /**
+   * Replaces live selections with persisted node snapshots supplied by task
+   * hydration, task request restoration, or a fresh lock action.
+    * Called by: lockSelection, lockWithCurrentNodes, and hydration restore helpers because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
+       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   */
   const lockWithSnapshots = (
       snapshotInput:
         | Array<{ id: string; name?: string; columns?: string[] | null; shape?: [number | null, number | null] | number[] }>
@@ -115,6 +128,10 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
       setIsLocked(true);
     };
 
+    /**
+   * Called by: toggleLock and feature run handlers before starting a new task because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
+   * Flow: derive display state, bind user actions, then render the analysis UI.
+   */
   const lockSelection = () => {
     const snapshot = nodeColumnSelections.map((sel) => {
       const node = selectedNodes.find((n) => n.id === sel.nodeId);
@@ -128,6 +145,7 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     lockWithSnapshots(snapshot);
   };
 
+  /** Called by: analysis panel controls that expose a manual lock/unlock action because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
   const toggleLock = () => {
     if (isLocked) {
       unlockSelection();
@@ -235,6 +253,12 @@ export interface UseAnalysisLockMachineConfig extends AnalysisLockConfig {
   getAuthHeaders?: () => Record<string, string>;
 }
 
+/**
+ * Extends the local lock core with workspace-aware snapshot capture so features
+ * can restore selected columns from cached node metadata or backend task payloads.
+ * Used by: useAnalysisLock and analysis feature screens with direct lock-machine needs.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
 export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => {
   const {
     workspaceId = null,
@@ -246,6 +270,11 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
   const { activeNodeIds, lockWithSnapshots } = lockState;
   const queryClient = useQueryClient();
 
+  /**
+   * Reads node metadata through the shared query cache before locking ids that
+   * came from restored task requests or current workspace selections.
+    * Called by: lockWithCurrentNodes and restoreAnalysisLockFromRequest consumers because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
+   */
   const captureSnapshotsForNodes = async (
       nodeIds: string[],
       columnMap?: Record<string, string>
@@ -270,6 +299,7 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
       }
     };
 
+  /** Called by: analysis feature run handlers that need fresh snapshot data because locks should capture current node snapshots before the request mutates result state. */
   const lockWithCurrentNodes = async (columnMap?: Record<string, string>) => {
       const nodeIds = activeNodeIds;
       if (!nodeIds.length) {

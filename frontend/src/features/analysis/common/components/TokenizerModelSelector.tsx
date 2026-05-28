@@ -34,6 +34,12 @@ export interface TokenizerModelSelectorProps {
   className?: string;
 }
 
+/**
+ * Lets token-based analysis panels choose a tokenizer model for the selected
+ * source column, using sampled text to group backend models by detected language.
+ * Used by: concordance and token-frequency parameter panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export function TokenizerModelSelector({
   workspaceId,
   nodeId,
@@ -52,6 +58,7 @@ export function TokenizerModelSelector({
       : ['tokenizer-language-sample', nodeId, column],
     enabled: canFetchSample,
     staleTime: 60_000,
+    /** Called by: TanStack Query to fetch sample text for language detection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     queryFn: async () => {
       const { data } = await getNodeData({
         path: { node_id: nodeId },
@@ -73,6 +80,7 @@ export function TokenizerModelSelector({
     enabled: sampleText.length > 0,
     staleTime: 5 * 60_000,
     retry: false,
+    /** Called by: TanStack Query after sample text is available because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     queryFn: () => detectLanguageIso6391(sampleText),
   });
 
@@ -81,6 +89,7 @@ export function TokenizerModelSelector({
     queryKey: queryKeys.tokenizerModels,
     enabled: false,
     staleTime: 10 * 60_000,
+    /** Called by: TanStack Query when the selector opens and requests model inventory because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     queryFn: async () => {
       const { data } = await getTokenizerModels({
         headers: getAuthHeaders(),

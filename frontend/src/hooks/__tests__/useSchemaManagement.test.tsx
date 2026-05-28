@@ -21,10 +21,14 @@ import {
   useSchemaManagement,
 } from '../useSchemaManagement';
 
+/** Renders schema hooks under an isolated query client for cache/invalidation assertions. */
+/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 const renderWithClient = <T,>(callback: () => T) => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  /** Provides the per-test query client to hook renders without leaking cache between tests. */
+  /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
@@ -203,6 +207,8 @@ describe('useSchemaManagement', () => {
           nodeId: 'node-1',
           isLocked: false,
           workspaceId: 'ws-1',
+          /** Supplies query auth headers so schema fetching can run in the hook test. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
         }),
       );
@@ -221,6 +227,8 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: undefined,
+          /** Keeps the hook signature complete while bypassing remote schema queries. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
           nodeData: {
             columns: ['a', 'b'],
@@ -241,6 +249,8 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: undefined,
+          /** Keeps auth available while the test uses selected-node schema fallback data. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
           selectedNode: {
             data: {
@@ -269,6 +279,8 @@ describe('useSchemaManagement', () => {
           nodeId: 'node-1',
           isLocked: false,
           workspaceId: 'ws-1',
+          /** Provides headers for the unlocked schema fetch before lock capture. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
         }),
       );
@@ -287,6 +299,8 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: undefined,
+          /** Keeps auth plumbing present while testing explicit lock overrides. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
         }),
       );
@@ -303,6 +317,8 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: undefined,
+          /** Keeps auth plumbing present while testing lock clearing. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
         }),
       );
@@ -326,6 +342,8 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: undefined,
+          /** Keeps auth plumbing present while testing type filtering over local data. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
           nodeData: {
             columns: ['a', 'b', 'c'],
@@ -350,6 +368,8 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: 'ws-1',
+          /** Provides headers even though null node IDs should keep the query disabled. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
         }),
       );
@@ -362,6 +382,8 @@ describe('useSchemaManagement', () => {
           nodeId: 'node-1',
           isLocked: true,
           workspaceId: 'ws-1',
+          /** Provides headers that should not be consumed while schema fetching is locked. */
+          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
         }),
       );

@@ -46,6 +46,12 @@ type DetachColumnsDialogProps = {
   confirmDisabledReason?: string;
 };
 
+/**
+ * Renders the shared detach-columns confirmation dialog used by analysis tools
+ * that can materialize selected optional columns into the workspace.
+ * Used by: concordance, quotation, and topic-modeling detach flows because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export function DetachColumnsDialog({
   open,
   onOpenChange,

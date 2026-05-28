@@ -5,6 +5,12 @@ import { setNodeDocumentColumn, setNodeTokenizationPreference } from '@/api/gene
 import type { WorkspaceGraphResponse, WorkspaceNodeInfo } from '@/api/generated/types.gen';
 import { queryKeys } from '@/lib/queryKeys';
 
+/**
+ * Updates both node-info and graph caches after node preference writes so graph
+ * panels and analysis selectors immediately see the persisted metadata.
+ * Called by: node document-column and tokenization preference persistence hooks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+  * Flow: write node-info and workspace-graph query data with the new node info, then invalidate both caches so selectors and graph panels refetch if needed.
+ */
 export function updateWorkspaceNodeInfoCache(
   queryClient: QueryClient,
   workspaceId: string,
@@ -30,6 +36,12 @@ export function updateWorkspaceNodeInfoCache(
   void queryClient.invalidateQueries({ queryKey: queryKeys.nodeInfo(workspaceId, nodeInfo.id) });
 }
 
+/**
+ * Returns the mutation used by node/column selectors to persist a preferred
+ * document column and keep cached workspace metadata in sync.
+ * Used by: analysis selectors that let users choose a document column per node because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+  * Flow: capture QueryClient and auth context, return a document-column mutation that trims empty values, writes the backend preference, updates caches, and shows a toast on failure.
+ */
 export function usePersistNodeDocumentColumn({
   workspaceId,
   getAuthHeaders,
@@ -60,6 +72,12 @@ export function usePersistNodeDocumentColumn({
   );
 }
 
+/**
+ * Returns the mutation used by tokenizer selectors to persist per-column model
+ * preferences that later analyses use when choosing tokenized columns.
+ * Used by: token model selectors in analysis parameter panels because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
 export function usePersistNodeTokenizationPreference({
   workspaceId,
   getAuthHeaders,

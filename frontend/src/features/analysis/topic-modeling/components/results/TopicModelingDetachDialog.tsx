@@ -17,6 +17,10 @@ type Props = {
   handleDetachConfirm: () => Promise<void> | void;
 };
 
+/**
+ * Rendered by: TopicModelingResultsPanel to wrap the shared detach dialog with topic-modeling validation because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export function TopicModelingDetachDialog({
   open,
   onOpenChange,

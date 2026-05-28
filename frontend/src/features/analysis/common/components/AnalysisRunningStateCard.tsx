@@ -11,8 +11,15 @@ type AnalysisRunningStateCardProps = {
 };
 
 // Backend sends started_at as time.time() (Unix seconds). Convert to ms when needed.
+/** Called by: running-state elapsed time calculations because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const toMs = (v: number) => (v < 1e12 ? v * 1000 : v);
 
+/**
+ * Tracks elapsed task runtime for running-state cards without requiring every
+ * feature to own an interval timer.
+ * Used by: AnalysisRunningStateCard because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Flow: initialize elapsed seconds from started_at, tick every second while a valid start exists, then clear the interval when the card unmounts or task changes.
+ */
 function useElapsedSeconds(startedAt: string | number | null | undefined): number {
   const [elapsed, setElapsed] = useState<number>(() => {
     if (!startedAt) return 0;
@@ -24,6 +31,7 @@ function useElapsedSeconds(startedAt: string | number | null | undefined): numbe
     if (!startedAt) return;
     const start = typeof startedAt === 'number' ? toMs(startedAt) : Date.parse(startedAt);
     if (isNaN(start)) return;
+    /** Called by: the interval timer and initial effect pass because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
     tick();
     const id = setInterval(tick, 1000);
@@ -33,6 +41,7 @@ function useElapsedSeconds(startedAt: string | number | null | undefined): numbe
   return elapsed;
 }
 
+/** Called by: AnalysisRunningStateCard when rendering elapsed runtime text because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 function formatElapsed(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
   const m = Math.floor(seconds / 60);
@@ -40,6 +49,12 @@ function formatElapsed(seconds: number): string {
   return s === 0 ? `${m} min` : `${m} min ${s}s`;
 }
 
+/**
+ * Displays progress and elapsed time for an analysis task that is still running
+ * when the feature panel renders or hydrates from task state.
+ * Used by: token-frequency and topic-modeling result panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export function AnalysisRunningStateCard({
   title = 'Task running',
   message,

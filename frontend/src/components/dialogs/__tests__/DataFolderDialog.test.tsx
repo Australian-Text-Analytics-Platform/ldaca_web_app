@@ -5,8 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DataFolderDialog } from '../DataFolderDialog';
 import { queryKeys } from '@/lib/queryKeys';
 
+/** Auth refresh mock used to verify directory changes reload session-derived config. */
 const refreshAuth = vi.fn();
+/** Workspace reset mock used to verify changing data roots unloads the active workspace first. */
 const setCurrentWorkspace = vi.fn();
+/** Used by: the generated SDK module factory to inspect backend config update payloads because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 const updateConfig = vi.fn();
 
 vi.mock('sonner', () => ({
@@ -18,10 +21,12 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/api/generated/sdk.gen', () => ({
+  /** Used by: the generated SDK module mock to assert DataFolderDialog updateConfig calls because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   updateConfig: (...args: unknown[]) => updateConfig(...args),
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
+  /** Used by: DataFolderDialog tests to supply auth state and refresh behavior because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useAuth: () => ({
     dataFolder: '/tmp/original',
     refreshAuth,
@@ -29,12 +34,17 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
+  /** Used by: DataFolderDialog tests to supply the active-workspace fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceData: () => ({
     currentWorkspaceId: 'ws-1',
   }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
+  /**
+   * Exposes the workspace reset spy consumed by the dialog submit path.
+   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
+   */
   useWorkspaceActions: () => ({
     setCurrentWorkspace,
   }),

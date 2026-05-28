@@ -33,6 +33,11 @@ export interface ServerTableOptions<TData> {
   tableOptions?: Partial<TableOptions<TData>>;
 }
 
+/** Creates a TanStack Table instance whose sort/filter/page state drives backend queries. */
+/**
+ * Used by: src/features/preprocessing/components/PreviewTable.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Flow: initialize controlled or internal sorting/filter state, bridge table change callbacks, then build a manual TanStack table for backend paging.
+ */
 export function useServerTable<TData>({
   data,
   columns,
@@ -54,18 +59,24 @@ export function useServerTable<TData>({
   const [internalFilters, setInternalFilters] = useState<ColumnFiltersState>([]);
   const columnFilters = externalFilters ?? internalFilters;
 
+  /** Bridges TanStack sorting updates into controlled or internal state. */
+  /** Used by: useServerTable callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const handleSortingChange: OnChangeFn<SortingState> = (updater) => {
     const next = typeof updater === 'function' ? updater(sorting) : updater;
     setInternalSorting(next);
     onSortingChange?.(next);
   };
 
+  /** Converts table pagination updates into caller-owned backend paging params. */
+  /** Used by: useServerTable callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
     const current = { pageIndex, pageSize };
     const next = typeof updater === 'function' ? updater(current) : updater;
     onPaginationChange?.(next);
   };
 
+  /** Bridges column-filter updates into controlled or internal state for backend filtering. */
+  /** Used by: useServerTable callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (updater) => {
     const next = typeof updater === 'function' ? updater(columnFilters) : updater;
     setInternalFilters(next);

@@ -15,6 +15,13 @@ interface AddFilePanelProps {
   onConfirm: (selectedSheet?: string | null) => Promise<void> | void;
 }
 
+/**
+ * Confirmation dialog opened by the data loader before a selected file becomes
+ * a workspace block. It gates rendering on a filename so preview hooks only run
+ * for an actual file chosen by the uploader.
+ * Rendered by: DataLoaderFeature when a pending upload needs confirmation.
+ * Flow: combine open state with filename presence, mirror close events to the caller, then mount the dialog content only for a concrete file.
+ */
 export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onClose, onConfirm }) => {
   const isOpen = open && Boolean(filename);
 
@@ -38,6 +45,13 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
   );
 };
 
+/**
+ * File-add dialog body used by `AddFilePanel`. It shows preview rows, optional
+ * Excel sheet selection, and corpus language defaults before delegating the
+ * actual add operation back to the data-loader feature.
+ * Why: adding a file needs preview, sheet, and language choices gathered before the data-loader mutates the workspace.
+ * Flow: query preview data, read/update language preference, manage submit state, then render language, sheet, preview, and confirm controls.
+ */
 function AddFilePanelContent({
   filename,
   onClose,
@@ -60,10 +74,12 @@ function AddFilePanelContent({
 
   const [submitting, setSubmitting] = useState(false);
 
+  /** Called by: AddFilePanelContent Cancel button and post-confirm close path because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleClose = () => {
     onClose();
   };
 
+  /** Called by: AddFilePanelContent Add to Workspace button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleConfirm = async () => {
     if (!filename) return;
     try {

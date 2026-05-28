@@ -25,6 +25,12 @@ const SMART_CHAR_MAP: Record<string, string> = {
   '\u201B': "'", // ‛
 };
 
+/**
+ * Normalizes smart quotes before expressions reach the backend parser. Builder
+ * inputs and column-name fields use this so pasted prose does not break Polars
+ * code unexpectedly.
+ * Used by: local callers in preprocessing/useAggregateSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const normalizeSmartCharacters = (input: string): string =>
   input.replace(/[\u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B]/g, (char) => SMART_CHAR_MAP[char] ?? char);
 
@@ -138,6 +144,11 @@ export interface UseAggregateSubTabResult {
   dropZoneRef: React.RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * Creates stable token ids for the visual expression builder. Token lists use
+ * these ids for React keys and drag/drop targeting.
+ * Used by: local callers in preprocessing/useAggregateSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const createTokenId = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -145,6 +156,15 @@ const createTokenId = (): string => {
   return `token-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+/**
+ * Owns computed-column state for the Aggregate sub-tab. The component consumes
+ * this hook for node selection, token-builder behavior, preview data, and apply
+ * controls.
+ * Used by: tokenIndexMath hook, AggregateSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: derive the active node and available columns, synchronize builder tokens with
+ * expression text, handle drag/drop editing, run preview/apply requests, and return grouped
+ * configs for the tab component.
+ */
 export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSubTabResult => {
   const {
     selectedNodeId,
@@ -235,8 +255,18 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     );
   })();
 
+    /**
+     * Escapes custom literal text before embedding it into generated Polars code.
+     * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const escapeLiteralValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
+    /**
+     * Converts one visual builder token into a Polars expression fragment.
+     * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+      * Steps: escape column names, append selected operations, and serialize literal custom
+      * tokens as strings or numeric values.
+     */
   const tokenToPolars = (token: BasicToken): string => {
     if (token.kind === 'column') {
       const safe = token.column.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -264,15 +294,31 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     return `pl.lit("${escapeLiteralValue(raw)}")`;
   };
 
+  /**
+   * Joins all builder tokens into the expression shown in the code preview.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const tokensToExpression = (tokens: BasicToken[]) =>
       tokens.map(tokenToPolars).join(' + ');
 
+  /**
+   * Updates the text expression and its latest ref together so debounced commit
+   * and apply logic read the same normalized value.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const setExpressionAndMarkDirty = (nextExpression: string) => {
     const normalizedExpression = normalizeSmartCharacters(nextExpression);
     latestExpressionRef.current = normalizedExpression;
     setExpression(normalizedExpression);
   };
 
+  /**
+   * Applies token-list edits and mirrors them into the generated expression.
+   * All token add/remove/move/operation handlers route through this helper.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Steps: run the token updater, rebuild the expression preview, preserve no-op token
+  * references, and mark expression state dirty when needed.
+   */
   const applyBasicTokenUpdate = (updater: (prev: BasicToken[]) => BasicToken[]) => {
       setBasicTokens((prev) => {
         const next = updater(prev);
@@ -287,6 +333,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       });
     };
 
+  /**
+   * Builds the backend request from the latest expression/column refs. Preview
+   * and apply paths use the same alias-wrapping behavior.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const buildRequest = (): PolarsExpressionRequest => {
     const expressionValue = latestExpressionRef.current.trim();
     const columnValue = latestColumnNameRef.current.trim();
@@ -301,6 +352,10 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     };
   };
 
+  /**
+   * Commits the current expression/name into the debounced preview payload.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const commitExpression = () => {
     setCommittedExpression(latestExpressionRef.current.trim());
     setCommittedColumnName(latestColumnNameRef.current.trim());
@@ -317,6 +372,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     [],
   );
 
+  /**
+   * Debounces expression commits so typing/dragging does not fire preview calls
+   * for every intermediate token state.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const scheduleCommit = () => {
     if (!hasSelection) return;
     if (typeof window === 'undefined') return;
@@ -364,6 +424,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const canApply = hasSelection && trimmedExpression.length > 0 && !applyLoading && !isLoading.operations && !previewError;
 
+  /**
+   * Adds a selected source column to the builder, optionally at a drag/drop
+   * insertion index.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const addColumnToken = (column: string, dtype: string, index?: number) => {
       if (basicDisabled || !column) return;
       applyBasicTokenUpdate((prev) =>
@@ -372,6 +437,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       scheduleCommit();
     };
 
+  /**
+   * Adds an editable literal token and puts it into edit mode for immediate
+   * typing.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const addCustomToken = (index?: number) => {
       if (basicDisabled) return;
       const tokenId = createTokenId();
@@ -383,6 +453,10 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       customOriginalRef.current = '';
     };
 
+  /**
+   * Removes a builder token by id. Token chip delete buttons call this handler.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const removeBasicToken = (tokenId: string) => {
       if (basicDisabled) return;
       applyBasicTokenUpdate((prev) => {
@@ -393,6 +467,13 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       scheduleCommit();
     };
 
+  /**
+   * Reorders an existing token after drag/drop. The visual builder calls this
+   * with the calculated insertion index.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Steps: resolve the token index, move it through shared index math, suppress no-op
+  * reference churn, and schedule a preview commit.
+   */
   const moveBasicToken = (tokenId: string, index: number) => {
       if (basicDisabled) return;
       applyBasicTokenUpdate((prev) => {
@@ -410,6 +491,10 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       scheduleCommit();
     };
 
+  /**
+   * Appends a backend-advertised operation to a column token.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const addOperation = (tokenId: string, operation: string) => {
     if (basicDisabled) return;
     applyBasicTokenUpdate((prev) =>
@@ -423,6 +508,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     scheduleCommit();
   };
 
+  /**
+   * Removes one operation from a column token. Operation chips use this to undo
+   * method additions.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const removeOperation = (tokenId: string, index: number) => {
     if (basicDisabled) return;
     applyBasicTokenUpdate((prev) =>
@@ -438,6 +528,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     scheduleCommit();
   };
 
+  /**
+   * Opens a custom token for editing while preserving the original value for
+   * Escape/cancel.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const startEditingCustomToken = (tokenId: string) => {
       if (basicDisabled) return;
       const target = basicTokens.find(
@@ -450,6 +545,13 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       customOriginalRef.current = normalizedValue;
     };
 
+  /**
+   * Commits or cancels the custom-token draft. Keyboard and blur handlers use
+   * this shared path.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Steps: apply committed text when requested, restore the original draft on cancel,
+  * schedule preview updates, and clear edit state.
+   */
   const finishCustomEdit = (commit: boolean) => {
       if (!editingTokenId) {
         setCustomDraft('');
@@ -476,6 +578,10 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setCustomDraft('');
     };
 
+  /**
+   * Clears all builder tokens and the generated expression for the Clear button.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const clearBasicBuilder = () => {
     if (basicDisabled) return;
     if (basicTokens.length === 0) {
@@ -487,7 +593,18 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     scheduleCommit();
   };
 
+  /**
+   * Reads a drag payload from browser drag metadata, with a ref fallback for
+   * environments that strip custom MIME data during dragover/drop.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Steps: try custom, JSON, and plain-text drag payloads, then fall back to the last
+  * in-memory payload for WebView compatibility.
+   */
   const parseDragPayload = (event: React.DragEvent): DragPayload | null => {
+            /**
+             * Decodes one serialized drag payload candidate.
+             * Called by: parseDragPayload internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+             */
       const decode = (raw: string | null | undefined): DragPayload | null => {
         if (!raw) return null;
         try {
@@ -514,6 +631,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       return lastDragPayloadRef.current;
     };
 
+  /**
+   * Writes drag payloads in several MIME slots so browser/WebView drag behavior
+   * stays compatible across the desktop and web builds.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const setDragPayload = (dataTransfer: DataTransfer, payload: DragPayload, plainText: string): void => {
     const BASIC_TOKEN_MIME = 'application/x-ldaca-builder-token';
     const encoded = JSON.stringify(payload);
@@ -534,6 +656,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }
   };
 
+  /**
+   * Starts dragging a source-column palette token into the builder.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Flow: block disabled drags, build a column payload, cache it for fallback reads, write transfer data, and mark copy drag active.
+   */
   const handleColumnDragStart = (event: React.DragEvent<HTMLButtonElement>, column: string, dtype: string) => {
       if (basicDisabled) {
         event.preventDefault();
@@ -548,6 +675,10 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setBasicDragActive(true);
     };
 
+  /**
+   * Starts dragging a blank custom-literal palette token into the builder.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleCustomDragStart = (event: React.DragEvent<HTMLButtonElement>) => {
       if (basicDisabled) {
         event.preventDefault();
@@ -562,6 +693,12 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setBasicDragActive(true);
     };
 
+  /**
+   * Starts moving an existing token, committing any active custom edit first so
+   * the drag payload reflects stable token state.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Flow: prevent disabled drags, finish pending custom edits, create an existing-token payload, write transfer data, and mark move drag active.
+   */
   const handleExistingTokenDragStart = (event: React.DragEvent<HTMLDivElement>, tokenId: string) => {
       if (basicDisabled) {
         event.preventDefault();
@@ -579,16 +716,28 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setBasicDragActive(true);
     };
 
+    /**
+     * Clears builder drag state after dragging an existing token ends.
+     * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handleExistingTokenDragEnd = () => {
     setBasicDragActive(false);
     setDropIndicator(null);
   };
 
+    /**
+     * Clears builder drag state after dragging a palette token ends.
+     * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handlePaletteDragEnd = () => {
     setBasicDragActive(false);
     setDropIndicator(null);
   };
 
+  /**
+   * Updates the before/after insertion indicator when dragging over a token.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleTokenDragOver = (tokenId: string, event: React.DragEvent<HTMLDivElement>) => {
       if (basicDisabled) return;
       event.preventDefault();
@@ -597,6 +746,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setDropIndicator({ tokenId, position: isBefore ? 'before' : 'after' });
     };
 
+  /**
+   * Keeps the builder drop zone active and sets the browser copy/move cue while
+   * a valid token is dragged over it.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleBuilderDragOver = (event: React.DragEvent<HTMLDivElement>) => {
       if (basicDisabled) return;
       event.preventDefault();
@@ -607,6 +761,10 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setBasicDragActive(true);
     };
 
+  /**
+   * Clears drop-zone state only when the drag leaves the entire builder surface.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleBuilderDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     if (!dropZoneRef.current) return;
     const related = event.relatedTarget as Node | null;
@@ -615,6 +773,13 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     setDropIndicator(null);
   };
 
+  /**
+   * Inserts, creates, or reorders builder tokens after a drop. The visual drop
+   * zone and token rows share this handler.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Steps: clear drag state, resolve the insertion index, distinguish palette from existing
+  * tokens, then delegate to add/move helpers.
+   */
   const handleBuilderDrop = (event: React.DragEvent<HTMLDivElement>) => {
       if (basicDisabled) return;
       event.preventDefault();
@@ -650,6 +815,12 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       lastDragPayloadRef.current = null;
     };
 
+  /**
+   * Applies the current expression to the active node, refreshes schema, and
+   * refreshes preview so the sub-tab reflects the created column.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Flow: guard missing node or expression, build the request, apply it, announce the created node, refresh schema/preview, and clear loading.
+   */
   const handleApply = async () => {
     const currentExpression = latestExpressionRef.current.trim();
     if (!activeNodeId || currentExpression.length === 0) return;
@@ -669,20 +840,38 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }
   };
 
+  /**
+   * Updates the output column name while keeping the latest ref in sync for
+   * delayed preview commits.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleColumnNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       const next = normalizeSmartCharacters(event.target.value);
       latestColumnNameRef.current = next;
       setColumnName(next);
     };
 
+    /**
+     * Forces the preview payload to commit when the column-name field blurs.
+     * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handleColumnBlur = () => {
     commitExpression();
   };
 
+    /**
+     * Normalizes smart characters while editing a custom literal token.
+     * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handleCustomDraftChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setCustomDraft(normalizeSmartCharacters(event.target.value));
   };
 
+  /**
+   * Handles Enter/Escape for custom-token editing so keyboard interactions
+   * share the same commit/cancel path as pointer interactions.
+   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleCustomInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
         event.preventDefault();

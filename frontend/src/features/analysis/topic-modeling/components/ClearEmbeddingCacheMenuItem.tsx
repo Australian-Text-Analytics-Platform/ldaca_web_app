@@ -12,18 +12,21 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatBytes } from '@/lib/utils';
 
 /**
- * Sidebar menu entry that opens a confirm dialog showing the topic-modelling
+ * Rendered by: Sidebar. Sidebar menu entry that opens a confirm dialog showing the topic-modelling because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * embedding cache size and lets the user clear it.
  *
  * Self-contained: owns its dialog state, fetches the cache size on open, and
  * runs the clear mutation on confirm. Replaces ~50 LoC of topic-modelling
  * business logic that previously lived in the layout Sidebar component.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const ClearEmbeddingCacheMenuItem: React.FC = () => {
   const { getAuthHeaders } = useAuth();
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<{ bytes: number; files: number } | null>(null);
 
+  // Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+  // Called by: ClearEmbeddingCacheMenuItem dropdown item to open the dialog and fetch cache stats because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const openDialog = async () => {
     setStats(null);
     setOpen(true);
@@ -38,6 +41,7 @@ export const ClearEmbeddingCacheMenuItem: React.FC = () => {
     }
   };
 
+  // Called by: ClearEmbeddingCacheMenuItem confirm dialog because users need a guarded cache delete with reclaimed-size feedback. Flow: close the dialog, call the clear-cache endpoint, toast empty or reclaimed-file results, then surface failures.
   const handleConfirm = async () => {
     setOpen(false);
     try {

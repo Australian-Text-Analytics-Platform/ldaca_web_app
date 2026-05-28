@@ -51,6 +51,7 @@ const TYPE_RULES: Array<[(s: string) => boolean, string]> = [
  * `'string'` for unknown/missing input — most components render strings
  * safely, so this is the least-surprising default.
  */
+/** Used by: src/features/analysis/ai-annotator/AiAnnotatorFeature.tsx, src/features/analysis/common/useNodeColumnOptions.ts, src/features/analysis/sequential-analysis/SequentialAnalysisFeature.tsx and 6 other importers because the utility needs local normalization steps before returning a shared result. */
 export const normalizeTypeName = (type?: string | null): string => {
   if (!type || typeof type !== 'string') return 'string';
   const s = type.toLowerCase();
@@ -60,6 +61,8 @@ export const normalizeTypeName = (type?: string | null): string => {
   return 'string';
 };
 
+/** Reads the dtype field from whichever schema-entry shape a backend route returned. */
+/** Called by: normalizeTypeName and mapColumnsToInfo in this utility module because the utility needs local normalization steps before returning a shared result. */
 const extractTypeFromSchemaEntry = (entry: unknown): string | undefined => {
   if (!entry) return undefined;
   if (typeof entry === 'string') return entry;
@@ -80,6 +83,10 @@ const extractTypeFromSchemaEntry = (entry: unknown): string | undefined => {
  * If multiple sources disagree we keep the earliest non-`string` answer,
  * because the generic `columns` list is the weakest evidence.
  */
+/**
+ * Used by: src/features/analysis/common/useNodeColumnOptions.ts, src/features/preprocessing/aggregate/hooks/useAggregateSubTab.ts, src/features/preprocessing/replace/hooks/useReplaceSubTab.ts and 2 other importers because the utility needs local normalization steps before returning a shared result.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
   if (!node) return [];
 
@@ -88,6 +95,11 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
   const columnOrder: string[] = [];
   const typeMap = new Map<string, string>();
 
+  /** Merges column order and dtype evidence while preserving the first reliable column position. */
+  /**
+   * Called by: normalizeTypeName and mapColumnsToInfo in this utility module because the utility needs local normalization steps before returning a shared result.
+   * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+   */
   const register = (name: unknown, rawType?: unknown) => {
     if (typeof name !== 'string' || !name) return;
     const normalizedType = normalizeTypeName(
@@ -136,6 +148,7 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
  * Narrow `columns` to entries whose `dataType` appears in `allowedTypes`.
  * If `allowedTypes` is empty the list is returned as-is (no-op filter).
  */
+/** Used by: src/features/analysis/common/useNodeColumnOptions.ts, src/hooks/useAutoNodeColumns.ts because the utility needs local normalization steps before returning a shared result. */
 export const filterColumnsByType = (columns: ColumnInfo[], allowedTypes: string[]): ColumnInfo[] => {
   if (!allowedTypes.length) return columns;
   const allowed = new Set(allowedTypes.map((t) => t.toLowerCase()));

@@ -5,6 +5,12 @@ import type { LoadedSnapshot, SnapshotManifest, ViewMode } from '../types';
 
 const SHARE_SNAPSHOT_MODE: ViewMode = { kind: 'shareSnapshot' };
 
+/**
+ * Builds a loaded snapshot fixture for store mutation tests.
+ * Used by: Vitest setup or assertions in snapshot-view/store.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: manifest defaults are assembled first, then the loaded snapshot wraps the payload map expected by the store.
+ */
 function makeFakeSnapshot(overrides: Partial<SnapshotManifest> = {}): LoadedSnapshot {
   const manifest: SnapshotManifest = {
     schema_version: 1,

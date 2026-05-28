@@ -18,6 +18,10 @@ export type ChartTypeOption = 'line' | 'bar' | 'area';
 
 export const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
 
+// Narrows stored or server-provided chart type values to the supported UI options.
+/**
+ * Used by: SequentialAnalysisFeature.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ */
 export const isChartTypeOption = (value: unknown): value is ChartTypeOption =>
   typeof value === 'string' && CHART_TYPE_OPTIONS.includes(value as ChartTypeOption);
 
@@ -26,11 +30,20 @@ export const SEQUENTIAL_ANALYSIS_PALETTE = [
   '#14b8a6', '#f97316', '#ec4899', '#0ea5e9', '#22c55e',
 ] as const;
 
+// Provides deterministic colours for generated chart series.
+/**
+ * Used by: SequentialChart.tsx, SequentialAnalysisFeature.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ */
 export const getPaletteColor = (index: number) =>
   SEQUENTIAL_ANALYSIS_PALETTE[index % SEQUENTIAL_ANALYSIS_PALETTE.length];
 
 const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_end']);
 
+// Compares period boundary values so grouped rows retain their earliest start and latest end.
+/**
+ * Called by: useSequentialAnalysisTaskFlow hook during this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Flow: order nullish values last, compare numeric bounds directly, compare parseable dates by time, then fall back to string ordering.
+ */
 const comparePeriodBounds = (left: unknown, right: unknown): number => {
   if (left === right) return 0;
   if (left === undefined || left === null) return 1;
@@ -49,6 +62,11 @@ const comparePeriodBounds = (left: unknown, right: unknown): number => {
   return String(left).localeCompare(String(right));
 };
 
+// Formats sequential chart x-axis labels for timestamps while preserving raw non-date values.
+/**
+ * Used by: SequentialChart.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Flow: return a placeholder for empty values, format parseable dates with month/year/day detail, then preserve raw non-date labels.
+ */
 export const formatTimeLabel = (value?: string | number) => {
   if (value === undefined || value === null || value === '') return '—';
   // Numeric input is interpreted as epoch-milliseconds (this is what the
@@ -110,6 +128,11 @@ type Params = {
   lock: SequentialAnalysisLock;
 };
 
+/** Builds the submit, clear, chart-type, and chart-shaping logic for sequential analysis. */
+/**
+ * Used by: SequentialChart.tsx, sequentialRebucket.ts, SequentialAnalysisFeature.tsx, and related files because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ */
 export function useSequentialAnalysisTaskFlow({
   state: {
     currentWorkspaceId,
@@ -142,6 +165,11 @@ export function useSequentialAnalysisTaskFlow({
   },
   lock: { getAuthHeaders, queryClient },
 }: Params) {
+  // Validates current parameters, submits the analysis request, and locks the selected node.
+  /**
+   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ */
   const handleAnalyze = async () => {
     const nodeIdForAnalysis = activeNodeId;
     if (!nodeIdForAnalysis || !currentWorkspaceId) {
@@ -263,10 +291,19 @@ export function useSequentialAnalysisTaskFlow({
     }
   };
 
+  // Clears the active sequential-analysis result through the shared lifecycle.
+  /**
+   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   */
   const handleClearResults = async () => {
     await clearResults();
   };
 
+  // Persists chart-type changes onto both local result state and the stored task result.
+  /**
+   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+       * Flow: derive display state, bind user actions, then render the analysis UI.
+   */
   const handleChartTypeChange = async (value: ChartTypeOption) => {
     setChartType(value);
     setResults((prev: Record<string, unknown> | null) => (prev ? { ...prev, chart_type: value } : prev));

@@ -11,6 +11,11 @@ type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   className?: string
 }
 
+/**
+ * Scroll area wrapper used by overflow-heavy panels that need styled Radix scrollbars.
+ * Why: overflow panels need Radix scrollbars with app styling while preserving the caller's viewport content.
+ * Flow: render Root and Viewport, conditionally mount vertical/horizontal ScrollBar primitives, then add the Radix corner when both axes show.
+ */
 function ScrollArea({
   className,
   children,
@@ -41,6 +46,11 @@ function ScrollArea({
   )
 }
 
+/**
+ * Scrollbar renderer used by `ScrollArea` for vertical and horizontal rails.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ * Flow: compose orientation-specific rail classes, render the Radix ScrollAreaScrollbar, then nest the styled thumb primitive.
+ */
 function ScrollBar({
   className,
   orientation = "vertical",

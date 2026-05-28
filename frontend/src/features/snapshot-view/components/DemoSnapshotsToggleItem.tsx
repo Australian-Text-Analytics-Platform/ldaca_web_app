@@ -11,6 +11,8 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
  *
  * Sibling of "Reset all hints" / "Clear embedding cache" in the sidebar
  * dropdown menu.
+ * Rendered by: Sidebar component, index module, DemoSnapshotsToggleItem tests (rg call sites/imports).
+ * Why: because the sidebar needs a menu item that toggles demo snapshot mode without changing the current workspace route.
  */
 export const DemoSnapshotsToggleItem: React.FC = () => {
   const enabled = usePreferencesStore((s) => s.demoSnapshotsEnabled);

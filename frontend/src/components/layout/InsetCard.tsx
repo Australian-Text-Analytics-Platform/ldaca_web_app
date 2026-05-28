@@ -7,10 +7,9 @@ export interface InsetCardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * Outer padding wrapper + inner rounded/bordered/shadowed card.
- * Mirrors the sidebar's variant=inset pattern so the card's shadow
- * and rounded corners render inside the outer padding zone rather
- * than being clipped by ancestor `overflow-hidden` containers.
+ * Ref-forwarding card shell used by workspace split panes. It mirrors the
+ * sidebar inset treatment so graph/table cards keep visible shadows and rounded
+ * corners inside overflow-constrained layout parents.
  */
 export const InsetCard = React.forwardRef<HTMLDivElement, InsetCardProps>(
   ({ className, innerClassName, innerRef, children, ...props }, ref) => (

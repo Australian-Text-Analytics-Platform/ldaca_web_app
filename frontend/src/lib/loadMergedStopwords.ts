@@ -2,7 +2,7 @@
  * Load client-side default stop-word lists for one or more saved language codes
  * and combine them into a single user-facing payload.
  *
- * Used by:
+ * Used by: because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
  * - Token-frequency's "Apply Stop Words" action, which spans the saved
  *   tokenizer languages for selected corpora so multilingual comparisons fill
  *   with all relevant stoplists merged into one textarea.
@@ -47,6 +47,8 @@ type StopwordExports = Record<string, unknown>;
 
 const stopwordExports = stopwordLists as StopwordExports;
 
+/** Converts UI/user language strings to the primary code used for stopword lookup. */
+/** Called by: resolveMergedStopwords and loadMergedStopwords in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const normaliseLanguageCode = (raw: string): string => raw.trim().toLowerCase().split(/[-_]/)[0] ?? '';
 
 const iso6393ByIso6391 = new Map(
@@ -55,6 +57,8 @@ const iso6393ByIso6391 = new Map(
     .map((language) => [language.iso6391, language.iso6393] as const),
 );
 
+/** Maps ISO 639-1/639-3 inputs to the third-party stopword package's export keys. */
+/** Called by: resolveMergedStopwords and loadMergedStopwords in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const resolveStopwordLanguageCode = (language: string): string | null => {
   const normalised = normaliseLanguageCode(language);
   if (!normalised) return null;
@@ -62,12 +66,19 @@ const resolveStopwordLanguageCode = (language: string): string | null => {
   return iso6393ByIso6391.get(normalised) ?? null;
 };
 
+/** Reads one stopword export while treating unsupported package keys as an empty list. */
+/** Called by: resolveMergedStopwords and loadMergedStopwords in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const getStopwordList = (iso6393Code: string): string[] => {
   const list = stopwordExports[iso6393Code];
   if (!Array.isArray(list)) return [];
   return list.map((word) => String(word).trim()).filter(Boolean);
 };
 
+/** Resolves and deduplicates stopwords synchronously for callers/tests that already have languages. */
+/**
+ * Used by: src/features/analysis/common/hooks/useDefaultStopwords.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 export function resolveMergedStopwords(
   languages: ReadonlyArray<string | null | undefined>,
 ): MergedStopwordsResult {
@@ -106,6 +117,8 @@ export function resolveMergedStopwords(
   return { byLanguage, merged };
 }
 
+/** Async facade for UI actions that may later load stopword sources dynamically. */
+/** Used by: src/features/analysis/token-frequency/hooks/useTokenFrequencyPreferences.ts, src/lib/__tests__/loadMergedStopwords.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 export async function loadMergedStopwords(args: {
   languages: ReadonlyArray<string | null | undefined>;
 }): Promise<MergedStopwordsResult> {

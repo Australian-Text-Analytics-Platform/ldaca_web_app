@@ -29,12 +29,24 @@ export interface GroupByAggState {
   aggExpressions: ExpressionItem[];
 }
 
+/**
+ * Generates stable expression row ids for React list keys and focus tracking.
+ * Used by: local callers in preprocessing/usePolarsExpressionSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const newId = () =>
   (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+/**
+ * Creates an empty expression row with a stable id for React list keys.
+ * Used by: PolarsExpressionSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ */
 export const blankExpression = (): ExpressionItem => ({ id: newId(), code: '' });
+/**
+ * Creates an empty sort expression row with a stable id and default direction.
+ * Used by: PolarsExpressionSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ */
 export const blankSortExpression = (): SortExpressionItem => ({ id: newId(), code: '', descending: false });
 
 export interface PolarsExpressionSubTabProps {
@@ -58,6 +70,14 @@ export interface PolarsExpressionSubTabProps {
 
 const DEFAULT_PALETTE = ['#2563eb'];
 
+/**
+ * Owns request-building and preview/apply state for the Polars expression tab.
+ * The component consumes this hook to keep each context's editor state and
+ * serialized backend request in one place.
+ * Used by: CodeEditor module, PolarsExpressionSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: manage expression item state per context, build request payloads, run preview/apply
+ * APIs, and expose tab/editor actions to the component.
+ */
 export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const { selectedNodes, onAlert, polarsExpressionPreview, polarsExpressionApply, refreshNodeSchema } = props;
 
@@ -87,6 +107,13 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   const nodeColors = { [effectiveNode?.id ?? '']: DEFAULT_PALETTE[0]! };
 
+  /**
+   * Serializes the currently active context into a PolarsExpressionRequest for
+   * preview and apply calls.
+   * Called by: usePolarsExpressionSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: build the request payload from committed expressions, call preview for the current
+   * node/page, and adapt backend rows into preview state.
+   */
   const evalExpressions = async () => {
     setEvalError(null);
     setSerializedRequest(null);
@@ -137,12 +164,19 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const preview = usePreprocessingPreview({
     request: nodeId && serializedRequest ? { nodeId, req: serializedRequest } : null,
     enabled: !!nodeId && !!serializedRequest,
+    // Adapts the generated preview API to the shared preprocessing preview hook.
+    // Called by: usePreprocessingPreview option object inside usePolarsExpressionSubTab because consumers need this callback at the object boundary instead of recreating it inline.
     fetcher: async ({ request, page, pageSize, signal: _signal }) => {
       const res = await polarsExpressionPreview(request.nodeId, request.req, page, pageSize);
       return { data: res.data, columns: res.columns, pagination: res.pagination };
     },
   });
 
+  /**
+   * Applies the serialized expression to the selected node and refreshes schema
+   * so downstream selectors can see new/changed columns.
+   * Called by: usePolarsExpressionSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const applyExpression = async () => {
     if (!nodeId || !serializedRequest) return;
     setIsApplying(true);

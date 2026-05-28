@@ -8,9 +8,11 @@ describe('executeAnalysisRunOrUpdate', () => {
 
     await executeAnalysisRunOrUpdate({
       hasLockedParameterChanges: true,
+      /** Called by: executeAnalysisRunOrUpdate when locked parameters changed because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
       clearResults: async () => {
         events.push('clear');
       },
+      /** Called by: executeAnalysisRunOrUpdate after optional clear completes because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
       runFreshAnalysis: async () => {
         events.push('run');
       },

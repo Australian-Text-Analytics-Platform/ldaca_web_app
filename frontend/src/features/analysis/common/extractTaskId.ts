@@ -3,8 +3,7 @@
  * stores it via `setLocalTaskId` so that `resolveTaskId()` can return it
  * without falling back to slower server queries.
  *
- * Every analysis task-flow hook should call this immediately after a
- * successful submit/search API call.
+ * Called by: analysis task-flow hooks immediately after successful submit/search API calls because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
  */
 export function extractAndSetTaskId(
   response: unknown,

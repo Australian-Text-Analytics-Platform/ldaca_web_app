@@ -11,6 +11,10 @@ const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
   'days',
   'weeks',
 ];
+// Narrows unknown snapshot request values to the custom interval units supported by the UI.
+/**
+ * Called by: useSequentialResultSummary hook during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ */
 const isCustomIntervalUnit = (value: unknown): value is SequentialCustomIntervalUnit =>
   typeof value === 'string' &&
   VALID_CUSTOM_INTERVAL_UNITS.includes(value as SequentialCustomIntervalUnit);
@@ -58,6 +62,10 @@ interface Fallbacks {
  *
  * Replaces ~30 lines of `((results?.analysis_params as Record<…>)?.X)
  * ?? localValue` plumbing previously inlined in SequentialAnalysisFeature.
+ */
+/**
+ * Used by: SequentialAnalysisResultsPanel.tsx, SequentialAnalysisFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export const useSequentialResultSummary = (
   results: ResultLike | null | undefined,

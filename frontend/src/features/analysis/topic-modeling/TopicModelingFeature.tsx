@@ -53,6 +53,11 @@ import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocu
 const DEFAULT_TOPIC_SIZE_VALUE = 20;
 type TopicModelingRequest = TopicModelingRequestInput;
 
+/** Renders the topic-modeling workflow for live BERTopic runs and saved snapshot views. */
+/**
+ * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
@@ -177,6 +182,8 @@ const TopicModelingFeature: React.FC = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef,
+    // Loads the latest topic-modeling result for polling and task resumption.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
       const { data } = await topicModelingTaskResult({
         headers,
@@ -185,6 +192,8 @@ const TopicModelingFeature: React.FC = () => {
       });
       return data;
     },
+    // Retrieves the submitted request so hydration can restore parameter and lock state.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
       const { data } = await topicModelingTaskRequest({
         headers,
@@ -193,6 +202,8 @@ const TopicModelingFeature: React.FC = () => {
       });
       return data;
     },
+    // Applies freshly fetched task results and surfaces failed/successful status messages.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onResultFetched: (resultData) => {
       setResultSafely(resultData);
       if (resultData.state === 'failed') {
@@ -201,6 +212,8 @@ const TopicModelingFeature: React.FC = () => {
         setError(null);
       }
     },
+    // Rebuilds live result state from a hydrated task payload after reload.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onHydratedResult: (resultData) => {
       if (!resultData) return;
       setResultSafely(resultData);
@@ -210,6 +223,8 @@ const TopicModelingFeature: React.FC = () => {
         setError(null);
       }
     },
+    // Restores selected nodes, columns, and topic parameters from the stored request.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedRequest: async (requestPayload) => {
       const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown>;
       if (!req) return;
@@ -240,18 +255,33 @@ const TopicModelingFeature: React.FC = () => {
         } catch { /* ignore */ }
       }
     },
+    // Clears topic-specific result and error state after the shared lifecycle deletes results.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onCleared: () => {
       setResultSafely(null);
       setError(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
+    // Removes completed topic tasks from the global task list after clear/delete operations.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     pruneGlobalTasks: (taskIds) =>
       setTasks((prev: TaskItem[]) => Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev),
+    // Finds task ids embedded in result metadata for status recovery.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getExtraTaskIdCandidates: () => [(resultRef.current as TopicModelingResponse | null)?.metadata?.task_id],
+    // Finds task ids embedded in result metadata for clear operations.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getClearTaskIdSources: () => [(resultRef.current as TopicModelingResponse | null)?.metadata?.task_id],
+    // Treats hydrated running results as active tasks for shared banner/action state.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     isResultRunning: (r) => r?.state === 'running',
   });
 
+  // Computes default per-corpus sampling controls from selected node row counts.
+  /**
+   * Called by: TopicModelingFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+     * Flow: read the first two selected node row counts, compute a rounded sample percent capped at 100, then enable sampling only below full corpus.
+   */
   const computeDefaultCorpusSamples = (): CorpusSample[] =>
     panelSelectedNodes.slice(0, 2).map((node) => {
       const nDocs = (node as { shape?: number[] }).shape?.[0] ?? 0;
@@ -260,6 +290,10 @@ const TopicModelingFeature: React.FC = () => {
       return { percent: String(autoPercent), enabled: autoPercent < 100 };
     });
 
+  // Clears live topic results while preserving user-tuned sampling only when explicitly set.
+  /**
+   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleClear = async () => {
     if (inSnapshotMode) return;
     setIsClearing(true);
@@ -282,6 +316,10 @@ const TopicModelingFeature: React.FC = () => {
     setIsClearing(false);
   };
 
+  // Switches between min-topic-size and exact-topic target modes for the next run.
+  /**
+   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleTopicSizeModeChange = (mode: 'min' | 'exact') => {
     setTopicSizeMode(mode);
     setTopicSizeUserSet(false);
@@ -290,6 +328,10 @@ const TopicModelingFeature: React.FC = () => {
     }
   };
 
+  // Records the next-run topic size value and keeps the exact-topic reference in sync.
+  /**
+   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleTopicSizeValueChange = (value: number) => {
     setTopicSizeValue(value);
     setTopicSizeUserSet(true);
@@ -298,6 +340,10 @@ const TopicModelingFeature: React.FC = () => {
     }
   };
 
+  // Toggles topics selected for detach/export workflows.
+  /**
+   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleToggleTopicSelection = (id: number) => {
     setSelectedTopicIds((prev) => {
       const next = new Set(prev);
@@ -307,6 +353,10 @@ const TopicModelingFeature: React.FC = () => {
     });
   };
 
+  // Clears the current topic selection set.
+  /**
+   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleClearTopicSelection = () => {
     setSelectedTopicIds(new Set());
   };
@@ -321,6 +371,10 @@ const TopicModelingFeature: React.FC = () => {
   useEffect(()=>{
     const el = chartRef.current;
     if(!el) return;
+    // Debounces resize observer updates into a stable chart width state.
+    /**
+     * Called by: TopicModelingFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+     */
     const updateChartWidth = (width: number) => {
       const nextWidth = Math.round(width);
       if (!nextWidth) return;
@@ -389,6 +443,9 @@ const TopicModelingFeature: React.FC = () => {
   // sample_fractions diff: server stores `null` (or absent) when sampling
   // is disabled per corpus; mirror that shape so the comparison is stable
   // across "no sampling specified" vs "explicit 100%".
+  /**
+   * Called by: TopicModelingFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const normalizeSampleFractions = (raw: unknown, nodeCount: number): (number | null)[] => {
     const list = Array.isArray(raw) ? raw : [];
     return Array.from({ length: nodeCount }, (_, idx) => {
@@ -422,6 +479,8 @@ const TopicModelingFeature: React.FC = () => {
         panelNodeIds.length,
       ),
     },
+    // Extracts comparable server-side parameters from the stored topic-modeling request.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getServerParams: (request) => ({
       random_seed: Number(request.random_seed),
       topic_size_mode: request.topic_size_mode ?? 'exact',
@@ -512,6 +571,10 @@ const TopicModelingFeature: React.FC = () => {
     });
   }, [inSnapshotMode, loadedSnapshot]);
 
+  // Updates a node's selected text column and persists it as the document column preference.
+  /**
+   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked || inSnapshotMode) return;
     setNodeColumnSelection(nodeId, column);
@@ -735,6 +798,10 @@ const TopicModelingFeature: React.FC = () => {
     handleResetZoom,
   });
 
+  // Runs a fresh topic-modeling task or updates a locked task after parameter changes.
+  /**
+   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleRunOrUpdate = async () => {
     if (inSnapshotMode) return;
     // Promote this tab's pending temp colours to assigned — Run is the
@@ -747,6 +814,11 @@ const TopicModelingFeature: React.FC = () => {
     });
   };
 
+  // Re-aggregates a completed exact-topic result without changing the next-run parameter input.
+  /**
+   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const handleUpdateExactTopicCount = async (value: number) => {
     if (inSnapshotMode) return;
     if (topicSizeMode !== 'exact') return;
@@ -790,6 +862,10 @@ const TopicModelingFeature: React.FC = () => {
   // ----- Snapshot capture + load wiring -----
   const handleOpenSnapshot = useTopicModelingSnapshotLoad();
 
+  // Reads the row count from a selected node for snapshot eligibility checks.
+  /**
+   * Called by: TopicModelingFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const getTopicNodeRowCount = (node: WorkspaceNodeLike) => {
     const shape = node.shape as unknown;
     if (Array.isArray(shape) && typeof shape[0] === 'number') return shape[0];

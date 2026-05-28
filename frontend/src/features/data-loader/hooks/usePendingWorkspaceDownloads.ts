@@ -10,6 +10,11 @@ type PendingDownload = {
   workspaceName: string;
 };
 
+/**
+ * Removes one workspace download from the pending map without mutating the
+ * previous state object. The download hook uses this after success/failure.
+ * Used by: local callers in data-loader/usePendingWorkspaceDownloads module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const omitPendingDownload = (
   pendingDownloads: Record<string, PendingDownload>,
   workspaceId: string,
@@ -29,6 +34,14 @@ export type PendingWorkspaceDownloadsHandle = {
   isPending: (workspaceId: string) => boolean;
 };
 
+/**
+ * Tracks asynchronous workspace ZIP downloads. The workspace manager uses this
+ * handle to start downloads and to disable rows while backend tasks prepare
+ * artifacts.
+ * Used by: WorkspaceManagerCard component, DataLoaderFeature module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: track workspace download ids, poll progress for active entries, surface
+ * completion/errors through notifications, and provide progress handles to the workspace card.
+ */
 export function usePendingWorkspaceDownloads({
   authHeaders,
   notify,
@@ -37,6 +50,10 @@ export function usePendingWorkspaceDownloads({
   const [startingWorkspaceId, setStartingWorkspaceId] = useState<string | null>(null);
   const [pendingDownloads, setPendingDownloads] = useState<Record<string, PendingDownload>>({});
 
+  /**
+   * Starts artifact generation for a workspace and records the returned task id
+   * so the hook can complete the download when the task stream reports success.
+   */
   const startDownload = useCallback(
     async (workspaceId: string, workspaceName: string) => {
       try {
@@ -58,10 +75,18 @@ export function usePendingWorkspaceDownloads({
     [authHeaders, notify],
   );
 
+    /**
+     * Clears a pending workspace entry after the download task resolves or
+     * fails.
+     */
     const dismissPendingDownload = useCallback((workspaceId: string) => {
       setPendingDownloads((prev) => omitPendingDownload(prev, workspaceId));
     }, []);
 
+    /**
+     * Fetches the generated ZIP artifact and saves it locally once the backend
+     * task reaches `successful`.
+     */
     const completePendingDownload = useCallback(
       async (workspaceId: string, taskId: string, workspaceName: string) => {
         dismissPendingDownload(workspaceId);
@@ -83,6 +108,10 @@ export function usePendingWorkspaceDownloads({
       [authHeaders, dismissPendingDownload, notify],
     );
 
+    /**
+     * Reports failed/cancelled workspace artifact tasks and removes their row
+     * from the pending download map.
+     */
     const failPendingDownload = useCallback(
       (workspaceId: string, message: string | undefined) => {
         dismissPendingDownload(workspaceId);
@@ -108,10 +137,12 @@ export function usePendingWorkspaceDownloads({
     }, [tasks, pendingDownloads, completePendingDownload, failPendingDownload]);
 
   const isStarting = useCallback(
+    /** Reports whether a given workspace row is currently starting a download. */
     (workspaceId: string) => startingWorkspaceId === workspaceId,
     [startingWorkspaceId],
   );
   const isPending = useCallback(
+    /** Reports whether a given workspace row already has a pending artifact task. */
     (workspaceId: string) => Boolean(pendingDownloads[workspaceId]),
     [pendingDownloads],
   );

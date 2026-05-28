@@ -14,6 +14,8 @@ export type NodeLike = Record<string, unknown> & {
   unique_id?: string;
 };
 
+/** Resolves the backend node id from graph, table, or legacy node payload shapes. */
+/** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const resolveNodeId = (node: NodeLike | null | undefined, fallbackIndex: number): string | null => {
   if (!node) return null;
   const candidates = [
@@ -49,6 +51,10 @@ export interface UseNodeColumnInfosResult {
  * caching, and invalidation flow through the TanStack client used
  * everywhere else in the app.
  */
+/**
+ * Used by: src/features/analysis/ai-annotator/AiAnnotatorFeature.tsx, src/features/analysis/common/useAnalysisLockMachine.ts, src/features/analysis/concordance/ConcordanceFeature.tsx and 3 other importers because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Flow: resolve node ids, issue node-info queries, build a typed column cache, then return a fallback-aware getter and loading flag.
+ */
 export const useNodeColumnInfos = (
   params: {
     workspaceId?: string | null;
@@ -81,6 +87,8 @@ export const useNodeColumnInfos = (
     return cache;
   }, [nodeIds, results]);
 
+  /** Returns typed cached columns when available, otherwise derives from the node snapshot. */
+  /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
   const getColumnInfos = (node: NodeLike | null | undefined, idx = 0): ColumnInfo[] => {
     const nodeId = resolveNodeId(node, idx);
     if (!nodeId) return [];

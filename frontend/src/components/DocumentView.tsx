@@ -22,6 +22,7 @@ type NavigationState = {
   currentTarget: DocumentTarget | null;
 };
 
+/** Document viewer defaults keyed by modal type for help/info/reference routes. */
 const DOC_CONFIG: Record<DocumentType, { title: string; defaultFile: string }> = {
   tutorial: { title: 'LDaCA Tutorial', defaultFile: 'tutorials/index.md' },
   warning: { title: 'LDaCA Warnings', defaultFile: 'warnings/index.md' },
@@ -29,6 +30,7 @@ const DOC_CONFIG: Record<DocumentType, { title: string; defaultFile: string }> =
   reference: { title: 'LDaCA References', defaultFile: 'references/index.md' },
 };
 
+/** Called by: DocumentView link handlers when resolving local markdown hrefs because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const normalizePath = (input: string): string => {
   const segments = input.split('/');
   const stack: string[] = [];
@@ -43,11 +45,13 @@ const normalizePath = (input: string): string => {
   return stack.join('/');
 };
 
+/** Called by: DocumentView markdown anchor rendering to identify links that should leave the modal because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 const isExternalLink = (href?: string | null): boolean => {
   if (!href) return false;
   return /^(https?:)?\/\//i.test(href) || href.startsWith('mailto:') || href.startsWith('tel:');
 };
 
+/** Called by: resolveDocUrl when bundled docs need desktop/web base-path resolution because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const resolveLocalDocUrl = (requestedFile: string): string => {
   if (typeof window === 'undefined') {
     return requestedFile;
@@ -71,14 +75,10 @@ const resolveLocalDocUrl = (requestedFile: string): string => {
 };
 
 /**
- * Resolve a requested doc file to a fetchable URL.
- *
- * - Files in `BUNDLED_FILES` always resolve locally (`public/<file>`), so
- *   offline / bundled-fallback paths keep working without a network hop.
- * - When `VITE_DOCS_BASE_URL` is set and the file is NOT bundled, it's
- *   resolved against the remote base URL.
- * - When `VITE_DOCS_BASE_URL` is unset, every file resolves locally —
- *   matches the pre-migration behavior.
+ * Resolves a requested doc file to the URL fetched by `DocumentView`.
+ * Bundled files stay local for desktop/offline use, while optional remote docs
+ * can be served from `VITE_DOCS_BASE_URL` without changing document links.
+ * Called by: DocumentView's markdown-loading effect because the caller needs one documented boundary for the lookup, event, or state handoff step.
  */
 const resolveDocUrl = (requestedFile: string): string => {
   if (BUNDLED_FILES.has(requestedFile)) {
@@ -96,6 +96,14 @@ const resolveDocUrl = (requestedFile: string): string => {
   return resolveLocalDocUrl(requestedFile);
 };
 
+/**
+ * Markdown document reader used by help dialogs and standalone documentation
+ * routes. It owns loading, intra-doc navigation, anchor highlighting, and zoom
+ * controls so the help icons can open the same viewer for tutorials, warnings,
+ * information, and references.
+ * Why: all help/reference entry points need one markdown viewer that works for bundled, remote, modal, and standalone docs.
+ * Flow: resolve the active document target, fetch markdown with build placeholders, sync anchors and zoom state, then render markdown navigation controls.
+ */
 const DocumentView: React.FC<{
   docType: DocumentType;
   onClose?: () => void;
@@ -116,13 +124,21 @@ const DocumentView: React.FC<{
   const activeAnchor = currentTarget?.anchor ?? null;
   const missingAnchorRef = useRef<string | null>(null);
 
+  /** Called by: DocumentView zoom controls to keep scale within readable bounds because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const clamp = (v: number) => Math.min(2, Math.max(0.5, v));
+  /** Called by: DocumentView Zoom in button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const zoomIn = () => setZoom((z) => clamp(parseFloat((z + 0.1).toFixed(2))));
+  /** Called by: DocumentView Zoom out button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const zoomOut = () => setZoom((z) => clamp(parseFloat((z - 0.1).toFixed(2))));
+  /** Called by: DocumentView reset button and keyboard reset action because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const zoomReset = () => setZoom(1);
 
   useEffect(() => {
     let cancelled = false;
+    /**
+     * Called by: DocumentView's markdown-loading effect whenever the selected file changes because the caller needs one documented boundary for the lookup, event, or state handoff step.
+      * Flow: derive the requested doc URL, fetch markdown without cache, replace build placeholders, then update content/error/loading if still mounted.
+     */
     const load = async () => {
       setLoading(true);
       setError(null);
@@ -179,14 +195,29 @@ const DocumentView: React.FC<{
     return () => window.clearTimeout(timeoutId);
   }, [activeAnchor, error, loading]);
 
+  /**
+   * Markdown render overrides used by `ReactMarkdown` for safe image sizing and in-modal doc links.
+    * Why: bundled docs should keep internal links inside the viewer while external links retain normal browser behavior.
+    * Flow: constrain image sizing and alt text, rewrite internal markdown anchors to viewer state, then leave external links opening safely.
+   */
   const markdownComponents: Components = {
+    /** Called by: ReactMarkdown when rendering markdown image nodes inside DocumentView because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
     img: ({ node: _node, className, alt, ...props }) => {
       const mergedClassName = ['max-w-full h-auto', className].filter(Boolean).join(' ');
       const resolvedAlt = typeof alt === 'string' ? alt : '';
       return <img {...props} className={mergedClassName.trim()} alt={resolvedAlt} />;
     },
+    /**
+     * Rewrites markdown anchors so document consumers stay inside the modal navigation flow.
+     * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
+      * Flow: resolve relative markdown hrefs against the current file, route internal `.md` links through navigation state, and pass external links through.
+     */
     a: ({ node: _node, children, href, target: linkTarget, rel, ...props }) => {
       const baseFile = currentTarget?.file ?? config.defaultFile;
+      /**
+       * Called by: the markdown anchor onClick prop to route internal links through DocumentView state because the interaction needs a single handler that validates state, runs the action, and updates feedback.
+        * Flow: parse the clicked href path/hash, resolve the next markdown file, prevent default navigation, then store the next file/anchor target.
+       */
       const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
         if (!href || isExternalLink(href)) return;
         const [rawPath, rawHash] = href.split('#');
@@ -225,7 +256,12 @@ const DocumentView: React.FC<{
   };
 
   useEffect(() => {
+    /** Called by: DocumentView keyboard listener to mirror header zoom bounds because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
     const clampZoom = (v: number) => Math.min(2, Math.max(0.5, v));
+    /**
+     * Called by: the window keydown listener registered by DocumentView because the interaction needs a single handler that validates state, runs the action, and updates feedback.
+      * Flow: detect Ctrl/Cmd zoom keys, clamp zoom in/out or reset, then ignore unrelated keyboard events.
+     */
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom((z) => clampZoom(parseFloat((z + 0.1).toFixed(2)))); }

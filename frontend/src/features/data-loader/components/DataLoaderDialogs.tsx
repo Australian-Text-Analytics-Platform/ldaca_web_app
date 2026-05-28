@@ -50,12 +50,23 @@ const LDACA_SEARCH_METHODS = Object.keys(LDACA_SEARCH_METHOD_LABELS) as LdacaSea
 const ALL_FILTER_VALUE = 'all';
 const LDACA_PORTAL_COLLECTION_URL = 'https://data.ldaca.edu.au/collection';
 
+/**
+ * Normalizes varied Oni record statistic values for the small metadata cards
+ * shown inside each LDaCA search result.
+ * Used by: local callers in data-loader/DataLoaderDialogs module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 function formatLdacaStat(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ');
   if (value === undefined || value === null) return '';
   return String(value);
 }
 
+/**
+ * Builds filter menu options from loaded records. The LDaCA import dialog uses
+ * it so collection/file-format filters reflect the current search result set.
+ * Used by: local callers in data-loader/DataLoaderDialogs module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Flow: collect unique metadata values across records, preserve first-seen uniqueness in a set, then return locale-sorted option labels.
+ */
 function ldacaFilterOptions(records: LdacaSearchResult[], field: 'collections' | 'file_formats') {
   const seen = new Set<string>();
   const values: string[] = [];
@@ -70,14 +81,29 @@ function ldacaFilterOptions(records: LdacaSearchResult[], field: 'collections' |
   return values.sort((first, second) => first.localeCompare(second));
 }
 
+/**
+ * Applies the dialog's all-or-specific filter convention to record metadata.
+ * Search-result filtering and staff-pick rendering share this helper.
+ * Used by: local callers in data-loader/DataLoaderDialogs module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 function matchesLdacaFilter(values: string[] | undefined, selectedValue: string) {
   return selectedValue === ALL_FILTER_VALUE || (values ?? []).includes(selectedValue);
 }
 
+/**
+ * Keeps long collection/format labels readable in select menus used by the
+ * LDaCA search filters.
+ * Used by: local callers in data-loader/DataLoaderDialogs module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 function formatLdacaFilterLabel(value: string) {
   return value.length > 64 ? `${value.slice(0, 61)}...` : value;
 }
 
+/**
+ * Produces a stable portal URL for an Oni record. `LdacaRecordCard` uses this
+ * so users can inspect the source collection before importing it.
+ * Used by: local callers in data-loader/DataLoaderDialogs module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 function ldacaRecordUrl(record: LdacaSearchResult) {
   const identifier = record.crate_id || record.id;
   if (/^https?:\/\//i.test(identifier)) return identifier;
@@ -87,6 +113,13 @@ function ldacaRecordUrl(record: LdacaSearchResult) {
   return `${LDACA_PORTAL_COLLECTION_URL}?id=${encodedIdentifier}&_crateId=${encodedCrateId}`;
 }
 
+/**
+ * Displays one LDaCA collection result with import affordances. The import
+ * dialog uses it for both staff picks and search results.
+ * Rendered by: data-loader/DataLoaderDialogs module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: render record metadata, expose import disabled/busy state, and surface
+ * collection/file-format context so the dialog can import a selected ONI record.
+ */
 function LdacaRecordCard({
   record,
   importingId,
@@ -233,6 +266,14 @@ export type DataLoaderDialogsProps = {
   };
 };
 
+/**
+ * Collects the modal/dialog surfaces owned by the Data Loader. The feature
+ * passes state and callbacks here so destructive confirmations, token entry,
+ * folder creation, citation viewing, and Oni imports stay visually colocated.
+ * Rendered by: useFolderCreation hook, useDataLoaderWorkspaceActions hook, DataLoaderFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: render each modal from hook-owned state, wire form fields to hook setters, then
+ * delegate confirmations/import/search actions back to DataLoaderFeature hooks.
+ */
 export const DataLoaderDialogs: React.FC<DataLoaderDialogsProps> = ({
   noWorkspaceAlert,
   workspaceNameAlert,
@@ -258,6 +299,11 @@ export const DataLoaderDialogs: React.FC<DataLoaderDialogsProps> = ({
   const listTitle = showingSearchResults ? 'Search Results' : 'Staff Picks';
   const listRecords = showingSearchResults ? filteredSearchResults : ldacaImport.featuredRecords;
   const listLoading = showingSearchResults ? ldacaImport.searching : ldacaImport.featuredLoading;
+  /**
+   * Toggles between deleting an existing Oni token and opening the save-token
+   * dialog. The token button is the only control that owns that branch.
+   * Called by: DataLoaderDialogs internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleLdacaTokenClick = () => {
     if (ldacaImport.hasToken) {
       ldacaImport.onTokenDelete();
@@ -269,6 +315,11 @@ export const DataLoaderDialogs: React.FC<DataLoaderDialogsProps> = ({
     setTokenDialogOpen(true);
   };
 
+  /**
+   * Resets token draft state when the Radix dialog closes so later opens start
+   * from a clean form.
+   * Called by: DataLoaderDialogs internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleTokenDialogOpenChange = (open: boolean) => {
     setTokenDialogOpen(open);
     if (!open) {
@@ -277,6 +328,11 @@ export const DataLoaderDialogs: React.FC<DataLoaderDialogsProps> = ({
     }
   };
 
+  /**
+   * Validates and forwards the Oni token form submission to the parent-owned
+   * preference action used by `DataLoaderFeature`.
+   * Called by: DataLoaderDialogs internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleTokenSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedToken = tokenDraft.trim();

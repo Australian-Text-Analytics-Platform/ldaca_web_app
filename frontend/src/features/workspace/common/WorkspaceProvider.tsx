@@ -19,6 +19,8 @@ import {
  * Internally everything still flows through `useWorkspaceInternal` so the
  * sub-hooks (core / queries / mutations) keep their orchestration in one
  * place; the provider's only job is to fan-out into the four contexts.
+ * Rendered by: App module, WorkspaceContext module, useWorkspaceNodeMutations hook (rg call sites/imports) because the app shell needs one provider boundary for workspace state.
+ * Flow: composed hooks build data, selection, status, and action slices so descendants subscribe only to the workspace state they use.
  */
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const ws = useWorkspaceInternal();

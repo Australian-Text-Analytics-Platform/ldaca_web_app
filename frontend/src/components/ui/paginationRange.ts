@@ -7,15 +7,11 @@
 export type PaginationRangeItem = number | "dots";
 
 /**
- * Build a compact list of page numbers (and "dots" markers) to display.
- *
- * When `totalPages` is known the algorithm keeps the first and last pages
- * plus a small window around the current page. When the total is **not**
- * known (server-side analysis features that paginate by source-row), we
- * fall back to a simpler heuristic driven by `hasNext`.
- *
- * Consolidated home for the formerly-duplicated implementations in
- * `AnalysisPagination.tsx` and `ServerTablePagination.tsx`.
+ * Builds compact page ranges for pagination components. Analysis tables and
+ * server-row paginators use it to share first/last/current-window behavior
+ * while still supporting unknown totals via `hasNext`.
+ * Called by: AnalysisPagination and ServerTablePagination before rendering page controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+ * Flow: emit first/last/current-window pages with dots for known totals, or emit a current-window plus trailing dots when unknown totals still have next pages.
  */
 export const buildPaginationRange = (
   current: number,

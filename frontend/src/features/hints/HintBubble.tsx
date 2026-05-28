@@ -22,6 +22,14 @@ interface Position {
 const BUBBLE_GAP = 12;
 const VIEWPORT_MARGIN = 12;
 
+/**
+ * Computes a viewport-safe position for the visible hint bubble. `HintBubble`
+ * uses it after measuring the target and bubble so coach marks stay attached
+ * to their controls without clipping off-screen.
+ * Used by: local callers in hints/HintBubble module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Steps: measure bubble and target rectangles, choose a side that fits the viewport, clamp
+ * coordinates, and return arrow offsets for the bubble.
+ */
 function computePosition(
   rect: DOMRect,
   bubbleRect: { width: number; height: number },
@@ -85,6 +93,9 @@ function computePosition(
  * target element. Uses fixed positioning + viewport math; intentionally
  * lightweight so it composes with our existing dialogs without focus-trap
  * or pointer-event conflicts.
+ * Rendered by: HintsController module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: compute position from target and tick, render text/actions/dismiss controls, and
+ * remeasure when the anchor or viewport changes.
  */
 export const HintBubble: React.FC<HintBubbleProps> = ({
   hint,
@@ -100,6 +111,11 @@ export const HintBubble: React.FC<HintBubbleProps> = ({
 
   useEffect(() => {
     let raf = 0;
+    /**
+     * Positions the bubble beside the target after layout and viewport changes.
+     * Called by: HintBubble internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     * Flow: schedule measurement in animation frame, skip detached anchors, measure fallback bubble bounds, and commit computed placement.
+     */
     const measure = () => {
       raf = requestAnimationFrame(() => {
         const rect = target.getBoundingClientRect();

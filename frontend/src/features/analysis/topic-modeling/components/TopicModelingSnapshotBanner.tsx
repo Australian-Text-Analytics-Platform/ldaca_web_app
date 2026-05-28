@@ -5,9 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useSnapshotViewStore } from '@/features/snapshot-view';
 
 /**
- * Snapshot mode banner for topic-modeling. Mirrors the other tool
+ * Rendered by: TopicModelingFeature. Snapshot mode banner for topic-modeling. Mirrors the other tool because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * banners — see the family doc / ConcordanceSnapshotBanner for design
  * rationale.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const TopicModelingSnapshotBanner: React.FC = () => {
   const snapshot = useSnapshotViewStore((s) => s.snapshots.topic_modeling);

@@ -45,6 +45,8 @@ export type PartialRemoteRegistry = {
   meta?: RegistryMeta;
 };
 
+/** Overlays remote doc targets on top of the bundled fallback while preserving offline entries. */
+/** Used by: useRegistryStore in the tutorials module because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
 const mergeBundledWithRemote = (remote: PartialRemoteRegistry | null): RegistryShape => ({
   tutorial: { ...BUNDLED_REGISTRY.tutorial, ...(remote?.tutorial ?? {}) },
   info: { ...BUNDLED_REGISTRY.info, ...(remote?.info ?? {}) },
@@ -57,6 +59,10 @@ export const useRegistryStore = create<State & Actions>((set) => ({
   meta: null,
   lastFetchedAt: null,
   remoteAttempted: false,
+  /**
+   * Applies remote docs data once per load attempt so modal consumers can repaint if needed.
+   * Why: documentation consumers need one registry path for bundled, cached, and remote content.
+   */
   applyRemote: (payload) =>
     set(() => ({
       registry: mergeBundledWithRemote(payload),

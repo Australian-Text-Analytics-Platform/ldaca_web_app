@@ -2,6 +2,8 @@ import { useAnalysisStore, isPendingTaskState, isTerminalTaskState } from '../st
 import type { TaskItem } from '../stores/analysisStore';
 import { getTaskTypeCandidates } from './analysisTaskUtils';
 
+/** Normalizes backend timestamp variants so streamed and fetched tasks sort together. */
+/** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const normalizeTimestamp = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -15,12 +17,16 @@ const normalizeTimestamp = (value: unknown): number => {
   return 0;
 };
 
+/** Picks the freshest timestamp available on a task, including stream-only event metadata. */
+/** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const getTaskTimestamp = (task?: TaskItem | null) => {
   const anyTask = task as (TaskItem & { __event_timestamp?: unknown }) | undefined | null;
   return normalizeTimestamp(anyTask?.__event_timestamp) ||
     normalizeTimestamp(task?.updated_at ?? task?.finished_at ?? task?.started_at ?? task?.created_at ?? 0);
 };
 
+/** Breaks timestamp ties using task-stream event order when events arrive in the same millisecond. */
+/** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const getTaskEventSequence = (task?: TaskItem | null) => {
   const anyTask = task as (TaskItem & { __event_sequence?: unknown }) | undefined | null;
   return typeof anyTask?.__event_sequence === 'number' && Number.isFinite(anyTask.__event_sequence)
@@ -42,6 +48,11 @@ export interface AnalysisTaskStatus {
   bannerMessage?: string;
 }
 
+/** Summarizes the latest task state for an analysis feature's banners and result panels. */
+/**
+ * Used by: src/features/analysis/common/hooks/useMaterializeLifecycle.ts, src/features/analysis/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Flow: expand task-type aliases, filter and sort stored tasks by timestamp/event order, then expose active, terminal, and banner task summaries.
+ */
 export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTaskStatus => {
   const tasks = useAnalysisStore((state) => state.tasks);
   const candidateTypes = Array.isArray(taskType)

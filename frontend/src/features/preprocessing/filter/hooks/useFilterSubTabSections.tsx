@@ -125,6 +125,10 @@ interface CategoricalOptionEntry {
 
 const NULL_OPTION_KEY = '__LDACA_NULL__';
 
+/**
+ * Normalizes backend unique values into primitives the checklist can compare.
+ * Used by: local callers in preprocessing/useFilterSubTabSections module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const toCategoricalPrimitive = (value: unknown): CategoricalPrimitive => {
   if (value === null) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -136,16 +140,31 @@ const toCategoricalPrimitive = (value: unknown): CategoricalPrimitive => {
   return String(value);
 };
 
+/**
+ * Creates collision-resistant keys for categorical checklist selections.
+ * Used by: local callers in preprocessing/useFilterSubTabSections module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const getCategoricalOptionKey = (value: CategoricalPrimitive): string => {
   if (value === null) return NULL_OPTION_KEY;
   return `${typeof value}::${String(value)}`;
 };
 
+/**
+ * Picks the first supported operator for a column type when rows are created.
+ * Used by: local callers in preprocessing/useFilterSubTabSections module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const getDefaultOperatorForType = (dataType: string): FilterCondition['operator'] => {
   const operators = getOperatorsForType(dataType);
   return (operators[0]?.value as FilterCondition['operator']) ?? 'eq';
 };
 
+/**
+ * Builds deduplicated checklist options from `getColumnUniqueValues`. The
+ * categorical renderer uses these entries to preserve null handling and labels.
+ * Used by: local callers in preprocessing/useFilterSubTabSections module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Steps: convert backend unique values to comparable primitives, deduplicate by type-aware key,
+ * prepend null when present, and preserve display labels.
+ */
 const buildCategoricalOptionEntries = (
   rawValues: unknown[],
   hasNullFromResponse: boolean,
@@ -182,6 +201,13 @@ const buildCategoricalOptionEntries = (
   return optionList;
 };
 
+/**
+ * Owns the Filter sub-tab state and backend request wiring. `FilterSubTab`
+ * consumes this hook for condition editing, preview fallback, and apply state.
+ * Used by: FilterValueChecklist component, FilterSubTab module, ConditionBuilder component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: derive selected nodes/schema, manage condition rows and categorical options, prefill
+ * typed inputs, request previews, and apply complete filter payloads.
+ */
 export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubTabSectionsResult => {
   const {
     selectedNodeId,
@@ -267,10 +293,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     return node ? [node] : [];
   })();
 
-  // Identity stability: used in useEffect dependency array via ensureCategoricalOptions
+  /** Keys cached categorical options by workspace, node, and column. */
   const getCategoricalKey = useCallback((column: string) => `${currentWorkspaceId ?? 'none'}::${selectedNodeId ?? 'none'}::${column}`, [currentWorkspaceId, selectedNodeId]);
 
-  // Identity stability: used in useEffect dependency array
+  /**
+   * Loads categorical/list-string values on demand for checklist conditions.
+   * Condition changes and retry buttons call this to populate option state.
+   */
   const ensureCategoricalOptions = useCallback(async (column: string, dataType: string) => {
       if (!currentWorkspaceId || !selectedNodeId || !column) {
         return;
@@ -335,7 +364,15 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
 
   const filterNodeSelections: NodeColumnSelection[] = selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : [];
 
+    /**
+     * Placeholder color handler because the filter panel uses one fixed color.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow.
+     */
   const handleFilterColorChange = () => undefined;
+    /**
+     * Placeholder column handler because filter columns are edited in conditions.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow.
+     */
   const handleFilterColumnChange = () => undefined;
 
   useEffect(() => {
@@ -402,6 +439,12 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
 
+    /**
+     * Adds a new filter condition seeded from the first available column.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+      * Steps: pick the first column, choose its default operator/value, create a stable row id,
+      * and append the new condition.
+     */
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
     const defaultOperator = firstColumn ? getDefaultOperatorForType(firstColumn.dataType) : 'eq';
@@ -419,6 +462,10 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     setConditions([...conditions, newCondition]);
   };
 
+    /**
+     * Removes a condition row and its associated checklist search state.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handleRemoveCondition = (id: string) => {
     if (conditions.length > 1) {
       setConditions(conditions.filter(c => c.id !== id));
@@ -429,6 +476,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
   };
 
+  /**
+   * Updates one condition field while keeping operator defaults, typed values,
+   * and lazy categorical/datetime/numeric prefill in sync.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: normalize a row change, reset incompatible value state when column/operator type
+   * changes, and trigger categorical loading when needed.
+   */
   const handleConditionChange = <Key extends keyof FilterConditionWithId>(
     id: string,
     field: Key,
@@ -529,6 +583,12 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
   };
 
+    /**
+     * Renders row-level filter flags used by string and negated conditions.
+     * Rendered by: useFilterSubTabSections JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
+     * Flow: inspect the condition type/operator, fetch checklist state when relevant, and
+     * render loading/error/search metadata beside the condition.
+     */
   const renderConditionMetadata = (condition: FilterConditionWithId, rowDisabled: boolean) => (
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
       <label className="flex items-center gap-1.5">
@@ -566,14 +626,28 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     </div>
   );
 
+    /**
+     * Categorical/list filters use checklist UI instead of an operator select.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const shouldHideOperatorSelect = (condition: FilterConditionWithId) => (
     condition.dataType === 'categorical' || condition.dataType === 'list_string'
   );
 
+    /**
+     * Supplies type-aware operator options to the shared ConditionBuilder.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const getConditionOperatorOptions = (condition: FilterConditionWithId) => (
     getOperatorsForType(condition.dataType || 'string')
   );
 
+    /**
+     * Prefills datetime filters from column stats to reduce empty preview states.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     * Steps: reuse an existing date/time value when present, otherwise fetch column stats and
+     * seed the condition from backend min/max values.
+     */
   const prefillDatetimeValue = async (
     conditionId: string,
     column: string,
@@ -620,6 +694,12 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
   };
 
+    /**
+     * Prefills numeric range filters from column min/max stats when available.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     * Steps: reuse existing numeric bounds when present, otherwise describe the column and seed
+     * range/equality inputs from backend min/max values.
+     */
   const prefillNumericValue = async (
     conditionId: string,
     column: string,
@@ -659,6 +739,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
   };
 
+  /**
+   * Renders the value editor matching the condition's column type. The shared
+   * ConditionBuilder calls this hook callback for each condition row.
+   * Rendered by: useFilterSubTabSections JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
+   * Flow: choose the control for categorical, range, datetime, boolean, regex, or scalar
+   * conditions, then connect each control to condition updates.
+   */
   const renderConditionValueInput = (condition: FilterConditionWithId, disabled: boolean) => {
     if (disabled) {
       return (
@@ -687,10 +774,18 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       const isLoadingOptions = optionState?.loading ?? false;
       const optionError = optionState?.error ?? null;
 
+            /**
+             * Writes checklist selections back into the condition value field.
+             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+             */
       const updateSelections = (nextSelections: CategoricalPrimitive[]) => {
         handleConditionChange(condition.id, 'value', nextSelections);
       };
 
+            /**
+             * Toggles one categorical/list-string option in the condition value.
+             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+             */
       const toggleValue = (entry: FilterChecklistOption, nextChecked: boolean) => {
         if (disabled) return;
         if (nextChecked) {
@@ -705,11 +800,19 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         }
       };
 
+            /**
+             * Selects all loaded options for the current checklist condition.
+             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+             */
       const handleSelectAll = () => {
         if (disabled) return;
         updateSelections(optionEntries.map((entry) => entry.value));
       };
 
+            /**
+             * Adds only the currently visible search results to the selection.
+             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+             */
       const handleSelectVisible = (visibleOptions: FilterChecklistOption[]) => {
         if (disabled) return;
         const merged = new Map<string, CategoricalPrimitive>(
@@ -721,6 +824,10 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         updateSelections(Array.from(merged.values()));
       };
 
+            /**
+             * Clears all selected values for the current checklist condition.
+             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+             */
       const handleClearAll = () => {
         if (disabled) return;
         updateSelections([]);
@@ -860,6 +967,12 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     );
   };
 
+    /**
+     * Validates and applies the configured filter as a new workspace node.
+     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+      * Steps: require a selected node and complete conditions, serialize the request, call the
+      * filter mutation, and clear loading state.
+     */
   const handleApplyFilter = async () => {
     if (!selectedNodeId) {
       onAlert('Please select a data block first');

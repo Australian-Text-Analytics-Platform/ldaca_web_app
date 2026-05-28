@@ -6,12 +6,16 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
+/** Radix alert dialog root used for confirmation/destructive decision flows. */
 const AlertDialog = AlertDialogPrimitive.Root
 
+/** Alert dialog trigger primitive for callers that let Radix manage opening. */
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger
 
+/** Portal primitive used by alert dialog content to escape normal layout flow. */
 const AlertDialogPortal = AlertDialogPrimitive.Portal
 
+/** Shared alert-dialog backdrop for confirmation modals. */
 const AlertDialogOverlay = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>
@@ -27,6 +31,7 @@ const AlertDialogOverlay = React.forwardRef<
 ))
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
 
+/** Centered alert dialog content used by destructive and confirmation wrappers. */
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
@@ -45,6 +50,7 @@ const AlertDialogContent = React.forwardRef<
 ))
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName
 
+/** Used by: alert-dialog content that renders title and description copy because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 const AlertDialogHeader = ({
   className,
   ...props
@@ -59,6 +65,7 @@ const AlertDialogHeader = ({
 )
 AlertDialogHeader.displayName = "AlertDialogHeader"
 
+/** Used by: alert-dialog content that renders cancel/confirm action rows because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 const AlertDialogFooter = ({
   className,
   ...props
@@ -73,6 +80,7 @@ const AlertDialogFooter = ({
 )
 AlertDialogFooter.displayName = "AlertDialogFooter"
 
+/** Alert dialog title primitive used by confirmation prompts. */
 const AlertDialogTitle = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Title>
@@ -85,6 +93,7 @@ const AlertDialogTitle = React.forwardRef<
 ))
 AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName
 
+/** Alert dialog description primitive used to explain confirmation consequences. */
 const AlertDialogDescription = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Description>
@@ -98,6 +107,7 @@ const AlertDialogDescription = React.forwardRef<
 AlertDialogDescription.displayName =
   AlertDialogPrimitive.Description.displayName
 
+  /** Confirm action button wrapper used by reusable confirmation dialogs. */
 const AlertDialogAction = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Action>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action>
@@ -110,6 +120,7 @@ const AlertDialogAction = React.forwardRef<
 ))
 AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName
 
+/** Cancel action button wrapper used by alert dialogs for non-destructive escape. */
 const AlertDialogCancel = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Cancel>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Cancel>

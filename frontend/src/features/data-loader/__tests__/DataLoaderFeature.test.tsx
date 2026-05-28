@@ -62,10 +62,16 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
+  // Supplies a mutable workspace fixture so each test can exercise loaded and
+  // unloaded Data Loader states without mounting the real workspace provider.
+  // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   useWorkspaceData: () => mockWorkspaceState,
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
+  // Exposes only the workspace actions that this feature test asserts, while
+  // keeping unrelated mutations inert.
+  // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   useWorkspaceActions: () => ({
     createWorkspace: vi.fn(),
     renameWorkspace: vi.fn(),
@@ -78,14 +84,22 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
+  // Keeps workspace cards out of loading state so tests can target controls.
+  // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   useWorkspaceStatus: () => ({
     isLoading: { workspaces: false, currentWorkspace: false },
   }),
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
+  // Provides deterministic auth/data-folder context for generated API calls.
+  // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   useAuth: () => ({
     dataFolder: '/tmp/user_data',
+        /**
+         * Returns empty headers so SDK calls avoid depending on auth setup.
+         * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+         */
     getAuthHeaders: () => ({}),
   }),
 }));
@@ -144,6 +158,9 @@ vi.mock('@/api/generated/sdk.gen', () => ({
 }));
 
 vi.mock('@/hooks/useFiles', () => ({
+  // Supplies a stable file tree with README citation coverage for the Data
+  // Loader browser tests.
+  // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   useFiles: () => ({
     fileTree: mockFileTree,
     selectedFile: null,
@@ -159,23 +176,48 @@ vi.mock('@/hooks/useFiles', () => ({
 }));
 
 vi.mock('@/components/panels', () => ({
+  // The panel internals are covered elsewhere; this suite only needs Data
+  // Loader wiring and file/workspace controls.
+  // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   AddFilePanel: () => null,
+    /**
+     * Keeps preview rendering inert while preserving the feature prop contract.
+     * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+     */
   FilePreviewPanel: () => null,
 }));
 
 vi.mock('@/components/help/HelpIcon', () => ({
+    /**
+     * Replaces help chrome so tests focus on Data Loader behavior.
+     * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+     */
   default: () => null,
 }));
 
 vi.mock('@/components/help/InfoIcon', () => ({
+    /**
+     * Replaces info chrome so tests focus on Data Loader behavior.
+     * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+     */
   default: () => null,
 }));
 
 describe('DataLoaderFeature citation UI', () => {
+  /**
+   * Selects the visible duplicate when responsive/mobile markup leaves more
+   * than one matching control in the test DOM.
+   * Used by: Vitest setup or assertions in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+   */
   const getVisibleMatch = <T extends HTMLElement>(elements: T[]) => {
     return elements.at(-1) ?? elements[0]!;
   };
 
+  /**
+   * Mounts DataLoaderFeature with a QueryClient because sample/LDaCA dialogs use
+   * TanStack Query even in focused feature tests.
+   * Used by: Vitest setup or assertions in data-loader/DataLoaderFeature.
+   */
   const renderWithProviders = (ui: React.ReactElement) => {
     const queryClient = new QueryClient({
       defaultOptions: {

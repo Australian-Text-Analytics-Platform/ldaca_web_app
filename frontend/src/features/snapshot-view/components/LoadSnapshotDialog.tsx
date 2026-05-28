@@ -33,7 +33,11 @@ export interface LoadSnapshotDialogProps {
   onOpenSnapshot?: (filename: string) => Promise<void>;
 }
 
-/** Short human label for a captured-at ISO string. */
+/**
+ * Short human label for a captured-at ISO string.
+   * Used by: local callers in snapshot-view/LoadSnapshotDialog module.
+   * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+   */
 function formatCapturedAt(iso: string): string {
   try {
     const d = new Date(iso);
@@ -55,6 +59,12 @@ interface DecoratedItem {
   compatible: boolean;
 }
 
+/**
+ * Lists saved snapshots for one tool, opens compatible bundles, and manages
+ * per-row or batch deletion flows.
+ * Rendered by: compat module, index module, SnapshotActions component (rg call sites/imports) because feature headers need a shared loader for compatible saved bundles.
+ * Flow: the user chooses a bundle, entries are queried, a mutation parses the selected payload, and feature state hydrates from it.
+ */
 export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
   open,
   onOpenChange,
@@ -74,6 +84,11 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['snapshots-list', tool],
+        /**
+     * Loads the tool-specific snapshot index when the dialog is open.
+         * Called by: useQuery option object inside LoadSnapshotDialog.
+         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+         */
     queryFn: async () => {
       const { data } = await listSnapshots({
         headers: getAuthHeaders(),
@@ -108,6 +123,11 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
 
   // Per-snapshot delete mutation.
   const deleteOneMutation = useMutation({
+        /**
+     * Deletes the row selected by the user from the snapshot store.
+         * Called by: useMutation option object inside LoadSnapshotDialog.
+         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+         */
     mutationFn: async (filename: string) => {
       const { data } = await deleteSnapshot({
         headers: getAuthHeaders(),
@@ -116,11 +136,21 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
       });
       return data;
     },
+        /**
+     * Refreshes the list after a successful row-level delete.
+         * Called by: useMutation option object inside LoadSnapshotDialog.
+         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+         */
     onSuccess: (_res, filename) => {
       toast.success(`Snapshot deleted.`);
       void queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
       void filename;
     },
+        /**
+     * Reports delete failures through the shared toast surface.
+         * Called by: useMutation option object inside LoadSnapshotDialog.
+         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+         */
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Failed to delete snapshots.');
     },
@@ -129,6 +159,11 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
   // Batch delete mutation. The variant decides whether to send
   // `incompatible_with` for the stale-only path.
   const deleteBatchMutation = useMutation({
+        /**
+     * Deletes either stale or all snapshots, depending on the batch action.
+         * Called by: useMutation option object inside LoadSnapshotDialog.
+         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+         */
     mutationFn: async ({ variant }: { variant: 'stale' | 'all' }) => {
       const { data } = await batchDeleteSnapshots({
         headers: getAuthHeaders(),
@@ -137,16 +172,31 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
       });
       return data;
     },
+        /**
+     * Refreshes the snapshot index after the batch delete completes.
+         * Called by: useMutation option object inside LoadSnapshotDialog.
+         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+         */
     onSuccess: (res) => {
       const n = res.deleted.length;
       toast.success(`Deleted ${n} snapshot${n === 1 ? '' : 's'}.`);
       void queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
     },
+        /**
+     * Reports batch delete failures through the shared toast surface.
+         * Called by: useMutation option object inside LoadSnapshotDialog.
+         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+         */
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Failed to delete snapshots.');
     },
   });
 
+    /**
+   * Opens a compatible snapshot or reports that loading is not wired yet.
+     * Called by: LoadSnapshotDialog internal event, effect, or helper flow.
+     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+     */
   const handleOpen = async (filename: string) => {
     if (!onOpenSnapshot) {
       toast.info('Snapshot view coming in the next release.');

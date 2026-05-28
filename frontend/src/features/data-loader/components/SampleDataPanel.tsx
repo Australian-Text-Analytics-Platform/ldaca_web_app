@@ -35,12 +35,23 @@ const TOOL_LABELS: Record<string, string> = {
   'sequential-analysis': 'Sequential Analysis',
 };
 
+/**
+ * Formats sample-data collection sizes in the import dialog. Kept local because
+ * sample catalogue entries always include concrete byte counts.
+ * Used by: local callers in data-loader/SampleDataPanel module.
+ */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Renders local availability for a sample-data collection so users understand
+ * which rows are bundled, downloaded, partial, or pending download.
+ * Rendered by: data-loader/SampleDataPanel module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: map backend availability states to compact labels and color classes for the collection row.
+ */
 function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
   const map: Record<SampleDataCollection['status'], { label: string; className: string }> = {
     bundled:        { label: '● Available',      className: 'text-green-600 dark:text-green-400' },
@@ -52,6 +63,11 @@ function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
   return <span className={cn('text-xs font-medium whitespace-nowrap', className)}>{label}</span>;
 }
 
+/**
+ * Finds the collection README file used by the citation viewer. The sample
+ * import list calls this per row to decide whether to show the README action.
+ * Used by: local callers in data-loader/SampleDataPanel module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 function readmePath(col: SampleDataCollection): string | null {
   return col.files.find((f) => f.path.endsWith('README.md'))?.path ?? null;
 }
@@ -64,6 +80,12 @@ interface ReadmeViewerProps {
   onClose: () => void;
 }
 
+/**
+ * Displays collection README markdown so users can inspect sample citations.
+ * Rendered by: data-loader/SampleDataPanel module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: load README markdown for a snapshot, show loading/error states, and render fetched text
+ * only after the request resolves.
+ */
 const ReadmeViewer: React.FC<ReadmeViewerProps> = ({ path, collectionName, onClose }) => {
   const { data, isLoading, isError } = useQuery({
     ...getSampleDataReadmeOptions({
@@ -119,6 +141,14 @@ interface Props {
   onImportComplete: () => void;
 }
 
+/**
+ * Opens the sample-content import workflow from Data Loader. It manages local
+ * dataset selection and delegates successful imports back to the parent file
+ * browser refresh callback.
+ * Rendered by: DemoSnapshotsTab component, DataLoaderFeature module, SnapshotDescriptionDialog component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: request available sample categories, render snapshot tabs and description dialog, then
+ * delegate imports so the Data Loader can refresh files afterward.
+ */
 export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete }) => {
   const [open, setOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -133,14 +163,30 @@ export const SampleDataPanel: React.FC<Props> = ({ authHeaders, onImportComplete
   });
   const catalogue = data;
 
+  /**
+   * Treats bundled collections as always selected. Checkbox rendering and
+   * import payload creation both use this helper to stay consistent.
+   * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const getChecked = (col: SampleDataCollection) => {
     if (col.bundled) return true;
     return checked[col.id] ?? false;
   };
 
+  /**
+   * Toggles optional remote collections in the dataset import dialog.
+   * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const toggle = (id: string) =>
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
 
+  /**
+   * Imports selected sample datasets and refreshes the parent file browser once
+   * the backend reports the import has started or completed.
+   * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: collect selected IDs, show import progress, call the backend, report remote-download
+   * state, refresh files, then reset dialog state.
+   */
   const handleImport = async () => {
     const selectedIds = catalogue
       ? catalogue.collections.filter((col) => getChecked(col)).map((col) => col.id)

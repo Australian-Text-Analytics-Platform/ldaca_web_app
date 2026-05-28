@@ -28,6 +28,7 @@ interface SnapshotBannerCase {
   preview: SnapshotPreview;
 }
 
+/** Baseline snapshot capabilities for banners whose result payloads can paginate. */
 const paginatedCapabilities: SnapshotCapabilities = {
   canPaginate: true,
   canSortAndFilterResult: true,
@@ -36,11 +37,16 @@ const paginatedCapabilities: SnapshotCapabilities = {
   canCrossJump: false,
 };
 
+/** Capability variant used by snapshot banners that show static preview summaries. */
 const nonPaginatedCapabilities: SnapshotCapabilities = {
   ...paginatedCapabilities,
   canPaginate: false,
 };
 
+/**
+ * Exercises every feature-specific snapshot banner through the same store-backed
+ * live/demo mode contract.
+ */
 const bannerCases: SnapshotBannerCase[] = [
   {
     name: 'ConcordanceSnapshotBanner',
@@ -118,6 +124,7 @@ const bannerCases: SnapshotBannerCase[] = [
   },
 ];
 
+/** Used by: snapshot banner variant tests when loading per-tool fixtures because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 function makeManifest(testCase: SnapshotBannerCase): SnapshotManifest {
   return {
     schema_version: 1,
@@ -140,6 +147,7 @@ function makeManifest(testCase: SnapshotBannerCase): SnapshotManifest {
   };
 }
 
+/** Called by: snapshot banner variant tests before rendering loaded state because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 function loadFixtureSnapshot(testCase: SnapshotBannerCase) {
   const manifest = makeManifest(testCase);
   const snapshot: LoadedSnapshot = {

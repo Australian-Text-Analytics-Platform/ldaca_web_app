@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import SidebarNodesSection from '../SidebarNodesSection';
 
+/** Minimal node fixture used to verify row activation and display-name behavior. */
 const nodes = [
   {
     id: 'node-1',

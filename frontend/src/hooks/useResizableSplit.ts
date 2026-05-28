@@ -106,6 +106,8 @@ export type ResizableSplitHandle = {
 const DEFAULT_PERCENT_MIN = 0.15;
 const DEFAULT_PERCENT_MAX = 0.85;
 
+/** Reads a persisted split value while tolerating private-mode/localStorage failures. */
+/** Called by: useResizableSplit in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const readPersisted = (key: string | undefined, fallback: number): number => {
   if (!key || typeof window === 'undefined') return fallback;
   try {
@@ -118,6 +120,8 @@ const readPersisted = (key: string | undefined, fallback: number): number => {
   }
 };
 
+/** Persists committed split values so layout sizing survives reloads. */
+/** Called by: useResizableSplit in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const writePersisted = (key: string | undefined, value: number) => {
   if (!key || typeof window === 'undefined') return;
   try {
@@ -127,6 +131,11 @@ const writePersisted = (key: string | undefined, value: number) => {
   }
 };
 
+/** Provides state, DOM refs, keyboard handlers, and pointer handlers for resizable panes. */
+/**
+ * Used by: src/App.tsx, src/components/layout/WorkspaceView.tsx, src/features/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Flow: initialize persisted split value, clamp pointer and keyboard updates, capture splitter events, then expose value, drag state, refs, and ARIA props.
+ */
 export function useResizableSplit({
   orientation = 'horizontal',
   mode = 'percent',
@@ -209,6 +218,7 @@ export function useResizableSplit({
     [min, max, mode, maxPixels],
   );
 
+  /** Converts pointer coordinates into the split value represented by the configured anchor/mode. */
   const computeFromPointer = useCallback(
     (event: { clientX: number; clientY: number }): number | null => {
       const container = containerRef.current;
@@ -230,6 +240,7 @@ export function useResizableSplit({
     [orientation, anchor, mode, clamp],
   );
 
+  /** Starts a drag interaction and captures the pointer for reliable splitter movement. */
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     draggingRef.current = true;
@@ -243,6 +254,7 @@ export function useResizableSplit({
     }
   }, [value]);
 
+  /** Streams drag updates either through DOM-imperative callbacks or hook state. */
   const onPointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (!draggingRef.current) return;
@@ -264,6 +276,7 @@ export function useResizableSplit({
     [computeFromPointer],
   );
 
+  /** Commits the live drag value and releases pointer capture when resizing ends. */
   const onPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
@@ -281,6 +294,7 @@ export function useResizableSplit({
     }
   }, []);
 
+  /** Provides keyboard resizing semantics for accessible separator controls. */
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       // ArrowUp/ArrowLeft moves the splitter toward the START edge of the
@@ -314,6 +328,7 @@ export function useResizableSplit({
     [orientation, anchor, clamp, step, min, max, mode, defaultValue],
   );
 
+  /** Resets the split to its default/midpoint for users who overshoot a drag. */
   const onDoubleClick = useCallback(() => {
     setValue(mode === 'percent' ? 0.5 : defaultValue);
   }, [mode, defaultValue]);

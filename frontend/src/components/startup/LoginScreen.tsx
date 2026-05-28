@@ -12,8 +12,11 @@ interface LoginScreenProps {
 }
 
 /**
- * Multi-user-mode login screen. Reuses the BlockingScreen full-screen
- * layout but swaps the spinner card for a Google / CILogon sign-in card.
+ * Multi-provider login screen rendered when the backend requires interactive
+ * sign-in. It chooses the enabled provider button from backend auth metadata
+ * and wraps it in `ErrorBoundary` so OAuth widget failures stay recoverable.
+ * Rendered by: App while auth state requires interactive login because provider widgets should fail inside the card, not the app shell.
+ * Flow: inspect enabled auth methods, choose the provider label and button, wrap OAuth UI in ErrorBoundary, then render the branded sign-in card.
  */
 export const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error, authMethods = [] }) => {
   const hasCILogon = authMethods.some((m) => m.name === 'cilogon' && m.enabled);

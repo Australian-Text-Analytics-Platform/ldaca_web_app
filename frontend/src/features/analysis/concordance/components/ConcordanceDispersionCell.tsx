@@ -21,6 +21,7 @@ type Props = {
 
 const DEFAULT_BAR_COLOR = '#0284c7';
 
+/** Used by: ConcordanceDispersionCell to normalize source offsets before plotting hit markers because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const getNumericIndex = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return Math.max(0, value);
@@ -32,6 +33,10 @@ const getNumericIndex = (value: unknown): number | null => {
   return null;
 };
 
+/**
+ * Rendered by: ConcordanceDispersionNodeBlock and dispersion-cell tests as the compact per-document hit map because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const ConcordanceDispersionCell: React.FC<Props> = ({
   hits,
   textLength,

@@ -89,10 +89,11 @@ const AGGREGATE_LINE_LABEL = 'All matches';
 const X_AXIS_TICKS = [0, 20, 40, 60, 80, 100];
 
 /**
- * Format a bin's range as a human-friendly string. For sufficiently wide bins
+ * Used by: ConcordanceDispersionSummary axis and tooltip labels to format a bin range as a human-friendly string. For sufficiently wide bins because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * (≥ 2 % each, i.e. binCount ≤ 50) we use non-overlapping integer ranges with
  * a +1 increment ("0-5%", "6-10%"). For narrower bins we fall back to
  * one-decimal fractional ranges so the labels stay accurate.
+   * Flow: clamp bin count, derive the bin index and width from the center value, then return integer or one-decimal percentage ranges based on bin width.
  */
 const formatBinRange = (binCenter: number, binCount: number): string => {
   const safeBinCount = Math.max(1, Math.floor(binCount));
@@ -113,17 +114,23 @@ const formatBinRange = (binCenter: number, binCount: number): string => {
 
 const SOURCE_DASH_STYLES: (string | undefined)[] = [undefined, '6 4'];
 
+/** Used by: ConcordanceDispersionSummary chart axis to format ticks as relative-position percentages because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const formatTickLabel = (value: number): string => {
   if (!Number.isFinite(value)) return '';
   return `${Math.round(value)}%`;
 };
 
+/** Used by: ConcordanceDispersionSummary legend/count derivation to split combined text/source series keys because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const stripSeriesKey = (key: string): { text: string; source: string | null } => {
   const idx = key.indexOf(DISPERSION_SOURCE_DELIMITER);
   if (idx === -1) return { text: key, source: null };
   return { text: key.slice(0, idx), source: key.slice(idx + DISPERSION_SOURCE_DELIMITER.length) };
 };
 
+/**
+ * Rendered by: ConcordanceDispersionNodeBlock to build the dispersion chart and export payload because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const ConcordanceDispersionSummary: React.FC<Props> = ({
   rows,
   textColumn,
@@ -290,6 +297,10 @@ export const ConcordanceDispersionSummary: React.FC<Props> = ({
     return out;
   }, [aggregateAll, visibleTexts, matchedTextColors, splitBySource, sources]);
 
+    /**
+   * Called by: ConcordanceDispersionSummary download dialog to export the rendered chart because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Flow: verify the chart SVG exists, assemble export header and legend metadata, then download the dispersion chart or show a toast error.
+   */
   const handleDownload = async (format: ChartImageFormat) => {
     if (!chartContainerRef.current) {
       toast.error('Chart not available for export.');

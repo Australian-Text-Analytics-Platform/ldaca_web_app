@@ -15,18 +15,12 @@ type SidebarNodesSectionProps = {
   onClearSelection?: () => void;
 };
 
-/** Sidebar check icon mirroring the node-colour strategy doc:
- *   - active     → filled dot in pair.X + white tick
- *   - focus      → filled dot in pair.Y + white tick (same tick, lighter fill)
- *   - unselected → outline circle in pair.X, no fill, no tick
- *
- * When ``isFresh`` is set (newly-created node that hasn't been
- * acknowledged), a black outline wraps the icon as a "find me" cue —
- * cleared on first click / select.
- *
- * The text label next to it stays the standard foreground colour
- * (not tinted) — the strategy doc is explicit that the colour rides
- * on the icon only.
+/**
+ * Sidebar selection glyph used by `SidebarNodesSection`. It maps node visual
+ * state to the global node color pair so selection/focus colors match the graph
+ * while fresh-node outlines help users find newly created blocks.
+ * Why: sidebar node rows should use the same colour semantics as the graph while marking fresh nodes visibly.
+ * Flow: derive fill from visual state, apply fresh-node outline when needed, then render the checkmark only for selected/focus states.
  */
 const NodeCheckIcon: React.FC<{
   state: NodeVisualState;
@@ -50,23 +44,37 @@ const NodeCheckIcon: React.FC<{
   );
 };
 
+/**
+ * Called by: SidebarNodesSection row rendering to build data-block tooltips because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+ * Flow: read shape from node data or top-level payload, format numeric row/column parts, then fall back to unknown markers.
+ */
 const formatShapeLabel = (node: SidebarWorkspaceNode): string => {
   const rawShape = node.data?.shape || (node as { shape?: [number | null, number | null] }).shape;
   if (!rawShape) {
     return '—';
   }
   const [rows, cols] = rawShape;
+  /** Called by: formatShapeLabel for row and column tooltip fragments because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const formatPart = (value: number | null | undefined) =>
     typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
   return `${formatPart(rows)} × ${formatPart(cols)}`;
 };
 
+/** Called by: SidebarNodesSection sorting and row labels because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const getNodeDisplayName = (node: SidebarWorkspaceNode): string =>
   node?.data?.nodeName || node?.data?.label || node?.label || node?.name || node.id;
 
+/** Called by: SidebarNodesSection row onKeyDown handlers because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
 const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
   event.key === 'Enter' || event.key === ' ';
 
+/**
+ * Data-block section used inside the app sidebar. It presents selectable nodes
+ * in a stable order and bridges sidebar clicks back to workspace selection and
+ * fresh-node acknowledgement stores.
+ * Rendered by: Sidebar's Data Blocks section because graph selection and fresh-node acknowledgement must stay aligned.
+ * Flow: read colour/current-view/fresh state, order selected nodes first, then render counts, clear action, and toggleable node rows.
+ */
 const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
   nodes,
   selectedNodeIds,
@@ -76,9 +84,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
 
-  // Per-node visual state (active / focus / unselected) + X/Y colour pair
-  // derived from the global node-colour store and the currently-active
-  // analytics view. See ``lib/nodeVisualState.ts`` + the strategy doc.
+  // Derived here so the list mirrors graph node color semantics for the active analysis view.
   const assignedColors = useNodeColorsStore((state) => state.colors);
   const currentView = useUIStore((state) => state.currentView);
   const freshIds = useFreshNodesStore((state) => state.freshIds);
@@ -89,15 +95,13 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
     assignedColors,
   };
 
-  // Wrap the parent's toggle so a sidebar click counts as "I've
-  // acknowledged this node" and clears the black-outline highlight.
+  /** Called by: SidebarNodesSection row click and keyboard activation handlers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const handleToggle = (nodeId: string) => {
     markInteracted([nodeId]);
     onToggleNodeSelection(nodeId);
   };
 
-  // Order: selected nodes first in reverse selection order (latest first),
-  // followed by unselected nodes sorted alphabetically (case-insensitive) by display name.
+  /** Orders selected nodes first for context, then unselected nodes alphabetically for scanning. */
   const orderedNodes = (() => {
     const selectedIds = selectedNodeIds ?? [];
     const nodeById = new Map(nodes.map((node) => [node.id, node]));

@@ -32,7 +32,9 @@ export const TOOL_COMPATIBILITY: Partial<Record<SnapshotToolKey, ToolCompatibili
 
 /** Return ``"<MAJOR>.<MINOR>"`` from a version string, or ``null``
  * if malformed. Accepts ``"v0.4.4"``, ``"0.4.4"``, ``"0.4"``,
- * ``"0.4.0-rc1"`` etc. */
+   * ``"0.4.0-rc1"`` etc.  * Used by: index module, compat tests (rg call sites/imports).
+   * Why: because snapshot loading needs coarse version compatibility gates before unsupported bundles hydrate feature state.
+   */
 export function parseMajorMinor(version: string | null | undefined): string | null {
   if (typeof version !== 'string') return null;
   const m = version.trim().match(/^v?(\d+)\.(\d+)(?:\.\d+)?(?:[-+].*)?$/);
@@ -42,7 +44,9 @@ export function parseMajorMinor(version: string | null | undefined): string | nu
 
 /** True when a snapshot of version ``snapshotVersion`` (typically
  * read from ``manifest.tool_version``) is openable by the current
- * build running at ``currentVersion``. */
+ * build running at ``currentVersion``.  * Used by: index module, compat tests, LoadSnapshotDialog component (rg call sites/imports).
+ * Why: because snapshot loading needs coarse version compatibility gates before unsupported bundles hydrate feature state.
+ */
 export function isCompatibleSnapshot(
   snapshotVersion: string,
   tool: SnapshotToolKey,
@@ -62,7 +66,9 @@ export function isCompatibleSnapshot(
  * unavailable — callers should treat that as "version unknown" and
  * be defensive (the compat predicate returns false on an empty
  * current-version, which keeps the user from accidentally opening
- * a snapshot against an unknown build). */
+ * a snapshot against an unknown build).  * Used by: useQuotationSnapshotCapture hook, useTokenFrequencySnapshotCapture hook, useConcordanceSnapshotCapture hook (rg call sites/imports).
+ * Why: because snapshot loading needs coarse version compatibility gates before unsupported bundles hydrate feature state.
+ */
 export function getCurrentAppVersion(): string {
   return (import.meta.env.VITE_APP_VERSION as string | undefined) ?? '';
 }

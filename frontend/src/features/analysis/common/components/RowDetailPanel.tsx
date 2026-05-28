@@ -55,6 +55,11 @@ export interface RowDetailPanelProps {
 
 // ---- Helpers ----
 
+/**
+ * Converts arbitrary row metadata into displayable strings for the detail dialog
+ * while preserving object structure for the preformatted metadata table.
+ * Called by: RowDetailPanel metadata table rendering because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ */
 const formatMetadataValue = (value: unknown): string => {
   if (value === null || value === undefined) return 'null';
   if (typeof value === 'object') return JSON.stringify(value, null, 2);
@@ -63,6 +68,12 @@ const formatMetadataValue = (value: unknown): string => {
 
 // ---- Component ----
 
+/**
+ * Opens the shared row-detail dialog used by analysis tables to inspect full
+ * document text, custom summary fields, and remaining row metadata.
+ * Used by: concordance and quotation result row detail flows because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export const RowDetailPanel: React.FC<RowDetailPanelProps> = ({
   open,
   onOpenChange,

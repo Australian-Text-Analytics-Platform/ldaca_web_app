@@ -9,6 +9,11 @@ import { type DayButton, DayPicker, getDefaultClassNames } from "react-day-picke
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
 
+/**
+ * Calendar wrapper used by date controls while preserving app button and selection styling.
+ * Why: date controls need DayPicker behavior with shadcn button, range, dropdown, and RTL styling applied consistently.
+ * Flow: merge DayPicker defaults with app class names, install formatter/navigation/day components, then pass caller props through.
+ */
 function Calendar({
   className,
   classNames,
@@ -34,6 +39,7 @@ function Calendar({
       )}
       captionLayout={captionLayout}
       formatters={{
+        /** Called by: DayPicker month dropdown rendering inside Calendar because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
         formatMonthDropdown: (date) =>
           date.toLocaleString("default", { month: "short" }),
         ...formatters,
@@ -123,6 +129,10 @@ function Calendar({
         ...classNames,
       }}
       components={{
+        /**
+         * Wraps DayPicker's root so shadcn consumers keep the expected calendar data slot.
+         * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+         */
         Root: ({ className, rootRef, ...props }) => {
           return (
             <div
@@ -133,6 +143,7 @@ function Calendar({
             />
           )
         },
+        /** Called by: DayPicker navigation and dropdown affordance rendering inside Calendar because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
         Chevron: ({ className, orientation, ...props }) => {
           if (orientation === "left") {
             return (
@@ -154,6 +165,7 @@ function Calendar({
           )
         },
         DayButton: CalendarDayButton,
+        /** Called by: DayPicker week-number rendering inside Calendar because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
         WeekNumber: ({ children, ...props }) => {
           return (
             <td {...props}>
@@ -170,6 +182,11 @@ function Calendar({
   )
 }
 
+/**
+ * Day button renderer used by `Calendar` to focus selected days and apply range data attributes.
+ * Why: selected and ranged days need app button styling plus DayPicker data attributes for CSS selectors.
+ * Flow: focus the active day ref, set single/range data attributes, then render the ghost icon Button with merged day classes.
+ */
 function CalendarDayButton({
   className,
   day,

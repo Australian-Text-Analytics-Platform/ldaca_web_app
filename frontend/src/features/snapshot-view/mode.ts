@@ -12,7 +12,8 @@ export const DEMO_SNAPSHOT_MODE = { kind: 'demoSnapshot' } as const satisfies Vi
 
 /** True if the view is showing a snapshot (either demo or share).
  * Use this everywhere a component or handler needs to "disable
- * mutation paths" — never compare ``mode.kind`` to a string inline. */
+ * mutation paths" — never compare ``mode.kind`` to a string inline.  * Used by: useSnapshotBackedAnalysisState module, index module, ConcordanceFeature module (rg call sites/imports).
+ */
 export function isSnapshotMode(mode: ViewMode): boolean {
   return mode.kind === 'demoSnapshot' || mode.kind === 'shareSnapshot';
 }
@@ -21,7 +22,8 @@ export function isSnapshotMode(mode: ViewMode): boolean {
  * Used by source-row inspector components that don't exist in demo
  * mode. Always false in v1 because no code constructs the
  * ``shareSnapshot`` arm yet — but UI gates check it anyway so when
- * Mode 2a lands no guard site needs editing. */
+ * Mode 2a lands no guard site needs editing.  * Used by: index module, store tests (rg call sites/imports).
+ */
 export function isShareSnapshotMode(mode: ViewMode): boolean {
   return mode.kind === 'shareSnapshot';
 }

@@ -11,6 +11,13 @@ interface FilePreviewPanelProps {
   onClose: () => void;
 }
 
+/**
+ * Read-only file preview dialog used by the data loader before import. It owns
+ * preview pagination and worksheet selection while the caller controls which
+ * filename is being inspected.
+ * Why: upload/import flows need an inspect-only preview that can page and switch Excel sheets without mutating the workspace.
+ * Flow: read preview hook data, derive previous/next availability, then render sheet picker, preview table, and paging controls.
+ */
 export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, open, onClose }) => {
   const {
     previewData,
@@ -31,11 +38,13 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
   const canPrev = page > 0;
   const canNext = totalRows ? (page + 1) * pageSize < totalRows : previewData.length > 0;
 
+  /** Called by: FilePreviewPanel Prev button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handlePrev = () => {
     if (!filename || !canPrev) return;
     setPage((p) => p - 1);
   };
 
+  /** Called by: FilePreviewPanel Next button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleNext = () => {
     if (!filename || !canNext) return;
     setPage((p) => p + 1);

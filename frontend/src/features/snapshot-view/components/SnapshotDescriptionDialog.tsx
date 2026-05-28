@@ -30,6 +30,9 @@ export interface SnapshotDescriptionDialogProps {
  * ``.md`` description sidecar via react-markdown. Mirrors the
  * ``ReadmeViewer`` pattern from ``SampleDataPanel`` so the UX feels
  * the same across imports and snapshot loads.
+ * Rendered by: LoadSnapshotDialog component, index module, SampleDataPanel component (rg call sites/imports).
+ * Why: because snapshot loaders and sample panels need a compact metadata surface before users decide to inspect or load a snapshot.
+ * Flow: fetch the markdown sidecar, render loading/error fallbacks, then show the parsed description in a modal.
  */
 export const SnapshotDescriptionDialog: React.FC<SnapshotDescriptionDialogProps> = ({
   filename,
@@ -39,6 +42,11 @@ export const SnapshotDescriptionDialog: React.FC<SnapshotDescriptionDialogProps>
   const { getAuthHeaders } = useAuth();
   const { data: content, isLoading, isError } = useQuery({
     queryKey: ['snapshot-description', filename],
+        /**
+     * Fetches markdown description text for the selected snapshot row.
+         * Called by: useQuery option object inside SnapshotDescriptionDialog.
+         * Why: because snapshot loaders and sample panels need a compact metadata surface before users decide to inspect or load a snapshot.
+         */
     queryFn: async () => {
       const { data } = await getSnapshotDescription({
         headers: getAuthHeaders(),

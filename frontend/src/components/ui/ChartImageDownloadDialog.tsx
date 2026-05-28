@@ -28,6 +28,11 @@ type Props = {
   extraOptions?: ChartDownloadExtraOption[];
 };
 
+/**
+ * Dialog body used by chart result components to choose image format and export extras.
+ * Why: chart result actions share the same AlertDialog export chooser for image formats and optional overlays.
+ * Flow: initialize selected format and extra checkboxes, render AlertDialog form sections, then confirm with format/extras and close.
+ */
 const ChartImageDownloadDialogContent = ({
   title = 'Download Chart',
   onConfirm,
@@ -39,12 +44,14 @@ const ChartImageDownloadDialogContent = ({
     () => Object.fromEntries(extraOptions.map((opt) => [opt.id, opt.defaultChecked ?? false])),
   );
 
+  /** Called by: ChartImageDownloadDialogContent Download action because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const handleConfirm = (e: React.MouseEvent) => {
     e.preventDefault();
     onConfirm(selectedFormat, extraStates);
     onOpenChange(false);
   };
 
+  /** Called by: ChartImageDownloadDialogContent extra-option checkboxes because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const toggleExtra = (id: string, checked: boolean) => {
     setExtraStates((prev) => ({ ...prev, [id]: checked }));
   };
@@ -98,6 +105,10 @@ const ChartImageDownloadDialogContent = ({
   );
 };
 
+/**
+ * Alert-dialog wrapper used by chart result actions before exporting PNG/SVG/JPEG images.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 export const ChartImageDownloadDialog = ({ open, onOpenChange, title, onConfirm, extraOptions }: Props) => (
   <AlertDialog open={open} onOpenChange={onOpenChange}>
     {open ? (

@@ -7,6 +7,7 @@ import {
 
 /** Tailwind / hex inspection helpers — converted inline so the tests
  * stay decoupled from the colour module's internal HSL plumbing. */
+/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const s = hex.replace('#', '');
   return {
@@ -16,6 +17,8 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   };
 }
 
+/** Computes HSL lightness inline so tests validate public output, not private color helpers. */
+/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 function rgbLightness(r: number, g: number, b: number): number {
   // HSL L = (max + min) / 2, expressed as 0–100.
   const max = Math.max(r, g, b);

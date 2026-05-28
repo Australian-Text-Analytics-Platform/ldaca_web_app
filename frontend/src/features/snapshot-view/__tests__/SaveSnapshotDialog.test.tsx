@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Toaster } from 'sonner';
 import { SaveSnapshotDialog } from '../components/SaveSnapshotDialog';
 
+/**
+ * Renders the save dialog with default spies and overridable props.
+ * Used by: Vitest setup or assertions in snapshot-view/SaveSnapshotDialog.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: create default save/open spies, render the dialog with toaster support, apply per-test overrides, and return spies for assertions.
+ */
 function setup(
   overrides: Partial<React.ComponentProps<typeof SaveSnapshotDialog>> = {},
 ) {

@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { WorkspaceControls } from '../WorkspaceControls';
 
+/** Workspace graph fixture used to verify batch-delete selection counts and root sorting behavior. */
 const mockGraph = {
   nodes: [
     { id: 'a', name: 'Alpha', operation: 'import' },
@@ -17,9 +18,14 @@ const mockGraph = {
   ],
 };
 
+/** Mutable selection fixture consumed by the mocked selection hook in each test. */
 const selectionState = { selectedNodeIds: [] as string[] };
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
+  /**
+   * Supplies workspace identity and graph roots consumed by `WorkspaceControls`.
+   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
+   */
   useWorkspaceData: () => ({
     currentWorkspace: { id: 'ws-1', name: 'Main Workspace' },
     workspaceGraph: mockGraph,
@@ -27,6 +33,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
+  /** Used by: WorkspaceControls tests to provide action spies because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceActions: () => ({
     renameWorkspace: vi.fn(),
     deleteNode: vi.fn().mockResolvedValue(undefined),
@@ -35,6 +42,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
+  /** Used by: WorkspaceControls tests to expose the mutable selected-node fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceSelection: () => ({
     selectedNodeIds: selectionState.selectedNodeIds,
   }),

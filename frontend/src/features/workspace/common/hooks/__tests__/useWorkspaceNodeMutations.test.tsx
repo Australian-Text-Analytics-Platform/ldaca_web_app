@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------- API mocks ---------------------------------------------------
 
+/** Hoisted generated-SDK mock lets mutation actions be verified without HTTP. */
 const workspaceSdkMock = vi.hoisted(() => ({
   addNodeToWorkspace: vi.fn(),
   castNode: vi.fn(),
@@ -41,6 +42,7 @@ const workspaceSdkMock = vi.hoisted(() => ({
   updateWorkspaceDescription: vi.fn(),
 }));
 
+/** Hoisted node-info mock isolates schema refresh behavior from network I/O. */
 const fetchNodeInfoMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/api/generated/sdk.gen', () => workspaceSdkMock);
@@ -57,12 +59,27 @@ import { useWorkspaceNodeMutations } from '../useWorkspaceNodeMutations';
 
 // ---------- Wrapper helpers --------------------------------------------
 
+/**
+ * Creates a no-retry QueryClient for deterministic mutation-hook tests.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 const createTestClient = () =>
   new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
 
+/**
+ * Wraps hook renders with the query client under test.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 const wrapWithClient = (client: QueryClient): React.FC<{ children: React.ReactNode }> => {
+    /**
+   * Provides the caller's QueryClient to the mutation hook render.
+     * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+     * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+     */
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
@@ -77,10 +94,35 @@ type ClearSelectionSpy = ReturnType<typeof vi.fn> & (() => void);
 type OperationFnSpy = ReturnType<typeof vi.fn> & ((operationId: string) => void);
 type OperationErrorSpy = ReturnType<typeof vi.fn> & ((operationId: string, error: string) => void);
 
+/**
+ * Creates a typed current-workspace setter spy for hook args.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 const mkSetWorkspaceId = () => vi.fn() as unknown as SetWorkspaceIdSpy;
+/**
+ * Creates a typed selected-nodes setter spy for hook args.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 const mkSetSelectedNodes = () => vi.fn() as unknown as SetSelectedNodesSpy;
+/**
+ * Creates a typed selection-clear spy for hook args.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 const mkClearSelection = () => vi.fn() as unknown as ClearSelectionSpy;
+/**
+ * Creates a typed operation lifecycle spy for hook args.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 const mkOperationFn = () => vi.fn() as unknown as OperationFnSpy;
+/**
+ * Creates a typed operation-error spy for hook args.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 const mkOperationError = () => vi.fn() as unknown as OperationErrorSpy;
 
 interface BuildArgs {
@@ -95,6 +137,12 @@ interface BuildArgs {
   setOperationError?: OperationErrorSpy;
 }
 
+/**
+ * Builds hook params while preserving explicit null workspace test cases.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: merge default spies and ids with overrides, preserving explicit nulls for no-workspace branches.
+ */
 const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => ({
   authHeaders: overrides.authHeaders ?? { Authorization: 'Bearer test' },
   // `'currentWorkspaceId' in overrides` so callers can pass `null` to test

@@ -12,6 +12,10 @@ const EXPRESSION_CONTEXT_SUFFIX: Record<'filter' | 'with_columns' | 'select' | '
   group_by_agg: 'grouped_expr',
 };
 
+/**
+ * Sanitizes user/schema text into safe auto-generated node-name tokens.
+ * Used by: local callers in preprocessing/autoNodeNames module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const sanitizeToken = (value: string): string => {
   const trimmed = value.trim();
   if (!trimmed) return 'value';
@@ -25,6 +29,10 @@ const sanitizeToken = (value: string): string => {
   return normalized || 'value';
 };
 
+/**
+ * Formats scalar condition values for stable, readable output names.
+ * Used by: local callers in preprocessing/autoNodeNames module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const formatScalar = (value: string | number | boolean | Date | null): string => {
   if (value === null) return 'null';
   if (value instanceof Date) return sanitizeToken(value.toISOString());
@@ -34,6 +42,11 @@ const formatScalar = (value: string | number | boolean | Date | null): string =>
   return sanitizeToken(String(value));
 };
 
+/**
+ * Converts filter condition values, including ranges and lists, into name tokens.
+ * Used by: local callers in preprocessing/autoNodeNames module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Steps: serialize arrays, dates, ranges, scalars, and unknown values into compact filename-safe tokens.
+ */
 const formatConditionValue = (value: FilterConditionWithId['value']): string => {
   if (Array.isArray(value)) {
     if (value.length === 0) return 'empty';
@@ -57,6 +70,11 @@ const formatConditionValue = (value: FilterConditionWithId['value']): string => 
   return 'value';
 };
 
+/**
+ * Builds one descriptive token for a complete filter condition.
+ * Used by: local callers in preprocessing/autoNodeNames module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Steps: sanitize the column, include negation/operator details, and delegate value formatting by condition shape.
+ */
 const formatFilterConditionToken = (condition: FilterConditionWithId): string => {
   const columnToken = sanitizeToken(condition.column || 'column');
   const negatePrefix = condition.negate ? 'not_' : '';
@@ -75,6 +93,11 @@ const formatFilterConditionToken = (condition: FilterConditionWithId): string =>
   }
 };
 
+/**
+ * Builds the suggested output name shown by the Filter tab.
+ * Used by: useFilterSubTabSections hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: normalize the base label, keep only complete conditions, choose AND/OR join tokens, and append encoded condition tokens.
+ */
 export const buildFilterAutoNodeName = ({
   baseName,
   conditions,
@@ -96,6 +119,12 @@ export const buildFilterAutoNodeName = ({
   return `${base}_filtered_by_${conditionToken}`;
 };
 
+/**
+ * Builds the suggested output name shown by the Sample Rows tab.
+ * Used by: useTopicModelingTaskFlow hook, useSliceSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Steps: normalize source labels, encode random/fraction/n-count mode details, include seed
+ * when present, and trim the generated name.
+ */
 export const buildSamplingAutoNodeName = ({
   baseName,
   mode,
@@ -152,6 +181,10 @@ export const buildSamplingAutoNodeName = ({
   return `${base}_sampled_${sampleToken}${seedToken}`;
 };
 
+/**
+ * Builds the suggested output name shown by the Polars expression tab.
+ * Used by: autoNodeNames tests, usePolarsExpressionSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ */
 export const buildExpressionAutoNodeName = ({
   baseName,
   context,

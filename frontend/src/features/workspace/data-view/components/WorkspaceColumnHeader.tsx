@@ -89,6 +89,9 @@ export interface WorkspaceColumnHeaderProps {
  * WorkspaceTable.tsx into its own component. Pin / rename / sort / data-type
  * cast / wide-column expand / column-settings dropdown / filter form / active
  * filter badge — all rendering, no state.
+ * Rendered by: RenameInput component, ColumnFilterForm component, WorkspaceTable component (rg call sites/imports).
+ * Why: because the table needs one header surface for sort, filter, rename, cast, and delete controls on each column.
+ * Flow: render the label and sort affordance, then expose per-column actions through dropdown controls.
  */
 export const WorkspaceColumnHeader: React.FC<WorkspaceColumnHeaderProps> = ({
   column,

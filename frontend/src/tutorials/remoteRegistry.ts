@@ -28,6 +28,11 @@ type CachedEnvelope = {
   payload: PartialRemoteRegistry;
 };
 
+/** Validates only the loose shape the frontend needs before merging remote docs data. */
+/**
+ * Called by: tutorial registry hydration and docs modal consumers because docs consumers need one registry path for bundled, cached, and remote documentation targets.
+ * Flow: validate registry input, merge local and remote metadata, then expose the documentation entries to UI consumers.
+ */
 const isPartialRegistry = (value: unknown): value is PartialRemoteRegistry => {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
@@ -39,6 +44,8 @@ const isPartialRegistry = (value: unknown): value is PartialRemoteRegistry => {
   return true;
 };
 
+/** Restores a cached registry payload so docs links work before the network refresh finishes. */
+/** Called by: tutorial registry hydration and docs modal consumers because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
 const readCache = (): PartialRemoteRegistry | null => {
   if (typeof localStorage === 'undefined') return null;
   try {
@@ -53,6 +60,8 @@ const readCache = (): PartialRemoteRegistry | null => {
   }
 };
 
+/** Stores the last successful remote registry as a startup-latency optimization. */
+/** Called by: tutorial registry hydration and docs modal consumers because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
 const writeCache = (payload: PartialRemoteRegistry): void => {
   if (typeof localStorage === 'undefined') return;
   try {
@@ -68,6 +77,11 @@ const writeCache = (payload: PartialRemoteRegistry): void => {
   }
 };
 
+/** Fetches the remote registry without throwing so bundled docs remain the correctness fallback. */
+/**
+ * Called by: tutorial registry hydration and docs modal consumers because docs consumers need one registry path for bundled, cached, and remote documentation targets.
+ * Flow: resolve `registry.json` against the remote base URL, fetch without cache, validate the loose registry shape, and return null on any failure.
+ */
 const fetchRegistry = async (baseUrl: string): Promise<PartialRemoteRegistry | null> => {
   try {
     const url = new URL('registry.json', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString();
@@ -87,6 +101,10 @@ let loadPromise: Promise<void> | null = null;
  * function's async work begins) and kick off a background refresh.
  * Idempotent — safe to call from multiple useEffects; subsequent calls
  * return the same in-flight (or settled) promise.
+ */
+/**
+ * Used by: src/App.tsx, src/tutorials/__tests__/registry.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Flow: validate registry input, merge local and remote metadata, then expose the documentation entries to UI consumers.
  */
 export const loadRemoteRegistry = (): Promise<void> => {
   if (loadPromise) return loadPromise;
@@ -125,6 +143,7 @@ export const loadRemoteRegistry = (): Promise<void> => {
 
 /** Test-only hook to drop the cached load promise so a fresh test gets a
  *  fresh remote attempt. Not exported through any barrel. */
+/** Used by: src/tutorials/__tests__/registry.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 export const __resetLoadPromiseForTests = (): void => {
   loadPromise = null;
 };

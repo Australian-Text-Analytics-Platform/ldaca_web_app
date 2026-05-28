@@ -54,6 +54,14 @@ type PaginationState = {
   pageSize: number;
 };
 
+/**
+   * Shared debounced preview loader for preprocessing tabs. Operation-specific
+   * hooks supply the request and fetcher so pagination, cancellation, loading,
+   * and error state behave consistently across tabs.
+   * Used by: useJoinSubTab hook, useNodePreviewWithRawFallback hook, useConcatSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+   * Flow: debounce request signatures, reset page state on request changes, call the provided
+   * fetcher, and guard against stale responses with request ids.
+   */
 export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
   options: UsePreprocessingPreviewOptions<RequestPayload, Row>,
 ): UsePreprocessingPreviewResult<Row> => {
@@ -100,6 +108,10 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
   const page = isPaginationCurrent ? paginationState.page : initialPage;
   const pageSize = isPaginationCurrent ? paginationState.pageSize : initialPageSize;
 
+    /**
+     * Stores pagination with the active request signature to avoid stale pages.
+     * Called by: usePreprocessingPreview internal event, effect, or helper flow.
+     */
   const setPaginationDraft = (nextPage: number, nextPageSize: number) => {
     setPaginationState({
       signature: derivedSignature,
@@ -110,6 +122,10 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     });
   };
 
+    /**
+     * Updates only the current page while preserving the active page size.
+     * Called by: usePreprocessingPreview internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const setPage = (nextPage: number) => {
     setPaginationDraft(nextPage, pageSize);
   };
@@ -123,7 +139,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     requestRef.current = request;
   });
 
-  // Debounced preview fetcher.
+  // Debounced preview fetcher shared by all preprocessing operations.
   useEffect(() => {
     const currentRequest = requestRef.current;
     if (!ready || !currentRequest) {
@@ -179,10 +195,18 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     };
   }, [ready, page, pageSize, debounceMs, refreshKey, derivedSignature, initialPage, initialPageSize]);
 
+    /**
+     * Resets preview paging when consumers choose a different page size.
+     * Called by: usePreprocessingPreview internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handleSetPageSize = (size: number) => {
     setPaginationDraft(1, size);
   };
 
+    /**
+     * Forces a refetch without changing the current request or pagination.
+     * Called by: usePreprocessingPreview internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const refresh = () => {
     setRefreshKey((current) => current + 1);
   };

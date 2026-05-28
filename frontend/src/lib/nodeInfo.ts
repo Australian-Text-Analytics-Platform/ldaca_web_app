@@ -42,6 +42,8 @@ type AuthProviderArgs = BaseQueryArgs & {
  */
 export type NodeInfoQueryArgs = HeadersArgs | AuthProviderArgs;
 
+/** Resolves auth once a query actually executes so refetches see current credentials. */
+/** Called by: nodeInfoQueryOptions and fetchNodeInfo in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const resolveHeaders = (args: NodeInfoQueryArgs): Record<string, string> =>
   'headers' in args && args.headers ? args.headers : args.getAuthHeaders();
 
@@ -50,8 +52,13 @@ const resolveHeaders = (args: NodeInfoQueryArgs): Record<string, string> =>
  * Headers are resolved lazily inside `queryFn` so the latest auth is
  * picked up on each refetch.
  */
+/** Used by: src/hooks/useNodeColumnInfos.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
   queryKey: queryKeys.nodeInfo(args.workspaceId, args.nodeId),
+  /**
+   * Fetches fresh node metadata for query consumers while resolving auth at execution time.
+   * Why: importers need one shared normalization boundary to keep behavior consistent.
+   */
   queryFn: async (): Promise<NodeInfo> => {
     const { data } = await getNodeInfo({
       headers: resolveHeaders(args),
@@ -77,6 +84,8 @@ export type FetchNodeInfoArgs = {
  * and other async work outside React's render tree. Returns the cached
  * value when present (and fresh); otherwise runs `getNodeInfo` once,
  * caching the result for future hook subscriptions.
+ * Why: importers need one shared normalization boundary to keep behavior consistent.
+ * Flow: optionally remove the cached node entry, build headers or auth-provider query args, then fetch through TanStack Query.
  */
 export const fetchNodeInfo = async ({
   queryClient,
@@ -100,6 +109,10 @@ export const fetchNodeInfo = async ({
  * workspace when `nodeId` is omitted). Mirrors the previous
  * `invalidateNodeInfo` API.
  */
+/**
+ * Used by: src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: invalidate one node-info key when provided, otherwise predicate-match every node-info query under the workspace.
+ */
 export const invalidateNodeInfoQuery = (
   queryClient: QueryClient,
   workspaceId: string,
@@ -110,6 +123,8 @@ export const invalidateNodeInfoQuery = (
     return;
   }
   queryClient.invalidateQueries({
+    /** Limits broad invalidation to node-info records under the requested workspace. */
+    /** Called by: TanStack Query cache invalidation filtering because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
     predicate: (query) => {
       const key = query.queryKey;
       return (

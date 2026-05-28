@@ -11,11 +11,20 @@ interface UseFilesProps {
   enabled?: boolean;
 }
 
+/** Coordinates user file tree loading plus upload/delete/download actions for data-loader panels. */
+/**
+ * Used by: src/features/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Flow: fetch the file tree, wire upload/delete mutations to cache invalidation, then expose selection and file actions for data-loader panels.
+ */
 export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {}) => {
   const queryClient = useQueryClient();
 
   const filesQuery = useQuery<FileTreeNode[]>({
     queryKey: queryKeys.files,
+    /**
+     * Fetches the user-visible file tree for data-loader consumers.
+     * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
+     */
     queryFn: async () => {
       const { data } = await getUserFiles({ headers: authHeaders, throwOnError: true });
       return data as FileTreeNode[];
@@ -27,14 +36,20 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
+  /** Invalidates the shared file-tree cache after file mutations. */
+  /** Called by: useFiles in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
   const invalidateFiles = () => queryClient.invalidateQueries({ queryKey: queryKeys.files });
 
   const uploadMutation = useMutation({
+    /** Uploads a browser File object through the generated SDK for file panel actions. */
+    /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
     mutationFn: (file: File) => uploadFile({ body: { file }, headers: authHeaders, throwOnError: true }),
     onSuccess: invalidateFiles,
   });
 
   const deleteMutation = useMutation({
+    /** Deletes the selected server-side file and lets mutation success refresh the tree. */
+    /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
     mutationFn: (filename: string) => deleteFile({
       headers: authHeaders,
       path: { filename },
@@ -43,8 +58,12 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     onSuccess: invalidateFiles,
   });
 
+  /** Gives panels an imperative refresh entry point after external file operations. */
+  /** Called by: useFiles in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
   const refetchFiles = async () => (await filesQuery.refetch()).data ?? null;
 
+  /** Uploads a selected file and returns a boolean so panels can update inline status. */
+  /** Used by: useFiles callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const handleUploadFile = async (file: File) => {
     try {
       await uploadMutation.mutateAsync(file);
@@ -56,6 +75,8 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     }
   };
 
+  /** Deletes a user file and clears selection if the deleted file was active. */
+  /** Used by: useFiles callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const handleDeleteFile = async (filename: string) => {
     try {
       await deleteMutation.mutateAsync(filename);
@@ -68,6 +89,8 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     }
   };
 
+  /** Downloads a user file through the shared browser/Tauri save helper. */
+  /** Used by: useFiles callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const handleDownloadFile = async (filename: string) => {
     try {
       const { data } = await downloadFile({

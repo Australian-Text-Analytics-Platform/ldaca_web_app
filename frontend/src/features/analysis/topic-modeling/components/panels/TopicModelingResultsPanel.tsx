@@ -29,6 +29,10 @@ type ExactTopicCountSliderProps = {
   onUpdateExactTopicCount: (value: number) => Promise<void> | void;
 };
 
+/**
+ * Rendered by: TopicModelingResultsPanel to let users re-aggregate a fitted model to an exact topic count because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+ */
 function ExactTopicCountSlider({
   currentExactTopicCount,
   exactTopicCountRange,
@@ -44,6 +48,7 @@ function ExactTopicCountSlider({
   const sliderProgressPercent =
     ((sliderValue - exactTopicCountRange.min) / sliderDenominator) * 100;
 
+  // Called by: ExactTopicCountSlider pointer, blur, and keyboard handlers because only changed in-range topic counts should trigger re-aggregation. Flow: clamp and round the slider value, sync the input element, skip duplicate submissions, then call onUpdateExactTopicCount.
   const commitExactTopicCount = (rawValue: string, input?: HTMLInputElement | null) => {
     const parsed = Number(rawValue);
     const nextValue = Math.min(
@@ -62,6 +67,7 @@ function ExactTopicCountSlider({
     void onUpdateExactTopicCount(nextValue);
   };
 
+  // Called by: ExactTopicCountSlider keyup handler for keyboard-driven slider commits because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleExactTopicCountKeyUp = (event: KeyboardEvent<HTMLInputElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
       return;
@@ -210,6 +216,10 @@ type Props = {
   readOnly?: boolean;
 };
 
+/**
+ * Rendered by: TopicModelingFeature to show results, controls, detach dialog, and chart export affordances because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export function TopicModelingResultsPanel({
   topicWaitingBanner,
   runningTask,

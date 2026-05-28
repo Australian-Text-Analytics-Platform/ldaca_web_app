@@ -67,6 +67,8 @@ let refreshFailures = 0;
 let inFlight: Promise<void> | null = null;
 let refreshIntervalId: number | null = null;
 
+/** Reads the bearer token captured from login flows without making React subscribe to storage. */
+/** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
 const readStoredToken = (): string | null => {
   if (typeof window === 'undefined') return null;
   try {
@@ -76,6 +78,8 @@ const readStoredToken = (): string | null => {
   }
 };
 
+/** Writes or clears the bearer token for generated SDK auth header resolution. */
+/** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
 const persistToken = (token: string | null): void => {
   if (typeof window === 'undefined') return;
   try {
@@ -89,11 +93,15 @@ const persistToken = (token: string | null): void => {
   }
 };
 
+/** Builds raw Authorization headers for bootstrap/logout calls that bypass the store action. */
+/** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
 const buildAuthHeaders = (): Record<string, string> => {
   const token = readStoredToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+/** Creates a bounded signal for auth probes so startup does not hang indefinitely. */
+/** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
 const timeoutSignal = (timeoutMs: number): AbortSignal => AbortSignal.timeout(timeoutMs);
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -101,6 +109,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   config: null,
   phase: { status: 'bootstrapping', attempts: 0 },
 
+  /** Runs config/auth-info fetches as a single coalesced auth state-machine transition. */
+  /**
+   * Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: coalesce in-flight fetches, set bootstrap or refresh phase, load config/auth info, then record ready, degraded, or fatal outcomes.
+   */
   runAuthFetch: (reason) => {
     if (inFlight) return inFlight;
 
@@ -188,6 +201,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     return inFlight;
   },
 
+  /** Starts the background refresh loop once so long-lived sessions stay warm. */
+  /** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   ensureRefreshInterval: () => {
     if (refreshIntervalId != null || typeof window === 'undefined') return;
     refreshIntervalId = window.setInterval(() => {
@@ -197,12 +212,21 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }, REFRESH_INTERVAL_MS);
   },
 
+  /**
+   * Public refresh entry point used by retry buttons and the `useAuth` hook.
+   * Why: store consumers need one typed boundary for shared state reads, updates, and persistence.
+   */
   refreshAuth: async () => {
     const { authInfo, phase } = get();
     const reason: FetchReason = !authInfo || phase.status === 'fatal' ? 'bootstrap' : 'manual';
     await get().runAuthFetch(reason);
   },
 
+  /** Exchanges Google credentials for the app token and refreshes the auth snapshot. */
+  /**
+   * Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+   * Flow: require multi-user mode, exchange the Google token, persist the app access token, then bootstrap auth state or rethrow a user-facing error.
+   */
   loginWithGoogle: async (idToken) => {
     if (!get().config?.multi_user_mode) {
       throw new Error('Google login not available in single-user mode');
@@ -221,6 +245,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  /** Ends a multi-user session locally and server-side, then reboots anonymous auth state. */
+  /**
+   * Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+   * Flow: skip single-user mode, attempt server logout, clear local token and counters, reset phase, then bootstrap anonymous auth.
+   */
   logout: async () => {
     if (!get().config?.multi_user_mode) return;
 
@@ -237,6 +266,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  /** Returns headers for API callers while suppressing bearer tokens in single-user mode. */
+  /** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   getAuthHeaders: (): Record<string, string> => {
     const token = readStoredToken();
     if (!token) return {};
@@ -245,6 +276,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     return { Authorization: `Bearer ${token}` };
   },
 
+  /** Captures redirect-token login results and scrubs secrets from the visible URL. */
+  /**
+   * Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: parse `auth_token` from the query string, persist it for SDK headers, remove the secret param, and replace the URL without navigation.
+   */
   processGoogleRedirectToken: () => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);

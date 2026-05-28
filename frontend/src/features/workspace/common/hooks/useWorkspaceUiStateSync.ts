@@ -26,6 +26,12 @@ import { getWorkspaceUiState, putWorkspaceUiState } from '@/api/generated/sdk.ge
  * state by closing the tab a second after picking. */
 const DEBOUNCE_MS = 500;
 
+/**
+ * Keeps node colour UI state persisted per workspace for graph consumers.
+ * Used by: WorkspaceProvider module (rg call sites/imports).
+ * Why: because the provider needs backend current-workspace state mirrored into the UI store after loading and workspace changes.
+ * Flow: hydrate colors on workspace changes, suppress echo writes, then debounce outbound UI-state saves.
+ */
 export function useWorkspaceUiStateSync(
   currentWorkspaceId: string | null | undefined,
   getAuthHeaders: () => Record<string, string>,

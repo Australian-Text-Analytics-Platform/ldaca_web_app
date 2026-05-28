@@ -34,7 +34,13 @@ export interface TopicModelingSnapshotPayload {
   settings?: TopicModelingRequest;
 }
 
+/** Signals topic-modeling snapshot load failures with reason codes for toasts and tests. */
+/**
+ * Used by: useTopicModelingSnapshotLoad hook exports or same-file callers because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+ */
 export class TopicModelingSnapshotLoadError extends Error {
+  /** Preserves the load failure reason while retaining normal Error behavior. */
+  // Called by: TopicModelingSnapshotLoadError when this analysis object handles its lifecycle work because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
   constructor(
     message: string,
     public readonly reason: string,
@@ -44,6 +50,11 @@ export class TopicModelingSnapshotLoadError extends Error {
   }
 }
 
+/** Returns a loader that decodes a topic-modeling snapshot into snapshot-view state. */
+/**
+ * Used by: useTopicModelingBubbleChart.tsx, useTopicModelingSnapshotCapture.ts, useTopicModelingSnapshotLoad.test.tsx, and related files because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+ * Flow: download the snapshot bundle, locate the manifest and payload files, hydrate request/result state, then surface contextual load errors.
+ */
 export function useTopicModelingSnapshotLoad(): (filename: string) => Promise<void> {
   const { getAuthHeaders } = useAuth();
   const loadSnapshotIntoStore = useSnapshotViewStore((s) => s.loadSnapshot);
@@ -75,6 +86,10 @@ export function useTopicModelingSnapshotLoad(): (filename: string) => Promise<vo
         );
       }
 
+      // Locates payload paths by kind so the loader does not depend on manifest ordering.
+      /**
+       * Called by: useTopicModelingSnapshotLoad during this analysis workflow because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+       */
       const findPath = (kind: string): string | null =>
         manifest.payloads.find((p) => p.kind === kind)?.path ?? null;
 

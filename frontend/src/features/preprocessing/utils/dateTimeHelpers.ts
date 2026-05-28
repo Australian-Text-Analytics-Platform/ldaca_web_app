@@ -1,7 +1,9 @@
 export const ISO_PLACEHOLDER = 'YYYY-MM-DDTHH:MM:SS+00:00';
 
 /**
- * Normalize incomplete ISO date string
+ * Normalizes partial ISO drafts before datetime filters send values to APIs.
+ * Used by: dateTimeUtils utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Steps: trim input, expand date/time-only forms, append UTC offsets, and normalize Z suffixes.
  */
 export const normalizeIsoDraft = (txt: string): string => {
   let s = txt.trim();
@@ -14,7 +16,10 @@ export const normalizeIsoDraft = (txt: string): string => {
 };
 
 /**
- * Parse ISO string to local Date object
+ * Parses ISO filter values into local Date objects for calendar controls.
+ * Used by: dateTimeUtils utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Steps: normalize partial ISO text, parse a Date, preserve local calendar fields when present,
+ * and return null for invalid values.
  */
 export const parseIsoToLocalDate = (input: string): Date | null => {
   if (!input) return null;
@@ -43,17 +48,23 @@ export const parseIsoToLocalDate = (input: string): Date | null => {
   return d;
 };
 
+/**
+ * Pads date/time segments for ISO and time input strings.
+ * Used by: local callers in preprocessing/dateTimeHelpers module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const padNumber = (value: number): string => value.toString().padStart(2, '0');
 
 /**
- * Convert Date to ISO UTC string
+ * Converts calendar selections into the UTC-style string backend filters expect.
+ * Used by: dateTimeUtils utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
 export const toIsoUtcString = (date: Date): string => {
   return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}:${padNumber(date.getSeconds())}+00:00`;
 };
 
 /**
- * Format time input value from Date
+ * Formats a parsed Date for the time input inside DateTimePickerField.
+ * Used by: dateTimeUtils utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
 export const formatTimeInputValue = (date: Date | null | undefined): string => {
   if (!date) {
@@ -63,7 +74,9 @@ export const formatTimeInputValue = (date: Date | null | undefined): string => {
 };
 
 /**
- * Parse time string into segments
+ * Splits a time input value into numeric segments for date recombination.
+ * Used by: local callers in preprocessing/dateTimeHelpers module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Flow: split HH:MM:SS parts, parse each segment, and replace invalid numbers with zero before recombination.
  */
 export const parseTimeSegments = (value: string): [number, number, number] => {
   const [hours = '0', minutes = '0', seconds = '0'] = value.split(':');
@@ -78,7 +91,8 @@ export const parseTimeSegments = (value: string): [number, number, number] => {
 };
 
 /**
- * Combine date and time values
+ * Combines calendar date and time input values for datetime filter editing.
+ * Used by: dateTimeUtils utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
 export const combineDateAndTime = (date: Date, timeValue: string): Date => {
   const [hours, minutes, seconds] = parseTimeSegments(timeValue);
@@ -86,7 +100,8 @@ export const combineDateAndTime = (date: Date, timeValue: string): Date => {
 };
 
 /**
- * Normalize time value string
+ * Clamps user-entered time values into the valid HH:MM:SS range.
+ * Used by: dateTimeUtils utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
 export const normalizeTimeValue = (value: string): string => {
   const [hours, minutes, seconds] = parseTimeSegments(value);

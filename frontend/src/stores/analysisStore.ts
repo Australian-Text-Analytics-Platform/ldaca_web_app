@@ -14,16 +14,22 @@ export type TaskState =
   | 'cancelled';
 
 /** States representing work the backend has accepted but not started. */
-export const PENDING_TASK_STATES: ReadonlySet<string> = new Set<string>(['pending', 'queued', 'submitted']);
+const PENDING_TASK_STATES: ReadonlySet<string> = new Set<string>(['pending', 'queued', 'submitted']);
 /** States representing in-flight execution. */
-export const RUNNING_TASK_STATES: ReadonlySet<string> = new Set<string>(['running']);
+const RUNNING_TASK_STATES: ReadonlySet<string> = new Set<string>(['running']);
 /** States the task can never leave (i.e. polling can stop). */
 export const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>(['successful', 'failed', 'cancelled']);
 
+/** Lets hooks treat queued/submitted variants as one pending bucket. */
+/** Used by: src/features/data-loader/DataLoaderFeature.tsx, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
 export const isPendingTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && PENDING_TASK_STATES.has(state));
+/** Lets task banners detect active worker execution. */
+/** Used by: src/features/data-loader/DataLoaderFeature.tsx because store consumers need the action and state contract documented at the mutation boundary. */
 export const isRunningTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && RUNNING_TASK_STATES.has(state));
+/** Lets polling/result hooks stop watching states that cannot transition further. */
+/** Used by: src/features/analysis/common/tasks/policies.ts, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
 export const isTerminalTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && TERMINAL_TASK_STATES.has(state));
 
@@ -94,10 +100,14 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   tasks: [],
   pendingConcordance: null,
   materializedEvents: [],
+  /** Replaces or updates task summaries received from polling/SSE task streams. */
+  /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   setTasks: (tasks) =>
     set((state) => ({
       tasks: typeof tasks === 'function' ? tasks(state.tasks) : tasks,
     })),
+  /** Stores the concordance payload that should be consumed after an auto-run handoff. */
+  /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   setPendingConcordance: (payload) =>
     set(() => ({
       pendingConcordance: {
@@ -105,10 +115,14 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
         timestamp: payload.timestamp ?? Date.now(),
       },
     })),
+  /** Clears the concordance handoff once the destination feature consumes it. */
+  /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   clearPendingConcordance: () =>
     set(() => ({
       pendingConcordance: null,
     })),
+  /** Records worker materialization events so feature tabs can react without refetch races. */
+  /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   pushMaterializedEvent: (event) =>
     set((state) => {
       materializedEventSequence += 1;

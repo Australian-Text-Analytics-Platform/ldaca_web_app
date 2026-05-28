@@ -4,6 +4,12 @@ import type { WorkspaceSelectionTabsState } from '../hooks/useWorkspaceDataTable
 
 type WorkspaceSelectionTabsProps = WorkspaceSelectionTabsState;
 
+/**
+ * Renders tabs for multi-selected workspace nodes in the data view.
+ * Rendered by: WorkspaceDataTableFeature component (rg call sites/imports).
+ * Why: because the data table feature needs selected-node tabs that switch the active table without touching graph selection internals.
+ * Flow: skip rendering when there is a single selection, otherwise render tab buttons with close controls.
+ */
 export const WorkspaceSelectionTabs = ({
   shouldShowTabs,
   tabs,
@@ -21,7 +27,7 @@ export const WorkspaceSelectionTabs = ({
           <div
             key={tab.id}
             className={cn(
-              'group flex min-w-[140px] max-w-[240px] items-center rounded-t-md border border-border/60 bg-muted/60 pr-1 text-xs font-medium transition-all',
+              'group flex min-w-35 max-w-60 items-center rounded-t-md border border-border/60 bg-muted/60 pr-1 text-xs font-medium transition-all',
               tab.isActive
                 ? 'border-b-transparent bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'

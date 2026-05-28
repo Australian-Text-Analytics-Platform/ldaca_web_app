@@ -9,6 +9,12 @@ import type {
   UseAnalysisTaskFlowResult,
 } from './types';
 
+/**
+ * Adapts global task-store status into the banner, active-task flag, and terminal
+ * refresh callback contract used by every analysis tab.
+ * Used by: useAnalysisFeature to bridge global task status into feature UI state because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ */
 export const useAnalysisTaskFlow = (options: UseAnalysisTaskFlowOptions): UseAnalysisTaskFlowResult => {
   const {
     taskType,
@@ -68,6 +74,11 @@ export const useAnalysisTaskFlow = (options: UseAnalysisTaskFlowOptions): UseAna
     return null;
   })();
 
+  /**
+   * Exposes an imperative refresh path for callers that need to reapply results
+   * outside the automatic terminal-task effect.
+    * Called by: consumers of useAnalysisTaskFlow through the refreshNow return value because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   */
   const refreshNow = async (reason: AnalysisTaskFlowRefreshContext['reason'] = 'terminal') => {
     if (!workspaceId || !refreshResultsRef.current) {
       return;

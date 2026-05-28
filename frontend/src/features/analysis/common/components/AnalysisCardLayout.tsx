@@ -71,6 +71,12 @@ type AnalysisCardLayoutProps = {
   cardRef?: React.RefObject<HTMLDivElement | null>;
 };
 
+/**
+ * Provides the shared card chrome for analysis feature panels, including help
+ * affordances, snapshot actions, and consistent run/stop/clear controls.
+ * Used by: token-frequency, quotation, sequential, topic-modeling, and AI panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export function AnalysisCardLayout({
   title,
   info,

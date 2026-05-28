@@ -8,11 +8,13 @@ vi.mock('sonner', () => ({
 }));
 
 describe('DocumentView (docType="tutorial")', () => {
+  /** Original fetch implementation restored after tests that mock markdown loading. */
   const originalFetch = global.fetch;
 
   beforeEach(() => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
+      /** Called by: DocumentView test fetch mock when markdown content is requested because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
       text: () => Promise.resolve('# Tutorial'),
     }) as unknown as typeof fetch;
   });

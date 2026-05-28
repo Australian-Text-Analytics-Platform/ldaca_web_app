@@ -12,6 +12,12 @@ interface DatetimeFormatPanelProps {
   sampleValues?: string[];
 }
 
+/**
+ * Modal wrapper used by preprocessing flows before converting a column to
+ * datetime. It keeps open/close ownership with the caller while mounting the
+ * form only when the dialog is visible.
+ * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
+ */
 export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
   open,
   onClose,
@@ -31,6 +37,13 @@ export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
   );
 };
 
+/**
+ * Datetime format form used inside `DatetimeFormatPanel`. It lets users accept
+ * an inferred Python `strftime` format or provide one manually before the
+ * preprocessing feature submits the conversion.
+ * Rendered by: DatetimeFormatPanel while the conversion dialog is open because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+ * Flow: infer the initial format from samples, manage custom and auto-fill state, then render cancel/auto-fill/convert controls.
+ */
 function DatetimeFormatPanelContent({
   onClose,
   onConfirm,
@@ -44,10 +57,12 @@ function DatetimeFormatPanelContent({
     sampleValues.length > 0 && !initialFormat ? 'Could not infer format' : null,
   );
 
+  /** Called by: DatetimeFormatPanelContent Cancel button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleCancel = () => {
     onClose();
   };
 
+  /** Called by: DatetimeFormatPanelContent Auto Fill button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleAutoFill = () => {
     setAutoFillTried(true);
     setAutoFillError(null);
@@ -59,6 +74,7 @@ function DatetimeFormatPanelContent({
     }
   };
 
+  /** Called by: DatetimeFormatPanelContent Convert button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleConfirm = () => {
     const trimmed = customFormat.trim();
     onConfirm(trimmed.length ? trimmed : undefined);

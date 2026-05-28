@@ -17,7 +17,13 @@ interface QuotationEngineDialogState {
 
 export const useQuotationEngineDialogStore = create<QuotationEngineDialogState>((set) => ({
   isOpen: false,
+  /** Supports controlled dialog callbacks from Radix/shadcn open-state changes. */
+  /** Consumed by: useQuotationEngineDialogStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   setOpen: (isOpen) => set({ isOpen }),
+  /** Opens the quotation-engine configuration dialog from sidebar actions. */
+  /** Consumed by: useQuotationEngineDialogStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   open: () => set({ isOpen: true }),
+  /** Closes the dialog after save/cancel or overlay dismissal. */
+  /** Consumed by: useQuotationEngineDialogStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   close: () => set({ isOpen: false }),
 }));

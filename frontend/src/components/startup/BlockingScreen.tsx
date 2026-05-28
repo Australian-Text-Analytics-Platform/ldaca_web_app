@@ -12,8 +12,11 @@ type BlockingScreenProps = {
 };
 
 /**
- * Shared full-screen blocking screen used while the desktop app waits for the
- * backend to become healthy or while the auth handshake is still running.
+ * Shared full-screen gate used by startup/auth flows when the app cannot yet
+ * show the workspace. `App` and login helpers supply copy/actions while this
+ * component keeps the loading shell visually consistent.
+ * Why: startup and auth gates share the same shell while callers own the precise copy and recovery actions.
+ * Flow: render optional logo and copy, show spinner/status/hint, then add error details and caller-supplied actions when present.
  */
 const BlockingScreen: React.FC<BlockingScreenProps> = ({
   title,

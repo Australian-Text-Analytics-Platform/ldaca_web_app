@@ -37,7 +37,13 @@ export interface TokenFrequencySnapshotPayload {
   settings?: TokenFrequencyRequest;
 }
 
+/** Carries a machine-readable failure reason for token-frequency snapshot loading. */
+/**
+ * Used by: useTokenFrequencySnapshotLoad hook exports or same-file callers because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+ */
 export class TokenFrequencySnapshotLoadError extends Error {
+  /** Initializes the snapshot-load error with user-facing text and a stable reason. */
+  // Called by: TokenFrequencySnapshotLoadError when this analysis object handles its lifecycle work because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
   constructor(
     message: string,
     public readonly reason: string,
@@ -47,6 +53,11 @@ export class TokenFrequencySnapshotLoadError extends Error {
   }
 }
 
+/** Returns the open-snapshot callback that downloads and hydrates token-frequency snapshots. */
+/**
+ * Used by: useTokenFrequencySnapshotCapture.ts, TokenFrequencyFeature.tsx, useTokenFrequencySnapshotLoad.test.tsx because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+ * Flow: download the snapshot bundle, locate the manifest and payload files, hydrate request/result state, then surface contextual load errors.
+ */
 export function useTokenFrequencySnapshotLoad(): (filename: string) => Promise<void> {
   const { getAuthHeaders } = useAuth();
   const loadSnapshotIntoStore = useSnapshotViewStore((s) => s.loadSnapshot);
@@ -78,6 +89,10 @@ export function useTokenFrequencySnapshotLoad(): (filename: string) => Promise<v
         );
       }
 
+      /** Finds the payload path for a manifest entry kind inside the loaded bundle. */
+      /**
+       * Called by: useTokenFrequencySnapshotLoad during this analysis workflow because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+       */
       const findPath = (kind: string): string | null =>
         manifest.payloads.find((p) => p.kind === kind)?.path ?? null;
 

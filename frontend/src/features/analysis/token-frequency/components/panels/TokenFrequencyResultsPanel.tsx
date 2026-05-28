@@ -68,6 +68,10 @@ type TokenFrequencyResultsPanelProps = {
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
 };
 
+/**
+ * Rendered by: TokenFrequencyFeature to show running status, controls, and token-frequency result sections because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const TokenFrequencyResultsPanel = ({
   results,
   isRunning,
@@ -151,11 +155,16 @@ export const TokenFrequencyResultsPanel = ({
     });
   }, [effectiveTokenLimit]);
 
+  /** Called by: TokenFrequencyResultsPanel list-limit input to capture edits and clear stale errors because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const handleListLimitInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setListLimitInput(event.target.value);
     if (listLimitError) setListLimitError(null);
   };
 
+    /**
+   * Called by: TokenFrequencyResultsPanel list-limit Apply button and blur handler because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Flow: parse the list-limit input, clamp it to the visible vocabulary range, clear validation errors, then mirror the capped value to cloud preferences when needed.
+   */
   const handleApplyListLimit = () => {
     const parsed = Number.parseInt(listLimitInput, 10);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -176,6 +185,7 @@ export const TokenFrequencyResultsPanel = ({
   // Wrap cloud apply so that applying the cloud value also mirrors it down
   // to the list limit (cloud is always ≤ 100, so the two stay in lockstep
   // whenever the user touches the cloud input).
+  /** Called by: TokenFrequencyResultsPanel cloud-limit Apply button, blur handler, and Enter key because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const handleApplyCloudLimit = () => {
     const parsed = Number.parseInt(tokenLimitInput, 10);
     if (Number.isFinite(parsed) && parsed > 0) {

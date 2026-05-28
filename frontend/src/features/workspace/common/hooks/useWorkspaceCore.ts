@@ -5,6 +5,11 @@ import { useSelectionStore } from '@/stores/selectionStore';
 import { useUIStore } from '@/stores/uiStore';
 import { type PaginationMap, type PaginationState, createDefaultPagination } from './types';
 
+/**
+ * Reads the selection store fields the workspace feature owns.
+ * Used by: workspace/useWorkspaceCore components or tests that consume this hook.
+ * Why: because the internal workspace hook needs auth, query client, and UI-store inputs gathered before query and mutation hooks run.
+ */
 const useSelectionSlice = () =>
   useSelectionStore(
     useShallow((state) => ({
@@ -19,6 +24,11 @@ const useSelectionSlice = () =>
     }))
   );
 
+/**
+ * Reads operation loading/error helpers from the UI store.
+ * Used by: workspace/useWorkspaceCore components or tests that consume this hook.
+ * Why: because the internal workspace hook needs auth, query client, and UI-store inputs gathered before query and mutation hooks run.
+ */
 const useUISlice = () =>
   useUIStore(
     useShallow((state) => ({
@@ -35,6 +45,8 @@ const useUISlice = () =>
  * per-node pagination. `currentWorkspaceId` lives in `selectionStore`, so this
  * hook just re-exposes the slice. Pagination stays as local state because it's tightly coupled to `selectedNodeId` lifecycle and
  * shouldn't persist across workspaces.
+ * Used by: selectionStore module, useWorkspaceInternal hook, useWorkspaceInternal tests (rg call sites/imports).
+ * Flow: auth and selection slices are read first, then pagination handlers update the active node's server-table state.
  */
 export const useWorkspaceCore = () => {
   const { getAuthHeaders, isAuthenticated } = useAuth();
@@ -114,12 +126,14 @@ export const useWorkspaceCore = () => {
   }, [pagination, selectedNodeId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  /** Updates the current selected node's server-side page. */
   const handlePageChange = useCallback(
     (page: number) => {
       if (selectedNodeId) updateCurrentPage(selectedNodeId, page);
     },
     [selectedNodeId, updateCurrentPage],
   );
+  /** Updates the current selected node's page size and resets to page one. */
   const handlePageSizeChange = useCallback(
     (pageSize: number) => {
       if (selectedNodeId) updatePageSize(selectedNodeId, pageSize);
@@ -127,6 +141,7 @@ export const useWorkspaceCore = () => {
     [selectedNodeId, updatePageSize],
   );
 
+  /** Stores server-side sort state for the selected node. */
   const handleSortingChange = useCallback(
     (sortBy: string | undefined, descending: boolean | undefined) => {
       if (!selectedNodeId) return;
@@ -140,6 +155,7 @@ export const useWorkspaceCore = () => {
     [selectedNodeId, updatePagination],
   );
 
+  /** Stores server-side filter state for the selected node. */
   const handleFilterChange = useCallback(
     (filterColumn: string | undefined, filterValue: string | undefined, filterOp: string | undefined) => {
       if (!selectedNodeId) return;

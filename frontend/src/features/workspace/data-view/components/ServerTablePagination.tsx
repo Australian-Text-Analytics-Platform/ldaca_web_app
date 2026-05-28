@@ -13,12 +13,17 @@ import { buildPaginationRange } from '@/components/ui/paginationRange';
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-// ── Main pagination component ────────────────────────────────────────
 interface ServerTablePaginationProps<TData> {
   table: Table<TData>;
   pageSizeOptions?: number[];
 }
 
+/**
+ * Renders TanStack server-pagination controls for WorkspaceTable.
+ * Rendered by: paginationRange component, WorkspaceTable component (rg call sites/imports).
+ * Why: because server-backed tables need pagination controls that update query state rather than slicing rows locally.
+ * Flow: derive page bounds from TanStack state, render navigation buttons, then emit page-size changes through the table instance.
+ */
 export function ServerTablePagination<TData>({
   table,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
@@ -38,6 +43,11 @@ export function ServerTablePagination<TData>({
   const canPrev = table.getCanPreviousPage();
   const canNext = table.getCanNextPage();
 
+    /**
+   * Converts display page numbers back into TanStack's zero-based page index.
+     * Called by: ServerTablePagination internal event, effect, or helper flow.
+     * Why: because server-backed tables need pagination controls that update query state rather than slicing rows locally.
+     */
   const goToPage = (page: number) => {
     table.setPageIndex(page - 1); // 1-indexed → 0-indexed
   };

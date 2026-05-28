@@ -16,6 +16,12 @@ export interface SnapshotBackedAnalysisState<Payload> {
   readOnly: boolean;
 }
 
+/**
+ * Combines per-tool mode and loaded payload into the read-only state consumed
+ * by analysis features that can render from snapshots.
+ * Used by: store module, index module, QuotationFeature module (rg call sites/imports) because snapshot-aware features need a single live/demo state adapter.
+ * Flow: read the tool mode, select the matching loaded payload, require both snapshot mode and payload before marking the feature read-only.
+ */
 export function useSnapshotBackedAnalysisState<Payload>(
   tool: SnapshotToolKey,
 ): SnapshotBackedAnalysisState<Payload> {
@@ -33,6 +39,11 @@ export function useSnapshotBackedAnalysisState<Payload>(
   };
 }
 
+/**
+ * Reconstructs source-node cards from manifest metadata for snapshot views.
+ * Used by: index module, useSnapshotBackedAnalysisState tests, ConcordanceFeature module (rg call sites/imports) because frozen manifests must supply the node cards normally read from live workspace data.
+ * Flow: derive an even row-count fallback, pair manifest node ids with labels and per-block rows, then emit node-like records for snapshot-only panels.
+ */
 export function snapshotSourceNodes(
   source: SnapshotManifest['source'],
 ): SnapshotSourceNode[] {

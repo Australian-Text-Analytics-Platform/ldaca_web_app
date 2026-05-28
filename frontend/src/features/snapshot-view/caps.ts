@@ -79,7 +79,11 @@ export type SnapshotIneligibilityReason =
 /** Decide whether a capture is allowed for ``mode`` given the per-
  * block source sizes and the result-row count. Returns ``ok: false``
  * for hard caps and ``warnings`` for soft thresholds (UI prompts the
- * user to confirm). */
+ * user to confirm).
+ * Used by: useConcordanceSnapshotCapture hook, index module, caps tests (rg call sites/imports).
+ * Why: because snapshot actions need capability checks before offering capture or load paths the current mode cannot support.
+ * Flow: row counts are compared to hard caps first, then soft warnings are accumulated for confirmable captures.
+ */
 export function checkSnapshotEligibility(
   input: EligibilityInput,
 ): EligibilityResult {

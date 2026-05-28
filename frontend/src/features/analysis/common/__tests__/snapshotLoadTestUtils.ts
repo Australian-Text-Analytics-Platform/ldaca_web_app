@@ -19,6 +19,13 @@ interface ManifestInput {
   canPaginate?: boolean;
 }
 
+/**
+ * Creates manifest fixtures for snapshot-load tests without repeating the stable
+ * workspace/source/capability scaffolding in every banner test.
+ * Used by: snapshot load tests that need valid bundle manifests because bundle plumbing needs consistent manifest scaffolding before feature-specific payload assertions.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+   * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
+ */
 export function makeSnapshotManifest(
   input: ManifestInput,
   overrides: Partial<SnapshotManifest> = {},
@@ -51,6 +58,12 @@ export function makeSnapshotManifest(
   };
 }
 
+/**
+ * Packages manifest and payload JSON into the same zip Blob shape returned by
+ * the generated downloadSnapshot client.
+ * Used by: snapshot load tests that mock downloaded bundles because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 export async function buildJsonBundleBlob(
   manifest: SnapshotManifest,
   files: Record<string, unknown>,
@@ -64,6 +77,12 @@ export async function buildJsonBundleBlob(
   return new Blob([bytes as BlobPart], { type: 'application/zip' });
 }
 
+/**
+ * Adapts the generated SDK spy to resolve with a Blob payload so snapshot-load
+ * tests can bypass network calls while preserving client response shape.
+ * Used by: snapshot load tests before invoking load/open flows because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 export function mockSnapshotDownload() {
   const spy = vi.spyOn(generatedSdk, 'downloadSnapshot');
   const mockResolvedValue = spy.mockResolvedValue.bind(spy);
@@ -72,6 +91,7 @@ export function mockSnapshotDownload() {
   return spy;
 }
 
+/** Called by: snapshot load tests that share snapshot store state because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 export function resetSnapshotStore() {
   act(() => {
     useSnapshotViewStore.getState().reset();

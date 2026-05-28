@@ -16,6 +16,8 @@ import { isTauri } from '@/lib/isTauri';
  * Backoff: six fast attempts (500 ms) then exponential up to 5 s.
  */
 
+/** Converts an API/backend base URL into the health endpoint URL the startup gate polls. */
+/** Called by: useBackendHealth in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const normalizeToHealthUrl = (backendUrl: string) => {
   const trimmed = backendUrl.replace(/\/$/, '');
   return trimmed.endsWith('/api')
@@ -23,6 +25,11 @@ const normalizeToHealthUrl = (backendUrl: string) => {
     : `${trimmed}/health`;
 };
 
+/** Resolves the health URL from Tauri injection, Tauri command, or web API-base rules. */
+/**
+ * Called by: useBackendHealth because the startup gate needs the same `/health` endpoint across web proxies and packaged desktop launches.
+ * Flow: prefer the injected desktop backend URL, ask Tauri for one when needed, cache it on window, then derive the web fallback from getApiBase().
+ */
 const resolveHealthUrl = async (): Promise<string> => {
   if (typeof window !== 'undefined') {
     if (window.__BACKEND_URL__) {
@@ -41,6 +48,11 @@ const resolveHealthUrl = async (): Promise<string> => {
   return normalizeToHealthUrl(getApiBase());
 };
 
+/** Polls backend readiness for the blocking startup screen. */
+/**
+ * Used by: src/App.tsx because app startup must hold the UI until the local or remote backend can answer health checks.
+ * Flow: resolve the health URL, poll it with startup backoff, then expose readiness and the latest error to the blocking screen.
+ */
 export const useBackendHealth = () => {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +76,8 @@ export const useBackendHealth = () => {
     let attempt = 0;
     let timeoutId: number | null = null;
 
+    /** Applies the health-poll backoff after failed attempts. */
+    /** Called by: useBackendHealth in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
     const scheduleNext = () => {
       if (cancelled) return;
       const nextDelay = attempt <= 6
@@ -72,6 +86,11 @@ export const useBackendHealth = () => {
       timeoutId = window.setTimeout(poll, nextDelay);
     };
 
+    /** Performs one health check and schedules another unless the backend is ready. */
+    /**
+      * Called by: the polling effect because backend startup can lag behind the frontend shell in desktop and dev modes.
+      * Flow: fetch the health URL without cache, accept healthy/operational statuses, otherwise store the failure and schedule the next retry.
+     */
     const poll = async () => {
       attempt += 1;
       try {

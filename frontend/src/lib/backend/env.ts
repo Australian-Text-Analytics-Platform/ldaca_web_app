@@ -1,11 +1,16 @@
-// Centralized environment & API base URL detection
-// Priority order:
-//  1. Explicit override via function argument (tests)
-//  2. Tauri: window.__BACKEND_URL__ (injected by Rust)
-//  3. Vite env var: VITE_BACKEND_API_BASE (full URL override)
-//  4. Server-injected window.__BASE_PATH__ (works for any reverse proxy)
-//  5. Vite dev: localhost/127.0.0.1 -> backend at configured port
-//  6. Default: same-origin /api
+/**
+ * Centralized environment and API base URL detection for browser, served SPA,
+ * test, and Tauri desktop contexts. Every API client consumes this module so
+ * reverse-proxy and desktop URL rules stay in one place.
+ *
+ * Priority order:
+ *  1. Explicit override via function argument (tests)
+ *  2. Tauri: window.__BACKEND_URL__ (injected by Rust)
+ *  3. Vite env var: VITE_BACKEND_API_BASE (full URL override)
+ *  4. Server-injected window.__BASE_PATH__ (works for any reverse proxy)
+ *  5. Vite dev: localhost/127.0.0.1 -> backend at configured port
+ *  6. Default: same-origin /api
+ */
 
 declare global {
   interface Window {
@@ -20,7 +25,8 @@ export type ApiEnvOptions = {
   localStorageGet?: (k: string) => string | null; // allow mock
 };
 
-// Get backend port from env var, default to 8001
+/** Resolves the dev backend port used when the SPA is served separately from FastAPI. */
+/** Called by: getApiBase in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 function getBackendPort(): string {
   if (typeof import.meta !== 'undefined' && import.meta.env) {
     const port = import.meta.env.VITE_BACKEND_PORT;
@@ -31,6 +37,12 @@ function getBackendPort(): string {
   return '8001';
 }
 
+/**
+ * Returns the `/api` base URL used by generated SDK clients and local fetches,
+ * normalizing each runtime's way of telling the frontend where the backend is.
+ * Why: API callers need one runtime boundary for backend URL, timeout, and response handling.
+ * Flow: read runtime configuration, normalize request or response details, then return the backend-facing value.
+ */
 export function getApiBase(options: ApiEnvOptions = {}): string {
   // 1. Explicit override (tests / callers)
   if (options.explicitBase) return options.explicitBase.replace(/\/$/, '');

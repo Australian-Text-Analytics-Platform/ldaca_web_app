@@ -3,6 +3,10 @@ import * as TabsPrimitive from "@radix-ui/react-tabs"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Tabs root primitive used by feature panels with segmented content.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function Tabs({
   className,
   ...props
@@ -16,6 +20,7 @@ function Tabs({
   )
 }
 
+/** Used by: feature panels that render app-styled segmented tab controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function TabsList({
   className,
   ...props
@@ -32,6 +37,7 @@ function TabsList({
   )
 }
 
+/** Used by: TabsList consumers for each selectable tab because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function TabsTrigger({
   className,
   ...props
@@ -48,6 +54,10 @@ function TabsTrigger({
   )
 }
 
+/**
+ * Tab content region used by feature panels to mount active tab bodies.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function TabsContent({
   className,
   ...props

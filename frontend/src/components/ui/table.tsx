@@ -7,6 +7,7 @@ interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
   disableContainer?: boolean
 }
 
+/** Responsive table primitive used by data previews and feature result tables. */
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, containerClassName, disableContainer = false, ...props }, ref) => {
     const tableElement = (
@@ -30,6 +31,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
 )
 Table.displayName = "Table"
 
+/** Table header section used by shared table layouts. */
 const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
@@ -38,6 +40,7 @@ const TableHeader = React.forwardRef<
 ))
 TableHeader.displayName = "TableHeader"
 
+/** Table body section used for rows rendered by feature and workspace tables. */
 const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
@@ -50,6 +53,7 @@ const TableBody = React.forwardRef<
 ))
 TableBody.displayName = "TableBody"
 
+/** Table footer section used where summaries or footer controls need table semantics. */
 const TableFooter = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
@@ -65,6 +69,7 @@ const TableFooter = React.forwardRef<
 ))
 TableFooter.displayName = "TableFooter"
 
+/** Table row primitive with shared hover/selected styling for data grids. */
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
@@ -80,6 +85,7 @@ const TableRow = React.forwardRef<
 ))
 TableRow.displayName = "TableRow"
 
+/** Table header cell primitive used by app tables for consistent alignment and checkbox spacing. */
 const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
@@ -95,6 +101,7 @@ const TableHead = React.forwardRef<
 ))
 TableHead.displayName = "TableHead"
 
+/** Table data cell primitive used by feature rows and workspace data previews. */
 const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
@@ -110,6 +117,7 @@ const TableCell = React.forwardRef<
 ))
 TableCell.displayName = "TableCell"
 
+/** Table caption primitive used when callers need accessible table context below data. */
 const TableCaption = React.forwardRef<
   HTMLTableCaptionElement,
   React.HTMLAttributes<HTMLTableCaptionElement>

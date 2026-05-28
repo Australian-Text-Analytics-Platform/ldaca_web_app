@@ -28,6 +28,21 @@ import { SampleDataPanel } from './components/SampleDataPanel';
 import { countFilesInNode } from './utils/fileTreeHelpers';
 import { getWorkspaceId } from './utils/format';
 
+/**
+ * Orchestrates the Data Loader tab. It exists as the feature shell that wires
+ * workspace actions, file browsing, uploads, sample imports, and dialogs for
+ * the main app route.
+ * Rendered by: ViewRouter when the user opens the Data Loader view because
+ * this component is the only place that combines file-system state, workspace
+ * mutations, upload/import hooks, and the split-panel layout. DataLoaderFeature
+ * tests render it to verify those integrated workflows stay connected, while
+ * AddFilePanel receives callbacks from it so individual selected files can be
+ * promoted into workspace nodes.
+ * Flow: collect workspace/auth/file-browser state, build notification and
+ * mutation hooks, derive workspace/file summary values, block unsafe workspace
+ * changes while tasks are active, then render the workspace, file tree, sample
+ * data, preview, and dialog panels with the handlers they need.
+ */
 export const DataLoaderFeature: React.FC = () => {
   const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
@@ -61,6 +76,14 @@ export const DataLoaderFeature: React.FC = () => {
   });
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
 
+  /**
+   * Called by: Data Loader hooks when long-running file, workspace, import, or
+   * folder actions need consistent user feedback. They call through this local
+   * adapter so durations and Sonner entry points stay centralized instead of
+   * each hook choosing its own toast behavior.
+   * Flow: choose an error-specific or normal duration, map the semantic status
+   * to the matching Sonner API, and fall back to the neutral toast for info.
+   */
   const notify = useCallback((type: 'success' | 'error' | 'info', message: string) => {
     const duration = type === 'error' ? 6000 : 3500;
     if (type === 'success') {
@@ -178,6 +201,17 @@ export const DataLoaderFeature: React.FC = () => {
     currentWorkspace?.total_nodes ??
     0;
 
+  /**
+   * Bridges the add-file dialog to workspace node creation. The AddFilePanel
+   * calls this after optional sheet selection, and the feature owns clearing
+   * the pending filename afterward.
+   * Called by: AddFilePanel's submit path because the sheet chooser only knows
+   * the selected worksheet; DataLoaderFeature holds the pending filename and the
+   * workspace mutation hook needed to create the node.
+   * Flow: ignore submits with no pending filename, delegate node creation to the
+   * workspace action hook, report any failure through the feature toast adapter,
+   * then clear the pending filename so the dialog cannot resubmit stale state.
+   */
   const handleAddToWorkspace = async (selectedSheet?: string | null) => {
     if (!addFileName) return;
     try {
@@ -418,17 +452,23 @@ export const DataLoaderFeature: React.FC = () => {
       <FilePreviewPanel
         filename={previewFile}
         open={Boolean(previewFile)}
+        /** Clears the selected preview file when the preview dialog closes. */
         onClose={() => setPreviewFile(null)}
       />
       <AddFilePanel
         filename={addFileName}
         open={Boolean(addFileName)}
+        /** Clears the pending file-to-workspace selection when the add dialog closes. */
         onClose={() => setAddFileName(null)}
         onConfirm={handleAddToWorkspace}
       />
       <DataLoaderDialogs
         noWorkspaceAlert={{
           open: workspaceAlertOpen,
+                    /**
+         * Dismisses the no-workspace alert owned by DataLoaderDialogs.
+         * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+         */
           onClose: () => setWorkspaceAlertOpen(false),
         }}
         workspaceNameAlert={{
@@ -443,6 +483,10 @@ export const DataLoaderFeature: React.FC = () => {
           target: workspaceToDelete,
           deleting: deletingWorkspace,
           onCancel: closeDeleteWorkspaceDialog,
+                    /**
+                     * Confirms the pending workspace delete from the presentation dialog.
+                     * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+                     */
           onConfirm: () => void handleConfirmDeleteWorkspace(),
         }}
         ldacaImport={{
@@ -465,6 +509,9 @@ export const DataLoaderFeature: React.FC = () => {
           importingId,
           importing: ldacaImporting,
           errorMessage: ldacaErrorMessage,
+          // These handlers adapt dialog-level token/search/import controls to
+          // the feature hooks and preference store that own their side effects.
+          // Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
           onTokenSave: (token) => {
             const trimmed = token.trim();
             if (!trimmed) {
@@ -475,12 +522,24 @@ export const DataLoaderFeature: React.FC = () => {
             void reloadFeaturedRecords(trimmed);
             notify('success', 'LDaCA token saved.');
           },
+                    /**
+                     * Deletes the stored Oni token and refreshes featured collections anonymously.
+                     * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+                     */
           onTokenDelete: () => {
             setLdacaOniApiToken(null);
             void reloadFeaturedRecords(null);
             notify('success', 'LDaCA token deleted.');
           },
+                    /**
+                     * Routes dialog search submission through the feature's guarded search handler.
+                     * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+                     */
           onSearch: () => void handleLdacaSearch(),
+                    /**
+                     * Routes row-level imports through the feature's import task handler.
+                     * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+                     */
           onImport: (recordId) => void handleLdacaImport(recordId),
         }}
         createFolder={{
@@ -491,6 +550,9 @@ export const DataLoaderFeature: React.FC = () => {
           name: newFolderName,
           onNameChange: setNewFolderName,
           creating: creatingFolder,
+          // The dialog only knows about form state; folder creation stays in
+          // the hook so file-list refetch and alerts share one owner.
+          // Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
           onCreate: () => void handleCreateFolder(),
         }}
         citation={{

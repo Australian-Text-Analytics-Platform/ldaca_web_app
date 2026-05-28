@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import SidebarTasksSection from '../SidebarTasksSection';
 import type { SidebarTaskRecord } from '../types';
 
+/** Default connection props shared by task-section tests. */
 const baseProps = {
   isConnected: true,
   isConnecting: false,
@@ -12,6 +13,7 @@ const baseProps = {
   onReconnect: vi.fn(),
 };
 
+/** Called by: SidebarTasksSection tests that need compact task fixture rendering because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 const renderTasks = (tasks: SidebarTaskRecord[]) =>
   render(<SidebarTasksSection {...baseProps} tasks={tasks} />);
 

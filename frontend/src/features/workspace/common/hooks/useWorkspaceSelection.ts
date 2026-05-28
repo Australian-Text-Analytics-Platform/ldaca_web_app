@@ -1,6 +1,11 @@
 import { useContext } from 'react';
 import { WorkspaceSelectionContext } from '../WorkspaceContext';
 
+/**
+ * Reads selected-node state and pagination handlers from WorkspaceProvider.
+ * Used by: WorkspaceControls component, conditions tests, Sidebar component (rg call sites/imports).
+ * Why: because workspace chrome and sidebar controls need only selection state and setters from the provider.
+ */
 export const useWorkspaceSelection = () => {
   const selection = useContext(WorkspaceSelectionContext);
   if (!selection) {

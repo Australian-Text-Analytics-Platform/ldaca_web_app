@@ -21,6 +21,12 @@ export interface NodeColumnSelectorProps {
   labelClassName?: string;
 }
 
+/**
+ * Renders the shared column selector used by analysis parameter panels, including
+ * preserved lock values and disabled-reason tooltips.
+ * Used by: NodeSelectionPanel and feature-specific column selection controls because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export const NodeColumnSelector: React.FC<NodeColumnSelectorProps> = ({
   columns,
   value,

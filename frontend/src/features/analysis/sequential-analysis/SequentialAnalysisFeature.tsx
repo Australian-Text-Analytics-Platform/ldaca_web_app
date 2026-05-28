@@ -90,6 +90,10 @@ const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
 type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequestInput['custom_interval_unit']>;
 
+// Narrows persisted request values to the custom interval units accepted by the form.
+/**
+ * Called by: SequentialAnalysisFeature analysis panel during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+ */
 const isCustomIntervalUnit = (value: unknown): value is SequentialCustomIntervalUnit =>
   typeof value === 'string' &&
   VALID_CUSTOM_INTERVAL_UNITS.includes(value as SequentialCustomIntervalUnit);
@@ -97,6 +101,10 @@ const isCustomIntervalUnit = (value: unknown): value is SequentialCustomInterval
 const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
 const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
 
+// Parses optional numeric inputs while preserving null for empty or invalid entries.
+/**
+ * Called by: SequentialAnalysisFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ */
 const parseNumericInput = (value: string): number | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -105,6 +113,10 @@ const parseNumericInput = (value: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+// Parses custom interval values that must be positive whole numbers.
+/**
+ * Called by: SequentialAnalysisFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ */
 const parsePositiveIntegerInput = (value: string): number | null => {
   const parsed = parseNumericInput(value);
   if (parsed === null) return null;
@@ -112,6 +124,10 @@ const parsePositiveIntegerInput = (value: string): number | null => {
   return parsed;
 };
 
+// Parses context/minimum-size inputs that may legitimately be zero.
+/**
+ * Called by: SequentialAnalysisFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ */
 const parseNonNegativeIntegerInput = (value: string): number | null => {
   const parsed = parseNumericInput(value);
   if (parsed === null) return null;
@@ -119,6 +135,11 @@ const parseNonNegativeIntegerInput = (value: string): number | null => {
   return parsed;
 };
 
+/** Renders the sequential-analysis workflow for live trends and saved snapshot views. */
+/**
+ * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
 const SequentialAnalysisFeature = () => {
   const queryClient = useQueryClient();
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
@@ -252,6 +273,8 @@ const SequentialAnalysisFeature = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef,
+    // Loads the latest sequential-analysis result for polling and task resumption.
+    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
       const { data } = await sequentialAnalysisTaskResult({
         headers,
@@ -260,6 +283,8 @@ const SequentialAnalysisFeature = () => {
       });
       return data;
     },
+    // Retrieves the submitted request so hydration can restore parameters and locks.
+    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
       const { data } = await sequentialAnalysisTaskRequest({
         headers,
@@ -268,6 +293,8 @@ const SequentialAnalysisFeature = () => {
       });
       return data;
     },
+    // Applies freshly fetched task results to chart state after lifecycle polling completes.
+    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onResultFetched: (resultData) => {
       if (!resultData) return;
       setDetachNodeName('');
@@ -286,6 +313,8 @@ const SequentialAnalysisFeature = () => {
       });
       setChartType(resolvedChartType);
     },
+    // Rebuilds chart state from a cached result payload and any hydrated request parameters.
+    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedResult: (resultPayload) => {
       if (!resultPayload) return;
       setDetachNodeName('');
@@ -317,6 +346,8 @@ const SequentialAnalysisFeature = () => {
       setResults({ ...enriched, chart_type: resolvedChartType });
       setChartType(resolvedChartType);
     },
+    // Restores sequential request parameters, selection lock, and schema after reload.
+    // Called by: useAnalysisFeature hydration because Trends restores must rebuild time-column selection, bucket settings, grouping columns, and case handling from the submitted request. Flow: unwrap request data, apply numeric or datetime controls, restore node/group selections, then release hydration state.
     onHydratedRequest: async (requestPayload) => {
       const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown> | null;
       if (!req) return;
@@ -406,6 +437,8 @@ const SequentialAnalysisFeature = () => {
       }
       setHydratingSelection(false);
     },
+    // Clears sequential-specific state after the shared lifecycle removes the task result.
+    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onCleared: (_, options) => {
       setResultSafely(null);
       setHiddenKeys(new Set());
@@ -424,8 +457,14 @@ const SequentialAnalysisFeature = () => {
       setCustomIntervalValueInput('1');
       setCustomIntervalUnit('minutes');
     },
+    // Finds task ids embedded in result metadata for status recovery.
+    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getExtraTaskIdCandidates: () => [(resultRef.current as Record<string, unknown> | null)?.metadata as Record<string, unknown> | undefined].map(m => m?.task_id as string | undefined),
+    // Finds task ids embedded in result metadata for clear operations.
+    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getClearTaskIdSources: () => [(resultRef.current as Record<string, unknown> | null)?.metadata as Record<string, unknown> | undefined].map(m => m?.task_id as string | undefined),
+    // Treats hydrated running results as active tasks for the shared banner/action state.
+    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     isResultRunning: (r: Record<string, unknown> | null) => Boolean(r) && r?.state === 'running',
   });
 
@@ -510,6 +549,10 @@ const SequentialAnalysisFeature = () => {
         }))
         .filter((column) => TIME_COMPATIBLE_TYPES.includes(column.dataType as (typeof TIME_COMPATIBLE_TYPES)[number]))
         .sort((a, b) => {
+          // Prioritizes datetime columns before numeric fallbacks in the default selector.
+          /**
+           * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+           */
           const priority = (type: string) => (type === 'datetime' ? 0 : 1);
           return priority(a.dataType) - priority(b.dataType);
         });
@@ -579,6 +622,8 @@ const SequentialAnalysisFeature = () => {
       custom_interval_unit: isCustomDatetime ? customIntervalUnitValue : null,
       case_sensitive: caseSensitive,
     },
+    // Extracts comparable server-side parameters from the stored task request.
+    // Called by: SequentialAnalysisFeature lock diffing because request payloads store datetime and numeric bucket settings in nullable backend fields. Flow: normalize frequency, grouping, numeric/custom interval, and case flags, then return comparable sequential params.
     getServerParams: (request) => {
       const serverColumnType = typeof request.column_type === 'string' ? request.column_type : 'datetime';
       const serverFrequency = typeof request.frequency === 'string' ? request.frequency : 'year';
@@ -659,22 +704,38 @@ const SequentialAnalysisFeature = () => {
   }, [inSnapshotMode, isLocked, hydratingSelection, selectedNodeId, timeColumnOptions, setNodeColumnSelections, nodeColumnSelections, timeColumn]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Adds a blank grouping control up to the supported three-column limit.
+  /**
+   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleAddGroupByColumn = () => {
     if (groupByColumns.length < 3) {
       setGroupByColumns([...groupByColumns, '']);
     }
   };
 
+  // Removes one grouping control while preserving the order of the remaining groups.
+  /**
+   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleRemoveGroupByColumn = (index: number) => {
     setGroupByColumns(groupByColumns.filter((_, i) => i !== index));
   };
 
+  // Updates the selected column for one grouping slot.
+  /**
+   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleGroupByColumnChange = (index: number, value: string) => {
     const newColumns = [...groupByColumns];
     newColumns[index] = value;
     setGroupByColumns(newColumns);
   };
 
+  // Toggles chart series visibility without losing the underlying result rows.
+  /**
+   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleToggleKey = (key: string) => {
     setHiddenKeys((prev) => {
       const next = new Set(prev);
@@ -688,6 +749,7 @@ const SequentialAnalysisFeature = () => {
   };
 
   const {
+  // Toggles or range-selects chart periods for the add-to-workspace detach flow.
     handleAnalyze,
     handleClearResults,
     handleChartTypeChange,
@@ -797,6 +859,11 @@ const SequentialAnalysisFeature = () => {
     return capturedGroupColumns.map((name) => ({ name, dataType: 'string' }));
   })();
 
+  // Toggles or range-selects chart periods for the add-to-workspace detach flow.
+  /**
+   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+     * Flow: ignore out-of-range clicks, add shift-click ranges from the last anchor or toggle a single period, then store the updated selection set.
+   */
   const handlePeriodClick = (index: number, shiftHeld: boolean) => {
     if (index < 0 || index >= chartData.length) return;
 
@@ -822,11 +889,19 @@ const SequentialAnalysisFeature = () => {
     });
   };
 
+  // Clears selected chart periods and the anchor used for shift-click range selection.
+  /**
+   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   */
   const clearPeriodSelection = () => {
     setSelectedPeriodIndices(new Set());
     lastClickedIndexRef.current = null;
   };
 
+  // Runs a fresh trends analysis or updates a locked task after parameter changes.
+  /**
+   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleRunOrUpdate = async () => {
     if (inSnapshotMode) return;
     // Promote pending per-tab temp colours to assigned (Run is the
@@ -943,6 +1018,10 @@ const SequentialAnalysisFeature = () => {
   // differing requests under the same task slot with a 409
   // "Clear current sequential analysis results..."). The preview
   // endpoint returns just ``total_records``, no chart data shipped.
+  /**
+   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   */
   const dryRunSnapshotRows = async (config: TrendsSnapshotConfig): Promise<number> => {
     if (!liveCaptureNode || !activeTimeColumn) return 0;
     const nodeId = (liveCaptureNode.id as string | undefined)
@@ -1019,11 +1098,19 @@ const SequentialAnalysisFeature = () => {
   const effectiveGroupBy = inSnapshotMode
     ? groupByColumns.filter((c) => c.trim() !== '')
     : summaryGroupBy;
+  // Normalizes group values the same way snapshot rebucketing does for visibility checks.
+  /**
+   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   */
   const foldGroupValue = (raw: unknown): string => {
     const str = raw == null ? '' : String(raw);
     return inSnapshotMode && !caseSensitive ? str.toLowerCase() : str;
   };
 
+  // Builds the visible-series key for one raw result row.
+  /**
+   * Called by: SequentialAnalysisFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const getGroupKey = (row: Record<string, unknown>) => effectiveGroupBy
     .map((column) => foldGroupValue(row[column]))
     .join(' - ');
@@ -1041,6 +1128,10 @@ const SequentialAnalysisFeature = () => {
     return sizes;
   })();
 
+  // Applies the minimum group-size threshold to chart series keys.
+  /**
+   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   */
   const passesMinGroupSize = (key: string) => !effectiveGroupBy.length || (groupSizeByKey[key] ?? 0) >= minGroupSize;
   const filteredGroupKeys = groupKeys.filter((key) => passesMinGroupSize(key));
   const filteredOutGroupKeys = new Set(groupKeys.filter((key) => !passesMinGroupSize(key)));
@@ -1063,11 +1154,19 @@ const SequentialAnalysisFeature = () => {
     queryClient,
   });
 
+  // Checks whether one raw row belongs to a currently visible chart series.
+  /**
+   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   */
   const isRowVisible = (row: Record<string, unknown>) => {
     if (!effectiveGroupBy.length) return true;
     return !invisibleGroupKeys.has(getGroupKey(row));
   };
 
+  // Produces the bucket id used to match selected chart points back to raw rows.
+  /**
+   * Called by: SequentialAnalysisFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const getTimeBucketKey = (row: Record<string, unknown>) => String(
     (row.time_period_formatted as string | number | undefined)
       ?? (row.time_period as string | number | undefined)
@@ -1080,6 +1179,10 @@ const SequentialAnalysisFeature = () => {
       .filter((value) => value.length > 0),
   );
 
+  // Sums sequential document counts across raw rows for summary metrics.
+  /**
+   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   */
   const sumSequentialDocs = (rows: Array<Record<string, unknown>>) => rows.reduce((total, row) => {
     const count = row.sequential_count;
     return total + (typeof count === 'number' ? count : Number(count ?? 0));
@@ -1105,6 +1208,11 @@ const SequentialAnalysisFeature = () => {
         : `Frequency of records grouped by ${summaryTimeColumn}`)
     : 'Aggregated frequency over time';
 
+  // Exports the rendered chart SVG with contextual title and legend metadata.
+  /**
+   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const handleDownloadChart = async (format: ChartImageFormat) => {
     if (!chartContainerRef.current) {
       toast.error('Chart not available for export.');
@@ -1171,6 +1279,8 @@ const SequentialAnalysisFeature = () => {
           // Trends overrides the standard Save dialog with a richer
           // configuration dialog: pick the finest time bin + group-by
           // columns so the viewer can re-aggregate client-side.
+          // Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+          // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
           saveDialog: ({ open, onOpenChange, tool, existingFilenames, defaultName, onSave }) => (
             <TrendsSnapshotConfigDialog
               open={open}
@@ -1192,14 +1302,20 @@ const SequentialAnalysisFeature = () => {
           ),
         }}
         actions={{
+          // Routes the Run button through live sequential analysis only outside snapshot mode.
+          // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
           onRun: () => {
             if (inSnapshotMode) return;
             void handleRunOrUpdate();
           },
+          // Stops the active sequential-analysis task from the shared layout action.
+          // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
           onStop: () => {
             if (inSnapshotMode) return;
             void stopTask();
           },
+          // Clears live sequential-analysis results from the shared layout action.
+          // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
           onClear: () => {
             if (inSnapshotMode) return;
             void handleClearResults();

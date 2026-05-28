@@ -25,7 +25,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+/** Desktop sidebar width shared by the provider and layout gap elements. */
 const SIDEBAR_WIDTH = "16rem"
+/** Mobile sheet sidebar width used when `useIsMobile` switches to sheet rendering. */
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 
 type SidebarContextProps = {
@@ -38,8 +40,13 @@ type SidebarContextProps = {
   toggleSidebar: () => void
 }
 
+/** Context carrying open/collapse state for all sidebar primitives. */
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 
+/**
+ * Hook used by sidebar subcomponents to access provider state and toggles.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function useSidebar() {
   const context = React.useContext(SidebarContext)
   if (!context) {
@@ -49,6 +56,11 @@ function useSidebar() {
   return context
 }
 
+/**
+ * Provider used by the app shell to coordinate desktop/sidebar and mobile sheet state.
+ * Why: sidebar primitives need shared desktop collapse state, mobile sheet state, and width variables from one context.
+ * Flow: read the mobile breakpoint, resolve controlled/uncontrolled open state, provide toggle context, then wrap children with tooltip and width vars.
+ */
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -65,10 +77,10 @@ function SidebarProvider({
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
+  // Supports both controlled and uncontrolled sidebar state for app shell consumers.
   const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
+  /** Called by: SidebarProvider consumers and mobile sheet onOpenChange handlers because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const setOpen = (value: boolean | ((value: boolean) => boolean)) => {
     const openState = typeof value === "function" ? value(open) : value
     if (setOpenProp) {
@@ -78,13 +90,12 @@ function SidebarProvider({
     }
   }
 
-  // Helper to toggle the sidebar.
+  /** Called by: SidebarTrigger and provider consumers that toggle the sidebar because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const toggleSidebar = () => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
   }
 
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
+  // Exposes a stable styling state for Tailwind data-attribute selectors.
   const state = open ? "expanded" : "collapsed"
 
   const contextValue: SidebarContextProps = {
@@ -121,6 +132,11 @@ function SidebarProvider({
   )
 }
 
+/**
+ * Responsive sidebar container used by the app shell for desktop inset/offcanvas and mobile sheet modes.
+ * Why: the app shell uses one primitive for fixed desktop sidebars, collapsible offcanvas rails, and mobile sheet navigation.
+ * Flow: read sidebar context, render fixed layout when non-collapsible, render SheetContent on mobile, or render desktop gap/container elements.
+ */
 function Sidebar({
   side = "left",
   variant = "inset",
@@ -218,6 +234,11 @@ function Sidebar({
   )
 }
 
+/**
+ * Icon button used by mobile chrome and callers to toggle the sidebar provider state.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ * Flow: read the provider toggle, run any caller onClick first, toggle sidebar state, then render the panel icon with sr-only text.
+ */
 function SidebarTrigger({
   className,
   onClick,
@@ -244,6 +265,7 @@ function SidebarTrigger({
   )
 }
 
+/** Used by: App sidebar layouts that keep the shadcn desktop rail affordance because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarRail({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -262,6 +284,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Used by: app layouts that render main content beside an inset sidebar because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   return (
     <main
@@ -276,6 +299,10 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   )
 }
 
+/**
+ * Sidebar-scoped input wrapper used by search/filter controls in sidebar content.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function SidebarInput({
   className,
   ...props
@@ -290,6 +317,7 @@ function SidebarInput({
   )
 }
 
+/** Used by: Sidebar to render branding and account controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -301,6 +329,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Used by: Sidebar to render secondary actions and working-directory controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -312,6 +341,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Used by: sidebar consumers to divide grouped sidebar content because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarSeparator({
   className,
   ...props
@@ -326,6 +356,7 @@ function SidebarSeparator({
   )
 }
 
+/** Used by: Sidebar to hold the scroll-constrained section stack because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -340,6 +371,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Used by: shadcn-compatible sidebar consumers for grouped content blocks because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -351,6 +383,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Used by: SidebarGroup headers and shadcn-compatible grouped sidebar content because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarGroupLabel({
   className,
   asChild = false,
@@ -371,6 +404,7 @@ function SidebarGroupLabel({
   )
 }
 
+/** Used by: SidebarGroup headers that need a trailing absolute-positioned action because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarGroupAction({
   className,
   asChild = false,
@@ -393,6 +427,7 @@ function SidebarGroupAction({
   )
 }
 
+/** Used by: SidebarGroup children to render grouped sidebar content because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function SidebarGroupContent({
   className,
   ...props
@@ -407,6 +442,10 @@ function SidebarGroupContent({
   )
 }
 
+/**
+ * Menu list primitive used by the app sidebar view navigation.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
@@ -418,6 +457,7 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   )
 }
 
+/** Used by: SidebarMenu rows to position action and badge slots because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
     <li
@@ -429,6 +469,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   )
 }
 
+/** Menu button variants shared by sidebar navigation and nested menu links. */
 const sidebarMenuButtonVariants = cva(
   "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
   {
@@ -451,6 +492,10 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
+/**
+ * Used by: Sidebar navigation rows and action-like menu entries because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Flow: choose Slot or button rendering, compose CVA classes and data attrs, then optionally wrap the button in a collapsed-desktop tooltip.
+ */
 function SidebarMenuButton({
   asChild = false,
   isActive = false,
@@ -501,6 +546,7 @@ function SidebarMenuButton({
   )
 }
 
+/** Used by: SidebarMenuItem rows such as quotation settings because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarMenuAction({
   className,
   asChild = false,
@@ -532,6 +578,7 @@ function SidebarMenuAction({
   )
 }
 
+/** Used by: SidebarMenuItem rows that need numeric or status badges because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarMenuBadge({
   className,
   ...props
@@ -553,6 +600,10 @@ function SidebarMenuBadge({
   )
 }
 
+/**
+ * Used by: sidebar menus while async content is loading because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Flow: choose a skeleton text width once, render an optional icon placeholder, then render the menu text skeleton with sidebar data slots.
+ */
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
@@ -588,6 +639,7 @@ function SidebarMenuSkeleton({
   )
 }
 
+/** Used by: sidebar consumers that render nested sub-navigation because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
@@ -601,6 +653,8 @@ function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
     />
   )
 }
+
+/** Used by: SidebarMenuSub rows for nested sub-navigation because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SidebarMenuSubItem({
   className,
   ...props
@@ -615,6 +669,10 @@ function SidebarMenuSubItem({
   )
 }
 
+/**
+ * Used by: SidebarMenuSubItem targets in nested sub-navigation because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Flow: choose Slot or anchor rendering, set size/active data attrs, then merge nested-menu classes with caller classes.
+ */
 function SidebarMenuSubButton({
   asChild = false,
   size = "md",

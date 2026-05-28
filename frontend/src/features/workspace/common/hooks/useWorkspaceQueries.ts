@@ -21,6 +21,7 @@ const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
   },
   columns: [],
   dtypes: {},
+      /** Loads workspace summaries for selectors and launch screens. */
   sorting: { sort_by: null, descending: false },
   filtering: { column: null, value: null, op: 'contains' },
 }) as NodeDataResponse;
@@ -34,6 +35,12 @@ interface WorkspaceQueriesParams {
   getPaginationForNode: (nodeId?: string | null) => PaginationState;
 }
 
+/**
+ * Owns all workspace React Query reads. `useWorkspaceInternal` consumes this
+ * hook to keep server data, selected node data, and query states together.
+ * Used by: useWorkspaceInternal hook, useWorkspaceInternal tests (rg call sites/imports) because workspace orchestration needs all server reads in one query bundle.
+ * Flow: auth headers and the current workspace id feed TanStack queries for current workspace, graph, node data, and schema.
+ */
 export const useWorkspaceQueries = ({
   authHeaders,
   isAuthenticated,
@@ -44,6 +51,11 @@ export const useWorkspaceQueries = ({
 }: WorkspaceQueriesParams) => {
   const workspacesQuery = useQuery({
     queryKey: queryKeys.workspaces,
+        /**
+     * Loads workspace summaries for selectors and launch screens.
+         * Called by: useQuery option object inside useWorkspaceQueries.
+         * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+         */
     queryFn: async () => {
       const { data } = await listWorkspaces({ headers: authHeaders, throwOnError: true });
       return data;
@@ -54,6 +66,11 @@ export const useWorkspaceQueries = ({
 
   const currentWorkspaceQuery = useQuery({
     queryKey: queryKeys.currentWorkspace,
+        /**
+     * Restores the backend-selected workspace during authenticated startup.
+         * Called by: useQuery option object inside useWorkspaceQueries.
+         * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+         */
     queryFn: async () => {
       const { data } = await getCurrentWorkspace({ headers: authHeaders, throwOnError: true });
       return data.id ?? null;
@@ -66,6 +83,11 @@ export const useWorkspaceQueries = ({
     queryKey: currentWorkspaceId
       ? queryKeys.workspaceGraph(currentWorkspaceId)
       : ['workspaces', 'graph'],
+        /**
+     * Fetches graph topology for the active workspace view.
+         * Called by: useQuery option object inside useWorkspaceQueries.
+         * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+         */
     queryFn: async () => {
       const { data } = await getWorkspaceGraph({ headers: authHeaders, throwOnError: true });
       return data;
@@ -86,6 +108,12 @@ export const useWorkspaceQueries = ({
       getPaginationForNode(selectedNodeId).filterColumn,
       getPaginationForNode(selectedNodeId).filterValue,
     ),
+      /**
+     * Fetches the selected node page using server-side table controls.
+       * Called by: useQuery option object inside useWorkspaceQueries.
+       * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+       * Flow: verify the active workspace/node, derive pagination controls, then call the generated node-data endpoint.
+       */
     queryFn: () => {
       if (!currentWorkspaceId || !selectedNodeId) throw new Error('Missing workspace or node ID');
       const { currentPage, pageSize, sortBy, descending, filterColumn, filterValue, filterOp } = getPaginationForNode(selectedNodeId);

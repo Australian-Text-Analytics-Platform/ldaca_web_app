@@ -60,6 +60,10 @@ export type UseConcordanceMaterializedEventsResult = {
  *      persisted, so they don't race with the parent-task save the way the
  *      GET-based fallback can.
  */
+/**
+ * Used by: ConcordanceFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
 export function useConcordanceMaterializedEvents({
   concordanceTaskId,
   materializeTaskIds,
@@ -196,6 +200,8 @@ export function useConcordanceMaterializedEvents({
 
   return {
     concordanceTaskIdRef,
+    /** Lets hydration clear the materialized-event dedupe window for a new task. */
+    // Called by: useConcordanceMaterializedEvents through its owning hook, JSX prop, or analysis lifecycle config because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
     resetProcessedEvents: () => {
       processedMaterializedEventSeqRef.current = new Set();
     },

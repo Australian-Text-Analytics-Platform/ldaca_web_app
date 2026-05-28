@@ -36,6 +36,11 @@ export interface ColorPair {
 
 const HEX_RE = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
+/** Parses user/store hex colours into RGB so palette math can stay numeric. */
+/**
+ * Called by: DEFAULT_GREY_PAIR and deriveLightVariant in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 function parseHex(hex: string): { r: number; g: number; b: number } | null {
   const match = hex.match(HEX_RE);
   if (!match) return null;
@@ -48,14 +53,20 @@ function parseHex(hex: string): { r: number; g: number; b: number } | null {
   };
 }
 
+/** Bounds fractional HSL values before converting them back to display colours. */
+/** Called by: DEFAULT_GREY_PAIR and deriveLightVariant in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
+/** Bounds rounded RGB channels to browser-safe byte values. */
+/** Called by: DEFAULT_GREY_PAIR and deriveLightVariant in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 function clampByte(n: number): number {
   return Math.max(0, Math.min(255, Math.round(n)));
 }
 
+/** Formats one RGB channel for CSS hex output. */
+/** Called by: DEFAULT_GREY_PAIR and deriveLightVariant in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 function toHex(n: number): string {
   return clampByte(n).toString(16).padStart(2, '0');
 }
@@ -69,6 +80,11 @@ interface Hsl {
   l: number;
 }
 
+/** Converts assigned node colours to HSL so light variants preserve hue. */
+/**
+ * Called by: DEFAULT_GREY_PAIR and deriveLightVariant in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 function rgbToHsl(r: number, g: number, b: number): Hsl {
   const R = r / 255;
   const G = g / 255;
@@ -96,6 +112,11 @@ function rgbToHsl(r: number, g: number, b: number): Hsl {
   return { h: h * 360, s: s * 100, l: l * 100 };
 }
 
+/** Converts adjusted HSL values back to RGB for CSS output. */
+/**
+ * Called by: DEFAULT_GREY_PAIR and deriveLightVariant in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
   const H = ((h % 360) + 360) % 360 / 360;
   const S = clamp01(s / 100);
@@ -106,6 +127,11 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
   }
   const q = L < 0.5 ? L * (1 + S) : L + S - L * S;
   const p = 2 * L - q;
+  /** Samples one hue-offset channel from the temporary HSL conversion curve. */
+  /**
+   * Called by: hslToRgb in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+   * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+   */
   const channel = (t: number) => {
     let x = t;
     if (x < 0) x += 1;
@@ -134,6 +160,10 @@ const DEFAULT_LIGHT_VARIANT_LIGHTNESS = 86;
  * sense that re-lightening an already-light colour clamps at the
  * target; it won't drift further.
  */
+/**
+ * Used by: src/lib/__tests__/color.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 export function deriveLightVariant(
   hex: string,
   targetLightness: number = DEFAULT_LIGHT_VARIANT_LIGHTNESS,
@@ -155,6 +185,7 @@ export function deriveLightVariant(
  * - ``assigned`` truthy + parsable → ``{ X: assigned, Y: lightVariant(assigned) }``.
  * - ``assigned`` null / undefined / empty / unparsable → ``DEFAULT_GREY_PAIR``.
  */
+/** Used by: src/lib/__tests__/color.test.ts, src/lib/nodeVisualState.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 export function colorPairFor(assigned: string | null | undefined): ColorPair {
   if (!assigned) return DEFAULT_GREY_PAIR;
   const rgb = parseHex(assigned);

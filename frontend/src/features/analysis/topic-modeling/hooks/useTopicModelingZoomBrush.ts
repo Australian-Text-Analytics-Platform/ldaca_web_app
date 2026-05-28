@@ -33,6 +33,11 @@ type Params<TTopic extends TopicPoint> = {
   setTooltip: React.Dispatch<React.SetStateAction<TooltipLike<TTopic>>>;
 };
 
+/** Manages click-drag zoom brushing for the topic-modeling bubble chart. */
+/**
+ * Used by: TopicModelingFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
 export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
   topics,
   chartWidth,
@@ -61,6 +66,11 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     };
   }, []);
 
+  // Animates the chart domain so zoom and reset transitions remain spatially legible.
+  /**
+   * Called by: useTopicModelingZoomBrush during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
   const animateDomainTo = (target: ZoomDomain) => {
     const animationTopics = topics;
     const start = activeDomain ?? target;
@@ -71,8 +81,17 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
 
     const startAt = performance.now();
     const durationMs = 260;
+    // Eases domain interpolation so zoom transitions decelerate near the target.
+    /**
+     * Called by: animateDomainTo during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     */
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
+    // Advances one animation frame of the zoom-domain interpolation.
+    /**
+     * Called by: animateDomainTo during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+           * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+     */
     const step = (now: number) => {
       const raw = (now - startAt) / durationMs;
       const t = Math.max(0, Math.min(1, raw));
@@ -97,6 +116,10 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     animationFrameRef.current = requestAnimationFrame(step);
   };
 
+  // Converts mouse coordinates into SVG-local coordinates for brush geometry.
+  /**
+   * Called by: useTopicModelingZoomBrush during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   */
   const toSvgPoint = (event: React.MouseEvent<SVGSVGElement>) => {
     const svg = chartSvgRef.current;
     if (!svg) return null;
@@ -107,6 +130,10 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     };
   };
 
+  // Starts a brush selection and suppresses hover state while the drag is active.
+  /**
+   * Called by: useTopicModelingZoomBrush through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   */
   const handleBrushStart = (event: React.MouseEvent<SVGSVGElement>) => {
     if (event.button !== 0 || !activeDomain) return;
     const point = toSvgPoint(event);
@@ -123,6 +150,10 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     });
   };
 
+  // Updates the live brush rectangle as the pointer moves.
+  /**
+   * Called by: useTopicModelingZoomBrush through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   */
   const handleBrushMove = (event: React.MouseEvent<SVGSVGElement>) => {
     if (!isBrushing) return;
     const point = toSvgPoint(event);
@@ -130,6 +161,11 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     setBrushRect((prev) => (prev ? { ...prev, currentX: point.x, currentY: point.y } : prev));
   };
 
+  // Converts the finished brush rectangle back into topic-coordinate zoom bounds.
+  /**
+   * Called by: useTopicModelingZoomBrush through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
   const handleBrushEnd = () => {
     if (!isBrushing || !brushRect || !activeDomain) {
       setIsBrushing(false);
@@ -151,13 +187,25 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
 
     const innerWidth = Math.max(1, chartWidth - 2 * chartPadding);
     const innerHeight = Math.max(1, chartHeight - 2 * chartPadding);
+    // Keeps inverted brush coordinates within the drawable chart bounds.
+    /**
+     * Called by: handleBrushEnd as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     */
     const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
+    // Converts an SVG x-coordinate back into topic-domain coordinates.
+    /**
+     * Called by: handleBrushEnd during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     */
     const invX = (px: number) => {
       const t = clamp((px - chartPadding) / innerWidth, 0, 1);
       return activeDomain.xMin + t * (activeDomain.xMax - activeDomain.xMin);
     };
 
+    // Converts an SVG y-coordinate back into topic-domain coordinates.
+    /**
+     * Called by: handleBrushEnd during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     */
     const invY = (py: number) => {
       const t = clamp((py - chartPadding) / innerHeight, 0, 1);
       return activeDomain.yMin + t * (activeDomain.yMax - activeDomain.yMin);
@@ -177,6 +225,10 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     });
   };
 
+  // Restores the chart to the full domain covering all fitted topics.
+  /**
+   * Called by: useTopicModelingZoomBrush through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   */
   const handleResetZoom = () => {
     if (!fullDomain) return;
     animateDomainTo(fullDomain);

@@ -82,7 +82,11 @@ export type ParseResult =
   | { ok: true; manifest: SnapshotManifest; degradations: ParseDegradation[] }
   | { ok: false; error: ParseError };
 
-/** Parse raw manifest JSON text into a typed manifest. */
+/**
+ * Parse raw manifest JSON text into a typed manifest.
+ * Used by: bundle module, index module, manifest tests (rg call sites/imports) because bundle loading starts from raw manifest text.
+ * Flow: decode the raw JSON string, convert syntax failures into parse errors, then delegate structural checks to parseManifest.
+ */
 export function parseManifestJson(raw: string): ParseResult {
   let parsed: unknown;
   try {
@@ -99,8 +103,12 @@ export function parseManifestJson(raw: string): ParseResult {
   return parseManifest(parsed);
 }
 
-/** Parse an already-decoded JSON value. Split out so callers that
- * have the parsed JSON in hand don't double-decode. */
+/**
+ * Parse an already-decoded JSON value. Split out so callers that
+ * have the parsed JSON in hand don't double-decode.
+ * Used by: index module, manifest tests (rg call sites/imports) because tests and importers sometimes already hold decoded JSON.
+ * Flow: validate the manifest envelope, source/capability/preview blocks, normalize known payload entries, collect recoverable degradations, and require a result payload.
+ */
 export function parseManifest(raw: unknown): ParseResult {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     return { ok: false, error: { kind: 'not-an-object' } };
@@ -228,6 +236,11 @@ export function parseManifest(raw: unknown): ParseResult {
   return { ok: true, manifest, degradations };
 }
 
+/**
+ * Validates source metadata required to rebuild snapshot source context.
+ * Used by: local callers in snapshot-view/manifest module because parsed manifests must reject incomplete source blocks before hydration.
+ * Flow: require an object source block, validate workspace strings and node arrays, then ensure total_source_rows is finite.
+ */
 function validateSourceBlock(src: unknown): ParseError | null {
   if (typeof src !== 'object' || src === null || Array.isArray(src)) {
     return { kind: 'invalid-field-type', field: 'source', expected: 'object' };
@@ -253,6 +266,11 @@ function validateSourceBlock(src: unknown): ParseError | null {
   return null;
 }
 
+/**
+ * Validates feature flags so UI gating can trust parsed manifest capabilities.
+ * Used by: local callers in snapshot-view/manifest module because capability flags decide which snapshot affordances can render.
+ * Flow: require an object capability block, then verify each UI gating flag is present as a boolean.
+ */
 function validateCapabilities(caps: unknown): ParseError | null {
   if (typeof caps !== 'object' || caps === null || Array.isArray(caps)) {
     return { kind: 'invalid-field-type', field: 'capabilities', expected: 'object' };
@@ -277,14 +295,18 @@ function validateCapabilities(caps: unknown): ParseError | null {
   return null;
 }
 
-/** Apply build-side capability gating to a parsed manifest. Returns
+/**
+ * Apply build-side capability gating to a parsed manifest. Returns
  * a manifest with capabilities tightened to what the build actually
  * supports, plus the list of degradations applied. Source-projection
  * payload entries are kept (so the loader knows they exist) — the
  * capability flag, not the payload list, is what gates the UI.
  *
  * Callers typically merge these degradations with parse-time ones
- * before showing the user the consolidated notice. */
+ * before showing the user the consolidated notice.
+ * Used by: bundle module, index module, manifest tests (rg call sites/imports) because older bundles can contain capabilities unsupported by the running build.
+ * Flow: copy parsed capabilities, disable unsupported source/cross-jump affordances, and return the gated manifest with user-facing degradation notices.
+ */
 export function applyBuildCapabilityGating(
   manifest: SnapshotManifest,
   buildSupport: BuildSupport = V1_BUILD_SUPPORT,
@@ -312,8 +334,12 @@ export function applyBuildCapabilityGating(
   };
 }
 
-/** Emit a typed manifest to a JSON string suitable for writing into
- * the bundle. Pretty-printed for diff-friendliness inside the zip. */
+/**
+ * Emit a typed manifest to a JSON string suitable for writing into
+ * the bundle. Pretty-printed for diff-friendliness inside the zip.
+ * Used by: bundle module, index module, bundle tests (rg call sites/imports) because bundle writers need stable JSON bytes for snapshots.
+ * Flow: serialize the already-typed manifest with stable two-space formatting so bundle bytes are predictable in tests and archives.
+ */
 export function emitManifestJson(manifest: SnapshotManifest): string {
   return JSON.stringify(manifest, null, 2);
 }

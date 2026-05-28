@@ -1,6 +1,6 @@
 import type { TaskItem } from '../stores/analysisStore';
 
-export const CANONICAL_TASK_TYPE_MAP = {
+const CANONICAL_TASK_TYPE_MAP = {
   topic_modeling: 'topic_modeling',
   token_frequencies: 'token_frequencies',
   'token-frequency': 'token_frequencies',
@@ -16,11 +16,14 @@ export type CanonicalTaskType =
   | 'concordance'
   | 'quotation';
 
-export const normalizeTaskTypeKey = (taskType: string): string => {
+/** Called by: getTaskTypeCandidates when expanding legacy task labels because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+const normalizeTaskTypeKey = (taskType: string): string => {
   const normalized = taskType.trim();
   return CANONICAL_TASK_TYPE_MAP[normalized as keyof typeof CANONICAL_TASK_TYPE_MAP] ?? normalized;
 };
 
+/** Returns all task-type aliases a UI feature should watch for one logical analysis. */
+/** Used by: src/features/analysis/common/tasks/policies.ts, src/features/analysis/common/tasks/useAnalysisTaskFlow.ts, src/hooks/useAnalysisTaskStatus.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const getTaskTypeCandidates = (taskType: string): string[] => {
   const canonical = normalizeTaskTypeKey(taskType);
   const aliases = Object.entries(CANONICAL_TASK_TYPE_MAP)
@@ -29,6 +32,8 @@ export const getTaskTypeCandidates = (taskType: string): string[] => {
   return Array.from(new Set([canonical, ...aliases]));
 };
 
+/** Builds a stable key for deduping repeated task-state events from task streams. */
+/** Used by: src/features/analysis/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const normalizeTaskDedupeKey = (
   taskId: string | null | undefined,
   state: string | null | undefined
@@ -41,8 +46,8 @@ export const normalizeTaskDedupeKey = (
   return `${normalizedTaskId}:${normalizedState}`;
 };
 
-type TaskOperation = (workspaceId: string, taskId: string) => Promise<unknown>;
-
+/** Treats blank, missing, and non-string task ids as absent before API calls. */
+/** Called by: getTaskTypeCandidates and normalizeTaskDedupeKey in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const normalizeTaskId = (value: unknown): string | null => {
   if (typeof value !== 'string') {
     return null;
@@ -51,6 +56,8 @@ const normalizeTaskId = (value: unknown): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+/** Collects unique valid task ids from local state, route params, or server responses. */
+/** Used by: src/features/analysis/common/clearAnalysis.ts, src/features/analysis/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const collectTaskIds = (candidateIds: Array<string | null | undefined>): string[] => {
   const ids = candidateIds
     .map((value) => normalizeTaskId(value))
@@ -64,6 +71,11 @@ interface ResolveAnalysisTaskIdOptions {
   onResolved?: (taskId: string | null) => void;
 }
 
+/** Resolves the best task id for cleanup/result-fetch flows, falling back to a server lookup. */
+/**
+ * Used by: src/features/analysis/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Flow: prefer valid local candidate ids, optionally fetch the current server task id, normalize it, then notify the resolver callback.
+ */
 export const resolveAnalysisTaskId = async ({
   candidateIds,
   fetchCurrentTaskId,
@@ -90,79 +102,8 @@ export const resolveAnalysisTaskId = async ({
   }
 };
 
-interface ClearAnalysisTaskResultsOptions {
-  workspaceId: string;
-  taskIds: string[];
-  clearTask: TaskOperation;
-  warnContext?: string;
-}
-
-export const clearAnalysisTaskResults = async ({
-  workspaceId,
-  taskIds,
-  clearTask,
-  warnContext,
-}: ClearAnalysisTaskResultsOptions): Promise<void> => {
-  const ids = collectTaskIds(taskIds);
-  if (ids.length === 0) {
-    return;
-  }
-
-  const settled = await Promise.allSettled(
-    ids.map((taskId) => clearTask(workspaceId, taskId))
-  );
-
-  settled.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      const label = warnContext ? `[${warnContext}]` : '[analysis]';
-      console.warn(`${label} failed to clear task ${ids[index]}`, result.reason);
-    }
-  });
-};
-
-interface ClearAnalysisTaskArtifactsOptions {
-  workspaceId: string;
-  taskIds: string[];
-  clearManagerTask?: TaskOperation;
-  warnContext?: string;
-}
-
-const runTaskOperation = async (
-  operation: TaskOperation | undefined,
-  workspaceId: string,
-  taskId: string,
-  label: string,
-  warnContext?: string
-): Promise<void> => {
-  if (!operation) {
-    return;
-  }
-  try {
-    await operation(workspaceId, taskId);
-  } catch (error) {
-    const context = warnContext ? `[${warnContext}]` : '[analysis]';
-    console.warn(`${context} failed to ${label} task ${taskId}`, error);
-  }
-};
-
-export const clearAnalysisTaskArtifacts = async ({
-  workspaceId,
-  taskIds,
-  clearManagerTask,
-  warnContext,
-}: ClearAnalysisTaskArtifactsOptions): Promise<void> => {
-  const ids = collectTaskIds(taskIds);
-  if (ids.length === 0) {
-    return;
-  }
-
-  await Promise.all(
-    ids.map(async (taskId) => {
-      await runTaskOperation(clearManagerTask, workspaceId, taskId, 'clear', warnContext);
-    })
-  );
-};
-
+/** Removes completed/cleared tasks from the Zustand task list after task cleanup succeeds. */
+/** Used by: src/features/analysis/concordance/ConcordanceFeature.tsx, src/features/analysis/token-frequency/TokenFrequencyFeature.tsx, src/features/analysis/topic-modeling/TopicModelingFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const pruneTasksById = <T extends Pick<TaskItem, 'task_id'>>(
   tasks: T[],
   taskIds: string[]

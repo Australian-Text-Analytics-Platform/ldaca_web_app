@@ -86,6 +86,10 @@ export type ConcordanceParameterPanelProps = {
   renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
 };
 
+/**
+ * Rendered by: ConcordanceFeature to own concordance parameters and header snapshot controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps> = ({
   panelSelectedNodes,
   effectiveNodeColumnSelections,

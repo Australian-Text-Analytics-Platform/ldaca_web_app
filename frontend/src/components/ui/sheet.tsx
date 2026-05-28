@@ -6,28 +6,33 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+/** Used by: slide-in side panels and the mobile sidebar wrapper because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
 
+/** Used by: controls that open slide-in sheet panels because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SheetTrigger({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
 }
 
+/** Used by: custom close controls inside slide-in sheet panels because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SheetClose({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
 }
 
+/** Used by: SheetContent to render panels outside the caller's layout because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function SheetPortal({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Portal>) {
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
 }
 
+/** Used by: SheetContent as the shared backdrop for sheet panels because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function SheetOverlay({
   className,
   ...props
@@ -44,6 +49,11 @@ function SheetOverlay({
   )
 }
 
+/**
+ * Slide-in content wrapper used by sheets and the mobile sidebar.
+ * Why: Radix Dialog sheets need side-aware slide classes, a shared overlay, and a consistent close affordance.
+ * Flow: render Portal and Overlay, compose side-specific Content classes, then append the close button with an sr-only label.
+ */
 function SheetContent({
   className,
   children,
@@ -81,6 +91,7 @@ function SheetContent({
   )
 }
 
+/** Used by: sheet consumers that render titles and descriptions because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -91,6 +102,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Used by: sheet consumers that render footer actions because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -101,6 +113,10 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ * Accessible sheet title primitive used by sheet content.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function SheetTitle({
   className,
   ...props
@@ -114,6 +130,10 @@ function SheetTitle({
   )
 }
 
+/**
+ * Accessible sheet description primitive used by sheet content.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function SheetDescription({
   className,
   ...props

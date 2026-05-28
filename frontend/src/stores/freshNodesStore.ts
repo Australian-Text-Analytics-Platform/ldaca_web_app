@@ -42,6 +42,11 @@ export const useFreshNodesStore = create<FreshNodesState>((set) => ({
   seenIds: new Set<string>(),
   freshIds: new Set<string>(),
 
+  /** Observes a graph payload and marks only mid-session arrivals as fresh. */
+  /**
+   * Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: copy seen/fresh sets, treat the first graph payload as baseline, then mark later unseen node ids as fresh highlights.
+   */
   observeNodeIds: (currentIds) => {
     set((state) => {
       const wasEmpty = state.seenIds.size === 0;
@@ -64,6 +69,8 @@ export const useFreshNodesStore = create<FreshNodesState>((set) => ({
     });
   },
 
+  /** Removes the fresh highlight once graph/sidebar interactions prove the user noticed nodes. */
+  /** Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   markInteracted: (nodeIds) => {
     set((state) => {
       if (nodeIds.length === 0 || state.freshIds.size === 0) return state;
@@ -77,6 +84,11 @@ export const useFreshNodesStore = create<FreshNodesState>((set) => ({
     });
   },
 
+  /** Drops deleted nodes from tracking so future same-id arrivals can be highlighted again. */
+  /**
+   * Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: copy tracking sets, remove deleted ids from seen and fresh state, then return the original state when no tracked id changed.
+   */
   forgetNodeIds: (nodeIds) => {
     set((state) => {
       if (nodeIds.length === 0) return state;
@@ -92,5 +104,7 @@ export const useFreshNodesStore = create<FreshNodesState>((set) => ({
     });
   },
 
+  /** Resets session-only freshness state for tests and workspace-session resets. */
+  /** Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   reset: () => set({ seenIds: new Set(), freshIds: new Set() }),
 }));

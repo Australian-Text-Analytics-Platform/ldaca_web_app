@@ -19,9 +19,17 @@ export interface TokenFrequencyNodeContext {
   selections: NodeColumnSelection[];
 }
 
+/** Narrows unknown values to usable non-empty node or column identifiers. */
+/**
+ * Called by: tokenFrequencyHelpers analysis helper module during this analysis workflow because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 const isValidId = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
+/** Removes duplicate node IDs while preserving the user's comparison order. */
+/**
+ * Called by: tokenFrequencyHelpers analysis helper module during this analysis workflow because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 const dedupePreserveOrder = (ids: string[]): string[] => {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -34,6 +42,11 @@ const dedupePreserveOrder = (ids: string[]): string[] => {
   return result;
 };
 
+/** Resolves the node and column context needed when token clicks jump to concordance. */
+/**
+ * Used by: useTokenFrequencyTaskFlow.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
+ */
 export function resolveTokenFrequencyNodeContext({
   lastCompareNodeIds = [],
   analysisParams,
@@ -85,6 +98,11 @@ export interface ConcordanceSeedParams {
   combined?: boolean;
 }
 
+/** Builds a concordance request seed from a clicked token and the current frequency context. */
+/**
+ * Used by: tokenFrequencyHelpers analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
+ */
 export function createConcordanceSeedRequest(
   token: string,
   {

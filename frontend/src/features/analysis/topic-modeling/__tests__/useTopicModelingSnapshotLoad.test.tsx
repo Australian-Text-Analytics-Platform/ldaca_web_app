@@ -11,9 +11,20 @@ import {
 import { useTopicModelingSnapshotLoad } from '../hooks/useTopicModelingSnapshotLoad';
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ getAuthHeaders: () => ({}) }),
+  // Supplies the auth hook contract without requiring login state in snapshot-load tests.
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+  useAuth: () => ({
+    // Snapshot download tests only need a stable header object.
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+    getAuthHeaders: () => ({}),
+  }),
 }));
 
+// Builds topic-modeling snapshot manifests with overridable fields for load-path tests.
+/**
+ * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 function makeManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManifest {
   return makeSnapshotManifest(
     {
@@ -34,6 +45,11 @@ function makeManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManife
   );
 }
 
+// Packages result/settings payloads into the Blob shape returned by the mocked download API.
+/**
+ * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 async function buildBundleBlob(
   manifest: SnapshotManifest,
   resultPayload: unknown,

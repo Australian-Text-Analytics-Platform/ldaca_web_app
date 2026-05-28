@@ -4,12 +4,8 @@ import { configResponse, preferencesResponse } from './fixtures';
 
 export const API_MOCK_ORIGIN = 'http://api.test';
 
-export const apiUrl = (path: string): string => {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${API_MOCK_ORIGIN}/api${normalizedPath}`;
-};
-
-export const apiPath = (path: string): string => {
+/** Called by: the shared MSW handler definitions in this module because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+const apiPath = (path: string): string => {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `*/api${normalizedPath}`;
 };

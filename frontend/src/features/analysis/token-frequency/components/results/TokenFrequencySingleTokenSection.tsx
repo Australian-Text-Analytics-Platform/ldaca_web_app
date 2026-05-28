@@ -92,6 +92,7 @@ const SingleNodeWordCloud = memo(({
   );
   const minFontSize = Math.max(SINGLE_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
   const maxFrequency = Math.max(1, ...words.map((w) => w.value));
+  /** Used by: SingleNodeWordCloud Wordcloud prop to scale each cloud word by frequency because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const fontSizeSetter = (datum: { value: number }) =>
     Math.max(
       minFontSize,
@@ -151,6 +152,10 @@ const SingleNodeWordCloud = memo(({
 });
 SingleNodeWordCloud.displayName = 'SingleNodeWordCloud';
 
+/**
+ * Rendered by: TokenFrequencyResultsPanel to show per-node word clouds or synchronized token lists because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 const TokenFrequencySingleTokenSectionInner = ({
   nodeDisplayResults,
   getColorForNode,
@@ -169,6 +174,10 @@ const TokenFrequencySingleTokenSectionInner = ({
   const listScrollRefs = useRef<Array<HTMLDivElement | null>>([]);
   const isSyncingScrollRef = useRef(false);
 
+    /**
+   * Called by: per-node token list scroll containers to keep rows visually aligned across cards because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Flow: ignore recursive sync events, copy the source scrollTop to sibling token lists, then release the sync guard.
+   */
   const handleListScroll = (sourceIndex: number) => (event: React.UIEvent<HTMLDivElement>) => {
     if (isSyncingScrollRef.current) {
       // Avoid feedback loops while we propagate scrollTop to siblings.
@@ -198,6 +207,7 @@ const TokenFrequencySingleTokenSectionInner = ({
   // list display limit) across cards so ranks don't shift when filtering.
   const tokenFilterTrimmed = tokenFilter.trim();
   const tokenFilterRegex = tokenFilterTrimmed ? wildcardToRegExp(tokenFilterTrimmed) : null;
+  /** Used by: TokenFrequencySingleTokenSectionInner list rows to test visibility under the current filter because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const matchesTokenFilter = (token: string): boolean => {
     if (!tokenFilterTrimmed) return true;
     if (!tokenFilterRegex) {

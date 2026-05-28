@@ -3,6 +3,11 @@ import type { FileTreeDirectory, FileTreeFile, FileTreeNode } from '@/types';
 export const README_FILENAME = 'README.md';
 export const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
 
+/**
+ * Counts visible data files below a file-tree node. Data Loader excludes README
+ * citation files from totals because they are shown as folder metadata instead.
+ * Used by: DataLoaderFeature module, FileTree component (rg call sites/imports).
+ */
 export function countFilesInNode(node: FileTreeNode): number {
   if (node.type === 'file') {
     return node.name.toLowerCase() === README_FILENAME.toLowerCase() ? 0 : 1;
@@ -10,6 +15,11 @@ export function countFilesInNode(node: FileTreeNode): number {
   return node.children.reduce((sum, child) => sum + countFilesInNode(child), 0);
 }
 
+/**
+ * Finds the README citation file attached to a directory. `FileTree` uses this
+ * to expose citation viewing without rendering README.md as a normal data file.
+ * Used by: FileTree component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ */
 export function getCitationFile(directory: FileTreeDirectory): FileTreeFile | null {
   const child = directory.children.find(
     (candidate): candidate is FileTreeFile =>
@@ -18,12 +28,22 @@ export function getCitationFile(directory: FileTreeDirectory): FileTreeFile | nu
   return child ?? null;
 }
 
+/**
+ * Returns children that should appear in the file browser, hiding citation
+ * README files that are represented by the folder citation action.
+ * Used by: FileTree component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ */
 export function getVisibleDirectoryChildren(directory: FileTreeDirectory): FileTreeNode[] {
   return directory.children.filter(
     (child) => child.type !== 'file' || child.name.toLowerCase() !== README_FILENAME.toLowerCase(),
   );
 }
 
+/**
+ * Derives a file's parent directory path for drag-to-move checks and drop
+ * target routing in `FileTree`.
+ * Used by: FileTree component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ */
 export function getParentDirectoryPath(filePath: string): string {
   const lastSlashIndex = filePath.lastIndexOf('/');
   return lastSlashIndex === -1 ? '' : filePath.slice(0, lastSlashIndex);

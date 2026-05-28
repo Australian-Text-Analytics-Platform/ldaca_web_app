@@ -21,6 +21,12 @@ export type ServerLockAnalysisType =
   | 'topic_modeling'
   | 'sequential_analysis';
 
+/**
+ * Routes lock/polling hooks to the generated "current tasks" endpoint that
+ * matches each analysis tab, including legacy tab aliases still emitted by UI code.
+ * Used by: useAnalysisServerRequestLock and hydration helpers because they need one switch that maps UI analysis aliases to generated current-task endpoints.
+ * Flow: normalize inputs, apply the analysis-specific branch, then return the derived value consumed by the caller.
+ */
 export async function getCurrentAnalysisTask(
   analysisType: ServerLockAnalysisType | string,
   headers: Record<string, string>,
@@ -57,6 +63,12 @@ export async function getCurrentAnalysisTask(
   }
 }
 
+/**
+ * Fetches the original backend request for a task so feature panels can rebuild
+ * locked selections and parameter forms from a task-center or hydration entry.
+ * Used by: useAnalysisServerRequestLock and task restore flows because they need task-center ids resolved through the matching generated task-request endpoint.
+ * Flow: normalize inputs, apply the analysis-specific branch, then return the derived value consumed by the caller.
+ */
 export async function getAnalysisTaskRequest(
   analysisType: ServerLockAnalysisType,
   taskId: string,

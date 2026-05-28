@@ -6,6 +6,11 @@ export interface NodeNameEntry {
   name?: string | null;
 }
 
+/** Builds a node-id to display-name lookup from selection sources. */
+/**
+ * Used by: TokenFrequencyFeature.tsx, tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+   * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const buildSelectionNameById = (
   selectedNodes: Array<NodeNameEntry | null | undefined>,
   panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null
@@ -29,6 +34,10 @@ export const buildSelectionNameById = (
   return mapping;
 };
 
+/** Creates a stable cache key for selection display-name mappings. */
+/**
+ * Used by: tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 export const buildSelectionNameKey = (
   selectedNodes: Array<NodeNameEntry | null | undefined>,
   panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null
@@ -40,6 +49,10 @@ export const buildSelectionNameKey = (
     .join('|');
 };
 
+/** Reads the backend's persisted token display limit from all supported response locations. */
+/**
+ * Used by: TokenFrequencyFeature.tsx, tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null): number | null => {
   if (!results) return null;
   const candidate =
@@ -49,6 +62,11 @@ export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null)
   return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
 };
 
+/** Reads the backend's persisted stop-word list from all supported response locations. */
+/**
+ * Used by: tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+   * Flow: check top-level, analysis_params, and metadata stop-word arrays in order, stringify entries, then return null when none exist.
+ */
 export const deriveBackendStopWords = (results?: TokenFrequencyResponse | null): string[] | null => {
   if (!results) return null;
   const candidate =
@@ -58,6 +76,10 @@ export const deriveBackendStopWords = (results?: TokenFrequencyResponse | null):
   return Array.isArray(candidate) ? candidate.map((item) => String(item)) : null;
 };
 
+/** Builds a stable stop-word key for effects that sync backend preferences into UI state. */
+/**
+ * Used by: tokenFrequencyUtils.test.ts, TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 export const deriveBackendStopWordsKey = (results?: TokenFrequencyResponse | null): string => {
   const stopWords = deriveBackendStopWords(results);
   if (!Array.isArray(stopWords) || stopWords.length === 0) return '';

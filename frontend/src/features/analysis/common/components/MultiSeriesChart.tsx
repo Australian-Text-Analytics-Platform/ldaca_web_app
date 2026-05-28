@@ -116,9 +116,17 @@ export interface MultiSeriesChartProps {
   suppressOverflowWarning?: boolean;
 }
 
+/** Default chart margins keep axes readable across compact analysis cards. */
 const DEFAULT_MARGIN = { top: 20, right: 30, left: 20, bottom: 20 } as const;
+/** Active-dot radius shared by selectable line and area chart variants. */
 const ACTIVE_DOT_RADIUS = 5;
 
+/**
+ * Wraps the project's Recharts usage for analysis trend/result charts so line,
+ * bar, area, tooltip, and point-selection behavior stay consistent.
+ * Used by: concordance dispersion and sequential analysis chart panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export const MultiSeriesChart: React.FC<MultiSeriesChartProps> = ({
   data,
   xKey,
@@ -155,6 +163,7 @@ export const MultiSeriesChart: React.FC<MultiSeriesChartProps> = ({
   useEffect(() => {
     const el = plotMeasureRef.current;
     if (!el) return;
+    /** Called by: ResizeObserver and initial chart mount for overflow warnings because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     const update = () => setChartPixelWidth(el.clientWidth);
     update();
     const ro = new ResizeObserver(update);
@@ -169,6 +178,7 @@ export const MultiSeriesChart: React.FC<MultiSeriesChartProps> = ({
   const xAxisType = xAxis?.type ?? 'category';
   const hasSelection = !!selection && selection.selectedIndices.size > 0;
 
+  /** Converts Recharts click payloads into the index-selection API used by charts. */
   const handleChartClick = selection
     ? (
         nextState: { activeTooltipIndex?: number | string } | null | undefined,
@@ -189,6 +199,10 @@ export const MultiSeriesChart: React.FC<MultiSeriesChartProps> = ({
 
   type DotProps = { cx?: number; cy?: number; index?: number };
 
+    /**
+   * Called by: dotFor when line/area series need custom point rendering because selection state must alter point visibility without duplicating Recharts dot branches.
+   * Flow: reject incomplete Recharts point props, draw the single-point marker when no selection exists, then emphasize selected indices and fade other points.
+   */
   const renderDot = (color: string, singlePoint: boolean) => (props: DotProps) => {
     const { cx, cy, index } = props;
     if (typeof cx !== 'number' || typeof cy !== 'number' || typeof index !== 'number') {
@@ -205,11 +219,13 @@ export const MultiSeriesChart: React.FC<MultiSeriesChartProps> = ({
     return <circle cx={cx} cy={cy} r={3} fill={color} fillOpacity={0.25} />;
   };
 
+  /** Called by: Recharts line and area series configuration because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const dotFor = (s: MultiSeriesChartSeries) => {
     if (!hasSelection && !s.singlePoint) return false;
     return renderDot(s.color, !!s.singlePoint);
   };
 
+  /** Builds the requested tooltip implementation once for the selected chart flavor. */
   const tooltipElement = ((): React.ReactElement | null => {
     if (!tooltip) return null;
     if (tooltip.content) return <ChartTooltip content={tooltip.content} />;

@@ -5,6 +5,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { QuotationAnalysisResponse } from '@/api/generated/types.gen';
 import { useQuotationTaskFlow } from '../useQuotationTaskFlow';
 
+// Builds the minimal successful quotation response shape consumed by task-flow assertions.
+/**
+ * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 const buildQuotationResponse = (): QuotationAnalysisResponse => ({
   data: [],
   columns: [],
@@ -62,6 +67,8 @@ describe('useQuotationTaskFlow', () => {
           setLocalTaskId: vi.fn(),
         },
         lock: {
+          // Supplies empty auth headers because these tests assert request payload shaping only.
+          // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
           getAuthHeaders: () => ({}),
           lockWithSnapshots: vi.fn(),
           resolveTaskId: vi.fn(async () => null),
@@ -139,6 +146,8 @@ describe('useQuotationTaskFlow', () => {
           setLocalTaskId: vi.fn(),
         },
         lock: {
+          // Supplies empty auth headers because these tests assert pagination payload shaping only.
+          // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
           getAuthHeaders: () => ({}),
           lockWithSnapshots: vi.fn(),
           resolveTaskId: vi.fn(async () => 'task-1'),

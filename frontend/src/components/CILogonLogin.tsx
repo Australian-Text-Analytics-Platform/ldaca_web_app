@@ -6,11 +6,11 @@ interface CILogonLoginProps {
 }
 
 /**
- * CILogon OIDC sign-in button. Clicking redirects to the backend's
- * /api/auth/cilogon/login endpoint which initiates the authorization code
- * flow and bounces the user to CILogon. On success CILogon redirects back
- * to /api/auth/cilogon/callback which issues a local session and sends the
- * browser back to the SPA with auth_token in the URL.
+ * CILogon OIDC sign-in button used by `LoginScreen` when the backend reports
+ * CILogon as an enabled auth provider. It exists to hand the browser to the
+ * backend-owned authorization flow while showing shared loading/error states.
+ * Why: the backend owns the OIDC redirect target, so the button only builds the handoff URL and mirrors login status.
+ * Flow: build `/auth/cilogon/login`, render the provider button, hide a broken favicon, then show supplied error or loading feedback.
  */
 function CILogonLogin({ isLoading, error }: CILogonLoginProps) {
   const loginUrl = `${getApiBase()}/auth/cilogon/login`;

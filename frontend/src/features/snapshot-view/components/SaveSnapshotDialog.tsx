@@ -43,6 +43,11 @@ export interface SaveSnapshotDialogProps {
   onSave: (filename: string, description: string) => Promise<void>;
 }
 
+/**
+ * Sanitizes the user-facing snapshot name before building an on-disk filename.
+ * Used by: local callers in snapshot-view/SaveSnapshotDialog module.
+ * Why: because save flow helpers need to validate description text and keep dialog state separate from capture side effects.
+ */
 function sanitiseName(raw: string): string {
   return raw.replace(INVALID_NAME_CHARS, '_').trim();
 }
@@ -54,6 +59,12 @@ interface NameValidation {
   error: string | null;
 }
 
+/**
+ * Performs inline filename validation for the save dialog before capture.
+ * Used by: local callers in snapshot-view/SaveSnapshotDialog module.
+ * Why: because save flow helpers need to validate description text and keep dialog state separate from capture side effects.
+ * Flow: trim input, reject missing or unsafe names, then compare the generated filename against saved bundles.
+ */
 function validateName(
   rawName: string,
   tool: SnapshotToolKey,
@@ -76,6 +87,12 @@ function validateName(
   return { ok: true, error: null };
 }
 
+/**
+ * Presents snapshot naming/description fields and delegates actual capture to
+ * the host analysis feature through `onSave`.
+ * Rendered by: index module, SaveSnapshotDialog tests, SnapshotActions component (rg call sites/imports) because save buttons need one dialog to collect metadata before capture.
+ * Flow: the user names a snapshot, the capture callback builds the bundle, and the dialog surfaces success or failure.
+ */
 export const SaveSnapshotDialog: React.FC<SaveSnapshotDialogProps> = ({
   open,
   onOpenChange,
@@ -103,6 +120,12 @@ export const SaveSnapshotDialog: React.FC<SaveSnapshotDialogProps> = ({
 
   const validation = validateName(name, tool, existingFilenames);
 
+  /**
+   * Saves the validated filename and keeps the dialog locked while uploading.
+   * Called by: SaveSnapshotDialog internal event, effect, or helper flow.
+   * Why: because save flow helpers need to validate description text and keep dialog state separate from capture side effects.
+   * Flow: guard invalid state, await the capture callback, close on success, and show failures inline.
+   */
   const handleSave = async () => {
     if (!validation.ok || isSaving) return;
     const filename = `${tool}-${sanitiseName(name)}.ldaca-snapshot`;

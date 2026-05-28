@@ -8,13 +8,23 @@ import { SidebarProvider } from '../../ui/sidebar';
 import { DEFAULT_VISIBLE_VIEWS, useUIStore } from '@/stores/uiStore';
 import { useHintsStore } from '@/stores/hintsStore';
 
+/** Toast spy used to verify sidebar menu actions surface user feedback. */
 const toastMock = vi.fn();
 
 vi.mock('sonner', () => ({
+  /** Used by: sidebar menu tests to assert toast feedback because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   toast: (...args: unknown[]) => toastMock(...args),
 }));
 
+/**
+ * Mutable auth fixture consumed by the mocked `useAuth` hook across sidebar visibility tests.
+ * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
+ */
 const authState = {
+  /**
+   * Supplies empty request headers for sidebar consumers that ask auth before data calls.
+   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
+   */
   getAuthHeaders: () => ({}),
   user: { name: 'Test User' },
   logout: vi.fn(),
@@ -23,6 +33,7 @@ const authState = {
 };
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
+  /** Used by: Sidebar tests to provide an empty workspace graph fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceData: () => ({
     workspaceGraph: { nodes: [] },
     currentWorkspaceId: 'ws-1',
@@ -30,18 +41,21 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
+  /** Used by: Sidebar tests to keep node-selection state empty because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceSelection: () => ({
     selectedNodeIds: [],
   }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
+  /** Used by: Sidebar tests to stub child component workspace actions because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceActions: () => ({
     toggleNodeSelection: vi.fn(),
   }),
 }));
 
 vi.mock('@/features/workspace/task-stream/useWorkspaceTaskInbox', () => ({
+  /** Used by: Sidebar tests to provide a quiet task-stream fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceTaskInbox: () => ({
     status: 'closed',
     error: null,
@@ -50,23 +64,34 @@ vi.mock('@/features/workspace/task-stream/useWorkspaceTaskInbox', () => ({
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
+  /**
+   * Returns the mutable auth fixture used by sidebar account and action controls.
+   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
+   */
   useAuth: () => authState,
 }));
 
 vi.mock('@/stores/analysisStore', () => ({
+  /** Used by: Sidebar tests to expose an empty analysis-task store fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useAnalysisStore: (selector: (state: { tasks: []; setTasks: ReturnType<typeof vi.fn> }) => unknown) =>
     selector({ tasks: [], setTasks: vi.fn() }),
 }));
 
 vi.mock('@/stores/quotationEngineStore', () => ({
+  /**
+   * Provides the dialog-open action consumed by sidebar quotation controls.
+   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
+   */
   useQuotationEngineDialogStore: (selector: (state: { open: ReturnType<typeof vi.fn> }) => unknown) =>
     selector({ open: vi.fn() }),
 }));
 
 vi.mock('@/components/dialogs/DataFolderDialog', () => ({
+  /** Used by: Sidebar layout tests that do not exercise the folder dialog because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   DataFolderDialog: () => null,
 }));
 
+/** Called by: Sidebar view-visibility tests before querying menu behavior because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 const renderSidebar = () => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },

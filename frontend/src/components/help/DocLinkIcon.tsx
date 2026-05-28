@@ -23,6 +23,7 @@ interface DocLinkConfig {
   openTarget: (target: DocTarget) => void;
 }
 
+/** Documentation modal configuration consumed by `DocLinkIcon` for each icon kind. */
 const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
   tutorial: {
     Icon: CircleHelp,
@@ -30,6 +31,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     defaultClassName: 'h-6 w-6 text-muted-foreground',
     missingMessage: 'No anchor found for this help item.',
     getTarget: getTutorialTarget,
+    /** Called by: DocLinkIcon handleClick for tutorial-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
     openTarget: (target) => useUIStore.getState().openTutorialTarget(target),
   },
   info: {
@@ -38,6 +40,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     defaultClassName: 'h-6 w-6 text-blue-500',
     missingMessage: 'No anchor found for this information item.',
     getTarget: getInfoTarget,
+    /** Called by: DocLinkIcon handleClick for information-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
     openTarget: (target) => useUIStore.getState().openInfoTarget(target),
   },
   reference: {
@@ -46,6 +49,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     defaultClassName: 'h-6 w-6',
     missingMessage: 'No anchor found for this reference item.',
     getTarget: getReferenceTarget,
+    /** Called by: DocLinkIcon handleClick for reference-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
     openTarget: (target) => useUIStore.getState().openReferenceTarget(target),
   },
   warning: {
@@ -55,7 +59,9 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     missingMessage: 'No anchor found for this warning item.',
     // No registry exists for warnings yet. The store action exists; if a
     // warningRegistry is added later, swap this for getWarningTarget.
+    /** Called by: DocLinkIcon handleClick for future warning-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
     getTarget: () => null,
+    /** Called by: DocLinkIcon handleClick for future warning documentation targets because the caller needs one documented boundary for the lookup, event, or state handoff step. */
     openTarget: (target) => useUIStore.getState().openWarningTarget(target),
   },
 };
@@ -69,9 +75,11 @@ export interface DocLinkIconProps {
 }
 
 /**
- * Unified help/info/reference/warning icon. The four `<XIcon>` components
- * (HelpIcon/InfoIcon/ReferenceIcon/...) are thin wrappers over this so call
- * sites and existing test mocks remain untouched.
+ * Unified documentation icon used by the Help/Info/Reference wrappers. It
+ * resolves registry keys, opens the matching modal through `useUIStore`, and
+ * gives callers a shared tooltip/button treatment for documentation links.
+ * Why: help, info, warning, and reference affordances share registry lookup, missing-target feedback, and modal dispatch.
+ * Flow: choose the icon config, resolve label and tooltip text, open the registry target or toast when missing, then render the icon button.
  */
 export const DocLinkIcon: React.FC<DocLinkIconProps> = ({
   kind,
@@ -85,6 +93,7 @@ export const DocLinkIcon: React.FC<DocLinkIconProps> = ({
   const tooltipText = tooltip ?? resolvedLabel;
   const Icon = config.Icon;
 
+  /** Called by: the DocLinkIcon button onClick prop because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleClick = () => {
     const target = config.getTarget(targetKey);
     if (!target) {

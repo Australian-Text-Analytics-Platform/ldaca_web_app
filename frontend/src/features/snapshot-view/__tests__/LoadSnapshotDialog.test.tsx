@@ -11,9 +11,27 @@ import type { SnapshotListItem } from '@/api/generated/types.gen';
 import type { SnapshotManifest } from '../types';
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ getAuthHeaders: () => ({ Authorization: 'Bearer test' }) }),
+  /**
+   * Supplies deterministic auth context for generated snapshot SDK calls.
+   * Used by: test mock object in snapshot-view/LoadSnapshotDialog.
+   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+   */
+  useAuth: () => ({
+    /**
+     * Returns stable headers so assertions are independent of real auth state.
+     * Used by: test mock object in snapshot-view/LoadSnapshotDialog.
+     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+     */
+    getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
+  }),
 }));
 
+/**
+ * Builds a valid snapshot manifest fixture for load-dialog rows.
+ * Used by: Vitest setup or assertions in snapshot-view/LoadSnapshotDialog.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: defaults create a complete manifest, then overrides replace only the fields needed by each assertion.
+ */
 function manifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManifest {
   return {
     schema_version: 1,
@@ -49,6 +67,11 @@ function manifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManifest {
   };
 }
 
+/**
+ * Builds an API list item fixture around a manifest override.
+ * Used by: Vitest setup or assertions in snapshot-view/LoadSnapshotDialog.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 function item(name: string, overrides: Partial<SnapshotManifest> = {}): SnapshotListItem {
   return {
     filename: `concordance-${name}.ldaca-snapshot`,
@@ -57,6 +80,11 @@ function item(name: string, overrides: Partial<SnapshotManifest> = {}): Snapshot
   };
 }
 
+/**
+ * Provides QueryClient and toast context required by LoadSnapshotDialog.
+ * Used by: Vitest setup or assertions in snapshot-view/LoadSnapshotDialog.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 function renderWithClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },

@@ -91,6 +91,11 @@ type ConcordanceGroupedRow = Record<string, unknown>[];
 
 
 
+/** Orchestrates the full concordance analysis UI, task lifecycle, snapshots, and detach flows. */
+/**
+ * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
 const ConcordanceFeature: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
@@ -340,6 +345,10 @@ const ConcordanceFeature: React.FC = () => {
     return null;
   }, [panelSelectedNodes, labelToNodeId]);
 
+  /** Resolves a displayed result block key to the source node ids needed for materialized bins. */
+  /**
+   * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   */
   const relevantNodeIdsForKey = (nodeKey: string): string[] => {
     if (nodeKey === '__COMBINED__') {
       return panelSelectedNodes
@@ -400,11 +409,20 @@ const ConcordanceFeature: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDispersion, proportionalDispersionBars, concordanceTaskId, materializedPaths, panelSelectedNodes]);
 
+  /** Reports whether every source node behind a result block has a cached materialized path. */
+  /**
+   * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   */
   const isBlockMaterialised = (nodeKey: string): boolean => {
     const ids = relevantNodeIdsForKey(nodeKey);
     return ids.length > 0 && ids.every((id) => id in materializedPaths);
   };
 
+  /** Combines per-node server bins into the tagged row shape expected by dispersion charts. */
+  /**
+   * Called by: ConcordanceFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+     * Flow: resolve source node ids for the display key, require all materialized paths and bins, tag each bin with its node label, then return chart-ready rows.
+   */
   const getMaterializedBinsForKey = (
     nodeKey: string,
   ): TaggedBinRow[] | undefined => {
@@ -466,6 +484,10 @@ const ConcordanceFeature: React.FC = () => {
       return;
     }
 
+    /** Keeps dispersion column sizing synced with the rendered results viewport. */
+    /**
+     * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+     */
     const updateWidth = () => {
       setResultsViewportWidth(element.clientWidth);
     };
@@ -664,6 +686,8 @@ const ConcordanceFeature: React.FC = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef: concordanceResultsRef,
+    /** Fetches a completed concordance task result for polling and hydration. */
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
       const { data } = await concordanceTaskResult({
         headers,
@@ -672,6 +696,8 @@ const ConcordanceFeature: React.FC = () => {
       });
       return data;
     },
+    /** Fetches the saved request so hydration can restore parameters and materialized state. */
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
       const { data } = await concordanceTaskRequest({
         headers,
@@ -680,17 +706,23 @@ const ConcordanceFeature: React.FC = () => {
       });
       return data;
     },
+    /** Copies freshly fetched task results into the feature's safe-result state. */
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onResultFetched: (resultData) => {
       if (resultData) {
         setResults(resultData as ConcordanceAnalysisResponse);
       }
     },
+    /** Accepts restored result payloads from persisted analysis tasks. */
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onHydratedResult: (resultPayload) => {
       const res = resultPayload?.data ?? resultPayload;
       if (res) {
         setResults(resultPayload as ConcordanceAnalysisResponse);
       }
     },
+    /** Restores concordance form controls and materialized caches from a saved request. */
+    // Called by: useAnalysisFeature hydration because restored concordance tasks must rebuild node selections, search options, materialized paths, and bin caches together. Flow: unwrap the saved request, apply form fields, restore materialized metadata, then lock the submitted nodes.
     onHydratedRequest: async (requestPayload) => {
       const req = (requestPayload as Record<string, unknown>)?.data ?? requestPayload;
       if (!req || typeof req !== 'object') return;
@@ -744,6 +776,8 @@ const ConcordanceFeature: React.FC = () => {
         });
       } catch { /* ignore */ }
     },
+    /** Clears result-specific state while preserving local controls when requested by handoff flows. */
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onCleared: (_, options) => {
       setResults(null);
       setNodePagination({});
@@ -754,12 +788,16 @@ const ConcordanceFeature: React.FC = () => {
       }
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
+    /** Keeps the global task list free of concordance task duplicates after lifecycle updates. */
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     pruneGlobalTasks: (taskIds) => {
       setTasks((prev) => {
         if (!Array.isArray(prev)) return prev;
         return taskIds.length > 0 ? pruneTasksById(prev, taskIds) : prev;
       });
     },
+    /** Lets the shared analysis lifecycle recognize in-flight concordance responses. */
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     isResultRunning: (r) => r?.state === 'running',
   });
 
@@ -974,6 +1012,8 @@ const ConcordanceFeature: React.FC = () => {
       whole_word: wholeWord,
       case_sensitive: caseSensitive,
     },
+    /** Normalizes backend request aliases before comparing against live form values. */
+    // Called by: ConcordanceFeature lock diffing because submitted requests may use old token-count aliases and regex changes force whole_word false. Flow: read search/options from the request, normalize left/right token aliases and boolean flags, then return comparable concordance params.
     getServerParams: (request) => ({
       search_word: typeof request.search_word === 'string' ? request.search_word : '',
       num_left_tokens:
@@ -1141,6 +1181,9 @@ const ConcordanceFeature: React.FC = () => {
 
 
 
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
     void persistDocumentColumn(nodeId, column);
@@ -1152,6 +1195,10 @@ const ConcordanceFeature: React.FC = () => {
     });
   };
 
+  /** Persists the tokenizer model chosen for a node/column when tokens mode is available. */
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleTokenizerModelChange = (
     nodeId: string,
     column: string,
@@ -1179,11 +1226,19 @@ const ConcordanceFeature: React.FC = () => {
     return () => cancelAnimationFrame(id);
   }, [shouldAutoSearch, handleSearch, setShouldAutoSearch]);
 
+  /** Delegates clearing to the shared analysis lifecycle only when a workspace is active. */
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleClearResults = async () => {
     if (!currentWorkspaceId) return;
     await clearResults();
   };
 
+  /** Confirms a token-frequency handoff by clearing stale concordance output first. */
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleConfirmPendingConcordance = async () => {
     if (!queuedPendingConcordance) {
       setHandoffConfirmOpen(false);
@@ -1198,11 +1253,19 @@ const ConcordanceFeature: React.FC = () => {
     }
   };
 
+  /** Cancels a queued token-frequency handoff without touching current concordance results. */
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleCancelPendingConcordance = () => {
     setQueuedPendingConcordance(null);
     setHandoffConfirmOpen(false);
   };
 
+  /** Runs or updates concordance while promoting temporary node colours into workspace state. */
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleRunOrUpdate = async () => {
     if (isSnapshotMode(snapshotMode)) return;
     // Commit the per-tab temp colours to the global assigned store so
@@ -1213,6 +1276,8 @@ const ConcordanceFeature: React.FC = () => {
     await executeAnalysisRunOrUpdate({
       hasLockedParameterChanges,
       clearResults: handleClearResults,
+      /** Starts the feature-specific concordance search after shared update checks pass. */
+      // Called by: handleRunOrUpdate through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
       runFreshAnalysis: () =>
         handleSearch(
           true,
@@ -1236,6 +1301,11 @@ const ConcordanceFeature: React.FC = () => {
   });
 
 
+  /** Opens row details with concordance-specific hit context and metadata filtering. */
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+     * Flow: verify workspace context, choose grouped hits or the clicked row, cache concordance detail metadata, then open row details without analysis-only columns.
+   */
   const handleRowClick = (
     row: Record<string, unknown>,
     nodeId: string,
@@ -1299,6 +1369,8 @@ const ConcordanceFeature: React.FC = () => {
           value: String(record[CONCORDANCE_COLUMN_KEYS.rightTokenFreq]),
         }] : []),
       ],
+      /** Highlights every concordance hit in the source text shown by the row-detail panel. */
+      // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
       renderDocumentText: (text: string) =>
         highlightMatchInText(
           text,
@@ -1315,6 +1387,10 @@ const ConcordanceFeature: React.FC = () => {
   })();
 
   // --- Detach dialog helpers ---
+  /**
+   * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const openDetachDialog = async (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => {
     setPendingDetachNodes(nodes);
 
@@ -1343,6 +1419,10 @@ const ConcordanceFeature: React.FC = () => {
     }
   };
 
+  /** Dispatches per-hit detach requests for every selected source in the dialog. */
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleDetachConfirm = async () => {
     for (const n of pendingDetachNodes) {
       const cols = selectedDetachColumns[n.nodeId] || [];
@@ -1355,6 +1435,10 @@ const ConcordanceFeature: React.FC = () => {
   };
 
   // --- Dispersion detach dialog helpers ---
+  /**
+   * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const openDispersionDetachDialog = async (
     nodes: { nodeId: string; column: string; nodeLabel: string }[],
     selectedBins: ReadonlySet<number> | null,
@@ -1424,6 +1508,11 @@ const ConcordanceFeature: React.FC = () => {
     }
   };
 
+  /** Dispatches aggregated dispersion detach requests using the dialog's column and bin choices. */
+  /**
+   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+     * Flow: convert pending bin selections to a set, dispatch each pending dispersion detach with chosen columns and match filters, then reset dialog state.
+   */
   const handleDispersionDetachConfirm = async () => {
     const binsSet = pendingDispersionBinSelection
       ? new Set(pendingDispersionBinSelection)

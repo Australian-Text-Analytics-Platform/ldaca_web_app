@@ -13,6 +13,10 @@ import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { takeMostRecent } from '@/utils/selectionUtils';
 
+/** Detects whether incoming token-frequency handoffs would replace visible results. */
+/**
+ * Called by: useConcordancePendingHandoff hook during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ */
 const hasSuccessfulConcordanceResults = (
   result: ConcordanceAnalysisResponse | null,
 ): boolean => Boolean(result && result.state === 'successful');
@@ -53,6 +57,10 @@ export type UseConcordancePendingHandoffResult = {
  * The actual auto-search dispatch + confirm/cancel handlers stay in the
  * parent — they need access to `handleSearch` and `clearResults`, which the
  * parent already has wired up.
+ */
+/**
+ * Used by: ConcordanceFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export function useConcordancePendingHandoff({
   pendingConcordance,

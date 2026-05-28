@@ -43,6 +43,8 @@ export interface UseNodeColorManagementReturn {
  * picker changes become previews that the graph/sidebar do not yet
  * see; on Run the temp promotes to assigned and the rest of the UI
  * catches up.
+ * Used by: analysis tabs and ExportFeature when rendering per-node colour state because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export function useNodeColorManagement(
   config: UseNodeColorManagementConfig,

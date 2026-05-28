@@ -61,7 +61,9 @@ export interface SnapshotActionsProps {
  * filename: trim, drop filename-invalid characters, collapse
  * whitespace runs to hyphens. The Save dialog re-runs its own
  * sanitisation when it computes the on-disk filename, so this is
- * just for the readable pre-populated string. */
+   * just for the readable pre-populated string.  * Used by: local callers in snapshot-view/SnapshotActions module.
+   * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
+   */
 function slugifyLabel(label: string): string {
   return label
     .trim()
@@ -69,6 +71,11 @@ function slugifyLabel(label: string): string {
     .replace(/\s+/g, '-');
 }
 
+  /**
+ * Builds the initial save-dialog name from selected node labels and date.
+   * Used by: local callers in snapshot-view/SnapshotActions module.
+   * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
+   */
 function buildDefaultName(nodeLabels: string[] | undefined): string {
   const date = new Date().toISOString().slice(0, 10);
   const cleaned = (nodeLabels ?? [])
@@ -86,6 +93,8 @@ function buildDefaultName(nodeLabels: string[] | undefined): string {
  *
  * Load is further gated on the snapshot list for this tool being non-empty:
  * "no snapshots saved yet" is conveyed by absence, not by an empty dialog.
+ * Rendered by: index module, SaveSnapshotDialog component, useConcordanceSnapshotLoad hook (rg call sites/imports) because analysis headers need one action slot for save/load workflows.
+ * Flow: mode and capability checks choose available actions, then save/load/description dialogs run the selected snapshot workflow.
  */
 export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   tool,
@@ -107,6 +116,11 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   //   - the Load button mounts only when ≥1 snapshot exists
   const { data: listData } = useQuery({
     queryKey: ['snapshots-list', tool],
+        /**
+     * Loads saved snapshots so Save can detect collisions and Load can mount.
+         * Called by: useQuery option object inside SnapshotActions.
+         * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
+         */
     queryFn: async () => {
       const { data } = await listSnapshots({
         headers: getAuthHeaders(),
@@ -122,6 +136,7 @@ export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   // Wrap the host's onSave so the snapshot list refetches as soon as
   // the upload succeeds. Without this, the Load button stays hidden
   // until the 10-second staleTime expires or the user switches tabs.
+  // Called by: SnapshotActions save dialog callback because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
   const handleSave = async (filename: string, description: string) => {
     if (!onSave) return;
     await onSave(filename, description);

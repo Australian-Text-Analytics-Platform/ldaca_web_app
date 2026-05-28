@@ -92,8 +92,20 @@ export interface UseConcatSubTabResult {
   showActivityTag: boolean;
 }
 
+/**
+ * Placeholder handler for NodeSelectionPanel callbacks hidden in concat mode.
+ * Used by: local callers in preprocessing/useConcatSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const noop = () => undefined;
 
+/**
+ * Summarizes selected nodes into normalized schema metadata. The concat hook
+ * uses these summaries for compatibility analysis, preview payloads, and UI
+ * status messages.
+ * Used by: local callers in preprocessing/useConcatSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Steps: derive display labels, collect unique columns, normalize dtype lookup keys, and
+ * return the metadata needed by preview/apply paths.
+ */
 const buildConcatNodeSummaries = (nodes: WorkspaceNodeLike[]): ConcatNodeSummary[] => {
   return nodes.map((node) => {
     const nodeId = getNodeKey(node);
@@ -122,6 +134,13 @@ const buildConcatNodeSummaries = (nodes: WorkspaceNodeLike[]): ConcatNodeSummary
   });
 };
 
+/**
+ * Compares selected node schemas to decide whether stacking is safe. The hook
+ * feeds the result to disabled states, mismatch panels, and preview readiness.
+ * Used by: local callers in preprocessing/useConcatSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Steps: group node schemas by column name, detect dtype/presence mismatches, and return a
+ * summary that drives warnings before concatenation.
+ */
 const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => {
   const result: ConcatSchemaAnalysis = {
     summaries,
@@ -202,6 +221,14 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
   return result;
 };
 
+/**
+ * Owns Concatenate sub-tab state. `ConcatSubTab` consumes this hook for node
+ * selection display, schema mismatch reporting, preview data, and the apply
+ * action.
+ * Used by: ConcatSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: derive eligible nodes and schema diagnostics, run preview for node ordering/page
+ * changes, build concat requests, and apply/refresh the resulting node.
+ */
 export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult => {
   const {
     selectedNodeIds,
@@ -263,6 +290,12 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     return `${concatPreviewRequest.nodeIds.join('|')}|dedup=${concatPreviewRequest.deduplicate ? '1' : '0'}`;
   })();
 
+  /**
+   * Adapts the workspace concat preview callback to the generic preprocessing
+   * preview hook result shape.
+   * Called by: useConcatSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Flow: call concat preview with ordered node ids, page and dedupe settings, then normalize rows, columns, and pagination for the shared preview hook.
+   */
   const concatPreviewFetcher = async ({
     request,
     page,
@@ -305,6 +338,10 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     return [];
   })();
 
+    /**
+     * Resets preview pagination when the user changes rows per page.
+     * Called by: useConcatSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
   const handleConcatPreviewPageSizeChange = (size: number) => {
     if (!Number.isNaN(size)) {
       setConcatPreviewPageSize(size);
@@ -324,6 +361,13 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     return undefined;
   })();
 
+  /**
+   * Applies the stack operation using the current compatible node set and
+   * optional output name from the form.
+   * Called by: useConcatSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: validate schema readiness, choose the output name, call concatNodes, and clear
+   * loading state after success or failure.
+   */
   const handleApplyConcat = async () => {
     if (!concatAnalysis.ready) {
       onAlert(concatAnalysis.issues || 'Select at least two compatible data blocks to stack.');

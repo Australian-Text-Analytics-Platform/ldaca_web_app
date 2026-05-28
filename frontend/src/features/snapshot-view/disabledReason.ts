@@ -25,7 +25,8 @@ export const SNAPSHOT_DISABLED_REASON =
  *   <DisabledReasonTooltip reason={reason}>...</DisabledReasonTooltip>
  *
  * Snapshot mode takes precedence over other reasons because exiting
- * demo mode is the prerequisite for everything else mattering. */
+ * demo mode is the prerequisite for everything else mattering.  * Used by: index module, SequentialChart component, ConcordanceParameterPanel component (rg call sites/imports).
+ */
 export function snapshotDisabledReason(
   inSnapshotMode: boolean,
   ...fallbackReasons: Array<string | false | null | undefined>

@@ -17,6 +17,13 @@ import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSub
 
 export type { ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
+/**
+ * Renders the Find/Transform preprocessing tab. It delegates regex/extract
+ * state, preview, and apply behavior to `useReplaceSubTab`.
+ * Rendered by: DataPreprocessingFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: render target column/find-replace controls, show preview output, and delegate
+ * apply/preview actions to the replace hook.
+ */
 export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
   const {
     activeNodeId,

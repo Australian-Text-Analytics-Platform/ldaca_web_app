@@ -23,6 +23,9 @@ interface ColumnFilterFormProps {
  * Filter editor rendered inside the workspace-table column settings
  * dropdown sub-menu. Auto-focuses the value input on mount; clicks/keys
  * are stopped from propagating so the dropdown doesn't close mid-edit.
+ * Rendered by: WorkspaceColumnHeader component (rg call sites/imports).
+ * Why: because column headers need a focused filter form that translates user input into the server filter model.
+ * Flow: local input state mirrors the active filter, then Apply/Clear callbacks update the server filter state.
  */
 export function ColumnFilterForm({
   column,

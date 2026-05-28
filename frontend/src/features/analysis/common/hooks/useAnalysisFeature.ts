@@ -108,6 +108,12 @@ export interface UseAnalysisFeatureReturn {
 // Hook
 // ---------------------------------------------------------------------------
 
+/**
+ * Owns the common task lifecycle for analysis tabs: task id discovery, status
+ * banners, hydration, stopping, result refresh, and clear/reset coordination.
+ * Used by: task-backed analysis feature screens because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
 export function useAnalysisFeature<TResult = unknown>(
   config: UseAnalysisFeatureConfig<TResult>,
 ): UseAnalysisFeatureReturn {
@@ -183,6 +189,12 @@ export function useAnalysisFeature<TResult = unknown>(
   // in-memory task-flow status → caller-supplied extras → network /current.
   // The server-lock cache check means we almost never need to hit /current
   // on hydration because the lock query fires on mount.
+  /**
+   * Resolves the task id from the cheapest local source before falling back to
+   * backend current-task lookup, then records the winning id for future clears.
+    * Called by: hydration, terminal result refresh, clear, and stop workflows because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     * Flow: collect task-id candidates from refs, result metadata, server lock cache, task status, and caller extras; fall back to /current; then cache the resolved id.
+   */
   const resolveTaskId = async (): Promise<string | null> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return null;
@@ -204,6 +216,7 @@ export function useAnalysisFeature<TResult = unknown>(
         status?.terminalTask?.task_id,
         ...extra,
       ],
+      /** Called by: resolveAnalysisTaskId as the last-resort backend lookup because callers need shared hook state and handlers without duplicating analysis lifecycle wiring. */
       fetchCurrentTaskId: async () => {
         const headers = cfg.getAuthHeaders();
         const current = (await getCurrentAnalysisTask(cfg.analysisType, headers)) as Record<string, unknown>;
@@ -219,6 +232,12 @@ export function useAnalysisFeature<TResult = unknown>(
   // Fetches a task result, deduped against concurrent fetches (from either
   // hydration or the task-flow terminal-refresh) and against identical
   // already-applied results. Also updates lastFetchedRef + isRunning.
+  /**
+   * Fetches and applies terminal results for task-flow refreshes while sharing
+   * de-dupe refs with hydration so one task id only produces one result update.
+    * Called by: task refresh handling and consumers of useAnalysisFeature because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
   const fetchAndApplyResult = async (
       taskId: string | null,
       expectedState: 'successful' | 'failed',
@@ -264,6 +283,11 @@ export function useAnalysisFeature<TResult = unknown>(
     };
 
   // ---- Task flow refresh callback (wired into useAnalysisTaskFlow) ----
+  /**
+   * Bridges task-store terminal events into feature-specific result refreshes
+   * only for active tabs and successful/failed terminal states.
+    * Called by: useAnalysisTaskFlow when the tracked task reaches terminal state because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   */
   const handleTaskRefresh = async (context: AnalysisTaskFlowRefreshContext): Promise<void> => {
       if (context.reason !== 'terminal') return;
       if (!configRef.current.isTabActive) return;
@@ -275,6 +299,12 @@ export function useAnalysisFeature<TResult = unknown>(
     };
 
   // ---- Fallback banner ----
+  /**
+   * Builds a running banner from a feature's cached result when task-store state
+   * has not yet observed the same task, keeping restored tasks visible on load.
+    * Called by: useAnalysisTaskFlow while deriving the banner fallback because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
   const fallbackRunningBanner = (status: AnalysisTaskStatus) => {
       const cfg = configRef.current;
       const resultRunning = cfg.isResultRunning
@@ -353,6 +383,12 @@ export function useAnalysisFeature<TResult = unknown>(
           );
         }
       : undefined,
+    /**
+     * Shares result fetching with terminal refreshes so hydration does not repeat
+     * a result already applied for the same successful or failed task.
+      * Called by: useAnalysisHydration when loading persisted task results because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+       * Flow: skip blank, duplicate, or already terminal task ids, call the feature result fetcher with auth headers, then release the in-flight guard.
+     */
     fetchResult: async (taskId) => {
       if (!taskId) return null;
       if (fetchingTaskIdRef.current === taskId) return null;
@@ -402,6 +438,12 @@ export function useAnalysisFeature<TResult = unknown>(
   }, [config.isTabActive, config.workspaceId, hydrateFromServer]);
 
   // ---- Clear ----
+  /**
+   * Clears backend task records and every local source of task/result state so
+   * feature panels can start a new analysis from an unlocked baseline.
+    * Called by: analysis feature clear buttons and task banner cleanup flows because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     * Flow: collect local/result/status task ids, call clearAnalysis with cleanup hooks, then clear local ids, fetch markers, running state, global tasks, and feature results.
+   */
   const clearResults = async (options?: ClearAnalysisUiOptions): Promise<void> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return;
@@ -424,6 +466,7 @@ export function useAnalysisFeature<TResult = unknown>(
       ],
       resolveTaskId,
       getAuthHeaders: cfg.getAuthHeaders,
+      /** Called by: clearAnalysis after backend task-cache cleanup completes because callers need shared hook state and handlers without duplicating analysis lifecycle wiring. */
       onCleanup: (taskIds) => {
         setLocalTaskId(null);
         lastFetchedRef.current = { taskId: null, state: null };
@@ -434,6 +477,12 @@ export function useAnalysisFeature<TResult = unknown>(
     });
   };
 
+  /**
+   * Cancels the best-known running task id for features whose long-running
+   * backend jobs can be stopped from the shared analysis banner.
+    * Called by: analysis running banners through the hook return value because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     * Flow: choose the running/active/local/result task id, send cancelTask with auth headers, then update stopping and running flags around failures.
+   */
   const stopTask = async (): Promise<void> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return;

@@ -21,9 +21,13 @@ type MatBoolSpy = ReturnType<typeof vi.fn> & Dispatch<SetStateAction<Record<stri
 type MatTaskIdsSpy = ReturnType<typeof vi.fn> & Dispatch<SetStateAction<Record<string, string>>>;
 type SuccessSpy = ReturnType<typeof vi.fn> & ((nodeId: string, taskId: string) => void | Promise<void>);
 type FailureSpy = ReturnType<typeof vi.fn> & ((nodeId: string, state: 'failed' | 'cancelled') => void);
+/** Called by: materialize lifecycle tests when asserting node loading cleanup because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 const mkMatBool = () => vi.fn() as unknown as MatBoolSpy;
+/** Called by: materialize lifecycle tests when asserting task-id cleanup because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 const mkMatTaskIds = () => vi.fn() as unknown as MatTaskIdsSpy;
+/** Called by: materialize lifecycle tests for successful terminal tasks because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 const mkSuccess = () => vi.fn() as unknown as SuccessSpy;
+/** Called by: materialize lifecycle tests for failed or cancelled terminal tasks because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 const mkFailure = () => vi.fn() as unknown as FailureSpy;
 
 interface Args {
@@ -34,6 +38,12 @@ interface Args {
   onTerminalFailure?: FailureSpy;
 }
 
+/**
+ * Builds a complete hook argument object while letting each lifecycle test swap
+ * only the tracked tasks or callback spies under scrutiny.
+ * Used by: useMaterializeLifecycle tests because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 const buildArgs = (overrides: Args = {}) => ({
   taskType: 'concordance_materialize',
   materializeTaskIds: overrides.materializeTaskIds ?? {},

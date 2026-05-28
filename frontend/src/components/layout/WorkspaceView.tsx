@@ -6,12 +6,11 @@ import { WorkspaceDataTableFeature } from '@/features/workspace/data-view';
 import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
 
 /**
- * Stacked workspace view: graph on top, data table on bottom, with a
- * drag-to-resize separator. The graph view mounts React Flow and the
- * data view mounts a TanStack table, so we use the DOM-imperative mode
- * of useResizableSplit — pane heights are written via refs during the
- * drag and only committed to React state on pointerUp, keeping the
- * heavy children off the per-frame render path.
+ * Stacked workspace view used by the main app shell: graph above, data table
+ * below, with a drag separator. It uses `useResizableSplit` refs so React Flow
+ * and TanStack Table panes avoid per-frame React rerenders during resizing.
+ * Why: graph and table panes need resize feedback without rerendering expensive children on every pointer move.
+ * Flow: connect split refs to graph/table panes, imperatively resize during drag, then render controls, graph, splitter, and data table.
  */
 const WorkspaceView: React.FC = () => {
   const topRef = useRef<HTMLDivElement | null>(null);
@@ -21,6 +20,10 @@ const WorkspaceView: React.FC = () => {
     min: 0.2,
     max: 0.8,
     persistKey: 'ldaca.layout.workspaceGraphRatio',
+    /**
+     * Applies drag feedback directly to panes so graph/table consumers avoid render churn mid-resize.
+     * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
+     */
     onLiveUpdate: (next) => {
       if (topRef.current) topRef.current.style.height = `${next * 100}%`;
       if (bottomRef.current) bottomRef.current.style.height = `${(1 - next) * 100}%`;

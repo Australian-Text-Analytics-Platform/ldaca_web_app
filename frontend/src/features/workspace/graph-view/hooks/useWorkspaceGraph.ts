@@ -24,6 +24,7 @@ import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
 
 const EDGE_STROKE = '#0f172a';
+/** Registers the React Flow node renderer used for workspace graph nodes. */
 const nodeTypes = { customNode: CustomNode } as const;
 
 export interface WorkspaceGraphViewModel {
@@ -56,6 +57,11 @@ export interface WorkspaceGraphViewModel {
   };
 }
 
+/**
+ * Builds the React Flow view model consumed by `WorkspaceGraphFeature`.
+ * Used by: nodeColorsStore module, WorkspaceGraphFeature component, CustomNode component (rg call sites/imports) because the graph shell needs backend graph data converted to React Flow state.
+ * Flow: workspace graph data is laid out, colored, and converted into React Flow nodes before handlers update selection and navigation.
+ */
 export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const { workspaceGraph } = useWorkspaceData();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -71,6 +77,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     clearSelection,
   } = useWorkspaceActions();
 
+  /** Deletes a graph node through workspace actions. */
   const handleDelete = useCallback(
     (nodeId: string) => {
       if (!nodeId || !deleteNode) {
@@ -81,6 +88,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [deleteNode]
   );
 
+  /** Renames a graph node through workspace actions. */
   const handleRename = useCallback(
     (nodeId: string, newName: string) => {
       if (!nodeId || !newName?.trim() || !renameNode) {
@@ -91,6 +99,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [renameNode]
   );
 
+  /** Clones a graph node through workspace actions. */
   const handleCopy = useCallback(
     (nodeId: string) => {
       if (!nodeId || !copyNode) {
@@ -101,6 +110,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [copyNode]
   );
 
+  /** Applies an undo operation to a graph node. */
   const handleUndo = useCallback(
     (nodeId: string) => {
       if (!nodeId || !undoNode) {
@@ -111,6 +121,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [undoNode]
   );
 
+  /** Applies a redo operation to a graph node. */
   const handleRedo = useCallback(
     (nodeId: string) => {
       if (!nodeId || !redoNode) {
@@ -276,6 +287,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     visualInfo?: { state?: string; pair?: { X?: string } };
     isFresh?: boolean;
   };
+  /**
+   * Encodes visible node fields so React Flow state refreshes when they change.
+   * Called by: useWorkspaceGraph internal event, effect, or helper flow.
+   * Why: because the graph hook needs helpers that bridge backend graph data, React Flow events, and workspace selection state.
+   * Flow: collect visible metadata, visual state, and freshness into one string used for change detection.
+   */
   const nodeSignatureFor = (node: Node): string => {
     const nd = node.data as NodeDataSignatureShape;
     const dt = nd?.node?.data_type ?? 'unknown';
@@ -344,6 +361,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     }
   }, [selectedNodeIds, setNodes]);
 
+  /** Keeps React Flow select changes aligned with the app selection store. */
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const normalized = (changes || []).map((change: NodeChange) => {
@@ -357,6 +375,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [onNodesChange, selectedNodeIds]
   );
 
+  /** Restores visual selection when pane clicks would otherwise clear React Flow state. */
   const handlePaneClick = useCallback(() => {
     setNodes((existing) =>
       existing.map((node: Node) => ({
@@ -366,6 +385,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     );
   }, [selectedNodeIds, setNodes]);
 
+  /** Toggles app-level node selection when a graph node is clicked. */
   const handleNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
       event.preventDefault();
@@ -381,21 +401,25 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [toggleNodeSelection, markInteracted]
   );
 
+  /** No-op connection handler because graph edges are backend-derived. */
   const handleConnect = useCallback(
     (_connection: Connection) => {},
     []
   );
 
+  /** No-op connection-start handler retained for React Flow prop parity. */
   const handleConnectStart = useCallback(
     (_event: MouseEvent | TouchEvent, _params: { nodeId: string | null; handleId: string | null; handleType: string | null }) => {},
     []
   );
 
+  /** No-op connection-end handler retained for React Flow prop parity. */
   const handleConnectEnd = useCallback(
     (_event: MouseEvent | TouchEvent) => {},
     []
   );
 
+  /** Fits the graph into view after React Flow initializes. */
   const handleInit = useCallback((instance: ReactFlowInstance) => {
     try {
       instance.fitView({ padding: 0.2, includeHiddenNodes: false });

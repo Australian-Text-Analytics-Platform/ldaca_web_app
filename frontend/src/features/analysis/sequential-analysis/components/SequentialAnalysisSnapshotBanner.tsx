@@ -5,9 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useSnapshotViewStore } from '@/features/snapshot-view';
 
 /**
- * Snapshot mode banner for Trends (sequential-analysis). Mirrors the
+ * Rendered by: SequentialAnalysisFeature. Snapshot mode banner for Trends (sequential-analysis). Mirrors the because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * concordance / quotation / token-frequency banners — see those
  * components for the design rationale.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const SequentialAnalysisSnapshotBanner: React.FC = () => {
   const snapshot = useSnapshotViewStore((s) => s.snapshots.sequential_analysis);

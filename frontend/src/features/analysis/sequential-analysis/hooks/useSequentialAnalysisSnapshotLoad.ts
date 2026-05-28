@@ -36,7 +36,13 @@ export interface SequentialAnalysisSnapshotPayload {
   settings?: SequentialAnalysisRequest & { node_id?: string };
 }
 
+/** Signals sequential snapshot load failures with reason codes for toasts and tests. */
+/**
+ * Used by: useSequentialAnalysisSnapshotLoad hook exports or same-file callers because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+ */
 export class SequentialAnalysisSnapshotLoadError extends Error {
+  /** Preserves the failure reason while retaining the standard Error shape. */
+  // Called by: SequentialAnalysisSnapshotLoadError when this analysis object handles its lifecycle work because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
   constructor(
     message: string,
     public readonly reason: string,
@@ -46,6 +52,11 @@ export class SequentialAnalysisSnapshotLoadError extends Error {
   }
 }
 
+/** Returns a loader that decodes a sequential-analysis snapshot into snapshot-view state. */
+/**
+ * Used by: bundle.ts, useSequentialAnalysisSnapshotLoad.test.tsx, useSequentialAnalysisSnapshotCapture.ts, and related files because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+ * Flow: download the snapshot bundle, locate the manifest and payload files, hydrate request/result state, then surface contextual load errors.
+ */
 export function useSequentialAnalysisSnapshotLoad(): (filename: string) => Promise<void> {
   const { getAuthHeaders } = useAuth();
   const loadSnapshotIntoStore = useSnapshotViewStore((s) => s.loadSnapshot);
@@ -77,6 +88,10 @@ export function useSequentialAnalysisSnapshotLoad(): (filename: string) => Promi
         );
       }
 
+      // Locates payload paths by kind so the loader is resilient to manifest ordering.
+      /**
+       * Called by: useSequentialAnalysisSnapshotLoad during this analysis workflow because snapshot loading needs this unit to rebuild saved request/result state from bundled files before hydrating the feature.
+       */
       const findPath = (kind: string): string | null =>
         manifest.payloads.find((p) => p.kind === kind)?.path ?? null;
 

@@ -5,6 +5,12 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisFeatureHeader } from '../AnalysisFeatureHeader';
 
+/**
+ * Renders the header with the providers SnapshotActions needs even when the test
+ * only asserts that demo snapshot controls stay hidden.
+ * Used by: AnalysisFeatureHeader tests because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 function renderHeader() {
   // SnapshotActions uses useQuery to fetch the snapshot list for
   // collision-checking; it needs a QueryClient even when the demo

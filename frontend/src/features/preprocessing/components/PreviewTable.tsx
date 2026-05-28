@@ -31,10 +31,20 @@ interface PreviewTableProps {
   documentColumn?: string;
 }
 
+/**
+   * Builds TanStack column definitions from backend-provided preview columns.
+   * `PreviewTable` uses it so all preprocessing tabs share the same value
+   * formatting in table cells.
+   * Used by: local callers in preprocessing/PreviewTable module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+   */
 function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow, unknown>[] {
   return columnsToRender.map((col) => ({
     accessorKey: col,
     header: col,
+        /**
+         * Formats backend preview values for shared preprocessing table cells.
+         * Called by: buildColumnDefs object consumers because consumers need this callback at the object boundary instead of recreating it inline.
+         */
     cell: ({ getValue }) => formatPreviewValue(getValue()),
   }));
 }
@@ -43,6 +53,9 @@ function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow, unkno
  * Shared preview table component used across data preprocessing sub-tabs.
  * Internally backed by a server-side TanStack Table (useServerTable) for
  * consistent rendering and pagination handling.
+ * Rendered by: FilterSubTab module, PolarsExpressionSubTab module, SliceSubTab module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: build server-table columns from preview rows, wire pagination/page-size controls,
+ * render loading/error/empty states, and show the table body when preview data arrives.
  */
 export const PreviewTable: React.FC<PreviewTableProps> = ({
   title,
@@ -80,6 +93,9 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
     rowCount: pagination?.total_rows ?? data.length,
     pageIndex: currentPage - 1,
     pageSize,
+    // Bridges TanStack's zero-based pagination model to the one-based preview
+    // endpoints exposed by preprocessing APIs.
+    // Called by: useServerTable option object inside PreviewTable because consumers need this callback at the object boundary instead of recreating it inline.
     onPaginationChange: (next) => {
       if (next.pageSize !== pageSize) {
         onPageSizeChange(next.pageSize);

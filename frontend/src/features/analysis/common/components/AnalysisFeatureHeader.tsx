@@ -47,6 +47,8 @@ export interface AnalysisFeatureHeaderProps {
  *
  * The right slot returns ``null`` when the demo-snapshot master switch is off,
  * so no DOM is added in the default experience.
+ * Used by: concordance parameter panel snapshot header because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
   tool,

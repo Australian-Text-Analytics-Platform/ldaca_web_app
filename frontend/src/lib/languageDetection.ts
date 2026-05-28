@@ -7,6 +7,8 @@ const MAX_DETECTION_CHARS = 20_000;
 
 let languageDetectorPromise: Promise<MediaPipeLanguageDetector> | null = null;
 
+/** Loads the MediaPipe detector once so repeated local guesses do not reload WASM/model assets. */
+/** Called by: detectLanguageIso6391 in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 async function getLanguageDetector(): Promise<MediaPipeLanguageDetector> {
   if (!languageDetectorPromise) {
     languageDetectorPromise = import('@mediapipe/tasks-text').then(async ({ FilesetResolver, LanguageDetector }) => {
@@ -17,6 +19,8 @@ async function getLanguageDetector(): Promise<MediaPipeLanguageDetector> {
   return languageDetectorPromise;
 }
 
+/** Guesses an ISO 639-1 language code from user text for language-aware tool defaults. */
+/** Used by: src/features/analysis/common/components/TokenizerModelSelector.tsx, src/features/analysis/common/components/__tests__/TokenizerModelSelector.behaviour.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 export async function detectLanguageIso6391(text: string): Promise<string | null> {
   const sample = text.replace(/\s+/g, ' ').trim().slice(0, MAX_DETECTION_CHARS);
   if (!sample) return null;

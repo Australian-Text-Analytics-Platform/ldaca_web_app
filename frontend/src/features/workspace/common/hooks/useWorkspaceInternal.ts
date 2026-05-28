@@ -4,6 +4,12 @@ import { useWorkspaceCore } from './useWorkspaceCore';
 import { useWorkspaceQueries } from './useWorkspaceQueries';
 import { useWorkspaceNodeMutations } from './useWorkspaceNodeMutations';
 
+/**
+ * Orchestrates core state, queries, and mutations into the single internal
+ * workspace model fanned out by `WorkspaceProvider`.
+ * Used by: WorkspaceContext module, WorkspaceProvider module, useWorkspaceQueries hook (rg call sites/imports) because provider slices need one composed workspace model.
+ * Flow: core, query, mutation, and UI-sync hooks combine backend data with local selection before provider contexts expose the slices.
+ */
 export const useWorkspaceInternal = () => {
   const core = useWorkspaceCore();
   const queryClient = useQueryClient();

@@ -7,9 +7,11 @@ interface GoogleLoginProps {
 }
 
 /**
- * Redirect-mode Google sign-in button. The OAuth flow is handled server-side
- * via `login_uri`, so we don't need `onLogin`/`onLogout` callbacks here — the
- * browser will be redirected to the backend callback on success.
+ * Redirect-mode Google sign-in button used by `LoginScreen` when Google auth
+ * is enabled. It exists to delegate OAuth completion to the backend callback
+ * while preserving the login card's loading/error presentation.
+ * Why: redirect mode keeps credential exchange server-side while the login card still owns status messaging.
+ * Flow: build the backend callback URI, configure the Google OAuth widget for redirect mode, then render supplied error or loading feedback.
  */
 function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
   const loginUri = `${getApiBase()}/auth/google/callback`;
@@ -23,7 +25,7 @@ function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
       )}
 
       <OAuthGoogleLogin
-        onSuccess={() => {/* redirect mode — handled server-side */}}
+        onSuccess={() => {/* redirect mode handled server-side */}}
         ux_mode="redirect"
         login_uri={loginUri}
         size="large"

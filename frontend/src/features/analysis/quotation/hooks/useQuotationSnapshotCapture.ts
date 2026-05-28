@@ -57,12 +57,20 @@ export interface CaptureError extends Error {
   reason: string;
 }
 
+/** Creates typed capture errors so callers can distinguish eligibility failures from upload failures. */
+/**
+ * Called by: useQuotationSnapshotCapture hook during this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ */
 function captureError(reason: string, message: string): CaptureError {
   const err = new Error(message) as CaptureError;
   err.reason = reason;
   return err;
 }
 
+/** Builds the quotation preview block consumed by the shared snapshot manifest UI. */
+/**
+ * Called by: useQuotationSnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ */
 function buildQuotationPreview(
   resp: QuotationAnalysisResponse,
 ): SnapshotManifest['preview'] {
@@ -81,6 +89,11 @@ function buildQuotationPreview(
   };
 }
 
+/** Returns the callback that packages the current quotation result into a portable snapshot bundle. */
+/**
+ * Used by: compat.ts, QuotationFeature.tsx, useQuotationSnapshotLoad.ts because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
+ */
 export function useQuotationSnapshotCapture(
   input: UseQuotationSnapshotCaptureInput,
 ) {

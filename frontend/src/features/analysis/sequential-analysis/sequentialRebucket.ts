@@ -49,6 +49,9 @@ const FREQUENCY_INDEX: Record<SnapshotFinestFrequency, number> = Object.fromEntr
 
 /** Returns true when ``view`` is the same as or coarser than
  * ``capture``. Used to gate the viewer's frequency dropdown. */
+/**
+ * Used by: SequentialAnalysisFeature.tsx, sequentialRebucket.test.ts because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+ */
 export function isCoarserOrEqual(
   view: SnapshotFinestFrequency,
   capture: SnapshotFinestFrequency,
@@ -61,6 +64,10 @@ const DEFAULT_PALETTE = [
   '#14b8a6', '#f97316', '#ec4899', '#0ea5e9', '#22c55e',
 ];
 
+// Provides deterministic series colours that match the live sequential chart palette style.
+/**
+ * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+ */
 const paletteColor = (index: number) =>
   DEFAULT_PALETTE[index % DEFAULT_PALETTE.length] ?? '#888888';
 
@@ -69,6 +76,10 @@ const paletteColor = (index: number) =>
 /** Parse a captured ``period_start`` value (ISO string, epoch millis,
  * or epoch microseconds) into a UTC Date. Returns ``null`` for
  * unrecognisable inputs. */
+/**
+ * Called by: sequentialRebucket analysis helper module as a local helper in this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+   * Flow: accept Date instances, detect epoch microseconds versus milliseconds, parse nonempty strings, then return null for unrecognized values.
+ */
 function parseCapturedTimestamp(value: unknown): Date | null {
   if (value == null) return null;
   if (value instanceof Date) {
@@ -91,6 +102,10 @@ function parseCapturedTimestamp(value: unknown): Date | null {
 }
 
 /** Round ``d`` down to the start of its bucket at ``freq``. Pure UTC. */
+/**
+ * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+   * Flow: extract UTC date parts, round to the requested second/minute/hour/day/week/month/quarter/year boundary, then return the bucket start.
+ */
 function bucketStart(d: Date, freq: SnapshotFinestFrequency): Date {
   const y = d.getUTCFullYear();
   const m = d.getUTCMonth();
@@ -125,11 +140,19 @@ function bucketStart(d: Date, freq: SnapshotFinestFrequency): Date {
   }
 }
 
+// Pads date/time fields so rebucketed labels match backend string formatting.
+/**
+ * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+ */
 const pad2 = (n: number): string => (n < 10 ? `0${n}` : String(n));
 
 /** strftime ``%W``: Monday-start week-of-year, 00–53. Week 01 is the
  * week containing the first Monday. Days before the first Monday are
  * week 00. Matches polars' ``%W`` behaviour. */
+/**
+ * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+ */
 function isoWeekNumberMondayStart(d: Date): number {
   const y = d.getUTCFullYear();
   const jan1 = new Date(Date.UTC(y, 0, 1));
@@ -148,6 +171,10 @@ function isoWeekNumberMondayStart(d: Date): number {
  * convention for ``freq``. The viewer relies on these strings being
  * identical to what a live run would have produced so chart x-axis
  * labels stay consistent across modes. */
+/**
+ * Used by: sequentialRebucket.test.ts because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+   * Flow: read UTC bucket parts, format each supported frequency with backend-compatible labels, then return the period string.
+ */
 export function formatBucket(d: Date, freq: SnapshotFinestFrequency): string {
   const y = d.getUTCFullYear();
   const m = d.getUTCMonth() + 1;
@@ -229,6 +256,9 @@ const NON_SERIES_KEYS = new Set(['time_period', 'period_start', 'period_end']);
 /** Compose the group key for a single captured row given the viewer's
  * selected group columns. Empty group list → an implicit single
  * series. */
+/**
+ * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+ */
 function groupKeyFor(
   row: CapturedRow,
   viewGroupByColumns: string[],
@@ -254,6 +284,10 @@ interface BucketAccumulator {
 /** Compute the view-time bucket key + start for a captured row. For
  * datetime: parse period_start, round down to viewFrequency. For
  * numeric: floor(time_period / interval) * interval. */
+/**
+ * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+ */
 function viewBucket(
   row: CapturedRow,
   config: RebucketViewConfig,
@@ -288,6 +322,10 @@ function viewBucket(
 /** Core entry point. Takes captured rows + the viewer's chosen
  * config, returns chart-ready data matching the live task-flow's
  * output shape. */
+/**
+ * Used by: sequentialRebucket.test.ts, SequentialAnalysisFeature.tsx because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
+ * Flow: parse captured buckets, regroup rows under the requested view, aggregate series counts, then return chart-ready data and config.
+ */
 export function rebucket(
   capturedRows: CapturedRow[],
   config: RebucketViewConfig,

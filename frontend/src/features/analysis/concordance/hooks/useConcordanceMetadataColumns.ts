@@ -34,6 +34,10 @@ type Params = {
  * block — so we surface them as visible-but-disabled, and disable the whole
  * "Show metadata" UI when there are no columns common to all blocks.
  */
+/**
+ * Used by: ConcordanceFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
 export function useConcordanceMetadataColumns({
   results,
   panelSelectedNodes,

@@ -12,6 +12,7 @@ interface AnalysisTaskBannerProps {
   children?: React.ReactNode;
 }
 
+/** Visual treatment map for queued versus actively running analysis task banners. */
 const statusStyles: Record<NonNullable<AnalysisTaskBannerProps['status']>, { card: string; text: string; badge: string }> = {
   running: {
     card: 'border-amber-200 bg-amber-50/80',
@@ -25,6 +26,12 @@ const statusStyles: Record<NonNullable<AnalysisTaskBannerProps['status']>, { car
   },
 };
 
+/**
+ * Shows task-store banner state above analysis results while a queued or running
+ * backend task owns the next refresh for the active feature.
+ * Used by: task-backed analysis feature screens because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 const AnalysisTaskBanner: React.FC<AnalysisTaskBannerProps> = ({
   analysisName,
   status = 'running',

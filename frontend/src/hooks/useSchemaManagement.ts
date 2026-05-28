@@ -13,8 +13,12 @@ export interface NodeSnapshot {
 }
 
 /**
- * Utility function to normalize schema from node info API response.
- * Handles both array and object schema payload formats.
+ * Normalizes node-info schema payloads for analysis tabs that need one
+ * `{ column: canonicalType }` map regardless of backend wire format.
+ */
+/**
+ * Used by: src/features/analysis/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Flow: accept array or object schema payloads, normalize type names, and default malformed values to string columns.
  */
 export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
   const rawSchema = (info as Record<string, unknown>)?.schema;
@@ -36,12 +40,11 @@ export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
 }
 
 /**
- * Utility function to create a node snapshot with info fetched from backend.
- *
- * Takes a `QueryClient` so the fetch goes through the shared TanStack cache
- * (deduped against `useNodeInfo` subscribers, automatically invalidated by
- * mutation handlers). Hook-context callers obtain the client via
- * `useQueryClient`; non-hook callers must thread one in explicitly.
+ * Creates the snapshot shape multi-node analyses submit to the backend.
+ * Uses the shared TanStack node-info cache so schema consumers and mutation
+ * invalidations all agree on the same node metadata.
+ * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
+ * Flow: fetch node info through the query cache, derive name/columns/schema/shape, then return the backend snapshot payload.
  */
 export async function createNodeSnapshot(
   workspaceId: string,
@@ -66,6 +69,11 @@ export async function createNodeSnapshot(
   };
 }
 
+/** Builds resilient node snapshots for multi-node analysis requests, falling back per-node on fetch failure. */
+/**
+ * Used by: src/features/analysis/common/useAnalysisLockMachine.ts, src/features/analysis/common/utils.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Flow: fetch snapshots concurrently, catch per-node failures, and substitute empty fallback snapshots so one bad node does not abort the batch.
+ */
 export async function createNodeSnapshots(
   workspaceId: string,
   nodeIds: string[],
@@ -90,6 +98,11 @@ export async function createNodeSnapshots(
   return snapshots;
 }
 
+/** Narrows each snapshot to the selected analysis column while keeping a first-column fallback. */
+/**
+ * Used by: src/features/analysis/common/useAnalysisLockMachine.ts, src/features/analysis/common/utils.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Flow: choose each snapshot's selected column when present, fall back to its first valid column, then return narrowed snapshot copies for task submission.
+ */
 export function applySelectedColumnsToSnapshots<T extends { id: string; columns?: string[] }>(
   snapshots: T[],
   selectedColumns: Record<string, string | undefined>
@@ -156,6 +169,10 @@ interface SchemaManagementConfig {
  * @param config - Configuration object
  * @returns Schema state and utilities
  */
+/**
+ * Used by: src/features/analysis/sequential-analysis/SequentialAnalysisFeature.tsx, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Flow: fetch live schema while unlocked, preserve locked schema during runs, merge node payload fallbacks, then expose effective schema and column options.
+ */
 export function useSchemaManagement(config: SchemaManagementConfig) {
   const { nodeId, isLocked, workspaceId, getAuthHeaders, nodeData, selectedNode } = config;
 
@@ -173,6 +190,8 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   // Fetch schema via React Query so invalidation (e.g. after cast) triggers re-fetch
   const schemaQuery = useQuery({
     queryKey: (nodeId && workspaceId) ? queryKeys.nodeSchema(workspaceId, nodeId) : ['_no_schema_'],
+    /** Fetches schema through node-info cache so cast/preprocessing invalidations refresh column types. */
+    /** Called by: TanStack Query inside useSchemaManagement because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
     queryFn: async () => {
       if (!workspaceId || !nodeId) return {};
       const info = await fetchNodeInfo({ queryClient, workspaceId, nodeId, getAuthHeaders });
@@ -190,15 +209,10 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   }, [schemaQuery.data]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  /**
-   * Get the effective schema (locked if locked, otherwise current)
-   */
+  /** Schema seen by task builders: locked while a task is running, live otherwise. */
   const effectiveSchema = isLocked ? (lockedSchema || currentSchema) : currentSchema;
 
-  /**
-   * Get available columns with type information from schema.
-   * Falls back to nodeData/selectedNode if schema not yet available.
-   */
+  /** Column options for parameter panels, with node payload fallbacks while schema fetches. */
   const availableColumns = (() => {
     // Primary: use schema if available
     if (effectiveSchema && Object.keys(effectiveSchema).length > 0) {
@@ -248,24 +262,23 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     return columns;
   })();
 
-  /**
-   * Helper to filter columns by data type
-   */
+  /** Lets feature panels request type-specific column subsets without duplicating filter logic. */
+  /** Called by: useSchemaManagement in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
   const getColumnsByType = (dataType: string | string[]) => {
     const types = Array.isArray(dataType) ? dataType : [dataType];
     return availableColumns.filter((col) => types.includes(col.dataType));
   };
 
   /**
-   * Lock the current schema (or provide a specific schema to lock)
+   * Freezes the schema used by an in-flight task so late refetches do not change params.
+   * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
    */
   const lockCurrentSchema = (schemaToLock?: Record<string, string>) => {
     setLockedSchema(schemaToLock || currentSchema);
   };
 
-  /**
-   * Clear the locked schema
-   */
+  /** Re-enables live schema updates after a task completes or is cleared. */
+  /** Called by: useSchemaManagement in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
   const clearLockedSchema = () => {
     setLockedSchema(null);
   };

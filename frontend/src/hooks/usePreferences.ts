@@ -26,6 +26,7 @@ interface PersistedSnapshot {
  * (≤ a handful of strings + one engine config object), so re-stringifying
  * on every store change is fine — saves writing a per-field shallow eq.
  */
+/** Called by: usePreferencesInit in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const snapshotPersisted = (
   state: ReturnType<typeof usePreferencesStore.getState>,
 ): PersistedSnapshot => ({
@@ -39,6 +40,11 @@ const snapshotPersisted = (
   demoSnapshotsEnabled: state.demoSnapshotsEnabled,
 });
 
+/** Compares the persisted preference subset so cosmetic store changes do not sync to the backend. */
+/**
+ * Called by: usePreferencesInit because only durable preference changes should trigger a debounced backend write.
+ * Flow: compare scalar preferences first, then hidden-view and favorite arrays in order, returning true only for identical persisted snapshots.
+ */
 const snapshotsEqual = (a: PersistedSnapshot, b: PersistedSnapshot) => {
   if (a.quotationEngineKey !== b.quotationEngineKey) return false;
   if (a.quotationLastRemoteUrl !== b.quotationLastRemoteUrl) return false;
@@ -65,6 +71,10 @@ const snapshotsEqual = (a: PersistedSnapshot, b: PersistedSnapshot) => {
  * load-from-backend step doesn't immediately trigger a sync of the same
  * data we just received) and only when authenticated (anonymous edits
  * stay in `localStorage` until the user signs in).
+ */
+/**
+ * Used by: src/App.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Flow: load backend preferences once auth state is known, then subscribe after hydration and debounce authenticated syncs back to the server.
  */
 export function usePreferencesInit() {
   const { getAuthHeaders, isAuthenticated } = useAuth();

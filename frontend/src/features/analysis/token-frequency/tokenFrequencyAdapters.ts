@@ -20,6 +20,10 @@ export type NodeResultView = NormalizedNodeResult & {
   maxFrequency: number;
 };
 
+/** Extracts token-frequency rows from either raw arrays or backend node-result envelopes. */
+/**
+ * Used by: tokenFrequencyAdapters analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 export const extractRows = (entry: unknown): TokenFrequencyRow[] => {
   if (Array.isArray(entry)) {
     return entry as TokenFrequencyRow[];
@@ -35,6 +39,10 @@ export const extractRows = (entry: unknown): TokenFrequencyRow[] => {
   return [];
 };
 
+/** Pulls backend metadata from a node-result envelope for display-name recovery. */
+/**
+ * Used by: tokenFrequencyAdapters analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 export const extractMetadata = (entry: unknown): Record<string, unknown> => {
   if (
     entry &&
@@ -48,6 +56,10 @@ export const extractMetadata = (entry: unknown): Record<string, unknown> => {
   return {};
 };
 
+/** Returns the largest selected numeric value while preserving a caller-provided fallback. */
+/**
+ * Used by: tokenFrequencyAdapters analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 export const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: number): number => {
   let max = fallback;
   for (const item of items) {
@@ -59,6 +71,11 @@ export const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: n
   return max;
 };
 
+/** Builds node display-name hints from response metadata before UI-level fallback naming runs. */
+/**
+ * Used by: TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+   * Flow: read metadata node_display_names, scan per-node result metadata for node/display-name pairs, then return the hint map.
+ */
 export const buildResponseDisplayNameHints = (results?: TokenFrequencyResponse | null): Record<string, string> => {
   const mapping: Record<string, string> = {};
   const metadataNodeNames = ((results?.metadata as Record<string, unknown> | null | undefined)?.node_display_names ?? {}) as Record<string, unknown>;
@@ -84,6 +101,11 @@ export const buildResponseDisplayNameHints = (results?: TokenFrequencyResponse |
   return mapping;
 };
 
+/** Resolves the node ordering that downstream adapters should use for result display. */
+/**
+ * Used by: TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+   * Flow: combine request node_ids, previous comparison ids, and selected node ids, then keep first nonempty occurrence of each id.
+ */
 export const computeAnalysisNodeIds = (
   paramsNodeIds: unknown,
   lastCompareNodeIds: string[],
@@ -107,6 +129,11 @@ export const computeAnalysisNodeIds = (
   return deduped;
 };
 
+/** Normalizes backend result maps into stable per-node view models for panels and exports. */
+/**
+ * Used by: TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
+ */
 export const normalizeNodeResults = (
   data: unknown,
   analysisNodeIds: string[],
@@ -121,6 +148,10 @@ export const normalizeNodeResults = (
   const usedKeys = new Set<string>();
   const nodeIds = analysisNodeIds.length > 0 ? analysisNodeIds : entries.map(([key]) => key);
 
+  /** Finds an unmatched backend entry whose metadata identifies the requested node. */
+  /**
+   * Called by: normalizeNodeResults during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   */
   const findUnusedEntryByNodeId = (nodeId: string) =>
     entries.find(([key, value]) => {
       if (usedKeys.has(key)) return false;
@@ -163,6 +194,11 @@ export const normalizeNodeResults = (
   });
 };
 
+/** Applies stop-word and display-limit projections to normalized node result rows. */
+/**
+ * Used by: useTokenFrequencyPreferences.ts, TokenFrequencyFeature.tsx, tokenFrequencyAdapters.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
+ */
 export const deriveNodeDisplayResults = (
   normalizedNodeResults: NormalizedNodeResult[],
   appliedStopSet: Set<string>,
@@ -174,6 +210,10 @@ export const deriveNodeDisplayResults = (
       : null;
 
   const hasStopFilter = appliedStopSet.size > 0;
+  /** Decides whether a raw token should be hidden by the active stop-word set. */
+  /**
+   * Called by: deriveNodeDisplayResults during this analysis workflow because callers need the same normalization and view-model rules before rendering or testing analysis results.
+   */
   const shouldFilterToken = (token: unknown) => {
     if (!hasStopFilter) return false;
     const normalizedToken = String(token ?? '').toLowerCase();
@@ -214,6 +254,10 @@ export const deriveNodeDisplayResults = (
   });
 };
 
+/** Converts user wildcard syntax into a token filter regular expression for list views. */
+/**
+ * Used by: TokenFrequencySingleTokenSection.tsx, TokenFrequencyStatisticsTable.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ */
 export const wildcardToRegExp = (pattern: string): RegExp | null => {
   const trimmed = pattern.trim();
   if (!trimmed) return null;

@@ -8,6 +8,12 @@ import {
   useSnapshotBackedAnalysisState,
 } from '../useSnapshotBackedAnalysisState';
 
+/**
+ * Builds a typed loaded-snapshot fixture for one tool and payload shape.
+ * Used by: Vitest setup or assertions in snapshot-view/useSnapshotBackedAnalysisState.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: the manifest captures source metadata, then the payload map carries the tool result under the result key.
+ */
 function snapshotForTool<Payload>(
   tool: SnapshotToolKey,
   payload: Payload,

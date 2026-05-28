@@ -3,6 +3,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** Wraps concordance renders with a no-retry query client for deterministic assertions. */
+/**
+ * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 const renderWithClient = (ui: React.ReactElement) => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -26,24 +31,34 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/features/analysis/common/components/NodeSelectionPanel', () => ({
+  /** Replaces node-selection chrome so tests focus on concordance orchestration. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => <div data-testid="node-selection-panel" />,
 }));
 
 vi.mock('@/components/help/HelpIcon', () => ({
+  /** Replaces help popovers with a stable marker for component rendering tests. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => <span data-testid="help-icon" />,
 }));
 
 vi.mock('@/components/help/InfoIcon', () => ({
+  /** Replaces informational popovers with a stable marker for component rendering tests. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => <span data-testid="info-icon" />,
 }));
 
 vi.mock('@/features/analysis/common/components/AnalysisTaskBanner', () => ({
+  /** Removes lifecycle banner rendering so button and handoff assertions stay focused. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => null,
 }));
 
 vi.mock('@/components/ui/tabs', () => {
   let currentOnValueChange: ((value: string) => void) | undefined;
   return {
+    /** Captures tab value changes while keeping Radix markup out of this unit test. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     Tabs: ({
       children,
       onValueChange,
@@ -55,7 +70,11 @@ vi.mock('@/components/ui/tabs', () => {
       currentOnValueChange = onValueChange;
       return <div>{children}</div>;
     },
+    /** Simplifies tab-list structure without changing child rendering. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    /** Converts tab triggers into plain buttons that still fire value changes. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     TabsTrigger: ({
       children,
       value,
@@ -75,13 +94,24 @@ vi.mock('@/components/ui/tabs', () => {
 });
 
 vi.mock('@/components/ui/dialog', () => ({
+  /** Keeps dialog content mounted so confirmation text is directly queryable. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  /** Removes Radix portal behavior for local test rendering. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  /** Preserves dialog heading grouping without layout dependencies. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  /** Renders dialog titles as plain text for screen queries. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/ui/confirm-dialog', () => ({
+  /** Provides a minimal confirm dialog that exercises confirm/cancel callbacks. */
+  // Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   ConfirmDialog: ({
     open,
     title,
@@ -118,20 +148,28 @@ vi.mock('@/components/ui/confirm-dialog', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
+  /** Supplies one selected text node as the default concordance test fixture. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceSelection: () => ({
     selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
   }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
+  /** Keeps workspace loading false so the feature renders immediately. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceStatus: () => ({ isLoading: { graph: false } }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
+  /** Supplies a stable workspace id required by concordance actions. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceData: () => ({ currentWorkspaceId: 'ws-1' }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
+  /** Stubs workspace mutations that are outside this feature-level test boundary. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceActions: () => ({
     detachConcordance: vi.fn(),
     materializeConcordance: vi.fn(),
@@ -140,16 +178,28 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ getAuthHeaders: () => ({}) }),
+  /** Provides auth shape expected by generated API calls without real credentials. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+  useAuth: () => ({
+    /** Supplies empty headers because every network boundary is mocked. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+    getAuthHeaders: () => ({}),
+  }),
 }));
 
 vi.mock('@/hooks/useNodeColumnInfos', () => ({
+  /** Supplies the text column needed for auto-selection and parameter rendering. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => ({
+    /** Reports a single string column so concordance has a valid target. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     getColumnInfos: () => [{ name: 'text' }],
   }),
 }));
 
 vi.mock('@/stores/analysisStore', () => ({
+  /** Feeds pending handoff state and materialized events into the feature under test. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useAnalysisStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       pendingConcordance: mockPendingConcordance,
@@ -160,18 +210,26 @@ vi.mock('@/stores/analysisStore', () => ({
 }));
 
 vi.mock('@/stores', () => ({
+  /** Pins the UI store to the concordance tab so lifecycle hooks stay active. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({ currentView: 'concordance' }),
 }));
 
 vi.mock('@/hooks/analysisTaskUtils', () => ({
   pruneTasksById: vi.fn((tasks) => tasks),
+  /** Keeps task dedupe candidates scoped to the requested type. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   getTaskTypeCandidates: (taskType: string) => [taskType],
+  /** Produces deterministic task dedupe keys for lifecycle assertions. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   normalizeTaskDedupeKey: (taskId: string | null, state: string | null) =>
     taskId && state ? `${taskId}:${state}` : null,
 }));
 
 vi.mock('../components/ConcordanceDetachDialog', () => ({
+  /** Removes the detach dialog from tests that focus on run/update behavior. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   ConcordanceDetachDialog: () => null,
 }));
 
@@ -188,6 +246,8 @@ vi.mock('../generatedColumns', () => ({
 }));
 
 vi.mock('../hooks/useConcordanceTaskFlow', () => ({
+  /** Captures task-flow inputs while exposing controllable action mocks. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useConcordanceTaskFlow: (params: { state?: Record<string, unknown> }) => {
     latestTaskFlowParams = params;
     return {
@@ -209,7 +269,12 @@ vi.mock('../../common', async () => {
     hasLockedParameterDiff: vi.fn(() => true),
     resetAnalysisSelectionAfterClear: vi.fn(),
     restoreAnalysisLockFromRequest: vi.fn(),
+    /** Mirrors the shared node-id helper with a deterministic fallback for fixtures. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     getNodeIdentifier: (node: { id?: string }, index: number) => node.id ?? `node-${index}`,
+    /** Supplies locked concordance selection state without invoking the shared hook stack. */
+    // Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
     useAnalysisLock: () => ({
       isLocked: true,
       lockWithSnapshots: vi.fn(),
@@ -230,6 +295,8 @@ vi.mock('../../common', async () => {
         case_sensitive: false,
       },
     }),
+    /** Supplies analysis lifecycle state and mockable clear behavior for feature tests. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     useAnalysisFeature: () => ({
       resolveTaskId: vi.fn(async () => 'task-1'),
       setLocalTaskId: vi.fn(),
@@ -241,12 +308,16 @@ vi.mock('../../common', async () => {
       hydrationState: mockHydrationState,
       clearResults: clearResultsMock,
     }),
+    /** Provides node-colour controls without depending on global colour stores. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     useNodeColorManagement: () => ({
       nodeColors: {},
       handleColorChange: vi.fn(),
       defaultPalette: ['#000000'],
       promoteTempColors: vi.fn(),
     }),
+    /** Emulates the shared safe-result hook while exposing the setter to tests. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     useSafeResult: () => {
       const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(mockInitialResult);
       const ref = ReactModule.useRef<Record<string, unknown> | null>(result);

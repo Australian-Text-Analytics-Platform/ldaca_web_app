@@ -51,12 +51,20 @@ export interface CaptureError extends Error {
   reason: string;
 }
 
+/** Creates typed capture errors that the save dialog can map to user-facing reasons. */
+/**
+ * Called by: useConcordanceSnapshotCapture hook during this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ */
 function captureError(reason: string, message: string): CaptureError {
   const err = new Error(message) as CaptureError;
   err.reason = reason;
   return err;
 }
 
+/** Reports selected source sizes so snapshot eligibility can enforce demo caps per block. */
+/**
+ * Called by: useConcordanceSnapshotCapture hook during this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ */
 function perBlockRowCounts(
   nodes: readonly WorkspaceNodeLike[],
   getCount: (n: WorkspaceNodeLike) => number,
@@ -64,6 +72,11 @@ function perBlockRowCounts(
   return nodes.map((n) => (Number.isFinite(getCount(n)) ? getCount(n) : 0));
 }
 
+/** Builds the manifest preview shown before a concordance snapshot is loaded. */
+/**
+ * Called by: useConcordanceSnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+   * Flow: read the request search term, count hits across result nodes, detect materialized output, capture display columns, then return preview metadata.
+ */
 function buildConcordancePreview(
   resp: ConcordanceAnalysisResponse,
   request: ConcordanceAnalysisRequest | null,
@@ -88,6 +101,11 @@ function buildConcordancePreview(
   };
 }
 
+/** Returns the save-snapshot callback that serializes concordance result data and bins. */
+/**
+ * Used by: ConcordanceFeature.tsx, compat.ts, useConcordanceSnapshotLoad.ts, and related files because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
+ */
 export function useConcordanceSnapshotCapture(
   input: UseConcordanceSnapshotCaptureInput,
 ) {

@@ -1,5 +1,5 @@
 /**
- * De-duplicate and trim metadata column names. Used by MetadataColumnSelector
+ * De-duplicate and trim metadata column names. Used by: MetadataColumnSelector because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * to keep its `availableColumns` / `selectedColumns` lists canonical.
  */
 export const normalizeMetadataColumns = (columns: string[]): string[] => {

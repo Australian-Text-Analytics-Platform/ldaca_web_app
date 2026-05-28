@@ -22,6 +22,8 @@ interface Props {
  * "Documents per batch" page-size selector. Replaces the verbatim
  * `<span>Documents per batch</span><Select…/>` block previously duplicated in
  * concordance and quotation feature footers.
+ * Used by: concordance and quotation parameter/result footers because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export const PageSizeSelect: React.FC<Props> = ({
   value,

@@ -5,6 +5,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { appRoute, viewSearchFor } from '@/router';
 import { useUIStore, type ViewType } from '@/stores';
 
+/** Called by: ViewRouteSync before writing store-driven view state back to the URL because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const getRoutableView = ({
   currentView,
   isWorkspaceLoaded,
@@ -19,6 +20,13 @@ const getRoutableView = ({
   return currentView;
 };
 
+/**
+ * Synchronizes the single-route URL search state with the Zustand `currentView`.
+ * It lets browser back/forward and shared links select views while keeping the
+ * sidebar/store as the app's primary navigation source.
+ * Rendered by: App once near the shell so URL/search state can follow the global view without file-based routes.
+ * Flow: detect valid URL-driven view changes, apply them to the store, then navigate search params back to the current routable view.
+ */
 export const ViewRouteSync = () => {
   const { view: routeView } = appRoute.useSearch();
   const navigate = appRoute.useNavigate();

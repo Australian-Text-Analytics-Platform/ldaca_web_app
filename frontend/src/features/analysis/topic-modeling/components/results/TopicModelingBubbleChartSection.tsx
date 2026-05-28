@@ -65,8 +65,10 @@ type Props = {
 const OVERLAY_BTN =
   'flex items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
 
+// Used by: buildTopicsCSV to escape topic labels and representative words for optional CSV export because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
 const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
 
+// Used by: topic-modeling chart downloads because optional CSV bundles must mirror selected-topic ordering and visible corpus columns. Flow: sort selected topics first, build topic/corpus headers, escape cells, then join rows as CSV.
 const buildTopicsCSV = (
   topics: TopicLike[],
   selectedTopicIds: Set<number>,
@@ -119,7 +121,7 @@ const TM_STOPWORDS_OPTION = {
   defaultChecked: true,
 } as const;
 
-/** Build a plain-text file containing the active stopword groups,
+/** Used by: handleDownloadChart to build a plain-text file containing the active stopword groups, because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  *  one ``# Language`` heading per group followed by one word per line.
  *  Mirrors the format users already see in the read-only dialog and is
  *  trivial to diff / inspect after the fact. */
@@ -134,6 +136,10 @@ const buildStopwordsTxt = (
   return `${blocks.join('\n\n')}\n`;
 };
 
+/**
+ * Rendered by: TopicModelingResultsPanel to show the topic bubble chart and export controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export function TopicModelingBubbleChartSection({
   topics,
   chartRef,
@@ -172,6 +178,7 @@ export function TopicModelingBubbleChartSection({
     ? [TM_CSV_OPTION, TM_STOPWORDS_OPTION]
     : [TM_CSV_OPTION];
 
+  // Called by: TopicModelingBubbleChartSection download menu because chart exports may include SVG/bitmap, topic CSV, and active stopword lists. Flow: verify the chart SVG, build header and extra files, then download the chart bundle or show toast errors.
   const handleDownloadChart = async (format: ChartImageFormat, extras: Record<string, boolean>) => {
     if (!chartRef.current) {
       toast.error('Chart not available for export.');

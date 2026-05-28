@@ -17,6 +17,7 @@ type Props = {
   handleDetachConfirm: () => Promise<void> | void;
 };
 
+/** Rendered by: ConcordanceFeature to adapt the shared detach-column dialog for per-document dispersion outputs because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface. */
 export function ConcordanceDispersionDetachDialog({
   open,
   onOpenChange,

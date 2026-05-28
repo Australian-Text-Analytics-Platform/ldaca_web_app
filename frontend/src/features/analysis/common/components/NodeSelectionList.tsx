@@ -29,6 +29,12 @@ export interface NodeSelectionListProps {
   cardClassName?: string;
 }
 
+/**
+ * Displays the selected analysis data blocks as horizontally scrollable cards,
+ * with optional colour controls and feature-provided per-node content slots.
+ * Used by: NodeSelectionPanel and shared node-selection tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
   nodes = [],
   nodeIds,

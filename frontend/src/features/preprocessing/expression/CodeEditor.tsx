@@ -53,6 +53,14 @@ interface CodeEditorProps {
   className?: string;
 }
 
+/**
+ * Thin CodeMirror wrapper styled like the app inputs. Polars expression and
+ * aggregate UIs use it for Python-expression editing without duplicating editor
+ * setup details.
+ * Rendered by: usePolarsExpressionSubTab hook, PolarsExpressionSubTab module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: pass controlled value/events into CodeMirror, apply the shared Python extensions,
+ * and mirror disabled/min-height styling from preprocessing forms.
+ */
 export const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   onChange,

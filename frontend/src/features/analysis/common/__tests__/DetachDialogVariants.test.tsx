@@ -29,6 +29,10 @@ interface DetachDialogCase {
   selectedColumn: string;
 }
 
+/**
+ * Drives the same mandatory-column regression checks across each feature-specific
+ * detach dialog wrapper that delegates to the shared dialog implementation.
+ */
 const dialogCases: DetachDialogCase[] = [
   {
     name: 'ConcordanceDetachDialog',
@@ -62,10 +66,18 @@ const dialogCases: DetachDialogCase[] = [
   },
 ];
 
+/** Called by: detach dialog variant assertions that build role-name regexes because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Renders a detach dialog case with shared defaults so each test only states the
+ * callback or selection state relevant to its regression.
+ * Used by: detach dialog variant tests because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+   * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
+ */
 function renderDialog(testCase: DetachDialogCase, overrides: Partial<DetachDialogProps> = {}) {
   const Dialog = testCase.Dialog;
   render(

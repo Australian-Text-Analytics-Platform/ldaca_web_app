@@ -44,6 +44,10 @@ export interface AppliedStopwordsDialogProps {
   }>;
 }
 
+/**
+ * Rendered by: TopicModelingResultsPanel to display stopword groups hidden from representative topic words because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export function AppliedStopwordsDialog({
   open,
   onClose,

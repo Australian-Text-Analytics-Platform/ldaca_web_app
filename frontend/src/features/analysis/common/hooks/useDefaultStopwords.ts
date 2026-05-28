@@ -38,6 +38,7 @@ interface UseDefaultStopwordsResult {
  * The ``strict`` option is retained for call-site compatibility. Unsupported
  * languages are ignored because there is no backend fallback after the default
  * stopword endpoint was removed.
+ * Used by: topic-modeling parameter panels and results summaries because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  */
 export const useDefaultStopwords = (
   languages: ReadonlyArray<string | null | undefined>,

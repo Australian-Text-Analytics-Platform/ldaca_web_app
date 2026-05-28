@@ -6,6 +6,7 @@ import {
   nodeVisualInfo,
 } from '../nodeVisualState';
 
+/** Shared assigned-colour fixture used by visual-state tests that assert focus/active colours. */
 const BASE_ASSIGNED = { 'n-a': '#2563eb', 'n-b': '#dc2626' };
 
 describe('activeSetForContext', () => {

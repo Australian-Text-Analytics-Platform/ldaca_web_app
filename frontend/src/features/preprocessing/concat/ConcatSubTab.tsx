@@ -16,6 +16,14 @@ import { useConcatSubTab, type ConcatSubTabProps } from './hooks/useConcatSubTab
 
 export type { ConcatSubTabProps } from './hooks/useConcatSubTab';
 
+/**
+ * Renders the Concatenate preprocessing sub-tab. It consumes `useConcatSubTab`
+ * so schema analysis, preview fetching, and apply behavior stay out of the
+ * JSX layout.
+ * Rendered by: DataPreprocessingFeature module, SubTabActivityTag component, useConcatSubTab hook (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: collect selected nodes/schema analysis from its hook, render node ordering and mismatch
+ * guidance, preview concatenation results, then expose apply controls.
+ */
 export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
   const {
     selectionPanel,

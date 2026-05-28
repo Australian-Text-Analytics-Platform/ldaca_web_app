@@ -5,8 +5,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useSnapshotViewStore } from '@/features/snapshot-view';
 
 /**
- * Snapshot mode banner for quotation. Mirrors the concordance banner —
+ * Rendered by: QuotationFeature. Snapshot mode banner for quotation. Mirrors the concordance banner — because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * see ConcordanceSnapshotBanner for the design rationale.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const QuotationSnapshotBanner: React.FC = () => {
   const snapshot = useSnapshotViewStore((s) => s.snapshots.quotation);

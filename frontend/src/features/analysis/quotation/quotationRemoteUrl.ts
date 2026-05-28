@@ -18,6 +18,8 @@ const NORMALIZED_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
  * Accept user-entered URLs that may omit the scheme; reject anything that
  * isn't an http(s) endpoint. Returns the normalized URL plus a structured
  * reason on failure so the UI can show a specific error message.
+ * Used by: QuotationFeature remote-engine controls because user-entered service URLs may omit schemes but must resolve to http(s) before task submission.
+ * Flow: normalize inputs, apply the analysis-specific branch, then return the derived value consumed by the caller.
  */
 export const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
   const trimmed = value.trim();
@@ -28,6 +30,8 @@ export const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
   const hasScheme = NORMALIZED_SCHEME_REGEX.test(trimmed);
   const isHttpScheme = /^https?:\/\//i.test(trimmed);
 
+  // Reuses URL parsing to validate candidate endpoints after optional scheme insertion.
+  // Called by: normalizeRemoteUrl for raw and scheme-prefixed URL candidates because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
   const canParse = (candidate: string) => {
     try {
       const parsed = new URL(candidate);

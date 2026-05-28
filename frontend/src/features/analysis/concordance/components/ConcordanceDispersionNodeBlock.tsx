@@ -40,6 +40,7 @@ type ConcordanceGroupedRow = Record<string, unknown>[];
 
 const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
 
+/** Used by: ConcordanceDispersionNodeBlock display-column assembly to prevent duplicate dispersion/metadata cells because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const dedupeColumns = (cols: string[]): string[] => {
   const seen = new Set<string>();
   return cols.filter((col) => {
@@ -59,6 +60,7 @@ const dedupeColumns = (cols: string[]): string[] => {
 const DISPERSION_COLUMN_WIDTH_RATIO = 0.85;
 const METADATA_COLUMN_MIN_WIDTH_PX = 200;
 
+/** Used by: ConcordanceDispersionNodeBlock tables to keep metadata scroll from collapsing hit bars because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const getDispersionColumnStyle = (
   isMetadataVisible: boolean,
   visibleWidth: number,
@@ -81,6 +83,7 @@ const getDispersionColumnStyle = (
 
 // Force a sensible minimum width on each visible metadata column so the
 // table extends beyond the viewport when needed, enabling horizontal scroll.
+/** Used by: ConcordanceDispersionNodeBlock tables to size visible metadata columns consistently because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const getMetadataColumnStyle = (
   isMetadataVisible: boolean,
 ): React.CSSProperties | undefined =>
@@ -173,6 +176,10 @@ export type ConcordanceDispersionNodeBlockProps = {
   readOnly?: boolean;
 };
 
+/**
+ * Rendered by: ConcordanceResultsPanel for each concordance dispersion result block because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeBlockProps> = ({
   nodeKey,
   nodeData,
@@ -558,8 +565,10 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
                   selectedIndices:
                     (selectedBinIndices['__COMBINED__'] as ReadonlySet<number> | undefined) ??
                     EMPTY_BIN_SELECTION,
+                  /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
                   onSelect: (index, shiftHeld) =>
                     onBinSelect('__COMBINED__', index, shiftHeld),
+                  /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
                   onClear: () => onClearBinSelection('__COMBINED__'),
                 }}
                 onLegendCountsChange={handleLegendCountsChange}
@@ -853,7 +862,9 @@ export const ConcordanceDispersionNodeBlock: React.FC<ConcordanceDispersionNodeB
               selectedIndices:
                 (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
                 EMPTY_BIN_SELECTION,
+              /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
               onSelect: (index, shiftHeld) => onBinSelect(nodeKey, index, shiftHeld),
+              /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
               onClear: () => onClearBinSelection(nodeKey),
             }}
             onLegendCountsChange={handleLegendCountsChange}

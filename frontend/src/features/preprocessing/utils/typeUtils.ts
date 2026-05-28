@@ -3,7 +3,10 @@
 export { normalizeTypeName } from '@/utils/columnTypes';
 
 /**
- * Get available filter operators for each data type
+ * Supplies condition operators for the Filter tab based on normalized dtype.
+ * Used by: useFilterSubTabSections hook, typeUtils tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: normalize the dtype, choose operator sets for numeric/datetime/string/boolean/list
+ * types, and return filter-builder options.
  */
 export const getOperatorsForType = (dataType: string) => {
   switch (dataType) {
@@ -52,7 +55,10 @@ export const getOperatorsForType = (dataType: string) => {
 };
 
 /**
- * Format a value for display in preview tables
+ * Formats arbitrary preview cell values for tables and checklist labels.
+ * Used by: useFilterSubTabSections hook, PreviewTable component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Steps: map nullish/empty primitives to readable labels, preserve scalar text, JSON-stringify
+ * objects when possible, and fall back to String conversion.
  */
 export const formatPreviewValue = (value: unknown): string => {
   if (value === null) {
@@ -87,7 +93,10 @@ export const formatPreviewValue = (value: unknown): string => {
 };
 
 /**
- * Check if a value is non-empty (for validation)
+ * Checks whether filter condition values are complete enough to serialize.
+ * Used by: serializers utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Steps: reject nullish/blank values, accept scalar values, recurse arrays and ranges, and
+ * inspect object entries for any non-empty value.
  */
 export const hasNonEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;

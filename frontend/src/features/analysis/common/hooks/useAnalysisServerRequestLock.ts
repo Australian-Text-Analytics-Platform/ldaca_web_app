@@ -8,6 +8,11 @@ import {
 
 export type { ServerLockAnalysisType };
 
+/**
+ * Names the query cache entry shared by hydration, lock comparison, and clear
+ * flows for the active analysis task request.
+ * Used by: lock, hydration, and clear helpers that share server request state because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ */
 export const analysisServerRequestLockQueryKey = (
   analysisType: ServerLockAnalysisType,
   workspaceId: string | null
@@ -19,10 +24,20 @@ type Args = {
   getAuthHeaders: () => Record<string, string>;
 };
 
+/**
+ * Fetches the backend's current task and original request payload so analysis
+ * tabs can restore locks without issuing duplicate current/request calls.
+ * Used by: useAnalysisLock and direct cache readers in useAnalysisFeature because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
 export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAuthHeaders }: Args) {
   const query = useQuery({
     queryKey: analysisServerRequestLockQueryKey(analysisType, workspaceId),
     enabled: Boolean(workspaceId),
+        /**
+     * Called by: TanStack Query when refreshing the analysis server-request lock because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+     */
     queryFn: async () => {
       if (!workspaceId) {
         return {

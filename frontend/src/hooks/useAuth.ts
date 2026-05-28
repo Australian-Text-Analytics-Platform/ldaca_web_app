@@ -14,6 +14,11 @@ export interface UseAuthOptions {
   autoStart?: boolean;
 }
 
+/** Exposes auth store state/actions as a hook and performs first-mount auth bootstrap work. */
+/**
+ * Used by: src/App.tsx, src/components/dialogs/DataFolderDialog.tsx, src/components/layout/Sidebar.tsx and 32 other importers because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Flow: subscribe to the auth-store slice, run redirect-token/bootstrap/refresh setup on mount, then derive UI-friendly auth flags and actions.
+ */
 export const useAuth = (options: UseAuthOptions = {}) => {
   const autoStart = options.autoStart ?? false;
 

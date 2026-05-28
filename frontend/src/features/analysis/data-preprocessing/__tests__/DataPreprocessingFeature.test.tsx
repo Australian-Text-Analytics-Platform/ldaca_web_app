@@ -29,6 +29,8 @@ const mockSelectedNode = {
 };
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
+  // Supplies the selected corpus node expected by every preprocessing subtab test.
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceSelection: () => ({
     selectedNodeId: 'node-1',
     selectedNode: mockSelectedNode,
@@ -38,6 +40,8 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
+  // Provides table schema data so subtab controls can render column choices.
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceData: () => ({
     nodeData: {
       columns: ['Body', 'Count'],
@@ -52,6 +56,8 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
+  // Exposes workspace action doubles used to assert preview/apply calls from subtabs.
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceActions: () => ({
     filterNode: mockFilterNode,
     filterPreview: mockFilterPreview,
@@ -69,6 +75,8 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
+  // Keeps feature loading state idle so tests exercise normal enabled controls.
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceStatus: () => ({
     isLoading: {
       nodeData: false,
@@ -79,10 +87,14 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
 }));
 
 vi.mock('@/components/help/HelpIcon', () => ({
+  // Removes help chrome from assertions focused on preprocessing behavior.
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => null,
 }));
 
 vi.mock('@/components/help/InfoIcon', () => ({
+  // Removes info chrome from assertions focused on preprocessing behavior.
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => null,
 }));
 
@@ -367,6 +379,9 @@ describe('DataPreprocessingFeature replace tab', () => {
     // surrounding <DisabledReasonTooltip> swaps its child whenever its
     // `reason` prop transitions undefined↔defined, so a once-grabbed
     // DOM ref goes stale.
+    /**
+     * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+     */
     const getAddButton = () =>
       within(screen.getByRole('tabpanel', { name: 'Filter' }))
         .getByRole('button', { name: 'Add to Workspace' });

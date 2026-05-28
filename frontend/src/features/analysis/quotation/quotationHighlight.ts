@@ -14,6 +14,11 @@ export const TYPE_COLORS: Record<string, string> = {
   verb: '#7c3aed',    // violet-600
 };
 
+// Converts palette colours to translucent backgrounds used by hover highlights.
+/**
+ * Used by: QuotationHighlightedCell because hover and segment backgrounds need translucent versions of the quotation highlight palette.
+   * Flow: expand shorthand hex colors, parse RGB channels, then return an rgba string with the requested alpha.
+ */
 export const hexToRgba = (hex: string, alpha = 0.18): string => {
   const h = hex.replace('#', '');
   const bigint = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
@@ -27,6 +32,9 @@ export const hexToRgba = (hex: string, alpha = 0.18): string => {
  * Build multi-line-safe text decorations for a stacked set of highlight
  * types. Each type contributes one underline coloured per `TYPE_COLORS`
  * so overlapping spans render as parallel lines.
+ */
+/**
+ * Used by: quotation detail and highlighted-cell renderers because overlapping speaker/quote/verb spans need stacked underline colors. Flow: return an empty style for no types, map types to underline layers and palette colors, then return multi-line-safe CSSProperties.
  */
 export const buildUnderlineStyle = (types: string[]): CSSProperties => {
   if (!types.length) return {};

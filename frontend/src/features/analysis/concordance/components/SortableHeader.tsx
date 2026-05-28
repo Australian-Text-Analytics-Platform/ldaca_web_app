@@ -11,6 +11,10 @@ type Props = {
   onSort: (columnKey: string, paginationKey: string, requestNodeId: string) => void;
 };
 
+/**
+ * Rendered by: ConcordanceTableNodeBlock as the concordance table's reusable sortable header affordance because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const SortableHeader: React.FC<Props> = ({
   columnKey,
   label,

@@ -10,6 +10,10 @@ import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
+/**
+ * Pagination navigation landmark used by table and analysis pagination controls.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
     <nav
@@ -22,6 +26,7 @@ function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   )
 }
 
+/** Used by: Pagination consumers to wrap page links, jump controls, and ellipses because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function PaginationContent({
   className,
   ...props
@@ -35,6 +40,7 @@ function PaginationContent({
   )
 }
 
+/** Used by: Pagination consumers for each page link or ellipsis item because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function PaginationItem({ ...props }: React.ComponentProps<"li">) {
   return <li data-slot="pagination-item" {...props} />
 }
@@ -55,8 +61,11 @@ interface PaginationJumpProps {
 }
 
 /**
- * Clickable "…" that becomes a page-number input. Pressing Go jumps to
- * the entered page; Escape / outside-click closes the popover.
+ * Clickable page-jump control used by pagination footers when page ranges are
+ * compacted. It lets users enter an exact page while keeping unknown-total
+ * server pagination supported.
+ * Why: compact table pagers need an exact-page popover without assuming every backend can report total pages.
+ * Flow: manage popover/input/error state, handle outside click and focus reset, validate page input, then call onPageChange and close.
  */
 export const PaginationJump: React.FC<PaginationJumpProps> = ({
   totalPages,
@@ -75,10 +84,15 @@ export const PaginationJump: React.FC<PaginationJumpProps> = ({
   React.useEffect(() => {
     if (!open) return
 
+    /**
+     * Closes the page-size selector when consumers click outside the control.
+     * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+     */
     const handlePointerDown = (event: MouseEvent) => {
       if (!containerRef.current || containerRef.current.contains(event.target as Node)) return
       setOpen(false)
     }
+    /** Called by: the PaginationJump document keydown listener because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false)
     }
@@ -103,6 +117,10 @@ export const PaginationJump: React.FC<PaginationJumpProps> = ({
     return () => cancelAnimationFrame(id)
   }, [open])
 
+  /**
+   * Called by: the PaginationJump form onSubmit prop because the interaction needs a single handler that validates state, runs the action, and updates feedback.
+    * Flow: trim and validate numeric input, report range errors, emit the parsed page to onPageChange, then close the popover.
+   */
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmed = value.trim()
@@ -176,6 +194,7 @@ export const PaginationJump: React.FC<PaginationJumpProps> = ({
   )
 }
 
+/** Used by: pagination footers for numeric pages and previous/next controls because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function PaginationLink({
   className,
   isActive,
@@ -199,6 +218,10 @@ function PaginationLink({
   )
 }
 
+/**
+ * Previous-page link wrapper used by paginated tables and analysis results.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function PaginationPrevious({
   className,
   ...props
@@ -216,6 +239,10 @@ function PaginationPrevious({
   )
 }
 
+/**
+ * Next-page link wrapper used by paginated tables and analysis results.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 function PaginationNext({
   className,
   ...props
@@ -233,6 +260,7 @@ function PaginationNext({
   )
 }
 
+/** Used by: pagination footers when compact ranges hide intermediate pages because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 function PaginationEllipsis({
   className,
   ...props

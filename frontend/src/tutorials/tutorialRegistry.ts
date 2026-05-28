@@ -26,7 +26,10 @@ export type TutorialTarget = DocTarget;
  */
 export type TutorialTargetKey = BundledTutorialKey;
 
+/** Resolves tutorial help links for HelpIcon and modal callers. */
+/** Used by: src/components/help/DocLinkIcon.tsx, src/features/hints/HintsController.tsx because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
 export const getTutorialTarget = (key: string): TutorialTarget | null =>
   getDocTarget('tutorial', key);
 
+/** Tutorial index target used by global docs navigation. */
 export const tutorialIndexTarget: TutorialTarget = TUTORIAL_INDEX_TARGET;

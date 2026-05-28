@@ -8,6 +8,12 @@ import {
 } from '../manifest';
 import type { SnapshotManifest } from '../types';
 
+/**
+ * Builds a valid demo manifest fixture with optional overrides.
+ * Used by: Vitest setup or assertions in snapshot-view/manifest.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: defaults define every required manifest block, then tests mutate one block to exercise validation.
+ */
 function demoManifest(
   overrides: Partial<SnapshotManifest> = {},
 ): SnapshotManifest {
@@ -48,6 +54,11 @@ function demoManifest(
   };
 }
 
+/**
+ * Builds a share-mode manifest fixture for capability-gating tests.
+ * Used by: Vitest setup or assertions in snapshot-view/manifest.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 function shareManifest(): SnapshotManifest {
   return demoManifest({
     mode: 'share',

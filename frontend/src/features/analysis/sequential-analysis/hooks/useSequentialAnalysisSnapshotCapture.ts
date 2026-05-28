@@ -57,12 +57,21 @@ export interface CaptureError extends Error {
   reason: string;
 }
 
+/** Creates typed capture errors so the dialog can show precise snapshot failure reasons. */
+/**
+ * Called by: useSequentialAnalysisSnapshotCapture hook during this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ */
 function captureError(reason: string, message: string): CaptureError {
   const err = new Error(message) as CaptureError;
   err.reason = reason;
   return err;
 }
 
+/** Builds the manifest preview summary from captured trends rows and request settings. */
+/**
+ * Called by: useSequentialAnalysisSnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+   * Flow: scan captured rows for unique periods and group keys, derive series and bucket counts, read chart type, then return snapshot preview metadata.
+ */
 function buildSequentialPreview(
   result: Record<string, unknown>,
   request: SequentialAnalysisRequest,
@@ -100,6 +109,10 @@ function buildSequentialPreview(
  * case-fold toggle can merge variants client-side without information
  * loss. Always uses a preset frequency (never ``custom``) — the
  * dialog enforces this. */
+/**
+ * Used by: SequentialAnalysisFeature.tsx because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+   * Flow: choose numeric or datetime request shape, convert empty group lists to null, force sorted and case-sensitive capture, then return the backend request.
+ */
 export function buildCaptureRequest(
   timeColumn: string,
   columnType: 'datetime' | 'numeric',
@@ -127,6 +140,11 @@ export function buildCaptureRequest(
   };
 }
 
+/** Returns the callback that captures sequential-analysis data into a sliceable snapshot bundle. */
+/**
+ * Used by: useSequentialAnalysisSnapshotLoad.ts, SequentialAnalysisFeature.tsx because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
+ * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
+ */
 export function useSequentialAnalysisSnapshotCapture(
   input: UseSequentialAnalysisSnapshotCaptureInput,
 ) {

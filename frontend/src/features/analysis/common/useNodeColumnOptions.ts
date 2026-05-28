@@ -21,6 +21,12 @@ export interface UseNodeColumnOptionsConfig {
   fallbackToAllColumns?: boolean;
 }
 
+/**
+ * Converts either raw column names or typed column metadata into the single
+ * ColumnInfo shape consumed by shared node/column selectors.
+ * Called by: buildNodeColumnOptionsMap for each workspace node because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
+   * Flow: return no columns for missing sources, convert raw names to string ColumnInfo entries, then normalize typed metadata names and data types.
+ */
 const normalizeColumnInfos = (source?: NodeColumnSource): ColumnInfo[] => {
   if (!source || !Array.isArray(source) || source.length === 0) return [];
   const first = source[0];
@@ -33,6 +39,12 @@ const normalizeColumnInfos = (source?: NodeColumnSource): ColumnInfo[] => {
   }));
 };
 
+/**
+ * Applies data-type filtering and fallback policy for one node's selectable
+ * columns, preserving diagnostics for panels that need to explain hidden choices.
+ * Called by: buildNodeColumnOptionsMap after node column metadata is normalized because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
+ * Flow: normalize inputs, apply the analysis-specific branch, then return the derived value consumed by the caller.
+ */
 const buildEntry = (
   nodeId: string,
   columnInfos: ColumnInfo[],
@@ -81,6 +93,11 @@ export interface BuildNodeColumnOptionsArgs {
   fallbackToAllColumns?: boolean;
 }
 
+/**
+ * Builds the per-node column option map used by multi-node analysis parameter
+ * panels and their detached-column dialogs.
+ * Used by: useNodeColumnOptions and tests because multi-node panels need per-node selectable columns with data-type filtering and fallback diagnostics.
+ */
 export const buildNodeColumnOptionsMap = ({
   nodes = [],
   getNodeColumns,
@@ -100,6 +117,11 @@ export const buildNodeColumnOptionsMap = ({
   }, {});
 };
 
+/**
+ * Hook wrapper around the pure column-option builder for components that receive
+ * live workspace nodes from React state.
+ * Used by: NodeSelectionPanel when building selectable columns for active nodes because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ */
 export const useNodeColumnOptions = (
   config: UseNodeColumnOptionsConfig
 ): NodeColumnOptionsMap => {

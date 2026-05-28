@@ -13,6 +13,11 @@ import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRaw
 
 const SINGLE_NODE_PALETTE = ['#2563eb'];
 
+/**
+ * Resolves a stable node id from workspace node shapes that may expose either
+ * `id` or `node_id`.
+ * Used by: local callers in preprocessing/useReplaceSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 const getNodeId = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
   node.id || node.node_id || `node-${fallbackIndex}`;
 
@@ -31,6 +36,13 @@ export interface ReplaceSubTabProps {
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
 
+/**
+ * Owns regex replace/extract state for the Find sub-tab. The component consumes
+ * this hook for string-column selection, preview data, and apply controls.
+ * Used by: ReplaceSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: manage find/replace form state, build replacement request payloads, request preview
+ * data, and apply/refresh the output node.
+ */
 export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const {
     selectedNodeId,
@@ -122,6 +134,13 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     return undefined;
   })();
 
+  /**
+   * Applies the replace/extract operation to the selected node and refreshes
+   * schema so output-column changes are visible to downstream tools.
+   * Called by: useReplaceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+  * Steps: guard required inputs, build the replace request, call the mutation, refresh schema,
+  * and clear apply loading.
+   */
   const handleApply = async () => {
     if (!activeNodeId || !selectedColumn || pattern.length === 0) return;
     setApplyLoading(true);

@@ -15,6 +15,7 @@ export interface NodeSelectionColumnAddonArgs extends NodeSelectionRenderArgs {
 
 const CLEAR_SELECTION_VALUE = '__ldaca__clear__';
 
+/** Status banner styles shared by node-selection warnings inside analysis cards. */
 const STATUS_VARIANT_STYLES: Record<'info' | 'warning' | 'error', string> = {
   info: 'border-sky-500/50 bg-sky-100/60 text-sky-900',
   warning: 'border-amber-500/60 bg-amber-100/60 text-amber-900',
@@ -54,7 +55,12 @@ interface NodeSelectionPanelProps {
   renderColumnControlAddon?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
 }
 
-/** Shared node + text-column + color selection panel reused across analysis tabs */
+/**
+ * Shared node, text-column, and colour selection panel reused across analysis
+ * tabs that need to lock selected data blocks to running or restored results.
+ * Used by: analysis parameter panels that choose workspace data blocks because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   selectedNodes,
   nodeColumnSelections,
@@ -83,6 +89,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   renderExtraNodeContent,
   renderColumnControlAddon,
 }) => {
+  /** Called by: renderColumnSelector while labeling each node's column control because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
   const selectedNodeIds = selectedNodes.map((node, idx) => getNodeIdentifier(node, idx));
@@ -104,17 +111,23 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     fallbackToAllColumns,
   });
 
+    /**
+   * Called by: renderMetaContent when shape display is enabled because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Flow: read the optional row/column shape tuple, format finite dimensions with locale separators, then return placeholders for unknown values.
+   */
   const formatShape = (node: WorkspaceNodeLike): string => {
     const rawShape = (node.shape as [number | null, number | null] | undefined) ?? null;
     if (!rawShape) {
       return '—';
     }
     const [rows, cols] = rawShape;
+    /** Called by: formatShape for row and column tuple values because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     const formatPart = (value: number | null | undefined) =>
       typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
     return `${formatPart(rows)} × ${formatPart(cols)}`;
   };
 
+  /** Called by: NodeSelectionList when rendering node metadata slots because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const renderMetaContent = ({ node }: NodeSelectionRenderArgs) => {
     if (renderNodeMeta) {
       return renderNodeMeta(node);
@@ -125,6 +138,10 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     return null;
   };
 
+    /**
+   * Called by: NodeSelectionList for each selected node body because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Flow: derive display state, bind user actions, then render the analysis UI.
+   */
   const renderColumnSelector = (args: NodeSelectionRenderArgs) => {
     const { node, nodeId, index } = args;
     if (!showColumnPicker) return null;
@@ -166,6 +183,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     );
   };
 
+  /** Called by: NodeSelectionList colour controls because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const handleNodeColorChange = (nodeId: string, color: string) => {
     if (disabled) return;
     onColorChange(nodeId, color);

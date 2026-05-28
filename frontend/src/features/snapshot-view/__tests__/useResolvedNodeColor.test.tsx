@@ -6,6 +6,12 @@ import { useSnapshotViewStore } from '../store';
 import type { LoadedSnapshot, SnapshotManifest } from '../types';
 import { useResolvedNodeColor } from '../useResolvedNodeColor';
 
+/**
+ * Builds a loaded snapshot fixture whose manifest carries frozen node colors.
+ * Used by: Vitest setup or assertions in snapshot-view/useResolvedNodeColor.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: node colors enter manifest metadata, then the loaded snapshot fixture exposes them through the hook path.
+ */
 function snapshotWithColors(
   colors: Record<string, string>,
 ): LoadedSnapshot {

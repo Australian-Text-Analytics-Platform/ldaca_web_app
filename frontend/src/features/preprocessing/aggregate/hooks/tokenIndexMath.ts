@@ -7,7 +7,10 @@
  * the source, otherwise the moved item lands one slot too far to the left.
  */
 
-/** Clamp `value` into `[0, max]`. NaN and out-of-range values fall back to `max`. */
+/**
+ * Clamp `value` into `[0, max]`. NaN and out-of-range values fall back to `max`.
+ * Used by: tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ */
 export const clampIndex = (value: number, max: number): number => {
   if (Number.isNaN(value)) return max;
   if (value < 0) return 0;
@@ -18,6 +21,7 @@ export const clampIndex = (value: number, max: number): number => {
 /**
  * Insert `item` into a copy of `items` at `targetIndex`, clamped to
  * `[0, items.length]`. `undefined` for `targetIndex` appends.
+ * Used by: useAggregateSubTab hook, tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
 export const insertItemAt = <T>(items: readonly T[], targetIndex: number | undefined, item: T): T[] => {
   const next = [...items];
@@ -29,6 +33,7 @@ export const insertItemAt = <T>(items: readonly T[], targetIndex: number | undef
 /**
  * Remove the entry at `index`. Out-of-range indexes return the array
  * unchanged.
+ * Used by: useAggregateSubTab hook, tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
 export const removeItemAt = <T>(items: readonly T[], index: number): T[] => {
   if (index < 0 || index >= items.length) return [...items];
@@ -45,6 +50,9 @@ export const removeItemAt = <T>(items: readonly T[], index: number): T[] => {
  * source item has been removed*. When `fromIndex < toIndex` we therefore
  * decrement `toIndex` by one — without that adjustment, the moved item
  * would land one slot too far to the left.
+ * Used by: useAggregateSubTab hook, tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Steps: reject invalid moves, remove the source item, adjust the post-removal target, and
+ * reinsert only when the order changes.
  */
 export const moveItemTo = <T>(items: readonly T[], fromIndex: number, toIndex: number): T[] => {
   if (fromIndex < 0 || fromIndex >= items.length) return [...items];

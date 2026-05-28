@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MetadataColumnSelector } from '../MetadataColumnSelector';
 
+/** Used by: MetadataColumnSelector tests that exercise real selection updates because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 const TestHarness = ({ disabledReason }: { disabledReason?: string }) => {
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
 

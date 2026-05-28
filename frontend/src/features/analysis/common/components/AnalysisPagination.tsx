@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 // AnalysisPagination – main exported component
 // ---------------------------------------------------------------------------
 
+/** Default page-size options shared by paginated analysis result tables. */
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 export interface AnalysisPaginationProps {
@@ -54,6 +55,12 @@ export interface AnalysisPaginationProps {
   className?: string;
 }
 
+/**
+ * Renders the shared pagination footer for analysis tables, combining page-size
+ * controls, jump links, loading state, and optional trailing feature actions.
+ * Used by: paginated analysis result table panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export const AnalysisPagination = ({
   page,
   pageSize,

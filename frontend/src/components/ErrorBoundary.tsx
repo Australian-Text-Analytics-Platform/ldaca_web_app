@@ -11,26 +11,35 @@ interface ErrorBoundaryProps {
 }
 
 /**
- * Error boundary component to catch and handle React errors gracefully
+ * Reusable React error boundary for isolating failures around login and
+ * workspace surfaces. Callers can provide feature-specific fallbacks while the
+ * default keeps the SPA recoverable with retry/reload actions.
+ * Rendered by: App, LoginScreen, and ViewRouter because auth/workspace crashes should swap to recovery UI without blanking the whole SPA.
+ * Flow: catch child render errors into state, choose a caller fallback or the default panel, then let fallbacks reset the boundary.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  /** Called by: React when an ErrorBoundary instance is mounted around children because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
 
+  /** Called by: React after a child render error so `render` can swap to a fallback because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
+  /** Called by: React error recovery to expose stack details for developers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error Boundary caught an error:', error, errorInfo);
   }
 
+  /** Lets fallback UIs retry the child tree without forcing a full page reload. */
   resetError = () => {
     this.setState({ hasError: false, error: undefined });
   };
 
+  /** Called by: React to render either protected children or the caller-selected fallback because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
   override render() {
     if (this.state.hasError) {
       const Fallback = this.props.fallback || DefaultErrorFallback;
@@ -42,7 +51,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 }
 
 /**
- * Default error fallback component
+ * Default fallback used when a caller only needs a generic recovery panel with
+ * retry and reload controls.
+ * Used by: ErrorBoundary when no feature-specific fallback component is passed because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Flow: show the error message, offer retry and reload actions, then reveal stack details only in development builds.
  */
 function DefaultErrorFallback({ 
   error, 
@@ -89,7 +101,10 @@ function DefaultErrorFallback({
 }
 
 /**
- * Workspace-specific error fallback
+ * Workspace-specific fallback used by workspace views to keep data-loading
+ * failures visually distinct from full-app crashes.
+ * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
+ * Flow: show a workspace-specific error message and retry button, then delegate recovery to resetError.
  */
 export function WorkspaceErrorFallback({ 
   error, 

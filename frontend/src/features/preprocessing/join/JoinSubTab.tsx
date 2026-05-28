@@ -17,6 +17,13 @@ import { useJoinSubTab, type JoinSubTabProps } from './hooks/useJoinSubTab';
 
 export type { JoinSubTabProps } from './hooks/useJoinSubTab';
 
+/**
+ * Renders the Join preprocessing tab. It consumes `useJoinSubTab` for
+ * two-node selection state, preview data, and apply behavior.
+ * Rendered by: DataPreprocessingFeature module, SubTabActivityTag component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: consume join hook sections, render node/column selection, join type controls, preview
+ * results, and apply state in one tab surface.
+ */
 export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
   const {
     selectionPanel,

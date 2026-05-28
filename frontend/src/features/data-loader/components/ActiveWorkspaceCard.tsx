@@ -22,6 +22,15 @@ export type ActiveWorkspaceCardProps = {
   onUnload: () => Promise<void> | void;
 };
 
+/**
+ * Renders the active-workspace/create-workspace panel. `DataLoaderFeature`
+ * uses it to keep workspace creation and currently loaded workspace controls
+ * in one card while delegating persistence to workspace hooks.
+ * Rendered by: DataLoaderFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: sync local editable drafts to the active workspace identity, choose create vs
+ * active-workspace controls, gate unsafe unloads while tasks run, then forward
+ * save/rename/create events to parent actions.
+ */
 export const ActiveWorkspaceCard: React.FC<ActiveWorkspaceCardProps> = ({
   currentWorkspace,
   nodeCount,
@@ -63,6 +72,11 @@ export const ActiveWorkspaceCard: React.FC<ActiveWorkspaceCardProps> = ({
   const normalizedCurrentDescription = (currentWorkspace?.description || '').trim();
   const normalizedDescriptionValue = descriptionValue.trim();
 
+  /**
+   * Submits the create form and clears local inputs only after the parent
+   * workspace action reports success.
+   * Called by: ActiveWorkspaceCard internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleCreate = async () => {
     const ok = await onCreate(newWorkspaceName.trim(), newWorkspaceDescription.trim());
     if (ok) {

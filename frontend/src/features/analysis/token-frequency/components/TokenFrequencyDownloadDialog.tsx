@@ -35,6 +35,7 @@ type TokenFrequencyDownloadDialogProps = {
   onConfirm: (options: { format: string; includeStopWords: boolean }) => void;
 };
 
+/** Used by: TokenFrequencyDownloadDialogContent to select the initial export format for the current mode because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const getDefaultFormat = (mode: DownloadDialogMode) => (mode === 'wordcloud' ? 'png' : 'csv');
 
 type TokenFrequencyDownloadDialogContentProps = {
@@ -43,6 +44,10 @@ type TokenFrequencyDownloadDialogContentProps = {
   onOpenChange: (open: boolean) => void;
 };
 
+/**
+ * Rendered by: TokenFrequencyDownloadDialog as the modal body for format and stop-word options because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 const TokenFrequencyDownloadDialogContent = ({
   mode,
   onConfirm,
@@ -58,6 +63,7 @@ const TokenFrequencyDownloadDialogContent = ({
       ? 'Choose image format for the word cloud export.'
       : 'Choose file format for the frequency data export.';
 
+  /** Called by: TokenFrequencyDownloadDialogContent action button to confirm export options and close because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const handleConfirm = (e: React.MouseEvent) => {
     e.preventDefault();
     onConfirm({ format: selectedFormat, includeStopWords });
@@ -109,6 +115,7 @@ const TokenFrequencyDownloadDialogContent = ({
   );
 };
 
+/** Rendered by: TokenFrequencyFeature to host the token-frequency download dialog because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface. */
 export const TokenFrequencyDownloadDialog = ({
   open,
   onOpenChange,

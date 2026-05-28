@@ -75,19 +75,24 @@ type NavItem = {
 
 type SectionKey = 'views' | 'nodes' | 'tasks';
 
+/** Ordered sidebar section ids consumed by `useStackedSplits` and rendering loops. */
 const SECTION_KEYS: SectionKey[] = ['views', 'nodes', 'tasks'];
+/** Human labels for collapsible sidebar sections shown in the section headers. */
 const SECTION_TITLES: Record<SectionKey, string> = {
   views: 'Views',
   nodes: 'Data Blocks',
   tasks: 'Tasks',
 };
+/** Help target ids paired with sidebar section headers for contextual docs. */
 const SECTION_HELP_KEYS: Record<SectionKey, string> = {
   views: 'ui.tool-choice',
   nodes: 'ui.data-selection',
   tasks: 'ui.task-centre',
 };
+/** Minimum sidebar section height passed to the stacked split resize hook. */
 const MIN_SECTION_HEIGHT = 120;
 
+/** Navigation items rendered in the Views sidebar section and routed by `ViewRouter`. */
 const NAV_ITEMS: NavItem[] = [
   { id: 'data-loader', label: 'Data Loader', icon: FolderOpen },
   { id: 'filter', label: 'Preprocessing', icon: Filter },
@@ -100,6 +105,13 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'export', label: 'Export', icon: Upload },
 ];
 
+/**
+ * Main app sidebar used by the workspace shell. It coordinates view navigation,
+ * data-block selection, task stream status, help links, feedback, and working
+ * directory controls from the global stores and workspace hooks.
+ * Why: navigation, data selection, task status, feedback, and working-directory actions need one persistent shell surface.
+ * Flow: select global/workspace/task state, wire logout/settings/dialog handlers, compute split sections and visible nav items, then render sidebar chrome.
+ */
 const Sidebar: React.FC = () => {
   const {
     currentView,
@@ -134,6 +146,7 @@ const Sidebar: React.FC = () => {
   const { toggleNodeSelection, clearSelection } = useWorkspaceActions();
   const { user, logout, dataFolder, isMultiUserMode } = useAuth();
   const queryClient = useQueryClient();
+  /** Called by: the Sidebar footer/header Logout button onClick prop because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleLogout = async () => {
     // Drop all cached query data so the next signed-in user never sees the
     // previous user's files, workspaces, nodes, or preferences.
@@ -151,11 +164,13 @@ const Sidebar: React.FC = () => {
   const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
   const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
 
+  /** Called by: the quotation view SidebarMenuAction settings button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const openQuotationEngineDialog = () => {
     setCurrentView('quotation');
     openEngineDialog();
   };
 
+  /** Called by: the Sidebar view menu Reset all hints item because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const handleResetHints = () => {
     resetHints();
     resetSessionDismissedHints();
@@ -164,6 +179,7 @@ const Sidebar: React.FC = () => {
 
   const [isDataFolderDialogOpen, setIsDataFolderDialogOpen] = React.useState(false);
 
+  /** Called by: the Sidebar footer Change working directory button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleEditDataFolder = () => {
     setIsDataFolderDialogOpen(true);
   };
@@ -201,6 +217,10 @@ const Sidebar: React.FC = () => {
     }
   }, [currentView, fallbackVisibleView, setCurrentView, visibleViews]);
 
+  /**
+   * Called by: Sidebar's Views section body renderer because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+    * Flow: map visible views to sidebar buttons, disable workspace-only views until a workspace loads, and attach the quotation settings action.
+   */
   const renderViewsBody = () => (
     <SidebarMenu>
       {visibleNavItems.map(({ id, label, icon: Icon }) => {

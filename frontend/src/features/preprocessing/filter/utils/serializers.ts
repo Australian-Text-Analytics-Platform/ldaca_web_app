@@ -7,6 +7,13 @@ import type {
 } from '../../types';
 import { hasNonEmptyValue } from '../../utils/typeUtils';
 
+/**
+ * Converts UI-only filter condition records into the backend request condition
+ * shape. Filter preview and apply paths both call this serializer.
+ * Used by: local callers in preprocessing/serializers module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Steps: drop incomplete rows, normalize range/date/list values, and preserve boolean/regex
+ * flags for backend request payloads.
+ */
 export const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
   return conditions.map<FilterCondition>((condition) => {
     let value: ConditionValue;
@@ -20,6 +27,10 @@ export const serializeConditionsForRequest = (conditions: FilterConditionWithId[
       );
     } else if (condition.value && typeof condition.value === 'object' && 'start' in condition.value) {
       const range = condition.value as ConditionRange;
+            /**
+             * Normalizes one range edge to the nullable ISO/string payload expected by the API.
+             * Called by: serializeConditionsForRequest internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+             */
       const normalizeEdge = (edge: ConditionRange['start']): string | null => {
         if (!edge) return null;
         if (edge instanceof Date) return edge.toISOString();
@@ -49,6 +60,11 @@ export const serializeConditionsForRequest = (conditions: FilterConditionWithId[
   });
 };
 
+/**
+ * Builds a complete FilterRequest from UI conditions, logic, and optional auto
+ * node name. Filter preview and apply share this payload builder.
+ * Used by: useFilterSubTabSections hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ */
 export const buildFilterRequestPayload = (
   conditions: FilterConditionWithId[],
   logic: string,
@@ -59,6 +75,12 @@ export const buildFilterRequestPayload = (
   new_node_name: newNodeName && newNodeName.trim() ? newNodeName : undefined,
 });
 
+/**
+ * Determines whether a condition is ready to send to preview/apply. Filter
+ * buttons and preview payload construction use this validation gate.
+ * Used by: useFilterSubTabSections hook, autoNodeNames utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: require a column, allow null checks without values, accept either side of between ranges, and otherwise require a non-empty value.
+ */
 export const isConditionComplete = (condition: FilterConditionWithId): boolean => {
   if (!condition.column) return false;
   if (condition.operator === 'is_null') return true;

@@ -3,14 +3,19 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 
+/** Radix dialog root re-export used by modal wrappers throughout the app. */
 const Dialog = DialogPrimitive.Root
 
+/** Dialog trigger primitive for callers that need Radix-managed open state. */
 const DialogTrigger = DialogPrimitive.Trigger
 
+/** Dialog portal primitive used by content wrappers to render outside normal layout flow. */
 const DialogPortal = DialogPrimitive.Portal
 
+/** Dialog close primitive used by consumers that need custom close controls. */
 const DialogClose = DialogPrimitive.Close
 
+/** Shared modal backdrop used by `DialogContent` for app dialogs. */
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -26,6 +31,7 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+/** Centered modal content wrapper used by panels and document modals. */
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
@@ -50,6 +56,10 @@ const DialogContent = React.forwardRef<
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
+/**
+ * Header layout helper used by dialogs for title/description grouping.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 const DialogHeader = ({
   className,
   ...props
@@ -64,6 +74,10 @@ const DialogHeader = ({
 )
 DialogHeader.displayName = "DialogHeader"
 
+/**
+ * Footer layout helper used by dialogs for action button rows.
+ * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ */
 const DialogFooter = ({
   className,
   ...props
@@ -78,6 +92,7 @@ const DialogFooter = ({
 )
 DialogFooter.displayName = "DialogFooter"
 
+/** Accessible dialog title primitive consumed by modal content. */
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
@@ -93,6 +108,7 @@ const DialogTitle = React.forwardRef<
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
+/** Accessible dialog description primitive consumed by modal content. */
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>

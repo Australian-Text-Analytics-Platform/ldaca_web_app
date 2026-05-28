@@ -1,6 +1,8 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { usePreferencesStore } from '../preferencesStore';
 
+/** Restores the persisted preferences store to factory defaults between isolated store tests. */
+/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 function resetStore() {
   // Reset to factory defaults between tests so partialize-persisted state
   // from prior tests doesn't leak.

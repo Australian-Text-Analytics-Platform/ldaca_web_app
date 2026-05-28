@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest';
 
 import { acceptPlaceholderOnTab } from '../placeholderTabFill';
 
+/**
+ * Minimal controlled input harness for testing placeholder-to-value tab flow.
+ * Used by: Vitest setup or assertions in preprocessing/placeholderTabFill because the test needs a stable fixture or assertion helper for this scenario.
+ */
 function PlaceholderHarness() {
   const [value, setValue] = useState('');
 

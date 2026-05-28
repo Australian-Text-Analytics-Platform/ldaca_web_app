@@ -27,6 +27,8 @@ export const useHintsStore = create<HintsStore>()(
         dismissedHints: [],
         hintsEnabled: true,
 
+        /** Records a permanent hint dismissal so future sessions do not show it again. */
+        /** Consumed by: useHintsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         dismissHint: (id) =>
           set((state) => {
             if (!state.dismissedHints.includes(id)) {
@@ -34,11 +36,15 @@ export const useHintsStore = create<HintsStore>()(
             }
           }),
 
+        /** Clears permanent dismissals from the settings/debug reset path. */
+        /** Consumed by: useHintsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         resetHints: () =>
           set((state) => {
             state.dismissedHints = [];
           }),
 
+        /** Toggles all contextual hints without deleting dismissal history. */
+        /** Consumed by: useHintsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         setHintsEnabled: (enabled) =>
           set((state) => {
             state.hintsEnabled = enabled;
@@ -46,6 +52,8 @@ export const useHintsStore = create<HintsStore>()(
       })),
       {
         name: 'ldaca-hints',
+        /** Persists only user choices, not middleware/devtools metadata. */
+        /** Consumed by: Zustand persist for useHintsStore because persisted hydration needs a stable storage contract before store state is restored. */
         partialize: (state) => ({
           dismissedHints: state.dismissedHints,
           hintsEnabled: state.hintsEnabled,

@@ -12,6 +12,7 @@ interface DatetimeModalState {
 }
 
 interface UseColumnMutationsArgs {
+/** Applies a fetched schema to local header dtype state. */
   workspaceId: string | undefined;
   nodeId: string | undefined;
   /** Current visible column names (used for duplicate-rename validation). */
@@ -54,6 +55,8 @@ export interface ColumnMutationsApi {
  * (data-type cast / rename / delete / per-column busy state) plus the schema
  * bootstrap effect. Keeps WorkspaceTable.tsx focused on rendering. Behaviour
  * preserved exactly; toasts and error messages unchanged.
+ * Used by: WorkspaceTable component (rg call sites/imports) because table rendering needs mutation state separated from column UI structure.
+ * Flow: column UI calls workspace actions, the shared mutation facade persists schema changes, and toast feedback reports results.
  */
 export const useColumnMutations = ({
   workspaceId,
@@ -76,6 +79,7 @@ export const useColumnMutations = ({
   const [deleteColumnDialogOpen, setDeleteColumnDialogOpen] = useState(false);
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
 
+  /** Applies a fetched schema to local header dtype state. */
   const applySchema = useCallback((schema: unknown) => {
     const mapping = extractColumnTypes(schema as NodeSchemaResponse | null);
     setColumnTypes(mapping);
@@ -92,6 +96,7 @@ export const useColumnMutations = ({
     return () => { cancelled = true; };
   }, [workspaceId, nodeId, onRefreshSchema, applySchema]);
 
+  /** Tracks per-column mutation spinners for rename/delete actions. */
   const setColumnBusy = useCallback((column: string, active: boolean) => {
     setColumnActionLoading((prev) => {
       if (active) return prev[column] ? prev : { ...prev, [column]: true };
@@ -101,6 +106,7 @@ export const useColumnMutations = ({
     });
   }, []);
 
+  /** Runs a dtype cast and refreshes schema so headers reflect the new type. */
   const performCast = useCallback(async (column: string, targetType: string, format?: string) => {
     if (!onCast) return;
     setLoadingCast((prev) => ({ ...prev, [column]: true }));
@@ -118,6 +124,7 @@ export const useColumnMutations = ({
     }
   }, [onCast, onRefreshSchema, applySchema]);
 
+  /** Handles dtype menu selection, including the datetime-format confirmation path. */
   const handleTypeChange = useCallback((column: string, newType: string) => {
     if (!onCast) return;
     const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
@@ -132,24 +139,29 @@ export const useColumnMutations = ({
     void performCast(column, newType);
   }, [onCast, columnTypes, performCast]);
 
+  /** Applies the datetime format chosen in the confirmation panel. */
   const handleDatetimeFormatConfirm = useCallback((format?: string) => {
     const { column, targetType } = datetimeModal;
     setDatetimeModal({ isOpen: false, column: '', targetType: '' });
     if (column && targetType) void performCast(column, targetType, format);
   }, [datetimeModal, performCast]);
 
+  /** Closes the datetime confirmation panel without casting. */
   const closeDatetimeModal = useCallback(() => {
     setDatetimeModal({ isOpen: false, column: '', targetType: '' });
   }, []);
 
+  /** Starts inline rename mode for one column header. */
   const startRename = useCallback((column: string) => {
     setRenamingColumn(column);
   }, []);
 
+  /** Cancels inline rename mode without calling the backend. */
   const cancelRename = useCallback(() => {
     setRenamingColumn(null);
   }, []);
 
+  /** Validates and submits a column rename, then refreshes schema state. */
   const submitRename = useCallback(async (column: string, value: string) => {
     if (!onRenameColumn) {
       setRenamingColumn(null);
@@ -178,11 +190,13 @@ export const useColumnMutations = ({
     }
   }, [onRenameColumn, columns, setColumnBusy, onRefreshSchema, applySchema]);
 
+  /** Opens the delete confirmation dialog for one column. */
   const requestDeleteColumn = useCallback((column: string) => {
     setColumnToDelete(column);
     setDeleteColumnDialogOpen(true);
   }, []);
 
+  /** Deletes the selected column and removes/refreshes its schema metadata. */
   const confirmDeleteColumn = useCallback(async () => {
     if (!columnToDelete || !onDeleteColumn) return;
     const column = columnToDelete;

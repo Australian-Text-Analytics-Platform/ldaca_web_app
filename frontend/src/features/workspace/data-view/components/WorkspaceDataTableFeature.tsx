@@ -7,6 +7,11 @@ import { useWorkspaceDataTable } from '../hooks/useWorkspaceDataTable';
 
 export type WorkspaceDataTableFeatureProps = Record<string, never>;
 
+/**
+ * Loading placeholder shown while selected node rows are fetching.
+ * Rendered by: workspace/WorkspaceDataTableFeature module JSX because data-view loading needs a table-shaped placeholder.
+ * Flow: render a spinner label followed by table-shaped skeleton rows so the data view keeps its expected layout while rows load.
+ */
 const LoadingState = () => (
   <div className="space-y-4 p-6">
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -33,6 +38,11 @@ const LoadingState = () => (
   </div>
 );
 
+/**
+ * Empty placeholder shown until a workspace graph node is selected.
+ * Rendered by: workspace/WorkspaceDataTableFeature module JSX because the feature needs an idle state before node selection.
+ * Flow: render the idle panel with an icon, heading, and prompt when the workspace has no active data block selection.
+ */
 const EmptyState = () => (
   <div className="p-6">
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/50 bg-muted/40 p-6 text-center">
@@ -56,6 +66,11 @@ const EmptyState = () => (
   </div>
 );
 
+/**
+ * Feature shell that renders selected-node tabs, header, and server table.
+ * Rendered by: index module, WorkspaceView component, useWorkspaceDataTable hook (rg call sites/imports) because the workspace view needs one data-table feature shell.
+ * Flow: read the table view model, branch to loading or empty states, then render selection tabs, header actions, and the server-backed table.
+ */
 export function WorkspaceDataTableFeature(_props: WorkspaceDataTableFeatureProps) {
   const { selectedNode, header, tabs, table, loading, nodeActions } = useWorkspaceDataTable();
 

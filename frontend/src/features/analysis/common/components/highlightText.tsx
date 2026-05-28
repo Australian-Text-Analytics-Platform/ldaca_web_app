@@ -3,6 +3,8 @@ import React from 'react';
 /**
  * Highlight matching text regions given explicit start/end index ranges,
  * with an optional fallback plain-text search.
+ * Used by: concordance row detail rendering because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const highlightMatchInText = (
   textValue: string,
@@ -14,6 +16,7 @@ export const highlightMatchInText = (
     return textValue;
   }
 
+  /** Called by: highlightMatchInText while normalizing backend match ranges because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const parseIndex = (value: unknown): number | null => {
     if (typeof value === 'number' && Number.isFinite(value)) {
       return Math.floor(value);

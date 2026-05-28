@@ -17,6 +17,10 @@ import { isTauri } from '@/lib/isTauri';
  * Lookups use the `fs` plugin's `exists` command (download scope, recursive).
  * Caps attempts at 1000 to avoid pathological loops.
  */
+/**
+ * Called by: saveBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 const resolveUniqueFilename = async (
   filename: string,
   exists: (path: string, opts: { baseDir: number }) => Promise<boolean>,
@@ -33,6 +37,11 @@ const resolveUniqueFilename = async (
   return `${stem}-${Date.now()}${ext}`;
 };
 
+/** Uses native browser download UI for web builds where destination/progress are already visible. */
+/**
+ * Called by: saveBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 const browserDownload = (blob: Blob, filename: string) => {
   if (typeof document === 'undefined') return;
   const url = URL.createObjectURL(blob);
@@ -56,12 +65,18 @@ const browserDownload = (blob: Blob, filename: string) => {
  * strip these for `<a download>`, but Tauri's `writeFile` would interpret
  * them as nested directories under Downloads (which don't exist) and fail.
  */
+/** Called by: saveBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const toBasename = (filename: string): string => {
   const trimmed = filename.replace(/[/\\]+$/, '');
   const idx = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
   return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
 };
 
+/** Writes bytes through Tauri plugins so desktop users get a real file in Downloads. */
+/**
+ * Called by: saveBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 const tauriDownload = async (blob: Blob, filename: string) => {
   // Dynamic imports keep these out of browser bundles.
   const [{ writeFile, exists, BaseDirectory }, { downloadDir, join }, opener] =
@@ -95,6 +110,10 @@ export interface SaveBlobOptions {
  * browsers we delegate to the native `<a download>` mechanism, which already
  * shows progress and the destination in the browser chrome — no toast needed.
  */
+/**
+ * Used by: src/features/analysis/export/ExportFeature.tsx, src/features/analysis/token-frequency/tokenFrequencyExport.ts, src/features/analysis/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx and 3 other importers because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 export const saveBlob = async (
   blob: Blob,
   filename: string,
@@ -114,6 +133,8 @@ export const saveBlob = async (
         description: fullPath,
         action: {
           label: 'Show in folder',
+          /** Lets desktop users reveal the saved file from the success toast action. */
+          /** Used by: the toast action onClick handler in this module because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
           onClick: () => {
             void opener.revealItemInDir(fullPath).catch(() => {
               // Reveal failures are non-fatal — the file still exists.
@@ -129,22 +150,4 @@ export const saveBlob = async (
     }
     throw error;
   }
-};
-
-/**
- * Save an already-materialized URL (data URL, blob URL, http URL). For blob
- * URLs prefer {@link saveBlob} so we can write bytes directly under Tauri.
- *
- * Used for canvas `toDataURL()` outputs (e.g. word-cloud PNG export).
- */
-export const saveDataUrl = async (
-  dataUrl: string,
-  filename: string,
-  options: SaveBlobOptions = {},
-): Promise<void> => {
-  // Convert to blob so the Tauri path can write bytes; in the browser we still
-  // end up using the same `<a download>` flow under the hood.
-  const resp = await fetch(dataUrl);
-  const blob = await resp.blob();
-  await saveBlob(blob, filename, options);
 };

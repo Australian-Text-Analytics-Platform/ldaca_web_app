@@ -17,6 +17,12 @@ export type AnalysisActionState = {
   runDisabledReason: string | undefined;
 };
 
+/**
+ * Centralizes run/clear button policy so every analysis feature presents the
+ * same disabled states while task locks or active tasks own the current result.
+ * Used by: analysis feature screens when deriving Run/Update/Clear button state because each panel needs lock-aware labels, disabled state, and guidance text from the same policy.
+ * Flow: combine workspace/selection, busy, lock, active-task, and update flags; derive run/clear disabled states and labels; then return the button contract.
+ */
 export const getAnalysisActionState = ({
   hasWorkspace,
   hasSelection,

@@ -17,6 +17,11 @@ import { PolarsExpressionSubTab } from '../../preprocessing/expression/PolarsExp
 
 type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
 
+// Hosts the preprocessing subtabs and passes the selected workspace node context into each tool.
+/**
+ * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
 const DataPreprocessingFeature: React.FC = () => {
   const { selectedNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId, nodes: workspaceNodes = [] } = useWorkspaceData();
@@ -40,6 +45,10 @@ const DataPreprocessingFeature: React.FC = () => {
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
+  // Gives child subtabs one shared alert surface for validation and backend errors.
+  /**
+   * Called by: DataPreprocessingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleAlert = (message: string) => {
     setAlertMessage(message);
     setAlertOpen(true);

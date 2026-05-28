@@ -47,15 +47,12 @@ export interface StackedSplitsApi<KeyT extends string> {
 }
 
 /**
- * State + behaviour for a vertical stack of N collapsible panes that share
- * the available height proportionally and can be drag-resized between
- * adjacent siblings. Extracted from Sidebar.tsx — owns:
- *
- *   - `collapsedSections` / `sectionHeights` state
- *   - container ResizeObserver (so we know the height in pixels)
- *   - per-section scroll-container ref registry
- *   - drag math: delta-Y → ratio; clamped at `minSectionPx`; overflow
- *     pushes the over-pressed pane's scrollTop instead of resizing.
+ * Hook used by the sidebar to manage collapsible, drag-resizable vertical
+ * sections. It owns section ratios, collapse state, resize observation, and
+ * overflow scrolling so the sidebar component can stay focused on rendering
+ * views, nodes, and tasks.
+ * Why: the sidebar needs collapsible, resizable vertical sections without mixing layout math into rendering code.
+ * Flow: seed collapse and ratio state, observe container height, compute flex styles, and expose collapse, ref, and drag-resize handlers.
  */
 export const useStackedSplits = <KeyT extends string>(
   keys: readonly KeyT[],
@@ -165,6 +162,10 @@ export const useStackedSplits = <KeyT extends string>(
       const minUpper = safeMinCandidate;
       const maxUpper = pairTotal - safeMinCandidate;
 
+      /**
+       * Called by: the window mousemove listener installed by handleResizeStart because the interaction needs a single handler that validates state, runs the action, and updates feedback.
+        * Flow: convert mouse delta to section ratios, clamp the upper/lower pair, update heights, then scroll overflow when the drag hits a minimum bound.
+       */
       const onMove = (moveEvent: MouseEvent) => {
         const deltaY = moveEvent.clientY - startY;
         const deltaRatio = deltaY / height;
@@ -195,6 +196,7 @@ export const useStackedSplits = <KeyT extends string>(
         }
       };
 
+      /** Called by: the window mouseup listener installed by handleResizeStart because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);

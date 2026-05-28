@@ -13,6 +13,9 @@ interface RenameInputProps {
  * Inline text input shown when the user picks "Rename" on a workspace-table
  * column. Auto-focuses + selects on mount, commits on blur or Enter, and
  * cancels on Escape.
+ * Rendered by: WorkspaceColumnHeader component (rg call sites/imports).
+ * Why: because column headers need inline rename editing without embedding form state in the full table component.
+ * Flow: initialize the draft from the column, autofocus the input, then commit or cancel on blur and keys.
  */
 export function RenameInput({ column, disabled, onSubmit, onCancel }: RenameInputProps) {
   const [draft, setDraft] = useState(column);

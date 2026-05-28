@@ -546,6 +546,7 @@ const reference = {
   },
 } as const satisfies Record<string, DocTarget>;
 
+/** Bundled docs registry consumed before or instead of the remote docs registry. */
 export const BUNDLED_REGISTRY: RegistryShape = { tutorial, info, reference };
 
 /** Files that ship inside `frontend/public/`. The remote-URL resolver in
@@ -563,18 +564,21 @@ export type BundledTutorialKey = keyof typeof tutorial;
 export type BundledInfoKey = keyof typeof info;
 export type BundledReferenceKey = keyof typeof reference;
 
+/** Fallback target for opening the tutorial index from generic help affordances. */
 export const TUTORIAL_INDEX_TARGET: DocTarget = {
   file: 'tutorials/index.md',
   anchor: 'help-tutorial-index',
   label: 'Tutorial index',
 };
 
+/** Fallback target for opening the information index from generic help affordances. */
 export const INFO_INDEX_TARGET: DocTarget = {
   file: 'information/index.md',
   anchor: 'help-information-index',
   label: 'Information index',
 };
 
+/** Fallback target for opening the reference index from generic help affordances. */
 export const REFERENCE_INDEX_TARGET: DocTarget = {
   file: 'references/index.md',
   anchor: 'help-references-index',

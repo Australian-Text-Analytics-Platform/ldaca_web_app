@@ -9,6 +9,10 @@ interface QueryClientLike {
   invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown>;
 }
 
+/**
+ * Describes the clear workflow shared by analysis features that mirror task
+ * state in both the backend task cache and local UI state.
+ */
 export interface ClearAnalysisOptions {
   analysisType: ServerLockAnalysisType;
   workspaceId: string;
@@ -19,6 +23,12 @@ export interface ClearAnalysisOptions {
   onCleanup: (clearedTaskIds: string[]) => void;
 }
 
+/**
+ * Clears backend task records, local task state, and the server-request lock so
+ * analysis feature hooks can reset without leaving stale running-task metadata.
+ * Used by: useAnalysisFeature clear/cleanup flows because every task-backed tab must delete known task ids, invalidate task caches, and release local state together.
+ * Flow: normalize inputs, apply the analysis-specific branch, then return the derived value consumed by the caller.
+ */
 export async function clearAnalysis({
   analysisType,
   workspaceId,

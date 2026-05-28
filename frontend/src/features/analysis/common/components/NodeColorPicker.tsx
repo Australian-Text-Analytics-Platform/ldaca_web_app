@@ -11,6 +11,12 @@ export interface NodeColorPickerProps {
   'aria-label'?: string;
 }
 
+/**
+ * Provides the reusable node-colour picker used by analysis selection panels to
+ * preview or commit per-node colours from either palette or custom hex input.
+ * Used by: NodeSelectionList colour controls because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
+ */
 export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
   color,
   palette,
@@ -22,6 +28,7 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
   const [hexEditing, setHexEditing] = useState(false);
   const displayedHex = hexEditing ? hexInput : color.toUpperCase();
 
+  /** Called by: custom hex input changes inside NodeColorPicker because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const handleHexChange = (value: string) => {
     const trimmed = value.trim().toUpperCase();
     const normalized = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;

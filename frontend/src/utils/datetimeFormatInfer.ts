@@ -2,6 +2,10 @@
 // Tries to detect common patterns (date, time, fractional seconds, timezone).
 // Returns null if not confident enough (e.g., missing year).
 
+/**
+ * Used by: src/components/panels/DatetimeFormatPanel.tsx, src/utils/__tests__/datetimeFormatInfer.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ */
 export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boolean } = {}): string | null {
   const nonEmpty = samples.filter(s => typeof s === 'string' && s.trim()).slice(0, 50);
   if (!nonEmpty.length) return null;
@@ -24,7 +28,11 @@ export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boo
     format = format.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i, '%b');
   }
 
+  /** Tells later replacements whether the candidate already exposes a month token. */
+  /** Called by: inferDatetimeFormat in this utility module because the utility needs local normalization steps before returning a shared result. */
   const hasMonthToken = () => format.includes('%m') || format.includes('%b') || format.includes('%B');
+  /** Escapes regex-significant date separators before dynamic replacement rules consume them. */
+  /** Called by: inferDatetimeFormat in this utility module because the utility needs local normalization steps before returning a shared result. */
   const escapeSep = (s: string) => (s === '.' ? '\\.' : s);
 
   // Month and day: attempt to respect separators - replace first 2-digit group after %Y separator with %m then next with %d

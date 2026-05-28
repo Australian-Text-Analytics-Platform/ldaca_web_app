@@ -6,14 +6,17 @@ import { TokenFrequencyUnifiedTokenSection } from '../TokenFrequencyUnifiedToken
 import type { NodeResultView, TokenFrequencyStatisticsEntry } from '@/features/analysis/token-frequency/tokenFrequencyAdapters';
 
 vi.mock('@/components/help/HelpIcon', () => ({
+  /** Used by: HelpIcon mock module factory so layout assertions can ignore tutorial wiring because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   default: () => <span data-testid="help-icon" />,
 }));
 
 vi.mock('@/components/help/InfoIcon', () => ({
+  /** Used by: InfoIcon mock module factory so tests do not depend on shared chrome because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   default: () => <span data-testid="info-icon" />,
 }));
 
 vi.mock('@visx/wordcloud', () => ({
+  /** Used by: Wordcloud mock module factory to render deterministic cloud words without d3 layout because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   Wordcloud: ({ children, words }: { children: (cloudWords: Array<Record<string, unknown>>) => React.ReactNode; words: Array<Record<string, unknown>> }) => (
     <g data-testid="mock-wordcloud">
       {children(
@@ -31,9 +34,14 @@ vi.mock('@visx/wordcloud', () => ({
 }));
 
 vi.mock('@visx/text', () => ({
+  /** Used by: Text mock module factory to replace VisX text with a plain SVG element because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   Text: ({ children, ...props }: React.SVGProps<SVGTextElement>) => <text {...props}>{children}</text>,
 }));
 
+/**
+ * Used by: token-frequency result layout tests to build normalized node-result fixtures because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
+ */
 const buildNodeResult = (overrides: Partial<NodeResultView> = {}): NodeResultView => ({
   nodeId: overrides.nodeId ?? 'node-1',
   displayName: overrides.displayName ?? 'Node 1',
@@ -46,7 +54,9 @@ const buildNodeResult = (overrides: Partial<NodeResultView> = {}): NodeResultVie
   maxFrequency: overrides.maxFrequency ?? 12,
 });
 
+/** Used by: TokenFrequencySingleTokenSection layout tests as overridable per-node default props because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 const baseSingleSectionProps = {
+  /** Used by: baseSingleSectionProps to supply a stable swatch for every mocked node because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   getColorForNode: () => '#3b82f6',
   onTokenClick: vi.fn(),
   onTokenRightClick: vi.fn(),
@@ -56,6 +66,10 @@ const baseSingleSectionProps = {
   view: 'cloud' as const,
 };
 
+/**
+ * Used by: unified token-frequency layout tests to build comparative statistics fixtures because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
+ */
 const buildStatistic = (overrides: Partial<TokenFrequencyStatisticsEntry> = {}): TokenFrequencyStatisticsEntry => ({
   token: overrides.token ?? 'alpha',
   freq_reference: overrides.freq_reference ?? 18,
@@ -76,6 +90,7 @@ const buildStatistic = (overrides: Partial<TokenFrequencyStatisticsEntry> = {}):
   significance: overrides.significance ?? '**',
 });
 
+/** Used by: TokenFrequencyUnifiedTokenSection layout tests as overridable unified-section defaults because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 const baseUnifiedSectionProps = {
   normalizedNodeResults: [buildNodeResult()],
   nodeDisplayResults: [buildNodeResult()],
@@ -84,7 +99,9 @@ const baseUnifiedSectionProps = {
   appliedStopSet: new Set<string>(),
   effectiveTokenLimit: 25,
   defaultTokenLimit: 25,
+  /** Used by: baseUnifiedSectionProps to echo node IDs as predictable display names because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   computeDisplayName: (nodeId: string) => nodeId,
+  /** Used by: baseUnifiedSectionProps to supply a stable swatch for the unified cloud fixture because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   getColorForNode: () => '#3b82f6',
   onDownloadWordCloud: vi.fn(),
   onTokenClick: vi.fn(),

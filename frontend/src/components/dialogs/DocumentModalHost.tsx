@@ -3,9 +3,12 @@ import React, { lazy, Suspense } from 'react';
 import { useUIStore } from '@/stores';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
+/** Lazy document viewer chunk shared by all help/reference modal slots. */
 const DocumentView = lazy(() => import('@/components/DocumentView'));
 
+/** Shared modal sizing for document viewers opened from help/reference icons. */
 const DIALOG_CONTENT_CLASS = 'max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden';
+/** Shared Suspense fallback layout used while the markdown viewer chunk loads. */
 const FALLBACK_BASE = 'p-8 flex items-center justify-center h-full';
 
 interface ModalSlotProps {
@@ -18,6 +21,13 @@ interface ModalSlotProps {
   spinnerColor: string;
 }
 
+/**
+ * Single document-dialog slot used by `DocumentModalHost` for each help content
+ * type. It keeps the lazy `DocumentView` wiring identical across tutorial,
+ * warning, information, and reference modals.
+ * Why: every document modal should share the same lazy viewer chrome while differing only by target and colour.
+ * Flow: open the dialog, render the hidden title, lazy-load DocumentView, then show the spinner fallback until the chunk is ready.
+ */
 const ModalSlot: React.FC<ModalSlotProps> = ({ open, onClose, target, docType, title, spinnerColor }) => (
   <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
     <DialogContent className={DIALOG_CONTENT_CLASS}>
@@ -38,14 +48,11 @@ const ModalSlot: React.FC<ModalSlotProps> = ({ open, onClose, target, docType, t
 );
 
 /**
- * Renders the four lazy-loaded help/info/warning/reference modals,
- * each gated by its own bit in `useUIStore.modals`. Replaces four
- * near-identical `<Dialog>` blocks that lived in App.tsx.
- *
- * Each store field is read with a stable primitive selector so this
- * component only re-renders when one of those primitives actually
- * changes. (An earlier `useShallow` selector returning nested objects
- * returned a new identity every render and caused an infinite loop.)
+ * Hosts the four lazy-loaded help/info/warning/reference modals for the app
+ * shell. It reads primitive `useUIStore` fields separately so icon triggers can
+ * open documentation without reintroducing nested selector identity loops.
+ * Rendered by: App next to the workspace shell so help icons can open one of four modal targets without mounting viewers eagerly.
+ * Flow: read modal open states, targets, and close actions from UI store, then render one ModalSlot for each document type.
  */
 export const DocumentModalHost: React.FC = () => {
   const tutorialModal = useUIStore((s) => s.modals.tutorialModal);

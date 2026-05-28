@@ -18,8 +18,10 @@ type ChartContextValue = {
   config: ChartConfig
 }
 
+/** Chart configuration context consumed by chart tooltip components. */
 const ChartContext = React.createContext<ChartContextValue | null>(null)
 
+/** Called by: chart tooltip render helpers that need ChartContainer config because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 const useChartContext = () => {
   const context = React.useContext(ChartContext)
   if (!context) {
@@ -28,6 +30,7 @@ const useChartContext = () => {
   return context
 }
 
+/** Called by: ChartContainer and ChartTooltipContent when deriving series CSS variables because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const slug = (key: string) => key.toString().toLowerCase().replace(/[^a-z0-9]+/g, "-")
 
 interface ChartContainerProps
@@ -35,6 +38,7 @@ interface ChartContainerProps
   config: ChartConfig
 }
 
+/** Chart wrapper that publishes series config and CSS color variables to Recharts children. */
 const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(
   ({ className, children, config, style, ...props }, ref) => {
     const cssVars: React.CSSProperties = (() => {
@@ -74,6 +78,7 @@ interface ChartTooltipProps
   content?: React.ComponentProps<typeof Tooltip>["content"]
 }
 
+/** Recharts tooltip wrapper that provides the app's default cursor and content renderer. */
 const ChartTooltip = React.forwardRef<HTMLDivElement, ChartTooltipProps>(
   ({ content, cursor = { strokeDasharray: "3 3" }, ...props }, _ref) => {
     return (
@@ -107,6 +112,7 @@ interface ChartTooltipContentProps {
   labelFormatter?: (value?: string | number) => React.ReactNode
 }
 
+/** Tooltip content renderer used by `ChartTooltip` to show configured labels, colors, and values. */
 const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContentProps>(
   (
     {

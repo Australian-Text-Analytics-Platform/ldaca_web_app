@@ -36,6 +36,14 @@ export type WorkspaceManagerCardProps = {
   onDeleteWorkspace: (workspaceId: string) => void;
 };
 
+/**
+ * Lists saved workspaces and their quick actions. `DataLoaderFeature` uses it
+ * beside the active-workspace card for load/unload, favorite, download, delete,
+ * refresh, and ZIP upload controls.
+ * Rendered by: ActiveWorkspaceCard component, DataLoaderFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: render the workspace list and controls, capture rename/delete/save/upload events, and
+ * hand mutations to parent hooks while reflecting busy states.
+ */
 export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
   workspaces,
   currentWorkspaceId,
@@ -60,6 +68,11 @@ export const WorkspaceManagerCard: React.FC<WorkspaceManagerCardProps> = ({
     })),
   );
 
+  /**
+   * Forwards the selected ZIP file to the parent upload action and clears the
+   * file input so selecting the same archive again still fires change events.
+   * Called by: WorkspaceManagerCard internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleZipChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;

@@ -50,6 +50,10 @@ type Params = {
   handleResetZoom: () => void;
 };
 
+// Resolves the corpus colour for one bubble segment from assigned node colours or defaults.
+/**
+ * Called by: useTopicModelingBubbleChart hook as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ */
 const resolvePanelColor = (
   index: number,
   fallback: string,
@@ -64,6 +68,11 @@ const resolvePanelColor = (
   return fallback;
 };
 
+/** Builds topic bubble chart SVG elements and shared rendering helpers for the results panel. */
+/**
+ * Used by: checklistSearch.ts, TopicModelingFeature.tsx, useTopicModelingSnapshotLoad.ts because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ */
 export function useTopicModelingBubbleChart({
   topics,
   activeDomain,
@@ -92,6 +101,11 @@ export function useTopicModelingBubbleChart({
   const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
   const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
 
+  // Renders per-corpus size chips using the same colours as the node palette.
+  /**
+   * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     * Flow: handle missing or single-corpus sizes, resolve palette colors and readable text, then render colored corpus size chips with totals.
+   */
   const renderSizeComposition = (sizes: number[] | undefined, total?: number | null) => {
     if (corpusCount === 0 || !sizes) return null;
     if (sizes.length === 1) {
@@ -124,7 +138,15 @@ export function useTopicModelingBubbleChart({
 
     const width = chartWidth;
     const height = chartHeight;
+    // Maps topic embedding x-coordinates into the SVG plotting area.
+    /**
+     * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     */
     const scaleX = (x: number) => ((x - activeDomain.xMin) / (activeDomain.xMax - activeDomain.xMin || 1)) * (width - 2 * chartPadding) + chartPadding;
+    // Maps topic embedding y-coordinates into the SVG plotting area.
+    /**
+     * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     */
     const scaleY = (y: number) => ((y - activeDomain.yMin) / (activeDomain.yMax - activeDomain.yMin || 1)) * (height - 2 * chartPadding) + chartPadding;
     const maxSize = Math.max(...topics.map((topic) => topic.total_size));
     const hasSearchFilter = topicSearchQuery.trim().length > 0;

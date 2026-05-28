@@ -11,9 +11,20 @@ import {
 import { useTokenFrequencySnapshotLoad } from '../hooks/useTokenFrequencySnapshotLoad';
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ getAuthHeaders: () => ({}) }),
+  /** Supplies the auth hook shape expected by the snapshot loader. */
+  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+  useAuth: () => ({
+    /** Keeps generated API calls header-compatible without real credentials. */
+    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+    getAuthHeaders: () => ({}),
+  }),
 }));
 
+/** Builds a token-frequency snapshot manifest fixture with optional overrides. */
+/**
+ * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 function makeManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManifest {
   return makeSnapshotManifest(
     {
@@ -34,6 +45,11 @@ function makeManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManife
   );
 }
 
+/** Creates a zipped snapshot blob containing result and optional settings payloads. */
+/**
+ * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 async function buildBundleBlob(
   manifest: SnapshotManifest,
   resultPayload: unknown,

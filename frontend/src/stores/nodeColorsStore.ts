@@ -100,6 +100,8 @@ interface NodeColorsState {
   reset(): void;
 }
 
+/** Chooses a palette colour not already visible in the current analysis tab when possible. */
+/** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
 function pickRandomPaletteAvoiding(avoid: ReadonlySet<string>): string {
   const free = AUTO_ASSIGN_PALETTE.filter((c) => !avoid.has(c));
   if (free.length === 0) {
@@ -117,6 +119,11 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
   assignmentOrder: [],
   temps: {},
 
+  /** Assigns persistent node colours for callers that do not use a temp preview layer. */
+  /**
+   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: copy assigned colours and order, assign palette positions to new node ids, then update the store only when a colour was added.
+   */
   ensureColors: (nodeIds) => {
     if (nodeIds.length === 0) return;
     const { colors, assignmentOrder } = get();
@@ -133,6 +140,8 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     if (mutated) set({ colors: updatedColors, assignmentOrder: updatedOrder });
   },
 
+  /** Writes an assigned colour directly for workspace/sidebar or promoted temp updates. */
+  /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   setColor: (nodeId, color) => {
     if (!nodeId) return;
     set((state) => {
@@ -146,6 +155,11 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     });
   },
 
+  /** Seeds per-tab temporary colours for analysis selections before the user runs the tool. */
+  /**
+   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: copy tab temps, build the visible-colour avoidance set, reuse non-conflicting assigned colours, or choose an available palette colour.
+   */
   ensureTempColors: (tabKey, nodeIds) => {
     if (!tabKey || nodeIds.length === 0) return;
     const { temps, colors } = get();
@@ -175,6 +189,8 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     if (mutated) set({ temps: { ...temps, [tabKey]: tabTemps } });
   },
 
+  /** Stores a manual colour override in the tab-local temp layer. */
+  /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   setTempColor: (tabKey, nodeId, color) => {
     if (!tabKey || !nodeId) return;
     set((state) => ({
@@ -185,6 +201,11 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     }));
   },
 
+  /** Clears tab-local temp colours when selections leave the analysis tab. */
+  /**
+   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: drop the whole tab layer when no ids are supplied, otherwise delete requested temp ids and keep state unchanged when nothing moved.
+   */
   clearTempColors: (tabKey, nodeIds) => {
     if (!tabKey) return;
     set((state) => {
@@ -207,6 +228,11 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     });
   },
 
+  /** Commits temp colours into assigned graph/sidebar colours after an analysis run. */
+  /**
+   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: read tab-local temp colours, copy promoted colours into assigned state/order, then clear the promoted temp entries.
+   */
   promoteTempColors: (tabKey, nodeIds) => {
     if (!tabKey || nodeIds.length === 0) return;
     set((state) => {
@@ -233,6 +259,8 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     });
   },
 
+  /** Rehydrates assigned colours from workspace persistence without touching session temp previews. */
+  /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   hydrateColors: (next) => {
     set({
       colors: { ...next },
@@ -240,6 +268,11 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     });
   },
 
+  /** Removes colour metadata for nodes no longer present in the latest workspace graph. */
+  /**
+   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+    * Flow: build the live-node set, sweep assigned colours, assignment order, and tab temps, then update only the layers that changed.
+   */
   pruneStaleColors: (activeNodeIds) => {
     set((state) => {
       const alive = new Set(activeNodeIds);
@@ -279,5 +312,7 @@ export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
     });
   },
 
+  /** Clears all assigned and temporary colours for tests and workspace reset flows. */
+  /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
   reset: () => set({ colors: {}, assignmentOrder: [], temps: {} }),
 }));

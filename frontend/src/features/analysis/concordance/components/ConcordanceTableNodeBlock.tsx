@@ -29,7 +29,7 @@ import {
 
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
-/** Per-column alignment for the concordance table.
+/** Used by: ConcordanceTableNodeBlock table headers and cells for per-column alignment because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  *
  * Classic KWIC ("key word in context") layout:
  *   - left-context: right-aligned so its rightmost character anchors to
@@ -51,6 +51,7 @@ const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];
 const ALL_CONC_COLS_SET = new Set<string>([...CORE_COLS, ...FREQ_COLS]);
 
+/** Used by: ConcordanceTableNodeBlock display-column assembly to remove repeated concordance/metadata keys because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const dedupeColumns = (cols: string[]): string[] => {
   const seen = new Set<string>();
   return cols.filter((col) => {
@@ -118,6 +119,10 @@ export type ConcordanceTableNodeBlockProps = {
   readOnly?: boolean;
 };
 
+/**
+ * Rendered by: ConcordanceResultsPanel for each table-oriented concordance result block because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export const ConcordanceTableNodeBlock: React.FC<ConcordanceTableNodeBlockProps> = ({
   nodeKey,
   nodeData,

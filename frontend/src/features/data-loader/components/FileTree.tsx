@@ -44,6 +44,13 @@ export type FileTreeProps = {
   onMoveFile: (sourcePath: string, targetDirectoryPath: string) => Promise<void> | void;
 };
 
+/**
+ * Renders the nested file browser for uploaded data. `DataLoaderFeature` uses
+ * it for preview/add/download/delete actions plus drag-to-move file handling.
+ * Rendered by: useFileBrowserActions hook, DataLoaderFeature module, fileTreeHelpers utilities (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: build rows from the browser tree, attach move/drop/create-folder handlers, and expose
+ * add/preview/delete/download actions for selected files.
+ */
 export const FileTree: React.FC<FileTreeProps> = ({
   nodes,
   selectedFile,
@@ -62,6 +69,11 @@ export const FileTree: React.FC<FileTreeProps> = ({
   const [draggingFilePath, setDraggingFilePath] = useState<string | null>(null);
   const [fileMoveTarget, setFileMoveTarget] = useState<FileMoveTarget | null>(null);
 
+  /**
+   * Recovers the dragged file path from custom drag metadata with a local state
+   * fallback for browsers that clear dataTransfer during nested drag events.
+   * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const getDraggedFilePath = (event: React.DragEvent<HTMLElement>): string | null => {
     const customPath = event.dataTransfer.getData(FILE_DRAG_MIME_TYPE);
     if (customPath) return customPath;
@@ -69,11 +81,21 @@ export const FileTree: React.FC<FileTreeProps> = ({
     return plainTextPath || draggingFilePath;
   };
 
+  /**
+   * Blocks no-op moves into the file's current parent. Directory hover/drop
+   * handlers use this before showing an active target or calling the API.
+   * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const canDropFileIntoDirectory = (sourcePath: string | null, targetDirectoryPath: string): boolean => {
     if (!sourcePath) return false;
     return getParentDirectoryPath(sourcePath) !== targetDirectoryPath;
   };
 
+  /**
+   * Drives drag styling for the exact directory/file-row target currently able
+   * to receive the dragged file.
+   * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const isFileMoveTargetActive = (targetKey: string, targetDirectoryPath: string): boolean => {
     return (
       fileMoveTarget?.key === targetKey &&
@@ -82,6 +104,11 @@ export const FileTree: React.FC<FileTreeProps> = ({
     );
   };
 
+  /**
+   * Seeds browser drag metadata for a file row. Row drag handles call this so
+   * drop targets can recover the source path without prop drilling.
+   * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleTreeFileDragStart = (event: React.DragEvent<HTMLDivElement>, filePath: string) => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(FILE_DRAG_MIME_TYPE, filePath);
@@ -90,11 +117,21 @@ export const FileTree: React.FC<FileTreeProps> = ({
     setFileMoveTarget(null);
   };
 
+  /**
+   * Clears local drag bookkeeping after a file move attempt completes or is
+   * cancelled by the browser.
+   * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleTreeFileDragEnd = () => {
     setDraggingFilePath(null);
     setFileMoveTarget(null);
   };
 
+  /**
+   * Marks a directory/file-row parent as a valid move destination while the
+   * dragged file is over it.
+   * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleDirectoryDragOver = (
     targetKey: string,
     targetDirectoryPath: string,
@@ -107,12 +144,22 @@ export const FileTree: React.FC<FileTreeProps> = ({
     setFileMoveTarget({ key: targetKey, directoryPath: targetDirectoryPath });
   };
 
+  /**
+   * Removes move-target highlighting only when the drag leaves the whole row,
+   * not when it moves between children inside the row.
+   * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleDirectoryDragLeave = (targetKey: string, event: React.DragEvent<HTMLElement>) => {
     const relatedTarget = event.relatedTarget;
     if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return;
     setFileMoveTarget((current) => (current?.key === targetKey ? null : current));
   };
 
+  /**
+   * Completes a file move into the target directory. File and folder rows share
+   * this drop path through the parent `onMoveFile` callback.
+   * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleDirectoryDrop = async (targetDirectoryPath: string, event: React.DragEvent<HTMLElement>) => {
     const sourcePath = getDraggedFilePath(event);
     if (!canDropFileIntoDirectory(sourcePath, targetDirectoryPath)) return;
@@ -123,6 +170,13 @@ export const FileTree: React.FC<FileTreeProps> = ({
     await onMoveFile(sourcePath, targetDirectoryPath);
   };
 
+  /**
+   * Renders one file row with all file-level actions. `renderNode` delegates to
+   * this so directory traversal and file action markup stay separate.
+   * Rendered by: FileTree JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
+   * Flow: derive file metadata/actions, attach drag payload and citation/download/delete
+   * handlers, then render a row with add-to-workspace affordances.
+   */
   const renderFileItem = (file: FileTreeFile, parentDirectoryPath: string) => (
     <div
       key={file.path}
@@ -194,6 +248,13 @@ export const FileTree: React.FC<FileTreeProps> = ({
     </div>
   );
 
+  /**
+   * Recursively renders directories and files, hiding citation README files
+   * from the main list while exposing their citation button on the folder row.
+   * Rendered by: FileTree JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
+   * Flow: split directory and file branches, render visible children recursively, and keep
+   * folder/citation affordances beside the relevant tree row.
+   */
   const renderNode = (node: FileTreeNode): React.ReactNode => {
     if (node.type === 'file') {
       return renderFileItem(node, getParentDirectoryPath(node.path));

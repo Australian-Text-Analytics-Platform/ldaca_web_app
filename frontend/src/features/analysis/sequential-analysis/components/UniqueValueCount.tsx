@@ -10,11 +10,16 @@ interface UniqueValueCountProps {
   columnName: string;
 }
 
+/**
+ * Rendered by: SequentialAnalysisParameterPanel to show cardinality hints for candidate group-by columns because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+ */
 export const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId, columnName }) => {
   const { getAuthHeaders } = useAuth();
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.columnUniqueValues(workspaceId, nodeId, columnName),
+    // Used by: UniqueValueCount query to fetch metadata that informs snapshot-size decisions because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
     queryFn: async () => {
       const { data: response } = await getColumnUniqueValues({
         headers: getAuthHeaders(),

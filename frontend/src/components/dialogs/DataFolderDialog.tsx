@@ -25,6 +25,12 @@ interface DataFolderDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Working-directory modal shell used by the sidebar in single-user desktop/web
+ * mode. It mounts the content only while open so auth/query state is refreshed
+ * from the latest app configuration each time the user edits the folder.
+ * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
+ */
 export function DataFolderDialog({
   open,
   onOpenChange,
@@ -36,6 +42,13 @@ export function DataFolderDialog({
   );
 }
 
+/**
+ * Form body for changing the backend data root. It coordinates auth refresh,
+ * workspace reset, and query refetching so file/workspace consumers see the new
+ * directory immediately after the dialog closes.
+ * Why: changing the data root affects auth config, workspace selection, file lists, and workspace queries together.
+ * Flow: seed the path from auth state, handle desktop folder picking, submit config changes, refresh auth/cache, and close on success.
+ */
 function DataFolderDialogContent({
   onOpenChange,
 }: Pick<DataFolderDialogProps, 'onOpenChange'>) {
@@ -46,6 +59,7 @@ function DataFolderDialogContent({
   const [path, setPath] = useState(dataFolder || '');
   const [isLoading, setIsLoading] = useState(false);
 
+  /** Called by: the DataFolderDialogContent Browse button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleBrowse = async () => {
     if (isTauri()) {
       try {
@@ -67,6 +81,10 @@ function DataFolderDialogContent({
     }
   };
 
+  /**
+   * Called by: the DataFolderDialogContent form onSubmit prop because the interaction needs a single handler that validates state, runs the action, and updates feedback.
+    * Flow: validate a non-empty path, clear the active workspace when the directory changes, update backend config, refresh auth/files/workspaces, and toast outcomes.
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const nextPath = path.trim();

@@ -29,6 +29,7 @@ export interface QuotationHighlightedCellProps {
 
 const PRIORITY_ORDER: QuotationHighlightType[] = ['quote', 'speaker', 'verb'];
 
+// Used by: QuotationHighlightedCell hover rendering when multiple quotation span types overlap because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
 const choosePriorityType = (types: string[]): QuotationHighlightType => {
   for (const t of PRIORITY_ORDER) {
     if (types.includes(t)) return t;
@@ -37,12 +38,13 @@ const choosePriorityType = (types: string[]): QuotationHighlightType => {
 };
 
 /**
- * Renders a quotation source cell with multi-coloured underlines for the
+ * Rendered by: QuotationFeature. Renders a quotation source cell with multi-coloured underlines for the because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * speaker / quote / verb spans, label badges, and hover-driven highlight.
  *
  * Extracted from the 116-LoC closure in QuotationFeature.tsx so the cell
  * has a stable component identity and the hover handlers no longer
  * capture the parent's `setHoverState` directly.
+ * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const QuotationHighlightedCell: React.FC<QuotationHighlightedCellProps> = ({
   text,
@@ -57,6 +59,7 @@ export const QuotationHighlightedCell: React.FC<QuotationHighlightedCellProps> =
   }
 
   const spans: HighlightSpan[] = [];
+  // Used by: QuotationHighlightedCell to convert backend span coordinates into clipped table-cell ranges because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const addSpan = (start?: unknown, end?: unknown, type?: string) => {
     if (
       type
@@ -113,6 +116,7 @@ export const QuotationHighlightedCell: React.FC<QuotationHighlightedCellProps> =
     segs.push({ start: s, end: e, types: Array.from(new Set(covering)) });
   }
 
+  // Used by: QuotationHighlightedCell segment rendering because overlapping span badges must reflect hover state and forward hover changes per segment. Flow: skip empty type lists, render one badge per type with hover-aware colors, then wire mouse enter/leave to shared hover state.
   const renderLabels = (types: string[], segIndex: number) => {
     if (!types.length) return null;
     return types.map((t, idx) => (

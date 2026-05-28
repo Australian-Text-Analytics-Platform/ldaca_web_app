@@ -98,11 +98,18 @@ type ResolvedUserPreferences = Omit<
   demo_snapshots_enabled: boolean;
 };
 
+/** Converts frontend auth header casing to the generated preferences client contract. */
+/** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
 const getAuthorizationHeaders = (headers?: Record<string, string>): { authorization?: string } | undefined => {
   const authorization = headers?.Authorization ?? headers?.authorization;
   return authorization ? { authorization } : undefined;
 };
 
+/** Applies backend defaults so the store always works with concrete preference fields. */
+/**
+ * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+ * Flow: fill missing backend arrays, quotation fields, language/tokenizer choices, token, and demo flag with concrete frontend defaults.
+ */
 const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences => ({
   hidden_views: data.hidden_views ?? [],
   favorite_workspaces: data.favorite_workspaces ?? [],
@@ -116,6 +123,11 @@ const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences =>
   demo_snapshots_enabled: data.demo_snapshots_enabled ?? false,
 });
 
+/** Hydrates persisted preference fields into the immer draft after a successful backend load. */
+/**
+ * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+ * Flow: copy resolved backend preference fields into the draft store state, then mark hydration complete for subscribers.
+ */
 function applyServerState(state: PreferencesState, data: ResolvedUserPreferences) {
   state.hiddenViews = data.hidden_views;
   state.favoriteWorkspaces = data.favorite_workspaces;
@@ -143,6 +155,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
         hydrated: false,
         syncing: false,
 
+        /** Hides or reveals optional views while keeping Data Loader always reachable. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         setViewHidden: (view, hidden) => {
           if (view === 'data-loader') return;
           set((state) => {
@@ -155,6 +169,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /** Toggles a workspace in the user's quick-access favorites list. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         toggleFavorite: (workspaceId) => {
           set((state) => {
             const idx = state.favoriteWorkspaces.indexOf(workspaceId);
@@ -166,8 +182,12 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /** Checks favorite status for sidebar/workspace picker rendering. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         isFavorite: (workspaceId) => get().favoriteWorkspaces.includes(workspaceId),
 
+        /** Stores the active quotation extraction engine configuration from the settings dialog. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         setQuotationEngine: (config) => {
           set((state) => {
             state.quotationEngine = config;
@@ -177,6 +197,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /** Updates the remembered remote quotation URL and active remote engine together. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         updateQuotationRemoteUrl: (url) => {
           const trimmed = url.trim();
           set((state) => {
@@ -187,6 +209,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /** Stores the user's default language for language-aware analysis controls. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         setDefaultLanguage: (language) => {
           // Normalise to a trimmed lowercase code so backend resolution
           // doesn't see stray case / whitespace from form inputs.
@@ -197,6 +221,10 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /**
+         * Stores the preferred tokenizer model used by tokenization-aware tools.
+         * Why: store consumers need one typed boundary for shared state reads, updates, and persistence.
+         */
         setDefaultTokenizerModel: (model) => {
           const value = typeof model === 'string' && model.trim() ? model.trim() : null;
           set((state) => {
@@ -204,6 +232,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /** Persists the user's optional LDaCA Oni API token for portal import flows. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         setLdacaOniApiToken: (token) => {
           const value = typeof token === 'string' && token.trim() ? token.trim() : null;
           set((state) => {
@@ -211,12 +241,16 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /** Enables or disables demo snapshot controls across analysis feature headers. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         setDemoSnapshotsEnabled: (enabled) => {
           set((state) => {
             state.demoSnapshotsEnabled = !!enabled;
           });
         },
 
+        /** Loads preferences from the backend once auth is available, falling back to local state. */
+        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         loadFromBackend: async (headers) => {
           try {
             const { data: preferences } = await getPreferences({
@@ -235,6 +269,11 @@ export const usePreferencesStore = create<PreferencesStore>()(
           }
         },
 
+        /** Pushes the latest persisted preference subset to the backend from the debounce subscriber. */
+        /**
+         * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+         * Flow: guard concurrent syncs, build the partial preferences payload, call the backend update, then clear syncing even if the request fails.
+         */
         syncToBackend: async (headers) => {
           const state = get();
           if (state.syncing) return;
@@ -276,6 +315,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
       })),
       {
         name: 'ldaca-preferences',
+        /** Persists only durable user choices; transient hydration/sync flags stay in memory. */
+        /** Consumed by: Zustand persist for usePreferencesStore because persisted hydration needs a stable storage contract before store state is restored. */
         partialize: (state) => ({
           hiddenViews: state.hiddenViews,
           favoriteWorkspaces: state.favoriteWorkspaces,

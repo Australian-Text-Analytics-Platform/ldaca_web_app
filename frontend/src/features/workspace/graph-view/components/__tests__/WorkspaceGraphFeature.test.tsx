@@ -4,13 +4,34 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceGraphFeature } from '../WorkspaceGraphFeature';
 
+/** Captures React Flow props so graph configuration can be asserted. */
 const reactFlowMock = vi.fn();
 
 vi.mock('@xyflow/react', () => ({
+    /**
+   * Stubs the graph background while preserving the expected test id.
+ * Used by: test mock object in workspace/WorkspaceGraphFeature.
+ * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+ */
   Background: () => <div data-testid="graph-background" />,
   BackgroundVariant: { Dots: 'dots' },
+    /**
+   * Stubs controls so children still render for graph feature assertions.
+     * Used by: test mock object in workspace/WorkspaceGraphFeature.
+     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+     */
   Controls: ({ children }: { children?: ReactNode }) => <div data-testid="graph-controls">{children}</div>,
+    /**
+   * Stubs the minimap without loading React Flow internals.
+     * Used by: test mock object in workspace/WorkspaceGraphFeature.
+     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+     */
   MiniMap: () => <div data-testid="graph-minimap" />,
+    /**
+   * Captures graph props while rendering children for component tests.
+     * Used by: test mock object in workspace/WorkspaceGraphFeature.
+     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+     */
   ReactFlow: ({ children, ...props }: { children?: ReactNode }) => {
     reactFlowMock(props);
     return <div data-testid="react-flow">{children}</div>;
@@ -18,6 +39,12 @@ vi.mock('@xyflow/react', () => ({
 }));
 
 vi.mock('../../hooks/useWorkspaceGraph', () => ({
+  /**
+   * Supplies deterministic graph state for WorkspaceGraphFeature rendering.
+   * Used by: test mock object in workspace/WorkspaceGraphFeature.
+   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+   * Flow: return the full graph view-model shape with empty nodes, disabled controls, and spy handlers.
+   */
   useWorkspaceGraph: () => ({
     nodes: [],
     edges: [],

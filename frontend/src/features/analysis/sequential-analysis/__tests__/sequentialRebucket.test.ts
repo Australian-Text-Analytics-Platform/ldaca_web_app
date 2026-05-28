@@ -19,6 +19,10 @@ import {
 } from '../sequentialRebucket';
 
 /** Helper: build a captured row at daily granularity. */
+/**
+ * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+ * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ */
 function dailyRow(
   iso: string,
   count: number,
@@ -268,6 +272,10 @@ describe('rebucket — group composition', () => {
 });
 
 describe('rebucket — numeric coarsening', () => {
+  /** Builds captured numeric rows for rebucket tests without repeating fixture boilerplate. */
+  /**
+   * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+   */
   function numericRow(value: number, count: number, groups: Record<string, string> = {}): CapturedRow {
     return {
       time_period_formatted: String(value),

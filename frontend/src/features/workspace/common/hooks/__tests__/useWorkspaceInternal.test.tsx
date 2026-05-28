@@ -9,8 +9,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // state. The smoke tests focus on that orchestration contract; the three
 // sub-hooks are mocked so we can drive their outputs directly.
 
+/** Hoisted core-hook mock lets each test drive selection/auth state. */
 const useWorkspaceCoreMock = vi.hoisted(() => vi.fn());
+/** Hoisted query-hook mock lets each test drive server-derived workspace data. */
 const useWorkspaceQueriesMock = vi.hoisted(() => vi.fn());
+/** Hoisted mutation-hook mock lets each test assert action composition. */
 const useWorkspaceNodeMutationsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../useWorkspaceCore', () => ({ useWorkspaceCore: useWorkspaceCoreMock }));
@@ -48,6 +51,12 @@ interface QueriesOverrides {
   currentWorkspaceQueryError?: Error | null;
 }
 
+/**
+ * Builds the core-hook contract used by orchestration tests.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: start from production-shaped defaults, then override only the fields a test scenario needs.
+ */
 const buildCoreReturn = (overrides: CoreOverrides = {}) => ({
   authHeaders: overrides.authHeaders ?? { Authorization: 'Bearer x' },
   isAuthenticated: overrides.isAuthenticated ?? true,
@@ -71,6 +80,12 @@ const buildCoreReturn = (overrides: CoreOverrides = {}) => ({
   setOperationError: vi.fn(),
 });
 
+/**
+ * Builds the query-hook contract used by orchestration tests.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: fill query data/loading defaults first, then layer scenario-specific query results or errors.
+ */
 const buildQueriesReturn = (overrides: QueriesOverrides = {}) => ({
   workspaces: overrides.workspaces ?? [],
   currentWorkspace: overrides.currentWorkspace ?? null,
@@ -85,6 +100,12 @@ const buildQueriesReturn = (overrides: QueriesOverrides = {}) => ({
   currentWorkspaceQueryError: overrides.currentWorkspaceQueryError ?? null,
 });
 
+/**
+ * Builds the mutation-hook contract with overridable action spies.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ * Flow: create default action spies, then replace the individual actions asserted by each orchestration test.
+ */
 const buildMutationsReturn = (actions: Record<string, unknown> = {}) => ({
   actions: {
     setCurrentWorkspace: vi.fn(),
@@ -123,10 +144,20 @@ const buildMutationsReturn = (actions: Record<string, unknown> = {}) => ({
   },
 });
 
+/**
+ * Renders the hook under a query client so effects/invalidation can run.
+ * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
+ * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+ */
 const renderInternal = () => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+    /**
+   * Provides QueryClient context required by workspace internals under test.
+     * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
+     * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+     */
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );

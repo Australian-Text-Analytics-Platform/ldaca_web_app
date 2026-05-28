@@ -21,6 +21,12 @@ interface WorkspaceDataHeaderProps {
   canRedo?: boolean;
 }
 
+/**
+ * Renders selected-node title, rename, query-plan, undo, and redo controls.
+ * Rendered by: WorkspaceDataTableFeature component, WorkspaceDataHeader tests (rg call sites/imports).
+ * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+ * Flow: derive editable header state from node info, run inline rename, and expose node-level actions beside the table.
+ */
 export const WorkspaceDataHeader = ({
   info,
   onUndo,
@@ -37,6 +43,11 @@ export const WorkspaceDataHeader = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const isRenaming = renameDraft?.baseLabel === info.nodeLabel;
 
+    /**
+   * Commits a node rename when the inline editor blurs or submits.
+     * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
+     * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+     */
   const handleRenameCommit = () => {
     if (!isRenaming) {
       return;
@@ -48,6 +59,11 @@ export const WorkspaceDataHeader = ({
     setRenameDraft(undefined);
   };
 
+    /**
+   * Opens inline node rename mode and focuses the draft input.
+     * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
+     * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+     */
   const startRename = () => {
     setRenameDraft({ baseLabel: info.nodeLabel, value: info.nodeLabel });
     setTimeout(() => {
@@ -56,6 +72,11 @@ export const WorkspaceDataHeader = ({
     }, 10);
   };
 
+    /**
+   * Fetches and opens the Polars query plan dialog for the active node.
+     * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
+     * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+     */
   const handleOpenQueryPlan = async () => {
     setQueryPlanOpen(true);
     setQueryPlan(null);

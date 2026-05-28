@@ -37,12 +37,23 @@ const TOOL_LABELS: Record<string, string> = {
   topic_modeling: 'Topic Modelling',
 };
 
+/**
+ * Formats demo snapshot bundle sizes for the import list. Kept local because
+ * the catalogue always provides concrete byte counts.
+ * Used by: local callers in data-loader/DemoSnapshotsTab module.
+ */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Renders the per-snapshot availability status. The demo-snapshot tab uses it
+ * to explain why a row can or cannot be imported.
+ * Rendered by: data-loader/DemoSnapshotsTab module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: map the backend status to a compact label and color class, then render the badge text without changing import state.
+ */
 function StatusChip({ status }: { status: DemoSnapshotEntry['status'] }) {
   const map: Record<DemoSnapshotEntry['status'], { label: string; className: string }> = {
     downloaded: { label: '✓ Downloaded', className: 'text-green-600 dark:text-green-400' },
@@ -62,6 +73,12 @@ interface Props {
   enabled: boolean;
 }
 
+/**
+   * Renders the demo snapshot import workflow consumed by SampleDataPanel.
+   * Rendered by: SampleDataPanel component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+   * Flow: fetch demo snapshot metadata, render category/description/import controls, and keep
+   * per-snapshot import state so users see which sample is loading.
+   */
 export const DemoSnapshotsTab: React.FC<Props> = ({
   authHeaders,
   onImportComplete,
@@ -81,17 +98,32 @@ export const DemoSnapshotsTab: React.FC<Props> = ({
 
   const snapshots = catalogue?.snapshots ?? [];
 
+  /**
+   * Centralizes the row enablement rules so checkbox rendering and click
+   * handling agree about downloaded/conflicting snapshot states.
+   * Called by: DemoSnapshotsTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const isRowToggleable = (s: DemoSnapshotEntry): boolean => {
     if (s.status === 'downloaded') return false;
     if (s.status === 'conflict') return Boolean(replace[s.id]);
     return true;
   };
 
+  /**
+   * Toggles the selected snapshot set while respecting row-level import rules.
+   * Checkbox controls and row labels both call this helper.
+   * Called by: DemoSnapshotsTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const toggleChecked = (s: DemoSnapshotEntry) => {
     if (!isRowToggleable(s)) return;
     setChecked((prev) => ({ ...prev, [s.id]: !prev[s.id] }));
   };
 
+  /**
+   * Tracks the explicit replace opt-in for conflicting demo bundles. It also
+   * unselects rows when replacement is turned off.
+   * Called by: DemoSnapshotsTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const toggleReplace = (s: DemoSnapshotEntry) => {
     setReplace((prev) => {
       const next = !prev[s.id];
@@ -109,6 +141,13 @@ export const DemoSnapshotsTab: React.FC<Props> = ({
     .map((s) => s.id);
   const replaceIds = selectedIds.filter((id) => replace[id]);
 
+  /**
+   * Imports selected demo snapshot bundles and refreshes snapshot-list queries
+   * so downstream tool Load dialogs see the new files immediately.
+   * Called by: DemoSnapshotsTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: require a snapshot id, mark it busy, call sample-data import, notify the parent, and
+   * clear busy state even when the request fails.
+   */
   const handleImport = async () => {
     if (selectedIds.length === 0) return;
     setImporting(true);

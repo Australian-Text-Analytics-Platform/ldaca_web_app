@@ -31,6 +31,12 @@ const CONTEXT_LABELS: Record<string, string> = {
   group_by_agg: 'Group By',
 };
 
+/**
+ * Shows context-specific expression examples next to each CodeEditor. The
+ * Polars expression tab uses it to keep backend syntax hints near the active
+ * context without hard-coding them into every tab panel.
+ * Rendered by: preprocessing/PolarsExpressionSubTab module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ */
 const CodeHint: React.FC<{ context: string }> = ({ context }) => {
   const hints: Record<string, string> = {
     filter: 'A boolean Polars expression.\nExample: pl.col("age") > 18',
@@ -50,6 +56,13 @@ const CodeHint: React.FC<{ context: string }> = ({ context }) => {
   );
 };
 
+/**
+ * Renders the general Polars-expression preprocessing tab. It delegates request
+ * serialization, preview, and apply behavior to `usePolarsExpressionSubTab`.
+ * Rendered by: DataPreprocessingFeature module, CodeEditor module, PreviewTable component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: manage expression tabs and shared context, render editors/preview table, evaluate
+ * expressions for preview, and apply column/sort/group operations through hook actions.
+ */
 export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (props) => {
   const { isLoading } = props;
   const {

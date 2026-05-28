@@ -10,6 +10,13 @@ interface UseFileBrowserActionsParams {
   notify: Notify;
 }
 
+/**
+ * Owns file-browser side effects that are not simple rendering. Data Loader
+ * uses this hook for refresh, drag-to-move, and citation README preview state.
+ * Used by: FileTree component, DataLoaderFeature module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: wrap file refresh/move/citation operations with loading state and notifications, then
+ * expose handlers consumed by FileTree and DataLoaderFeature.
+ */
 export function useFileBrowserActions({
   authHeaders,
   refetchFiles,
@@ -22,6 +29,11 @@ export function useFileBrowserActions({
   const [citationLoading, setCitationLoading] = useState(false);
   const [refreshingFiles, setRefreshingFiles] = useState(false);
 
+  /**
+   * Refreshes the server-backed file tree and surfaces the result through the
+   * Data Loader toast channel.
+   * Called by: useFileBrowserActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleRefreshFiles = async () => {
     setRefreshingFiles(true);
     try {
@@ -34,6 +46,11 @@ export function useFileBrowserActions({
     }
   };
 
+  /**
+   * Moves a file into a target directory for `FileTree` drop events, then
+   * refreshes the browser so the row appears in its new location.
+   * Called by: useFileBrowserActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleMoveFile = async (sourcePath: string, targetDirectoryPath: string) => {
     try {
       await moveFile({
@@ -48,6 +65,13 @@ export function useFileBrowserActions({
     }
   };
 
+  /**
+   * Opens the citation dialog and loads README content when the selected folder
+   * has a citation file.
+   * Called by: useFileBrowserActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: open the dialog, handle folders without README files, fetch README text, then clear
+   * loading state after success or error.
+   */
   const openCitation = async (
     directory: FileTreeDirectory,
     readmePath: string | null,
@@ -79,6 +103,10 @@ export function useFileBrowserActions({
     }
   };
 
+  /**
+   * Resets citation-preview state for the dialog close action.
+   * Called by: useFileBrowserActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const closeCitation = () => {
     setCitationDirectory(null);
     setCitationPath(null);

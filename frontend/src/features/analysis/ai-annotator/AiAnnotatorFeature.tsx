@@ -48,14 +48,21 @@ import {
 } from '../common/components/MetadataColumnSelector';
 
 type EndpointPreset = 'openai' | 'lmstudio' | 'custom';
+
+/** Names the local OpenAI-compatible endpoint the AI annotator offers for users running LM Studio. */
 const LMSTUDIO_BASE_URL = 'http://127.0.0.1:1234/v1';
 
+/** Resolves the backend API base URL override that the run/save AI annotation calls send to the server. */
+/**
+ * Called by: AiAnnotatorFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ */
 const resolveBaseUrl = (preset: EndpointPreset, customUrl: string): string | null => {
   if (preset === 'openai') return null;
   if (preset === 'lmstudio') return LMSTUDIO_BASE_URL;
   return customUrl.trim() || null;
 };
 
+/** Seeds the AI annotator form with provider-neutral defaults consumed by the feature component state. */
 const DEFAULT_PARAMS = {
   endpointPreset: 'openai' as EndpointPreset,
   model: '',
@@ -69,6 +76,11 @@ const DEFAULT_PARAMS = {
   batchSize: '100',
 };
 
+/** Parses the user-authored class list into the request shape expected by the AI annotation backend. */
+/**
+ * Called by: AiAnnotatorFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   * Flow: split nonempty class lines, separate optional descriptions at colons, default blank descriptions to the class name, then drop entries without names.
+ */
 const parseClasses = (raw: string) => {
   return raw
     .split('\n')
@@ -86,6 +98,11 @@ const parseClasses = (raw: string) => {
     .filter((item) => item.name.length > 0);
 };
 
+/** Parses few-shot examples so the AI annotation task can pass validated query/classification pairs. */
+/**
+ * Called by: AiAnnotatorFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   * Flow: split nonempty example lines, keep only query-to-classification pairs with both sides present, then return typed few-shot examples.
+ */
 const parseExamples = (raw: string) => {
   return raw
     .split('\n')
@@ -106,8 +123,13 @@ const parseExamples = (raw: string) => {
     .filter((item): item is { query: string; classification: string } => Boolean(item));
 };
 
+/** Keeps result paging consistent across the annotation and review tables in this feature. */
 const DEFAULT_PAGE_SIZE = 5;
 
+/** Converts arbitrary backend cell values into editable/displayable text for annotation review cells. */
+/**
+ * Called by: AiAnnotatorFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ */
 const stringifyCell = (value: unknown): string => {
   if (value === null || value === undefined) {
     return '';
@@ -122,6 +144,10 @@ const stringifyCell = (value: unknown): string => {
   return String(value);
 };
 
+/** Builds the detached node name used by the AI annotation save/detach workflow. */
+/**
+ * Called by: AiAnnotatorFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ */
 const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
   const trimmed = nodeLabel.trim();
   const base = trimmed.length > 0 ? trimmed : 'node';
@@ -129,6 +155,11 @@ const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
   return `${normalized}${suffix}`;
 };
 
+/** Provides the AI annotation workspace tab, including task launch, result review, save, and detach flows. */
+/**
+ * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
 const AiAnnotatorFeature: React.FC = () => {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
@@ -227,6 +258,10 @@ const AiAnnotatorFeature: React.FC = () => {
     nodes: displayedNodes,
   });
 
+  // Keeps each selected node tied to the text column the AI request should annotate.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
   };
@@ -245,6 +280,11 @@ const AiAnnotatorFeature: React.FC = () => {
     isRunning;
 
 
+  // Normalizes task responses into the single result node rendered by the annotation table.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+     * Flow: read the first response node, merge response metadata into that node when present, then update result node id/state or clear it when data is missing.
+   */
   const applyResponseResult = (response: AiAnnotationResponse | null) => {
     const data = response?.data;
     if (!data || typeof data !== 'object') {
@@ -284,6 +324,8 @@ const AiAnnotatorFeature: React.FC = () => {
     getAuthHeaders,
     isTabActive: isActiveTab,
     resultRef: aiAnnotationResultRef,
+    // Loads the latest annotation result for lifecycle polling and tab hydration.
+    // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
       const { data } = await aiAnnotationTaskResult({
         headers,
@@ -292,6 +334,8 @@ const AiAnnotatorFeature: React.FC = () => {
       });
       return data;
     },
+    // Recovers the submitted request so locked selections can be restored after reloads.
+    // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
       const { data } = await aiAnnotationTaskRequest({
         headers,
@@ -300,11 +344,15 @@ const AiAnnotatorFeature: React.FC = () => {
       });
       return data;
     },
+    // Pushes freshly fetched results into local refs and user-facing status state.
+    // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onResultFetched: (result, _fetchedTaskId) => {
       aiAnnotationResultRef.current = result;
       applyResponseResult(result ?? null);
       setStatusMessage(result?.message ?? 'AI annotation results loaded.');
     },
+    // Rehydrates persisted result payloads when the tab regains a known task.
+    // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onHydratedResult: async (resultPayload) => {
       const hydrated = resultPayload ?? null;
       aiAnnotationResultRef.current = hydrated;
@@ -313,6 +361,8 @@ const AiAnnotatorFeature: React.FC = () => {
         setStatusMessage(hydrated.message);
       }
     },
+    // Restores annotation request parameters enough to rebuild the analysis lock.
+    // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedRequest: async (requestPayload) => {
       const requestData = (requestPayload as Record<string, unknown> | null) ?? null;
       if (!requestData) {
@@ -337,6 +387,8 @@ const AiAnnotatorFeature: React.FC = () => {
         // best-effort lock restoration
       }
     },
+    // Resets local annotation state after the shared analysis lifecycle clears the task.
+    // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onCleared: () => {
       aiAnnotationResultRef.current = null;
       setResultNodeId(null);
@@ -348,6 +400,11 @@ const AiAnnotatorFeature: React.FC = () => {
 
   const clearDisabled = !localTaskId && !statusMessage && !isClearing;
 
+  // Fetches a paged result slice for the annotation table without restarting the task.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+     * Flow: resolve the task id, request the selected result page, store the response ref and node result, then surface paging status or errors.
+   */
   const loadResultPage = async (page: number, pageSize: number) => {
     const resolvedTaskId = localTaskId ?? (await resolveTaskId());
     if (!resolvedTaskId) {
@@ -377,6 +434,11 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
+  // Queries the configured provider endpoint so users can choose a concrete model id.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+     * Flow: resolve the provider base URL, request available model ids with the API key, select a valid default model, then report load success or failure.
+   */
   const handleLoadModels = async () => {
     setIsLoadingModels(true);
     try {
@@ -409,6 +471,10 @@ const AiAnnotatorFeature: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpointPreset, customBaseUrl, currentWorkspaceId]);
 
+  // Returns the parameter controls to the default annotation provider configuration.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const resetParameters = () => {
     setEndpointPreset(DEFAULT_PARAMS.endpointPreset);
     setModel(DEFAULT_PARAMS.model);
@@ -423,6 +489,11 @@ const AiAnnotatorFeature: React.FC = () => {
     setStatusMessage('Parameters reset to defaults.');
   };
 
+  // Starts a backend detach task that materializes annotations into a new workspace node.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const handleDetach = async () => {
     if (!selectedNodeId || !selectedColumn) {
       setStatusMessage('Select one data block and text column before detaching.');
@@ -467,6 +538,11 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
+  // Submits the active node and column to the annotation backend and locks that context.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const handleRun = async () => {
     if (!selectedNodeId || !selectedColumn) {
       setStatusMessage('Select one data block and text column before running.');
@@ -527,6 +603,10 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
+  // Routes the Clear action through the shared analysis lifecycle while exposing local busy state.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleClear = async () => {
     setIsClearing(true);
     try {
@@ -584,8 +664,17 @@ const AiAnnotatorFeature: React.FC = () => {
   const totalPages = pagination?.total_source_pages;
   const annotationColumn = annotationColumns[0] ?? `${selectedColumn || 'text'}_annotation`;
 
+  // Builds a stable edit map key for one review table cell and annotator provider.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const buildEditKey = (rowIndex: number, providerName: string) => `${rowIndex}::${providerName}`;
 
+  // Reads the saved annotation value from the row payload for comparison during auto-save.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+     * Flow: scan the annotation column entries for the requested provider, return its saved annotation text, or fall back to an empty string.
+   */
   const getPersistedAnnotationValue = (
     row: Record<string, unknown>,
     providerName: string,
@@ -604,6 +693,10 @@ const AiAnnotatorFeature: React.FC = () => {
     return found ? String(found.annotation ?? '') : '';
   };
 
+  // Chooses the draft value when present, otherwise falling back to the persisted annotation.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const getAnnotationValue = (
     row: Record<string, unknown>,
     providerName: string,
@@ -617,11 +710,19 @@ const AiAnnotatorFeature: React.FC = () => {
     return getPersistedAnnotationValue(row, providerName, annCol);
   };
 
+  // Records an in-progress review edit before the blur handler attempts to persist it.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleReviewValueChange = (rowIndex: number, providerName: string, value: string) => {
     const key = buildEditKey(rowIndex, providerName);
     setReviewEdits((prev) => ({ ...prev, [key]: value }));
   };
 
+  // Adds a reviewer-defined provider name to the editable review grid.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleAddProvider = () => {
     const name = newProviderName.trim();
     if (!name) {
@@ -632,6 +733,11 @@ const AiAnnotatorFeature: React.FC = () => {
     setIsAddAnnotatorDialogOpen(false);
   };
 
+  // Loads source rows for the review tab while adapting node-data pagination to annotation metadata.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+     * Flow: fetch the selected node page, reshape backend pagination into review metadata, then store review rows and status.
+   */
   const loadReviewPage = async (nodeId: string, textCol: string, annotationCol: string, pg: number, pgSize: number) => {
     setIsReviewPaging(true);
     try {
@@ -667,6 +773,11 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
+  // Retrieves provider names already present in the selected annotation column.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+     * Flow: request provider names for the annotation column, dedupe trimmed names into review options, then reset options on failure.
+   */
   const loadReviewProviders = async (nodeId: string, annotationCol: string) => {
     try {
       const { data: response } = await getAiAnnotationProviders({
@@ -687,6 +798,11 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
+  // Retrieves saved annotation categories so the review select stays aligned with existing data.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+     * Flow: request saved categories for the annotation column, dedupe trimmed names into review choices, then reset choices on failure.
+   */
   const loadReviewCategories = async (nodeId: string, annotationCol: string) => {
     try {
       const { data: response } = await getAiAnnotationCategories({
@@ -707,12 +823,20 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
+  // Refreshes category options after local additions may have changed the review choices.
+  /**
+   * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+   */
   const refreshCategoryCache = async (nodeId: string, annotationCol: string) => {
     setTemporaryCategories([]);
     setReviewGlobalCategories([]);
     await loadReviewCategories(nodeId, annotationCol);
   };
 
+  // Opens the review workflow by loading rows, providers, and categories in parallel.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleReview = async () => {
     if (!selectedNodeId || !reviewTextColumn || !reviewAnnotationColumn) {
       setStatusMessage('Select a data block, text column, and annotation column to review.');
@@ -730,6 +854,10 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
+  // Applies a category menu choice, including the sentinel that opens the add-category dialog.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleCategorySelected = async (
     row: Record<string, unknown>,
     rowIndex: number,
@@ -749,6 +877,10 @@ const AiAnnotatorFeature: React.FC = () => {
     await handleReviewInputBlur(row, rowIndex, providerName, annotationCol, nextValue);
   };
 
+  // Commits a newly named category to the pending review cell and persists the edit.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   */
   const handleConfirmAddCategory = async () => {
     const name = newCategoryName.trim();
     if (!name || !pendingCategoryCell) {
@@ -770,6 +902,11 @@ const AiAnnotatorFeature: React.FC = () => {
     setIsAddCategoryDialogOpen(false);
   };
 
+  // Auto-saves a review cell when its draft differs from the persisted annotation value.
+  /**
+   * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+ * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ */
   const handleReviewInputBlur = async (
     row: Record<string, unknown>,
     rowIndex: number,
@@ -915,6 +1052,8 @@ const AiAnnotatorFeature: React.FC = () => {
         }}
         actions={panelTab === 'ai-annotation' ? {
           onRun: handleRun,
+          // Stops the active annotation task from the shared layout action.
+          // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
           onStop: () => {
             void stopTask();
           },

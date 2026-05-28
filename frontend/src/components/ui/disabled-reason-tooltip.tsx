@@ -33,22 +33,10 @@ export interface DisabledReasonTooltipProps {
 }
 
 /**
- * Generic helper for showing a "this is why I'm disabled" tooltip on top of
- * (form) controls. Disabled HTML elements don't emit pointer events
- * themselves, so the component wraps the child in a `<span>` that catches
- * hover and forwards it to a shadcn `Tooltip`.
- *
- * Usage:
- *
- * ```tsx
- * <DisabledReasonTooltip reason={isDisabled ? 'Pick a corpus first' : undefined}>
- *   <Button disabled={isDisabled} onClick={handleRun}>Run</Button>
- * </DisabledReasonTooltip>
- * ```
- *
- * When `reason` is empty/undefined the children render with no wrapping —
- * so it is safe to apply unconditionally and let the surrounding logic
- * decide whether to populate the prop.
+ * Tooltip wrapper used by feature forms to explain disabled controls. It wraps
+ * children only when a reason exists because disabled HTML controls do not emit
+ * pointer events for normal tooltip triggers.
+ * Flow: return children unchanged without a reason, otherwise wrap them in a span trigger and render TooltipProvider/TooltipContent with side and delay options.
  */
 export const DisabledReasonTooltip: React.FC<DisabledReasonTooltipProps> = ({
   reason,

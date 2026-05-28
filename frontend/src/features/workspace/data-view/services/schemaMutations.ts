@@ -15,6 +15,11 @@ export const DATA_TYPES = [
   { value: 'list_string', label: 'list_string' },
 ] as const;
 
+/**
+ * Normalizes node schema responses into a column-to-dtype map for headers.
+ * Used by: useColumnMutations hook (rg call sites/imports).
+ * Why: because column mutation UI needs backend schema types normalized before rendering cast options and labels.
+ */
 export const extractColumnTypes = (
   schema: NodeSchemaResponse | null | undefined
 ): Record<string, string> => {
@@ -33,6 +38,11 @@ export const extractColumnTypes = (
   return {};
 };
 
+/**
+ * Displays known dtype values with UI labels while preserving unknown types.
+ * Used by: WorkspaceTable component (rg call sites/imports).
+ * Why: because column mutation UI needs backend schema types normalized before rendering cast options and labels.
+ */
 export const getTypeDisplayName = (type: string): string => {
   const dataType = DATA_TYPES.find((entry) => entry.value === type);
   return dataType ? dataType.label : type;

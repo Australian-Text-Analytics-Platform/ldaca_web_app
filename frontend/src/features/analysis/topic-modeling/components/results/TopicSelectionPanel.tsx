@@ -26,6 +26,7 @@ type Props = {
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
 };
 
+/** Used by: TopicSelectionPanel filtering to check whether a topic is inside the current zoom domain because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 function isTopicInDomain(topic: TopicLike, domain: ZoomDomain): boolean {
   if (topic.x == null || topic.y == null) return true;
   return (
@@ -36,6 +37,10 @@ function isTopicInDomain(topic: TopicLike, domain: ZoomDomain): boolean {
   );
 }
 
+/**
+ * Rendered by: TopicModelingBubbleChartSection to show selected and available topic lists because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
+ */
 export function TopicSelectionPanel({
   topics,
   selectedTopicIds,

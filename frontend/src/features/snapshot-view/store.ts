@@ -60,12 +60,27 @@ export const useSnapshotViewStore = create<SnapshotViewState>((set, get) => ({
   mode: {},
   snapshots: {},
 
+  /**
+   * Lets tool panels read their current live/demo/share mode.
+   * Called by: store object consumers because tool panels need mode lookup without duplicating live-mode defaults.
+   * Flow: look up the sparse per-tool mode map, fall back to live mode, and return a concrete mode for render branching.
+   */
   getMode: (tool) => get().mode[tool] ?? LIVE_MODE,
 
+  /**
+   * Updates only mode so callers can switch without touching loaded payloads.
+   * Consumed by: store return object for feature components.
+   * Why: because feature components need the selected tool mode to choose between live backend state and snapshot payloads.
+   */
   setMode: (tool, mode) => {
     set((state) => ({ mode: { ...state.mode, [tool]: mode } }));
   },
 
+  /**
+   * Hydrates a tool snapshot and enters its read-only snapshot mode together.
+   * Called by: store object consumers because loaders need one atomic transition into snapshot-backed state.
+  * Flow: copy existing mode and snapshot maps, store the loaded payload for one tool, then set its demo/share mode in the same Zustand update.
+   */
   loadSnapshot: (tool, snapshot, mode) => {
     set((state) => ({
       mode: { ...state.mode, [tool]: mode },
@@ -73,6 +88,11 @@ export const useSnapshotViewStore = create<SnapshotViewState>((set, get) => ({
     }));
   },
 
+  /**
+   * Returns one tool to live mode and clears its frozen snapshot payload.
+   * Called by: store object consumers because exit controls need to clear mode and payload together.
+  * Flow: keep other tools untouched, replace the selected tool mode with live, and null out its snapshot slice.
+   */
   exitSnapshot: (tool) => {
     set((state) => ({
       mode: { ...state.mode, [tool]: LIVE_MODE },
@@ -80,15 +100,29 @@ export const useSnapshotViewStore = create<SnapshotViewState>((set, get) => ({
     }));
   },
 
+  /**
+   * Lets loaders and analysis hooks read the frozen payload for a tool.
+   * Called by: store object consumers because snapshot-backed analysis hooks need the payload paired with the active tool.
+  * Flow: read the sparse snapshot map, normalize an absent entry to null, and give callers a concrete loaded-or-empty value.
+   */
   getSnapshot: (tool) => get().snapshots[tool] ?? null,
 
+  /**
+   * Clears all tool slices for tests and global cleanup flows.
+   * Called by: store object consumers because tests and cleanup paths need a single reset boundary.
+  * Flow: replace both sparse maps with empty objects so every tool returns to live defaults on the next selector read.
+   */
   reset: () => set({ mode: {}, snapshots: {} }),
 }));
 
-/** Selector hook — read a tool's current view mode. Defaults to live
+/**
+ * Selector hook — read a tool's current view mode. Defaults to live
  * when the store has no entry for the tool. Recommended over inline
  * ``useSnapshotViewStore(s => s.mode[tool])`` so call sites don't
- * have to import ``LIVE_MODE`` separately. */
+ * have to import ``LIVE_MODE`` separately.
+ * Used by: useSnapshotBackedAnalysisState module, index module, useToolSnapshotMode tests (rg call sites/imports) because consumers need a stable live-mode default.
+ * Flow: subscribe to only the requested tool's mode entry, coerce missing state to live, and avoid exposing the sparse map to feature code.
+ */
 export function useToolSnapshotMode(tool: SnapshotToolKey) {
   return useSnapshotViewStore((s) => s.mode[tool] ?? LIVE_MODE);
 }

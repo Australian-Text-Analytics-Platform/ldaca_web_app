@@ -33,6 +33,12 @@ const HintsController = lazy(() => import('./features/hints/HintsController'));
 /**
  * Shell that renders the main workspace experience once the backend is healthy
  * and the user has completed authentication (if required).
+ * Rendered by: App because the backend gate needs a stable shell that can
+ * hydrate auth, preferences, workspace context, and global chrome only after
+ * `/health` confirms the runtime is ready.
+ * Flow: initialize auth and preferences, prepare resize state before any early
+ * return, show blocking/login surfaces when needed, then mount providers,
+ * global modals, sidebar chrome, and the active workspace view.
  */
 const WorkspaceShell: React.FC = () => {
   const { closeFeedbackModal, feedbackOpen } = useUIStore(
@@ -90,18 +96,21 @@ const WorkspaceShell: React.FC = () => {
     min: 160,
     max: 400,
     persistKey: 'ldaca.layout.sidebarWidth',
+    /** Consumed by: useResizableSplit because drag start needs transitions disabled before per-frame DOM width writes. */
     onDragStart: () => {
       const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
       const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
       if (gapEl) gapEl.style.transition = 'none';
       if (containerEl) containerEl.style.transition = 'none';
     },
+    /** Consumed by: useResizableSplit because live dragging needs to resize shadcn's gap and container without React rerenders. */
     onLiveUpdate: (next) => {
       const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
       const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
       if (gapEl) gapEl.style.width = `${next}px`;
       if (containerEl) containerEl.style.width = `${next}px`;
     },
+    /** Consumed by: useResizableSplit because drag end needs to return width control to the SidebarProvider CSS variable. */
     onDragEnd: () => {
       const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
       const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
@@ -140,6 +149,7 @@ const WorkspaceShell: React.FC = () => {
     max: 0.8,
     maxPixels: 800,
     persistKey: 'ldaca.layout.asidePanelRatio',
+    /** Consumed by: useResizableSplit because the right-panel drag needs frame-by-frame DOM widths while preserving hook state. */
     onLiveUpdate: (next) => {
       if (isRightCollapsed) return;
       if (mainRef.current) mainRef.current.style.width = `${(1 - next) * 100}%`;
@@ -164,6 +174,7 @@ const WorkspaceShell: React.FC = () => {
   // remember the last drag value so an uncollapse restores it. While
   // collapsed the splitter doesn't render, so the hook's value sits
   // unchanged in state.
+  /** Used by: the collapse and expand buttons because they need one toggle path that preserves the last expanded ratio. */
   const toggleRightPanel = () => {
     setIsRightCollapsed((prev) => {
       if (prev) {
@@ -346,6 +357,12 @@ const WorkspaceShell: React.FC = () => {
 /**
  * Top-level app entry that handles backend health gating
  * before rendering the main workspace shell.
+ * Rendered by: the TanStack router root route in router.tsx because the single
+ * route needs one place to wait for backend readiness before mounting stores,
+ * workspace providers, and long-lived UI surfaces.
+ * Flow: hydrate the remote docs registry, check backend health, choose the
+ * blocking or workspace shell branch, then keep global banners and toasts
+ * mounted outside that branch.
  */
 const App: React.FC = () => {
   // Kick off the docs registry hydrate + background refresh once on mount.
