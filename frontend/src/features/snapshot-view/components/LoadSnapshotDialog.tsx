@@ -29,7 +29,7 @@ export interface LoadSnapshotDialogProps {
   /** Called when the user clicks Open on a compatible row. The host
    * decodes the bundle and engages snapshot view; this dialog just
    * delivers the filename. If absent, Open is disabled with a
-   * "view coming soon" tooltip — Phase 1b-2 wires the host side. */
+   * "view coming soon" tooltip. */
   onOpenSnapshot?: (filename: string) => Promise<void>;
 }
 
@@ -97,10 +97,6 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
 
   const incompatibleCount = decorated.filter((d) => !d.compatible).length;
   const totalCount = decorated.length;
-  // Adaptive batch label (plan §5.7.4):
-  //   - any incompatible → "Delete stale snapshots" (deletes only those)
-  //   - none incompatible but ≥1 total → "Delete all snapshots"
-  //   - 0 total → button hidden
   const batchLabel =
     incompatibleCount > 0
       ? `Delete stale snapshots (${incompatibleCount})`
@@ -123,9 +119,6 @@ export const LoadSnapshotDialog: React.FC<LoadSnapshotDialogProps> = ({
     onSuccess: (_res, filename) => {
       toast.success(`Snapshot deleted.`);
       void queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
-      // If we just deleted the currently-loaded snapshot, the host
-      // will react when its store sees the removed slice. For Phase
-      // 1b-1 (no loaded view yet) this is a no-op.
       void filename;
     },
     onError: (err) => {

@@ -15,9 +15,8 @@ export interface SnapshotActionsProps {
   /** Called when the user clicks Save in the dialog with a validated
    * filename and the description text. The host feature (e.g.
    * ConcordanceFeature) implements this — it knows how to assemble
-   * the bundle from its in-memory state. If absent, the Save button
-   * doesn't render — the tool hasn't wired itself up yet (a useful
-   * Phase 1 staging signal). */
+  * the bundle from its in-memory state. If absent, the Save button
+  * doesn't render. */
   onSave?: (filename: string, description: string) => Promise<void>;
   /** When set, the Save button is rendered disabled with this string
    * as a hover tooltip. Mirrors the ``runDisabledReason`` pattern
@@ -26,9 +25,8 @@ export interface SnapshotActionsProps {
    * rows; demo cap is 2 000.") and pass it in. */
   disabledReason?: string | null;
   /** Called when the user clicks Open on a snapshot row. The host
-   * decodes the bundle and engages snapshot view. If absent, the
-   * Open buttons in the load dialog show "view coming soon" — Phase
-   * 1b-2 wires the host side. */
+    * decodes the bundle and engages snapshot view. If absent, the
+    * Open buttons in the load dialog show "view coming soon". */
   onOpenSnapshot?: (filename: string) => Promise<void>;
   /** Display labels of the currently-selected data blocks. Used to
    * pre-populate the Save dialog's filename input with something
@@ -86,9 +84,8 @@ function buildDefaultName(nodeLabels: string[] | undefined): string {
  * the demo-snapshot master switch — when off, returns null so no DOM
  * is added.
  *
- * Plan §3.7 + §5.7. Load is further gated on the snapshot list for
- * this tool being non-empty — "no snapshots saved yet" is conveyed
- * by absence, not by an empty dialog.
+ * Load is further gated on the snapshot list for this tool being non-empty:
+ * "no snapshots saved yet" is conveyed by absence, not by an empty dialog.
  */
 export const SnapshotActions: React.FC<SnapshotActionsProps> = ({
   tool,

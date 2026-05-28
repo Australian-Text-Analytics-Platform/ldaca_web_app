@@ -5,11 +5,7 @@
  * live view in quotation.
  *
  * The store is named ``useSnapshotViewStore`` (not ``DemoSnapshot``)
- * because once Mode 2a (share) ships it will hold share-mode
- * snapshots in the same slices — no rename needed. The
- * ``sourceProjection`` field on every ``LoadedSnapshot`` is wired in
- * from day one but is always ``null`` in Mode 1; Mode 2a populates it
- * without changing the slice type.
+ * because demo and share snapshot modes use the same per-tool slices.
  */
 import { create } from 'zustand';
 import type { LoadedSnapshot, SnapshotToolKey, ViewMode } from './types';
@@ -21,8 +17,8 @@ type ModeMap = Partial<Record<SnapshotToolKey, ViewMode>>;
 
 /** Per-tool slice: the snapshot currently loaded for that tool, or
  * ``null`` when in live mode. Typed as ``LoadedSnapshot`` with the
- * default ``unknown`` payload — per-tool capture/load code in
- * Phase 1+ narrows the generic at the call site. */
+ * default ``unknown`` payload; per-tool capture/load code narrows the
+ * generic at the call site. */
 type SlicesMap = Partial<Record<SnapshotToolKey, LoadedSnapshot | null>>;
 
 interface SnapshotViewState {

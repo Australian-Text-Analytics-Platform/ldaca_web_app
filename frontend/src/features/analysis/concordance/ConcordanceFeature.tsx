@@ -243,8 +243,7 @@ const ConcordanceFeature: React.FC = () => {
   // results, materializedPaths, materializedBins) are read by the rest
   // of the component as-is — making this a single dispatch point
   // rather than a sprawl of conditionals across every reference site.
-  // See plan §10 (Snapshot view) for the architecture rationale: a
-  // snapshot is "the live UI with frozen data + mutation guards", not
+  // A snapshot is "the live UI with frozen data + mutation guards", not
   // a parallel viewer.
   const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
     if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
@@ -793,10 +792,6 @@ const ConcordanceFeature: React.FC = () => {
     return 0;
   }, []);
 
-  // Snapshot load handler. Wired through the LoadSnapshotDialog →
-  // SnapshotActions → AnalysisFeatureHeader chain. Phase 1b-2a
-  // populates the snapshot store + shows the banner; the dual-source
-  // result rendering ships in Phase 1b-2b.
   const handleOpenSnapshot = useConcordanceSnapshotLoad();
 
   // Build the actual ConcordanceAnalysisRequest from the live form

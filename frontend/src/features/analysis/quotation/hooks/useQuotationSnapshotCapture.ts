@@ -1,10 +1,9 @@
 /**
  * Quotation-specific snapshot capture pipeline.
  *
- * Mirrors the concordance capture hook (Phase 1a, see
- * useConcordanceSnapshotCapture). Quotation operates on a single node
- * with no combined view, so the bundle is simpler — one result payload
- * and one settings payload, no per-node dispersion bins.
+ * Mirrors the concordance capture hook. Quotation operates on a single node
+ * with no combined view, so the bundle is simpler: one result payload and one
+ * settings payload, no per-node dispersion bins.
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
@@ -50,9 +49,7 @@ export interface UseQuotationSnapshotCaptureInput {
   selectedNode: WorkspaceNodeLike | null;
   getNodeRowCount: (node: WorkspaceNodeLike) => number;
   getAuthHeaders: () => Record<string, string>;
-  /** Whether the live result has been materialised (Process All
-   * clicked). Hard-required before save so the captured payload ships
-   * the materialised shape — see plan §4. */
+  /** Whether the live result has been materialised (Process All clicked). */
   materialized: boolean;
 }
 

@@ -1,17 +1,9 @@
 /**
- * Concordance snapshot load pipeline (plan §5.1 — Loader section).
- *
  * Counterpart to ``useConcordanceSnapshotCapture``: downloads the
- * bundle bytes via the Phase-0h ``GET /users/me/snapshots/{filename}``
- * endpoint, decodes the zip via the shared bundle codec (Phase 0c),
- * parses the per-node result + bins payloads, and atomically
- * populates ``useSnapshotViewStore`` while flipping the concordance
- * tool's view mode to ``demoSnapshot``.
- *
- * The downstream rendering (dual-source result panel + dispersion
- * chart) lands in Phase 1b-2b — this hook gets the data into the
- * store and the banner up, so the user has a clear signal that
- * "you're now viewing snapshot X" before the full view wires in.
+ * bundle bytes, decodes the zip via the shared bundle codec, parses the
+ * per-node result + bins payloads, and atomically populates
+ * ``useSnapshotViewStore`` while flipping the concordance tool's view mode to
+ * ``demoSnapshot``.
  */
 import { useCallback } from 'react';
 import { toast } from 'sonner';
@@ -73,7 +65,6 @@ export function useConcordanceSnapshotLoad(): (filename: string) => Promise<void
     async (filename: string): Promise<void> => {
       const headers = getAuthHeaders();
 
-      // Download bytes via Phase-0h endpoint.
       const { data } = await downloadSnapshot({
         headers,
         parseAs: 'blob',

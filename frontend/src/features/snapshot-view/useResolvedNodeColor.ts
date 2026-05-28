@@ -2,7 +2,7 @@
  * ``useResolvedNodeColor(tool, nodeId)`` — read the rendered colour
  * for a node, dispatching by the tool's view mode.
  *
- * Plan §3.5. In live mode the colour comes from the global
+ * In live mode the colour comes from the global
  * ``useNodeColorsStore`` (which is also persisted via the workspace
  * ``ui_state`` sidecar). In snapshot mode it comes from the loaded
  * snapshot's frozen ``node_colors`` map. The two are kept strictly

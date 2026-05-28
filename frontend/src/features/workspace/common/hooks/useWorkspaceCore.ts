@@ -32,9 +32,8 @@ const useUISlice = () =>
 
 /**
  * Core workspace wiring: bundles auth, current-workspace id, selection, and
- * per-node pagination. `currentWorkspaceId` lives in `selectionStore` (Phase
- * 4.1) so this hook just re-exposes the slice. Pagination stays as local
- * state because it's tightly coupled to `selectedNodeId` lifecycle and
+ * per-node pagination. `currentWorkspaceId` lives in `selectionStore`, so this
+ * hook just re-exposes the slice. Pagination stays as local state because it's tightly coupled to `selectedNodeId` lifecycle and
  * shouldn't persist across workspaces.
  */
 export const useWorkspaceCore = () => {

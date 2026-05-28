@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * Shared drag-to-resize hook for splitter UIs. Phase A unification:
- * covers the three previously hand-rolled implementations (DataLoader's
- * top/bottom percent split, WorkspaceView's top/bottom percent split,
- * App.tsx's sidebar pixel column + right-panel percent column).
+ * Shared drag-to-resize hook for splitter UIs.
  *
  * Axes:
  * - `orientation: 'horizontal'` — panes are stacked top/bottom, the

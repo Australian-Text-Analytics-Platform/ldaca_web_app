@@ -54,11 +54,6 @@ function AddFilePanelContent({
     setSelectedSheet,
   } = useFilePreview(filename, true);
 
-  // Phase 4.2: language selector. Selecting a non-English language here
-  // updates the per-user ``defaultLanguage`` preference, which the
-  // per-feature ``effective_language`` resolvers (Phase 3 / 4.5) then
-  // honor for every analysis on the new corpus. Existing English flows
-  // are unchanged when the user leaves the default selected.
   const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const setDefaultLanguage = usePreferencesStore((state) => state.setDefaultLanguage);
   const selectedLanguage = defaultLanguage ?? 'en';

@@ -22,9 +22,8 @@ export interface AnalysisFeatureHeaderProps {
   helpLabel: string;
   helpTooltip?: string;
   /** Snapshot save handler. The host feature wires its own capture
-   * logic in via this prop — see ``SnapshotActions.onSave``. Optional
-   * because most tools haven't wired snapshot capture yet (Phase 1
-   * lights it up tool-by-tool). */
+  * logic in via this prop — see ``SnapshotActions.onSave``. Optional
+  * because tools wire snapshot capture individually. */
   onSaveSnapshot?: (filename: string, description: string) => Promise<void>;
   /** When set, the Save button renders disabled with this string as
    * a hover tooltip — same UX as the Run-disabled pattern elsewhere
@@ -46,9 +45,8 @@ export interface AnalysisFeatureHeaderProps {
  * action slot on the right. Replaces each tool's hand-rolled
  * ``<CardHeader>`` block so the snapshot wiring lives once.
  *
- * Plan §3.7. The right slot returns ``null`` when the demo-snapshot
- * master switch is off, so no DOM is added in the default
- * experience.
+ * The right slot returns ``null`` when the demo-snapshot master switch is off,
+ * so no DOM is added in the default experience.
  */
 export const AnalysisFeatureHeader: React.FC<AnalysisFeatureHeaderProps> = ({
   tool,

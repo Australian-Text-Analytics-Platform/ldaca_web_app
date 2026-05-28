@@ -10,8 +10,6 @@ import {
 } from './WorkspaceContext';
 
 /**
- * Workspace provider — Phase 4.2 split.
- *
  * Renders four nested context providers, one per slice. Each slice value
  * is memoized on its underlying primitives so the providers only push a
  * new value when something in *that* slice actually changed; the action

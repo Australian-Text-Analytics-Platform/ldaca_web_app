@@ -7,15 +7,10 @@
  * manifest (e.g. for a "show snapshot info" tooltip) don't pay the
  * parse cost.
  *
- * Library choices (plan §6 Phase 0c, plan §8 Q5):
- *   - JSZip for the zip container (already a project dep).
- *   - hyparquet (pure JS) for parquet decoding. Chosen over
- *     parquet-wasm because it sidesteps wasm-asset loading on Tauri's
- *     custom scheme and behind Binder's JupyterServerProxy. Demo mode
- *     caps results at 500k rows, well within hyparquet's comfortable
- *     range. If a future need for larger result tables emerges, the
- *     decoder can swap to parquet-wasm without changing call sites
- *     because everything goes through ``decodeResultParquet``.
+ * hyparquet is used for parquet decoding because it avoids wasm-asset loading
+ * on Tauri's custom scheme and behind Binder's JupyterServerProxy. If larger
+ * result tables need a wasm decoder later, callers can stay behind
+ * ``decodeResultParquet``.
  */
 import JSZip from 'jszip';
 import { parquetQuery } from 'hyparquet';
@@ -65,8 +60,7 @@ export type BundleReadResult =
   | { ok: true; bundle: LoadedBundle }
   | { ok: false; error: BundleReadError };
 
-/** Write a bundle as a zip ``Uint8Array``. The caller turns this into
- * a Blob + triggers download (Phase 1 capture flow). */
+/** Write a bundle as a zip ``Uint8Array``. */
 export async function writeBundle(input: BundleWriteInput): Promise<Uint8Array> {
   const zip = new JSZip();
   zip.file(MANIFEST_FILE_NAME, emitManifestJson(input.manifest));

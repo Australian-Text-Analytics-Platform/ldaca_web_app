@@ -1,8 +1,3 @@
-/**
- * Phase 4.1: preferences store carries optional ``defaultLanguage`` and
- * ``defaultTokenizerModel`` synced to the backend. The store normalises
- * inputs so backend resolution doesn't see stray case / whitespace.
- */
 import { describe, expect, it, beforeEach } from 'vitest';
 import { usePreferencesStore } from '../preferencesStore';
 

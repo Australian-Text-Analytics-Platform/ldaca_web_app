@@ -32,8 +32,8 @@ export type WorkspaceStatusSlice = {
 export type WorkspaceActionsSlice = WorkspaceInternal['actions'];
 
 /**
- * Phase 4.2: each slice gets its own context so consumers re-render only
- * when *their* slice changes. The `actions` slice is the highest-leverage
+ * Each slice gets its own context so consumers re-render only when *their*
+ * slice changes. The `actions` slice is the highest-leverage
  * split — it has the most consumers (~30) and rarely changes, so isolating
  * it from `data`/`selection` churn cuts a lot of unnecessary work.
  *

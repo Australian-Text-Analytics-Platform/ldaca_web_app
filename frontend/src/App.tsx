@@ -271,8 +271,7 @@ const WorkspaceShell: React.FC = () => {
                       <div
                         // Hide the drag handle on touch viewports — it's
                         // hard to grab on small screens and the aside
-                        // layout itself collapses to stacked below `md`
-                        // (separate change; tracked in plan §3.6 Phase C).
+                        // layout itself collapses to stacked below `md`.
                         className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex"
                         aria-label="Resize right panel"
                         {...rightPanelSplitterProps}

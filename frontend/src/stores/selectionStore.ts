@@ -5,11 +5,8 @@ import { immer } from 'zustand/middleware/immer';
 /**
  * Workspace + node selection state.
  *
- * `currentWorkspaceId` is the canonical "which workspace is open" pointer
- * (Phase 4.1: previously triple-sourced across a useWorkspaceCore useState,
- * a react-query cache write, and the server `current.get` query — those are
- * all gone now; the server query is treated as a one-shot bootstrap that
- * hydrates this store).
+ * `currentWorkspaceId` is the canonical "which workspace is open" pointer;
+ * the server `current.get` query only bootstraps this store.
  *
  * `selectedNodeId` is the "focused" node (drives the data table / detail
  * panels); `selectedNodeIds` is the tab strip, ordered left-to-right. Every

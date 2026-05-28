@@ -33,13 +33,9 @@ interface ConcordanceState {
   regex: boolean;
   wholeWord: boolean;
   caseSensitive: boolean;
-  /**
-   * Phase 4.7: selected concordance engine. ``"regex"`` (default) walks
-  * raw text; ``"tokens"`` walks the active node's tokenization
-   * column for N-actual-token CJK-aware context.
-   */
+  /** Selected concordance engine. */
   searchMode: 'regex' | 'tokens';
-  /** Phase 4.4: optional language hint for the backend gate / resolver. */
+  /** Optional language hint for the backend gate / resolver. */
   language?: string;
 }
 

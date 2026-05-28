@@ -5,17 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useSnapshotViewStore } from '@/features/snapshot-view';
 
 /**
- * Snapshot mode banner for concordance. Renders above the live UI
- * when ``viewMode === 'demoSnapshot'`` (plan §5.7's "Snapshot info"
- * polish item, brought forward to land alongside the load flow so
- * the user has a clear "you're in snapshot view" signal as soon as
- * the bundle decodes).
+ * Snapshot mode banner for concordance. Renders above the live UI when
+ * ``viewMode === 'demoSnapshot'`` so the user has a clear "you're in snapshot
+ * view" signal as soon as the bundle decodes.
  *
  * Click "Exit snapshot view" → clears the snapshot slice and flips
- * the view mode back to live. The original live state was never
- * touched (Phase 1b-2a doesn't reroute live state through the
- * snapshot), so the user returns to whatever was on screen before
- * Open was clicked.
+ * the view mode back to live. The original live state was never touched, so
+ * the user returns to whatever was on screen before Open was clicked.
  */
 export const ConcordanceSnapshotBanner: React.FC = () => {
   const snapshot = useSnapshotViewStore((s) => s.snapshots.concordance);

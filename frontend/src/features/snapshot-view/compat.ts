@@ -1,6 +1,4 @@
 /**
- * Snapshot version compatibility (plan §2.4).
- *
  * Default predicate: a snapshot is compatible with the current
  * build when their MAJOR.MINOR match (e.g. ``0.4.x`` opens in any
  * ``0.4.x``; ``0.3.x`` and ``0.5.x`` do not). The

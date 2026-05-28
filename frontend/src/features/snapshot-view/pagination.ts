@@ -1,6 +1,4 @@
 /**
- * Dual-mode pagination contract — plan §3.4.
- *
  * Live result tables paginate server-side: the component receives a
  * pre-sliced page of rows and a setter that triggers a refetch via
  * React Query. Snapshot-mode tables paginate client-side: the
@@ -8,10 +6,7 @@
  * it on each page change.
  *
  * Both flows yield the same ``PaginationView<TRow>`` shape, so table
- * components consume one interface and stay mode-agnostic. The Phase
- * 0d commit lands the adapter + tests; the per-tool switchover
- * (concordance first) ships in Phase 1 alongside the capture/load
- * flows, so this module has no live-mode-side callers yet.
+ * components consume one interface and stay mode-agnostic.
  */
 
 export interface PaginationState {
@@ -65,8 +60,7 @@ export type PaginationSource<TRow> =
       ) => ((a: TRow, b: TRow) => number) | null;
     };
 
-/** Pure resolver — no React state. Callers wrap with ``useMemo`` if
- * the source's ``rows`` is a heavy array. */
+/** Pure resolver with no React state. */
 export function resolvePagination<TRow>(
   source: PaginationSource<TRow>,
 ): PaginationView<TRow> {

@@ -35,18 +35,14 @@ interface PreferencesState {
   favoriteWorkspaces: string[];
   quotationEngine: QuotationEngineConfig;
   quotationLastRemoteUrl: string;
-  /**
-   * Phase 4.1: per-user multilingual defaults. ``null`` lets the backend
-    * fall back to its per-request resolution chain; set this when the user wants
-   * every new corpus to default to their language without manual entry.
-   */
+  /** ``null`` lets the backend fall back to its per-request language resolver. */
   defaultLanguage: string | null;
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
   /** Master switch for the demo-snapshot feature. When false, every
    * tool's Save/Load button is unmounted via the shared
-   * ``<AnalysisFeatureHeader>``. Default false; persisted to backend
-   * preferences. See ``features/snapshot-view`` / plan §3.6. */
+  * ``<AnalysisFeatureHeader>``. Default false; persisted to backend
+  * preferences. */
   demoSnapshotsEnabled: boolean;
   /** True once the first backend fetch completes */
   hydrated: boolean;
@@ -65,12 +61,7 @@ interface PreferencesActions {
    * single call keeps the two in sync.
    */
   updateQuotationRemoteUrl: (url: string) => void;
-  /**
-   * Phase 4.1: persist a language code (e.g. ``"zh"``) or ``null`` to
-   * unset. Pairs with the AddFilePanel language selector and is honored by
-   * the per-feature API request builders when their explicit
-   * ``language`` field is unset.
-   */
+  /** Persist a language code (e.g. ``"zh"``) or ``null`` to unset. */
   setDefaultLanguage: (language: string | null) => void;
   setDefaultTokenizerModel: (model: string | null) => void;
   setLdacaOniApiToken: (token: string | null) => void;

@@ -1,8 +1,3 @@
-/**
- * Phase 4.2: the supported-languages list is shared by AddFilePanel
- * and analysis UI selectors. Tokenizer model inventory comes from the backend;
- * frontend logic only validates ISO codes and orders backend model records.
- */
 import { describe, expect, it } from 'vitest';
 import {
   SUPPORTED_LANGUAGES,
@@ -37,7 +32,6 @@ describe('SUPPORTED_LANGUAGES', () => {
   });
 
   it('marks every non-English language as quotation-unsupported', () => {
-    // Decision 4 / Phase 3.6: quotation extractor is English-only.
     const nonEn = SUPPORTED_LANGUAGES.filter((l) => l.code !== 'en');
     expect(nonEn.length).toBeGreaterThan(0);
     expect(nonEn.every((l) => !l.quotationSupported)).toBe(true);

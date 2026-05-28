@@ -136,11 +136,7 @@ export const useWorkspaceNodeMutations = ({
     onSuccess: (_data, workspaceId, context) => {
       const previousId = context?.previousId ?? null;
       const nextId = workspaceId ?? null;
-      // Phase 4.1: store is canonical, the server query is one-shot
-      // bootstrap. We used to also `setQueryData(currentWorkspace, nextId)`
-      // here to keep the query cache in step, but with the bootstrap guard
-      // the reconciler ignores subsequent query updates anyway, so the
-      // query cache no longer drives state.
+      // The selection store is canonical; the server query only bootstraps it.
       setCurrentWorkspaceId(nextId);
       clearSelection();
 
@@ -715,8 +711,7 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
-  // ---- Text-analysis mutations (Phase 4.8: moved here from
-  // useWorkspaceInternal so the mutation surface lives in one place). ----
+  // ---- Text-analysis mutations. ----
 
   const detachConcordanceMutation = useMutation({
     mutationFn: ({

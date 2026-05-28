@@ -52,8 +52,8 @@ export const useWorkspaceInternal = () => {
     getPaginationForNode,
   });
 
-  // Phase 4.1: the `current.get` server query is treated as a one-shot
-  // bootstrap that hydrates the selectionStore. After the first hydration
+  // The `current.get` server query is treated as a one-shot bootstrap that
+  // hydrates the selectionStore. After the first hydration
   // (or first error after authentication), `setCurrentWorkspace` mutations
   // are the only writer — without this guard, every refetch of the
   // currentWorkspace query would otherwise revert local state back to the

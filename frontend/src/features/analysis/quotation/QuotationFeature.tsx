@@ -553,7 +553,6 @@ const QuotationFeature: React.FC = () => {
   // that toggling page/sort in a snapshot doesn't pollute the live
   // session. Keyed by node id (same as ``liveNodeState``).
   const [snapshotNodeState, setSnapshotNodeState] = useState<Record<string, NodePaginationState>>({});
-  // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});

@@ -5,9 +5,8 @@
  * The codec is intentionally lenient on additive shape changes
  * (unknown payload kinds load with a console warn) and strict on
  * required structure (missing result payload, bad schema_version,
- * malformed required fields are fatal). This matches the plan §2.1
- * "loader rules" and keeps Mode 2a bundles forward-compatible with
- * v1 builds — see §5.6 and §10.3 of the plan.
+ * malformed required fields are fatal). This keeps future bundles
+ * forward-compatible with current builds.
  *
  * The codec returns discriminated results instead of throwing so call
  * sites stay typesafe and exhaustive.

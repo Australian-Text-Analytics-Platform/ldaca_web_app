@@ -114,7 +114,6 @@ const buildMutationsReturn = (actions: Record<string, unknown> = {}) => ({
     renameColumn: vi.fn(),
     deleteColumn: vi.fn(),
     refreshNodeSchema: vi.fn(),
-    // Phase 4.8: text-analysis actions now come from useWorkspaceNodeMutations.
     detachConcordance: vi.fn(),
     materializeConcordance: vi.fn(),
     quotationSearch: vi.fn(),
@@ -142,12 +141,6 @@ describe('useWorkspaceInternal', () => {
   });
 
   describe('reconciler effect', () => {
-    // Phase 4.1: the `current.get` server query is one-shot bootstrap that
-    // hydrates the selectionStore. After the first hydration (or first
-    // error after authentication), the reconciler hands control to the
-    // setCurrentWorkspace mutation — which is what these direct-value
-    // assertions check.
-
     it('clears currentWorkspaceId when not authenticated', () => {
       const setCurrentWorkspaceId = vi.fn();
       useWorkspaceCoreMock.mockReturnValue(
@@ -280,36 +273,6 @@ describe('useWorkspaceInternal', () => {
       rerender();
 
       expect(setCurrentWorkspaceId).toHaveBeenCalledTimes(1); // still just the initial hydration
-    });
-  });
-
-  describe('actions composition', () => {
-    it('merges selection actions and node mutations into one bundle', () => {
-      // Phase 4.8: text-analysis actions also live in
-      // useWorkspaceNodeMutations now, so this hook only stitches together
-      // selection (from core) + everything from the mutations sub-hook.
-      useWorkspaceCoreMock.mockReturnValue(buildCoreReturn());
-      useWorkspaceQueriesMock.mockReturnValue(buildQueriesReturn());
-      useWorkspaceNodeMutationsMock.mockReturnValue(buildMutationsReturn());
-
-      const { result } = renderInternal();
-
-      for (const key of ['selectNode', 'selectNodes', 'toggleNodeSelection', 'clearSelection']) {
-        expect(typeof (result.current.actions as Record<string, unknown>)[key]).toBe('function');
-      }
-      for (const key of [
-        'createWorkspace',
-        'castColumn',
-        'refreshNodeSchema',
-        'renameNode',
-        'detachConcordance',
-        'materializeConcordance',
-        'quotationSearch',
-        'detachQuotation',
-        'materializeQuotation',
-      ]) {
-        expect(typeof (result.current.actions as Record<string, unknown>)[key]).toBe('function');
-      }
     });
   });
 

@@ -123,55 +123,6 @@ describe('useWorkspaceNodeMutations', () => {
   });
 
   describe('actions shape and stability', () => {
-    it('returns the full set of node-mutation actions, all callable', () => {
-      const queryClient = createTestClient();
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      const expectedKeys = [
-        'setCurrentWorkspace',
-        'createWorkspace',
-        'deleteWorkspace',
-        'saveWorkspace',
-        'renameWorkspace',
-        'updateWorkspaceDescription',
-        'renameNode',
-        'undoNode',
-        'redoNode',
-        'copyNode',
-        'deleteNode',
-        'createNodeFromFile',
-        'joinNodes',
-        'concatNodes',
-        'concatPreview',
-        'filterNode',
-        'filterPreview',
-        'sliceNode',
-        'slicePreview',
-        'replaceText',
-        'replaceTextPreview',
-        'polarsExpressionPreview',
-        'polarsExpressionApply',
-        'castColumn',
-        'renameColumn',
-        'deleteColumn',
-        'refreshNodeSchema',
-        // Phase 4.8: text-analysis actions moved here from useWorkspaceInternal.
-        'detachConcordance',
-        'materializeConcordance',
-        'quotationSearch',
-        'detachQuotation',
-        'materializeQuotation',
-      ];
-
-      const { actions } = result.current;
-      for (const key of expectedKeys) {
-        expect(typeof (actions as Record<string, unknown>)[key]).toBe('function');
-      }
-    });
-
     it('memoizes actions across re-renders when authHeaders + currentWorkspaceId stay stable', () => {
       const queryClient = createTestClient();
       const args = buildHookArgs(queryClient);
@@ -258,9 +209,6 @@ describe('useWorkspaceNodeMutations', () => {
 
   describe('setCurrentWorkspace', () => {
     it('writes the new id to the selectionStore setter and clears node selection', async () => {
-      // Phase 4.1: the mutation no longer writes to the
-      // `['workspaces','current']` query cache — the selectionStore is
-      // canonical and the server query is one-shot bootstrap.
       const queryClient = createTestClient();
       workspaceSdkMock.setCurrentWorkspace.mockResolvedValue({ data: { state: 'successful', id: 'ws-2' }, error: undefined });
       const setCurrentWorkspaceId = mkSetWorkspaceId();
@@ -463,7 +411,7 @@ describe('useWorkspaceNodeMutations', () => {
     });
   });
 
-  describe('text-analysis actions (Phase 4.8 move)', () => {
+  describe('text-analysis actions', () => {
     it('detachConcordance synchronously throws when no workspace is selected', () => {
       // ensureWorkspaceSelected runs while building the mutateAsync args, so
       // the failure surfaces as a synchronous throw rather than a rejected

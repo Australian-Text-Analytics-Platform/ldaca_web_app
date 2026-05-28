@@ -65,7 +65,7 @@ export type ConcordanceParameterPanelProps = {
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
   persistResultPreferences: (partial: { pageSize?: number }) => Promise<unknown>;
   /** Forwarded to <AnalysisFeatureHeader> — wires the Save snapshot
-   * button in the header's right slot. See plan §3.7 + §5.7. */
+   * button in the header's right slot. */
   onSaveSnapshot?: (filename: string, description: string) => Promise<void>;
   /** Forwarded to <AnalysisFeatureHeader>. When set, the Save button
    * is rendered disabled with this string as a hover tooltip. */
@@ -81,8 +81,7 @@ export type ConcordanceParameterPanelProps = {
    * hidden, and the Save/Open snapshot buttons in the header stay
    * available (the host gates Save with ``saveSnapshotDisabledReason``
    * which it sets to a fixed string in snapshot mode). Used by the
-   * snapshot view to reuse the live ParameterPanel chrome verbatim
-   * — see plan §10 (Snapshot-view design). */
+  * snapshot view to reuse the live ParameterPanel chrome verbatim. */
   readOnly?: boolean;
   renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
 };

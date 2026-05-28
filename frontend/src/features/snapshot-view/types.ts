@@ -51,23 +51,20 @@ export type SnapshotPayloadEntry =
   | SnapshotPayloadEntrySourceProjection
   | SnapshotPayloadEntrySettings;
 
-/** Per-tool preview block (plan §2.3.1). Discriminated by ``tool``
+/** Per-tool preview block. Discriminated by ``tool``
  * so adding a new analytic tool means adding one arm here plus a
  * corresponding ``formatPreview()`` entry — the load dialog
  * inherits support automatically. */
 export type SnapshotPreview = SnapshotManifest['preview'];
 
 /** A snapshot loaded into the store. The payload shape is per-tool and
- * filled in by each tool's capture/load code in Phase 1+; for now it
- * defaults to ``unknown`` so the store types compile without forcing
- * concrete shapes. */
+ * filled in by each tool's capture/load code; it defaults to ``unknown``
+ * so the store type does not force concrete payload shapes. */
 export interface LoadedSnapshot<Payload = unknown> {
   manifest: SnapshotManifest;
   capabilities: SnapshotCapabilities;
   payload: Payload;
-  /** Share-mode only. ``null`` on Mode 1 (demo) bundles. The field is
-   * wired in from day one so Mode 2a is "populate this", not "add a
-   * new slice property to every tool". */
+  /** Share-mode only. ``null`` on demo bundles. */
   sourceProjection: SourceProjectionTable | null;
 }
 

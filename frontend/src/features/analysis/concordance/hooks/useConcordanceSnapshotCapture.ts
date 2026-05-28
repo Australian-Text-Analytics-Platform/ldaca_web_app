@@ -1,19 +1,9 @@
 /**
  * Concordance-specific snapshot capture pipeline.
  *
- * Phase 1a-2 (plan §5.1). Assembles a snapshot bundle from the
- * concordance feature's in-memory state plus a full-result fetch
- * via the Phase-0g ``page_size: "all"`` path. The hook returns a
- * single async function that the shared <AnalysisFeatureHeader>'s
- * onSaveSnapshot prop calls.
- *
- * Scope note: the v1 ships a minimum-viable capture — manifest +
- * full result rows. Dispersion bins, materialise summaries, and
- * local UI state (chart settings, current tab, expanded rows) are
- * tracked in plan §5.1 but ride along in Phase 2 polish as the
- * load-side rendering matures and uncovers what the bundle has to
- * actually carry. Round-trip parity stays the goal; this commit
- * lands the capture-side rail.
+ * Assembles a snapshot bundle from the concordance feature's in-memory state
+ * plus a full-result fetch. The hook returns a single async function that the
+ * shared <AnalysisFeatureHeader>'s onSaveSnapshot prop calls.
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
@@ -148,8 +138,7 @@ export function useConcordanceSnapshotCapture(
 
       const headers = getAuthHeaders();
 
-      // Fetch the full result via the Phase-0g page_size: 'all' path,
-      // and per-node dispersion bins in parallel. The bins endpoint
+      // Fetch the full result and per-node dispersion bins in parallel. The bins endpoint
       // always returns 100 server-side buckets; the snapshot viewer
       // re-aggregates them client-side onto any of
       // DISPERSION_DISPLAY_BIN_COUNTS = [4, 5, 10, 20, 25, 50, 100]
@@ -223,8 +212,7 @@ export function useConcordanceSnapshotCapture(
         );
       }
 
-      // Hard-require materialise (plan §4): the host's disable-reason
-      // check already gates the Save button on this, but assert here
+      // The host's disable-reason check already gates the Save button on this, but assert here
       // too so the hook stays self-contained — a captured bundle's
       // result payload must be the flat materialised shape, otherwise
       // the load-side viewer can't render it.
@@ -320,9 +308,8 @@ export function useConcordanceSnapshotCapture(
       }
       const bundleBytes = await zip.generateAsync({ type: 'uint8array' });
 
-      // Upload via the Phase-0h endpoints. The backend extracts the
-      // sidecar manifest + autogenerates the .md description sidecar
-      // automatically.
+      // The backend extracts the sidecar manifest and autogenerates the .md
+      // description sidecar automatically.
       await uploadSnapshot({
         body: {
           file: new Blob([bundleBytes as BlobPart], { type: 'application/zip' }),

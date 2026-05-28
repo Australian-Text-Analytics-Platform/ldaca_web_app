@@ -9,8 +9,8 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
  * shared <AnalysisFeatureHeader>. When on, the buttons appear in
  * each tool's title row. Default off.
  *
- * Plan §3.6. Sibling of "Reset all hints" / "Clear embedding cache"
- * in the sidebar dropdown menu.
+ * Sibling of "Reset all hints" / "Clear embedding cache" in the sidebar
+ * dropdown menu.
  */
 export const DemoSnapshotsToggleItem: React.FC = () => {
   const enabled = usePreferencesStore((s) => s.demoSnapshotsEnabled);
