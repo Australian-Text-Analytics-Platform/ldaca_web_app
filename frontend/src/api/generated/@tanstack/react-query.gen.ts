@@ -1695,12 +1695,6 @@ export const getWorkspaceGraphQueryKey = (options?: Options<GetWorkspaceGraphDat
  *
  * Used by:
  * - frontend graph canvas initialization and refresh
- *
- * Why:
- * - Exposes the workspace's native graph JSON; per-node entries are routed
- * through :func:`frontend_node_info` so the payload surfaces structured
- * ``tokenization`` metadata for the CustomNode inspector chip and
- * token-aware analyses.
  */
 export const getWorkspaceGraphOptions = (options?: Options<GetWorkspaceGraphData>) => queryOptions<GetWorkspaceGraphResponse, GetWorkspaceGraphError, GetWorkspaceGraphResponse, ReturnType<typeof getWorkspaceGraphQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

@@ -875,12 +875,6 @@ export const exportNodes = <ThrowOnError extends boolean = false>(options: Optio
  *
  * Used by:
  * - frontend graph canvas initialization and refresh
- *
- * Why:
- * - Exposes the workspace's native graph JSON; per-node entries are routed
- * through :func:`frontend_node_info` so the payload surfaces structured
- * ``tokenization`` metadata for the CustomNode inspector chip and
- * token-aware analyses.
  */
 export const getWorkspaceGraph = <ThrowOnError extends boolean = false>(options?: Options<GetWorkspaceGraphData, ThrowOnError>) => (options?.client ?? client).get<GetWorkspaceGraphResponses, GetWorkspaceGraphErrors, ThrowOnError>({ url: '/api/workspaces/graph', ...options });
 

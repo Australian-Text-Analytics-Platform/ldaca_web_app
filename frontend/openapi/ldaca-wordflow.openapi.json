@@ -8220,12 +8220,11 @@
             "title": "Shape",
             "type": "array"
           },
-          "tokenization": {
+          "tokenizer_models": {
             "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
+              "type": "string"
             },
-            "title": "Tokenization",
+            "title": "Tokenizer Models",
             "type": "object"
           }
         },
@@ -12484,7 +12483,7 @@
     },
     "/api/workspaces/graph": {
       "get": {
-        "description": "Return workspace graph payload.\n\nUsed by:\n- frontend graph canvas initialization and refresh\n\nWhy:\n    - Exposes the workspace's native graph JSON; per-node entries are routed\n        through :func:`frontend_node_info` so the payload surfaces structured\n        ``tokenization`` metadata for the CustomNode inspector chip and\n        token-aware analyses.",
+        "description": "Return workspace graph payload.\n\nUsed by:\n- frontend graph canvas initialization and refresh",
         "operationId": "get_workspace_graph",
         "parameters": [
           {

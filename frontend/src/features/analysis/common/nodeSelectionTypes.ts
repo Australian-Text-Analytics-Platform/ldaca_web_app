@@ -12,6 +12,7 @@ export interface WorkspaceNodeLike extends Record<string, unknown> {
   schema?: Record<string, unknown>;
   dtypes?: Record<string, unknown>;
   column_schema?: Record<string, unknown>;
+  tokenizer_models?: Record<string, string>;
 }
 
 export type NodeColumnSource = string[] | ColumnInfo[];

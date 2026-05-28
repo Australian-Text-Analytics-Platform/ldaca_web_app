@@ -4528,12 +4528,10 @@ export type WorkspaceNodeInfo = {
         number | null
     ];
     /**
-     * Tokenization
+     * Tokenizer Models
      */
-    tokenization?: {
-        [key: string]: {
-            [key: string]: unknown;
-        };
+    tokenizer_models?: {
+        [key: string]: string;
     };
     [key: string]: unknown;
 };

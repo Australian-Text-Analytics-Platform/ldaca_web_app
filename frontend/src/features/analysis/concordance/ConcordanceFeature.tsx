@@ -58,6 +58,7 @@ import { useConcordanceSnapshotLoad } from './hooks/useConcordanceSnapshotLoad';
 import { ConcordanceSnapshotBanner } from './components/ConcordanceSnapshotBanner';
 import type { ConcordanceSnapshotPayload } from './hooks/useConcordanceSnapshotLoad';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
+import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
@@ -67,7 +68,10 @@ import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
 import { ConcordanceDispersionDetachDialog } from './components/ConcordanceDispersionDetachDialog';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
-import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
+import {
+  usePersistNodeDocumentColumn,
+  usePersistNodeTokenizationPreference,
+} from '../common/hooks/usePersistNodeDocumentColumn';
 import {
   DISPERSION_DEFAULT_BIN_COUNT,
   type DispersionDisplayBinCount,
@@ -112,6 +116,10 @@ const ConcordanceFeature: React.FC = () => {
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
   });
+  const persistTokenizerPreference = usePersistNodeTokenizationPreference({
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+  });
   const {
     isLocked,
     lockWithSnapshots,
@@ -150,6 +158,7 @@ const ConcordanceFeature: React.FC = () => {
   // has been tokenised AND the user hasn't manually overridden.
   const [searchMode, setSearchMode] = useState<'regex' | 'tokens'>('regex');
   const [searchModeUserSet, setSearchModeUserSet] = useState(false);
+  const [tokenizerModelsByNode, setTokenizerModelsByNode] = useState<Record<string, string>>({});
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   // Metadata visibility derives from the selected columns: any selection
   // shows the corresponding metadata columns in the results table.
@@ -533,22 +542,31 @@ const ConcordanceFeature: React.FC = () => {
     return map;
   }, [panelSelectedNodes, nodeColors, defaultPalette]);
 
-  // Phase 4.7: check whether the selected source column has tokenization
-  // metadata, so tokens-mode is only offered when it makes sense.
+  // Tokens mode is available when every selected node that has a column also
+  // has a tokenizer model selected — either chosen in this session or
+  // previously persisted to the backend (read back via node.tokenizer_models).
   const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
+  const effectiveTokenizerModelsByNode = useMemo(() => {
+    // Seed with models persisted to the backend from previous sessions,
+    // then apply any live overrides the user has made in this session.
+    const fromNodes: Record<string, string> = {};
+    for (const sel of effectiveNodeColumnSelections) {
+      if (!sel.column) continue;
+      const node = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
+        const ids = [n.id, n.node_id];
+        return ids.some((id) => typeof id === 'string' && id === sel.nodeId);
+      });
+      const stored = node?.tokenizer_models?.[sel.column];
+      if (stored) fromNodes[sel.nodeId] = stored;
+    }
+    return { ...fromNodes, ...tokenizerModelsByNode };
+  }, [effectiveNodeColumnSelections, panelSelectedNodes, tokenizerModelsByNode]);
+
   const tokensModeAvailable = useMemo(() => {
-    const firstSelection = effectiveNodeColumnSelections[0];
-    if (!firstSelection?.column) return false;
-    const firstNode = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
-      const ids = [n.id, n.node_id];
-      return ids.some(
-        (id) => typeof id === 'string' && id === firstSelection.nodeId,
-      );
-    });
-    const tokenization = firstNode?.tokenization;
-    if (!tokenization || typeof tokenization !== 'object') return false;
-    return Boolean((tokenization as Record<string, unknown>)[firstSelection.column]);
-  }, [effectiveNodeColumnSelections, panelSelectedNodes]);
+    const selectionsWithColumn = effectiveNodeColumnSelections.filter((s) => s.column);
+    if (selectionsWithColumn.length === 0) return false;
+    return selectionsWithColumn.every((s) => Boolean(effectiveTokenizerModelsByNode[s.nodeId]));
+  }, [effectiveNodeColumnSelections, effectiveTokenizerModelsByNode]);
 
   // Auto-pick tokens-mode when it becomes available AND the user hasn't
   // manually overridden. When tokens stop being available (e.g. user
@@ -1142,6 +1160,27 @@ const ConcordanceFeature: React.FC = () => {
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
     void persistDocumentColumn(nodeId, column);
+    // Clear the tokenizer model for this node when the column changes — the
+    // previous model was tokenised for the old column and is no longer valid.
+    setTokenizerModelsByNode((prev) => {
+      const { [nodeId]: _removed, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const handleTokenizerModelChange = (
+    nodeId: string,
+    column: string,
+    model: string,
+    language: string | null,
+  ) => {
+    if (isLocked || inSnapshotMode) return;
+    setTokenizerModelsByNode((prev) => {
+      if (model) return { ...prev, [nodeId]: model };
+      const { [nodeId]: _removed, ...rest } = prev;
+      return rest;
+    });
+    void persistTokenizerPreference(nodeId, column, model, language);
   };
 
   useEffect(() => {
@@ -1673,6 +1712,24 @@ const ConcordanceFeature: React.FC = () => {
           setSearchModeUserSet(true);
         }}
         tokensModeAvailable={tokensModeAvailable || inSnapshotMode}
+        renderTokenizerModelSelector={({ nodeId, column }) => (
+          <TokenizerModelSelector
+            workspaceId={currentWorkspaceId}
+            nodeId={nodeId}
+            column={column}
+            value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
+            onChange={(model, detectedLanguage) =>
+              void handleTokenizerModelChange(nodeId, column, model, detectedLanguage)
+            }
+            getAuthHeaders={getAuthHeaders}
+            disabled={!!isLocked || inSnapshotMode}
+            disabledReason={
+              inSnapshotMode
+                ? 'Viewing a saved snapshot — tokenizer models are frozen.'
+                : 'Clear results first to change tokenizer models'
+            }
+          />
+        )}
         isSearching={isSearching}
         actionState={actionState}
         handleRunOrUpdate={handleRunOrUpdate}

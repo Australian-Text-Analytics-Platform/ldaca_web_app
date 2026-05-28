@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Play, Square, Trash2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisFeatureHeader } from '@/features/analysis/common/components/AnalysisFeatureHeader';
-import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
+import NodeSelectionPanel, { type NodeSelectionColumnAddonArgs } from '@/features/analysis/common/components/NodeSelectionPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { SNAPSHOT_DISABLED_REASON, snapshotDisabledReason } from '@/features/snapshot-view';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
@@ -85,6 +85,7 @@ export type ConcordanceParameterPanelProps = {
    * snapshot view to reuse the live ParameterPanel chrome verbatim
    * — see plan §10 (Snapshot-view design). */
   readOnly?: boolean;
+  renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
 };
 
 export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps> = ({
@@ -127,6 +128,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
   onOpenSnapshot,
   snapshotNodeLabels,
   readOnly = false,
+  renderTokenizerModelSelector,
 }) => {
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
@@ -170,6 +172,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
           allowedDataTypes={['string']}
           originalCount={displayNodeCount}
           lockedMessage={readOnly ? SNAPSHOT_DISABLED_REASON : ANALYSIS_LOCKED_MESSAGE}
+          renderColumnControlAddon={renderTokenizerModelSelector}
         />
 
         <TokensColumnMismatchNotice

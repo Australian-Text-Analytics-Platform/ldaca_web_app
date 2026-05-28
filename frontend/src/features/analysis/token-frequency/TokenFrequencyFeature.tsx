@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { setNodeTokenizationPreference, tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
+import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
 import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
-import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -62,8 +61,8 @@ import TokenizerModelSelector from '../common/components/TokenizerModelSelector'
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores/uiStore';
 import {
-  updateWorkspaceNodeInfoCache,
   usePersistNodeDocumentColumn,
+  usePersistNodeTokenizationPreference,
 } from '@/features/analysis/common/hooks/usePersistNodeDocumentColumn';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
@@ -93,40 +92,9 @@ function extractNodeTokenizerModels(
   return models;
 }
 
-function readNodeColumnTokenizerModel(node: WorkspaceNodeLike | undefined, column: string): string {
-  if (!node || !column) return '';
-  const tokenization = node.tokenization;
-  if (!tokenization || typeof tokenization !== 'object' || Array.isArray(tokenization)) return '';
-  const meta = (tokenization as Record<string, unknown>)[column];
-  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return '';
-  const model = (meta as Record<string, unknown>).model;
-  return typeof model === 'string' ? model.trim() : '';
-}
-
-function readNodeColumnTokenizerLanguage(node: WorkspaceNodeLike | undefined, column: string): string {
-  if (!node || !column) return '';
-  const tokenization = node.tokenization;
-  if (!tokenization || typeof tokenization !== 'object' || Array.isArray(tokenization)) return '';
-  const meta = (tokenization as Record<string, unknown>)[column];
-  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return '';
-  const language = (meta as Record<string, unknown>).language;
-  return typeof language === 'string' ? language.trim().toLowerCase() : '';
-}
-
-function deriveNodeTokenizerModels(
-  nodes: readonly WorkspaceNodeLike[],
-  selections: readonly { nodeId: string; column: string }[],
-): Record<string, string> {
-  const models: Record<string, string> = {};
-  for (const selection of selections) {
-    const node = nodes.find((candidate, index) => getNodeIdentifier(candidate, index) === selection.nodeId);
-    const model = readNodeColumnTokenizerModel(node, selection.column);
-    if (model) models[selection.nodeId] = model;
-  }
-  return models;
-}
-
 const TokenFrequencyFeature = () => {
+  const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<Record<string, string>>({});
+  const [liveTokenizerLanguagesByNode, setLiveTokenizerLanguagesByNode] = useState<Record<string, string | null>>({});
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspaceData();
@@ -363,8 +331,20 @@ const TokenFrequencyFeature = () => {
         loadedSnapshot.payload.settings.node_ids ?? loadedSnapshot.manifest.source.node_ids,
       );
     }
-    return deriveNodeTokenizerModels(panelSelectedNodes, effectiveNodeColumnSelections);
-  }, [inSnapshotMode, loadedSnapshot, panelSelectedNodes, effectiveNodeColumnSelections]);
+    // Seed with models persisted to the backend from previous sessions,
+    // then apply any live overrides the user has made in this session.
+    const fromNodes: Record<string, string> = {};
+    for (const sel of effectiveNodeColumnSelections) {
+      if (!sel.column) continue;
+      const node = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
+        const ids = [n.id, n.node_id];
+        return ids.some((id) => typeof id === 'string' && id === sel.nodeId);
+      });
+      const stored = node?.tokenizer_models?.[sel.column];
+      if (stored) fromNodes[sel.nodeId] = stored;
+    }
+    return { ...fromNodes, ...liveTokenizerModelsByNode };
+  }, [inSnapshotMode, loadedSnapshot, effectiveNodeColumnSelections, panelSelectedNodes, liveTokenizerModelsByNode]);
 
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,
@@ -386,18 +366,13 @@ const TokenFrequencyFeature = () => {
     const seen = new Set<string>();
     const ordered: string[] = [];
     for (const selection of effectiveNodeColumnSelections) {
-      const node = panelSelectedNodes.find((candidate) =>
-        [candidate.id, candidate.node_id].some(
-          (id) => typeof id === 'string' && id === selection.nodeId,
-        ),
-      );
-      const code = readNodeColumnTokenizerLanguage(node, selection.column);
-      if (!code || seen.has(code)) continue;
-      seen.add(code);
-      ordered.push(code);
+      const lang = liveTokenizerLanguagesByNode[selection.nodeId];
+      if (!lang || seen.has(lang)) continue;
+      seen.add(lang);
+      ordered.push(lang);
     }
     return ordered;
-  }, [effectiveNodeColumnSelections, panelSelectedNodes]);
+  }, [effectiveNodeColumnSelections, liveTokenizerLanguagesByNode]);
 
   const {
     stopWords,
@@ -706,28 +681,10 @@ const TokenFrequencyFeature = () => {
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
   });
-
-  const persistTokenizerPreference = useCallback(
-    async (nodeId: string, column: string, model: string, language: string | null) => {
-      if (!currentWorkspaceId) return;
-      try {
-        const { data } = await setNodeTokenizationPreference({
-          path: { node_id: nodeId },
-          body: {
-            source_column: column,
-            model: model.trim() || null,
-            language: model.trim() ? language : null,
-          },
-          headers: getAuthHeaders(),
-          throwOnError: true,
-        });
-        updateWorkspaceNodeInfoCache(queryClient, currentWorkspaceId, data);
-      } catch {
-        toast.error('Could not save the tokenizer model for this column.');
-      }
-    },
-    [currentWorkspaceId, getAuthHeaders, queryClient],
-  );
+  const persistTokenizerPreference = usePersistNodeTokenizationPreference({
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+  });
 
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked || inSnapshotMode) return;
@@ -737,7 +694,12 @@ const TokenFrequencyFeature = () => {
 
   const handleTokenizerModelChange = (nodeId: string, column: string, model: string, language: string | null) => {
     if (isLocked || inSnapshotMode) return;
-    if (!column) return;
+    setLiveTokenizerModelsByNode((prev) => {
+      if (model) return { ...prev, [nodeId]: model };
+      const { [nodeId]: _removed, ...rest } = prev;
+      return rest;
+    });
+    setLiveTokenizerLanguagesByNode((prev) => ({ ...prev, [nodeId]: language }));
     void persistTokenizerPreference(nodeId, column, model, language);
   };
 
@@ -937,7 +899,7 @@ const TokenFrequencyFeature = () => {
             column={column}
             value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
             onChange={(model, detectedLanguage) =>
-              handleTokenizerModelChange(nodeId, column, model, detectedLanguage)
+              void handleTokenizerModelChange(nodeId, column, model, detectedLanguage)
             }
             getAuthHeaders={getAuthHeaders}
             disabled={isLocked || inSnapshotMode}

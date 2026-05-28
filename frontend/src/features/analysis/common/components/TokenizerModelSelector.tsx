@@ -12,7 +12,7 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { getNodeData, getTokenizerModels } from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
-import { languageLabel, partitionTokenizerModelsForLanguage } from '@/lib/languages';
+import { partitionTokenizerModelsForLanguage } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 import { collectDocumentColumnText } from './tokenizerModelSelectorUtils';
 
@@ -106,7 +106,6 @@ export function TokenizerModelSelector({
     <div className={cn('space-y-1', className)}>
       <span className="block text-xs font-medium text-muted-foreground">
         Tokenizer Model
-        {detectedLanguage ? ` (${languageLabel(detectedLanguage)})` : ''}
       </span>
       <DisabledReasonTooltip reason={isDisabled ? reason : undefined} className="w-full">
         <Select
