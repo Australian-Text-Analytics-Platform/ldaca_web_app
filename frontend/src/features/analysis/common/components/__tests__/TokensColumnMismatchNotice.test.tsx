@@ -12,8 +12,8 @@ describe('TokensColumnMismatchNotice', () => {
             id: 'node-1',
             tokenization: {
               text: {
-                column_name: 'tokenization.text.jieba',
-                model: 'jieba',
+                column_name: 'tokenization.text.lindera:jieba',
+                model: 'lindera:jieba',
                 language: 'zh',
               },
             },
@@ -35,8 +35,8 @@ describe('TokensColumnMismatchNotice', () => {
             id: 'node-1',
             tokenization: {
               text: {
-                column_name: 'tokenization.text.jieba',
-                model: 'jieba',
+                column_name: 'tokenization.text.lindera:jieba',
+                model: 'lindera:jieba',
                 language: 'zh',
               },
             },

@@ -1,25 +1,8 @@
-/**
- * Curated language list for UI selectors. Codes match
- * ``polars_text.models.RECOMMENDED_TOKENIZERS`` and the backend's
- * ``effective_language`` resolution rules so a user's selection round-trips
- * end-to-end.
- *
- * The ``label`` is what's shown to humans (English label, since the app
- * shell is English); ``code`` is what's stored / sent to the API. Add
- * languages here at a single point so AddFilePanel (Phase 4.2),
- * Tokenise dialog (Phase 4.3), and any future selector stay consistent.
- */
-/**
- * Optional dict choice surfaced for languages where multiple morpheme
- * dictionaries are available (Japanese: IPADIC vs UniDic). The Tokenise
- * dialog renders a secondary selector when ``availableDicts`` is set and
- * has more than one entry; the first entry should match
- * ``recommendedModel`` so opening the dialog preselects the default.
- */
-export interface LanguageDictOption {
+/** Curated language list for UI selectors and tokenizer inventory. */
+export interface LanguageModelOption {
   /** Tokenizer model ID — what gets sent to the backend. */
   model: string;
-  /** Human label (with size hint) shown in the dict dropdown. */
+  /** Human label shown in model pickers. */
   label: string;
 }
 
@@ -27,73 +10,53 @@ export interface LanguageOption {
   code: string;
   label: string;
   /**
-   * Tokenizer model recommended for this language. Matches the backend's
-   * ``recommended_tokenizer_for(language)``; the Tokenise dialog (Phase
-   * 4.3) seeds the model field from this so a CJK user doesn't have to
-   * know the model ID. JA + KO now point at Lindera model IDs
-   * (``lindera-ja-ipadic`` / ``lindera-ko-dic``) — the matching dict is
-   * downloaded on first use into ``~/.cache/ldaca/lindera/``.
-   */
-  recommendedModel: string;
-  /**
    * Marker for languages quotation-extractor supports (Phase 3.6 /
    * decision 4 = English only). Drives the disabled-with-tooltip
    * indicator in tool menus.
    */
   quotationSupported: boolean;
-  /**
-   * Phase 5: per-language dictionary choices. Only Japanese has more
-   * than one practical option (IPADIC vs UniDic). When set + length>1,
-   * the Tokenise dialog shows a "Dictionary" selector and the chosen
-   * dict's model becomes the request payload.
-   */
-  availableDicts?: ReadonlyArray<LanguageDictOption>;
-  /**
-   * Phase 5: when the recommended tokenizer triggers a first-use
-   * download (Lindera dicts), the Tokenise dialog surfaces this hint
-   * next to the model input. Empty for fast-loading defaults (HF
-   * tokenizers cached by hf-hub, Jieba bundled in the wheel).
-   */
-  firstUseHint?: string;
+  /** Predefined tokenizer models known to support this language. */
+  models?: ReadonlyArray<LanguageModelOption>;
 }
 
 export const SUPPORTED_LANGUAGES: readonly LanguageOption[] = [
   {
     code: 'en',
     label: 'English',
-    recommendedModel: 'plain_words_en',
     quotationSupported: true,
+    models: [
+      { model: 'native:plain_words_en', label: 'Plain words (English)' },
+      { model: 'huggingface:bert-base-uncased', label: 'BERT base uncased' },
+    ],
   },
   {
     code: 'zh',
     label: 'Chinese',
-    recommendedModel: 'jieba',
     quotationSupported: false,
+    models: [
+      { model: 'lindera:cc-cedict', label: 'CC-CEDICT' },
+      { model: 'lindera:jieba', label: 'Jieba' },
+    ],
   },
   {
     code: 'ja',
     label: 'Japanese',
-    recommendedModel: 'lindera-ja-ipadic',
     quotationSupported: false,
-    availableDicts: [
-      { model: 'lindera-ja-ipadic', label: 'IPADIC (recommended, ~15 MB)' },
-      { model: 'lindera-ja-unidic', label: 'UniDic (more accurate, ~50 MB)' },
+    models: [
+      { model: 'lindera:ja-ipadic', label: 'IPADIC' },
+      { model: 'lindera:ja-ipadic-neologd', label: 'IPADIC Neologd' },
+      { model: 'lindera:ja-unidic', label: 'UniDic' },
     ],
-    firstUseHint:
-      'First use downloads the morpheme dictionary (~15 MB for IPADIC, ~50 MB for UniDic) into the local cache.',
   },
   {
     code: 'ko',
     label: 'Korean',
-    recommendedModel: 'lindera-ko-dic',
     quotationSupported: false,
-    firstUseHint:
-      'First use downloads the ko-dic morpheme dictionary (~34 MB) into the local cache.',
+    models: [{ model: 'lindera:ko-dic', label: 'ko-dic' }],
   },
   {
     code: 'multi',
     label: 'Other / Multilingual',
-    recommendedModel: 'xlm-roberta-base',
     quotationSupported: false,
   },
 ] as const;

@@ -69,7 +69,7 @@ const bannerCases: SnapshotBannerCase[] = [
       vocabSize: 17,
       topToken: 'the',
       topTokenCount: 42,
-      tokeniserId: '(default)',
+      tokeniserId: '(unspecified)',
     },
   },
   {

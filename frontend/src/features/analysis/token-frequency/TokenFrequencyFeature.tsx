@@ -56,7 +56,6 @@ import {
 } from '../common';
 import { pruneTasksById } from '@/hooks/analysisTaskUtils';
 import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
-import { findLanguage } from '@/lib/languages';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
 import { useAnalysisStore } from '@/stores/analysisStore';
@@ -67,7 +66,6 @@ const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
 const UNIFIED_WORDCLOUD_HEIGHT = 340;
 type TokenFrequencyRequest = TokenFrequencyRequestInput;
-const DEFAULT_TOKENIZER_MODEL = 'plain_words_en';
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
@@ -341,18 +339,7 @@ const TokenFrequencyFeature = () => {
     return ordered;
   }, [effectiveNodeColumnSelections, panelSelectedNodes, defaultLanguage]);
 
-  const tokenFrequencyTokenizerModel = useMemo(() => {
-    if (defaultTokenizerModel) return defaultTokenizerModel;
-    const recommendedModels = new Set(
-      defaultStopWordsLanguages
-        .map((languageCode) => findLanguage(languageCode)?.recommendedModel)
-        .filter((model): model is string => Boolean(model)),
-    );
-    if (recommendedModels.size === 1) {
-      return Array.from(recommendedModels)[0]!;
-    }
-    return DEFAULT_TOKENIZER_MODEL;
-  }, [defaultTokenizerModel, defaultStopWordsLanguages]);
+  const tokenFrequencyTokenizerModel = (defaultTokenizerModel ?? '').trim();
 
   const {
     stopWords,
@@ -633,7 +620,7 @@ const TokenFrequencyFeature = () => {
   const hasIncompleteSelections = effectiveNodeColumnSelections.some((selection) => !selection.column);
   const displayNodeCount = panelSelectedNodes.length;
 
-  const actionState = getAnalysisActionState({
+  const baseActionState = getAnalysisActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     hasSelection: panelSelectedNodes.length > 0 && !hasIncompleteSelections,
     isLocked,
@@ -642,6 +629,14 @@ const TokenFrequencyFeature = () => {
     hasActiveTask,
     allowRunWhenLocked: false,
   });
+  const hasTokenizerModel = Boolean(tokenFrequencyTokenizerModel);
+  const actionState = {
+    ...baseActionState,
+    runDisabled: baseActionState.runDisabled || !hasTokenizerModel,
+    runDisabledReason: !hasTokenizerModel
+      ? 'Set a tokenizer model in preferences before running token frequency'
+      : baseActionState.runDisabledReason,
+  };
 
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked || inSnapshotMode) return;
@@ -672,6 +667,7 @@ const TokenFrequencyFeature = () => {
       (id) => effectiveNodeColumnSelections.some((s) => s.nodeId === id && s.column),
     );
     if (orderedIds.length === 0) return null;
+    if (!tokenFrequencyTokenizerModel) return null;
     const nodeColumns: Record<string, string> = {};
     for (const sel of effectiveNodeColumnSelections) {
       if (sel.column) nodeColumns[sel.nodeId] = sel.column;

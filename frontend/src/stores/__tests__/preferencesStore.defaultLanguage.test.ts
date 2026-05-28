@@ -64,15 +64,17 @@ describe('preferencesStore default language fields', () => {
       'cl-tohoku/bert-base-japanese-v3',
     );
     // Trimming is still applied so stray copy/paste whitespace doesn't leak.
-    setDefaultTokenizerModel(' jieba ');
-    expect(usePreferencesStore.getState().defaultTokenizerModel).toBe('jieba');
-    setDefaultTokenizerModel(' plain_words_en ');
-    expect(usePreferencesStore.getState().defaultTokenizerModel).toBe('plain_words_en');
+    setDefaultTokenizerModel(' lindera:jieba ');
+    expect(usePreferencesStore.getState().defaultTokenizerModel).toBe('lindera:jieba');
+    setDefaultTokenizerModel(' native:plain_words_en ');
+    expect(usePreferencesStore.getState().defaultTokenizerModel).toBe(
+      'native:plain_words_en',
+    );
   });
 
   it('setDefaultTokenizerModel clears on empty input', () => {
     const { setDefaultTokenizerModel } = usePreferencesStore.getState();
-    setDefaultTokenizerModel('jieba');
+    setDefaultTokenizerModel('lindera:jieba');
     setDefaultTokenizerModel('');
     expect(usePreferencesStore.getState().defaultTokenizerModel).toBeNull();
   });

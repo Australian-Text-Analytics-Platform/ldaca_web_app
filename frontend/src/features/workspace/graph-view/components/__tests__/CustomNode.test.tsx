@@ -203,8 +203,8 @@ describe('CustomNode', () => {
           is_text_data: true,
           tokenization: {
             text: {
-              column_name: 'tokenization.text.jieba',
-              model: 'jieba',
+              column_name: 'tokenization.text.lindera:jieba',
+              model: 'lindera:jieba',
               language: 'zh',
             },
           },
@@ -223,7 +223,7 @@ describe('CustomNode', () => {
     } satisfies React.ComponentProps<typeof CustomNode>;
 
     render(<CustomNode {...props} />);
-    expect(screen.getByText('tokens: text · jieba')).toBeInTheDocument();
+    expect(screen.getByText('tokens: text · lindera:jieba')).toBeInTheDocument();
   });
 
   it('summarises multiple tokenised columns compactly', () => {
@@ -241,13 +241,13 @@ describe('CustomNode', () => {
           is_text_data: true,
           tokenization: {
             text: {
-              column_name: 'tokenization.text.jieba',
-              model: 'jieba',
+              column_name: 'tokenization.text.lindera:jieba',
+              model: 'lindera:jieba',
               language: 'zh',
             },
             notes: {
-              column_name: 'tokenization.notes.bert-base-uncased',
-              model: 'bert-base-uncased',
+              column_name: 'tokenization.notes.huggingface:bert-base-uncased',
+              model: 'huggingface:bert-base-uncased',
               language: 'en',
             },
           },
@@ -266,7 +266,7 @@ describe('CustomNode', () => {
     } satisfies React.ComponentProps<typeof CustomNode>;
 
     render(<CustomNode {...props} />);
-    expect(screen.getByText('tokens: text · jieba + 1 more')).toBeInTheDocument();
+    expect(screen.getByText('tokens: text · lindera:jieba + 1 more')).toBeInTheDocument();
   });
 
   it('exposes a Tokenise entry in the node menu when the node has columns', async () => {
@@ -382,8 +382,8 @@ describe('CustomNode', () => {
             ...baseNode,
             tokenization: {
               text: {
-                column_name: 'tokenization.text.jieba',
-                model: 'jieba',
+                column_name: 'tokenization.text.lindera:jieba',
+                model: 'lindera:jieba',
                 language: 'zh',
               },
             },

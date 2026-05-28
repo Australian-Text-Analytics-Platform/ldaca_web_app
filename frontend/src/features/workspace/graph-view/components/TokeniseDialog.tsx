@@ -62,12 +62,9 @@ function pickDefaultColumn(columns: string[]): string | null {
 }
 
 function getInitialModel(
-  defaultLanguage: string | null,
   defaultTokenizerModel: string | null,
 ): string {
-  return defaultTokenizerModel
-    ?? findLanguage(defaultLanguage ?? 'en')?.recommendedModel
-    ?? 'bert-base-uncased';
+  return defaultTokenizerModel ?? '';
 }
 
 export function TokeniseDialog({
@@ -106,33 +103,22 @@ function TokeniseDialogForm({
   );
   const [language, setLanguage] = useState<string>(defaultLanguage ?? 'en');
   const [model, setModel] = useState<string>(
-    () => getInitialModel(defaultLanguage, defaultTokenizerModel),
-  );
-  const [modelUserSet, setModelUserSet] = useState<boolean>(
-    Boolean(defaultTokenizerModel),
+    () => getInitialModel(defaultTokenizerModel),
   );
   const [submitting, setSubmitting] = useState(false);
 
   const languageOption = findLanguage(language);
-  const recommendedModelForLanguage = languageOption?.recommendedModel ?? 'bert-base-uncased';
-  const dictOptions = languageOption?.availableDicts && languageOption.availableDicts.length > 1
-    ? languageOption.availableDicts
+  const modelOptions = languageOption?.models && languageOption.models.length > 0
+    ? languageOption.models
     : null;
-  const selectedDictModel = dictOptions?.find((dict) => dict.model === model.trim())?.model ?? null;
+  const selectedKnownModel = modelOptions?.find((option) => option.model === model.trim())?.model ?? null;
 
   const handleLanguageChange = (next: string) => {
     setLanguage(next);
-    if (!modelUserSet) {
-      const recommended = findLanguage(next)?.recommendedModel;
-      if (recommended) setModel(recommended);
-    }
   };
 
-  const handleDictChange = (nextModel: string) => {
+  const handleKnownModelChange = (nextModel: string) => {
     setModel(nextModel);
-    // Dict picks aren't a "user-set custom model" — they're still a
-    // recommended default for the language. Keep modelUserSet=false so a
-    // subsequent language change re-applies the new language's default.
   };
 
   const canSubmit =
@@ -219,20 +205,20 @@ function TokeniseDialogForm({
             </Select>
           </div>
 
-          {dictOptions && (
+          {modelOptions && (
             <div className="space-y-1">
-              <Label htmlFor="tokenise-dict">Dictionary</Label>
+              <Label htmlFor="tokenise-known-model">Known model</Label>
               <Select
-                value={selectedDictModel ?? ''}
-                onValueChange={handleDictChange}
+                value={selectedKnownModel ?? ''}
+                onValueChange={handleKnownModelChange}
               >
-                <SelectTrigger id="tokenise-dict" aria-label="Morpheme dictionary">
-                  <SelectValue placeholder="Pick a dictionary" />
+                <SelectTrigger id="tokenise-known-model" aria-label="Known tokenizer model">
+                  <SelectValue placeholder="Pick a model" />
                 </SelectTrigger>
                 <SelectContent>
-                  {dictOptions.map((dict) => (
-                    <SelectItem key={dict.model} value={dict.model}>
-                      {dict.label}
+                  {modelOptions.map((option) => (
+                    <SelectItem key={option.model} value={option.model}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -247,23 +233,13 @@ function TokeniseDialogForm({
               value={model}
               onChange={(e) => {
                 setModel(e.target.value);
-                setModelUserSet(true);
               }}
-              placeholder={recommendedModelForLanguage}
+              placeholder="native:, huggingface:, or lindera: model ID"
             />
             <p className="text-xs text-muted-foreground">
-              Defaults to the recommended model for the chosen language
-              (currently <code>{recommendedModelForLanguage}</code>). HuggingFace
-              model IDs, the special <code>jieba</code> backend, or
-              {' '}
-              <code>lindera-ja-ipadic</code>/<code>lindera-ja-unidic</code>/
-              <code>lindera-ko-dic</code> are accepted.
+              Accepted IDs use <code>native:</code>, <code>huggingface:</code>,
+              or <code>lindera:</code> prefixes.
             </p>
-            {languageOption?.firstUseHint && (
-              <p className="text-xs text-muted-foreground italic">
-                {languageOption.firstUseHint}
-              </p>
-            )}
           </div>
         </div>
 

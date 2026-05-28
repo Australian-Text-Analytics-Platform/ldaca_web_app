@@ -12,14 +12,14 @@ import {
 } from '../effectiveNodeLanguage';
 
 const ZH_META = {
-  column_name: 'tokenization.text.jieba',
-  model: 'jieba',
+  column_name: 'tokenization.text.lindera:jieba',
+  model: 'lindera:jieba',
   language: 'zh',
 };
 
 const EN_META = {
-  column_name: 'tokenization.text.bert-base-uncased',
-  model: 'bert-base-uncased',
+  column_name: 'tokenization.text.huggingface:bert-base-uncased',
+  model: 'huggingface:bert-base-uncased',
   language: 'en',
 };
 

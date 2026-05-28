@@ -101,6 +101,12 @@ export const useTokenFrequencyTaskFlow = ({
     }
     if (runningRef.current) return;
 
+    const tokenizerModelId = tokenizerModel.trim();
+    if (!tokenizerModelId) {
+      toast.error('Set a tokenizer model before running token frequency.');
+      return;
+    }
+
     const incompleteSelections = effectiveNodeColumnSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
       toast.error('Please select a text column for all selected data blocks.');
@@ -129,7 +135,7 @@ export const useTokenFrequencyTaskFlow = ({
         node_ids: takeMostRecent(panelNodeIds, 2),
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
-        tokenizer_model: tokenizerModel,
+        tokenizer_model: tokenizerModelId,
       };
 
       try {

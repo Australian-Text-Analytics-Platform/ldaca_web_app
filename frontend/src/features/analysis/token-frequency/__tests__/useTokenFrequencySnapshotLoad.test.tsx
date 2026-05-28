@@ -23,7 +23,7 @@ function makeManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManife
         vocabSize: 17,
         topToken: 'the',
         topTokenCount: 42,
-        tokeniserId: '(default)',
+        tokeniserId: '(unspecified)',
       },
       payloads: [
         { kind: 'result', path: 'tables/result.json' },
