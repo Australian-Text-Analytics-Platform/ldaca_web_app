@@ -37,8 +37,7 @@ interface PreferencesState {
   quotationLastRemoteUrl: string;
   /**
    * Phase 4.1: per-user multilingual defaults. ``null`` lets the backend
-   * fall back to its per-request resolution chain
-  * (request -> tokenization metadata -> "en"); set this when the user wants
+    * fall back to its per-request resolution chain; set this when the user wants
    * every new corpus to default to their language without manual entry.
    */
   defaultLanguage: string | null;

@@ -43,17 +43,9 @@ export type WorkspaceNode = {
   data_type?: string;
   column_schema?: Record<string, string>;
   dtypes?: Record<string, string>;
-  /** Per-tokenisation metadata keyed by source column. */
-  tokenization?: Record<string, TokenizationMeta>;
+  /** Persisted tokenizer model IDs keyed by source column. */
+  tokenizer_models?: Record<string, string>;
   [key: string]: unknown;
-};
-
-/** Metadata for one source column's tokenisation spec. */
-export type TokenizationMeta = {
-  column_name: string;
-  model: string;
-  language: string | null;
-  params?: Record<string, unknown>;
 };
 
 export type NodeSchemaResponse = {

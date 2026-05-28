@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
-type NodeWithTokenization = {
+type NodeWithTokenizerModels = {
   id?: unknown;
   node_id?: unknown;
-  tokenization?: unknown;
+  tokenizer_models?: unknown;
   [key: string]: unknown;
 };
 
@@ -14,23 +14,23 @@ type Selection = {
 };
 
 export type TokensColumnMismatchNoticeProps = {
-  nodes: ReadonlyArray<NodeWithTokenization>;
+  nodes: ReadonlyArray<NodeWithTokenizerModels>;
   selections: ReadonlyArray<Selection>;
   className?: string;
 };
 
-const nodeMatchesId = (node: NodeWithTokenization, id: string) =>
+const nodeMatchesId = (node: NodeWithTokenizerModels, id: string) =>
   [node.id, node.node_id].some((value) => typeof value === 'string' && value === id);
 
-const collectTokensSources = (tokenization: unknown): string[] => {
-  if (!tokenization || typeof tokenization !== 'object') return [];
-  return Object.keys(tokenization).filter(Boolean);
+const collectTokenizerModelSources = (tokenizerModels: unknown): string[] => {
+  if (!tokenizerModels || typeof tokenizerModels !== 'object') return [];
+  return Object.keys(tokenizerModels).filter(Boolean);
 };
 
 /**
  * Inline notice that surfaces when the user has selected a text column for
- * analysis that *doesn't* have a tokenization spec, but the node does
- * carry legacy cached tokens for some *other* column.
+ * analysis that doesn't have a persisted tokenizer model, but the node does
+ * have a tokenizer model saved for another column.
  *
  * Only inspects the first selection — analyses cap their input at one or two
  * nodes and the first is enough to detect the mismatch pattern (typically a
@@ -46,10 +46,10 @@ export const TokensColumnMismatchNotice: React.FC<TokensColumnMismatchNoticeProp
     if (!first?.column || !first.nodeId) return null;
     const node = nodes.find((n) => nodeMatchesId(n, first.nodeId));
     if (!node) return null;
-    const tokensSources = collectTokensSources(node.tokenization);
-    if (tokensSources.length === 0) return null;
-    if (tokensSources.includes(first.column)) return null;
-    return { selectedColumn: first.column, tokensSources };
+    const tokenizerModelSources = collectTokenizerModelSources(node.tokenizer_models);
+    if (tokenizerModelSources.length === 0) return null;
+    if (tokenizerModelSources.includes(first.column)) return null;
+    return { selectedColumn: first.column, tokenizerModelSources };
   }, [nodes, selections]);
 
   if (!mismatch) return null;
@@ -62,15 +62,15 @@ export const TokensColumnMismatchNotice: React.FC<TokensColumnMismatchNoticeProp
       )}
       role="note"
     >
-      <strong className="font-semibold">No tokens for <code>{mismatch.selectedColumn}</code>.</strong>{' '}
-      Tokens are cached for: {mismatch.tokensSources.map((src, i) => (
+      <strong className="font-semibold">No tokenizer model for <code>{mismatch.selectedColumn}</code>.</strong>{' '}
+      Tokenizer models are saved for: {mismatch.tokenizerModelSources.map((src, i) => (
         <React.Fragment key={src}>
           {i > 0 ? ', ' : ''}
           <code>{src}</code>
         </React.Fragment>
       ))}
-      . Select one of those columns to reuse legacy cached tokens; otherwise this
-      analysis will use the live text/tokenizer settings for <code>{mismatch.selectedColumn}</code>.
+      . Select one of those columns to reuse its saved model, or choose a tokenizer model for{' '}
+      <code>{mismatch.selectedColumn}</code>.
     </div>
   );
 };

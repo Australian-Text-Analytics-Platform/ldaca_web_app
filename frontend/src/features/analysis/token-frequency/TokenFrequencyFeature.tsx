@@ -359,9 +359,8 @@ const TokenFrequencyFeature = () => {
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
-  // All distinct saved tokenizer languages across the currently-selected
-  // corpora, in selection order. Fill Default uses only languages that
-  // came from the selected column's tokenization metadata.
+  // All distinct tokenizer languages selected in this session, in selection order.
+  // Fill Default uses the detected language from the tokenizer selector.
   const defaultStopWordsLanguages = useMemo(() => {
     const seen = new Set<string>();
     const ordered: string[] = [];

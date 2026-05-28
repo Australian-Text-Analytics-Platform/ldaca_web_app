@@ -291,14 +291,12 @@ const QuotationFeature: React.FC = () => {
   const nodeColors: Record<string, string> =
     inSnapshotMode && loadedSnapshot ? loadedSnapshot.manifest.node_colors : liveNodeColors;
 
-  // Phase 4.5 / decision 4: quotation rules are English-only. Mirror the
+  // Quotation rules are English-only. Mirror the
   // backend gate at the UI so the Run button surfaces a clear "why is
   // this disabled" tooltip rather than letting the user submit a request
   // that's going to come back as HTTP 400. Resolves language from the
-  // active node's tokenization metadata first, then the
   // per-user default preference, then "en".
   const nodeLanguage = effectiveNodeLanguage({
-    node: displayedNodes[0] ?? null,
     defaultLanguage,
   });
   const quotationLanguageUnsupported = !isEnglish(nodeLanguage);

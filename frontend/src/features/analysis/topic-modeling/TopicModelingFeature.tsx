@@ -573,44 +573,7 @@ const TopicModelingFeature: React.FC = () => {
   const hasAnySampling = sampleFractionsForRequest.some((f) => f !== null);
 
   const rawTopics: TopicModelingTopic[] = result?.data?.topics || [];
-  // All distinct languages across the selected corpora — matches the
-  // pattern token-frequency uses for "Apply Stop Words" so a side-by-
-  // side EN/ZH comparison filters both vocabularies, not just the
-  // first corpus's language.
-  //
-  // Resolution order per node (via ``effectiveNodeLanguage``):
-  // 1. ``node.tokenization[*].language`` — set by legacy cached tokens; authoritative
-  // 2. user preferences ``defaultLanguage``
-  // 3. ``en`` — global fallback
-  //
-  // We deliberately don't read ``meta.language_resolution.language``
-  // any more — the backend resolver only records the *first node's*
-  // language (Phase 3.5), which is exactly the corner case this change
-  // is fixing. Computing per-node on the frontend keeps the filter
-  // honest regardless of how many corpora the user picked.
-  const topicLanguages = (() => {
-    const seen = new Set<string>();
-    const ordered: string[] = [];
-    for (const selection of effectiveNodeColumnSelections) {
-      const node = panelSelectedNodes.find((candidate) =>
-        [candidate.id, candidate.node_id].some(
-          (id) => typeof id === 'string' && id === selection.nodeId,
-        ),
-      );
-      const code = effectiveNodeLanguage({
-        node: node ?? null,
-        defaultLanguage,
-      });
-      if (!code || seen.has(code)) continue;
-      seen.add(code);
-      ordered.push(code);
-    }
-    if (ordered.length === 0) {
-      const fallback = effectiveNodeLanguage({ defaultLanguage });
-      return fallback ? [fallback] : ['en'];
-    }
-    return ordered;
-  })();
+  const topicLanguages = [effectiveNodeLanguage({ defaultLanguage })];
   const {
     stopwords: stopwordSet,
     byLanguage: stopwordByLanguage,

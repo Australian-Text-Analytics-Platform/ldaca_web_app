@@ -43,10 +43,9 @@ export type ConcordanceParameterPanelProps = {
   caseSensitive: boolean;
   setCaseSensitive: Dispatch<SetStateAction<boolean>>;
   /**
-   * Phase 4.7: selected concordance engine. ``tokens`` mode walks a
-  * tokenization column for word-aware CJK context; only meaningful
-   * when ``tokensModeAvailable`` is true (active node has been
-   * tokenised on the selected column).
+    * Selected concordance engine. ``tokens`` mode walks the tokenization column
+    * prepared by the selected tokenizer model; only meaningful when
+    * ``tokensModeAvailable`` is true.
    */
   searchMode: 'regex' | 'tokens';
   setSearchMode: (next: 'regex' | 'tokens') => void;
@@ -244,11 +243,10 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-sm">
-            {/* Phase 4.7 — search mode picker. ``tokens`` is auto-selected
-              when the active node carries tokenization metadata for
-                the selected source column; the regex / whole-word / case
-                checkboxes don't apply in tokens mode so they're disabled
-                with a tooltip explaining why. */}
+            {/* Search mode picker. ``tokens`` is auto-selected when every selected
+              source column has a tokenizer model; the regex / whole-word / case
+              checkboxes don't apply in tokens mode so they're disabled with a
+              tooltip explaining why. */}
             <div className="flex items-center gap-1">
               <span className="text-sm font-medium text-foreground">Search mode:</span>
               <div
@@ -277,7 +275,7 @@ export const ConcordanceParameterPanel: React.FC<ConcordanceParameterPanelProps>
                     readOnly,
                     tokensModeAvailable
                       ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                      : 'Tokens mode needs legacy cached tokens for this selected column.',
+                      : 'Tokens mode needs a tokenizer model for each selected column.',
                   )}
                 >
                   <button

@@ -151,11 +151,11 @@ const ConcordanceFeature: React.FC = () => {
   const [regex, setRegex] = useState(false);
   const [wholeWord, setWholeWord] = useState(true);
   const [caseSensitive, setCaseSensitive] = useState(false);
-  // Phase 4.7: concordance has two engines. ``regex`` walks raw text (the
-  // historical default, preserves ``equ\w*``-style affordances); ``tokens``
-  // walks the active node's tokenization column for N-actual-token CJK-
-  // aware context (decision 6). Auto-picked below when the active node
-  // has been tokenised AND the user hasn't manually overridden.
+  // Concordance has two engines. ``regex`` walks raw text (the historical
+  // default, preserving ``equ\w*``-style affordances); ``tokens`` walks the
+  // tokenization column prepared by the selected tokenizer model for
+  // actual-token context. Auto-picked below when every selected column has a
+  // tokenizer model and the user hasn't manually overridden.
   const [searchMode, setSearchMode] = useState<'regex' | 'tokens'>('regex');
   const [searchModeUserSet, setSearchModeUserSet] = useState(false);
   const [tokenizerModelsByNode, setTokenizerModelsByNode] = useState<Record<string, string>>({});
@@ -588,19 +588,8 @@ const ConcordanceFeature: React.FC = () => {
   }, [tokensModeAvailable, searchModeUserSet]);
 
   const concordanceLanguage = useMemo(() => {
-    const firstSelection = effectiveNodeColumnSelections[0];
-    const firstNode = firstSelection
-      ? panelSelectedNodes.find((n: WorkspaceNodeLike) =>
-          [n.id, n.node_id].some(
-            (id) => typeof id === 'string' && id === firstSelection.nodeId,
-          ),
-        )
-      : undefined;
-    return effectiveNodeLanguage({
-      node: firstNode ?? null,
-      defaultLanguage,
-    });
-  }, [effectiveNodeColumnSelections, panelSelectedNodes, defaultLanguage]);
+    return effectiveNodeLanguage({ defaultLanguage });
+  }, [defaultLanguage]);
 
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<PaginationState>({});
@@ -1160,8 +1149,8 @@ const ConcordanceFeature: React.FC = () => {
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
     void persistDocumentColumn(nodeId, column);
-    // Clear the tokenizer model for this node when the column changes — the
-    // previous model was tokenised for the old column and is no longer valid.
+    // Clear the tokenizer model for this node when the column changes; model
+    // preferences are scoped to source columns.
     setTokenizerModelsByNode((prev) => {
       const { [nodeId]: _removed, ...rest } = prev;
       return rest;
