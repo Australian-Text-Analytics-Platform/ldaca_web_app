@@ -71,6 +71,37 @@ These were validated in this workspace and are the fastest reliable entry points
 - Some `polars-text` features download Hugging Face assets on first use; avoid treating that as an unexpected network regression.
 - When a change alters implementation wiring, public APIs, workflows, package boundaries, release steps, or important design rules, update the relevant `docs/developer-guide/` page in the same change.
 
+## Implementation Comment Requirements
+
+Comments and docstrings are part of this repo's navigation layer for people and
+future AI agents. When adding or changing implementation code, update the
+nearest module, class, function, component, hook, route, worker, store, helper,
+and test/mock comments so they stay accurate.
+
+- For every non-trivial code unit, explain why it exists, what job it was
+  written to do, and the steps or flow clearly enough that a reader can picture
+  how the unit works without re-deriving the whole body.
+- Include caller or consumer context in the comment: `Used by`, `Called by`,
+  `Rendered by`, `Invoked by`, `Triggered by`, or similar. Use `rg`, language
+  server references, or nearby tests/routes/components to verify these callers
+  instead of guessing.
+- When the caller relationship is not obvious, explain why each important
+  caller uses the unit, not only that it calls it. Capture the utility the caller
+  gets, such as state ownership, validation, serialization, task orchestration,
+  UI composition, or test isolation.
+- For larger or branchy units, add `Flow:` or `Steps:` detail that names the
+  main phases, important guards, side effects, and returned/raised outcomes.
+- Keep generated, vendored, resource, and build-output files out of manual
+  comment sweeps. If generated code needs different comments, change the
+  generator or source template instead.
+- Do not add empty narration that repeats obvious syntax. Tiny self-explanatory
+  wrappers can stay brief, but any change that alters behavior, ownership,
+  call-sites, or side effects should update the surrounding comment/docstring in
+  the same patch.
+- For broad comment work, audit with AST-aware scripts or equivalent structured
+  checks plus targeted `rg` passes, repeat until missing caller/why/flow coverage
+  is zero, and run the relevant package validation afterward.
+
 ## Codebase-Specific AI Rules
 
 - Avoid eager `collect()` except at I/O boundaries, artifact writing, or final response serialization.
