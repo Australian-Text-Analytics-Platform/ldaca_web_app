@@ -16,8 +16,7 @@ export const hintRegistry: HintDefinition[] = [
   {
     id: 'workspace.upload-needs-workspace',
     title: 'Create a workspace before adding this file',
-    body:
-      'You\u2019ve uploaded a file, but it cannot be added to any workspace until one is active. Create a new workspace or pick an existing one from the list.',
+    body: 'You\u2019ve uploaded a file, but it cannot be added to any workspace until one is active. Create a new workspace or pick an existing one from the list.',
     condition: 'file-uploaded-no-workspace',
     anchorHintId: 'workspace.create-or-load',
     priority: 5,
@@ -27,8 +26,7 @@ export const hintRegistry: HintDefinition[] = [
   {
     id: 'workspace.create-or-load',
     title: 'Start by creating or loading a workspace',
-    body:
-      'Most actions are disabled until a workspace is active. Create a new one here, or pick an existing workspace from the list before uploading or analysing data.',
+    body: 'Most actions are disabled until a workspace is active. Create a new one here, or pick an existing workspace from the list before uploading or analysing data.',
     condition: 'no-active-workspace',
     anchorHintId: 'workspace.create-or-load',
     priority: 10,
@@ -39,8 +37,7 @@ export const hintRegistry: HintDefinition[] = [
   {
     id: 'data-loader.add-file-row',
     title: 'Add this file to your workspace',
-    body:
-      'Uploading a file does not load it automatically. Click "Add" on the file row to bring it into the active workspace as a data block.',
+    body: 'Uploading a file does not load it automatically. Click "Add" on the file row to bring it into the active workspace as a data block.',
     condition: 'file-uploaded-not-added',
     priority: 20,
     oneShot: false,
@@ -56,16 +53,14 @@ export const hintRegistry: HintDefinition[] = [
       );
       if (!row) return null;
       // Highlight the Add button specifically when present.
-      const addBtn =
-        row.querySelector('[data-hint-id="data-loader.file-row.add"]') ?? null;
+      const addBtn = row.querySelector('[data-hint-id="data-loader.file-row.add"]') ?? null;
       return addBtn ?? row;
     },
   },
   {
     id: 'workspace.empty-upload-data',
     title: 'Your workspace is empty',
-    body:
-      'Upload a file in the Data Loader and click "Add" to populate your workspace with a data block.',
+    body: 'Upload a file in the Data Loader and click "Add" to populate your workspace with a data block.',
     condition: 'workspace-has-no-nodes',
     anchorHintId: 'sidebar.data-loader',
     priority: 30,
@@ -75,8 +70,7 @@ export const hintRegistry: HintDefinition[] = [
   {
     id: 'preprocessing.filter.select-node',
     title: 'Select one data block to filter',
-    body:
-      'Choose a single data block from the workspace first. The Filter tool needs one selected source before you can configure conditions.',
+    body: 'Choose a single data block from the workspace first. The Filter tool needs one selected source before you can configure conditions.',
     condition: 'filter-no-node-selected',
     anchorHintId: 'preprocessing.filter.node-selection',
     priority: 35,
@@ -86,8 +80,7 @@ export const hintRegistry: HintDefinition[] = [
   {
     id: 'preprocessing.filter.select-column',
     title: 'Pick a column for this condition',
-    body:
-      'Start each filter condition by choosing the column you want to inspect. Once a column is selected, the operator and value inputs will unlock.',
+    body: 'Start each filter condition by choosing the column you want to inspect. Once a column is selected, the operator and value inputs will unlock.',
     condition: 'filter-awaiting-column-selection',
     priority: 36,
     oneShot: false,

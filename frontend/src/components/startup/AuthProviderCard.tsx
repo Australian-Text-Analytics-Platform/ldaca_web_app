@@ -15,9 +15,7 @@ export function AuthProviderCard({ isLoading, error, children }: AuthProviderCar
   return (
     <div className="space-y-4">
       {error && (
-        <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-          {error}
-        </div>
+        <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">{error}</div>
       )}
       {children}
       {isLoading && (

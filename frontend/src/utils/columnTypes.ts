@@ -22,16 +22,23 @@ export interface ColumnInfo {
  * `boolean`, `integer`, `float`, `categorical`, `struct`, `unknown`.
  */
 const TYPE_RULES: Array<[(s: string) => boolean, string]> = [
-  [(s) =>
+  [
+    (s) =>
       s === 'annotation' ||
-      (s.includes('list') && s.includes('struct') && s.includes('provider') && s.includes('annotation')),
-    'annotation'],
-  [(s) =>
+      (s.includes('list') &&
+        s.includes('struct') &&
+        s.includes('provider') &&
+        s.includes('annotation')),
+    'annotation',
+  ],
+  [
+    (s) =>
       s === 'list_string' ||
       s.includes('list(string') ||
       s.includes('list[utf8') ||
       s.includes('list[str'),
-    'list_string'],
+    'list_string',
+  ],
   [(s) => s.includes('utf8') || s.includes('string') || s.includes('str'), 'string'],
   [(s) => s.includes('datetime') || s.includes('timestamp'), 'datetime'],
   [(s) => s.includes('date') && !s.includes('update'), 'datetime'],
@@ -107,7 +114,7 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
         ? rawType
         : rawType != null
           ? String(rawType)
-          : typeMap.get(name) || undefined
+          : typeMap.get(name) || undefined,
     );
 
     if (!typeMap.has(name)) {
@@ -124,7 +131,9 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
 
   const schema = (n?.data as Record<string, unknown>)?.schema ?? n?.schema;
   if (Array.isArray(schema)) {
-    schema.forEach((entry: Record<string, unknown>) => register(entry?.name, entry?.js_type || entry?.type || entry?.dtype));
+    schema.forEach((entry: Record<string, unknown>) =>
+      register(entry?.name, entry?.js_type || entry?.type || entry?.dtype),
+    );
   } else if (schema && typeof schema === 'object') {
     Object.entries(schema as Record<string, unknown>).forEach(([name, entry]) => {
       register(name, extractTypeFromSchemaEntry(entry));
@@ -149,7 +158,10 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
  * If `allowedTypes` is empty the list is returned as-is (no-op filter).
  */
 /** Used by: src/features/analysis/common/useNodeColumnOptions.ts, src/hooks/useAutoNodeColumns.ts because the utility needs local normalization steps before returning a shared result. */
-export const filterColumnsByType = (columns: ColumnInfo[], allowedTypes: string[]): ColumnInfo[] => {
+export const filterColumnsByType = (
+  columns: ColumnInfo[],
+  allowedTypes: string[],
+): ColumnInfo[] => {
   if (!allowedTypes.length) return columns;
   const allowed = new Set(allowedTypes.map((t) => t.toLowerCase()));
   return columns.filter((column) => allowed.has(column.dataType.toLowerCase()));

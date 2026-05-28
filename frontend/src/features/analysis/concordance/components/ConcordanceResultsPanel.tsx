@@ -8,10 +8,7 @@ import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
 import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
-import {
-  type DispersionDisplayBinCount,
-  type TaggedBinRow,
-} from '../concordanceViewModels';
+import { type DispersionDisplayBinCount, type TaggedBinRow } from '../concordanceViewModels';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 import { ConcordanceDispersionNodeBlock } from './ConcordanceDispersionNodeBlock';
@@ -82,7 +79,10 @@ export type ConcordanceResultsPanelProps = {
   nodeDetaching: Record<string, boolean>;
   nodeMaterializing: Record<string, boolean>;
   materializedPaths: Record<string, string>;
-  materializeSummaries: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }>;
+  materializeSummaries: Record<
+    string,
+    { recordCount: number; uniqueDocuments: number; totalDocuments: number }
+  >;
 
   // Handlers
   handleSort: (columnKey: string, paginationKey: string, requestNodeId: string) => void;
@@ -319,9 +319,13 @@ export function ConcordanceResultsPanel({
       <CardContent>
         <div ref={resultsViewportRef} className="space-y-4">
           {results.data && Object.keys(results.data).length > 0 ? (
-            <div className={`grid gap-4 ${viewMode === 'combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
+            <div
+              className={`grid gap-4 ${viewMode === 'combined' ? 'grid-cols-1' : 'grid-cols-1'}`}
+            >
               {Object.entries(results.data)
-                .filter(([k]) => (viewMode === 'combined' ? k === '__COMBINED__' : k !== '__COMBINED__'))
+                .filter(([k]) =>
+                  viewMode === 'combined' ? k === '__COMBINED__' : k !== '__COMBINED__',
+                )
                 .map(([nodeName, nodeData]) => {
                   const keyedOrder = Object.keys(results.data);
                   const approxIndex = keyedOrder.indexOf(nodeName);
@@ -346,14 +350,17 @@ export function ConcordanceResultsPanel({
                   const resolvedNodeId = node?.id || mappedNodeId || '';
                   const paginationKey = resolvedNodeId || nodeName;
                   const requestNodeId = resolvedNodeId || nodeName;
-                  const selection = effectiveNodeColumnSelections.find((sel) => sel.nodeId === resolvedNodeId);
+                  const selection = effectiveNodeColumnSelections.find(
+                    (sel) => sel.nodeId === resolvedNodeId,
+                  );
                   const column = selection?.column || '';
 
                   const nodeDisplayName = (node?.name || nodeName) as string;
-                  const nodeColor = sourceColorMap[nodeName.toLowerCase()]
-                    || sourceColorMap[(node?.id || '').toLowerCase()]
-                    || sourceColorMap[(node?.name || '').toLowerCase()]
-                    || defaultPalette[approxIndex % defaultPalette.length];
+                  const nodeColor =
+                    sourceColorMap[nodeName.toLowerCase()] ||
+                    sourceColorMap[(node?.id || '').toLowerCase()] ||
+                    sourceColorMap[(node?.name || '').toLowerCase()] ||
+                    defaultPalette[approxIndex % defaultPalette.length];
 
                   const blockContext = {
                     nodeId: node?.id || '',

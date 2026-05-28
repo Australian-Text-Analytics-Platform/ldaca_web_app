@@ -65,7 +65,9 @@ describe('tokenFrequencyExport', () => {
 
     vi.runAllTimers();
 
-    expect(document.body.querySelector('a[download="My Corpus_frequencies.csv"]')).not.toBeInTheDocument();
+    expect(
+      document.body.querySelector('a[download="My Corpus_frequencies.csv"]'),
+    ).not.toBeInTheDocument();
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:csv-export');
   });
 
@@ -94,13 +96,13 @@ describe('tokenFrequencyExport', () => {
           note: 'left|right\nnext',
         },
       ],
-      'markdown'
+      'markdown',
     );
 
     const markdown = await capturedBlobs[0]!.text();
 
     expect(markdown).toContain(
-      '| token | freq_corpus_0 | percent_corpus_0 | significance | freq_corpus_1 | note |'
+      '| token | freq_corpus_0 | percent_corpus_0 | significance | freq_corpus_1 | note |',
     );
     expect(markdown).toContain('| alpha | 12 | 0.6 | ** |  |  |');
     expect(markdown).toContain('| beta | 8 | 0.4 | * | 7 | left\\|right<br />next |');
@@ -127,7 +129,9 @@ describe('tokenFrequencyExport', () => {
 
     vi.runAllTimers();
 
-    expect(document.body.querySelector('a[download="Sample Node_wordcloud.svg"]')).not.toBeInTheDocument();
+    expect(
+      document.body.querySelector('a[download="Sample Node_wordcloud.svg"]'),
+    ).not.toBeInTheDocument();
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:svg-export');
   });
 
@@ -152,12 +156,16 @@ describe('tokenFrequencyExport', () => {
       'my-corpus-frequencies.csv',
       'my-corpus-stopwords.txt',
     ]);
-    expect(await zip.file('my-corpus-frequencies.csv')?.async('string')).toBe('"word","count"\r\n"alpha","3"');
+    expect(await zip.file('my-corpus-frequencies.csv')?.async('string')).toBe(
+      '"word","count"\r\n"alpha","3"',
+    );
     expect(await zip.file('my-corpus-stopwords.txt')?.async('string')).toBe('the\nand');
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(document.body.querySelector('a[download="03-12_10-15-07_Corpus.zip"]')).not.toBeInTheDocument();
+    expect(
+      document.body.querySelector('a[download="03-12_10-15-07_Corpus.zip"]'),
+    ).not.toBeInTheDocument();
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:zip-export');
   });
 
@@ -168,8 +176,8 @@ describe('tokenFrequencyExport', () => {
           'sample_data/ADO/qldelection2020_candidate_tweets',
           'other/path/another_really_long_node_name_here',
         ],
-        new Date('2026-03-12T10:15:07')
-      )
+        new Date('2026-03-12T10:15:07'),
+      ),
     ).toBe('03-12_10-15-07_qldelection2020_cand_another_really_long.zip');
   });
 });

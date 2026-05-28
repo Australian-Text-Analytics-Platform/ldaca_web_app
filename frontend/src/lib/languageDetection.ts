@@ -2,7 +2,8 @@ import { normaliseIso6391LanguageCode } from './languages';
 import type { LanguageDetector as MediaPipeLanguageDetector } from '@mediapipe/tasks-text';
 
 const MEDIAPIPE_TEXT_TASKS_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-text/wasm';
-const MEDIAPIPE_LANGUAGE_DETECTOR_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/language_detector/language_detector/float32/1/language_detector.tflite';
+const MEDIAPIPE_LANGUAGE_DETECTOR_MODEL_URL =
+  'https://storage.googleapis.com/mediapipe-models/language_detector/language_detector/float32/1/language_detector.tflite';
 const MAX_DETECTION_CHARS = 20_000;
 
 let languageDetectorPromise: Promise<MediaPipeLanguageDetector> | null = null;
@@ -11,10 +12,12 @@ let languageDetectorPromise: Promise<MediaPipeLanguageDetector> | null = null;
 /** Called by: detectLanguageIso6391 in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 async function getLanguageDetector(): Promise<MediaPipeLanguageDetector> {
   if (!languageDetectorPromise) {
-    languageDetectorPromise = import('@mediapipe/tasks-text').then(async ({ FilesetResolver, LanguageDetector }) => {
-      const fileset = await FilesetResolver.forTextTasks(MEDIAPIPE_TEXT_TASKS_WASM_URL);
-      return LanguageDetector.createFromModelPath(fileset, MEDIAPIPE_LANGUAGE_DETECTOR_MODEL_URL);
-    });
+    languageDetectorPromise = import('@mediapipe/tasks-text').then(
+      async ({ FilesetResolver, LanguageDetector }) => {
+        const fileset = await FilesetResolver.forTextTasks(MEDIAPIPE_TEXT_TASKS_WASM_URL);
+        return LanguageDetector.createFromModelPath(fileset, MEDIAPIPE_LANGUAGE_DETECTOR_MODEL_URL);
+      },
+    );
   }
   return languageDetectorPromise;
 }

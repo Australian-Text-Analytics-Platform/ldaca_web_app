@@ -9,11 +9,11 @@ export interface NodeNameEntry {
 /** Builds a node-id to display-name lookup from selection sources. */
 /**
  * Used by: TokenFrequencyFeature.tsx, tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
-   * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export const buildSelectionNameById = (
   selectedNodes: Array<NodeNameEntry | null | undefined>,
-  panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null
+  panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null,
 ): Record<string, string> => {
   const mapping: Record<string, string> = {};
 
@@ -40,7 +40,7 @@ export const buildSelectionNameById = (
  */
 export const buildSelectionNameKey = (
   selectedNodes: Array<NodeNameEntry | null | undefined>,
-  panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null
+  panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null,
 ): string => {
   const mapping = buildSelectionNameById(selectedNodes, panelSelectedNodes);
   return Object.keys(mapping)
@@ -65,13 +65,17 @@ export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null)
 /** Reads the backend's persisted stop-word list from all supported response locations. */
 /**
  * Used by: tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
-   * Flow: check top-level, analysis_params, and metadata stop-word arrays in order, stringify entries, then return null when none exist.
+ * Flow: check top-level, analysis_params, and metadata stop-word arrays in order, stringify entries, then return null when none exist.
  */
-export const deriveBackendStopWords = (results?: TokenFrequencyResponse | null): string[] | null => {
+export const deriveBackendStopWords = (
+  results?: TokenFrequencyResponse | null,
+): string[] | null => {
   if (!results) return null;
   const candidate =
     (Array.isArray(results.stop_words) ? results.stop_words : null) ??
-    (Array.isArray(results.analysis_params?.stop_words) ? results.analysis_params.stop_words : null) ??
+    (Array.isArray(results.analysis_params?.stop_words)
+      ? results.analysis_params.stop_words
+      : null) ??
     (Array.isArray(results.metadata?.stop_words) ? results.metadata.stop_words : null);
   return Array.isArray(candidate) ? candidate.map((item) => String(item)) : null;
 };

@@ -114,13 +114,14 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it('renders each saved snapshot with title, capture date, and size', async () => {
-    listSpy.mockResolvedValue({ data: {
-      items: [item('alpha'), item('beta')],
-    }, error: undefined });
+    listSpy.mockResolvedValue({
+      data: {
+        items: [item('alpha'), item('beta')],
+      },
+      error: undefined,
+    });
 
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
     expect(await screen.findByText('alpha')).toBeInTheDocument();
     expect(screen.getByText('beta')).toBeInTheDocument();
@@ -136,26 +137,23 @@ describe('LoadSnapshotDialog', () => {
   it('shows an empty-state message when no snapshots exist', async () => {
     listSpy.mockResolvedValue({ data: { items: [] }, error: undefined });
 
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
-    expect(
-      await screen.findByText(/no saved snapshots/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no saved snapshots/i)).toBeInTheDocument();
   });
 
   it('marks incompatible snapshots with a badge and disabled Open button', async () => {
-    listSpy.mockResolvedValue({ data: {
-      items: [
-        item('current', { tool_version: 'v0.4.4' }),
-        item('old', { tool_version: 'v0.3.5' }),
-      ],
-    }, error: undefined });
+    listSpy.mockResolvedValue({
+      data: {
+        items: [
+          item('current', { tool_version: 'v0.4.4' }),
+          item('old', { tool_version: 'v0.3.5' }),
+        ],
+      },
+      error: undefined,
+    });
 
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
     await screen.findByText('current');
     const oldRow = screen.getByText('old').closest('li')!;
@@ -168,49 +166,46 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it("adaptive batch button reads 'Delete stale' when incompatible snapshots exist", async () => {
-    listSpy.mockResolvedValue({ data: {
-      items: [
-        item('current', { tool_version: 'v0.4.4' }),
-        item('old', { tool_version: 'v0.3.5' }),
-      ],
-    }, error: undefined });
+    listSpy.mockResolvedValue({
+      data: {
+        items: [
+          item('current', { tool_version: 'v0.4.4' }),
+          item('old', { tool_version: 'v0.3.5' }),
+        ],
+      },
+      error: undefined,
+    });
 
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
     await screen.findByText('current');
-    expect(
-      screen.getByRole('button', { name: /delete stale snapshots/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /delete all snapshots/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete stale snapshots/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /delete all snapshots/i })).not.toBeInTheDocument();
   });
 
   it("adaptive batch button reads 'Delete all' when only compatible snapshots exist", async () => {
-    listSpy.mockResolvedValue({ data: {
-      items: [item('a'), item('b'), item('c')],
-    }, error: undefined });
+    listSpy.mockResolvedValue({
+      data: {
+        items: [item('a'), item('b'), item('c')],
+      },
+      error: undefined,
+    });
 
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
     await screen.findByText('a');
-    expect(
-      screen.getByRole('button', { name: /delete all snapshots/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete all snapshots/i })).toBeInTheDocument();
   });
 
   it('per-row delete opens confirmation, then calls deleteOne on confirm', async () => {
     listSpy.mockResolvedValue({ data: { items: [item('foo')] }, error: undefined });
-    deleteOneSpy.mockResolvedValue({ data: { deleted: ['concordance-foo.ldaca-snapshot'] }, error: undefined });
+    deleteOneSpy.mockResolvedValue({
+      data: { deleted: ['concordance-foo.ldaca-snapshot'] },
+      error: undefined,
+    });
 
     const user = userEvent.setup();
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
     await screen.findByText('foo');
     const fooRow = screen.getByText('foo').closest('li')!;
@@ -233,23 +228,25 @@ describe('LoadSnapshotDialog', () => {
   });
 
   it('batch delete (stale) calls deleteBatch with incompatible_with version', async () => {
-    listSpy.mockResolvedValue({ data: {
-      items: [
-        item('current', { tool_version: 'v0.4.4' }),
-        item('old', { tool_version: 'v0.3.5' }),
-      ],
-    }, error: undefined });
-    deleteBatchSpy.mockResolvedValue({ data: { deleted: ['concordance-old.ldaca-snapshot'] }, error: undefined });
+    listSpy.mockResolvedValue({
+      data: {
+        items: [
+          item('current', { tool_version: 'v0.4.4' }),
+          item('old', { tool_version: 'v0.3.5' }),
+        ],
+      },
+      error: undefined,
+    });
+    deleteBatchSpy.mockResolvedValue({
+      data: { deleted: ['concordance-old.ldaca-snapshot'] },
+      error: undefined,
+    });
 
     const user = userEvent.setup();
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
     await screen.findByText('current');
-    await user.click(
-      screen.getByRole('button', { name: /delete stale snapshots/i }),
-    );
+    await user.click(screen.getByRole('button', { name: /delete stale snapshots/i }));
     await user.click(await screen.findByRole('button', { name: /^delete stale$/i }));
 
     await waitFor(() => {
@@ -263,19 +260,18 @@ describe('LoadSnapshotDialog', () => {
 
   it('batch delete (all) calls deleteBatch without incompatible_with', async () => {
     listSpy.mockResolvedValue({ data: { items: [item('a'), item('b')] }, error: undefined });
-    deleteBatchSpy.mockResolvedValue({ data: {
-      deleted: ['concordance-a.ldaca-snapshot', 'concordance-b.ldaca-snapshot'],
-    }, error: undefined });
+    deleteBatchSpy.mockResolvedValue({
+      data: {
+        deleted: ['concordance-a.ldaca-snapshot', 'concordance-b.ldaca-snapshot'],
+      },
+      error: undefined,
+    });
 
     const user = userEvent.setup();
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
     await screen.findByText('a');
-    await user.click(
-      screen.getByRole('button', { name: /delete all snapshots/i }),
-    );
+    await user.click(screen.getByRole('button', { name: /delete all snapshots/i }));
     await user.click(await screen.findByRole('button', { name: /^delete all$/i }));
 
     await waitFor(() => {
@@ -305,9 +301,7 @@ describe('LoadSnapshotDialog', () => {
     await screen.findByText('foo');
     await user.click(screen.getByRole('button', { name: 'Open' }));
 
-    await waitFor(() =>
-      expect(onOpen).toHaveBeenCalledWith('concordance-foo.ldaca-snapshot'),
-    );
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith('concordance-foo.ldaca-snapshot'));
     // Dialog closes on success
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
@@ -316,15 +310,11 @@ describe('LoadSnapshotDialog', () => {
     listSpy.mockResolvedValue({ data: { items: [item('foo')] }, error: undefined });
 
     const user = userEvent.setup();
-    renderWithClient(
-      <LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />,
-    );
+    renderWithClient(<LoadSnapshotDialog open onOpenChange={() => {}} tool="concordance" />);
 
     await screen.findByText('foo');
     await user.click(screen.getByRole('button', { name: 'Open' }));
     // Toast appears (Sonner renders it as a status region)
-    expect(
-      await screen.findByText(/snapshot view coming/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/snapshot view coming/i)).toBeInTheDocument();
   });
 });

@@ -17,9 +17,8 @@ import { takeMostRecent } from '@/utils/selectionUtils';
 /**
  * Called by: useConcordancePendingHandoff hook during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  */
-const hasSuccessfulConcordanceResults = (
-  result: ConcordanceAnalysisResponse | null,
-): boolean => Boolean(result && result.state === 'successful');
+const hasSuccessfulConcordanceResults = (result: ConcordanceAnalysisResponse | null): boolean =>
+  Boolean(result && result.state === 'successful');
 
 type Params = {
   pendingConcordance: PendingConcordance | null;
@@ -28,7 +27,10 @@ type Params = {
   results: ConcordanceAnalysisResponse | null;
   selectedNodes: WorkspaceNodeLike[];
   setSearchWord: Dispatch<SetStateAction<string>>;
-  setNodeColumnSelections: (selections: NodeColumnSelection[], options?: { replace?: boolean }) => void;
+  setNodeColumnSelections: (
+    selections: NodeColumnSelection[],
+    options?: { replace?: boolean },
+  ) => void;
   selectNodes: (ids: string[]) => void;
   handleColorChange: (nodeId: string, color: string) => void;
 };
@@ -124,8 +126,8 @@ export function useConcordancePendingHandoff({
     }
 
     if (
-      Array.isArray(queuedPendingConcordance.selectedNodes)
-      && queuedPendingConcordance.selectedNodes.length > 0
+      Array.isArray(queuedPendingConcordance.selectedNodes) &&
+      queuedPendingConcordance.selectedNodes.length > 0
     ) {
       const targetIds = queuedPendingConcordance.selectedNodes
         .map((node) => (typeof node?.id === 'string' ? node.id : ''))
@@ -134,8 +136,8 @@ export function useConcordancePendingHandoff({
       if (effectiveTargetIds.length > 0) {
         const currentIds = selectedNodes.map((node) => node.id);
         const needsSync =
-          effectiveTargetIds.length !== currentIds.length
-          || effectiveTargetIds.some((id, index) => id !== currentIds[index]);
+          effectiveTargetIds.length !== currentIds.length ||
+          effectiveTargetIds.some((id, index) => id !== currentIds[index]);
         if (needsSync) {
           try {
             selectNodes(effectiveTargetIds);
@@ -158,10 +160,14 @@ export function useConcordancePendingHandoff({
 
     let timeoutId: number | null = null;
     const hasNodeTargets =
-      selectedNodes.length > 0
-      || (queuedPendingConcordance.selectedNodes?.length ?? 0) > 0
-      || (queuedPendingConcordance.nodeColumnSelections?.length ?? 0) > 0;
-    if (queuedPendingConcordance.autoRun === true && queuedPendingConcordance.searchWord && hasNodeTargets) {
+      selectedNodes.length > 0 ||
+      (queuedPendingConcordance.selectedNodes?.length ?? 0) > 0 ||
+      (queuedPendingConcordance.nodeColumnSelections?.length ?? 0) > 0;
+    if (
+      queuedPendingConcordance.autoRun === true &&
+      queuedPendingConcordance.searchWord &&
+      hasNodeTargets
+    ) {
       timeoutId = window.setTimeout(() => {
         setShouldAutoSearch(true);
       }, 50);

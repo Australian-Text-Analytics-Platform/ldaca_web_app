@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import DocumentView from '@/components/DocumentView';
@@ -29,7 +28,7 @@ describe('DocumentView (docType="tutorial")', () => {
       <DocumentView
         docType="tutorial"
         target={{ file: 'tutorials/index.md', anchor: 'help-tutorial-index' }}
-      />
+      />,
     );
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
@@ -39,7 +38,7 @@ describe('DocumentView (docType="tutorial")', () => {
       <DocumentView
         docType="tutorial"
         target={{ file: 'tutorials/index.md', anchor: 'help-tutorial-index-2' }}
-      />
+      />,
     );
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));

@@ -142,7 +142,7 @@ export const TokenFrequencyResultsPanel = ({
   // (the cloud cap). Once list > 100 the two values diverge by design.
   React.useEffect(() => {
     if (!Number.isFinite(effectiveTokenLimit) || effectiveTokenLimit <= 0) return;
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       setListLimit((prev) => {
         if (prev > 100) return prev;
         return effectiveTokenLimit;
@@ -161,7 +161,7 @@ export const TokenFrequencyResultsPanel = ({
     if (listLimitError) setListLimitError(null);
   };
 
-    /**
+  /**
    * Called by: TokenFrequencyResultsPanel list-limit Apply button and blur handler because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: parse the list-limit input, clamp it to the visible vocabulary range, clear validation errors, then mirror the capped value to cloud preferences when needed.
    */
@@ -218,11 +218,17 @@ export const TokenFrequencyResultsPanel = ({
       }}
     >
       {isRunningState ? (
-        <AnalysisRunningStateCard message={runningMessage} taskId={runningTaskId} progress={runningProgress} />
+        <AnalysisRunningStateCard
+          message={runningMessage}
+          taskId={runningTaskId}
+          progress={runningProgress}
+        />
       ) : null}
 
       {isFailedState ? (
-        <p className="text-sm text-muted-foreground">{results?.message || 'Analysis failed to complete.'}</p>
+        <p className="text-sm text-muted-foreground">
+          {results?.message || 'Analysis failed to complete.'}
+        </p>
       ) : null}
 
       {isSuccessfulState && results ? (
@@ -310,7 +316,13 @@ export const TokenFrequencyResultsPanel = ({
                       }
                     }}
                   />
-                  <Button type="button" variant="outline" size="sm" onClick={handleApplyCloudLimit} disabled={isApplyingTokenLimit}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleApplyCloudLimit}
+                    disabled={isApplyingTokenLimit}
+                  >
                     <Wand2 className="mr-1 h-3.5 w-3.5" />
                     Apply
                   </Button>

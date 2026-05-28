@@ -22,17 +22,18 @@ export interface UseAuthOptions {
 export const useAuth = (options: UseAuthOptions = {}) => {
   const autoStart = options.autoStart ?? false;
 
-  const { phase, authInfo, config, refreshAuth, loginWithGoogle, logout, getAuthHeaders } = useAuthStore(
-    useShallow((state) => ({
-      phase: state.phase,
-      authInfo: state.authInfo,
-      config: state.config,
-      refreshAuth: state.refreshAuth,
-      loginWithGoogle: state.loginWithGoogle,
-      logout: state.logout,
-      getAuthHeaders: state.getAuthHeaders,
-    })),
-  );
+  const { phase, authInfo, config, refreshAuth, loginWithGoogle, logout, getAuthHeaders } =
+    useAuthStore(
+      useShallow((state) => ({
+        phase: state.phase,
+        authInfo: state.authInfo,
+        config: state.config,
+        refreshAuth: state.refreshAuth,
+        loginWithGoogle: state.loginWithGoogle,
+        logout: state.logout,
+        getAuthHeaders: state.getAuthHeaders,
+      })),
+    );
 
   useEffect(() => {
     const store = useAuthStore.getState();
@@ -54,7 +55,7 @@ export const useAuth = (options: UseAuthOptions = {}) => {
   const requiresAuthentication = authInfo?.requires_authentication ?? false;
   const availableAuthMethods = authInfo?.available_auth_methods ?? [];
   const dataFolder = authInfo?.data_folder ?? null;
-  const error = 'error' in phase ? phase.error ?? null : null;
+  const error = 'error' in phase ? (phase.error ?? null) : null;
   const isLoading = phase.status === 'bootstrapping';
 
   return {

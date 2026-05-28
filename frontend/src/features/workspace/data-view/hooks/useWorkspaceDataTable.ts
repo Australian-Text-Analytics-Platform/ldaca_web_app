@@ -58,7 +58,11 @@ export interface WorkspaceDataTableViewModel {
  * Used by: local callers in workspace/useWorkspaceDataTable module because selected nodes need normalized tab labels before rendering.
  * Flow: accept a selected node id, fall back to that id when no label is available, and attach the active-tab flag.
  */
-const buildTabDescriptor = (node: WorkspaceSelectionTab['id'], label?: string, isActive = false) => ({
+const buildTabDescriptor = (
+  node: WorkspaceSelectionTab['id'],
+  label?: string,
+  isActive = false,
+) => ({
   id: node,
   label: label ?? node,
   isActive,
@@ -75,7 +79,9 @@ interface WorkspaceNodeDisplayLike {
  * Used by: local callers in workspace/useWorkspaceDataTable module because node records can expose either names or ids.
  * Flow: return undefined for missing node data, otherwise prefer the display name and fall back to the node id.
  */
-const resolveNodeDisplayLabel = (node: WorkspaceNodeDisplayLike | null | undefined): string | undefined => {
+const resolveNodeDisplayLabel = (
+  node: WorkspaceNodeDisplayLike | null | undefined,
+): string | undefined => {
   if (!node) {
     return undefined;
   }
@@ -151,36 +157,36 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   }, [normalizedSelectedNodeIds]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const displayTabIds = (shouldShowTabs ? tabOrder.filter((id) => nodeById.has(id)) : []);
+  const displayTabIds = shouldShowTabs ? tabOrder.filter((id) => nodeById.has(id)) : [];
 
   const activeTabIndex = displayTabIds.findIndex((id) => id === activeNodeId);
   const tabPosition = activeTabIndex >= 0 ? activeTabIndex + 1 : displayTabIds.length > 0 ? 1 : 0;
 
-    /**
+  /**
    * Promotes a selected node tab to the active node.
-     * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
-     * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
-     */
+   * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
+   * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
+   */
   const handleTabChange = (nodeId: string) => {
-      if (!nodeId || nodeId === activeNodeId || !normalizedSelectedNodeIds.includes(nodeId)) {
-        return;
-      }
-      const reordered = [...normalizedSelectedNodeIds.filter((id) => id !== nodeId), nodeId];
-      selectNodes(reordered);
-    };
+    if (!nodeId || nodeId === activeNodeId || !normalizedSelectedNodeIds.includes(nodeId)) {
+      return;
+    }
+    const reordered = [...normalizedSelectedNodeIds.filter((id) => id !== nodeId), nodeId];
+    selectNodes(reordered);
+  };
 
-    /**
+  /**
    * Removes a node from the multi-selection tab strip.
-     * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
-     * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
-     */
+   * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
+   * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
+   */
   const handleTabClose = (nodeId: string) => {
-      if (!nodeId) {
-        return;
-      }
-      setTabOrder((current) => current.filter((id) => id !== nodeId));
-      toggleNodeSelection(nodeId);
-    };
+    if (!nodeId) {
+      return;
+    }
+    setTabOrder((current) => current.filter((id) => id !== nodeId));
+    toggleNodeSelection(nodeId);
+  };
 
   const selectedNodeCapabilities = selectedNode as {
     id?: string;
@@ -201,7 +207,10 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onUndo: selectedNode?.id && undoNode ? () => void undoNode(selectedNode.id) : undefined,
     onRedo: selectedNode?.id && redoNode ? () => void redoNode(selectedNode.id) : undefined,
     onDelete: selectedNode?.id && deleteNode ? () => void deleteNode(selectedNode.id) : undefined,
-    onRename: selectedNode?.id && renameNode ? (newName: string) => void renameNode(selectedNode.id, newName) : undefined,
+    onRename:
+      selectedNode?.id && renameNode
+        ? (newName: string) => void renameNode(selectedNode.id, newName)
+        : undefined,
     onQueryPlan: selectedNode?.id
       ? async () => {
           const { data: resp } = await getNodeQueryPlan({
@@ -219,7 +228,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const tabs: WorkspaceSelectionTabsState = {
     shouldShowTabs,
     tabs: displayTabIds.map((id) =>
-      buildTabDescriptor(id, resolveNodeDisplayLabel(nodeById.get(id)) || id, id === activeNodeId)
+      buildTabDescriptor(id, resolveNodeDisplayLabel(nodeById.get(id)) || id, id === activeNodeId),
     ),
     tabPosition,
     totalTabs: multiSelectedNodes.length,
@@ -237,15 +246,24 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     ? [{ id: paginationState.sortBy, desc: paginationState.descending ?? false }]
     : [];
 
-  const columnFilters: ColumnFiltersState = paginationState?.filterColumn && paginationState.filterValue
-    ? [{ id: paginationState.filterColumn, value: { value: paginationState.filterValue, op: (paginationState.filterOp ?? 'contains') as FilterOperator } }]
-    : [];
+  const columnFilters: ColumnFiltersState =
+    paginationState?.filterColumn && paginationState.filterValue
+      ? [
+          {
+            id: paginationState.filterColumn,
+            value: {
+              value: paginationState.filterValue,
+              op: (paginationState.filterOp ?? 'contains') as FilterOperator,
+            },
+          },
+        ]
+      : [];
 
-    /**
+  /**
    * Adapts TanStack sorting state into workspace pagination state.
-     * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
-     * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
-     */
+   * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
+   * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
+   */
   const onSortingChange = (next: SortingState) => {
     if (next.length === 0) {
       handleSortingChange(undefined, undefined);
@@ -254,11 +272,11 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     }
   };
 
-    /**
+  /**
    * Adapts TanStack column-filter state into workspace pagination state.
-     * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
-     * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
-     */
+   * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
+   * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
+   */
   const onColumnFiltersChange = (next: ColumnFiltersState) => {
     if (next.length === 0) {
       handleFilterChange(undefined, undefined, undefined);
@@ -275,22 +293,31 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const selectedNodeIdForCallbacks = selectedNode?.id;
 
   /** Casts a column on the active node. */
-  const handleCast = useCallback(async (column: string, targetType: string, format?: string) => {
-    if (!selectedNodeIdForCallbacks) return;
-    await castColumn(selectedNodeIdForCallbacks, column, targetType, format);
-  }, [selectedNodeIdForCallbacks, castColumn]);
+  const handleCast = useCallback(
+    async (column: string, targetType: string, format?: string) => {
+      if (!selectedNodeIdForCallbacks) return;
+      await castColumn(selectedNodeIdForCallbacks, column, targetType, format);
+    },
+    [selectedNodeIdForCallbacks, castColumn],
+  );
 
   /** Renames a column on the active node. */
-  const handleRenameColumn = useCallback(async (column: string, nextName: string) => {
-    if (!selectedNodeIdForCallbacks) return;
-    await renameColumn(selectedNodeIdForCallbacks, column, nextName);
-  }, [selectedNodeIdForCallbacks, renameColumn]);
+  const handleRenameColumn = useCallback(
+    async (column: string, nextName: string) => {
+      if (!selectedNodeIdForCallbacks) return;
+      await renameColumn(selectedNodeIdForCallbacks, column, nextName);
+    },
+    [selectedNodeIdForCallbacks, renameColumn],
+  );
 
   /** Deletes a column from the active node. */
-  const handleDeleteColumn = useCallback(async (column: string) => {
-    if (!selectedNodeIdForCallbacks) return;
-    await deleteColumn(selectedNodeIdForCallbacks, column);
-  }, [selectedNodeIdForCallbacks, deleteColumn]);
+  const handleDeleteColumn = useCallback(
+    async (column: string) => {
+      if (!selectedNodeIdForCallbacks) return;
+      await deleteColumn(selectedNodeIdForCallbacks, column);
+    },
+    [selectedNodeIdForCallbacks, deleteColumn],
+  );
 
   /** Refreshes schema for the active node after column mutations. */
   const handleRefreshSchema = useCallback(async () => {

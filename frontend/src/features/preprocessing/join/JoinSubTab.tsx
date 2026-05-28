@@ -1,4 +1,3 @@
-
 import { Loader2, Merge, Plus } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -7,7 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
@@ -116,20 +121,36 @@ export function JoinSubTab(props: JoinSubTabProps) {
         </CardContent>
         <CardFooter className="flex items-center gap-3 border-t pt-4">
           <div className="flex flex-1 items-center gap-2">
-            <Label htmlFor="join-new-node-name" className="shrink-0">New data block name</Label>
+            <Label htmlFor="join-new-node-name" className="shrink-0">
+              New data block name
+            </Label>
             <HelpIcon targetKey="preprocessing.join.new-node-name" label="Join output name" />
             <Input
               id="join-new-node-name"
               value={joinNewNodeName}
               placeholder={joinNamePlaceholder}
               onChange={(event) => setJoinNewNodeName(event.target.value)}
-              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: joinNewNodeName, setValue: setJoinNewNodeName })}
+              onKeyDown={(event) =>
+                acceptPlaceholderOnTab({
+                  event,
+                  value: joinNewNodeName,
+                  setValue: setJoinNewNodeName,
+                })
+              }
               autoComplete="off"
               className="min-w-0 flex-1"
             />
           </div>
           <DisabledReasonTooltip reason={apply.disabledReason}>
-            <Button type="button" size="sm" onClick={apply.run} disabled={apply.disabled} className="shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                void apply.run();
+              }}
+              disabled={apply.disabled}
+              className="shrink-0"
+            >
               {apply.isBusy ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -150,7 +171,8 @@ export function JoinSubTab(props: JoinSubTabProps) {
       <div className="space-y-3">
         {joinType === 'cross' && preview.ready && (
           <div className="rounded-md border border-amber-500/50 bg-amber-100/60 p-3 text-xs text-amber-900">
-            Cross joins can create very large outputs. The preview only displays {preview.pageSize} rows at a time.
+            Cross joins can create very large outputs. The preview only displays {preview.pageSize}{' '}
+            rows at a time.
           </div>
         )}
 

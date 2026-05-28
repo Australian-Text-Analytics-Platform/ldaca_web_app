@@ -21,7 +21,7 @@ const useSelectionSlice = () =>
       setSelectedNodes: state.setSelectedNodes,
       toggleNodeSelection: state.toggleNodeSelection,
       clearAllSelections: state.clearAllSelections,
-    }))
+    })),
   );
 
 /**
@@ -37,7 +37,7 @@ const useUISlice = () =>
       startOperation: state.startOperation,
       endOperation: state.endOperation,
       setOperationError: state.setOperationError,
-    }))
+    })),
   );
 
 /**
@@ -121,7 +121,7 @@ export const useWorkspaceCore = () => {
   useEffect(() => {
     if (!selectedNodeId || pagination[selectedNodeId]) return;
     setPaginationState((prev) =>
-      prev[selectedNodeId] ? prev : { ...prev, [selectedNodeId]: createDefaultPagination() }
+      prev[selectedNodeId] ? prev : { ...prev, [selectedNodeId]: createDefaultPagination() },
     );
   }, [pagination, selectedNodeId]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -157,7 +157,11 @@ export const useWorkspaceCore = () => {
 
   /** Stores server-side filter state for the selected node. */
   const handleFilterChange = useCallback(
-    (filterColumn: string | undefined, filterValue: string | undefined, filterOp: string | undefined) => {
+    (
+      filterColumn: string | undefined,
+      filterValue: string | undefined,
+      filterOp: string | undefined,
+    ) => {
       if (!selectedNodeId) return;
       updatePagination(selectedNodeId, (existing) => ({
         ...existing,
@@ -181,7 +185,9 @@ export const useWorkspaceCore = () => {
   }, [isAuthenticated, getAuthHeaders]);
 
   const operationErrorsRecord: Record<string, string> = {};
-  ui.operationErrors.forEach((value, key) => { operationErrorsRecord[key] = value; });
+  ui.operationErrors.forEach((value, key) => {
+    operationErrorsRecord[key] = value;
+  });
 
   return {
     authHeaders,

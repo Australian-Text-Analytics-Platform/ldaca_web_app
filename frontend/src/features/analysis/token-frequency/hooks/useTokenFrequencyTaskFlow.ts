@@ -4,8 +4,15 @@ import type { QueryClient } from '@tanstack/react-query';
 import { calculateTokenFrequencies } from '@/api/generated/sdk.gen';
 import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
-import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/features/analysis/token-frequency/tokenFrequencyHelpers';
-import { restoreAnalysisLockFromRequest, extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';
+import {
+  resolveTokenFrequencyNodeContext,
+  type TokenFrequencyAnalysisParams,
+} from '@/features/analysis/token-frequency/tokenFrequencyHelpers';
+import {
+  restoreAnalysisLockFromRequest,
+  extractAndSetTaskId,
+  type WorkspaceNodeLike,
+} from '../../common';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
 import { takeMostRecent } from '@/utils/selectionUtils';
@@ -39,7 +46,9 @@ interface AnalysisActions {
 
 interface LockActions {
   getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (nodes: Array<{ id: string; name?: string; columns?: string[] | null }>) => void;
+  lockWithSnapshots: (
+    nodes: Array<{ id: string; name?: string; columns?: string[] | null }>,
+  ) => void;
   queryClient: QueryClient;
 }
 
@@ -87,11 +96,7 @@ export const useTokenFrequencyTaskFlow = ({
     setStopWords,
     lastFetchedRef,
   },
-  lock: {
-    getAuthHeaders,
-    lockWithSnapshots,
-    queryClient,
-  },
+  lock: { getAuthHeaders, lockWithSnapshots, queryClient },
   navigation: {
     selectNodes,
     setPendingConcordance,
@@ -103,8 +108,8 @@ export const useTokenFrequencyTaskFlow = ({
   /** Builds and submits a token-frequency request from the current selection state. */
   /**
    * Called by: useTokenFrequencyTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
   const handleAnalyze = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) {
       return;
@@ -217,7 +222,8 @@ export const useTokenFrequencyTaskFlow = ({
   const handleTokenClick = useCallback(
     (token: string) => {
       const trimmedToken = token?.toString() ?? '';
-      const analysisParams = (results?.analysis_params ?? null) as TokenFrequencyAnalysisParams | null;
+      const analysisParams = (results?.analysis_params ??
+        null) as TokenFrequencyAnalysisParams | null;
 
       const resolvedContext = resolveTokenFrequencyNodeContext({
         lastCompareNodeIds,
@@ -230,18 +236,24 @@ export const useTokenFrequencyTaskFlow = ({
       const fallbackNodeIds: string[] =
         resolvedContext.nodeIds.length > 0
           ? resolvedContext.nodeIds
-          : panelNodeIds
-              .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+          : panelNodeIds.filter(
+              (id): id is string => typeof id === 'string' && id.trim().length > 0,
+            );
 
       const fallbackSelections: NodeColumnSelection[] =
         resolvedContext.nodeIds.length > 0
           ? resolvedContext.selections
-          : effectiveNodeColumnSelections.filter((selection) => fallbackNodeIds.includes(selection.nodeId) && selection.column);
+          : effectiveNodeColumnSelections.filter(
+              (selection) => fallbackNodeIds.includes(selection.nodeId) && selection.column,
+            );
 
-      const uniqueNodeIds: string[] = fallbackNodeIds
-        .filter((id, index, all) => all.indexOf(id) === index);
+      const uniqueNodeIds: string[] = fallbackNodeIds.filter(
+        (id, index, all) => all.indexOf(id) === index,
+      );
 
-      const effectiveSelections = fallbackSelections.filter((selection) => uniqueNodeIds.includes(selection.nodeId));
+      const effectiveSelections = fallbackSelections.filter((selection) =>
+        uniqueNodeIds.includes(selection.nodeId),
+      );
 
       if (uniqueNodeIds.length > 0) {
         try {

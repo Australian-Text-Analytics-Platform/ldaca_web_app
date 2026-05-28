@@ -177,12 +177,7 @@ export function HintBubble({
       <p className="mb-3 text-sm text-muted-foreground">{hint.body}</p>
       <div className="flex flex-wrap items-center justify-end gap-2">
         {hint.learnMoreTarget && onLearnMore && (
-          <Button
-            variant="link"
-            size="sm"
-            className="h-7 px-1 text-xs"
-            onClick={onLearnMore}
-          >
+          <Button variant="link" size="sm" className="h-7 px-1 text-xs" onClick={onLearnMore}>
             Learn more
           </Button>
         )}

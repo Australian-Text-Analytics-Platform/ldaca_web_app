@@ -1,4 +1,3 @@
-
 import { Camera } from 'lucide-react';
 import { DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { usePreferencesStore } from '@/stores/preferencesStore';

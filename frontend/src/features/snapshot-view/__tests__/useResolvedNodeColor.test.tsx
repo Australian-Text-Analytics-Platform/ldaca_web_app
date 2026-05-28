@@ -12,9 +12,7 @@ import { useResolvedNodeColor } from '../useResolvedNodeColor';
  * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  * Flow: node colors enter manifest metadata, then the loaded snapshot fixture exposes them through the hook path.
  */
-function snapshotWithColors(
-  colors: Record<string, string>,
-): LoadedSnapshot {
+function snapshotWithColors(colors: Record<string, string>): LoadedSnapshot {
   const manifest: SnapshotManifest = {
     schema_version: 1,
     mode: 'demo',
@@ -87,9 +85,7 @@ describe('useResolvedNodeColor', () => {
     useSnapshotViewStore
       .getState()
       .loadSnapshot('concordance', snapshotWithColors({ n1: '#ff00ff' }), DEMO_SNAPSHOT_MODE);
-    const { result } = renderHook(() =>
-      useResolvedNodeColor('concordance', 'absent-node'),
-    );
+    const { result } = renderHook(() => useResolvedNodeColor('concordance', 'absent-node'));
     expect(result.current).toBeUndefined();
   });
 
@@ -99,12 +95,8 @@ describe('useResolvedNodeColor', () => {
       .getState()
       .loadSnapshot('concordance', snapshotWithColors({ n1: '#ff00ff' }), DEMO_SNAPSHOT_MODE);
 
-    const { result: concResult } = renderHook(() =>
-      useResolvedNodeColor('concordance', 'n1'),
-    );
-    const { result: quotResult } = renderHook(() =>
-      useResolvedNodeColor('quotation', 'n1'),
-    );
+    const { result: concResult } = renderHook(() => useResolvedNodeColor('concordance', 'n1'));
+    const { result: quotResult } = renderHook(() => useResolvedNodeColor('quotation', 'n1'));
 
     expect(concResult.current).toBe('#ff00ff'); // from snapshot
     expect(quotResult.current).toBe('#aaaaaa'); // from live

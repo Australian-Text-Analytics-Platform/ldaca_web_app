@@ -5,10 +5,7 @@ import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWork
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useNodeColumnInfos } from '@/hooks/useNodeColumnInfos';
 import { useAutoNodeColumns } from '@/hooks/useAutoNodeColumns';
-import {
-  applySelectedColumnsToSnapshots,
-  createNodeSnapshots,
-} from '@/hooks/useSchemaManagement';
+import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '@/hooks/useSchemaManagement';
 
 export interface AnalysisLockConfig {
   allowedDataTypes: string[];
@@ -31,12 +28,7 @@ export interface LockedNodesSnapshot {
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
-  const {
-    allowedDataTypes,
-    maxNodes = 2,
-    docTypeOnly = false,
-    storageScope,
-  } = config;
+  const { allowedDataTypes, maxNodes = 2, docTypeOnly = false, storageScope } = config;
 
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -92,43 +84,62 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
   /**
    * Replaces live selections with persisted node snapshots supplied by task
    * hydration, task request restoration, or a fresh lock action.
-    * Called by: lockSelection, lockWithCurrentNodes, and hydration restore helpers because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
-       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   * Called by: lockSelection, lockWithCurrentNodes, and hydration restore helpers because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const lockWithSnapshots = (
-      snapshotInput:
-        | Array<{ id: string; name?: string; columns?: string[] | null; shape?: [number | null, number | null] | number[] }>
-        | { id: string; name?: string; columns?: string[] | null; shape?: [number | null, number | null] | number[] }
-        | null
-        | undefined
-    ) => {
-      if (!snapshotInput) {
-        unlockSelection();
-        return;
-      }
+    snapshotInput:
+      | Array<{
+          id: string;
+          name?: string;
+          columns?: string[] | null;
+          shape?: [number | null, number | null] | number[];
+        }>
+      | {
+          id: string;
+          name?: string;
+          columns?: string[] | null;
+          shape?: [number | null, number | null] | number[];
+        }
+      | null
+      | undefined,
+  ) => {
+    if (!snapshotInput) {
+      unlockSelection();
+      return;
+    }
 
-      const snapshotArray = Array.isArray(snapshotInput) ? snapshotInput : [snapshotInput];
-      const normalized: LockedNodesSnapshot[] = snapshotArray
-        .filter((snap): snap is { id: string; name?: string; columns?: string[] | null; shape?: [number | null, number | null] | number[] } => Boolean(snap?.id))
-        .map((snap) => ({
-          id: snap.id,
-          name: snap.name ?? snap.id,
-          columns: Array.isArray(snap.columns)
-            ? snap.columns.filter((col): col is string => typeof col === 'string')
-            : [],
-          shape: snap.shape,
-        }));
+    const snapshotArray = Array.isArray(snapshotInput) ? snapshotInput : [snapshotInput];
+    const normalized: LockedNodesSnapshot[] = snapshotArray
+      .filter(
+        (
+          snap,
+        ): snap is {
+          id: string;
+          name?: string;
+          columns?: string[] | null;
+          shape?: [number | null, number | null] | number[];
+        } => Boolean(snap?.id),
+      )
+      .map((snap) => ({
+        id: snap.id,
+        name: snap.name ?? snap.id,
+        columns: Array.isArray(snap.columns)
+          ? snap.columns.filter((col): col is string => typeof col === 'string')
+          : [],
+        shape: snap.shape,
+      }));
 
-      if (!normalized.length) {
-        unlockSelection();
-        return;
-      }
+    if (!normalized.length) {
+      unlockSelection();
+      return;
+    }
 
-      setLockedNodesSnapshot(normalized);
-      setIsLocked(true);
-    };
+    setLockedNodesSnapshot(normalized);
+    setIsLocked(true);
+  };
 
-    /**
+  /**
    * Called by: toggleLock and feature run handlers before starting a new task because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
    * Flow: derive display state, bind user actions, then render the analysis UI.
    */
@@ -139,7 +150,10 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
         id: sel.nodeId,
         name: nodeIdToName[sel.nodeId] || sel.nodeId,
         columns: sel.column ? [sel.column] : [],
-        shape: (node as Record<string, unknown> | undefined)?.shape as [number | null, number | null] | number[] | undefined,
+        shape: (node as Record<string, unknown> | undefined)?.shape as
+          | [number | null, number | null]
+          | number[]
+          | undefined,
       };
     });
     lockWithSnapshots(snapshot);
@@ -260,11 +274,7 @@ export interface UseAnalysisLockMachineConfig extends AnalysisLockConfig {
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => {
-  const {
-    workspaceId = null,
-    getAuthHeaders = () => ({}),
-    ...lockConfig
-  } = config;
+  const { workspaceId = null, getAuthHeaders = () => ({}), ...lockConfig } = config;
 
   const lockState = useAnalysisLockCore(lockConfig);
   const { activeNodeIds, lockWithSnapshots } = lockState;
@@ -273,44 +283,42 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
   /**
    * Reads node metadata through the shared query cache before locking ids that
    * came from restored task requests or current workspace selections.
-    * Called by: lockWithCurrentNodes and restoreAnalysisLockFromRequest consumers because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
+   * Called by: lockWithCurrentNodes and restoreAnalysisLockFromRequest consumers because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
    */
   const captureSnapshotsForNodes = async (
-      nodeIds: string[],
-      columnMap?: Record<string, string>
-    ) => {
-      if (!workspaceId || !Array.isArray(nodeIds) || nodeIds.length === 0) {
-        return [];
-      }
+    nodeIds: string[],
+    columnMap?: Record<string, string>,
+  ) => {
+    if (!workspaceId || !Array.isArray(nodeIds) || nodeIds.length === 0) {
+      return [];
+    }
 
-      try {
-        const snapshots = await createNodeSnapshots(
-          workspaceId,
-          nodeIds,
-          getAuthHeaders,
-          queryClient,
-        );
-        return columnMap
-          ? applySelectedColumnsToSnapshots(snapshots, columnMap)
-          : snapshots;
-      } catch (error) {
-        console.error('Failed to capture node snapshots', error);
-        return [];
-      }
-    };
+    try {
+      const snapshots = await createNodeSnapshots(
+        workspaceId,
+        nodeIds,
+        getAuthHeaders,
+        queryClient,
+      );
+      return columnMap ? applySelectedColumnsToSnapshots(snapshots, columnMap) : snapshots;
+    } catch (error) {
+      console.error('Failed to capture node snapshots', error);
+      return [];
+    }
+  };
 
   /** Called by: analysis feature run handlers that need fresh snapshot data because locks should capture current node snapshots before the request mutates result state. */
   const lockWithCurrentNodes = async (columnMap?: Record<string, string>) => {
-      const nodeIds = activeNodeIds;
-      if (!nodeIds.length) {
-        lockWithSnapshots(null);
-        return;
-      }
-      const snapshots = await captureSnapshotsForNodes(nodeIds, columnMap);
-      if (snapshots.length) {
-        lockWithSnapshots(snapshots);
-      }
-    };
+    const nodeIds = activeNodeIds;
+    if (!nodeIds.length) {
+      lockWithSnapshots(null);
+      return;
+    }
+    const snapshots = await captureSnapshotsForNodes(nodeIds, columnMap);
+    if (snapshots.length) {
+      lockWithSnapshots(snapshots);
+    }
+  };
 
   return {
     ...lockState,

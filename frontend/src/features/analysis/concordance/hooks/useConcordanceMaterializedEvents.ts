@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+  type MutableRefObject,
+} from 'react';
 import { toast } from 'sonner';
 import { concordanceTaskRequest } from '@/api/generated/sdk.gen';
 import type { ConcordanceDispersionBinRow } from '@/api/generated/types.gen';
@@ -82,70 +89,76 @@ export function useConcordanceMaterializedEvents({
   const concordanceTaskIdRef = useRef<string>('');
   const processedMaterializedEventSeqRef = useRef<Set<number>>(new Set());
 
-  const handleMaterializeSuccess = useCallback(async (_nodeId: string, _taskId: string) => {
-    void _nodeId;
-    void _taskId;
-    toast.success('Process All complete.');
+  const handleMaterializeSuccess = useCallback(
+    async (_nodeId: string, _taskId: string) => {
+      void _nodeId;
+      void _taskId;
+      toast.success('Process All complete.');
 
-    // Refetch parent concordance task request to learn the newly-persisted
-    // materialized_paths map; then reset page_size to 20 and refetch results
-    // so the table re-renders with occurrence-row semantics. Note: the
-    // authoritative path arrives via the `analysis_materialized` SSE event
-    // (handled separately) — this fetch is best-effort additional coverage.
-    try {
-      const headers = getAuthHeaders();
-      const parentTaskId = await resolveTaskId();
-      if (parentTaskId) {
-        const { data: req } = await concordanceTaskRequest({
-          headers,
-          path: { task_id: parentTaskId },
-          throwOnError: true,
-        });
-        const reqObj = (req as Record<string, unknown>) ?? {};
-        const paths = (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
-        if (paths && typeof paths === 'object') {
-          setMaterializedPaths((prev) => ({ ...prev, ...paths }));
-        }
-        const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
-        if (summaries && typeof summaries === 'object') {
-          const parsed: Record<string, MaterializeSummary> = {};
-          for (const [nid, s] of Object.entries(summaries)) {
-            parsed[nid] = {
-              recordCount: Number(s.record_count) || 0,
-              uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
-              totalDocuments: Number(s.total_source_documents) || 0,
-            };
+      // Refetch parent concordance task request to learn the newly-persisted
+      // materialized_paths map; then reset page_size to 20 and refetch results
+      // so the table re-renders with occurrence-row semantics. Note: the
+      // authoritative path arrives via the `analysis_materialized` SSE event
+      // (handled separately) — this fetch is best-effort additional coverage.
+      try {
+        const headers = getAuthHeaders();
+        const parentTaskId = await resolveTaskId();
+        if (parentTaskId) {
+          const { data: req } = await concordanceTaskRequest({
+            headers,
+            path: { task_id: parentTaskId },
+            throwOnError: true,
+          });
+          const reqObj = (req as Record<string, unknown>) ?? {};
+          const paths =
+            (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
+          if (paths && typeof paths === 'object') {
+            setMaterializedPaths((prev) => ({ ...prev, ...paths }));
           }
-          setMaterializeSummaries((prev) => ({ ...prev, ...parsed }));
+          const summaries = reqObj.materialize_summaries as
+            | Record<string, Record<string, unknown>>
+            | undefined;
+          if (summaries && typeof summaries === 'object') {
+            const parsed: Record<string, MaterializeSummary> = {};
+            for (const [nid, s] of Object.entries(summaries)) {
+              parsed[nid] = {
+                recordCount: Number(s.record_count) || 0,
+                uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
+                totalDocuments: Number(s.total_source_documents) || 0,
+              };
+            }
+            setMaterializeSummaries((prev) => ({ ...prev, ...parsed }));
+          }
         }
+      } catch (error) {
+        console.warn('Failed to refresh concordance task request after materialize', error);
       }
-    } catch (error) {
-      console.warn('Failed to refresh concordance task request after materialize', error);
-    }
 
-    setGlobalPageSize(20);
-    setNodePagination((prev) => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach((key) => {
-        updated[key] = { ...updated[key]!, pageSize: 20, currentPage: 1 };
+      setGlobalPageSize(20);
+      setNodePagination((prev) => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach((key) => {
+          updated[key] = { ...updated[key]!, pageSize: 20, currentPage: 1 };
+        });
+        return updated;
       });
-      return updated;
-    });
 
-    try {
-      await persistResultPreferences({ pageSize: 20 });
-    } catch (error) {
-      console.warn('Failed to refetch concordance after materialize', error);
-    }
-  }, [
-    getAuthHeaders,
-    resolveTaskId,
-    persistResultPreferences,
-    setMaterializedPaths,
-    setMaterializeSummaries,
-    setGlobalPageSize,
-    setNodePagination,
-  ]);
+      try {
+        await persistResultPreferences({ pageSize: 20 });
+      } catch (error) {
+        console.warn('Failed to refetch concordance after materialize', error);
+      }
+    },
+    [
+      getAuthHeaders,
+      resolveTaskId,
+      persistResultPreferences,
+      setMaterializedPaths,
+      setMaterializeSummaries,
+      setGlobalPageSize,
+      setNodePagination,
+    ],
+  );
 
   const handleMaterializeFailure = useCallback((_nodeId: string, state: 'failed' | 'cancelled') => {
     void _nodeId;
@@ -189,9 +202,10 @@ export function useConcordanceMaterializedEvents({
       // way and the dispersion view's scope dropdown then flips to
       // "whole data block" automatically.
       if (
-        event.taskType !== 'concordance_materialize'
-        && event.taskType !== 'concordance_dispersion_detach'
-      ) continue;
+        event.taskType !== 'concordance_materialize' &&
+        event.taskType !== 'concordance_dispersion_detach'
+      )
+        continue;
       if (event.parentTaskId !== effectiveTaskId) continue;
       processedMaterializedEventSeqRef.current.add(event.sequence);
       setMaterializedPaths((prev) => ({ ...prev, [event.parentNodeId]: event.materializedPath }));

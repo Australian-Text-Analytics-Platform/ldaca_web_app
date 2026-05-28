@@ -78,7 +78,7 @@ describe('useNodeColorsStore — per-tab temp layer', () => {
     }
   });
 
-  it('ensureTempColors prefers a node\'s existing assigned colour as the starting temp', () => {
+  it("ensureTempColors prefers a node's existing assigned colour as the starting temp", () => {
     useNodeColorsStore.getState().setColor('a', '#2563eb');
     useNodeColorsStore.getState().ensureTempColors('concordance', ['a']);
     expect(useNodeColorsStore.getState().temps.concordance?.a).toBe('#2563eb');
@@ -92,7 +92,7 @@ describe('useNodeColorsStore — per-tab temp layer', () => {
     expect(tabTemps.b).not.toBe('#2563eb');
   });
 
-  it('setTempColor writes manual picks into the tab\'s temp layer (not assigned)', () => {
+  it("setTempColor writes manual picks into the tab's temp layer (not assigned)", () => {
     useNodeColorsStore.getState().setTempColor('concordance', 'a', '#dc2626');
     expect(useNodeColorsStore.getState().temps.concordance?.a).toBe('#dc2626');
     expect(useNodeColorsStore.getState().colors.a).toBeUndefined();
@@ -131,7 +131,7 @@ describe('useNodeColorsStore — per-tab temp layer', () => {
     expect(temps.concordance?.b).toBe('#dc2626');
   });
 
-  it('promoteTempColors does NOT touch other tabs\' temps', () => {
+  it("promoteTempColors does NOT touch other tabs' temps", () => {
     useNodeColorsStore.getState().setTempColor('concordance', 'a', '#2563eb');
     useNodeColorsStore.getState().setTempColor('token-frequency', 'a', '#dc2626');
     useNodeColorsStore.getState().promoteTempColors('concordance', ['a']);

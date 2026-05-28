@@ -1,7 +1,19 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export interface FilePreviewData {
   previewData: Array<Record<string, unknown>>;
@@ -52,7 +64,16 @@ export function FilePreviewContent({
   footer,
 }: FilePreviewContentProps) {
   const isOpen = open && Boolean(filename);
-  const { previewData, columns, loading, error, fileType, sheetNames, selectedSheet, setSelectedSheet } = data;
+  const {
+    previewData,
+    columns,
+    loading,
+    error,
+    fileType,
+    sheetNames,
+    selectedSheet,
+    setSelectedSheet,
+  } = data;
 
   const handleSheetChange = (value: string) => {
     const next = value || null;
@@ -77,10 +98,7 @@ export function FilePreviewContent({
             {description ?? 'Inspect file content before adding to workspace.'}
           </DialogDescription>
         </DialogHeader>
-        <Card
-          className="flex w-full min-w-0 flex-col"
-          style={{ maxHeight: cardMaxHeight }}
-        >
+        <Card className="flex w-full min-w-0 flex-col" style={{ maxHeight: cardMaxHeight }}>
           <CardHeader className="border-b px-6 py-4">
             <CardTitle className="truncate text-lg font-semibold">
               {title ?? `File${filename ? `: ${filename}` : ''}`}
@@ -110,7 +128,9 @@ export function FilePreviewContent({
               </div>
             )}
             <div>
-              <label className="mb-2 block text-sm font-medium text-foreground">Preview (first rows)</label>
+              <label className="mb-2 block text-sm font-medium text-foreground">
+                Preview (first rows)
+              </label>
               <div className="max-h-60 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded border border-border">
                 {loading ? (
                   <div className="p-4 text-sm text-muted-foreground">Loading…</div>

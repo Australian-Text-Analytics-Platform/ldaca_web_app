@@ -4,7 +4,8 @@ import type { WorkspaceNodeLike } from '@/features/analysis/common/components/No
  * Safely treats loose workspace-node metadata as an object.
  * Used by: local callers in preprocessing/nodeMetadata module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
-const toRecord = (value: unknown): Record<string, unknown> => (value && typeof value === 'object' ? value as Record<string, unknown> : {});
+const toRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
 /**
  * Derives the human label used by preprocessing panels and auto names.
@@ -12,11 +13,7 @@ const toRecord = (value: unknown): Record<string, unknown> => (value && typeof v
  */
 export const deriveNodeLabel = (node: WorkspaceNodeLike | null | undefined): string => {
   const base = toRecord(node);
-  return (
-    (base.name as string | undefined) ??
-    (base.id as string | undefined) ??
-    ''
-  );
+  return (base.name as string | undefined) ?? (base.id as string | undefined) ?? '';
 };
 
 /**
@@ -25,18 +22,16 @@ export const deriveNodeLabel = (node: WorkspaceNodeLike | null | undefined): str
  */
 export const getNodeKey = (node: WorkspaceNodeLike, fallback?: string): string => {
   const base = toRecord(node);
-  return (
-    (base.id as string | undefined) ??
-    fallback ??
-    ''
-  );
+  return (base.id as string | undefined) ?? fallback ?? '';
 };
 
 /**
  * Builds the node lookup map shared by join, filter, slice, and concat hooks.
  * Used by: useSliceSubTab hook, useJoinSubTab hook, useConcatSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
-export const buildWorkspaceNodeMap = (workspaceNodes: WorkspaceNodeLike[]): Map<string, WorkspaceNodeLike> => {
+export const buildWorkspaceNodeMap = (
+  workspaceNodes: WorkspaceNodeLike[],
+): Map<string, WorkspaceNodeLike> => {
   const map = new Map<string, WorkspaceNodeLike>();
   workspaceNodes.forEach((node, index) => {
     const key = getNodeKey(node, `node-${index}`);
@@ -67,13 +62,18 @@ export const extractNodeColumns = (node: WorkspaceNodeLike | null | undefined): 
  * Used by: useConcatSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  * Flow: coerce the node to a record, inspect object-shaped schema metadata, stringify dtype values per column, and return an empty map otherwise.
  */
-export const extractNodeDtypes = (node: WorkspaceNodeLike | null | undefined): Record<string, string> => {
+export const extractNodeDtypes = (
+  node: WorkspaceNodeLike | null | undefined,
+): Record<string, string> => {
   const base = toRecord(node);
   if (base.schema && typeof base.schema === 'object') {
-    return Object.entries(base.schema as Record<string, unknown>).reduce<Record<string, string>>((acc, [column, dtype]) => {
-      acc[column] = String(dtype);
-      return acc;
-    }, {});
+    return Object.entries(base.schema as Record<string, unknown>).reduce<Record<string, string>>(
+      (acc, [column, dtype]) => {
+        acc[column] = String(dtype);
+        return acc;
+      },
+      {},
+    );
   }
   return {};
 };
@@ -84,7 +84,9 @@ export const extractNodeDtypes = (node: WorkspaceNodeLike | null | undefined): R
  * Steps: inspect legacy and nested metadata keys, prefer the first non-empty string, and
  * leave callers undefined when no document column is declared.
  */
-export const getNodeDocumentColumn = (node: WorkspaceNodeLike | null | undefined): string | undefined => {
+export const getNodeDocumentColumn = (
+  node: WorkspaceNodeLike | null | undefined,
+): string | undefined => {
   const base = toRecord(node);
   const data = toRecord(base.data);
   const dataNode = toRecord(data.node);

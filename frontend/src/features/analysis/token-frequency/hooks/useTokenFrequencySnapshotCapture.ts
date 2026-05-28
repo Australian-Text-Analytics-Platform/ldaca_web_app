@@ -9,10 +9,7 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import type {
-  TokenFrequencyRequestInput,
-  TokenFrequencyResponse,
-} from '@/api/generated/types.gen';
+import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
 import { uploadSnapshot } from '@/api/generated/sdk.gen';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
@@ -80,9 +77,7 @@ function buildTokenFrequencyPreview(
     for (const row of rows) {
       const token = typeof row?.token === 'string' ? row.token : '';
       const frequency =
-        typeof row?.frequency === 'number' && Number.isFinite(row.frequency)
-          ? row.frequency
-          : 0;
+        typeof row?.frequency === 'number' && Number.isFinite(row.frequency) ? row.frequency : 0;
       if (frequency > topTokenCount) {
         topToken = token;
         topTokenCount = frequency;
@@ -90,11 +85,12 @@ function buildTokenFrequencyPreview(
     }
   }
   const nodeTokenizerModels = request?.node_tokenizer_models ?? {};
-  const tokeniserId = request?.tokenizer_model
-    ?? (Object.entries(nodeTokenizerModels)
+  const tokeniserId =
+    request?.tokenizer_model ??
+    (Object.entries(nodeTokenizerModels)
       .map(([nodeId, model]) => `${nodeId}: ${model}`)
-      .join(', ')
-      || '(unspecified)');
+      .join(', ') ||
+      '(unspecified)');
   return {
     tool: 'token_frequencies',
     vocabSize,
@@ -109,9 +105,7 @@ function buildTokenFrequencyPreview(
  * Used by: useTokenFrequencySnapshotLoad.ts, compat.ts, TokenFrequencyFeature.tsx because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
  * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
  */
-export function useTokenFrequencySnapshotCapture(
-  input: UseTokenFrequencySnapshotCaptureInput,
-) {
+export function useTokenFrequencySnapshotCapture(input: UseTokenFrequencySnapshotCaptureInput) {
   const {
     workspaceId,
     workspaceName,
@@ -181,9 +175,7 @@ export function useTokenFrequencySnapshotCapture(
         tool: 'token_frequencies',
         tool_version: getCurrentAppVersion() || 'v0.0.0-dev',
         captured_at: new Date().toISOString(),
-        title: filename
-          .replace(/^token_frequencies-/, '')
-          .replace(/\.ldaca-snapshot$/, ''),
+        title: filename.replace(/^token_frequencies-/, '').replace(/\.ldaca-snapshot$/, ''),
         source: {
           workspace_id: workspaceId,
           workspace_name: workspaceName,
@@ -202,9 +194,7 @@ export function useTokenFrequencySnapshotCapture(
         preview: buildTokenFrequencyPreview(results, request),
         payloads: [
           { kind: 'result', path: RESULT_PAYLOAD_PATH },
-          ...(request
-            ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const)
-            : []),
+          ...(request ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const) : []),
         ],
         node_colors: nodeColorsForSnapshot,
       };
@@ -229,14 +219,6 @@ export function useTokenFrequencySnapshotCapture(
         throwOnError: true,
       });
     },
-    [
-      workspaceId,
-      workspaceName,
-      request,
-      results,
-      selectedNodes,
-      getNodeRowCount,
-      getAuthHeaders,
-    ],
+    [workspaceId, workspaceName, request, results, selectedNodes, getNodeRowCount, getAuthHeaders],
   );
 }

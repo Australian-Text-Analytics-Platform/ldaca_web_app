@@ -4,7 +4,10 @@ import { isConditionComplete } from '../filter/utils/serializers';
 const DEFAULT_NAME_FALLBACK = 'dataset';
 const DEFAULT_SLICE_OFFSET = 0;
 
-const EXPRESSION_CONTEXT_SUFFIX: Record<'filter' | 'with_columns' | 'select' | 'sort' | 'group_by_agg', string> = {
+const EXPRESSION_CONTEXT_SUFFIX: Record<
+  'filter' | 'with_columns' | 'select' | 'sort' | 'group_by_agg',
+  string
+> = {
   filter: 'filtered_expr',
   with_columns: 'with_columns',
   select: 'selected_expr',
@@ -50,7 +53,10 @@ const formatScalar = (value: string | number | boolean | Date | null): string =>
 const formatConditionValue = (value: FilterConditionWithId['value']): string => {
   if (Array.isArray(value)) {
     if (value.length === 0) return 'empty';
-    return value.slice(0, 3).map((entry) => formatScalar(entry)).join('_or_');
+    return value
+      .slice(0, 3)
+      .map((entry) => formatScalar(entry))
+      .join('_or_');
   }
 
   if (value instanceof Date) {
@@ -63,7 +69,12 @@ const formatConditionValue = (value: FilterConditionWithId['value']): string => 
     return `${startToken}_and_${endToken}`;
   }
 
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value === null
+  ) {
     return formatScalar(value);
   }
 
@@ -147,7 +158,8 @@ export const buildSamplingAutoNodeName = ({
   const base = (baseName || '').trim() || DEFAULT_NAME_FALLBACK;
 
   if (mode === 'slice') {
-    const start = Number.isInteger(offset) && (offset ?? 0) >= 0 ? (offset ?? 0) : DEFAULT_SLICE_OFFSET;
+    const start =
+      Number.isInteger(offset) && (offset ?? 0) >= 0 ? (offset ?? 0) : DEFAULT_SLICE_OFFSET;
 
     if (!Number.isInteger(length) || length === undefined) {
       return `${base}_sliced_from_${start}`;

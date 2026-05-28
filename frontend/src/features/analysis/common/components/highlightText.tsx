@@ -72,12 +72,19 @@ export const highlightMatchInText = (
   let cursor = 0;
   mergedRanges.forEach((range, index) => {
     if (cursor < range.start) {
-      children.push(<React.Fragment key={`plain-${index}`}>{textValue.slice(cursor, range.start)}</React.Fragment>);
+      children.push(
+        <React.Fragment key={`plain-${index}`}>
+          {textValue.slice(cursor, range.start)}
+        </React.Fragment>,
+      );
     }
     children.push(
-      <mark key={`mark-${range.start}-${range.end}`} className="bg-yellow-200 text-gray-900 rounded px-1">
+      <mark
+        key={`mark-${range.start}-${range.end}`}
+        className="bg-yellow-200 text-gray-900 rounded px-1"
+      >
         {textValue.slice(range.start, range.end)}
-      </mark>
+      </mark>,
     );
     cursor = range.end;
   });

@@ -51,7 +51,9 @@ export function FilterValueChecklist({
   onClearAll,
   onRetry,
 }: FilterValueChecklistProps) {
-  const filteredOptions = options.filter((option) => matchChecklistOption(option.label, searchQuery));
+  const filteredOptions = options.filter((option) =>
+    matchChecklistOption(option.label, searchQuery),
+  );
 
   const hasActiveSearch = searchQuery.trim().length > 0;
   const selectLabel = hasActiveSearch ? 'Select All Filtered' : 'Select all';
@@ -61,7 +63,9 @@ export function FilterValueChecklist({
       <Input
         type="text"
         value={searchQuery}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>) => onSearchQueryChange(event.target.value)}
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+          onSearchQueryChange(event.target.value)
+        }
         disabled={disabled}
         placeholder="Search values (supports * and ?)"
         className="h-8 text-sm"
@@ -88,13 +92,7 @@ export function FilterValueChecklist({
           Clear
         </Button>
         {error && onRetry && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onRetry}
-            disabled={disabled}
-          >
+          <Button type="button" variant="outline" size="sm" onClick={onRetry} disabled={disabled}>
             Retry
           </Button>
         )}
@@ -127,7 +125,9 @@ export function FilterValueChecklist({
                 >
                   <Checkbox
                     checked={checked}
-                    onCheckedChange={(next: boolean | 'indeterminate') => onToggleOption(option, next === true)}
+                    onCheckedChange={(next: boolean | 'indeterminate') =>
+                      onToggleOption(option, next === true)
+                    }
                     disabled={disabled}
                     id={`${idPrefix}-${option.key}`}
                   />
@@ -145,4 +145,4 @@ export function FilterValueChecklist({
       )}
     </div>
   );
-};
+}

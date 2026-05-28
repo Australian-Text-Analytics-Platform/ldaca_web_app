@@ -27,9 +27,9 @@ import { cn } from '@/lib/utils';
 import { DemoSnapshotsTab } from './DemoSnapshotsTab';
 
 const TOOL_LABELS: Record<string, string> = {
-  'concordance': 'Concordance',
+  concordance: 'Concordance',
   'token-frequency': 'Token Frequency',
-  'preprocessing': 'Preprocessing',
+  preprocessing: 'Preprocessing',
   'data-loader': 'Data Loader',
   'topic-modeling': 'Topic Modeling',
   'sequential-analysis': 'Sequential Analysis',
@@ -54,9 +54,9 @@ function formatBytes(bytes: number): string {
  */
 function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
   const map: Record<SampleDataCollection['status'], { label: string; className: string }> = {
-    bundled:        { label: '● Available',      className: 'text-green-600 dark:text-green-400' },
-    downloaded:     { label: '✓ Downloaded',     className: 'text-green-600 dark:text-green-400' },
-    partial:        { label: '⚠ Partial',        className: 'text-yellow-600 dark:text-yellow-400' },
+    bundled: { label: '● Available', className: 'text-green-600 dark:text-green-400' },
+    downloaded: { label: '✓ Downloaded', className: 'text-green-600 dark:text-green-400' },
+    partial: { label: '⚠ Partial', className: 'text-yellow-600 dark:text-yellow-400' },
     not_downloaded: { label: '○ Not downloaded', className: 'text-muted-foreground' },
   };
   const { label, className } = map[status] ?? map.not_downloaded;
@@ -99,7 +99,12 @@ function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
   const content = typeof data === 'string' ? data : '';
 
   return (
-    <Dialog open={path !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open={path !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{collectionName}</DialogTitle>
@@ -116,9 +121,7 @@ function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
               <Skeleton className="h-4 w-2/3" />
             </div>
           )}
-          {isError && (
-            <p className="text-sm text-destructive py-2">Could not load README.</p>
-          )}
+          {isError && <p className="text-sm text-destructive py-2">Could not load README.</p>}
           {!isLoading && !isError && content && (
             <div className="prose prose-sm prose-slate dark:prose-invert max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
@@ -127,7 +130,9 @@ function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -177,8 +182,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
    * Toggles optional remote collections in the dataset import dialog.
    * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const toggle = (id: string) =>
-    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggle = (id: string) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
 
   /**
    * Imports selected sample datasets and refreshes the parent file browser once
@@ -210,7 +214,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
       } else {
         toast.success('Sample data imported.');
       }
-      await onImportComplete();
+      onImportComplete();
       setOpen(false);
     } catch (err) {
       toast.dismiss(loadingToastId);
@@ -234,7 +238,8 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
           <DialogHeader>
             <DialogTitle>Import sample content</DialogTitle>
             <DialogDescription>
-              Datasets are raw corpora; demo snapshots are pre-built analyses you can open in any tool.
+              Datasets are raw corpora; demo snapshots are pre-built analyses you can open in any
+              tool.
             </DialogDescription>
           </DialogHeader>
 
@@ -284,7 +289,9 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
                               <Quote className="h-3.5 w-3.5" />
                             </Button>
                           )}
-                          <span className="text-xs text-muted-foreground">{formatBytes(col.total_size_bytes)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatBytes(col.total_size_bytes)}
+                          </span>
                           <StatusChip status={col.status} />
                         </div>
                         {col.recommended_for.length > 0 && (
@@ -309,7 +316,9 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
               )}
 
               <div className="flex justify-end">
-                <Button onClick={handleImport} disabled={importing || (!isError && !anyChecked)}>
+                <Button onClick={() => {
+                  void handleImport();
+                }} disabled={importing || (!isError && !anyChecked)}>
                   <FolderPlus className="mr-2 h-4 w-4" />
                   {importing ? 'Importing…' : 'Import selected'}
                 </Button>
@@ -319,7 +328,9 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
             <TabsContent value="snapshots">
               <DemoSnapshotsTab
                 authHeaders={authHeaders}
-                onImportComplete={() => { /* keep dialog open; the toast confirms */ }}
+                onImportComplete={() => {
+                  /* keep dialog open; the toast confirms */
+                }}
                 enabled={open}
               />
             </TabsContent>

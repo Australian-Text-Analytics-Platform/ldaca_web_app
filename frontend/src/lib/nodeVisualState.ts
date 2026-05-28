@@ -79,10 +79,7 @@ export function activeSetForContext(ctx: NodeVisualContext): string[] {
 
 /** Decide how one node should be rendered. */
 /** Used by: src/components/layout/sidebar/SidebarNodesSection.tsx, src/features/workspace/graph-view/hooks/useWorkspaceGraph.ts, src/lib/__tests__/nodeVisualState.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-export function nodeVisualInfo(
-  nodeId: string,
-  ctx: NodeVisualContext,
-): NodeVisualInfo {
+export function nodeVisualInfo(nodeId: string, ctx: NodeVisualContext): NodeVisualInfo {
   const pair = colorPairFor(ctx.assignedColors[nodeId]);
   if (!ctx.selectedNodeIds.includes(nodeId)) {
     return { state: 'unselected', pair };

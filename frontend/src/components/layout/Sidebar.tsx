@@ -32,7 +32,6 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { useHintsStore } from '@/stores/hintsStore';
 import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
-import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
@@ -121,21 +120,23 @@ function Sidebar() {
     openModal,
     resetSessionDismissedHints,
   } = useUIStore(
-    useShallow(({
-      currentView,
-      visibleViews,
-      setCurrentView,
-      setViewVisibility,
-      openModal,
-      resetSessionDismissedHints,
-    }) => ({
-      currentView,
-      visibleViews,
-      setCurrentView,
-      setViewVisibility,
-      openModal,
-      resetSessionDismissedHints,
-    }))
+    useShallow(
+      ({
+        currentView,
+        visibleViews,
+        setCurrentView,
+        setViewVisibility,
+        openModal,
+        resetSessionDismissedHints,
+      }) => ({
+        currentView,
+        visibleViews,
+        setCurrentView,
+        setViewVisibility,
+        openModal,
+        resetSessionDismissedHints,
+      }),
+    ),
   );
   const resetHints = useHintsStore((state) => state.resetHints);
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
@@ -151,7 +152,6 @@ function Sidebar() {
     await logout();
   };
   const tasks = useAnalysisStore((state) => state.tasks);
-  const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const {
     status: taskStreamStatus,
     error: taskStreamError,
@@ -164,7 +164,7 @@ function Sidebar() {
   /** Called by: the quotation view SidebarMenuAction settings button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const openQuotationEngineDialog = () => {
     setCurrentView('quotation');
-    openEngineDialog();
+    openModal('quotationEngine');
   };
 
   /** Called by: the Sidebar view menu Reset all hints item because the caller needs one documented boundary for the lookup, event, or state handoff step. */
@@ -216,7 +216,7 @@ function Sidebar() {
 
   /**
    * Called by: Sidebar's Views section body renderer because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
-    * Flow: map visible views to sidebar buttons, disable workspace-only views until a workspace loads, and attach the quotation settings action.
+   * Flow: map visible views to sidebar buttons, disable workspace-only views until a workspace loads, and attach the quotation settings action.
    */
   const renderViewsBody = () => (
     <SidebarMenu>
@@ -266,30 +266,41 @@ function Sidebar() {
     </SidebarMenu>
   );
   return (
-    <SidebarRoot
-      className="md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden"
-    >
+    <SidebarRoot className="md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden">
       <SidebarHeader className="border-b border-border/40 px-3 py-2">
         <div className="flex min-w-0 flex-col gap-2 w-full">
           <div className="flex items-center gap-2 w-full">
             <SidebarTrigger className="md:hidden" />
             <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
           </div>
-              <div className="flex items-center w-full">
+          <div className="flex items-center w-full">
             <p className="text-xl font-semibold flex-1">Wordflow</p>
-                <InfoIcon targetKey="general.overview" label="About Wordflow" className="h-5 w-5 text-blue-500" />
-                <ReferenceIcon targetKey="general.platform" label="Cite LDaCA Wordflow" className="h-5 w-5 text-emerald-600" />
-              </div>
+            <InfoIcon
+              targetKey="general.overview"
+              label="About Wordflow"
+              className="h-5 w-5 text-blue-500"
+            />
+            <ReferenceIcon
+              targetKey="general.platform"
+              label="Cite LDaCA Wordflow"
+              className="h-5 w-5 text-emerald-600"
+            />
+          </div>
           {isMultiUserMode && (
             <div className="flex items-center justify-between w-full">
-              <p className="text-[11px] text-muted-foreground truncate" title={user?.name ?? 'Guest'}>
+              <p
+                className="text-[11px] text-muted-foreground truncate"
+                title={user?.name ?? 'Guest'}
+              >
                 Welcome, {user?.name ?? 'Guest'}
               </p>
               <Button
                 variant="ghost"
                 size="sm"
                 className="text-xs text-red-600 hover:text-red-700 shrink-0 h-auto py-0 px-1"
-                onClick={handleLogout}
+                onClick={() => {
+                  void handleLogout();
+                }}
               >
                 Logout
               </Button>
@@ -325,9 +336,7 @@ function Sidebar() {
                       onClick={() => toggleSection(key)}
                       aria-expanded={!collapsed}
                     >
-                      <span className="flex items-center gap-1">
-                        {title}
-                      </span>
+                      <span className="flex items-center gap-1">{title}</span>
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                         {key === 'nodes' && (
                           <span className="font-medium text-foreground/80">{nodeCount}</span>
@@ -347,7 +356,7 @@ function Sidebar() {
                         <ChevronDown
                           className={cn(
                             'h-3 w-3 transition-transform',
-                            collapsed ? '-rotate-90' : 'rotate-0'
+                            collapsed ? '-rotate-90' : 'rotate-0',
                           )}
                         />
                       </div>
@@ -359,53 +368,55 @@ function Sidebar() {
                     />
                     {key === 'views' && (
                       <div className="pr-1.5">
-                      <DropdownMenu>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground"
-                                aria-label="Edit visible views"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">Edit visible views</TooltipContent>
-                        </Tooltip>
-                        <DropdownMenuContent align="end" className="w-56">
-                          {NAV_ITEMS.filter(({ id }) => id !== 'data-loader').map(({ id, label }) => {
-                            const checked = visibleViews.includes(id);
-                            const isLastVisibleItem = checked && visibleViews.length === 1;
-                            return (
-                              <DropdownMenuCheckboxItem
-                                key={id}
-                                checked={checked}
-                                disabled={isLastVisibleItem}
-                                onSelect={(event) => {
-                                  event.preventDefault();
-                                  setViewVisibility(id, !checked);
-                                }}
-                              >
-                                {label}
-                              </DropdownMenuCheckboxItem>
-                            );
-                          })}
-                          <DropdownMenuSeparator />
-                          <DemoSnapshotsToggleItem />
-                          <DropdownMenuItem
-                            onSelect={handleResetHints}
-                            className="text-xs text-muted-foreground focus:text-foreground"
-                          >
-                            <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                            Reset all hints
-                          </DropdownMenuItem>
-                          <ClearEmbeddingCacheMenuItem />
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        <DropdownMenu>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground"
+                                  aria-label="Edit visible views"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">Edit visible views</TooltipContent>
+                          </Tooltip>
+                          <DropdownMenuContent align="end" className="w-56">
+                            {NAV_ITEMS.filter(({ id }) => id !== 'data-loader').map(
+                              ({ id, label }) => {
+                                const checked = visibleViews.includes(id);
+                                const isLastVisibleItem = checked && visibleViews.length === 1;
+                                return (
+                                  <DropdownMenuCheckboxItem
+                                    key={id}
+                                    checked={checked}
+                                    disabled={isLastVisibleItem}
+                                    onSelect={(event) => {
+                                      event.preventDefault();
+                                      setViewVisibility(id, !checked);
+                                    }}
+                                  >
+                                    {label}
+                                  </DropdownMenuCheckboxItem>
+                                );
+                              },
+                            )}
+                            <DropdownMenuSeparator />
+                            <DemoSnapshotsToggleItem />
+                            <DropdownMenuItem
+                              onSelect={handleResetHints}
+                              className="text-xs text-muted-foreground focus:text-foreground"
+                            >
+                              <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                              Reset all hints
+                            </DropdownMenuItem>
+                            <ClearEmbeddingCacheMenuItem />
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     )}
                   </div>
@@ -413,7 +424,7 @@ function Sidebar() {
                 <div
                   className={cn(
                     'flex-1 overflow-hidden transition-[max-height] duration-200',
-                    collapsed ? 'max-h-0' : 'max-h-full'
+                    collapsed ? 'max-h-0' : 'max-h-full',
                   )}
                 >
                   {!collapsed && (
@@ -460,7 +471,11 @@ function Sidebar() {
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
                   Working directory
-                  <HelpIcon targetKey="ui.working-directory" label="Working Directory" className="h-4 w-4 text-muted-foreground" />
+                  <HelpIcon
+                    targetKey="ui.working-directory"
+                    label="Working Directory"
+                    className="h-4 w-4 text-muted-foreground"
+                  />
                 </p>
                 <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
                   {dataFolder || 'Not configured'}
@@ -507,10 +522,7 @@ function Sidebar() {
 
       <SidebarRail />
       {!isMultiUserMode && (
-        <DataFolderDialog
-          open={isDataFolderDialogOpen}
-          onOpenChange={setIsDataFolderDialogOpen}
-        />
+        <DataFolderDialog open={isDataFolderDialogOpen} onOpenChange={setIsDataFolderDialogOpen} />
       )}
     </SidebarRoot>
   );

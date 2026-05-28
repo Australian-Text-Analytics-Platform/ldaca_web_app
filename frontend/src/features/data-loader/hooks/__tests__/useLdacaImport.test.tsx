@@ -30,7 +30,7 @@ const cooeeRecord: LdacaSearchResult = {
 describe('useLdacaImport', () => {
   const authHeaders = { Authorization: 'Bearer token' };
   const ldacaApiToken = 'ldaca-secret-token';
-  const refetchFiles = vi.fn(async () => undefined);
+  const refetchFiles = vi.fn(() => Promise.resolve());
   const notify = vi.fn();
 
   beforeEach(() => {

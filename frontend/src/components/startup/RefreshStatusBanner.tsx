@@ -46,7 +46,9 @@ export function RefreshStatusBanner() {
           )}
           <button
             type="button"
-            onClick={refreshAuth}
+            onClick={() => {
+              void refreshAuth();
+            }}
             className="rounded-full border border-amber-400 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
           >
             Retry now

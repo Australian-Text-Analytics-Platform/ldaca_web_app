@@ -2,10 +2,7 @@
  * Thin re-export shim. See `tutorialRegistry.ts` for the design.
  */
 
-import {
-  type BundledReferenceKey,
-  type DocTarget,
-} from './bundledRegistry';
+import { type BundledReferenceKey, type DocTarget } from './bundledRegistry';
 import { getDocTarget } from './getDocTarget';
 
 export type ReferenceTarget = DocTarget;

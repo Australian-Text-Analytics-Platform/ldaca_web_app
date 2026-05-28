@@ -1,4 +1,4 @@
-import dagre from 'dagre';
+import dagre from '@dagrejs/dagre';
 
 export interface GraphLayoutOptions {
   rankdir?: 'LR' | 'TB';
@@ -36,7 +36,7 @@ const SUPER_SOURCE_ID = '__dagre_super_source_2f7c3a__';
 export const computeDagreLayout = (
   nodes: GraphNode[] = [],
   edges: GraphEdge[] = [],
-  options: GraphLayoutOptions = {}
+  options: GraphLayoutOptions = {},
 ) => {
   const g = new dagre.graphlib.Graph();
   g.setGraph({
@@ -63,9 +63,7 @@ export const computeDagreLayout = (
   // stripped from the position output so the rest of the app never
   // learns it existed.
   const incomingTargets = new Set(edges.map((edge) => edge.target));
-  const rootIds = nodes
-    .filter((node) => !incomingTargets.has(node.id))
-    .map((node) => node.id);
+  const rootIds = nodes.filter((node) => !incomingTargets.has(node.id)).map((node) => node.id);
   const useSuperSource = rootIds.length > 0;
 
   if (useSuperSource) {

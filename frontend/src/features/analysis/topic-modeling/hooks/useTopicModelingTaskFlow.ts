@@ -115,11 +115,7 @@ export function useTopicModelingTaskFlow({
     resolveTopicModelingTaskId,
     setLocalTaskId,
   },
-  lock: {
-    getAuthHeaders,
-    lockWithSnapshots,
-    queryClient,
-  },
+  lock: { getAuthHeaders, lockWithSnapshots, queryClient },
 }: Params) {
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
@@ -136,8 +132,8 @@ export function useTopicModelingTaskFlow({
   // Submits the topic-modeling request and restores the analysis lock for the requested nodes.
   /**
    * Called by: useTopicModelingTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
   const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) return;
     if (runningRef.current) return;
@@ -212,8 +208,8 @@ export function useTopicModelingTaskFlow({
   // Loads available detach columns before opening the topic-modeling detach dialog.
   /**
    * Called by: useTopicModelingTaskFlow during this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
   const openDetachDialog = async () => {
     if (!currentWorkspaceId) return;
     const taskId = await resolveTopicModelingTaskId();
@@ -247,8 +243,8 @@ export function useTopicModelingTaskFlow({
   // Confirms topic detach with selected source columns and displayed representative-word overrides.
   /**
    * Called by: useTopicModelingTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
   const handleDetachConfirm = async () => {
     if (!currentWorkspaceId) return;
     const taskId = await resolveTopicModelingTaskId();
@@ -266,9 +262,13 @@ export function useTopicModelingTaskFlow({
           const sampleFraction = sampleFractions?.[index];
           return [
             node.node_id,
-            buildTopicDetachNodeName(String(node.node_name || node.node_id), sampleFraction, randomSeed),
+            buildTopicDetachNodeName(
+              String(node.node_name || node.node_id),
+              sampleFraction,
+              randomSeed,
+            ),
           ];
-        })
+        }),
       );
       // Build a per-topic words override from what's currently on screen.
       // ``displayedTopics`` is already filtered by the stopword toggle;

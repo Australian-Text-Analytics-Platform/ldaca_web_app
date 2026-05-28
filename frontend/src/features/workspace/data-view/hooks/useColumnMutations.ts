@@ -12,7 +12,7 @@ interface DatetimeModalState {
 }
 
 interface UseColumnMutationsArgs {
-/** Applies a fetched schema to local header dtype state. */
+  /** Applies a fetched schema to local header dtype state. */
   workspaceId: string | undefined;
   nodeId: string | undefined;
   /** Current visible column names (used for duplicate-rename validation). */
@@ -91,9 +91,15 @@ export const useColumnMutations = ({
     if (!workspaceId || !nodeId || !onRefreshSchema) return;
     let cancelled = false;
     onRefreshSchema()
-      .then((schema) => { if (!cancelled) applySchema(schema); })
-      .catch((error) => { if (!cancelled) console.error('useColumnMutations: failed to refresh schema', error); });
-    return () => { cancelled = true; };
+      .then((schema) => {
+        if (!cancelled) applySchema(schema);
+      })
+      .catch((error) => {
+        if (!cancelled) console.error('useColumnMutations: failed to refresh schema', error);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [workspaceId, nodeId, onRefreshSchema, applySchema]);
 
   /** Tracks per-column mutation spinners for rename/delete actions. */
@@ -107,44 +113,53 @@ export const useColumnMutations = ({
   }, []);
 
   /** Runs a dtype cast and refreshes schema so headers reflect the new type. */
-  const performCast = useCallback(async (column: string, targetType: string, format?: string) => {
-    if (!onCast) return;
-    setLoadingCast((prev) => ({ ...prev, [column]: true }));
-    try {
-      await onCast(column, targetType, format);
-      if (onRefreshSchema) {
-        const schema = await onRefreshSchema();
-        applySchema(schema);
+  const performCast = useCallback(
+    async (column: string, targetType: string, format?: string) => {
+      if (!onCast) return;
+      setLoadingCast((prev) => ({ ...prev, [column]: true }));
+      try {
+        await onCast(column, targetType, format);
+        if (onRefreshSchema) {
+          const schema = await onRefreshSchema();
+          applySchema(schema);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        toast.error(`Failed to convert column "${column}" to ${targetType}: ${message}`);
+      } finally {
+        setLoadingCast((prev) => ({ ...prev, [column]: false }));
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to convert column "${column}" to ${targetType}: ${message}`);
-    } finally {
-      setLoadingCast((prev) => ({ ...prev, [column]: false }));
-    }
-  }, [onCast, onRefreshSchema, applySchema]);
+    },
+    [onCast, onRefreshSchema, applySchema],
+  );
 
   /** Handles dtype menu selection, including the datetime-format confirmation path. */
-  const handleTypeChange = useCallback((column: string, newType: string) => {
-    if (!onCast) return;
-    const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
-    if (newType.toLowerCase() === currentType.toLowerCase()) return;
-    const isStringToDatetime =
-      newType.toLowerCase() === 'datetime'
-      && (currentType === 'string' || currentType.includes('utf8'));
-    if (isStringToDatetime) {
-      setDatetimeModal({ isOpen: true, column, targetType: newType });
-      return;
-    }
-    void performCast(column, newType);
-  }, [onCast, columnTypes, performCast]);
+  const handleTypeChange = useCallback(
+    (column: string, newType: string) => {
+      if (!onCast) return;
+      const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
+      if (newType.toLowerCase() === currentType.toLowerCase()) return;
+      const isStringToDatetime =
+        newType.toLowerCase() === 'datetime' &&
+        (currentType === 'string' || currentType.includes('utf8'));
+      if (isStringToDatetime) {
+        setDatetimeModal({ isOpen: true, column, targetType: newType });
+        return;
+      }
+      void performCast(column, newType);
+    },
+    [onCast, columnTypes, performCast],
+  );
 
   /** Applies the datetime format chosen in the confirmation panel. */
-  const handleDatetimeFormatConfirm = useCallback((format?: string) => {
-    const { column, targetType } = datetimeModal;
-    setDatetimeModal({ isOpen: false, column: '', targetType: '' });
-    if (column && targetType) void performCast(column, targetType, format);
-  }, [datetimeModal, performCast]);
+  const handleDatetimeFormatConfirm = useCallback(
+    (format?: string) => {
+      const { column, targetType } = datetimeModal;
+      setDatetimeModal({ isOpen: false, column: '', targetType: '' });
+      if (column && targetType) void performCast(column, targetType, format);
+    },
+    [datetimeModal, performCast],
+  );
 
   /** Closes the datetime confirmation panel without casting. */
   const closeDatetimeModal = useCallback(() => {
@@ -162,33 +177,42 @@ export const useColumnMutations = ({
   }, []);
 
   /** Validates and submits a column rename, then refreshes schema state. */
-  const submitRename = useCallback(async (column: string, value: string) => {
-    if (!onRenameColumn) {
-      setRenamingColumn(null);
-      return;
-    }
-    const trimmed = value.trim();
-    if (!trimmed) { toast.error('Column name cannot be empty.'); return; }
-    if (trimmed === column) { setRenamingColumn(null); return; }
-    if (columns.some((c) => c !== column && c === trimmed)) {
-      toast.error(`A column named "${trimmed}" already exists.`);
-      return;
-    }
-    setColumnBusy(column, true);
-    try {
-      await onRenameColumn(column, trimmed);
-      if (onRefreshSchema) {
-        const schema = await onRefreshSchema();
-        applySchema(schema);
+  const submitRename = useCallback(
+    async (column: string, value: string) => {
+      if (!onRenameColumn) {
+        setRenamingColumn(null);
+        return;
       }
-      setRenamingColumn(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to rename column "${column}": ${message}`);
-    } finally {
-      setColumnBusy(column, false);
-    }
-  }, [onRenameColumn, columns, setColumnBusy, onRefreshSchema, applySchema]);
+      const trimmed = value.trim();
+      if (!trimmed) {
+        toast.error('Column name cannot be empty.');
+        return;
+      }
+      if (trimmed === column) {
+        setRenamingColumn(null);
+        return;
+      }
+      if (columns.some((c) => c !== column && c === trimmed)) {
+        toast.error(`A column named "${trimmed}" already exists.`);
+        return;
+      }
+      setColumnBusy(column, true);
+      try {
+        await onRenameColumn(column, trimmed);
+        if (onRefreshSchema) {
+          const schema = await onRefreshSchema();
+          applySchema(schema);
+        }
+        setRenamingColumn(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        toast.error(`Failed to rename column "${column}": ${message}`);
+      } finally {
+        setColumnBusy(column, false);
+      }
+    },
+    [onRenameColumn, columns, setColumnBusy, onRefreshSchema, applySchema],
+  );
 
   /** Opens the delete confirmation dialog for one column. */
   const requestDeleteColumn = useCallback((column: string) => {

@@ -79,12 +79,11 @@ const toBasename = (filename: string): string => {
  */
 const tauriDownload = async (blob: Blob, filename: string) => {
   // Dynamic imports keep these out of browser bundles.
-  const [{ writeFile, exists, BaseDirectory }, { downloadDir, join }, opener] =
-    await Promise.all([
-      import('@tauri-apps/plugin-fs'),
-      import('@tauri-apps/api/path'),
-      import('@tauri-apps/plugin-opener'),
-    ]);
+  const [{ writeFile, exists, BaseDirectory }, { downloadDir, join }, opener] = await Promise.all([
+    import('@tauri-apps/plugin-fs'),
+    import('@tauri-apps/api/path'),
+    import('@tauri-apps/plugin-opener'),
+  ]);
 
   const finalName = await resolveUniqueFilename(
     toBasename(filename),

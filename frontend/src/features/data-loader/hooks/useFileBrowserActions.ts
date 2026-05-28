@@ -22,8 +22,7 @@ export function useFileBrowserActions({
   refetchFiles,
   notify,
 }: UseFileBrowserActionsParams) {
-  const [citationDirectory, setCitationDirectory] =
-    useState<FileTreeDirectory | null>(null);
+  const [citationDirectory, setCitationDirectory] = useState<FileTreeDirectory | null>(null);
   const [citationPath, setCitationPath] = useState<string | null>(null);
   const [citationContent, setCitationContent] = useState<string | null>(null);
   const [citationLoading, setCitationLoading] = useState(false);
@@ -72,10 +71,7 @@ export function useFileBrowserActions({
    * Steps: open the dialog, handle folders without README files, fetch README text, then clear
    * loading state after success or error.
    */
-  const openCitation = async (
-    directory: FileTreeDirectory,
-    readmePath: string | null,
-  ) => {
+  const openCitation = async (directory: FileTreeDirectory, readmePath: string | null) => {
     if (!readmePath) {
       setCitationDirectory(directory);
       setCitationPath(null);

@@ -32,9 +32,9 @@ export const TOOL_COMPATIBILITY: Partial<Record<SnapshotToolKey, ToolCompatibili
 
 /** Return ``"<MAJOR>.<MINOR>"`` from a version string, or ``null``
  * if malformed. Accepts ``"v0.4.4"``, ``"0.4.4"``, ``"0.4"``,
-   * ``"0.4.0-rc1"`` etc.  * Used by: index module, compat tests (rg call sites/imports).
-   * Why: because snapshot loading needs coarse version compatibility gates before unsupported bundles hydrate feature state.
-   */
+ * ``"0.4.0-rc1"`` etc.  * Used by: index module, compat tests (rg call sites/imports).
+ * Why: because snapshot loading needs coarse version compatibility gates before unsupported bundles hydrate feature state.
+ */
 export function parseMajorMinor(version: string | null | undefined): string | null {
   if (typeof version !== 'string') return null;
   const m = version.trim().match(/^v?(\d+)\.(\d+)(?:\.\d+)?(?:[-+].*)?$/);

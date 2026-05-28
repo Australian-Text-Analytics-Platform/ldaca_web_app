@@ -54,7 +54,11 @@ export function TokenizerModelSelector({
   const canFetchSample = Boolean(workspaceId && nodeId && column);
   const sampleQuery = useQuery({
     queryKey: workspaceId
-      ? [...queryKeys.nodeData(workspaceId, nodeId, 1, LANGUAGE_SAMPLE_PAGE_SIZE), 'language-sample', column]
+      ? [
+          ...queryKeys.nodeData(workspaceId, nodeId, 1, LANGUAGE_SAMPLE_PAGE_SIZE),
+          'language-sample',
+          column,
+        ]
       : ['tokenizer-language-sample', nodeId, column],
     enabled: canFetchSample,
     staleTime: 60_000,
@@ -76,7 +80,13 @@ export function TokenizerModelSelector({
   );
 
   const detectionQuery = useQuery({
-    queryKey: ['tokenizer-language-detection', workspaceId, nodeId, column, sampleText.slice(0, 512)],
+    queryKey: [
+      'tokenizer-language-detection',
+      workspaceId,
+      nodeId,
+      column,
+      sampleText.slice(0, 512),
+    ],
     enabled: sampleText.length > 0,
     staleTime: 5 * 60_000,
     retry: false,
@@ -105,17 +115,11 @@ export function TokenizerModelSelector({
   const selectedModel = modelQuery.data?.find((option) => option.model === value);
   const selectValue = value && value.length > 0 ? value : TOKENIZER_MODEL_CLEAR_VALUE;
   const isDisabled = disabled || !column;
-  const reason = disabled
-    ? disabledReason
-    : !column
-      ? 'Select a text column first'
-      : undefined;
+  const reason = disabled ? disabledReason : !column ? 'Select a text column first' : undefined;
 
   return (
     <div className={cn('space-y-1', className)}>
-      <span className="block text-xs font-medium text-muted-foreground">
-        Tokenizer Model
-      </span>
+      <span className="block text-xs font-medium text-muted-foreground">Tokenizer Model</span>
       <DisabledReasonTooltip reason={isDisabled ? reason : undefined} className="w-full">
         <Select
           value={selectValue}
@@ -125,10 +129,7 @@ export function TokenizerModelSelector({
             }
           }}
           onValueChange={(nextValue) => {
-            onChange(
-              nextValue === TOKENIZER_MODEL_CLEAR_VALUE ? '' : nextValue,
-              detectedLanguage,
-            );
+            onChange(nextValue === TOKENIZER_MODEL_CLEAR_VALUE ? '' : nextValue, detectedLanguage);
           }}
           disabled={isDisabled}
         >
@@ -159,12 +160,16 @@ export function TokenizerModelSelector({
                 data-testid="tokenizer-model-recommendations"
                 className="my-1 rounded-lg border border-primary/40 bg-transparent p-1 shadow-xs"
               >
-                <SelectLabel className="px-2 py-1 text-xs font-medium text-primary">Recommended</SelectLabel>
+                <SelectLabel className="px-2 py-1 text-xs font-medium text-primary">
+                  Recommended
+                </SelectLabel>
                 {recommended.map((option) => (
                   <SelectItem key={option.model} value={option.model}>
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate">{option.label}</span>
-                      <span className="truncate font-mono text-xs text-muted-foreground">{option.model}</span>
+                      <span className="truncate font-mono text-xs text-muted-foreground">
+                        {option.model}
+                      </span>
                     </span>
                   </SelectItem>
                 ))}
@@ -174,7 +179,9 @@ export function TokenizerModelSelector({
               <SelectItem key={option.model} value={option.model}>
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate">{option.label}</span>
-                  <span className="truncate font-mono text-xs text-muted-foreground">{option.model}</span>
+                  <span className="truncate font-mono text-xs text-muted-foreground">
+                    {option.model}
+                  </span>
                 </span>
               </SelectItem>
             ))}

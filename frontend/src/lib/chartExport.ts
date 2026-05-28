@@ -28,14 +28,19 @@ export interface DownloadChartOptions {
 
 /** Builds filesystem-safe chart filenames that still identify the source node and tool. */
 /** Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-const toChartFilename = (nodeName: string, toolSuffix: string, format: ChartImageFormat): string => {
-  const safe = (nodeName || 'data')
-    .trim()
-    .replace(/[<>:"\\|?*/]+/g, '_')
-    .replace(/\s+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 60) || 'data';
+const toChartFilename = (
+  nodeName: string,
+  toolSuffix: string,
+  format: ChartImageFormat,
+): string => {
+  const safe =
+    (nodeName || 'data')
+      .trim()
+      .replace(/[<>:"\\|?*/]+/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 60) || 'data';
   return `${safe}_${toolSuffix || 'chart'}.${format}`;
 };
 
@@ -82,9 +87,9 @@ const serializeChartSvg = (
 
 const PAD = 8;
 const HEADER_TITLE_FONT = 11; // row 1: centred node name
-const HEADER_TITLE_H = 16;    // vertical space for title line
-const HEADER_INFO_FONT = 9;   // row 2: compact "Label: Value" pairs
-const HEADER_INFO_H = 13;     // vertical space for info line
+const HEADER_TITLE_H = 16; // vertical space for title line
+const HEADER_INFO_FONT = 9; // row 2: compact "Label: Value" pairs
+const HEADER_INFO_H = 13; // vertical space for info line
 const DIVIDER_GAP = 6;
 const LEGEND_FONT = 10;
 const LEGEND_ROW_H = 18;

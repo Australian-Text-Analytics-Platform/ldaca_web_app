@@ -24,7 +24,7 @@ interface ManifestInput {
  * workspace/source/capability scaffolding in every banner test.
  * Used by: snapshot load tests that need valid bundle manifests because bundle plumbing needs consistent manifest scaffolding before feature-specific payload assertions.
  * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
-   * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
+ * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
  */
 export function makeSnapshotManifest(
   input: ManifestInput,
@@ -87,7 +87,10 @@ export function mockSnapshotDownload() {
   const spy = vi.spyOn(generatedSdk, 'downloadSnapshot');
   const mockResolvedValue = spy.mockResolvedValue.bind(spy);
   spy.mockResolvedValue = ((value: Blob) =>
-    mockResolvedValue({ data: value, error: undefined })) as unknown as typeof spy.mockResolvedValue;
+    mockResolvedValue({
+      data: value,
+      error: undefined,
+    })) as unknown as typeof spy.mockResolvedValue;
   return spy;
 }
 

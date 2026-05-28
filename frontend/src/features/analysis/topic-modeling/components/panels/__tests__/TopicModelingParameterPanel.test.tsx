@@ -96,7 +96,7 @@ describe('TopicModelingParameterPanel', () => {
         selectedNodes={[{ id: 'n1', name: 'Corpus A' }]}
         corpusSamples={[{ percent: '50', enabled: true }]}
         nodeDocCounts={[8000]}
-      />
+      />,
     );
 
     // First row has the toggle
@@ -112,7 +112,7 @@ describe('TopicModelingParameterPanel', () => {
         selectedNodes={[{ id: 'n1', name: 'Corpus A' }]}
         corpusSamples={[{ percent: '40', enabled: false }]}
         nodeDocCounts={[10000]}
-      />
+      />,
     );
 
     const input = screen.getByLabelText('Sampling percentage for corpus 1') as HTMLInputElement;
@@ -130,22 +130,20 @@ describe('TopicModelingParameterPanel', () => {
         corpusSamples={[{ percent: '10', enabled: true }]}
         nodeDocCounts={[1000]}
         showSamplingWarning={true}
-      />
+      />,
     );
     expect(screen.getByText(/sampled corpus may be too small/i)).toBeInTheDocument();
   });
 
   it('shows a target-mode slowdown tooltip icon when Target Topic Number is selected', () => {
-    render(
-      <TopicModelingParameterPanel
-        {...baseProps}
-        topicSizeMode="exact"
-      />
-    );
+    render(<TopicModelingParameterPanel {...baseProps} topicSizeMode="exact" />);
 
     const tooltipIcon = screen.getByLabelText(/Target Topic Number/i);
     const input = screen.getByLabelText('Topic size value');
-    expect(tooltipIcon).toHaveAttribute('title', expect.stringMatching(/may run slower than Min Topic Size/i));
+    expect(tooltipIcon).toHaveAttribute(
+      'title',
+      expect.stringMatching(/may run slower than Min Topic Size/i),
+    );
     expect(tooltipIcon.compareDocumentPosition(input)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 });

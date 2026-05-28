@@ -54,9 +54,7 @@ export function TopicSelectionPanel({
   hoveredTopicId,
   setHoveredTopicId,
 }: Props) {
-  const sortedTopics = topics.toSorted(
-    (a, b) => (b.total_size ?? 0) - (a.total_size ?? 0),
-  );
+  const sortedTopics = topics.toSorted((a, b) => (b.total_size ?? 0) - (a.total_size ?? 0));
 
   const filteredTopics = sortedTopics.filter((topic) => {
     if (!isAtGlobalZoom && activeDomain && !isTopicInDomain(topic, activeDomain)) {
@@ -104,13 +102,8 @@ export function TopicSelectionPanel({
                   onMouseLeave={() => setHoveredTopicId(null)}
                 >
                   <div className="min-w-0 flex-1">
-                    <span className="text-sm font-medium text-foreground">
-                      Topic {topic.id}
-                    </span>
-                    <div
-                      className="truncate text-xs text-muted-foreground"
-                      title={topic.label}
-                    >
+                    <span className="text-sm font-medium text-foreground">Topic {topic.id}</span>
+                    <div className="truncate text-xs text-muted-foreground" title={topic.label}>
                       {topic.label}
                     </div>
                   </div>
@@ -169,15 +162,10 @@ export function TopicSelectionPanel({
                 onMouseLeave={() => setHoveredTopicId(null)}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">
-                    Topic {topic.id}
-                  </span>
+                  <span className="text-sm font-medium text-foreground">Topic {topic.id}</span>
                   {renderSizeComposition(topic.size, topic.total_size)}
                 </div>
-                <div
-                  className="mt-0.5 truncate text-xs text-muted-foreground"
-                  title={topic.label}
-                >
+                <div className="mt-0.5 truncate text-xs text-muted-foreground" title={topic.label}>
                   {topic.label}
                 </div>
               </div>

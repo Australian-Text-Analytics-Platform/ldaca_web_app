@@ -34,16 +34,16 @@ const renderSelector = ({
   return {
     onChange,
     ...render(
-    <QueryClientProvider client={queryClient}>
-      <TokenizerModelSelector
-        workspaceId="workspace-1"
-        nodeId="node-1"
-        column="text"
-        value={value}
-        onChange={onChange}
-        getAuthHeaders={() => ({ authorization: 'Bearer test' })}
-      />
-    </QueryClientProvider>,
+      <QueryClientProvider client={queryClient}>
+        <TokenizerModelSelector
+          workspaceId="workspace-1"
+          nodeId="node-1"
+          column="text"
+          value={value}
+          onChange={onChange}
+          getAuthHeaders={() => ({ authorization: 'Bearer test' })}
+        />
+      </QueryClientProvider>,
     ),
   };
 };

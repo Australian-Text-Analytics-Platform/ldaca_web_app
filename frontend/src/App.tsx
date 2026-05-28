@@ -107,7 +107,9 @@ function AuthGate() {
         actions={
           <button
             type="button"
-            onClick={refreshAuth}
+            onClick={() => {
+              void refreshAuth();
+            }}
             className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           >
             Retry connection

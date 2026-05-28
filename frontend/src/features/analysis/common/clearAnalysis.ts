@@ -57,10 +57,7 @@ export async function clearAnalysis({
 
     settled.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.warn(
-          `[${analysisType}] Failed to clear task ${allTaskIds[index]}`,
-          result.reason,
-        );
+        console.warn(`[${analysisType}] Failed to clear task ${allTaskIds[index]}`, result.reason);
       }
     });
   } catch (error) {

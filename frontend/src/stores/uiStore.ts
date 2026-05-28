@@ -43,7 +43,13 @@ export const DEFAULT_VISIBLE_VIEWS: ViewType[] = ALL_VIEWS.filter(
   (view) => view !== 'ai-annotator',
 );
 
-export type ModalKind = 'feedback' | 'tutorial' | 'warning' | 'info' | 'reference';
+export type ModalKind =
+  | 'feedback'
+  | 'tutorial'
+  | 'warning'
+  | 'info'
+  | 'reference'
+  | 'quotationEngine';
 
 export interface ModalTarget {
   file: string;
@@ -93,6 +99,7 @@ interface UIActions {
   openModal: (kind: ModalKind, target?: ModalTarget) => void;
   closeModal: (kind: ModalKind) => void;
   closeAllModals: () => void;
+  setModalOpen: (kind: ModalKind, open: boolean) => void;
 
   // Hints
   setLastUploadedFilePath: (path: string | null) => void;
@@ -117,6 +124,7 @@ export const useUIStore = create<UIStore>()(
           warning: false,
           info: false,
           reference: false,
+          quotationEngine: false,
         },
         modalTargets: {
           feedback: null,
@@ -124,92 +132,117 @@ export const useUIStore = create<UIStore>()(
           warning: null,
           info: null,
           reference: null,
+          quotationEngine: null,
         },
         lastUploadedFilePath: null,
         sessionDismissedHints: new Set<string>(),
 
-        setCurrentView: (view) => set((state) => {
-          if (state.currentView !== view) state.currentView = view;
-        }),
+        setCurrentView: (view) =>
+          set((state) => {
+            if (state.currentView !== view) state.currentView = view;
+          }),
 
-        setViewVisibility: (view, visible) => set((state) => {
-          const currentlyVisible = state.visibleViews.includes(view);
-          if (currentlyVisible === visible) return;
+        setViewVisibility: (view, visible) =>
+          set((state) => {
+            const currentlyVisible = state.visibleViews.includes(view);
+            if (currentlyVisible === visible) return;
 
-          if (visible) {
-            state.visibleViews = ALL_VIEWS.filter(
-              (candidate) => candidate === view || state.visibleViews.includes(candidate),
-            );
-          } else {
-            if (state.visibleViews.length <= 1) return;
-            state.visibleViews = state.visibleViews.filter((c) => c !== view);
-            if (state.currentView === view) {
+            if (visible) {
+              state.visibleViews = ALL_VIEWS.filter(
+                (candidate) => candidate === view || state.visibleViews.includes(candidate),
+              );
+            } else {
+              if (state.visibleViews.length <= 1) return;
+              state.visibleViews = state.visibleViews.filter((c) => c !== view);
+              if (state.currentView === view) {
+                state.currentView = state.visibleViews[0] ?? 'data-loader';
+              }
+            }
+
+            usePreferencesStore.getState().setViewHidden(view, !visible);
+          }),
+
+        syncVisibleViewsFromPreferences: () =>
+          set((state) => {
+            const hiddenViews = usePreferencesStore.getState().hiddenViews;
+            state.visibleViews = ALL_VIEWS.filter((v) => !hiddenViews.includes(v));
+            if (!state.visibleViews.includes(state.currentView)) {
               state.currentView = state.visibleViews[0] ?? 'data-loader';
             }
-          }
+          }),
 
-          usePreferencesStore.getState().setViewHidden(view, !visible);
-        }),
+        toggleSidebar: () =>
+          set((state) => {
+            state.sidebarCollapsed = !state.sidebarCollapsed;
+          }),
 
-        syncVisibleViewsFromPreferences: () => set((state) => {
-          const hiddenViews = usePreferencesStore.getState().hiddenViews;
-          state.visibleViews = ALL_VIEWS.filter((v) => !hiddenViews.includes(v));
-          if (!state.visibleViews.includes(state.currentView)) {
-            state.currentView = state.visibleViews[0] ?? 'data-loader';
-          }
-        }),
+        setSidebarCollapsed: (collapsed) =>
+          set((state) => {
+            state.sidebarCollapsed = collapsed;
+          }),
 
-        toggleSidebar: () => set((state) => {
-          state.sidebarCollapsed = !state.sidebarCollapsed;
-        }),
+        startOperation: (operationId) =>
+          set((state) => {
+            state.loadingOperations.add(operationId);
+          }),
 
-        setSidebarCollapsed: (collapsed) => set((state) => {
-          state.sidebarCollapsed = collapsed;
-        }),
+        endOperation: (operationId) =>
+          set((state) => {
+            state.loadingOperations.delete(operationId);
+            state.operationErrors.delete(operationId);
+          }),
 
-        startOperation: (operationId) => set((state) => {
-          state.loadingOperations.add(operationId);
-        }),
+        setOperationError: (operationId, error) =>
+          set((state) => {
+            state.operationErrors.set(operationId, error);
+            state.loadingOperations.delete(operationId);
+          }),
 
-        endOperation: (operationId) => set((state) => {
-          state.loadingOperations.delete(operationId);
-          state.operationErrors.delete(operationId);
-        }),
+        openModal: (kind, target) =>
+          set((state) => {
+            state.modals[kind] = true;
+            if (target !== undefined) {
+              state.modalTargets[kind] = target ?? null;
+            }
+          }),
 
-        setOperationError: (operationId, error) => set((state) => {
-          state.operationErrors.set(operationId, error);
-          state.loadingOperations.delete(operationId);
-        }),
-
-        openModal: (kind, target) => set((state) => {
-          state.modals[kind] = true;
-          if (target !== undefined) {
-            state.modalTargets[kind] = target ?? null;
-          }
-        }),
-
-        closeModal: (kind) => set((state) => {
-          state.modals[kind] = false;
-          state.modalTargets[kind] = null;
-        }),
-
-        closeAllModals: () => set((state) => {
-          for (const kind of Object.keys(state.modals) as ModalKind[]) {
+        closeModal: (kind) =>
+          set((state) => {
             state.modals[kind] = false;
-          }
-        }),
+            state.modalTargets[kind] = null;
+          }),
 
-        setLastUploadedFilePath: (path) => set((state) => {
-          state.lastUploadedFilePath = path;
-        }),
+        closeAllModals: () =>
+          set((state) => {
+            for (const kind of Object.keys(state.modals) as ModalKind[]) {
+              state.modals[kind] = false;
+            }
+          }),
 
-        sessionDismissHint: (id) => set((state) => {
-          state.sessionDismissedHints.add(id);
-        }),
+        setModalOpen: (kind, open) =>
+          set((state) => {
+            if (open) {
+              state.modals[kind] = true;
+            } else {
+              state.modals[kind] = false;
+              state.modalTargets[kind] = null;
+            }
+          }),
 
-        resetSessionDismissedHints: () => set((state) => {
-          state.sessionDismissedHints = new Set<string>();
-        }),
+        setLastUploadedFilePath: (path) =>
+          set((state) => {
+            state.lastUploadedFilePath = path;
+          }),
+
+        sessionDismissHint: (id) =>
+          set((state) => {
+            state.sessionDismissedHints.add(id);
+          }),
+
+        resetSessionDismissedHints: () =>
+          set((state) => {
+            state.sessionDismissedHints = new Set<string>();
+          }),
       })),
       {
         name: 'ldaca-ui-store',

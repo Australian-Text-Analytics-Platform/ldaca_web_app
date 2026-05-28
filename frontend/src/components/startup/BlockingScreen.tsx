@@ -32,11 +32,7 @@ function BlockingScreen({
       <div className="w-full max-w-xl text-center space-y-4 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
         {showLogo && (
           <div className="flex justify-center">
-            <img
-              src={logo}
-              alt="LDaCA Logo"
-              className="h-16 w-auto object-contain drop-shadow"
-            />
+            <img src={logo} alt="LDaCA Logo" className="h-16 w-auto object-contain drop-shadow" />
           </div>
         )}
         <div className="space-y-2">

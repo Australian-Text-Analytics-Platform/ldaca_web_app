@@ -25,7 +25,7 @@ export interface UseNodeColumnOptionsConfig {
  * Converts either raw column names or typed column metadata into the single
  * ColumnInfo shape consumed by shared node/column selectors.
  * Called by: buildNodeColumnOptionsMap for each workspace node because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
-   * Flow: return no columns for missing sources, convert raw names to string ColumnInfo entries, then normalize typed metadata names and data types.
+ * Flow: return no columns for missing sources, convert raw names to string ColumnInfo entries, then normalize typed metadata names and data types.
  */
 const normalizeColumnInfos = (source?: NodeColumnSource): ColumnInfo[] => {
   if (!source || !Array.isArray(source) || source.length === 0) return [];
@@ -49,7 +49,7 @@ const buildEntry = (
   nodeId: string,
   columnInfos: ColumnInfo[],
   allowedDataTypes?: string[],
-  fallbackToAllColumns?: boolean
+  fallbackToAllColumns?: boolean,
 ): NodeColumnOptionsEntry => {
   if (!allowedDataTypes?.length) {
     return {
@@ -122,15 +122,13 @@ export const buildNodeColumnOptionsMap = ({
  * live workspace nodes from React state.
  * Used by: NodeSelectionPanel when building selectable columns for active nodes because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  */
-export const useNodeColumnOptions = (
-  config: UseNodeColumnOptionsConfig
-): NodeColumnOptionsMap => {
+export const useNodeColumnOptions = (config: UseNodeColumnOptionsConfig): NodeColumnOptionsMap => {
   const { nodes = [], getNodeColumns, allowedDataTypes, fallbackToAllColumns } = config;
 
   return buildNodeColumnOptionsMap({
-        nodes,
-        getNodeColumns,
-        allowedDataTypes,
-        fallbackToAllColumns,
-      });
+    nodes,
+    getNodeColumns,
+    allowedDataTypes,
+    fallbackToAllColumns,
+  });
 };

@@ -20,9 +20,9 @@ type UseTokenFrequencyPreferencesParams = {
   resolveTokenFrequencyTaskId: () => Promise<string | null>;
   /**
    * Resolved language codes for the currently-selected corpora, one per
-    * unique language. "Apply Stop Words" loads all matching local stopword
-    * lists and merges them so a multi-language comparison (e.g. EN + ZH)
-    * fills both lists at once.
+   * unique language. "Apply Stop Words" loads all matching local stopword
+   * lists and merges them so a multi-language comparison (e.g. EN + ZH)
+   * fills both lists at once.
    */
   defaultStopWordsLanguages?: ReadonlyArray<string | null | undefined>;
   backendTokenLimit: number | null;
@@ -64,16 +64,20 @@ export const useTokenFrequencyPreferences = ({
   const [isApplyingTokenLimit, setIsApplyingTokenLimit] = useState(false);
 
   // Identity stability: used in useEffect dependency array
-  const applyTokenLimitState = useCallback((rawLimit: number | null | undefined) => {
-    const target = typeof rawLimit === 'number' && Number.isFinite(rawLimit) && rawLimit > 0
-      ? rawLimit
-      : DEFAULT_TOKEN_LIMIT;
-    const { limit: normalizedLimit } = clampDisplayTokenLimit(target);
-    const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
-    setTokenLimitOverride(inputLimit);
-    setTokenLimitInput(String(inputLimit));
-    setTokenLimitError(null);
-  }, [maxTokenLimitInput]);
+  const applyTokenLimitState = useCallback(
+    (rawLimit: number | null | undefined) => {
+      const target =
+        typeof rawLimit === 'number' && Number.isFinite(rawLimit) && rawLimit > 0
+          ? rawLimit
+          : DEFAULT_TOKEN_LIMIT;
+      const { limit: normalizedLimit } = clampDisplayTokenLimit(target);
+      const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
+      setTokenLimitOverride(inputLimit);
+      setTokenLimitInput(String(inputLimit));
+      setTokenLimitError(null);
+    },
+    [maxTokenLimitInput],
+  );
 
   useEffect(() => {
     const backendLimit =
@@ -89,7 +93,7 @@ export const useTokenFrequencyPreferences = ({
     }
 
     if (nextLimit !== null) {
-      Promise.resolve().then(() => applyTokenLimitState(nextLimit));
+      void Promise.resolve().then(() => applyTokenLimitState(nextLimit));
     }
   }, [applyTokenLimitState, backendTokenLimit, tokenLimitOverride]);
 
@@ -98,7 +102,7 @@ export const useTokenFrequencyPreferences = ({
       ? backendStopWordsKey.split('|').filter((word) => word.length > 0)
       : [];
 
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       if (!results) {
         setStopWords('');
         setAppliedStopSet(new Set());
@@ -134,7 +138,7 @@ export const useTokenFrequencyPreferences = ({
       if (prefs.token_limit !== undefined) {
         payload.token_limit = Math.min(
           clampDisplayTokenLimit(prefs.token_limit).limit,
-          maxTokenLimitInput
+          maxTokenLimitInput,
         );
       }
       if (prefs.stop_words !== undefined) {
@@ -149,67 +153,76 @@ export const useTokenFrequencyPreferences = ({
         throwOnError: true,
       });
     },
-    [persistEnabled, currentWorkspaceId, resolveTokenFrequencyTaskId, maxTokenLimitInput, getAuthHeaders],
+    [
+      persistEnabled,
+      currentWorkspaceId,
+      resolveTokenFrequencyTaskId,
+      maxTokenLimitInput,
+      getAuthHeaders,
+    ],
   );
 
-  const updateResultsPreferencesLocally = useCallback((prefs: { tokenLimit?: number; stopWords?: string[] }) => {
-    setResults((prev) => {
-      if (!prev) return prev;
+  const updateResultsPreferencesLocally = useCallback(
+    (prefs: { tokenLimit?: number; stopWords?: string[] }) => {
+      setResults((prev) => {
+        if (!prev) return prev;
 
-      const metadata = { ...((prev.metadata) ?? {}) } as Record<string, unknown>;
-      const analysisParams = { ...(prev.analysis_params ?? {}) } as Record<string, unknown>;
+        const metadata = { ...(prev.metadata ?? {}) } as Record<string, unknown>;
+        const analysisParams = { ...(prev.analysis_params ?? {}) } as Record<string, unknown>;
 
-      let nextTokenLimit: number | undefined;
-      const existingTokenLimit =
-        typeof prev.token_limit === 'number' && Number.isFinite(prev.token_limit)
-          ? prev.token_limit
-          : undefined;
-      if (prefs.tokenLimit !== undefined) {
-        nextTokenLimit = prefs.tokenLimit;
-      } else {
-        nextTokenLimit = existingTokenLimit;
-      }
+        let nextTokenLimit: number | undefined;
+        const existingTokenLimit =
+          typeof prev.token_limit === 'number' && Number.isFinite(prev.token_limit)
+            ? prev.token_limit
+            : undefined;
+        if (prefs.tokenLimit !== undefined) {
+          nextTokenLimit = prefs.tokenLimit;
+        } else {
+          nextTokenLimit = existingTokenLimit;
+        }
 
-      if (nextTokenLimit !== undefined && Number.isFinite(nextTokenLimit)) {
-        const { limit: normalizedLimit } = clampDisplayTokenLimit(nextTokenLimit);
-        const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
-        metadata.token_limit = inputLimit;
-        analysisParams.token_limit = inputLimit;
-        nextTokenLimit = inputLimit;
-      }
+        if (nextTokenLimit !== undefined && Number.isFinite(nextTokenLimit)) {
+          const { limit: normalizedLimit } = clampDisplayTokenLimit(nextTokenLimit);
+          const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
+          metadata.token_limit = inputLimit;
+          analysisParams.token_limit = inputLimit;
+          nextTokenLimit = inputLimit;
+        }
 
-      delete metadata.limit;
-      delete analysisParams.limit;
+        delete metadata.limit;
+        delete analysisParams.limit;
 
-      const stopWordsArray =
-        prefs.stopWords !== undefined
-          ? prefs.stopWords
-          : Array.isArray(prev.stop_words)
-          ? prev.stop_words
-          : Array.isArray(metadata.stop_words)
-          ? metadata.stop_words
-          : [];
+        const stopWordsArray =
+          prefs.stopWords !== undefined
+            ? prefs.stopWords
+            : Array.isArray(prev.stop_words)
+              ? prev.stop_words
+              : Array.isArray(metadata.stop_words)
+                ? metadata.stop_words
+                : [];
 
-      metadata.stop_words = stopWordsArray;
-      analysisParams.stop_words = stopWordsArray;
+        metadata.stop_words = stopWordsArray;
+        analysisParams.stop_words = stopWordsArray;
 
-      return {
-        ...prev,
-        token_limit: nextTokenLimit ?? undefined,
-        analysis_params: analysisParams,
-        metadata,
-        stop_words: stopWordsArray,
-        message: prev.message,
-        state: prev.state,
-      } as TokenFrequencyResponse;
-    });
-  }, [setResults, maxTokenLimitInput]);
+        return {
+          ...prev,
+          token_limit: nextTokenLimit ?? undefined,
+          analysis_params: analysisParams,
+          metadata,
+          stop_words: stopWordsArray,
+          message: prev.message,
+          state: prev.state,
+        } as TokenFrequencyResponse;
+      });
+    },
+    [setResults, maxTokenLimitInput],
+  );
 
   /** Validates and persists the cloud display limit entered in the parameter UI. */
   /**
    * Called by: useTokenFrequencyPreferences as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
- */
+   * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+   */
   const applyTokenLimitWithValidation = async () => {
     const parsed = toFiniteNumber(tokenLimitInput);
     if (parsed === null) {
@@ -273,15 +286,18 @@ export const useTokenFrequencyPreferences = ({
     saveStopWordsToBackendRef.current = saveStopWordsToBackend;
   }, [saveStopWordsToBackend]);
 
-  const applyStopSetFromText = useCallback((text: string) => {
-    const words = text
-      .split(STOPWORD_SEPARATOR_RE)
-      .map((word) => word.trim().toLowerCase())
-      .filter(Boolean);
-    setStopWords(words.join(', '));
-    setAppliedStopSet(new Set(words));
-    void saveStopWordsToBackendRef.current(words);
-  }, [setStopWords, setAppliedStopSet]);
+  const applyStopSetFromText = useCallback(
+    (text: string) => {
+      const words = text
+        .split(STOPWORD_SEPARATOR_RE)
+        .map((word) => word.trim().toLowerCase())
+        .filter(Boolean);
+      setStopWords(words.join(', '));
+      setAppliedStopSet(new Set(words));
+      void saveStopWordsToBackendRef.current(words);
+    },
+    [setStopWords, setAppliedStopSet],
+  );
 
   /** Sorts the current stop-word text so users can review and export a stable list. */
   /**
@@ -302,7 +318,7 @@ export const useTokenFrequencyPreferences = ({
   /** Mirrors token-limit keystrokes into state while clearing stale validation errors. */
   /**
    * Called by: useTokenFrequencyPreferences through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-     * Flow: accept empty input, clamp over-limit numeric edits to the max, mirror raw text state, then clear stale validation errors.
+   * Flow: accept empty input, clamp over-limit numeric edits to the max, mirror raw text state, then clear stale validation errors.
    */
   const handleTokenLimitInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value;
@@ -341,7 +357,7 @@ export const useTokenFrequencyPreferences = ({
   // persistence + state path as the cloud input itself).
   /**
    * Called by: useTokenFrequencyPreferences as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-     * Flow: normalize and cap the requested limit, update local input/error state, persist when results exist and value changed, then mirror preferences locally.
+   * Flow: normalize and cap the requested limit, update local input/error state, persist when results exist and value changed, then mirror preferences locally.
    */
   const applyTokenLimit = async (value: number) => {
     if (!Number.isFinite(value) || value <= 0) return;
@@ -373,14 +389,13 @@ export const useTokenFrequencyPreferences = ({
   /** Loads default stop words for the selected tokenizer languages into the editable text area. */
   /**
    * Called by: useTokenFrequencyPreferences through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-     * Flow: require resolved languages, load and merge default stop words by language, render grouped text, then apply the stop set.
+   * Flow: require resolved languages, load and merge default stop words by language, render grouped text, then apply the stop set.
    */
   const handleFillDefaultStopWords = async () => {
     setIsLoadingStopWords(true);
     try {
       const hasLanguages =
-        Array.isArray(defaultStopWordsLanguages) &&
-        defaultStopWordsLanguages.length > 0;
+        Array.isArray(defaultStopWordsLanguages) && defaultStopWordsLanguages.length > 0;
 
       if (!hasLanguages) {
         console.error('Default stop words require at least one resolved language');

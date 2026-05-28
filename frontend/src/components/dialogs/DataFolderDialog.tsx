@@ -31,10 +31,7 @@ interface DataFolderDialogProps {
  * from the latest app configuration each time the user edits the folder.
  * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
  */
-export function DataFolderDialog({
-  open,
-  onOpenChange,
-}: DataFolderDialogProps) {
+export function DataFolderDialog({ open, onOpenChange }: DataFolderDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open && <DataFolderDialogContent onOpenChange={onOpenChange} />}
@@ -49,9 +46,7 @@ export function DataFolderDialog({
  * Why: changing the data root affects auth config, workspace selection, file lists, and workspace queries together.
  * Flow: seed the path from auth state, handle desktop folder picking, submit config changes, refresh auth/cache, and close on success.
  */
-function DataFolderDialogContent({
-  onOpenChange,
-}: Pick<DataFolderDialogProps, 'onOpenChange'>) {
+function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, 'onOpenChange'>) {
   const queryClient = useQueryClient();
   const { dataFolder, refreshAuth } = useAuth();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -77,13 +72,15 @@ function DataFolderDialogContent({
         toast.error('Failed to open folder picker');
       }
     } else {
-      toast.info('Type the full path to your data folder, or use the desktop app for a folder picker.');
+      toast.info(
+        'Type the full path to your data folder, or use the desktop app for a folder picker.',
+      );
     }
   };
 
   /**
    * Called by: the DataFolderDialogContent form onSubmit prop because the interaction needs a single handler that validates state, runs the action, and updates feedback.
-    * Flow: validate a non-empty path, clear the active workspace when the directory changes, update backend config, refresh auth/files/workspaces, and toast outcomes.
+   * Flow: validate a non-empty path, clear the active workspace when the directory changes, update backend config, refresh auth/files/workspaces, and toast outcomes.
    */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -122,41 +119,51 @@ function DataFolderDialogContent({
 
   return (
     <DialogContent className="sm:max-w-106.25">
-        <DialogHeader>
-          <DialogTitle>Set Working Directory</DialogTitle>
-          <DialogDescription>
-            Choose the folder where your data is stored. This setting applies globally.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="path" className="text-right">
-                Path
-              </Label>
-              <div className="col-span-3 flex gap-2">
-                <Input
-                  id="path"
-                  value={path}
-                  onChange={(e) => setPath(e.target.value)}
-                  className="flex-1"
-                  placeholder="/path/to/data"
-                />
-                <Button type="button" variant="outline" size="icon" onClick={handleBrowse} title="Browse...">
-                  <FolderOpen className="h-4 w-4" />
-                </Button>
-              </div>
+      <DialogHeader>
+        <DialogTitle>Set Working Directory</DialogTitle>
+        <DialogDescription>
+          Choose the folder where your data is stored. This setting applies globally.
+        </DialogDescription>
+      </DialogHeader>
+      <form onSubmit={(e) => {
+        void handleSubmit(e);
+      }}>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="path" className="text-right">
+              Path
+            </Label>
+            <div className="col-span-3 flex gap-2">
+              <Input
+                id="path"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                className="flex-1"
+                placeholder="/path/to/data"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  void handleBrowse();
+                }}
+                title="Browse..."
+              >
+                <FolderOpen className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading || !path.trim()}>
-              {isLoading ? 'Saving...' : 'Save changes'}
-            </Button>
-          </DialogFooter>
-        </form>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isLoading || !path.trim()}>
+            {isLoading ? 'Saving...' : 'Save changes'}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   );
 }

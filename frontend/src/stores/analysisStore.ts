@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
 
 import type { ConcordanceAnalysisResponse } from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '../hooks/useAutoNodeColumns';
@@ -14,11 +15,19 @@ export type TaskState =
   | 'cancelled';
 
 /** States representing work the backend has accepted but not started. */
-const PENDING_TASK_STATES: ReadonlySet<string> = new Set<string>(['pending', 'queued', 'submitted']);
+const PENDING_TASK_STATES: ReadonlySet<string> = new Set<string>([
+  'pending',
+  'queued',
+  'submitted',
+]);
 /** States representing in-flight execution. */
 const RUNNING_TASK_STATES: ReadonlySet<string> = new Set<string>(['running']);
 /** States the task can never leave (i.e. polling can stop). */
-export const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>(['successful', 'failed', 'cancelled']);
+export const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>([
+  'successful',
+  'failed',
+  'cancelled',
+]);
 
 /** Lets hooks treat queued/submitted variants as one pending bucket. */
 /** Used by: src/features/data-loader/DataLoaderFeature.tsx, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
@@ -96,45 +105,41 @@ interface AnalysisState {
 const MATERIALIZED_EVENT_HISTORY_LIMIT = 64;
 let materializedEventSequence = 0;
 
-export const useAnalysisStore = create<AnalysisState>((set) => ({
-  tasks: [],
-  pendingConcordance: null,
-  materializedEvents: [],
-  /** Replaces or updates task summaries received from polling/SSE task streams. */
-  /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  setTasks: (tasks) =>
-    set((state) => ({
-      tasks: typeof tasks === 'function' ? tasks(state.tasks) : tasks,
-    })),
-  /** Stores the concordance payload that should be consumed after an auto-run handoff. */
-  /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  setPendingConcordance: (payload) =>
-    set(() => ({
-      pendingConcordance: {
-        ...payload,
-        timestamp: payload.timestamp ?? Date.now(),
-      },
-    })),
-  /** Clears the concordance handoff once the destination feature consumes it. */
-  /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  clearPendingConcordance: () =>
-    set(() => ({
-      pendingConcordance: null,
-    })),
-  /** Records worker materialization events so feature tabs can react without refetch races. */
-  /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  pushMaterializedEvent: (event) =>
-    set((state) => {
-      materializedEventSequence += 1;
-      const next: AnalysisMaterializedEvent = {
-        ...event,
-        sequence: materializedEventSequence,
-      };
-      const merged = [next, ...state.materializedEvents].slice(
-        0,
-        MATERIALIZED_EVENT_HISTORY_LIMIT,
-      );
-      return { materializedEvents: merged };
-    }),
-}));
-
+export const useAnalysisStore = create<AnalysisState>()(
+  immer((set) => ({
+    tasks: [],
+    pendingConcordance: null,
+    materializedEvents: [],
+    /** Replaces or updates task summaries received from polling/SSE task streams. */
+    /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    setTasks: (tasks) =>
+      set((state) => {
+        state.tasks = typeof tasks === 'function' ? tasks(state.tasks) : tasks;
+      }),
+    /** Stores the concordance payload that should be consumed after an auto-run handoff. */
+    /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    setPendingConcordance: (payload) =>
+      set((state) => {
+        state.pendingConcordance = { ...payload, timestamp: payload.timestamp ?? Date.now() };
+      }),
+    /** Clears the concordance handoff once the destination feature consumes it. */
+    /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    clearPendingConcordance: () =>
+      set((state) => {
+        state.pendingConcordance = null;
+      }),
+    /** Records worker materialization events so feature tabs can react without refetch races. */
+    /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    pushMaterializedEvent: (event) =>
+      set((state) => {
+        materializedEventSequence += 1;
+        state.materializedEvents.unshift({
+          ...event,
+          sequence: materializedEventSequence,
+        });
+        if (state.materializedEvents.length > MATERIALIZED_EVENT_HISTORY_LIMIT) {
+          state.materializedEvents.length = MATERIALIZED_EVENT_HISTORY_LIMIT;
+        }
+      }),
+  })),
+);

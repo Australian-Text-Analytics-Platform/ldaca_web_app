@@ -12,14 +12,18 @@ const isRequest = (input: RequestInfo | URL): input is Request =>
 
 /** Resolves the abort signal that should be chained into the generated-client timeout. */
 /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-const getRequestSignal = (input: RequestInfo | URL, init?: RequestInit): AbortSignal | undefined => {
+const getRequestSignal = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): AbortSignal | undefined => {
   if (init?.signal) return init.signal;
   return isRequest(input) ? input.signal : undefined;
 };
 
 /** Adapts the app's `/api` base to hey-api's expectation of the server origin. */
 /** Used by: src/lib/backend/__tests__/generatedClientConfig.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-export const getGeneratedApiBase = (apiBase = getApiBase()): string => apiBase.replace(/\/api\/?$/, '');
+export const getGeneratedApiBase = (apiBase = getApiBase()): string =>
+  apiBase.replace(/\/api\/?$/, '');
 
 /** Lazy-loads auth headers to avoid an import cycle between generated SDK config and the auth store. */
 /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
@@ -127,7 +131,10 @@ const createGeneratedApiFetch = (fetchImpl?: typeof fetch): typeof fetch => {
         throw new ApiError('Request timeout', { code: 'TIMEOUT' });
       }
       if (error instanceof TypeError) {
-        throw new ApiError(error.message || 'Network unreachable', { code: 'NETWORK', detail: error });
+        throw new ApiError(error.message || 'Network unreachable', {
+          code: 'NETWORK',
+          detail: error,
+        });
       }
       throw error;
     } finally {

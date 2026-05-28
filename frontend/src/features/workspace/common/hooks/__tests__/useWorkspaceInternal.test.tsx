@@ -153,11 +153,11 @@ const renderInternal = () => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-    /**
+  /**
    * Provides QueryClient context required by workspace internals under test.
-     * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
-     * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
-     */
+   * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
+   * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+   */
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );

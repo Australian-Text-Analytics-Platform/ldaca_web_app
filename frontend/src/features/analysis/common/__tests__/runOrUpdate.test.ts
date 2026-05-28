@@ -9,10 +9,12 @@ describe('executeAnalysisRunOrUpdate', () => {
     await executeAnalysisRunOrUpdate({
       hasLockedParameterChanges: true,
       /** Called by: executeAnalysisRunOrUpdate when locked parameters changed because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock must match async interface
       clearResults: async () => {
         events.push('clear');
       },
       /** Called by: executeAnalysisRunOrUpdate after optional clear completes because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock must match async interface
       runFreshAnalysis: async () => {
         events.push('run');
       },

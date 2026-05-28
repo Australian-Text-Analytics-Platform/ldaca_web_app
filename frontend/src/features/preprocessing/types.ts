@@ -22,7 +22,10 @@ export type FilterCondition = Omit<GeneratedFilterCondition, 'operator'> & {
   operator: FilterOperator;
 };
 
-export type FilterRequest = Omit<GeneratedFilterRequest, 'conditions' | 'logic' | 'new_node_name'> & {
+export type FilterRequest = Omit<
+  GeneratedFilterRequest,
+  'conditions' | 'logic' | 'new_node_name'
+> & {
   conditions: FilterCondition[];
   logic?: string;
   new_node_name?: string;
@@ -128,10 +131,22 @@ export const MAX_JOIN_NODES = 2;
 
 export const JOIN_TYPE_OPTIONS: Array<{ value: JoinType; description: string }> = [
   { value: 'inner', description: 'Only rows with matching keys in both data blocks.' },
-  { value: 'left', description: 'All rows from the left data block plus matching rows from the right.' },
-  { value: 'right', description: 'All rows from the right data block plus matching rows from the left.' },
+  {
+    value: 'left',
+    description: 'All rows from the left data block plus matching rows from the right.',
+  },
+  {
+    value: 'right',
+    description: 'All rows from the right data block plus matching rows from the left.',
+  },
   { value: 'full', description: 'All rows from both data blocks; missing matches become nulls.' },
-  { value: 'semi', description: 'Rows from the left data block that have at least one match in the right.' },
-  { value: 'anti', description: 'Rows from the left data block that do not match anything in the right.' },
+  {
+    value: 'semi',
+    description: 'Rows from the left data block that have at least one match in the right.',
+  },
+  {
+    value: 'anti',
+    description: 'Rows from the left data block that do not match anything in the right.',
+  },
   { value: 'cross', description: 'Cartesian product of all rows; ignores column selections.' },
 ];

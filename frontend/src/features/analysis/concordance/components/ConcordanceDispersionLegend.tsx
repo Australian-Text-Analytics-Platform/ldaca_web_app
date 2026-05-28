@@ -1,13 +1,11 @@
-
-
 type Props = {
   matchedTexts: string[];
   matchedTextColors: Record<string, string>;
   hiddenMatchedTexts: Set<string>;
   onToggle: (text: string) => void;
   /**
-  * Per-matched-text total count across the *full* displayed graph.
-  * Pre-computed by the caller; the legend renders
+   * Per-matched-text total count across the *full* displayed graph.
+   * Pre-computed by the caller; the legend renders
    * ``(n)`` after each label in the same colour/style.
    *
    * Hidden items keep their number; toggling visibility doesn't

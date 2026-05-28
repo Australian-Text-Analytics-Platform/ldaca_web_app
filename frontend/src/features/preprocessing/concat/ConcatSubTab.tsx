@@ -1,4 +1,3 @@
-
 import { Layers, Loader2, Plus } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -96,7 +95,10 @@ export function ConcatSubTab(props: ConcatSubTabProps) {
                   <li key={`concat-mismatch-${mismatch.nodeId}`} className="space-y-1">
                     <div className="font-medium">{mismatch.nodeName}</div>
                     {mismatch.details.map((detail, idx) => (
-                      <div key={`concat-mismatch-${mismatch.nodeId}-${idx}`} className="text-destructive">
+                      <div
+                        key={`concat-mismatch-${mismatch.nodeId}-${idx}`}
+                        className="text-destructive"
+                      >
                         {detail}
                       </div>
                     ))}
@@ -132,19 +134,29 @@ export function ConcatSubTab(props: ConcatSubTabProps) {
         </CardContent>
         <CardFooter className="flex items-center gap-3 border-t pt-4">
           <div className="flex flex-1 items-center gap-2">
-            <Label htmlFor="concat-new-node-name" className="shrink-0">New data block name</Label>
+            <Label htmlFor="concat-new-node-name" className="shrink-0">
+              New data block name
+            </Label>
             <HelpIcon targetKey="preprocessing.concat.new-node-name" label="Concat output name" />
             <Input
               id="concat-new-node-name"
               value={form.value}
               placeholder={form.placeholder}
               onChange={(event) => form.setValue(event.target.value)}
-              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: form.value, setValue: form.setValue })}
+              onKeyDown={(event) =>
+                acceptPlaceholderOnTab({ event, value: form.value, setValue: form.setValue })
+              }
               className="min-w-0 flex-1"
             />
           </div>
           <DisabledReasonTooltip reason={apply.disabledReason}>
-            <Button type="button" size="sm" onClick={() => void apply.run()} disabled={apply.disabled} className="shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void apply.run()}
+              disabled={apply.disabled}
+              className="shrink-0"
+            >
               {apply.isBusy ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

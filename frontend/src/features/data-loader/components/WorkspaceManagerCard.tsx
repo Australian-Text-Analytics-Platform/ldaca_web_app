@@ -1,5 +1,13 @@
 import React, { useRef } from 'react';
-import { Download as DownloadIcon, Loader2, MoreHorizontal, RefreshCcw, Star, Trash2, Upload } from 'lucide-react';
+import {
+  Download as DownloadIcon,
+  Loader2,
+  MoreHorizontal,
+  RefreshCcw,
+  Star,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -110,7 +118,9 @@ export function WorkspaceManagerCard({
               type="file"
               accept=".zip,application/zip"
               className="hidden"
-              onChange={handleZipChange}
+              onChange={(e) => {
+                void handleZipChange(e);
+              }}
             />
             <Button
               size="icon"
@@ -157,12 +167,16 @@ export function WorkspaceManagerCard({
                         size="icon"
                         variant="ghost"
                         className="h-6 w-6 shrink-0"
-                        aria-label={isFavorite(workspaceId) ? 'Remove from favorites' : 'Add to favorites'}
+                        aria-label={
+                          isFavorite(workspaceId) ? 'Remove from favorites' : 'Add to favorites'
+                        }
                         onClick={() => toggleFavorite(workspaceId)}
                       >
                         <Star
                           className={`h-4 w-4 ${
-                            isFavorite(workspaceId) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+                            isFavorite(workspaceId)
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-muted-foreground'
                           }`}
                         />
                       </Button>
@@ -187,7 +201,9 @@ export function WorkspaceManagerCard({
                       </DropdownMenu>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} | {blockCount} data block{blockCount === 1 ? '' : 's'} | Size {formatBytes(Number(workspace.workspace_size_Byte || 0))}
+                      Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} |{' '}
+                      {blockCount} data block{blockCount === 1 ? '' : 's'} | Size{' '}
+                      {formatBytes(Number(workspace.workspace_size_Byte || 0))}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -212,8 +228,12 @@ export function WorkspaceManagerCard({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => void downloads.startDownload(workspaceId, workspace.name || workspaceId)}
-                      disabled={downloads.isStarting(workspaceId) || downloads.isPending(workspaceId)}
+                      onClick={() =>
+                        void downloads.startDownload(workspaceId, workspace.name || workspaceId)
+                      }
+                      disabled={
+                        downloads.isStarting(workspaceId) || downloads.isPending(workspaceId)
+                      }
                     >
                       <DownloadIcon className="mr-1.5 h-4 w-4" />
                       {downloads.isPending(workspaceId)
@@ -222,7 +242,11 @@ export function WorkspaceManagerCard({
                           ? 'Starting…'
                           : 'Download'}
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => onDeleteWorkspace(workspaceId)}>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => onDeleteWorkspace(workspaceId)}
+                    >
                       <Trash2 className="mr-1.5 h-4 w-4" /> Delete
                     </Button>
                   </div>
@@ -234,6 +258,6 @@ export function WorkspaceManagerCard({
       </CardContent>
     </Card>
   );
-};
+}
 
 export default WorkspaceManagerCard;

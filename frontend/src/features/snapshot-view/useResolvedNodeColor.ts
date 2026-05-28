@@ -26,10 +26,7 @@ import type { SnapshotToolKey } from './types';
  * (snapshot mode).  * Used by: index module, useResolvedNodeColor tests (rg call sites/imports).
  * Why: because snapshot graph rendering needs captured source colors when live workspace color state is unavailable.
  */
-export function useResolvedNodeColor(
-  tool: SnapshotToolKey,
-  nodeId: string,
-): string | undefined {
+export function useResolvedNodeColor(tool: SnapshotToolKey, nodeId: string): string | undefined {
   const mode = useSnapshotViewStore((s) => s.mode[tool]);
   const snapshot = useSnapshotViewStore((s) => s.snapshots[tool]);
   const liveColor = useNodeColorsStore((s) => s.colors[nodeId]);

@@ -106,7 +106,11 @@ const resolveDocUrl = (requestedFile: string): string => {
  * Why: all help/reference entry points need one markdown viewer that works for bundled, remote, modal, and standalone docs.
  * Flow: resolve the active document target, fetch markdown with build placeholders, sync anchors and zoom state, then render markdown navigation controls.
  */
-function DocumentView({ docType, onClose, target }: {
+function DocumentView({
+  docType,
+  onClose,
+  target,
+}: {
   docType: DocumentType;
   onClose?: () => void;
   target?: DocumentTarget | null;
@@ -119,9 +123,8 @@ function DocumentView({ docType, onClose, target }: {
     propTarget: target,
     currentTarget: target ?? null,
   }));
-  const currentTarget = target && navigationState.propTarget !== target
-    ? target
-    : navigationState.currentTarget;
+  const currentTarget =
+    target && navigationState.propTarget !== target ? target : navigationState.currentTarget;
   const activeAnchor = currentTarget?.anchor ?? null;
 
   const { zoom, zoomIn, zoomOut, zoomReset } = useZoom({ keyboardShortcuts: true });
@@ -132,7 +135,7 @@ function DocumentView({ docType, onClose, target }: {
     let cancelled = false;
     /**
      * Called by: DocumentView's markdown-loading effect whenever the selected file changes because the caller needs one documented boundary for the lookup, event, or state handoff step.
-      * Flow: derive the requested doc URL, fetch markdown without cache, replace build placeholders, then update content/error/loading if still mounted.
+     * Flow: derive the requested doc URL, fetch markdown without cache, replace build placeholders, then update content/error/loading if still mounted.
      */
     const load = async () => {
       setLoading(true);
@@ -154,21 +157,24 @@ function DocumentView({ docType, onClose, target }: {
         if (!cancelled) setContent(rendered);
       } catch (err: unknown) {
         if (!cancelled) {
-          const message = err instanceof Error && err.message ? err.message : 'Failed to load document';
+          const message =
+            err instanceof Error && err.message ? err.message : 'Failed to load document';
           setError(message);
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-    load();
-    return () => { cancelled = true; };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [currentTarget?.file, config.defaultFile]);
 
   /**
    * Markdown render overrides used by `ReactMarkdown` for safe image sizing and in-modal doc links.
-    * Why: bundled docs should keep internal links inside the viewer while external links retain normal browser behavior.
-    * Flow: constrain image sizing and alt text, rewrite internal markdown anchors to viewer state, then leave external links opening safely.
+   * Why: bundled docs should keep internal links inside the viewer while external links retain normal browser behavior.
+   * Flow: constrain image sizing and alt text, rewrite internal markdown anchors to viewer state, then leave external links opening safely.
    */
   const markdownComponents: Components = {
     /** Called by: ReactMarkdown when rendering markdown image nodes inside DocumentView because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
@@ -180,13 +186,13 @@ function DocumentView({ docType, onClose, target }: {
     /**
      * Rewrites markdown anchors so document consumers stay inside the modal navigation flow.
      * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
-      * Flow: resolve relative markdown hrefs against the current file, route internal `.md` links through navigation state, and pass external links through.
+     * Flow: resolve relative markdown hrefs against the current file, route internal `.md` links through navigation state, and pass external links through.
      */
     a: ({ node: _node, children, href, target: linkTarget, rel, ...props }) => {
       const baseFile = currentTarget?.file ?? config.defaultFile;
       /**
        * Called by: the markdown anchor onClick prop to route internal links through DocumentView state because the interaction needs a single handler that validates state, runs the action, and updates feedback.
-        * Flow: parse the clicked href path/hash, resolve the next markdown file, prevent default navigation, then store the next file/anchor target.
+       * Flow: parse the clicked href path/hash, resolve the next markdown file, prevent default navigation, then store the next file/anchor target.
        */
       const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
         if (!href || isExternalLink(href)) return;
@@ -206,12 +212,20 @@ function DocumentView({ docType, onClose, target }: {
         }
         if (!nextFile.endsWith('.md')) return;
         event.preventDefault();
-        setNavigationState({ propTarget: target, currentTarget: { file: nextFile, anchor: nextAnchor } });
+        setNavigationState({
+          propTarget: target,
+          currentTarget: { file: nextFile, anchor: nextAnchor },
+        });
       };
 
       if (isExternalLink(href)) {
         return (
-          <a {...props} href={href} target={linkTarget ?? '_blank'} rel={rel ?? 'noopener noreferrer'}>
+          <a
+            {...props}
+            href={href}
+            target={linkTarget ?? '_blank'}
+            rel={rel ?? 'noopener noreferrer'}
+          >
             {children}
           </a>
         );
@@ -287,21 +301,17 @@ function DocumentView({ docType, onClose, target }: {
             transformOrigin: 'top center',
           }}
         >
-        {loading && (
-          <div className="text-center text-gray-600">Loading…</div>
-        )}
-        {error && (
-          <div className="text-red-600">{error}</div>
-        )}
-        {!loading && !error && (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[rehypeRaw, rehypeKatex]}
-            components={markdownComponents}
-          >
-            {content}
-          </ReactMarkdown>
-        )}
+          {loading && <div className="text-center text-gray-600">Loading…</div>}
+          {error && <div className="text-red-600">{error}</div>}
+          {!loading && !error && (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeRaw, rehypeKatex]}
+              components={markdownComponents}
+            >
+              {content}
+            </ReactMarkdown>
+          )}
         </div>
       </main>
     </div>

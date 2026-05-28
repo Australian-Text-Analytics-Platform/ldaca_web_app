@@ -25,12 +25,16 @@ export const serializeConditionsForRequest = (conditions: FilterConditionWithId[
       value = condition.value.map((entry: string | number | boolean | Date | null) =>
         entry instanceof Date ? entry.toISOString() : entry,
       );
-    } else if (condition.value && typeof condition.value === 'object' && 'start' in condition.value) {
+    } else if (
+      condition.value &&
+      typeof condition.value === 'object' &&
+      'start' in condition.value
+    ) {
       const range = condition.value as ConditionRange;
-            /**
-             * Normalizes one range edge to the nullable ISO/string payload expected by the API.
-             * Called by: serializeConditionsForRequest internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-             */
+      /**
+       * Normalizes one range edge to the nullable ISO/string payload expected by the API.
+       * Called by: serializeConditionsForRequest internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+       */
       const normalizeEdge = (edge: ConditionRange['start']): string | null => {
         if (!edge) return null;
         if (edge instanceof Date) return edge.toISOString();
@@ -54,7 +58,8 @@ export const serializeConditionsForRequest = (conditions: FilterConditionWithId[
 
     if (condition.negate !== undefined) payload.negate = Boolean(condition.negate);
     if (condition.regex !== undefined) payload.regex = Boolean(condition.regex);
-    if (condition.caseSensitive !== undefined) payload.case_sensitive = Boolean(condition.caseSensitive);
+    if (condition.caseSensitive !== undefined)
+      payload.case_sensitive = Boolean(condition.caseSensitive);
 
     return payload;
   });
@@ -85,9 +90,10 @@ export const isConditionComplete = (condition: FilterConditionWithId): boolean =
   if (!condition.column) return false;
   if (condition.operator === 'is_null') return true;
   if (condition.operator === 'between') {
-    const range = condition.value && typeof condition.value === 'object'
-      ? (condition.value as ConditionRange)
-      : { start: null, end: null };
+    const range =
+      condition.value && typeof condition.value === 'object'
+        ? (condition.value as ConditionRange)
+        : { start: null, end: null };
     return hasNonEmptyValue(range.start) || hasNonEmptyValue(range.end);
   }
   return hasNonEmptyValue(condition.value);

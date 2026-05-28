@@ -35,7 +35,7 @@ const buildQuotationResponse = (): QuotationAnalysisResponse => ({
 
 describe('useQuotationTaskFlow', () => {
   it('omits page_size on the initial quotation request so the backend can estimate it', async () => {
-    const quotationSearch = vi.fn(async () => buildQuotationResponse());
+    const quotationSearch = vi.fn(() => Promise.resolve(buildQuotationResponse()));
 
     const { result } = renderHook(() =>
       useQuotationTaskFlow({
@@ -71,19 +71,19 @@ describe('useQuotationTaskFlow', () => {
           // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
           getAuthHeaders: () => ({}),
           lockWithSnapshots: vi.fn(),
-          resolveTaskId: vi.fn(async () => null),
+          resolveTaskId: vi.fn(() => Promise.resolve(null)),
           quotationSearch,
-          detachQuotation: vi.fn(async () => ({
+          detachQuotation: vi.fn(() => Promise.resolve({
             state: 'running' as const,
             message: 'Quotation detach started',
             data: null,
             metadata: { task_id: 'quotation-detach-task' },
           })),
-          materializeQuotation: vi.fn(async () => undefined),
+          materializeQuotation: vi.fn(() => Promise.resolve(undefined)),
           openEngineDialog: vi.fn(),
           queryClient: new QueryClient(),
         },
-      })
+      }),
     );
 
     await act(async () => {
@@ -97,7 +97,7 @@ describe('useQuotationTaskFlow', () => {
         column: 'text',
         page: 1,
         engine: { type: 'local' },
-      })
+      }),
     );
     const initialRequest = quotationSearch.mock.calls[0]?.at(1) as
       | Record<string, unknown>
@@ -107,7 +107,7 @@ describe('useQuotationTaskFlow', () => {
   });
 
   it('keeps sending page_size after the user has an explicit pagination state', async () => {
-    const quotationSearch = vi.fn(async () => buildQuotationResponse());
+    const quotationSearch = vi.fn(() => Promise.resolve(buildQuotationResponse()));
 
     const { result } = renderHook(() =>
       useQuotationTaskFlow({
@@ -150,19 +150,19 @@ describe('useQuotationTaskFlow', () => {
           // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
           getAuthHeaders: () => ({}),
           lockWithSnapshots: vi.fn(),
-          resolveTaskId: vi.fn(async () => 'task-1'),
+          resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
           quotationSearch,
-          detachQuotation: vi.fn(async () => ({
+          detachQuotation: vi.fn(() => Promise.resolve({
             state: 'running' as const,
             message: 'Quotation detach started',
             data: null,
             metadata: { task_id: 'quotation-detach-task' },
           })),
-          materializeQuotation: vi.fn(async () => undefined),
+          materializeQuotation: vi.fn(() => Promise.resolve(undefined)),
           openEngineDialog: vi.fn(),
           queryClient: new QueryClient(),
         },
-      })
+      }),
     );
 
     await act(async () => {

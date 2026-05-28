@@ -75,50 +75,50 @@ export function usePendingWorkspaceDownloads({
     [authHeaders, notify],
   );
 
-    /**
-     * Clears a pending workspace entry after the download task resolves or
-     * fails.
-     */
-    const dismissPendingDownload = useCallback((workspaceId: string) => {
-      setPendingDownloads((prev) => omitPendingDownload(prev, workspaceId));
-    }, []);
+  /**
+   * Clears a pending workspace entry after the download task resolves or
+   * fails.
+   */
+  const dismissPendingDownload = useCallback((workspaceId: string) => {
+    setPendingDownloads((prev) => omitPendingDownload(prev, workspaceId));
+  }, []);
 
-    /**
-     * Fetches the generated ZIP artifact and saves it locally once the backend
-     * task reaches `successful`.
-     */
-    const completePendingDownload = useCallback(
-      async (workspaceId: string, taskId: string, workspaceName: string) => {
-        dismissPendingDownload(workspaceId);
-        try {
-          const { data } = await downloadWorkspaceArtifact({
-            headers: authHeaders,
-            parseAs: 'blob',
-            path: { task_id: taskId },
-            throwOnError: true,
-          });
-          const blob = data as Blob;
-          const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
-          await saveBlob(blob, filename);
-          notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
-        } catch (err) {
-          notify('error', (err as Error).message || 'Failed to download workspace ZIP.');
-        }
-      },
-      [authHeaders, dismissPendingDownload, notify],
-    );
+  /**
+   * Fetches the generated ZIP artifact and saves it locally once the backend
+   * task reaches `successful`.
+   */
+  const completePendingDownload = useCallback(
+    async (workspaceId: string, taskId: string, workspaceName: string) => {
+      dismissPendingDownload(workspaceId);
+      try {
+        const { data } = await downloadWorkspaceArtifact({
+          headers: authHeaders,
+          parseAs: 'blob',
+          path: { task_id: taskId },
+          throwOnError: true,
+        });
+        const blob = data as Blob;
+        const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
+        await saveBlob(blob, filename);
+        notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
+      } catch (err) {
+        notify('error', (err as Error).message || 'Failed to download workspace ZIP.');
+      }
+    },
+    [authHeaders, dismissPendingDownload, notify],
+  );
 
-    /**
-     * Reports failed/cancelled workspace artifact tasks and removes their row
-     * from the pending download map.
-     */
-    const failPendingDownload = useCallback(
-      (workspaceId: string, message: string | undefined) => {
-        dismissPendingDownload(workspaceId);
-        notify('error', message || 'Workspace download failed.');
-      },
-      [dismissPendingDownload, notify],
-    );
+  /**
+   * Reports failed/cancelled workspace artifact tasks and removes their row
+   * from the pending download map.
+   */
+  const failPendingDownload = useCallback(
+    (workspaceId: string, message: string | undefined) => {
+      dismissPendingDownload(workspaceId);
+      notify('error', message || 'Workspace download failed.');
+    },
+    [dismissPendingDownload, notify],
+  );
 
   useEffect(() => {
     const entries = Object.entries(pendingDownloads);
@@ -129,12 +129,14 @@ export function usePendingWorkspaceDownloads({
       if (!task) continue;
 
       if (task.state === 'successful') {
-          void Promise.resolve().then(() => completePendingDownload(workspaceId, taskId, workspaceName));
+        void Promise.resolve().then(() =>
+          completePendingDownload(workspaceId, taskId, workspaceName),
+        );
       } else if (task.state === 'failed' || task.state === 'cancelled') {
-          void Promise.resolve().then(() => failPendingDownload(workspaceId, task.message));
+        void Promise.resolve().then(() => failPendingDownload(workspaceId, task.message));
       }
     }
-    }, [tasks, pendingDownloads, completePendingDownload, failPendingDownload]);
+  }, [tasks, pendingDownloads, completePendingDownload, failPendingDownload]);
 
   const isStarting = useCallback(
     /** Reports whether a given workspace row is currently starting a download. */

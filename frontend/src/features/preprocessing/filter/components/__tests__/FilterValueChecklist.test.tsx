@@ -32,9 +32,7 @@ describe('FilterValueChecklist', () => {
     fireEvent.click(button);
 
     expect(onSelectAll).toHaveBeenCalledTimes(1);
-    expect(onSelectAll.mock.calls[0]?.[0]).toEqual([
-      { key: 'a', value: 'alpha', label: 'alpha' },
-    ]);
+    expect(onSelectAll.mock.calls[0]?.[0]).toEqual([{ key: 'a', value: 'alpha', label: 'alpha' }]);
   });
 
   it('filters visible options using wildcard matching', () => {

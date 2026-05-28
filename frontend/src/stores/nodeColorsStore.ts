@@ -24,6 +24,7 @@
  * pick.
  */
 import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
 import { AUTO_ASSIGN_PALETTE } from '@/features/analysis/common/palette';
 
 type ColorMap = Record<string, string>;
@@ -34,7 +35,7 @@ interface NodeColorsState {
   colors: ColorMap;
   /** Order in which nodeIds first received an assigned colour. Stable
    * across re-renders so the next-new node gets the next palette
-    * colour deterministically when ``ensureColors`` is used. */
+   * colour deterministically when ``ensureColors`` is used. */
   assignmentOrder: string[];
   /** Per-tab temp colour layer. Outer key is the tab identifier (each
    * analytics tab passes its own constant — typically the matching
@@ -114,205 +115,161 @@ function pickRandomPaletteAvoiding(avoid: ReadonlySet<string>): string {
   return free[Math.floor(Math.random() * free.length)]!;
 }
 
-export const useNodeColorsStore = create<NodeColorsState>((set, get) => ({
-  colors: {},
-  assignmentOrder: [],
-  temps: {},
+export const useNodeColorsStore = create<NodeColorsState>()(
+  immer((set) => ({
+    colors: {},
+    assignmentOrder: [],
+    temps: {},
 
-  /** Assigns persistent node colours for callers that do not use a temp preview layer. */
-  /**
-   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
-    * Flow: copy assigned colours and order, assign palette positions to new node ids, then update the store only when a colour was added.
-   */
-  ensureColors: (nodeIds) => {
-    if (nodeIds.length === 0) return;
-    const { colors, assignmentOrder } = get();
-    const updatedColors = { ...colors };
-    const updatedOrder = [...assignmentOrder];
-    let mutated = false;
-    for (const id of nodeIds) {
-      if (!id || updatedColors[id]) continue;
-      const palettePos = updatedOrder.length % AUTO_ASSIGN_PALETTE.length;
-      updatedColors[id] = AUTO_ASSIGN_PALETTE[palettePos]!;
-      updatedOrder.push(id);
-      mutated = true;
-    }
-    if (mutated) set({ colors: updatedColors, assignmentOrder: updatedOrder });
-  },
-
-  /** Writes an assigned colour directly for workspace/sidebar or promoted temp updates. */
-  /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  setColor: (nodeId, color) => {
-    if (!nodeId) return;
-    set((state) => {
-      const nextOrder = state.assignmentOrder.includes(nodeId)
-        ? state.assignmentOrder
-        : [...state.assignmentOrder, nodeId];
-      return {
-        colors: { ...state.colors, [nodeId]: color },
-        assignmentOrder: nextOrder,
-      };
-    });
-  },
-
-  /** Seeds per-tab temporary colours for analysis selections before the user runs the tool. */
-  /**
-   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
-    * Flow: copy tab temps, build the visible-colour avoidance set, reuse non-conflicting assigned colours, or choose an available palette colour.
-   */
-  ensureTempColors: (tabKey, nodeIds) => {
-    if (!tabKey || nodeIds.length === 0) return;
-    const { temps, colors } = get();
-    const tabTemps = { ...(temps[tabKey] ?? {}) };
-    // Seed the conflict-avoidance set with the colours already
-    // visible to the user in this tab: existing temps for this
-    // tab's nodes + assigned colours of nodes we won't need to
-    // re-roll. We re-derive the set as we add new temps below.
-    const visible = new Set<string>();
-    for (const id of nodeIds) {
-      if (tabTemps[id]) visible.add(tabTemps[id]);
-    }
-    let mutated = false;
-    for (const id of nodeIds) {
-      if (!id || tabTemps[id]) continue;
-      const assigned = colors[id];
-      let chosen: string;
-      if (assigned && !visible.has(assigned)) {
-        chosen = assigned;
-      } else {
-        chosen = pickRandomPaletteAvoiding(visible);
-      }
-      tabTemps[id] = chosen;
-      visible.add(chosen);
-      mutated = true;
-    }
-    if (mutated) set({ temps: { ...temps, [tabKey]: tabTemps } });
-  },
-
-  /** Stores a manual colour override in the tab-local temp layer. */
-  /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  setTempColor: (tabKey, nodeId, color) => {
-    if (!tabKey || !nodeId) return;
-    set((state) => ({
-      temps: {
-        ...state.temps,
-        [tabKey]: { ...(state.temps[tabKey] ?? {}), [nodeId]: color },
-      },
-    }));
-  },
-
-  /** Clears tab-local temp colours when selections leave the analysis tab. */
-  /**
-   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
-    * Flow: drop the whole tab layer when no ids are supplied, otherwise delete requested temp ids and keep state unchanged when nothing moved.
-   */
-  clearTempColors: (tabKey, nodeIds) => {
-    if (!tabKey) return;
-    set((state) => {
-      const tabTemps = state.temps[tabKey];
-      if (!tabTemps) return state;
-      if (!nodeIds) {
-        const { [tabKey]: _dropped, ...rest } = state.temps;
-        return { temps: rest };
-      }
-      const next = { ...tabTemps };
-      let mutated = false;
-      for (const id of nodeIds) {
-        if (id in next) {
-          Reflect.deleteProperty(next, id);
-          mutated = true;
+    /** Assigns persistent node colours for callers that do not use a temp preview layer. */
+    /**
+     * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Flow: copy assigned colours and order, assign palette positions to new node ids, then update the store only when a colour was added.
+     */
+    ensureColors: (nodeIds) => {
+      if (nodeIds.length === 0) return;
+      set((state) => {
+        for (const id of nodeIds) {
+          if (!id || state.colors[id]) continue;
+          const palettePos = state.assignmentOrder.length % AUTO_ASSIGN_PALETTE.length;
+          state.colors[id] = AUTO_ASSIGN_PALETTE[palettePos]!;
+          state.assignmentOrder.push(id);
         }
-      }
-      if (!mutated) return state;
-      return { temps: { ...state.temps, [tabKey]: next } };
-    });
-  },
+      });
+    },
 
-  /** Commits temp colours into assigned graph/sidebar colours after an analysis run. */
-  /**
-   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
-    * Flow: read tab-local temp colours, copy promoted colours into assigned state/order, then clear the promoted temp entries.
-   */
-  promoteTempColors: (tabKey, nodeIds) => {
-    if (!tabKey || nodeIds.length === 0) return;
-    set((state) => {
-      const tabTemps = state.temps[tabKey];
-      if (!tabTemps) return state;
-      const nextColors = { ...state.colors };
-      const nextOrder = [...state.assignmentOrder];
-      const nextTabTemps = { ...tabTemps };
-      let mutated = false;
-      for (const id of nodeIds) {
-        const temp = tabTemps[id];
-        if (!temp) continue;
-        nextColors[id] = temp;
-        if (!nextOrder.includes(id)) nextOrder.push(id);
-        Reflect.deleteProperty(nextTabTemps, id);
-        mutated = true;
-      }
-      if (!mutated) return state;
-      return {
-        colors: nextColors,
-        assignmentOrder: nextOrder,
-        temps: { ...state.temps, [tabKey]: nextTabTemps },
-      };
-    });
-  },
+    /** Writes an assigned colour directly for workspace/sidebar or promoted temp updates. */
+    /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    setColor: (nodeId, color) => {
+      if (!nodeId) return;
+      set((state) => {
+        state.colors[nodeId] = color;
+        if (!state.assignmentOrder.includes(nodeId)) state.assignmentOrder.push(nodeId);
+      });
+    },
 
-  /** Rehydrates assigned colours from workspace persistence without touching session temp previews. */
-  /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  hydrateColors: (next) => {
-    set({
-      colors: { ...next },
-      assignmentOrder: Object.keys(next),
-    });
-  },
-
-  /** Removes colour metadata for nodes no longer present in the latest workspace graph. */
-  /**
-   * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
-    * Flow: build the live-node set, sweep assigned colours, assignment order, and tab temps, then update only the layers that changed.
-   */
-  pruneStaleColors: (activeNodeIds) => {
-    set((state) => {
-      const alive = new Set(activeNodeIds);
-
-      // Sweep assigned colours.
-      const nextColors: ColorMap = {};
-      let colorsMutated = false;
-      for (const [id, color] of Object.entries(state.colors)) {
-        if (alive.has(id)) nextColors[id] = color;
-        else colorsMutated = true;
-      }
-
-      // Sweep assignmentOrder, preserving the surviving order.
-      const nextOrder = state.assignmentOrder.filter((id) => alive.has(id));
-      const orderMutated = nextOrder.length !== state.assignmentOrder.length;
-
-      // Sweep per-tab temps.
-      const nextTemps: Record<string, ColorMap> = {};
-      let tempsMutated = false;
-      for (const [tabKey, tabTemps] of Object.entries(state.temps)) {
-        const cleaned: ColorMap = {};
-        let tabMutated = false;
-        for (const [id, color] of Object.entries(tabTemps)) {
-          if (alive.has(id)) cleaned[id] = color;
-          else tabMutated = true;
+    /** Seeds per-tab temporary colours for analysis selections before the user runs the tool. */
+    /**
+     * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Flow: copy tab temps, build the visible-colour avoidance set, reuse non-conflicting assigned colours, or choose an available palette colour.
+     */
+    ensureTempColors: (tabKey, nodeIds) => {
+      if (!tabKey || nodeIds.length === 0) return;
+      set((state) => {
+        const tabTemps = state.temps[tabKey] ?? (state.temps[tabKey] = {});
+        const visible = new Set<string>();
+        for (const id of nodeIds) {
+          if (tabTemps[id]) visible.add(tabTemps[id]);
         }
-        nextTemps[tabKey] = cleaned;
-        if (tabMutated) tempsMutated = true;
-      }
+        for (const id of nodeIds) {
+          if (!id || tabTemps[id]) continue;
+          const assigned = state.colors[id];
+          let chosen: string;
+          if (assigned && !visible.has(assigned)) {
+            chosen = assigned;
+          } else {
+            chosen = pickRandomPaletteAvoiding(visible);
+          }
+          tabTemps[id] = chosen;
+          visible.add(chosen);
+        }
+      });
+    },
 
-      if (!colorsMutated && !orderMutated && !tempsMutated) return state;
-      return {
-        colors: colorsMutated ? nextColors : state.colors,
-        assignmentOrder: orderMutated ? nextOrder : state.assignmentOrder,
-        temps: tempsMutated ? nextTemps : state.temps,
-      };
-    });
-  },
+    /** Stores a manual colour override in the tab-local temp layer. */
+    /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    setTempColor: (tabKey, nodeId, color) => {
+      if (!tabKey || !nodeId) return;
+      set((state) => {
+        const tabTemps = state.temps[tabKey] ?? (state.temps[tabKey] = {});
+        tabTemps[nodeId] = color;
+      });
+    },
 
-  /** Clears all assigned and temporary colours for tests and workspace reset flows. */
-  /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  reset: () => set({ colors: {}, assignmentOrder: [], temps: {} }),
-}));
+    /** Clears tab-local temp colours when selections leave the analysis tab. */
+    /**
+     * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Flow: drop the whole tab layer when no ids are supplied, otherwise delete requested temp ids and keep state unchanged when nothing moved.
+     */
+    clearTempColors: (tabKey, nodeIds) => {
+      if (!tabKey) return;
+      set((state) => {
+        const tabTemps = state.temps[tabKey];
+        if (!tabTemps) return;
+        if (!nodeIds) {
+          Reflect.deleteProperty(state.temps, tabKey);
+          return;
+        }
+        for (const id of nodeIds) {
+          Reflect.deleteProperty(tabTemps, id);
+        }
+      });
+    },
+
+    /** Commits temp colours into assigned graph/sidebar colours after an analysis run. */
+    /**
+     * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Flow: read tab-local temp colours, copy promoted colours into assigned state/order, then clear the promoted temp entries.
+     */
+    promoteTempColors: (tabKey, nodeIds) => {
+      if (!tabKey || nodeIds.length === 0) return;
+      set((state) => {
+        const tabTemps = state.temps[tabKey];
+        if (!tabTemps) return;
+        for (const id of nodeIds) {
+          const temp = tabTemps[id];
+          if (!temp) continue;
+      state.colors[id] = temp;
+      if (!state.assignmentOrder.includes(id)) state.assignmentOrder.push(id);
+      Reflect.deleteProperty(tabTemps, id);
+        }
+      });
+    },
+
+    /** Rehydrates assigned colours from workspace persistence without touching session temp previews. */
+    /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    hydrateColors: (next) => {
+      set((state) => {
+        state.colors = { ...next };
+        state.assignmentOrder = Object.keys(next);
+      });
+    },
+
+    /** Removes colour metadata for nodes no longer present in the latest workspace graph. */
+    /**
+     * Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Flow: build the live-node set, sweep assigned colours, assignment order, and tab temps, then update only the layers that changed.
+     */
+    pruneStaleColors: (activeNodeIds) => {
+      set((state) => {
+        const alive = new Set(activeNodeIds);
+
+        for (const id of Object.keys(state.colors)) {
+          if (!alive.has(id)) Reflect.deleteProperty(state.colors, id);
+        }
+
+        for (let i = state.assignmentOrder.length - 1; i >= 0; i--) {
+          const id = state.assignmentOrder[i];
+          if (id && !alive.has(id)) state.assignmentOrder.splice(i, 1);
+        }
+
+        for (const tabKey of Object.keys(state.temps)) {
+          const tabTemps = state.temps[tabKey];
+          if (!tabTemps) continue;
+          for (const id of Object.keys(tabTemps)) {
+            if (!alive.has(id)) Reflect.deleteProperty(tabTemps, id);
+          }
+        }
+      });
+    },
+
+    /** Clears all assigned and temporary colours for tests and workspace reset flows. */
+    /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    reset: () =>
+      set((state) => {
+        state.colors = {};
+        state.assignmentOrder = [];
+        state.temps = {};
+      }),
+  })),
+);

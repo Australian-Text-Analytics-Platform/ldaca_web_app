@@ -1,4 +1,3 @@
-
 import { AlertCircle, Loader2, Plus, Shuffle } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -66,7 +65,6 @@ function SliceSubTabContent(props: SliceSubTabProps) {
                   tooltip="Create either a contiguous slice or a random sample from the selected data block."
                 />
               </CardTitle>
-              
             </div>
             <SubTabActivityTag active={showActivityTag} verb="Running" />
           </div>
@@ -96,10 +94,17 @@ function SliceSubTabContent(props: SliceSubTabProps) {
             }
           />
 
-          <Tabs value={form.mode} onValueChange={(value) => form.setMode(value as 'slice' | 'random_sample')}>
+          <Tabs
+            value={form.mode}
+            onValueChange={(value) => form.setMode(value as 'slice' | 'random_sample')}
+          >
             <TabsList>
-              <TabsTrigger value="slice" disabled={!hasSelection}>Slice</TabsTrigger>
-              <TabsTrigger value="random_sample" disabled={!hasSelection}>Random Sample</TabsTrigger>
+              <TabsTrigger value="slice" disabled={!hasSelection}>
+                Slice
+              </TabsTrigger>
+              <TabsTrigger value="random_sample" disabled={!hasSelection}>
+                Random Sample
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="slice" className="mt-4">
@@ -117,7 +122,9 @@ function SliceSubTabContent(props: SliceSubTabProps) {
                     onChange={(event) => form.setOffsetInput(event.target.value)}
                     disabled={!hasSelection}
                   />
-                  <p className="text-xs text-muted-foreground">Zero-based index of the first row to include.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Zero-based index of the first row to include.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -134,7 +141,9 @@ function SliceSubTabContent(props: SliceSubTabProps) {
                     disabled={!hasSelection}
                     placeholder="Number of rows to include"
                   />
-                  <p className="text-xs text-muted-foreground">Number of rows to include from the offset.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Number of rows to include from the offset.
+                  </p>
                 </div>
               </div>
             </TabsContent>
@@ -154,7 +163,10 @@ function SliceSubTabContent(props: SliceSubTabProps) {
                     disabled={!hasSelection}
                     placeholder="e.g. 0.4 for 40% or 100 for 100 rows"
                   />
-                  <p className="text-xs text-muted-foreground">Fraction (0–1) for proportional sampling, or an integer ≥ 1 for an absolute row count.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Fraction (0–1) for proportional sampling, or an integer ≥ 1 for an absolute row
+                    count.
+                  </p>
                   {form.sampleSizeHint && (
                     <p className="text-xs text-destructive">{form.sampleSizeHint}</p>
                   )}
@@ -179,11 +191,16 @@ function SliceSubTabContent(props: SliceSubTabProps) {
                       onCheckedChange={(checked) => form.setNoRandomSeed(checked === true)}
                       disabled={!hasSelection}
                     />
-                    <Label htmlFor="no-random-seed" className="text-sm font-normal text-muted-foreground whitespace-nowrap">
+                    <Label
+                      htmlFor="no-random-seed"
+                      className="text-sm font-normal text-muted-foreground whitespace-nowrap"
+                    >
                       No Random Seed
                     </Label>
                   </div>
-                  <p className="text-xs text-muted-foreground">Use a seed to reproduce the same sampled rows.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Use a seed to reproduce the same sampled rows.
+                  </p>
                 </div>
               </div>
             </TabsContent>
@@ -191,14 +208,22 @@ function SliceSubTabContent(props: SliceSubTabProps) {
         </CardContent>
         <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
           <div className="flex flex-1 items-center gap-2">
-            <Label htmlFor="slice-new-node-name" className="shrink-0">New data block name</Label>
+            <Label htmlFor="slice-new-node-name" className="shrink-0">
+              New data block name
+            </Label>
             <HelpIcon targetKey="preprocessing.slice.new-node-name" label="Sample output name" />
             <Input
               id="slice-new-node-name"
               type="text"
               value={form.newNodeName}
               onChange={(event) => form.setNewNodeName(event.target.value)}
-              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: form.newNodeName, setValue: form.setNewNodeName })}
+              onKeyDown={(event) =>
+                acceptPlaceholderOnTab({
+                  event,
+                  value: form.newNodeName,
+                  setValue: form.setNewNodeName,
+                })
+              }
               placeholder={form.newNodeNamePlaceholder}
               disabled={!hasSelection}
               className="min-w-0 flex-1"
@@ -211,7 +236,9 @@ function SliceSubTabContent(props: SliceSubTabProps) {
             </div>
           )}
           <DisabledReasonTooltip reason={applyDisabledReason}>
-            <Button size="sm" onClick={applySlice} disabled={applyDisabled} className="shrink-0">
+            <Button size="sm" onClick={() => {
+              void applySlice();
+            }} disabled={applyDisabled} className="shrink-0">
               {isBusy ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

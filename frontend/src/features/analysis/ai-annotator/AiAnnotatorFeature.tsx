@@ -20,17 +20,38 @@ import type { AiAnnotationNodeResult, AiAnnotationResponse } from '@/api/generat
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
 import { useUIStore } from '@/stores/uiStore';
-import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId, restoreAnalysisLockFromRequest, resetAnalysisSelectionAfterClear, useNodeColorManagement } from '../common';
+import {
+  getNodeIdentifier,
+  useAnalysisFeature,
+  useAnalysisLockMachine,
+  extractAndSetTaskId,
+  restoreAnalysisLockFromRequest,
+  resetAnalysisSelectionAfterClear,
+  useNodeColorManagement,
+} from '../common';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnalysisPagination } from '@/features/analysis/common/components/AnalysisPagination';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
@@ -43,9 +64,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { normalizeTypeName } from '@/utils/columnTypes';
-import {
-  MetadataColumnSelector,
-} from '../common/components/MetadataColumnSelector';
+import { MetadataColumnSelector } from '../common/components/MetadataColumnSelector';
 
 type EndpointPreset = 'openai' | 'lmstudio' | 'custom';
 
@@ -79,7 +98,7 @@ const DEFAULT_PARAMS = {
 /** Parses the user-authored class list into the request shape expected by the AI annotation backend. */
 /**
  * Called by: AiAnnotatorFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   * Flow: split nonempty class lines, separate optional descriptions at colons, default blank descriptions to the class name, then drop entries without names.
+ * Flow: split nonempty class lines, separate optional descriptions at colons, default blank descriptions to the class name, then drop entries without names.
  */
 const parseClasses = (raw: string) => {
   return raw
@@ -101,7 +120,7 @@ const parseClasses = (raw: string) => {
 /** Parses few-shot examples so the AI annotation task can pass validated query/classification pairs. */
 /**
  * Called by: AiAnnotatorFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   * Flow: split nonempty example lines, keep only query-to-classification pairs with both sides present, then return typed few-shot examples.
+ * Flow: split nonempty example lines, keep only query-to-classification pairs with both sides present, then return typed few-shot examples.
  */
 const parseExamples = (raw: string) => {
   return raw
@@ -166,7 +185,9 @@ function AiAnnotatorFeature() {
   const queryClient = useQueryClient();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'ai-annotator';
-  const [endpointPreset, setEndpointPreset] = useState<EndpointPreset>(DEFAULT_PARAMS.endpointPreset);
+  const [endpointPreset, setEndpointPreset] = useState<EndpointPreset>(
+    DEFAULT_PARAMS.endpointPreset,
+  );
   const [model, setModel] = useState(DEFAULT_PARAMS.model);
   const [classesText, setClassesText] = useState(DEFAULT_PARAMS.classesText);
   const [examplesText, setExamplesText] = useState(DEFAULT_PARAMS.examplesText);
@@ -250,8 +271,9 @@ function AiAnnotatorFeature() {
       tabKey: 'ai-annotator',
     });
 
-  const effectiveSelections = (isLocked ? activeNodeColumnSelections : nodeColumnSelections)
-    .filter((selection) => displayedNodeIds.includes(selection.nodeId));
+  const effectiveSelections = (isLocked ? activeNodeColumnSelections : nodeColumnSelections).filter(
+    (selection) => displayedNodeIds.includes(selection.nodeId),
+  );
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -279,11 +301,10 @@ function AiAnnotatorFeature() {
     parsedClasses.length === 0 ||
     isRunning;
 
-
   // Normalizes task responses into the single result node rendered by the annotation table.
   /**
    * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     * Flow: read the first response node, merge response metadata into that node when present, then update result node id/state or clear it when data is missing.
+   * Flow: read the first response node, merge response metadata into that node when present, then update result node id/state or clear it when data is missing.
    */
   const applyResponseResult = (response: AiAnnotationResponse | null) => {
     const data = response?.data;
@@ -353,6 +374,7 @@ function AiAnnotatorFeature() {
     },
     // Rehydrates persisted result payloads when the tab regains a known task.
     // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // eslint-disable-next-line @typescript-eslint/require-await
     onHydratedResult: async (resultPayload) => {
       const hydrated = resultPayload ?? null;
       aiAnnotationResultRef.current = hydrated;
@@ -377,7 +399,10 @@ function AiAnnotatorFeature() {
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
-          requestData: requestData as { node_ids?: string[]; node_columns?: Record<string, string> },
+          requestData: requestData as {
+            node_ids?: string[];
+            node_columns?: Record<string, string>;
+          },
           getAuthHeaders,
           lockWithSnapshots,
           queryClient,
@@ -403,7 +428,7 @@ function AiAnnotatorFeature() {
   // Fetches a paged result slice for the annotation table without restarting the task.
   /**
    * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     * Flow: resolve the task id, request the selected result page, store the response ref and node result, then surface paging status or errors.
+   * Flow: resolve the task id, request the selected result page, store the response ref and node result, then surface paging status or errors.
    */
   const loadResultPage = async (page: number, pageSize: number) => {
     const resolvedTaskId = localTaskId ?? (await resolveTaskId());
@@ -437,7 +462,7 @@ function AiAnnotatorFeature() {
   // Queries the configured provider endpoint so users can choose a concrete model id.
   /**
    * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-     * Flow: resolve the provider base URL, request available model ids with the API key, select a valid default model, then report load success or failure.
+   * Flow: resolve the provider base URL, request available model ids with the API key, select a valid default model, then report load success or failure.
    */
   const handleLoadModels = async () => {
     setIsLoadingModels(true);
@@ -456,7 +481,9 @@ function AiAnnotatorFeature() {
       }
       setStatusMessage(response?.message ?? 'Model catalog loaded.');
     } catch (error) {
-      setStatusMessage(`Failed to load models: ${error instanceof Error ? error.message : String(error)}`);
+      setStatusMessage(
+        `Failed to load models: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       setIsLoadingModels(false);
     }
@@ -466,7 +493,7 @@ function AiAnnotatorFeature() {
   useEffect(() => {
     if (!currentWorkspaceId) return;
     if (endpointPreset === 'custom' && !customBaseUrl.trim()) return;
-    Promise.resolve().then(() => handleLoadModels());
+    void Promise.resolve().then(() => handleLoadModels());
     // handleLoadModels is intentionally excluded — it's an event handler whose identity changes every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpointPreset, customBaseUrl, currentWorkspaceId]);
@@ -492,8 +519,8 @@ function AiAnnotatorFeature() {
   // Starts a backend detach task that materializes annotations into a new workspace node.
   /**
    * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const handleDetach = async () => {
     if (!selectedNodeId || !selectedColumn) {
       setStatusMessage('Select one data block and text column before detaching.');
@@ -532,7 +559,9 @@ function AiAnnotatorFeature() {
           : 'AI annotation detach started.',
       );
     } catch (error) {
-      setStatusMessage(`Failed to detach AI annotation: ${error instanceof Error ? error.message : String(error)}`);
+      setStatusMessage(
+        `Failed to detach AI annotation: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       setIsDetaching(false);
     }
@@ -541,8 +570,8 @@ function AiAnnotatorFeature() {
   // Submits the active node and column to the annotation backend and locks that context.
   /**
    * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const handleRun = async () => {
     if (!selectedNodeId || !selectedColumn) {
       setStatusMessage('Select one data block and text column before running.');
@@ -597,7 +626,9 @@ function AiAnnotatorFeature() {
         // best-effort lock after run
       }
     } catch (error) {
-      setStatusMessage(`Failed to run AI annotation: ${error instanceof Error ? error.message : String(error)}`);
+      setStatusMessage(
+        `Failed to run AI annotation: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       setIsRunning(false);
     }
@@ -612,7 +643,9 @@ function AiAnnotatorFeature() {
     try {
       await clearResults();
     } catch (error) {
-      setStatusMessage(`Failed to clear AI annotation: ${error instanceof Error ? error.message : String(error)}`);
+      setStatusMessage(
+        `Failed to clear AI annotation: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       setIsClearing(false);
     }
@@ -626,7 +659,8 @@ function AiAnnotatorFeature() {
     : [];
   const inferredTextColumn =
     (selectedColumn && resultColumns.includes(selectedColumn) ? selectedColumn : null) ??
-    (resultColumns.find((col) => !annotationColumns.includes(col)) ?? null);
+    resultColumns.find((col) => !annotationColumns.includes(col)) ??
+    null;
   const availableMetadataColumns = resultColumns.filter(
     (column) => !annotationColumns.includes(column) && column !== inferredTextColumn,
   );
@@ -636,9 +670,11 @@ function AiAnnotatorFeature() {
   // (e.g. a column got renamed or removed from the source data). No
   // auto-selection — only the user's explicit picks survive.
   useEffect(() => {
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       setSelectedMetadataColumns((previousSelection) => {
-        const filtered = previousSelection.filter((column) => availableMetadataColumns.includes(column));
+        const filtered = previousSelection.filter((column) =>
+          availableMetadataColumns.includes(column),
+        );
         if (filtered.length === previousSelection.length) return previousSelection;
         return filtered;
       });
@@ -646,10 +682,7 @@ function AiAnnotatorFeature() {
   }, [availableMetadataColumns, availableMetadataColumnsKey]);
 
   const visibleColumns = (() => {
-    const prioritized = [
-      ...annotationColumns,
-      ...(inferredTextColumn ? [inferredTextColumn] : []),
-    ];
+    const prioritized = [...annotationColumns, ...(inferredTextColumn ? [inferredTextColumn] : [])];
     const visibleMetadataColumns = selectedMetadataColumns.filter((column) =>
       availableMetadataColumns.includes(column),
     );
@@ -673,7 +706,7 @@ function AiAnnotatorFeature() {
   // Reads the saved annotation value from the row payload for comparison during auto-save.
   /**
    * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     * Flow: scan the annotation column entries for the requested provider, return its saved annotation text, or fall back to an empty string.
+   * Flow: scan the annotation column entries for the requested provider, return its saved annotation text, or fall back to an empty string.
    */
   const getPersistedAnnotationValue = (
     row: Record<string, unknown>,
@@ -736,9 +769,15 @@ function AiAnnotatorFeature() {
   // Loads source rows for the review tab while adapting node-data pagination to annotation metadata.
   /**
    * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     * Flow: fetch the selected node page, reshape backend pagination into review metadata, then store review rows and status.
+   * Flow: fetch the selected node page, reshape backend pagination into review metadata, then store review rows and status.
    */
-  const loadReviewPage = async (nodeId: string, textCol: string, annotationCol: string, pg: number, pgSize: number) => {
+  const loadReviewPage = async (
+    nodeId: string,
+    _textCol: string,
+    annotationCol: string,
+    pg: number,
+    pgSize: number,
+  ) => {
     setIsReviewPaging(true);
     try {
       const { data: response } = await getNodeData({
@@ -754,20 +793,24 @@ function AiAnnotatorFeature() {
         data: rows,
         columns,
         metadata: { annotation_columns: [annotationCol] },
-        pagination: pagination ? {
-          page: pagination.page ?? pg,
-          page_size: pagination.page_size ?? pgSize,
-          total_source_rows: pagination.total_rows,
-          total_source_pages: pagination.total_pages,
-          result_count: rows.length,
-          has_next: pagination.has_next ?? false,
-          has_prev: pagination.has_prev ?? false,
-        } : undefined,
+        pagination: pagination
+          ? {
+              page: pagination.page ?? pg,
+              page_size: pagination.page_size ?? pgSize,
+              total_source_rows: pagination.total_rows,
+              total_source_pages: pagination.total_pages,
+              result_count: rows.length,
+              has_next: pagination.has_next ?? false,
+              has_prev: pagination.has_prev ?? false,
+            }
+          : undefined,
       });
       setReviewNodeId(nodeId);
       setStatusMessage('Review data loaded.');
     } catch (error) {
-      setStatusMessage(`Failed to load review data: ${error instanceof Error ? error.message : String(error)}`);
+      setStatusMessage(
+        `Failed to load review data: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       setIsReviewPaging(false);
     }
@@ -776,7 +819,7 @@ function AiAnnotatorFeature() {
   // Retrieves provider names already present in the selected annotation column.
   /**
    * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     * Flow: request provider names for the annotation column, dedupe trimmed names into review options, then reset options on failure.
+   * Flow: request provider names for the annotation column, dedupe trimmed names into review options, then reset options on failure.
    */
   const loadReviewProviders = async (nodeId: string, annotationCol: string) => {
     try {
@@ -801,7 +844,7 @@ function AiAnnotatorFeature() {
   // Retrieves saved annotation categories so the review select stays aligned with existing data.
   /**
    * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     * Flow: request saved categories for the annotation column, dedupe trimmed names into review choices, then reset choices on failure.
+   * Flow: request saved categories for the annotation column, dedupe trimmed names into review choices, then reset choices on failure.
    */
   const loadReviewCategories = async (nodeId: string, annotationCol: string) => {
     try {
@@ -845,7 +888,13 @@ function AiAnnotatorFeature() {
     setIsReviewLoading(true);
     try {
       await Promise.all([
-        loadReviewPage(selectedNodeId, reviewTextColumn, reviewAnnotationColumn, 1, DEFAULT_PAGE_SIZE),
+        loadReviewPage(
+          selectedNodeId,
+          reviewTextColumn,
+          reviewAnnotationColumn,
+          1,
+          DEFAULT_PAGE_SIZE,
+        ),
         loadReviewProviders(selectedNodeId, reviewAnnotationColumn),
         refreshCategoryCache(selectedNodeId, reviewAnnotationColumn),
       ]);
@@ -905,8 +954,8 @@ function AiAnnotatorFeature() {
   // Auto-saves a review cell when its draft differs from the persisted annotation value.
   /**
    * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const handleReviewInputBlur = async (
     row: Record<string, unknown>,
     rowIndex: number,
@@ -967,11 +1016,14 @@ function AiAnnotatorFeature() {
           const raw = existingRow[annCol];
           const existingEntries = Array.isArray(raw)
             ? raw
-              .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-              .map((item) => ({
-                provider: String(item.provider ?? ''),
-                annotation: String(item.annotation ?? ''),
-              }))
+                .filter(
+                  (item): item is Record<string, unknown> =>
+                    Boolean(item) && typeof item === 'object',
+                )
+                .map((item) => ({
+                  provider: String(item.provider ?? ''),
+                  annotation: String(item.annotation ?? ''),
+                }))
             : [];
 
           let replaced = false;
@@ -1007,7 +1059,9 @@ function AiAnnotatorFeature() {
         return rest;
       });
     } catch (error) {
-      setStatusMessage(`Failed to auto-save review edit: ${error instanceof Error ? error.message : String(error)}`);
+      setStatusMessage(
+        `Failed to auto-save review edit: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       setSavingReviewCells((prev) => {
         const { [editKey]: _, ...rest } = prev;
@@ -1018,18 +1072,25 @@ function AiAnnotatorFeature() {
 
   // Shared column infos for selector UIs in both tabs
   const currentNodeColumnInfos = selectedNodeId ? getColumnInfos(displayedNodes[0]) : [];
-  const aiStringColumns = currentNodeColumnInfos.filter((ci) => normalizeTypeName(ci.dataType) === 'string');
-  const aiAnnotationColumns = currentNodeColumnInfos.filter((ci) => normalizeTypeName(ci.dataType) === 'annotation');
+  const aiStringColumns = currentNodeColumnInfos.filter(
+    (ci) => normalizeTypeName(ci.dataType) === 'string',
+  );
+  const aiAnnotationColumns = currentNodeColumnInfos.filter(
+    (ci) => normalizeTypeName(ci.dataType) === 'annotation',
+  );
   const reviewStringColumns = aiStringColumns;
   const reviewAnnotationColumns = aiAnnotationColumns;
 
   const reviewRunDisabled =
-    !currentWorkspaceId || !selectedNodeId || !reviewTextColumn || !reviewAnnotationColumn || isReviewLoading;
+    !currentWorkspaceId ||
+    !selectedNodeId ||
+    !reviewTextColumn ||
+    !reviewAnnotationColumn ||
+    isReviewLoading;
 
   useEffect(() => {
-    Promise.resolve().then(() => setReviewEdits({}));
+    void Promise.resolve().then(() => setReviewEdits({}));
   }, [resultNodeId, page, pageSize]);
-
 
   return (
     <div className="space-y-4">
@@ -1050,64 +1111,78 @@ function AiAnnotatorFeature() {
           label: 'About AI Annotation and Review',
           tooltip: 'Learn what AI annotation is and how it can help you.',
         }}
-        actions={panelTab === 'ai-annotation' ? {
-          onRun: handleRun,
-          // Stops the active annotation task from the shared layout action.
-          // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-          onStop: () => {
-            void stopTask();
-          },
-          onClear: handleClear,
-          runDisabled,
-          clearDisabled,
-          isRunning,
-          isStopping,
-          isClearing,
-          hasResult: Boolean(localTaskId),
-          extraContent: (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleLoadModels}
-                disabled={isLoadingModels || isRunning}
-              >
-                {isLoadingModels ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading Models
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Refresh Models
-                  </>
-                )}
-              </Button>
+        actions={
+          panelTab === 'ai-annotation'
+            ? {
+                onRun: handleRun,
+                // Stops the active annotation task from the shared layout action.
+                // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+                onStop: () => {
+                  void stopTask();
+                },
+                onClear: handleClear,
+                runDisabled,
+                clearDisabled,
+                isRunning,
+                isStopping,
+                isClearing,
+                hasResult: Boolean(localTaskId),
+                extraContent: (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        void handleLoadModels();
+                      }}
+                      disabled={isLoadingModels || isRunning}
+                    >
+                      {isLoadingModels ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading Models
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Refresh Models
+                        </>
+                      )}
+                    </Button>
 
-              <Button type="button" variant="outline" onClick={resetParameters} disabled={isRunning || isClearing}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Reset Parameters
-              </Button>
-            </div>
-          ),
-        } : {
-          onRun: handleReview,
-          onClear: handleClear,
-          runDisabled: reviewRunDisabled,
-          clearDisabled,
-          isRunning: isReviewLoading,
-          isClearing,
-          hasResult: Boolean(reviewData),
-          runLabel: isReviewLoading ? 'Reviewing' : 'Review',
-        }}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={resetParameters}
+                      disabled={isRunning || isClearing}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Reset Parameters
+                    </Button>
+                  </div>
+                ),
+              }
+            : {
+                onRun: handleReview,
+                onClear: handleClear,
+                runDisabled: reviewRunDisabled,
+                clearDisabled,
+                isRunning: isReviewLoading,
+                isClearing,
+                hasResult: Boolean(reviewData),
+                runLabel: isReviewLoading ? 'Reviewing' : 'Review',
+              }
+        }
       >
         <p className="mb-4 text-sm font-medium text-red-600 dark:text-red-400">
-          This tool is under development and not ready to be used. In order to use GenAI assisted coding,
-          you will need to have a valid API key from a commercial provider, or deploy a local GenAI model
-          and setup the endpoint correctly.
+          This tool is under development and not ready to be used. In order to use GenAI assisted
+          coding, you will need to have a valid API key from a commercial provider, or deploy a
+          local GenAI model and setup the endpoint correctly.
         </p>
-        <Tabs value={panelTab} onValueChange={(value) => setPanelTab(value as 'ai-annotation' | 'review')}>
+        <Tabs
+          value={panelTab}
+          onValueChange={(value) => setPanelTab(value as 'ai-annotation' | 'review')}
+        >
           <TabsList className="mb-4">
             <TabsTrigger value="ai-annotation">AI Annotation</TabsTrigger>
             <TabsTrigger value="review">Review</TabsTrigger>
@@ -1117,75 +1192,98 @@ function AiAnnotatorFeature() {
             <div className="space-y-4">
               <section className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Commonly Used Parameters</h3>
-                  <p className="text-xs text-muted-foreground">Choose one node, text column, model, and prompt schema.</p>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Commonly Used Parameters
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Choose one node, text column, model, and prompt schema.
+                  </p>
                 </div>
 
-              <NodeSelectionPanel
-                selectedNodes={displayedNodes}
-                nodeColumnSelections={[]}
-                onColumnChange={() => {}}
-                nodeColors={nodeColors}
-                onColorChange={handleColorChange}
-                getNodeColumns={getColumnInfos}
-                defaultPalette={defaultPalette}
-                maxCompare={1}
-                className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
-                showShape
-                showColorPicker
-                showColumnPicker={false}
-                disabled={isLocked}
-                locked={isLocked}
-                originalCount={displayNodeCount}
-                renderExtraNodeContent={() => (
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-medium text-muted-foreground" htmlFor="ai-text-column">Text Column</Label>
-                      <Select
-                        value={selectedColumn}
-                        onValueChange={(value) => {
-                          if (selectedNodeId) {
-                            handleColumnChange(selectedNodeId, value);
+                <NodeSelectionPanel
+                  selectedNodes={displayedNodes}
+                  nodeColumnSelections={[]}
+                  onColumnChange={() => {}}
+                  nodeColors={nodeColors}
+                  onColorChange={handleColorChange}
+                  getNodeColumns={getColumnInfos}
+                  defaultPalette={defaultPalette}
+                  maxCompare={1}
+                  className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
+                  showShape
+                  showColorPicker
+                  showColumnPicker={false}
+                  disabled={isLocked}
+                  locked={isLocked}
+                  originalCount={displayNodeCount}
+                  renderExtraNodeContent={() => (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label
+                          className="text-xs font-medium text-muted-foreground"
+                          htmlFor="ai-text-column"
+                        >
+                          Text Column
+                        </Label>
+                        <Select
+                          value={selectedColumn}
+                          onValueChange={(value) => {
+                            if (selectedNodeId) {
+                              handleColumnChange(selectedNodeId, value);
+                            }
+                          }}
+                          disabled={isLocked}
+                        >
+                          <SelectTrigger id="ai-text-column" className="w-full text-sm">
+                            <SelectValue placeholder="Select text column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {aiStringColumns.map((ci) => (
+                              <SelectItem key={ci.name} value={ci.name}>
+                                {ci.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label
+                          className="text-xs font-medium text-muted-foreground"
+                          htmlFor="ai-annotation-column"
+                        >
+                          Annotation Column
+                        </Label>
+                        <Select
+                          value={aiAnnotationColumn || '__none__'}
+                          onValueChange={(value) =>
+                            setAiAnnotationColumn(value === '__none__' ? '' : value)
                           }
-                        }}
-                        disabled={isLocked}
-                      >
-                        <SelectTrigger id="ai-text-column" className="w-full text-sm">
-                          <SelectValue placeholder="Select text column" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {aiStringColumns.map((ci) => (
-                            <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          disabled={isLocked}
+                        >
+                          <SelectTrigger id="ai-annotation-column" className="w-full text-sm">
+                            <SelectValue placeholder="Select annotation column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Create new annotation column</SelectItem>
+                            {aiAnnotationColumns.map((ci) => (
+                              <SelectItem key={ci.name} value={ci.name}>
+                                {ci.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs font-medium text-muted-foreground" htmlFor="ai-annotation-column">Annotation Column</Label>
-                      <Select
-                        value={aiAnnotationColumn || '__none__'}
-                        onValueChange={(value) => setAiAnnotationColumn(value === '__none__' ? '' : value)}
-                        disabled={isLocked}
-                      >
-                        <SelectTrigger id="ai-annotation-column" className="w-full text-sm">
-                          <SelectValue placeholder="Select annotation column" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Create new annotation column</SelectItem>
-                          {aiAnnotationColumns.map((ci) => (
-                            <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-              />
+                  )}
+                />
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="ai-annotator-endpoint-preset">Endpoint</Label>
-                    <Select value={endpointPreset} onValueChange={(value) => setEndpointPreset(value as EndpointPreset)}>
+                    <Select
+                      value={endpointPreset}
+                      onValueChange={(value) => setEndpointPreset(value as EndpointPreset)}
+                    >
                       <SelectTrigger id="ai-annotator-endpoint-preset">
                         <SelectValue placeholder="Select endpoint" />
                       </SelectTrigger>
@@ -1197,15 +1295,23 @@ function AiAnnotatorFeature() {
                     </Select>
                   </div>
 
-                  <div className={`space-y-2 ${endpointPreset === 'custom' ? '' : 'md:col-span-2'}`}>
+                  <div
+                    className={`space-y-2 ${endpointPreset === 'custom' ? '' : 'md:col-span-2'}`}
+                  >
                     <Label htmlFor="ai-annotator-model">Model</Label>
                     <Select value={model} onValueChange={setModel}>
                       <SelectTrigger id="ai-annotator-model">
-                        <SelectValue placeholder={isLoadingModels ? 'Loading models…' : 'Click "Refresh Models" to load'} />
+                        <SelectValue
+                          placeholder={
+                            isLoadingModels ? 'Loading models…' : 'Click "Refresh Models" to load'
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {modelNames.map((modelName) => (
-                          <SelectItem key={modelName} value={modelName}>{modelName}</SelectItem>
+                          <SelectItem key={modelName} value={modelName}>
+                            {modelName}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1231,12 +1337,18 @@ function AiAnnotatorFeature() {
                     type="password"
                     value={apiKey}
                     onChange={(event) => setApiKey(event.target.value)}
-                    placeholder={endpointPreset === 'openai' ? 'Required for OpenAI' : 'Leave blank if not needed'}
+                    placeholder={
+                      endpointPreset === 'openai'
+                        ? 'Required for OpenAI'
+                        : 'Leave blank if not needed'
+                    }
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ai-annotator-classes">Classes (one per line, `name: description`)</Label>
+                  <Label htmlFor="ai-annotator-classes">
+                    Classes (one per line, `name: description`)
+                  </Label>
                   <textarea
                     id="ai-annotator-classes"
                     value={classesText}
@@ -1256,7 +1368,11 @@ function AiAnnotatorFeature() {
                 >
                   <Wrench className="mr-2 h-4 w-4" />
                   Advanced Parameters
-                  {showAdvanced ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+                  {showAdvanced ? (
+                    <ChevronUp className="ml-2 h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  )}
                 </Button>
 
                 {showAdvanced ? (
@@ -1310,7 +1426,9 @@ function AiAnnotatorFeature() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="ai-annotator-examples">Examples (one per line, query to class format)</Label>
+                      <Label htmlFor="ai-annotator-examples">
+                        Examples (one per line, query to class format)
+                      </Label>
                       <textarea
                         id="ai-annotator-examples"
                         value={examplesText}
@@ -1329,7 +1447,9 @@ function AiAnnotatorFeature() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Review Annotations</h3>
-                <p className="text-xs text-muted-foreground">Select a node, text column, and annotation column to review and edit annotations.</p>
+                <p className="text-xs text-muted-foreground">
+                  Select a node, text column, and annotation column to review and edit annotations.
+                </p>
               </div>
 
               <NodeSelectionPanel
@@ -1351,27 +1471,49 @@ function AiAnnotatorFeature() {
                 renderExtraNodeContent={() => (
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-1">
-                      <Label className="text-xs font-medium text-muted-foreground" htmlFor="review-text-column">Text Column</Label>
-                      <Select value={reviewTextColumn} onValueChange={setReviewTextColumn} disabled={isLocked}>
+                      <Label
+                        className="text-xs font-medium text-muted-foreground"
+                        htmlFor="review-text-column"
+                      >
+                        Text Column
+                      </Label>
+                      <Select
+                        value={reviewTextColumn}
+                        onValueChange={setReviewTextColumn}
+                        disabled={isLocked}
+                      >
                         <SelectTrigger id="review-text-column" className="w-full text-sm">
                           <SelectValue placeholder="Select text column" />
                         </SelectTrigger>
                         <SelectContent>
                           {reviewStringColumns.map((ci) => (
-                            <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                            <SelectItem key={ci.name} value={ci.name}>
+                              {ci.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs font-medium text-muted-foreground" htmlFor="review-annotation-column">Annotation Column</Label>
-                      <Select value={reviewAnnotationColumn} onValueChange={setReviewAnnotationColumn} disabled={isLocked}>
+                      <Label
+                        className="text-xs font-medium text-muted-foreground"
+                        htmlFor="review-annotation-column"
+                      >
+                        Annotation Column
+                      </Label>
+                      <Select
+                        value={reviewAnnotationColumn}
+                        onValueChange={setReviewAnnotationColumn}
+                        disabled={isLocked}
+                      >
                         <SelectTrigger id="review-annotation-column" className="w-full text-sm">
                           <SelectValue placeholder="Select annotation column" />
                         </SelectTrigger>
                         <SelectContent>
                           {reviewAnnotationColumns.map((ci) => (
-                            <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                            <SelectItem key={ci.name} value={ci.name}>
+                              {ci.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -1386,7 +1528,9 @@ function AiAnnotatorFeature() {
         {statusMessage ? (
           <div className="mt-4 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
             {statusMessage}
-            {localTaskId ? <span className="ml-2 font-mono text-xs">Task: {localTaskId}</span> : null}
+            {localTaskId ? (
+              <span className="ml-2 font-mono text-xs">Task: {localTaskId}</span>
+            ) : null}
           </div>
         ) : null}
       </AnalysisCardLayout>
@@ -1405,8 +1549,16 @@ function AiAnnotatorFeature() {
               <Button
                 type="button"
                 size="sm"
-                onClick={handleDetach}
-                disabled={isDetaching || isRunning || !selectedNodeId || !selectedColumn || parsedClasses.length === 0}
+                onClick={() => {
+                  void handleDetach();
+                }}
+                disabled={
+                  isDetaching ||
+                  isRunning ||
+                  !selectedNodeId ||
+                  !selectedColumn ||
+                  parsedClasses.length === 0
+                }
               >
                 {isDetaching ? (
                   <>
@@ -1457,7 +1609,10 @@ function AiAnnotatorFeature() {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={Math.max(visibleColumns.length, 1)} className="h-24 text-center text-muted-foreground">
+                          <TableCell
+                            colSpan={Math.max(visibleColumns.length, 1)}
+                            className="h-24 text-center text-muted-foreground"
+                          >
                             No annotation rows returned for this page.
                           </TableCell>
                         </TableRow>
@@ -1488,244 +1643,290 @@ function AiAnnotatorFeature() {
       ) : null}
 
       {/* Review result panel */}
-      {panelTab === 'review' && reviewData && reviewNodeId ? (() => {
-        const rvRows = reviewData.data ?? [];
-        const rvPagination = reviewData.pagination;
-        const rvPage = rvPagination?.page ?? 1;
-        const rvPageSize = rvPagination?.page_size ?? DEFAULT_PAGE_SIZE;
-        const rvHasNext = Boolean(rvPagination?.has_next);
-        const rvHasPrev = Boolean(rvPagination?.has_prev);
-        const rvTotalPages = rvPagination?.total_source_pages;
+      {panelTab === 'review' && reviewData && reviewNodeId
+        ? (() => {
+            const rvRows = reviewData.data ?? [];
+            const rvPagination = reviewData.pagination;
+            const rvPage = rvPagination?.page ?? 1;
+            const rvPageSize = rvPagination?.page_size ?? DEFAULT_PAGE_SIZE;
+            const rvHasNext = Boolean(rvPagination?.has_next);
+            const rvHasPrev = Boolean(rvPagination?.has_prev);
+            const rvTotalPages = rvPagination?.total_source_pages;
 
-        const rvAnnotationCol = reviewAnnotationColumn;
-        const rvDiscoveredProviders = Array.from(
-          new Set(
-            rvRows.flatMap((row) => {
-              const raw = row[rvAnnotationCol];
-              if (!Array.isArray(raw)) return [];
-              return raw
-                .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-                .map((item) => String(item.provider ?? '').trim())
-                .filter(Boolean);
-            }),
-          ),
-        );
-        const rvProviders = Array.from(
-          new Set([
-            ...reviewGlobalProviders,
-            ...rvDiscoveredProviders,
-            ...additionalProviders,
-          ]),
-        ).filter(Boolean);
-        const rvDiscoveredCategories = Array.from(
-          new Set(
-            rvRows.flatMap((row) => {
-              const raw = row[rvAnnotationCol];
-              if (!Array.isArray(raw)) return [];
-              return raw
-                .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-                .map((item) => String(item.annotation ?? '').trim())
-                .filter(Boolean);
-            }),
-          ),
-        );
-        const rvCategoryOptions = Array.from(
-          new Set([
-            ...reviewGlobalCategories,
-            ...rvDiscoveredCategories,
-            ...temporaryCategories,
-          ]),
-        ).filter(Boolean);
+            const rvAnnotationCol = reviewAnnotationColumn;
+            const rvDiscoveredProviders = Array.from(
+              new Set(
+                rvRows.flatMap((row) => {
+                  const raw = row[rvAnnotationCol];
+                  if (!Array.isArray(raw)) return [];
+                  return raw
+                    .filter(
+                      (item): item is Record<string, unknown> =>
+                        Boolean(item) && typeof item === 'object',
+                    )
+                    .map((item) => String(item.provider ?? '').trim())
+                    .filter(Boolean);
+                }),
+              ),
+            );
+            const rvProviders = Array.from(
+              new Set([...reviewGlobalProviders, ...rvDiscoveredProviders, ...additionalProviders]),
+            ).filter(Boolean);
+            const rvDiscoveredCategories = Array.from(
+              new Set(
+                rvRows.flatMap((row) => {
+                  const raw = row[rvAnnotationCol];
+                  if (!Array.isArray(raw)) return [];
+                  return raw
+                    .filter(
+                      (item): item is Record<string, unknown> =>
+                        Boolean(item) && typeof item === 'object',
+                    )
+                    .map((item) => String(item.annotation ?? '').trim())
+                    .filter(Boolean);
+                }),
+              ),
+            );
+            const rvCategoryOptions = Array.from(
+              new Set([
+                ...reviewGlobalCategories,
+                ...rvDiscoveredCategories,
+                ...temporaryCategories,
+              ]),
+            ).filter(Boolean);
 
-        return (
-          <Card>
-            <CardHeader className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <CardTitle>Review Annotations</CardTitle>
-                  <CardDescription>
-                    Node: <span className="font-mono text-xs">{reviewNodeId}</span>
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border border-border bg-card">
-                <ScrollArea scrollbars="both" className="max-h-[70vh]">
-                  <div className="min-w-max">
-                    <Table className="min-w-180" disableContainer>
-                      <TableHeader className="sticky top-0 z-10">
-                        <TableRow className="bg-muted/90 backdrop-blur-sm border-b border-border/80">
-                          <TableHead className="whitespace-nowrap border-r border-border/70 bg-muted/90 py-2">
-                            <div className="flex items-center justify-center gap-2">
-                              <span className="font-semibold tracking-tight">text</span>
-                              <span className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                1 column
-                              </span>
-                            </div>
-                          </TableHead>
-                          <TableHead colSpan={rvProviders.length + 1} className="border-b-2 border-border/80 bg-muted/90 py-2">
-                            <div className="flex items-center justify-center gap-2">
-                              <span className="font-semibold tracking-tight">{rvAnnotationCol}</span>
-                            </div>
-                          </TableHead>
-                        </TableRow>
-                        <TableRow className="bg-muted/80 backdrop-blur-sm border-b border-border/80">
-                          <TableHead className="whitespace-nowrap border-r border-border/70 bg-muted/80">
-                            {reviewTextColumn}
-                          </TableHead>
-                          {rvProviders.map((providerName) => (
-                            <TableHead key={providerName} className="whitespace-nowrap border-r border-border/60">
-                              {providerName}
-                            </TableHead>
-                          ))}
-                          <TableHead className="w-12 min-w-12 text-center border-l border-border/70">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 rounded-full border border-border/60 hover:border-border"
-                              onClick={() => setIsAddAnnotatorDialogOpen(true)}
-                              aria-label="Add annotator"
-                              title="Add annotator"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {rvRows.length > 0 ? (
-                          rvRows.map((row, rowIdx) => {
-                            const rowIndex = (Math.max(rvPage, 1) - 1) * rvPageSize + rowIdx;
-                            return (
-                              <TableRow key={`${rowIndex}`}>
-                                <TableCell className="align-top max-w-xl whitespace-pre-wrap wrap-break-word">
-                                  {stringifyCell(row[reviewTextColumn])}
-                                </TableCell>
-                                {rvProviders.map((providerName) => (
-                                  <TableCell key={`${rowIndex}-${providerName}`} className="align-top min-w-40">
-                                    <Select
-                                      value={getAnnotationValue(row, providerName, rowIndex, rvAnnotationCol) || '__empty__'}
-                                      onValueChange={(value) => {
-                                        void handleCategorySelected(
-                                          row,
-                                          rowIndex,
-                                          providerName,
-                                          rvAnnotationCol,
-                                          value,
-                                        );
-                                      }}
-                                      disabled={Boolean(savingReviewCells[buildEditKey(rowIndex, providerName)])}
-                                    >
-                                      <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select category" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="__add_new_category__">+ Add a new category</SelectItem>
-                                        <SelectItem value="__empty__">(empty)</SelectItem>
-                                        {rvCategoryOptions.map((category) => (
-                                          <SelectItem key={category} value={category}>{category}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </TableCell>
-                                ))}
-                                <TableCell className="w-12" />
-                              </TableRow>
-                            );
-                          })
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={Math.max(rvProviders.length + 2, 1)} className="h-24 text-center text-muted-foreground">
-                              No annotation rows available for review.
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
+            return (
+              <Card>
+                <CardHeader className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <CardTitle>Review Annotations</CardTitle>
+                      <CardDescription>
+                        Node: <span className="font-mono text-xs">{reviewNodeId}</span>
+                      </CardDescription>
+                    </div>
                   </div>
-                </ScrollArea>
-              </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-lg border border-border bg-card">
+                    <ScrollArea scrollbars="both" className="max-h-[70vh]">
+                      <div className="min-w-max">
+                        <Table className="min-w-180" disableContainer>
+                          <TableHeader className="sticky top-0 z-10">
+                            <TableRow className="bg-muted/90 backdrop-blur-sm border-b border-border/80">
+                              <TableHead className="whitespace-nowrap border-r border-border/70 bg-muted/90 py-2">
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="font-semibold tracking-tight">text</span>
+                                  <span className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                    1 column
+                                  </span>
+                                </div>
+                              </TableHead>
+                              <TableHead
+                                colSpan={rvProviders.length + 1}
+                                className="border-b-2 border-border/80 bg-muted/90 py-2"
+                              >
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="font-semibold tracking-tight">
+                                    {rvAnnotationCol}
+                                  </span>
+                                </div>
+                              </TableHead>
+                            </TableRow>
+                            <TableRow className="bg-muted/80 backdrop-blur-sm border-b border-border/80">
+                              <TableHead className="whitespace-nowrap border-r border-border/70 bg-muted/80">
+                                {reviewTextColumn}
+                              </TableHead>
+                              {rvProviders.map((providerName) => (
+                                <TableHead
+                                  key={providerName}
+                                  className="whitespace-nowrap border-r border-border/60"
+                                >
+                                  {providerName}
+                                </TableHead>
+                              ))}
+                              <TableHead className="w-12 min-w-12 text-center border-l border-border/70">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 rounded-full border border-border/60 hover:border-border"
+                                  onClick={() => setIsAddAnnotatorDialogOpen(true)}
+                                  aria-label="Add annotator"
+                                  title="Add annotator"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rvRows.length > 0 ? (
+                              rvRows.map((row, rowIdx) => {
+                                const rowIndex = (Math.max(rvPage, 1) - 1) * rvPageSize + rowIdx;
+                                return (
+                                  <TableRow key={`${rowIndex}`}>
+                                    <TableCell className="align-top max-w-xl whitespace-pre-wrap wrap-break-word">
+                                      {stringifyCell(row[reviewTextColumn])}
+                                    </TableCell>
+                                    {rvProviders.map((providerName) => (
+                                      <TableCell
+                                        key={`${rowIndex}-${providerName}`}
+                                        className="align-top min-w-40"
+                                      >
+                                        <Select
+                                          value={
+                                            getAnnotationValue(
+                                              row,
+                                              providerName,
+                                              rowIndex,
+                                              rvAnnotationCol,
+                                            ) || '__empty__'
+                                          }
+                                          onValueChange={(value) => {
+                                            void handleCategorySelected(
+                                              row,
+                                              rowIndex,
+                                              providerName,
+                                              rvAnnotationCol,
+                                              value,
+                                            );
+                                          }}
+                                          disabled={Boolean(
+                                            savingReviewCells[buildEditKey(rowIndex, providerName)],
+                                          )}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select category" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="__add_new_category__">
+                                              + Add a new category
+                                            </SelectItem>
+                                            <SelectItem value="__empty__">(empty)</SelectItem>
+                                            {rvCategoryOptions.map((category) => (
+                                              <SelectItem key={category} value={category}>
+                                                {category}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </TableCell>
+                                    ))}
+                                    <TableCell className="w-12" />
+                                  </TableRow>
+                                );
+                              })
+                            ) : (
+                              <TableRow>
+                                <TableCell
+                                  colSpan={Math.max(rvProviders.length + 2, 1)}
+                                  className="h-24 text-center text-muted-foreground"
+                                >
+                                  No annotation rows available for review.
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </ScrollArea>
+                  </div>
 
-              <AnalysisPagination
-                page={rvPage}
-                pageSize={rvPageSize}
-                hasNext={rvHasNext}
-                hasPrev={rvHasPrev}
-                totalPages={rvTotalPages}
-                onPageChange={(nextPage) => {
-                  void Promise.all([
-                    loadReviewPage(reviewNodeId, reviewTextColumn, reviewAnnotationColumn, nextPage, rvPageSize),
-                    refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
-                  ]);
-                }}
-                onPageSizeChange={(nextPageSize) => {
-                  void Promise.all([
-                    loadReviewPage(reviewNodeId, reviewTextColumn, reviewAnnotationColumn, 1, nextPageSize),
-                    refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
-                  ]);
-                }}
-                pageSizeOptions={[5, 10, 20, 50, 100]}
-                loading={isReviewPaging}
-              />
-
-              <AlertDialog open={isAddAnnotatorDialogOpen} onOpenChange={setIsAddAnnotatorDialogOpen}>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Add Annotator</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Enter the annotator name to add a new review column.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <Input
-                    value={newProviderName}
-                    onChange={(event) => setNewProviderName(event.target.value)}
-                    placeholder="e.g. userA"
-                    autoFocus
+                  <AnalysisPagination
+                    page={rvPage}
+                    pageSize={rvPageSize}
+                    hasNext={rvHasNext}
+                    hasPrev={rvHasPrev}
+                    totalPages={rvTotalPages}
+                    onPageChange={(nextPage) => {
+                      void Promise.all([
+                        loadReviewPage(
+                          reviewNodeId,
+                          reviewTextColumn,
+                          reviewAnnotationColumn,
+                          nextPage,
+                          rvPageSize,
+                        ),
+                        refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
+                      ]);
+                    }}
+                    onPageSizeChange={(nextPageSize) => {
+                      void Promise.all([
+                        loadReviewPage(
+                          reviewNodeId,
+                          reviewTextColumn,
+                          reviewAnnotationColumn,
+                          1,
+                          nextPageSize,
+                        ),
+                        refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
+                      ]);
+                    }}
+                    pageSizeOptions={[5, 10, 20, 50, 100]}
+                    loading={isReviewPaging}
                   />
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleAddProvider}>Add</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
 
-              <AlertDialog
-                open={isAddCategoryDialogOpen}
-                onOpenChange={(open) => {
-                  setIsAddCategoryDialogOpen(open);
-                  if (!open) {
-                    setPendingCategoryCell(null);
-                    setNewCategoryName('');
-                  }
-                }}
-              >
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Add a New Category</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This category is temporary in the frontend and will reset on page change.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <Input
-                    value={newCategoryName}
-                    onChange={(event) => setNewCategoryName(event.target.value)}
-                    placeholder="e.g. mixed"
-                    autoFocus
-                  />
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => void handleConfirmAddCategory()}>
-                      Add Category
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CardContent>
-          </Card>
-        );
-      })() : null}
+                  <AlertDialog
+                    open={isAddAnnotatorDialogOpen}
+                    onOpenChange={setIsAddAnnotatorDialogOpen}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Add Annotator</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Enter the annotator name to add a new review column.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <Input
+                        value={newProviderName}
+                        onChange={(event) => setNewProviderName(event.target.value)}
+                        placeholder="e.g. userA"
+                        autoFocus
+                      />
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleAddProvider}>Add</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <AlertDialog
+                    open={isAddCategoryDialogOpen}
+                    onOpenChange={(open) => {
+                      setIsAddCategoryDialogOpen(open);
+                      if (!open) {
+                        setPendingCategoryCell(null);
+                        setNewCategoryName('');
+                      }
+                    }}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Add a New Category</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This category is temporary in the frontend and will reset on page change.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <Input
+                        value={newCategoryName}
+                        onChange={(event) => setNewCategoryName(event.target.value)}
+                        placeholder="e.g. mixed"
+                        autoFocus
+                      />
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => void handleConfirmAddCategory()}>
+                          Add Category
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            );
+          })()
+        : null}
     </div>
   );
 }

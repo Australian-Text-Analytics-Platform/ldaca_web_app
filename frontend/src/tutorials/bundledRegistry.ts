@@ -553,11 +553,9 @@ export const BUNDLED_REGISTRY: RegistryShape = { tutorial, info, reference };
  *  `DocumentView` falls back to the local-relative path for these even when
  *  `VITE_DOCS_BASE_URL` is set, so first-paint remains zero-network. */
 export const BUNDLED_FILES: ReadonlySet<string> = new Set(
-  [
-    ...Object.values(tutorial),
-    ...Object.values(info),
-    ...Object.values(reference),
-  ].map((t) => t.file),
+  [...Object.values(tutorial), ...Object.values(info), ...Object.values(reference)].map(
+    (t) => t.file,
+  ),
 );
 
 export type BundledTutorialKey = keyof typeof tutorial;

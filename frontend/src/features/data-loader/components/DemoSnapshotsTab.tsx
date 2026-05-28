@@ -74,22 +74,23 @@ interface Props {
 }
 
 /**
-   * Renders the demo snapshot import workflow consumed by SampleDataPanel.
-   * Rendered by: SampleDataPanel component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
-   * Flow: fetch demo snapshot metadata, render category/description/import controls, and keep
-   * per-snapshot import state so users see which sample is loading.
-   */
-export function DemoSnapshotsTab({
-  authHeaders,
-  onImportComplete,
-  enabled,
-}: Props) {
+ * Renders the demo snapshot import workflow consumed by SampleDataPanel.
+ * Rendered by: SampleDataPanel component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: fetch demo snapshot metadata, render category/description/import controls, and keep
+ * per-snapshot import state so users see which sample is loading.
+ */
+export function DemoSnapshotsTab({ authHeaders, onImportComplete, enabled }: Props) {
   const queryClient = useQueryClient();
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [replace, setReplace] = useState<Record<string, boolean>>({});
   const [importing, setImporting] = useState(false);
 
-  const { data: catalogue, isLoading, isError, refetch } = useQuery({
+  const {
+    data: catalogue,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     ...getDemoSnapshotsCatalogueOptions({ headers: authHeaders }),
     staleTime: 30_000,
     retry: 1,
@@ -136,9 +137,7 @@ export function DemoSnapshotsTab({
     });
   };
 
-  const selectedIds = snapshots
-    .filter((s) => checked[s.id])
-    .map((s) => s.id);
+  const selectedIds = snapshots.filter((s) => checked[s.id]).map((s) => s.id);
   const replaceIds = selectedIds.filter((id) => replace[id]);
 
   /**
@@ -160,7 +159,9 @@ export function DemoSnapshotsTab({
       });
       toast.dismiss(loadingToastId);
 
-      const imported = result.results.filter((r) => r.status === 'imported' || r.status === 'replaced').length;
+      const imported = result.results.filter(
+        (r) => r.status === 'imported' || r.status === 'replaced',
+      ).length;
       const skipped = result.results.filter(
         (r) => r.status === 'skipped_existing' || r.status === 'skipped_conflict',
       ).length;
@@ -173,10 +174,9 @@ export function DemoSnapshotsTab({
         toast.info(`${skipped} skipped (already present or conflicting).`, { duration: 6000 });
       }
       if (failed.length > 0) {
-        toast.error(
-          `${failed.length} failed: ${failed.map((f) => f.message ?? f.id).join('; ')}`,
-          { duration: 10000 },
-        );
+        toast.error(`${failed.length} failed: ${failed.map((f) => f.message ?? f.id).join('; ')}`, {
+          duration: 10000,
+        });
       }
 
       // Invalidate every per-tool snapshot list so the Load buttons
@@ -211,17 +211,13 @@ export function DemoSnapshotsTab({
 
   if (isError) {
     return (
-      <p className="py-4 text-sm text-muted-foreground">
-        Could not load demo-snapshot catalogue.
-      </p>
+      <p className="py-4 text-sm text-muted-foreground">Could not load demo-snapshot catalogue.</p>
     );
   }
 
   if (snapshots.length === 0) {
     return (
-      <p className="py-4 text-sm text-muted-foreground">
-        No demo snapshots are available yet.
-      </p>
+      <p className="py-4 text-sm text-muted-foreground">No demo snapshots are available yet.</p>
     );
   }
 
@@ -257,7 +253,9 @@ export function DemoSnapshotsTab({
                 <p className="pl-6 text-xs text-muted-foreground">{s.description}</p>
               )}
               <div className="flex flex-wrap items-center gap-1 pl-6">
-                <Badge variant="secondary" className="text-xs">{toolLabel}</Badge>
+                <Badge variant="secondary" className="text-xs">
+                  {toolLabel}
+                </Badge>
                 {s.recommended_dataset && (
                   <Badge variant="outline" className="text-xs">
                     Pairs with {s.recommended_dataset}
@@ -269,7 +267,9 @@ export function DemoSnapshotsTab({
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                   <div className="flex flex-1 flex-col gap-1.5 text-xs">
                     <span className="text-amber-700 dark:text-amber-300">
-                      A local snapshot named <code className="font-mono text-[0.7rem]">{s.filename}</code> exists but differs from the demo.
+                      A local snapshot named{' '}
+                      <code className="font-mono text-[0.7rem]">{s.filename}</code> exists but
+                      differs from the demo.
                     </span>
                     <label className="inline-flex cursor-pointer items-center gap-1.5 text-amber-700 dark:text-amber-300">
                       <Checkbox
@@ -287,10 +287,9 @@ export function DemoSnapshotsTab({
         })}
       </div>
       <div className="flex justify-end">
-        <Button
-          onClick={handleImport}
-          disabled={importing || selectedIds.length === 0}
-        >
+        <Button onClick={() => {
+          void handleImport();
+        }} disabled={importing || selectedIds.length === 0}>
           <FolderPlus className="mr-2 h-4 w-4" />
           {importing
             ? 'Importing…'

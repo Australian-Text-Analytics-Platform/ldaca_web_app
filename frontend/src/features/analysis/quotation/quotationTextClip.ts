@@ -60,7 +60,11 @@ export const clipTextAroundSpans = (
   const earliestStart = Math.max(0, Math.min(...spans.map((s) => s.start)));
   const latestEnd = Math.min(text.length, Math.max(...spans.map((s) => s.end)));
 
-  if (!Number.isFinite(earliestStart) || !Number.isFinite(latestEnd) || earliestStart >= latestEnd) {
+  if (
+    !Number.isFinite(earliestStart) ||
+    !Number.isFinite(latestEnd) ||
+    earliestStart >= latestEnd
+  ) {
     return {
       text,
       spans: spans.map((span) => ({ ...span })),

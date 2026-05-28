@@ -31,10 +31,7 @@ export type SnapshotMode = 'demo' | 'share';
 
 /** Active mode for one tool's view. Discriminated union so exhaustive
  * ``switch`` lights up every branch site when a new arm is added. */
-export type ViewMode =
-  | { kind: 'live' }
-  | { kind: 'demoSnapshot' }
-  | { kind: 'shareSnapshot' };
+export type ViewMode = { kind: 'live' } | { kind: 'demoSnapshot' } | { kind: 'shareSnapshot' };
 
 /** Capability flags carried on every loaded snapshot. Components must
  * read these instead of pattern-matching on the mode string. This is

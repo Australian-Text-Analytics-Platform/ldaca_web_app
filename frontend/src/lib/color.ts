@@ -45,7 +45,11 @@ function parseHex(hex: string): { r: number; g: number; b: number } | null {
   const match = hex.match(HEX_RE);
   if (!match) return null;
   let raw = match[1]!;
-  if (raw.length === 3) raw = raw.split('').map((c) => c + c).join('');
+  if (raw.length === 3)
+    raw = raw
+      .split('')
+      .map((c) => c + c)
+      .join('');
   return {
     r: parseInt(raw.slice(0, 2), 16),
     g: parseInt(raw.slice(2, 4), 16),
@@ -118,7 +122,7 @@ function rgbToHsl(r: number, g: number, b: number): Hsl {
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
-  const H = ((h % 360) + 360) % 360 / 360;
+  const H = (((h % 360) + 360) % 360) / 360;
   const S = clamp01(s / 100);
   const L = clamp01(l / 100);
   if (S === 0) {

@@ -30,7 +30,9 @@ export const useNodeColumnPersistence = ({
   /* eslint-disable react-hooks/set-state-in-effect -- Hydrating persisted column selections on workspace/scope change; no cascading renders */
   useEffect(() => {
     const persistenceCtx =
-      persist && workspaceId ? { workspaceId, scope: storageScope, storage: 'session' as const } : null;
+      persist && workspaceId
+        ? { workspaceId, scope: storageScope, storage: 'session' as const }
+        : null;
     if (!persistenceCtx) {
       if (!workspaceId) {
         setSelectionsState([]);
@@ -61,7 +63,9 @@ export const useNodeColumnPersistence = ({
         }
         if (
           updated.length === prev.length &&
-          updated.every((sel, i) => sel.nodeId === prev[i]!.nodeId && sel.column === prev[i]!.column)
+          updated.every(
+            (sel, i) => sel.nodeId === prev[i]!.nodeId && sel.column === prev[i]!.column,
+          )
         ) {
           return prev;
         }

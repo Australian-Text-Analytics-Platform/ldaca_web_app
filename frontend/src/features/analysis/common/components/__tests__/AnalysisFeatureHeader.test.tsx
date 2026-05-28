@@ -52,12 +52,8 @@ describe('AnalysisFeatureHeader', () => {
   it('renders the title and info/help icons', () => {
     renderHeader();
     expect(screen.getByText('Concordance Search')).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/about concordance search/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/concordance parameters/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/about concordance search/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/concordance parameters/i)).toBeInTheDocument();
   });
 
   it('the snapshot actions slot is empty when demo mode is off', () => {
@@ -65,5 +61,4 @@ describe('AnalysisFeatureHeader', () => {
     const slot = screen.getByTestId('analysis-feature-header-actions');
     expect(slot).toBeEmptyDOMElement();
   });
-
 });

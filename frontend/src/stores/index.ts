@@ -11,8 +11,6 @@ export type { ViewType, ModalKind, ModalTarget } from './uiStore';
 
 export { useSelectionStore } from './selectionStore';
 
-export { useQuotationEngineDialogStore } from './quotationEngineStore';
-
 export { usePreferencesStore } from './preferencesStore';
 
 export { useAnalysisStore } from './analysisStore';

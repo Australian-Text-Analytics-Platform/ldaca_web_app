@@ -168,9 +168,7 @@ export function SaveSnapshotDialog({
             />
             <p
               className={
-                validation.error
-                  ? 'text-xs text-destructive'
-                  : 'text-xs text-muted-foreground'
+                validation.error ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'
               }
             >
               {validation.error ??
@@ -200,11 +198,9 @@ export function SaveSnapshotDialog({
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={!validation.ok || isSaving}
-          >
+          <Button type="button" onClick={() => {
+            void handleSave();
+          }} disabled={!validation.ok || isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save
           </Button>

@@ -43,11 +43,11 @@ export const WorkspaceDataHeader = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const isRenaming = renameDraft?.baseLabel === info.nodeLabel;
 
-    /**
+  /**
    * Commits a node rename when the inline editor blurs or submits.
-     * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
-     * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
-     */
+   * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
+   * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+   */
   const handleRenameCommit = () => {
     if (!isRenaming) {
       return;
@@ -59,11 +59,11 @@ export const WorkspaceDataHeader = ({
     setRenameDraft(undefined);
   };
 
-    /**
+  /**
    * Opens inline node rename mode and focuses the draft input.
-     * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
-     * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
-     */
+   * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
+   * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+   */
   const startRename = () => {
     setRenameDraft({ baseLabel: info.nodeLabel, value: info.nodeLabel });
     setTimeout(() => {
@@ -72,11 +72,11 @@ export const WorkspaceDataHeader = ({
     }, 10);
   };
 
-    /**
+  /**
    * Fetches and opens the Polars query plan dialog for the active node.
-     * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
-     * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
-     */
+   * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
+   * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+   */
   const handleOpenQueryPlan = async () => {
     setQueryPlanOpen(true);
     setQueryPlan(null);
@@ -94,7 +94,11 @@ export const WorkspaceDataHeader = ({
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <h3 className="text-sm font-medium text-gray-700">Data View</h3>
-          <HelpIcon targetKey="ui.data-viewer" label="Data Viewer" className="h-5 w-5 text-muted-foreground" />
+          <HelpIcon
+            targetKey="ui.data-viewer"
+            label="Data Viewer"
+            className="h-5 w-5 text-muted-foreground"
+          />
           <span className="text-gray-300">|</span>
           {isRenaming ? (
             <input
@@ -119,7 +123,12 @@ export const WorkspaceDataHeader = ({
               title="Rename"
               aria-label="Rename node"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="w-3 h-3"
+              >
                 <path d="M16.862 3.487a1.5 1.5 0 0 1 2.121 0l1.53 1.53a1.5 1.5 0 0 1 0 2.122l-9.9 9.9a1.5 1.5 0 0 1-.53.352l-4.18 1.393a.75.75 0 0 1-.948-.948l1.392-4.18a1.5 1.5 0 0 1 .352-.53l9.9-9.9Z" />
                 <path d="M18.26 2.08a3 3 0 0 1 4.243 0l.53.53a3 3 0 0 1 0 4.243l-1.06 1.06-4.773-4.773 1.06-1.06Z" />
               </svg>
@@ -134,7 +143,15 @@ export const WorkspaceDataHeader = ({
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={handleOpenQueryPlan} disabled={!onQueryPlan}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void handleOpenQueryPlan();
+            }}
+            disabled={!onQueryPlan}
+          >
             Info
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={onUndo} disabled={!canUndo}>

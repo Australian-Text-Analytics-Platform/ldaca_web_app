@@ -129,13 +129,20 @@ export function DetachColumnsDialog({
                     const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
                     const isAnalysisColumn = column === node.text_column;
                     return (
-                      <label key={`${node.node_id}-${column}`} className="flex items-center gap-2 text-sm">
+                      <label
+                        key={`${node.node_id}-${column}`}
+                        className="flex items-center gap-2 text-sm"
+                      >
                         <Checkbox
                           checked={checked}
-                          onCheckedChange={(value: boolean | 'indeterminate') => toggleDetachColumn(node.node_id, column, value === true)}
+                          onCheckedChange={(value: boolean | 'indeterminate') =>
+                            toggleDetachColumn(node.node_id, column, value === true)
+                          }
                           disabled={isDetaching}
                         />
-                        <span className={isAnalysisColumn ? 'font-semibold' : undefined}>{column}</span>
+                        <span className={isAnalysisColumn ? 'font-semibold' : undefined}>
+                          {column}
+                        </span>
                       </label>
                     );
                   })}
@@ -157,9 +164,15 @@ export function DetachColumnsDialog({
                 disabled={isDetachDisabled}
               >
                 {isDetaching ? (
-                  <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Adding to Workspace…</span>
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Adding to Workspace…
+                  </span>
                 ) : (
-                  <span className="inline-flex items-center gap-2"><Plus className="h-4 w-4" />Add to Workspace</span>
+                  <span className="inline-flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add to Workspace
+                  </span>
                 )}
               </AlertDialogAction>
             </Button>

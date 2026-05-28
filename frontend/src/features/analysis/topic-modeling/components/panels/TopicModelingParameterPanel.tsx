@@ -38,7 +38,12 @@ type Props = {
   defaultPalette: string[];
   isLocked: boolean;
   getNodeColumns: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
-  actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string; runDisabledReason?: string };
+  actionState: {
+    runDisabled: boolean;
+    clearDisabled: boolean;
+    runLabel: string;
+    runDisabledReason?: string;
+  };
   corpusSamples: CorpusSample[];
   nodeDocCounts: number[];
   onCorpusSampleChange: (idx: number, update: Partial<CorpusSample>) => void;
@@ -146,9 +151,8 @@ export function TopicModelingParameterPanel({
     source: topicSizeValue,
     value: String(topicSizeValue),
   }));
-  const topicSizeValueDraft = topicSizeDraft.source === topicSizeValue
-    ? topicSizeDraft.value
-    : String(topicSizeValue);
+  const topicSizeValueDraft =
+    topicSizeDraft.source === topicSizeValue ? topicSizeDraft.value : String(topicSizeValue);
   // Called by: topic-size input change handler while preserving placeholder/user-set semantics because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const setTopicSizeValueDraft = (value: string) => {
     setTopicSizeDraft({ source: topicSizeValue, value });
@@ -162,13 +166,16 @@ export function TopicModelingParameterPanel({
     onTopicSizeValueChange(next); // always call — even unchanged — to solidify grey placeholder
   };
 
-  const [representativeWordsDraft, setRepresentativeWordsDraft] = useState<NumericInputDraft>(() => ({
-    source: representativeWordsCount,
-    value: String(representativeWordsCount),
-  }));
-  const representativeWordsCountDraft = representativeWordsDraft.source === representativeWordsCount
-    ? representativeWordsDraft.value
-    : String(representativeWordsCount);
+  const [representativeWordsDraft, setRepresentativeWordsDraft] = useState<NumericInputDraft>(
+    () => ({
+      source: representativeWordsCount,
+      value: String(representativeWordsCount),
+    }),
+  );
+  const representativeWordsCountDraft =
+    representativeWordsDraft.source === representativeWordsCount
+      ? representativeWordsDraft.value
+      : String(representativeWordsCount);
   // Called by: words-per-topic input change handler before validation on blur because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const setRepresentativeWordsCountDraft = (value: string) => {
     setRepresentativeWordsDraft({ source: representativeWordsCount, value });
@@ -178,9 +185,10 @@ export function TopicModelingParameterPanel({
   // 2× the originally-fitted count, so post-fit we can let the user scale
   // up without rerunning. Pre-fit cap stays at 50 since there's no fitted
   // count to double yet.
-  const representativeWordsCountCap = isLocked && representativeWordsCountServerMax
-    ? Math.max(50, 2 * representativeWordsCountServerMax)
-    : 50;
+  const representativeWordsCountCap =
+    isLocked && representativeWordsCountServerMax
+      ? Math.max(50, 2 * representativeWordsCountServerMax)
+      : 50;
 
   // Called by: words-per-topic input blur handler to commit within the backend-supported cap because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleRepresentativeWordsCountBlur = (event: FocusEvent<HTMLInputElement>) => {
@@ -224,26 +232,26 @@ export function TopicModelingParameterPanel({
         onColorChange={onNodeColorChange}
         defaultPalette={defaultPalette}
         getNodeColumns={getNodeColumns}
-          maxCompare={2}
+        maxCompare={2}
         showShape
         disabled={isLocked}
         locked={isLocked}
         allowedDataTypes={['string']}
-          lockedMessage={lockedMessage}
+        lockedMessage={lockedMessage}
         originalCount={selectedNodes.length}
       />
 
-        <div className="mt-4 grid grid-cols-2 gap-6">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-1.5">
-              <Label className="text-sm font-medium">Data Block Sampling</Label>
-              <HelpIcon targetKey="analysis.topic-modeling.sampling" />
-            </div>
+      <div className="mt-4 grid grid-cols-2 gap-6">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5">
+            <Label className="text-sm font-medium">Data Block Sampling</Label>
+            <HelpIcon targetKey="analysis.topic-modeling.sampling" />
+          </div>
 
           {/* Always render exactly 2 rows */}
           {([0, 1] as const).map((idx) => {
             const node = selectedNodes[idx];
-              const sample = corpusSamples[idx] ?? { percent: '100', enabled: false };
+            const sample = corpusSamples[idx] ?? { percent: '100', enabled: false };
             const nodeId = node?.id ?? '';
             const color = nodeId
               ? (nodeColors[nodeId] ?? defaultPalette[idx] ?? '#6b7280')
@@ -256,8 +264,8 @@ export function TopicModelingParameterPanel({
               ? Math.max(
                   1,
                   Math.round(
-                    (nDocs * Math.min(100, Math.max(1, Number(sample.percent) || 100))) / 100
-                  )
+                    (nDocs * Math.min(100, Math.max(1, Number(sample.percent) || 100))) / 100,
+                  ),
                 )
               : nDocs;
 
@@ -283,9 +291,7 @@ export function TopicModelingParameterPanel({
                 {/* Coloured circle radio toggle */}
                 <button
                   type="button"
-                  onClick={() =>
-                    onCorpusSampleChange(idx, { enabled: !sample.enabled })
-                  }
+                  onClick={() => onCorpusSampleChange(idx, { enabled: !sample.enabled })}
                   aria-label={sample.enabled ? 'Disable sampling' : 'Enable sampling'}
                   disabled={inputsDisabled}
                   className="h-5 w-5 shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
@@ -295,7 +301,11 @@ export function TopicModelingParameterPanel({
                   }}
                 />
 
-                <span className={`text-sm font-medium${sample.enabled ? '' : ' text-muted-foreground'}`}>Random</span>
+                <span
+                  className={`text-sm font-medium${sample.enabled ? '' : ' text-muted-foreground'}`}
+                >
+                  Random
+                </span>
 
                 {/* % input — vertically aligned across rows by identical prefix */}
                 <Input
@@ -310,10 +320,7 @@ export function TopicModelingParameterPanel({
                   onChange={(e) => onCorpusSampleChange(idx, { percent: e.target.value })}
                   onBlur={(e) => {
                     const raw = Number(e.target.value);
-                    const clamped = Math.min(
-                      100,
-                      Math.max(1, isNaN(raw) ? 1 : Math.round(raw))
-                    );
+                    const clamped = Math.min(100, Math.max(1, isNaN(raw) ? 1 : Math.round(raw)));
                     onCorpusSampleChange(idx, { percent: String(clamped) });
                   }}
                 />
@@ -322,7 +329,9 @@ export function TopicModelingParameterPanel({
 
                 {nDocs > 0 && (
                   <span className="text-sm font-medium">
-                    {`→ ~`}<span style={{ color }}>{effectiveDocs.toLocaleString()}</span>{` documents`}
+                    {`→ ~`}
+                    <span style={{ color }}>{effectiveDocs.toLocaleString()}</span>
+                    {` documents`}
                   </span>
                 )}
               </div>
@@ -355,8 +364,12 @@ export function TopicModelingParameterPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="exact" className="text-sm font-medium">Target Topic Number</SelectItem>
-                  <SelectItem value="min" className="text-sm font-medium">Min Topic Size</SelectItem>
+                  <SelectItem value="exact" className="text-sm font-medium">
+                    Target Topic Number
+                  </SelectItem>
+                  <SelectItem value="min" className="text-sm font-medium">
+                    Min Topic Size
+                  </SelectItem>
                 </SelectContent>
               </Select>
               {topicSizeMode === 'exact' ? (
@@ -382,16 +395,16 @@ export function TopicModelingParameterPanel({
                   ? 'Fewer than 3 documents per topic — results will likely be unusable'
                   : topicSizeWarning === 'orange'
                     ? 'Fewer than 10 documents per topic — topics may be noisy or unstable'
-                  : undefined
+                    : undefined
               }
               className={`h-8 w-24 shrink-0 px-2 text-right text-sm${
                 topicSizeWarning === 'red'
                   ? ' text-red-500'
                   : topicSizeWarning === 'orange'
-                  ? ' text-orange-500'
-                  : !topicSizeUserSet
-                  ? ' text-muted-foreground'
-                  : ''
+                    ? ' text-orange-500'
+                    : !topicSizeUserSet
+                      ? ' text-muted-foreground'
+                      : ''
               }`}
               onChange={(e) => setTopicSizeValueDraft(e.target.value)}
               onBlur={handleTopicSizeValueBlur}
@@ -423,26 +436,25 @@ export function TopicModelingParameterPanel({
             <DisabledReasonTooltip
               reason={
                 isLocked && representativeWordsCountServerMax
-                  ? (representativeWordsCountLockedReason
-                    ?? `Adjustable up to ${representativeWordsCountCap} after modelling. Clear Results to fit with a higher count.`)
+                  ? (representativeWordsCountLockedReason ??
+                    `Adjustable up to ${representativeWordsCountCap} after modelling. Clear Results to fit with a higher count.`)
                   : undefined
               }
             >
-            <Input
-              id="representative-words-count"
-              type="number"
-              min={3}
-              max={representativeWordsCountCap}
-              step={1}
-              value={representativeWordsCountDraft}
-              className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
-              onChange={(e) => setRepresentativeWordsCountDraft(e.target.value)}
-              onBlur={handleRepresentativeWordsCountBlur}
-            />
+              <Input
+                id="representative-words-count"
+                type="number"
+                min={3}
+                max={representativeWordsCountCap}
+                step={1}
+                value={representativeWordsCountDraft}
+                className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
+                onChange={(e) => setRepresentativeWordsCountDraft(e.target.value)}
+                onBlur={handleRepresentativeWordsCountBlur}
+              />
             </DisabledReasonTooltip>
           </div>
         </div>
-
       </div>
     </AnalysisCardLayout>
   );

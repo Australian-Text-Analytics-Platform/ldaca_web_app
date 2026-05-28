@@ -13,7 +13,7 @@ export interface ZoomDomain {
 /** Interpolates between two hex colours for topic bubble intensity scales. */
 /**
  * Used by: useTopicModelingBubbleChart.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
-   * Flow: parse both hex colors into RGB triples, linearly interpolate each channel by t, then return an rgb() string.
+ * Flow: parse both hex colors into RGB triples, linearly interpolate each channel by t, then return an rgb() string.
  */
 export function interpolateColor(colorA: string, colorB: string, t: number): string {
   // Parses six-character hex colours into RGB triples for interpolation.
@@ -41,7 +41,7 @@ export function interpolateColor(colorA: string, colorB: string, t: number): str
 /** Chooses readable text colour for chips rendered on arbitrary node colours. */
 /**
  * Used by: useTopicModelingBubbleChart.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
-   * Flow: reject missing or non-six-digit colors to white, compute RGB luminance, then choose dark text for light fills or white text otherwise.
+ * Flow: reject missing or non-six-digit colors to white, compute RGB luminance, then choose dark text for light fills or white text otherwise.
  */
 export function getReadableTextColor(hexColor: string): string {
   if (!hexColor) return '#ffffff';
@@ -59,7 +59,7 @@ export function getReadableTextColor(hexColor: string): string {
 /** Computes the full zoom domain needed to fit all topic points in the chart. */
 /**
  * Used by: useTopicModelingZoomBrush.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
-   * Flow: collect topic x/y coordinates, compute min/max bounds, widen flat axes with epsilon, then return the zoom domain.
+ * Flow: collect topic x/y coordinates, compute min/max bounds, widen flat axes with epsilon, then return the zoom domain.
  */
 export function computeZoomDomain(topics: TopicModelingTopicPoint[]): ZoomDomain | null {
   if (!topics.length) return null;

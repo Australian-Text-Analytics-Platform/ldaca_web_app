@@ -1,4 +1,3 @@
-
 import { Filter, Loader2, Plus } from 'lucide-react';
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,7 +98,10 @@ export function FilterSubTab(props: FilterSubTabProps) {
             title={
               <span className="flex items-center gap-2">
                 Filter conditions
-                <HelpIcon targetKey="preprocessing.filter.conditions" label="Filter conditions builder" />
+                <HelpIcon
+                  targetKey="preprocessing.filter.conditions"
+                  label="Filter conditions builder"
+                />
               </span>
             }
             description="Apply column-based filters to create a new data block from the selected data block."
@@ -120,13 +122,18 @@ export function FilterSubTab(props: FilterSubTabProps) {
             renderConditionMetadata={conditionBuilder.renderConditionMetadata}
             shouldHideOperatorSelect={conditionBuilder.shouldHideOperatorSelect}
             getOperatorOptions={conditionBuilder.getOperatorOptions}
-            getColumnHintId={(_condition, index) => (index === 0 ? 'preprocessing.filter.condition-column' : undefined)}
+            getColumnHintId={(_condition, index) =>
+              index === 0 ? 'preprocessing.filter.condition-column' : undefined
+            }
           />
         </CardContent>
 
         <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
           <div className="flex flex-1 items-center gap-2">
-            <label className="shrink-0 text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
+            <label
+              className="shrink-0 text-sm font-medium text-muted-foreground"
+              htmlFor="filter-new-node-name"
+            >
               New data block name
             </label>
             <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
@@ -135,14 +142,27 @@ export function FilterSubTab(props: FilterSubTabProps) {
               type="text"
               value={newNodeInput.value}
               onChange={(event) => newNodeInput.setValue(event.target.value)}
-              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: newNodeInput.value, setValue: newNodeInput.setValue })}
+              onKeyDown={(event) =>
+                acceptPlaceholderOnTab({
+                  event,
+                  value: newNodeInput.value,
+                  setValue: newNodeInput.setValue,
+                })
+              }
               placeholder={newNodeInput.placeholder}
               disabled={newNodeInput.disabled}
               className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
           <DisabledReasonTooltip reason={applyButtonDisabledReason}>
-            <Button size="sm" onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
+            <Button
+              size="sm"
+              onClick={() => {
+                void applyFilter();
+              }}
+              disabled={applyButtonDisabled}
+              className="shrink-0"
+            >
               {isFiltering ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

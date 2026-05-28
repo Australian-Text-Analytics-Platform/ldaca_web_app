@@ -8,30 +8,32 @@ import { WorkspaceGraphFeature } from '../WorkspaceGraphFeature';
 const reactFlowMock = vi.fn();
 
 vi.mock('@xyflow/react', () => ({
-    /**
+  /**
    * Stubs the graph background while preserving the expected test id.
- * Used by: test mock object in workspace/WorkspaceGraphFeature.
- * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
- */
+   * Used by: test mock object in workspace/WorkspaceGraphFeature.
+   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+   */
   Background: () => <div data-testid="graph-background" />,
   BackgroundVariant: { Dots: 'dots' },
-    /**
+  /**
    * Stubs controls so children still render for graph feature assertions.
-     * Used by: test mock object in workspace/WorkspaceGraphFeature.
-     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
-     */
-  Controls: ({ children }: { children?: ReactNode }) => <div data-testid="graph-controls">{children}</div>,
-    /**
+   * Used by: test mock object in workspace/WorkspaceGraphFeature.
+   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+   */
+  Controls: ({ children }: { children?: ReactNode }) => (
+    <div data-testid="graph-controls">{children}</div>
+  ),
+  /**
    * Stubs the minimap without loading React Flow internals.
-     * Used by: test mock object in workspace/WorkspaceGraphFeature.
-     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
-     */
+   * Used by: test mock object in workspace/WorkspaceGraphFeature.
+   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+   */
   MiniMap: () => <div data-testid="graph-minimap" />,
-    /**
+  /**
    * Captures graph props while rendering children for component tests.
-     * Used by: test mock object in workspace/WorkspaceGraphFeature.
-     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
-     */
+   * Used by: test mock object in workspace/WorkspaceGraphFeature.
+   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+   */
   ReactFlow: ({ children, ...props }: { children?: ReactNode }) => {
     reactFlowMock(props);
     return <div data-testid="react-flow">{children}</div>;

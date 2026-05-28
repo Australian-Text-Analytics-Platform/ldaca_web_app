@@ -8,19 +8,20 @@ import CustomNode from '../CustomNode';
 let mockZoom = 1;
 
 vi.mock('@xyflow/react', () => ({
-    /**
+  /**
    * Stubs React Flow handles so CustomNode can render outside a graph canvas.
-     * Used by: test mock object in workspace/CustomNode.
-     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
-     */
+   * Used by: test mock object in workspace/CustomNode.
+   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+   */
   Handle: () => <div data-testid="handle" />,
   Position: { Left: 'left', Right: 'right' },
-    /**
+  /**
    * Lets tests control zoom-dependent rendering without a React Flow store.
-     * Used by: test mock object in workspace/CustomNode.
-     * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
-     */
-  useStore: (selector: (state: { transform: [number, number, number] }) => number) => selector({ transform: [0, 0, mockZoom] }),
+   * Used by: test mock object in workspace/CustomNode.
+   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+   */
+  useStore: (selector: (state: { transform: [number, number, number] }) => number) =>
+    selector({ transform: [0, 0, mockZoom] }),
 }));
 
 /**
@@ -108,14 +109,14 @@ describe('CustomNode', () => {
       positionAbsoluteY: 0,
     } satisfies React.ComponentProps<typeof CustomNode>;
 
-    render(
-      <CustomNode {...props} />
-    );
+    render(<CustomNode {...props} />);
 
     await user.click(getLatestNodeSettingsButton());
     await user.click(screen.getByRole('button', { name: 'Rename' }));
 
-    const renameInputs = screen.getAllByDisplayValue('sample_data/ADO/qldelection2020_samidata_tweets');
+    const renameInputs = screen.getAllByDisplayValue(
+      'sample_data/ADO/qldelection2020_samidata_tweets',
+    );
     const renameInput = renameInputs[renameInputs.length - 1] as HTMLInputElement;
 
     await waitFor(() => expect(renameInput).toHaveFocus());
@@ -159,7 +160,7 @@ describe('CustomNode', () => {
         isConnectable
         positionAbsoluteX={0}
         positionAbsoluteY={0}
-    />
+      />,
     );
 
     expect(getLatestNodeSettingsButton()).toBeInTheDocument();
@@ -170,5 +171,4 @@ describe('CustomNode', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.getByText(/This action cannot be undone/)).toBeInTheDocument();
   });
-
 });

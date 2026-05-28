@@ -13,10 +13,7 @@ import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspa
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import { useSchemaManagement } from '@/hooks/useSchemaManagement';
-import {
-  snapshotSourceNodes,
-  useSnapshotBackedAnalysisState,
-} from '@/features/snapshot-view';
+import { snapshotSourceNodes, useSnapshotBackedAnalysisState } from '@/features/snapshot-view';
 import {
   buildCaptureRequest,
   useSequentialAnalysisSnapshotCapture,
@@ -27,9 +24,7 @@ import {
   rebucket,
   type CapturedRow,
 } from './sequentialRebucket';
-import {
-  TrendsSnapshotConfigDialog,
-} from './components/TrendsSnapshotConfigDialog';
+import { TrendsSnapshotConfigDialog } from './components/TrendsSnapshotConfigDialog';
 import {
   DEFAULT_TRENDS_SNAPSHOT_CONFIG,
   type SnapshotFinestFrequency,
@@ -88,7 +83,9 @@ const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
   'weeks',
 ];
 type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
-type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequestInput['custom_interval_unit']>;
+type SequentialCustomIntervalUnit = NonNullable<
+  SequentialAnalysisRequestInput['custom_interval_unit']
+>;
 
 // Narrows persisted request values to the custom interval units accepted by the form.
 /**
@@ -175,9 +172,7 @@ const SequentialAnalysisFeature = () => {
   // the shadowed names and naturally picks up snapshot data when in
   // snapshot mode.
   const { loadedSnapshot, inSnapshotMode } =
-    useSnapshotBackedAnalysisState<SequentialAnalysisSnapshotPayload>(
-      'sequential_analysis',
-    );
+    useSnapshotBackedAnalysisState<SequentialAnalysisSnapshotPayload>('sequential_analysis');
 
   const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
     if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
@@ -204,9 +199,7 @@ const SequentialAnalysisFeature = () => {
   // captured node IDs. Shadow with the frozen ``manifest.node_colors``
   // so the swatch + chart series read the captured colour.
   const trendsNodeColors: Record<string, string> =
-    inSnapshotMode && loadedSnapshot
-      ? loadedSnapshot.manifest.node_colors
-      : liveTrendsNodeColors;
+    inSnapshotMode && loadedSnapshot ? loadedSnapshot.manifest.node_colors : liveTrendsNodeColors;
 
   const [timeColumn, setTimeColumn] = useState('');
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
@@ -228,21 +221,18 @@ const SequentialAnalysisFeature = () => {
   const lastClickedIndexRef = useRef<number | null>(null);
 
   // Use schema management hook
-  const {
-    setLockedSchema,
-    availableColumns,
-    lockCurrentSchema,
-    currentSchemaRef,
-  } = useSchemaManagement({
-    nodeId: activeNodeId,
-    isLocked,
-    workspaceId: currentWorkspaceId || undefined,
-    getAuthHeaders,
-    nodeData: nodeData ?? undefined,
-    selectedNode: selectedNode ?? undefined,
-  });
+  const { setLockedSchema, availableColumns, lockCurrentSchema, currentSchemaRef } =
+    useSchemaManagement({
+      nodeId: activeNodeId,
+      isLocked,
+      workspaceId: currentWorkspaceId || undefined,
+      getAuthHeaders,
+      nodeData: nodeData ?? undefined,
+      selectedNode: selectedNode ?? undefined,
+    });
 
-  const [liveResults, resultRef, setResultSafely, setResults] = useSafeResult<Record<string, unknown>>();
+  const [liveResults, resultRef, setResultSafely, setResults] =
+    useSafeResult<Record<string, unknown>>();
   const [hydratingSelection, setHydratingSelection] = useState(false);
   const hydratedParamsRef = useRef<{
     timeColumn: string;
@@ -300,14 +290,22 @@ const SequentialAnalysisFeature = () => {
       setDetachNodeName('');
       setSelectedPeriodIndices(new Set());
       lastClickedIndexRef.current = null;
-      const resolvedChartType = isChartTypeOption((resultData as Record<string, unknown>)?.chart_type)
-        ? (resultData as Record<string, unknown>).chart_type as ChartTypeOption
+      const resolvedChartType = isChartTypeOption(
+        (resultData as Record<string, unknown>)?.chart_type,
+      )
+        ? ((resultData as Record<string, unknown>).chart_type as ChartTypeOption)
         : chartType;
       setResultSafely({
         ...(resultData as Record<string, unknown>),
         analysis_params: {
-          ...((results as Record<string, unknown> | null)?.analysis_params as Record<string, unknown> ?? {}),
-          ...((resultData as Record<string, unknown>)?.analysis_params as Record<string, unknown> ?? {}),
+          ...(((results as Record<string, unknown> | null)?.analysis_params as Record<
+            string,
+            unknown
+          >) ?? {}),
+          ...(((resultData as Record<string, unknown>)?.analysis_params as Record<
+            string,
+            unknown
+          >) ?? {}),
         },
         chart_type: resolvedChartType,
       });
@@ -324,7 +322,10 @@ const SequentialAnalysisFeature = () => {
       const enriched = {
         ...(resultPayload as Record<string, unknown>),
         analysis_params: {
-          ...((resultPayload as Record<string, unknown>)?.analysis_params as Record<string, unknown> ?? {}),
+          ...(((resultPayload as Record<string, unknown>)?.analysis_params as Record<
+            string,
+            unknown
+          >) ?? {}),
           ...(hydratedParams
             ? {
                 group_by_columns: hydratedParams.groupByColumns,
@@ -340,8 +341,10 @@ const SequentialAnalysisFeature = () => {
             : {}),
         },
       };
-      const resolvedChartType = isChartTypeOption((resultPayload as Record<string, unknown>)?.chart_type)
-        ? (resultPayload as Record<string, unknown>).chart_type as ChartTypeOption
+      const resolvedChartType = isChartTypeOption(
+        (resultPayload as Record<string, unknown>)?.chart_type,
+      )
+        ? ((resultPayload as Record<string, unknown>).chart_type as ChartTypeOption)
         : chartType;
       setResults({ ...enriched, chart_type: resolvedChartType });
       setChartType(resolvedChartType);
@@ -349,19 +352,28 @@ const SequentialAnalysisFeature = () => {
     // Restores sequential request parameters, selection lock, and schema after reload.
     // Called by: useAnalysisFeature hydration because Trends restores must rebuild time-column selection, bucket settings, grouping columns, and case handling from the submitted request. Flow: unwrap request data, apply numeric or datetime controls, restore node/group selections, then release hydration state.
     onHydratedRequest: async (requestPayload) => {
-      const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown> | null;
+      const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<
+        string,
+        unknown
+      > | null;
       if (!req) return;
       setHydratingSelection(true);
       const nodeIdStr = String(req.node_id || req.nodeId || '');
       const reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
       const reqColumnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
-      const lockedNumericOrigin = reqColumnType === 'numeric' && typeof req.numeric_origin === 'number'
-        ? req.numeric_origin : null;
-      const lockedNumericInterval = reqColumnType === 'numeric' && typeof req.numeric_interval === 'number'
-        ? req.numeric_interval : null;
+      const lockedNumericOrigin =
+        reqColumnType === 'numeric' && typeof req.numeric_origin === 'number'
+          ? req.numeric_origin
+          : null;
+      const lockedNumericInterval =
+        reqColumnType === 'numeric' && typeof req.numeric_interval === 'number'
+          ? req.numeric_interval
+          : null;
       if (reqColumnType === 'numeric') {
         setNumericOriginInput(lockedNumericOrigin != null ? String(lockedNumericOrigin) : '');
-        setNumericIntervalInput(lockedNumericInterval != null ? String(lockedNumericInterval) : '1');
+        setNumericIntervalInput(
+          lockedNumericInterval != null ? String(lockedNumericInterval) : '1',
+        );
       } else {
         setNumericOriginInput('');
         setNumericIntervalInput('1');
@@ -371,12 +383,24 @@ const SequentialAnalysisFeature = () => {
         setTimeColumn(reqTimeColumn);
       }
       const normalizedGroups = Array.isArray(req.group_by_columns)
-        ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
+        ? req.group_by_columns.filter(
+            (col: unknown): col is string => typeof col === 'string' && col.trim() !== '',
+          )
         : [];
       setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
-      const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'];
-      const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as SequentialFrequency) : undefined;
-      const lockedFrequency = reqFrequency && validFrequencies.includes(reqFrequency) ? reqFrequency : frequency;
+      const validFrequencies: SequentialFrequency[] = [
+        'hourly',
+        'daily',
+        'weekly',
+        'monthly',
+        'quarterly',
+        'yearly',
+        'custom',
+      ];
+      const reqFrequency =
+        typeof req.frequency === 'string' ? (req.frequency as SequentialFrequency) : undefined;
+      const lockedFrequency =
+        reqFrequency && validFrequencies.includes(reqFrequency) ? reqFrequency : frequency;
       setFrequency(lockedFrequency);
       const lockedCustomIntervalValue =
         reqColumnType === 'datetime' &&
@@ -424,7 +448,12 @@ const SequentialAnalysisFeature = () => {
             queryClient,
             maxNodes: 1,
           });
-          const info = await fetchNodeInfo({ queryClient, workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
+          const info = await fetchNodeInfo({
+            queryClient,
+            workspaceId: currentWorkspaceId,
+            nodeId: nodeIdStr,
+            getAuthHeaders,
+          });
           const normalizedSchema = normalizeSchemaFromInfo(info);
           if (Object.keys(normalizedSchema).length > 0) {
             setLockedSchema(normalizedSchema);
@@ -459,10 +488,20 @@ const SequentialAnalysisFeature = () => {
     },
     // Finds task ids embedded in result metadata for status recovery.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    getExtraTaskIdCandidates: () => [(resultRef.current as Record<string, unknown> | null)?.metadata as Record<string, unknown> | undefined].map(m => m?.task_id as string | undefined),
+    getExtraTaskIdCandidates: () =>
+      [
+        (resultRef.current as Record<string, unknown> | null)?.metadata as
+          | Record<string, unknown>
+          | undefined,
+      ].map((m) => m?.task_id as string | undefined),
     // Finds task ids embedded in result metadata for clear operations.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    getClearTaskIdSources: () => [(resultRef.current as Record<string, unknown> | null)?.metadata as Record<string, unknown> | undefined].map(m => m?.task_id as string | undefined),
+    getClearTaskIdSources: () =>
+      [
+        (resultRef.current as Record<string, unknown> | null)?.metadata as
+          | Record<string, unknown>
+          | undefined,
+      ].map((m) => m?.task_id as string | undefined),
     // Treats hydrated running results as active tasks for the shared banner/action state.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     isResultRunning: (r: Record<string, unknown> | null) => Boolean(r) && r?.state === 'running',
@@ -496,14 +535,11 @@ const SequentialAnalysisFeature = () => {
     if (!inSnapshotMode || !loadedSnapshot) return;
     const settings = loadedSnapshot.payload.settings;
     const result = loadedSnapshot.payload.result;
-    const snapshotConfigBlob = (settings as { snapshot_config?: Record<string, unknown> } | undefined)
-      ?.snapshot_config;
-    const analysisParams =
-      (result?.analysis_params as Record<string, unknown> | undefined) ?? {};
-    const tc =
-      settings?.time_column ??
-      (analysisParams.time_column as string | undefined) ??
-      '';
+    const snapshotConfigBlob = (
+      settings as { snapshot_config?: Record<string, unknown> } | undefined
+    )?.snapshot_config;
+    const analysisParams = (result?.analysis_params as Record<string, unknown> | undefined) ?? {};
+    const tc = settings?.time_column ?? (analysisParams.time_column as string | undefined) ?? '';
     setTimeColumn(tc);
     // Default to no grouping — user opts in via the panel.
     setGroupByColumns([]);
@@ -513,7 +549,9 @@ const SequentialAnalysisFeature = () => {
       (analysisParams.frequency as SequentialFrequency | undefined) ??
       'daily';
     setFrequency(freq);
-    const ct = isChartTypeOption(result?.chart_type) ? (result.chart_type as ChartTypeOption) : 'line';
+    const ct = isChartTypeOption(result?.chart_type)
+      ? (result.chart_type as ChartTypeOption)
+      : 'line';
     setChartType(ct);
     // Captured rows always have case_sensitive=true (the capture pass
     // forces it). The viewer toggle is purely client-side merging;
@@ -543,19 +581,21 @@ const SequentialAnalysisFeature = () => {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const timeCompatibleColumns = availableColumns
-        .map((column) => ({
-          ...column,
-          dataType: normalizeTypeName(column.dataType),
-        }))
-        .filter((column) => TIME_COMPATIBLE_TYPES.includes(column.dataType as (typeof TIME_COMPATIBLE_TYPES)[number]))
-        .sort((a, b) => {
-          // Prioritizes datetime columns before numeric fallbacks in the default selector.
-          /**
-           * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-           */
-          const priority = (type: string) => (type === 'datetime' ? 0 : 1);
-          return priority(a.dataType) - priority(b.dataType);
-        });
+    .map((column) => ({
+      ...column,
+      dataType: normalizeTypeName(column.dataType),
+    }))
+    .filter((column) =>
+      TIME_COMPATIBLE_TYPES.includes(column.dataType as (typeof TIME_COMPATIBLE_TYPES)[number]),
+    )
+    .sort((a, b) => {
+      // Prioritizes datetime columns before numeric fallbacks in the default selector.
+      /**
+       * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+       */
+      const priority = (type: string) => (type === 'datetime' ? 0 : 1);
+      return priority(a.dataType) - priority(b.dataType);
+    });
 
   const timeColumnOptions = timeCompatibleColumns.map((column) => column.name);
 
@@ -580,27 +620,40 @@ const SequentialAnalysisFeature = () => {
     if (inSnapshotMode && loadedSnapshot) {
       const settings = loadedSnapshot.payload.settings;
       if (settings?.time_column) return settings.time_column;
-      const fromParams = (loadedSnapshot.payload.result?.analysis_params as Record<string, unknown> | undefined)?.time_column;
+      const fromParams = (
+        loadedSnapshot.payload.result?.analysis_params as Record<string, unknown> | undefined
+      )?.time_column;
       return typeof fromParams === 'string' ? fromParams : '';
     }
     if (!activeNodeId) return '';
     const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
     if (selection?.column) return selection.column;
     if (timeColumn) return timeColumn;
-    const hydratedTime = ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as string | undefined) ?? '';
+    const hydratedTime =
+      ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as
+        | string
+        | undefined) ?? '';
     return hydratedTime;
   })();
 
   const activeColumnInfo = timeCompatibleColumns.find((column) => column.name === activeTimeColumn);
-  const activeColumnType = normalizeTypeName(activeColumnInfo?.dataType || (timeCompatibleColumns[0]?.dataType ?? 'datetime'));
-  const derivedColumnType: 'datetime' | 'numeric' = inSnapshotMode && loadedSnapshot
-    ? (((loadedSnapshot.payload.settings?.column_type ??
-        (loadedSnapshot.payload.result?.analysis_params as Record<string, unknown> | undefined)?.column_type) === 'numeric')
-      ? 'numeric'
-      : 'datetime')
-    : (NUMERIC_TYPE_SET.has(activeColumnType) ? 'numeric' : 'datetime');
-  const numericOriginValue = derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null;
-  const numericIntervalValue = derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null;
+  const activeColumnType = normalizeTypeName(
+    activeColumnInfo?.dataType || (timeCompatibleColumns[0]?.dataType ?? 'datetime'),
+  );
+  const derivedColumnType: 'datetime' | 'numeric' =
+    inSnapshotMode && loadedSnapshot
+      ? (loadedSnapshot.payload.settings?.column_type ??
+          (loadedSnapshot.payload.result?.analysis_params as Record<string, unknown> | undefined)
+            ?.column_type) === 'numeric'
+        ? 'numeric'
+        : 'datetime'
+      : NUMERIC_TYPE_SET.has(activeColumnType)
+        ? 'numeric'
+        : 'datetime';
+  const numericOriginValue =
+    derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null;
+  const numericIntervalValue =
+    derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null;
   const isCustomDatetime = derivedColumnType === 'datetime' && frequency === 'custom';
   const customIntervalValue = isCustomDatetime
     ? parsePositiveIntegerInput(customIntervalValueInput)
@@ -625,10 +678,13 @@ const SequentialAnalysisFeature = () => {
     // Extracts comparable server-side parameters from the stored task request.
     // Called by: SequentialAnalysisFeature lock diffing because request payloads store datetime and numeric bucket settings in nullable backend fields. Flow: normalize frequency, grouping, numeric/custom interval, and case flags, then return comparable sequential params.
     getServerParams: (request) => {
-      const serverColumnType = typeof request.column_type === 'string' ? request.column_type : 'datetime';
+      const serverColumnType =
+        typeof request.column_type === 'string' ? request.column_type : 'datetime';
       const serverFrequency = typeof request.frequency === 'string' ? request.frequency : 'year';
-      const serverNumericOrigin = request.numeric_origin == null ? null : Number(request.numeric_origin);
-      const serverNumericInterval = request.numeric_interval == null ? null : Number(request.numeric_interval);
+      const serverNumericOrigin =
+        request.numeric_origin == null ? null : Number(request.numeric_origin);
+      const serverNumericInterval =
+        request.numeric_interval == null ? null : Number(request.numeric_interval);
       const serverIsCustomDatetime =
         serverColumnType === 'datetime' && serverFrequency === 'custom';
       const serverCustomIntervalValue =
@@ -640,7 +696,8 @@ const SequentialAnalysisFeature = () => {
           ? (request.custom_interval_unit as SequentialCustomIntervalUnit)
           : null;
 
-      const serverCaseSensitive = typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true;
+      const serverCaseSensitive =
+        typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true;
       return {
         frequency: serverFrequency,
         group_by_columns: normalizeUnknownStringArray(request.group_by_columns),
@@ -681,7 +738,7 @@ const SequentialAnalysisFeature = () => {
 
     if (!timeColumnOptions.length) {
       // Check current state before updating to avoid infinite loop
-      const currentSelection = nodeColumnSelections.find(s => s.nodeId === selectedNodeId);
+      const currentSelection = nodeColumnSelections.find((s) => s.nodeId === selectedNodeId);
       if (!currentSelection || currentSelection.column !== '') {
         setNodeColumnSelections([{ nodeId: selectedNodeId, column: '' }]);
       }
@@ -697,11 +754,20 @@ const SequentialAnalysisFeature = () => {
     }
 
     // Check current state before updating to avoid infinite loop
-    const currentSelection = nodeColumnSelections.find(s => s.nodeId === selectedNodeId);
+    const currentSelection = nodeColumnSelections.find((s) => s.nodeId === selectedNodeId);
     if (!currentSelection || currentSelection.column !== desired) {
       setNodeColumnSelections([{ nodeId: selectedNodeId, column: desired }]);
     }
-  }, [inSnapshotMode, isLocked, hydratingSelection, selectedNodeId, timeColumnOptions, setNodeColumnSelections, nodeColumnSelections, timeColumn]);
+  }, [
+    inSnapshotMode,
+    isLocked,
+    hydratingSelection,
+    selectedNodeId,
+    timeColumnOptions,
+    setNodeColumnSelections,
+    nodeColumnSelections,
+    timeColumn,
+  ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Adds a blank grouping control up to the supported three-column limit.
@@ -749,7 +815,7 @@ const SequentialAnalysisFeature = () => {
   };
 
   const {
-  // Toggles or range-selects chart periods for the add-to-workspace detach flow.
+    // Toggles or range-selects chart periods for the add-to-workspace detach flow.
     handleAnalyze,
     handleClearResults,
     handleChartTypeChange,
@@ -807,27 +873,31 @@ const SequentialAnalysisFeature = () => {
     loadedSnapshot?.payload.settings as { snapshot_config?: Record<string, unknown> } | undefined
   )?.snapshot_config;
   const captureFinestFrequency =
-    (capturedSnapshotConfig?.finest_frequency as SnapshotFinestFrequency | undefined)
-    ?? (loadedSnapshot?.payload.settings?.frequency === 'custom'
+    (capturedSnapshotConfig?.finest_frequency as SnapshotFinestFrequency | undefined) ??
+    (loadedSnapshot?.payload.settings?.frequency === 'custom'
       ? 'daily'
-      : (loadedSnapshot?.payload.settings?.frequency as SnapshotFinestFrequency | undefined))
-    ?? 'daily';
+      : (loadedSnapshot?.payload.settings?.frequency as SnapshotFinestFrequency | undefined)) ??
+    'daily';
   const captureNumericOrigin = (() => {
     const fromConfig = capturedSnapshotConfig?.numeric_origin;
     if (typeof fromConfig === 'number') return fromConfig;
     const fromSettings = loadedSnapshot?.payload.settings?.numeric_origin;
     return typeof fromSettings === 'number' ? fromSettings : null;
   })();
-  const snapshotRebucket = inSnapshotMode && loadedSnapshot
-    ? rebucket(capturedRows, {
-        columnType: derivedColumnType,
-        viewFrequency: (frequency === 'custom' ? captureFinestFrequency : frequency as SnapshotFinestFrequency),
-        viewNumericInterval: numericIntervalValue ?? 1,
-        captureNumericOrigin,
-        viewGroupByColumns: groupByColumns.filter((c) => c.trim() !== ''),
-        caseSensitive,
-      })
-    : null;
+  const snapshotRebucket =
+    inSnapshotMode && loadedSnapshot
+      ? rebucket(capturedRows, {
+          columnType: derivedColumnType,
+          viewFrequency:
+            frequency === 'custom'
+              ? captureFinestFrequency
+              : (frequency as SnapshotFinestFrequency),
+          viewNumericInterval: numericIntervalValue ?? 1,
+          captureNumericOrigin,
+          viewGroupByColumns: groupByColumns.filter((c) => c.trim() !== ''),
+          caseSensitive,
+        })
+      : null;
 
   const chartData = snapshotRebucket?.chartData ?? liveChartData;
   const groupKeys = snapshotRebucket?.groupKeys ?? liveGroupKeys;
@@ -841,12 +911,12 @@ const SequentialAnalysisFeature = () => {
   //     shipped (a subset of the live workspace's columns).
   // In live mode the panel uses its default options.
   const snapshotFrequencyOptions = inSnapshotMode
-    ? FREQUENCY_ORDER
-        .filter((freq) => isCoarserOrEqual(freq, captureFinestFrequency))
-        .map((value) => ({
+    ? FREQUENCY_ORDER.filter((freq) => isCoarserOrEqual(freq, captureFinestFrequency)).map(
+        (value) => ({
           value: value as SequentialFrequency,
           label: value.charAt(0).toUpperCase() + value.slice(1),
-        }))
+        }),
+      )
     : undefined;
   const snapshotAvailableColumns = (() => {
     if (!inSnapshotMode) return null;
@@ -862,7 +932,7 @@ const SequentialAnalysisFeature = () => {
   // Toggles or range-selects chart periods for the add-to-workspace detach flow.
   /**
    * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-     * Flow: ignore out-of-range clicks, add shift-click ranges from the last anchor or toggle a single period, then store the updated selection set.
+   * Flow: ignore out-of-range clicks, add shift-click ranges from the last anchor or toggle a single period, then store the updated selection set.
    */
   const handlePeriodClick = (index: number, shiftHeld: boolean) => {
     if (index < 0 || index >= chartData.length) return;
@@ -951,7 +1021,9 @@ const SequentialAnalysisFeature = () => {
   useEffect(() => {
     if (inSnapshotMode) return;
     setSnapshotConfig((prev) =>
-      prev.finestFrequency === liveSnapshotFrequencyDefault ? prev : { ...prev, finestFrequency: liveSnapshotFrequencyDefault },
+      prev.finestFrequency === liveSnapshotFrequencyDefault
+        ? prev
+        : { ...prev, finestFrequency: liveSnapshotFrequencyDefault },
     );
   }, [inSnapshotMode, liveSnapshotFrequencyDefault]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -994,7 +1066,9 @@ const SequentialAnalysisFeature = () => {
   // than two periods are available; the dialog assumes one year.
   const liveYearsSpanHint: number | null = (() => {
     const live = liveResults as Record<string, unknown> | null;
-    const liveData = Array.isArray(live?.data) ? (live!.data as Array<Record<string, unknown>>) : [];
+    const liveData = Array.isArray(live?.data)
+      ? (live!.data as Array<Record<string, unknown>>)
+      : [];
     if (liveData.length < 2) return null;
     const periods = liveData
       .map((r) => r.period_start ?? r.time_period)
@@ -1007,7 +1081,9 @@ const SequentialAnalysisFeature = () => {
   })();
 
   const liveCaptureNodeId = liveCaptureNode
-    ? ((liveCaptureNode.id as string | undefined) ?? (liveCaptureNode.node_id as string | undefined) ?? '')
+    ? ((liveCaptureNode.id as string | undefined) ??
+      (liveCaptureNode.node_id as string | undefined) ??
+      '')
     : '';
   const liveCaptureNodeRowCount = liveCaptureNode ? getSequentialNodeRowCount(liveCaptureNode) : 0;
 
@@ -1020,13 +1096,14 @@ const SequentialAnalysisFeature = () => {
   // endpoint returns just ``total_records``, no chart data shipped.
   /**
    * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const dryRunSnapshotRows = async (config: TrendsSnapshotConfig): Promise<number> => {
     if (!liveCaptureNode || !activeTimeColumn) return 0;
-    const nodeId = (liveCaptureNode.id as string | undefined)
-      ?? (liveCaptureNode.node_id as string | undefined)
-      ?? '';
+    const nodeId =
+      (liveCaptureNode.id as string | undefined) ??
+      (liveCaptureNode.node_id as string | undefined) ??
+      '';
     if (!nodeId) return 0;
     const req = buildCaptureRequest(activeTimeColumn, derivedColumnType, config);
     const { data: result } = await previewSequentialAnalysis({
@@ -1061,7 +1138,9 @@ const SequentialAnalysisFeature = () => {
   // snapshot mode we keep the change client-side only — the displayed
   // chart updates, the captured bundle stays immutable.
   const effHandleChartTypeChange = inSnapshotMode
-    ? (value: ChartTypeOption) => { setChartType(value); }
+    ? (value: ChartTypeOption) => {
+        setChartType(value);
+      }
     : handleChartTypeChange;
 
   const {
@@ -1111,9 +1190,8 @@ const SequentialAnalysisFeature = () => {
   /**
    * Called by: SequentialAnalysisFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
    */
-  const getGroupKey = (row: Record<string, unknown>) => effectiveGroupBy
-    .map((column) => foldGroupValue(row[column]))
-    .join(' - ');
+  const getGroupKey = (row: Record<string, unknown>) =>
+    effectiveGroupBy.map((column) => foldGroupValue(row[column])).join(' - ');
 
   const groupSizeByKey = (() => {
     if (!effectiveGroupBy.length) return {} as Record<string, number>;
@@ -1132,14 +1210,16 @@ const SequentialAnalysisFeature = () => {
   /**
    * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
    */
-  const passesMinGroupSize = (key: string) => !effectiveGroupBy.length || (groupSizeByKey[key] ?? 0) >= minGroupSize;
+  const passesMinGroupSize = (key: string) =>
+    !effectiveGroupBy.length || (groupSizeByKey[key] ?? 0) >= minGroupSize;
   const filteredGroupKeys = groupKeys.filter((key) => passesMinGroupSize(key));
   const filteredOutGroupKeys = new Set(groupKeys.filter((key) => !passesMinGroupSize(key)));
   const invisibleGroupKeys = new Set([...hiddenKeys, ...filteredOutGroupKeys]);
 
-  const canDetach = selectedPeriodIndices.size > 0
-    && selectedPeriodIndices.size < chartData.length
-    && filteredGroupKeys.length > 0;
+  const canDetach =
+    selectedPeriodIndices.size > 0 &&
+    selectedPeriodIndices.size < chartData.length &&
+    filteredGroupKeys.length > 0;
 
   const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
     currentWorkspaceId,
@@ -1167,11 +1247,12 @@ const SequentialAnalysisFeature = () => {
   /**
    * Called by: SequentialAnalysisFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
    */
-  const getTimeBucketKey = (row: Record<string, unknown>) => String(
-    (row.time_period_formatted as string | number | undefined)
-      ?? (row.time_period as string | number | undefined)
-      ?? '',
-  );
+  const getTimeBucketKey = (row: Record<string, unknown>) =>
+    String(
+      (row.time_period_formatted as string | number | undefined) ??
+        (row.time_period as string | number | undefined) ??
+        '',
+    );
 
   const selectedTimeBucketKeys = new Set(
     Array.from(selectedPeriodIndices)
@@ -1183,36 +1264,37 @@ const SequentialAnalysisFeature = () => {
   /**
    * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
    */
-  const sumSequentialDocs = (rows: Array<Record<string, unknown>>) => rows.reduce((total, row) => {
-    const count = row.sequential_count;
-    return total + (typeof count === 'number' ? count : Number(count ?? 0));
-  }, 0);
+  const sumSequentialDocs = (rows: Array<Record<string, unknown>>) =>
+    rows.reduce((total, row) => {
+      const count = row.sequential_count;
+      return total + (typeof count === 'number' ? count : Number(count ?? 0));
+    }, 0);
 
   const shownRows = rawResultRows.filter(isRowVisible);
   const chosenRows = shownRows.filter((row) => selectedTimeBucketKeys.has(getTimeBucketKey(row)));
 
-  const totalPointCount = typeof results?.total_records === 'number'
-    ? results.total_records
-    : rawResultRows.length;
-  const totalDocumentCount = typeof panelSelectedNodes[0]?.shape?.[0] === 'number'
-    ? panelSelectedNodes[0].shape[0]
-    : sumSequentialDocs(rawResultRows);
+  const totalPointCount =
+    typeof results?.total_records === 'number' ? results.total_records : rawResultRows.length;
+  const totalDocumentCount =
+    typeof panelSelectedNodes[0]?.shape?.[0] === 'number'
+      ? panelSelectedNodes[0].shape[0]
+      : sumSequentialDocs(rawResultRows);
   const shownPointCount = shownRows.length;
   const shownDocumentCount = sumSequentialDocs(shownRows);
   const chosenPointCount = selectedPeriodIndices.size > 0 ? chosenRows.length : 0;
   const chosenDocumentCount = selectedPeriodIndices.size > 0 ? sumSequentialDocs(chosenRows) : 0;
 
   const resultsSummary = summaryTimeColumn
-    ? (summaryColumnType === 'numeric'
-        ? `Numeric bin counts for ${summaryTimeColumn}`
-        : `Frequency of records grouped by ${summaryTimeColumn}`)
+    ? summaryColumnType === 'numeric'
+      ? `Numeric bin counts for ${summaryTimeColumn}`
+      : `Frequency of records grouped by ${summaryTimeColumn}`
     : 'Aggregated frequency over time';
 
   // Exports the rendered chart SVG with contextual title and legend metadata.
   /**
    * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const handleDownloadChart = async (format: ChartImageFormat) => {
     if (!chartContainerRef.current) {
       toast.error('Chart not available for export.');
@@ -1320,7 +1402,8 @@ const SequentialAnalysisFeature = () => {
             if (inSnapshotMode) return;
             void handleClearResults();
           },
-          runDisabled: inSnapshotMode || actionState.runDisabled || isLoading.operations || !activeTimeColumn,
+          runDisabled:
+            inSnapshotMode || actionState.runDisabled || isLoading.operations || !activeTimeColumn,
           runDisabledReason: (() => {
             if (inSnapshotMode) return 'Disabled in snapshot view';
             if (isAnalyzing || isLoading.operations) return undefined;
@@ -1339,54 +1422,54 @@ const SequentialAnalysisFeature = () => {
           },
         }}
       >
-          <SequentialAnalysisParameterPanel
-            selectedNodes={displayedNodes}
-            nodeColumnSelections={effectiveNodeColumnSelections}
-            timeCompatibleColumns={timeCompatibleColumns}
-            timeCompatibleTypes={Array.from(TIME_COMPATIBLE_TYPES)}
-            isLocked={Boolean(isLocked) || inSnapshotMode}
-            lockedMessage={
-              inSnapshotMode
-                ? 'Viewing a saved snapshot — selection is frozen.'
-                : undefined
-            }
-            displayNodeCount={displayNodeCount}
-            onColumnChange={(nodeId, column) => {
-              if (isLocked || inSnapshotMode) return;
-              setNodeColumnSelections([{ nodeId, column }]);
-              setTimeColumn(column);
-            }}
-            derivedColumnType={derivedColumnType}
-            // Snapshot mode unlocks all the post-fit-tunable inputs
-            // (frequency, group-by, case-sensitive, numeric interval).
-            // The captured x-axis column stays locked via ``isLocked``;
-            // the parameter inputs drive client-side ``rebucket``.
-            inputsDisabled={!inSnapshotMode && (!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId))}
-            frequencyOptions={snapshotFrequencyOptions}
-            activeNodeId={activeNodeId}
-            selectedNodeId={selectedNodeId}
-            currentWorkspaceId={currentWorkspaceId}
-            frequency={frequency}
-            onFrequencyChange={setFrequency}
-            customIntervalValueInput={customIntervalValueInput}
-            onCustomIntervalValueChange={setCustomIntervalValueInput}
-            customIntervalUnit={customIntervalUnit}
-            onCustomIntervalUnitChange={setCustomIntervalUnit}
-            numericOriginInput={numericOriginInput}
-            onNumericOriginChange={setNumericOriginInput}
-            numericIntervalInput={numericIntervalInput}
-            onNumericIntervalChange={setNumericIntervalInput}
-            availableColumns={snapshotAvailableColumns ?? availableColumns}
-            groupByColumns={groupByColumns}
-            onAddGroupByColumn={handleAddGroupByColumn}
-            onRemoveGroupByColumn={handleRemoveGroupByColumn}
-            onGroupByColumnChange={handleGroupByColumnChange}
-            caseSensitive={caseSensitive}
-            onCaseSensitiveChange={setCaseSensitive}
-            nodeColors={trendsNodeColors}
-            defaultPalette={trendsDefaultPalette}
-            onColorChange={trendsHandleColorChange}
-          />
+        <SequentialAnalysisParameterPanel
+          selectedNodes={displayedNodes}
+          nodeColumnSelections={effectiveNodeColumnSelections}
+          timeCompatibleColumns={timeCompatibleColumns}
+          timeCompatibleTypes={Array.from(TIME_COMPATIBLE_TYPES)}
+          isLocked={Boolean(isLocked) || inSnapshotMode}
+          lockedMessage={
+            inSnapshotMode ? 'Viewing a saved snapshot — selection is frozen.' : undefined
+          }
+          displayNodeCount={displayNodeCount}
+          onColumnChange={(nodeId, column) => {
+            if (isLocked || inSnapshotMode) return;
+            setNodeColumnSelections([{ nodeId, column }]);
+            setTimeColumn(column);
+          }}
+          derivedColumnType={derivedColumnType}
+          // Snapshot mode unlocks all the post-fit-tunable inputs
+          // (frequency, group-by, case-sensitive, numeric interval).
+          // The captured x-axis column stays locked via ``isLocked``;
+          // the parameter inputs drive client-side ``rebucket``.
+          inputsDisabled={
+            !inSnapshotMode && !isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)
+          }
+          frequencyOptions={snapshotFrequencyOptions}
+          activeNodeId={activeNodeId}
+          selectedNodeId={selectedNodeId}
+          currentWorkspaceId={currentWorkspaceId}
+          frequency={frequency}
+          onFrequencyChange={setFrequency}
+          customIntervalValueInput={customIntervalValueInput}
+          onCustomIntervalValueChange={setCustomIntervalValueInput}
+          customIntervalUnit={customIntervalUnit}
+          onCustomIntervalUnitChange={setCustomIntervalUnit}
+          numericOriginInput={numericOriginInput}
+          onNumericOriginChange={setNumericOriginInput}
+          numericIntervalInput={numericIntervalInput}
+          onNumericIntervalChange={setNumericIntervalInput}
+          availableColumns={snapshotAvailableColumns ?? availableColumns}
+          groupByColumns={groupByColumns}
+          onAddGroupByColumn={handleAddGroupByColumn}
+          onRemoveGroupByColumn={handleRemoveGroupByColumn}
+          onGroupByColumnChange={handleGroupByColumnChange}
+          caseSensitive={caseSensitive}
+          onCaseSensitiveChange={setCaseSensitive}
+          nodeColors={trendsNodeColors}
+          defaultPalette={trendsDefaultPalette}
+          onColorChange={trendsHandleColorChange}
+        />
       </AnalysisCardLayout>
 
       {sequentialWaitingBanner && (
@@ -1451,7 +1534,9 @@ const SequentialAnalysisFeature = () => {
         open={downloadDialogOpen}
         onOpenChange={setDownloadDialogOpen}
         title="Download Trends Chart"
-        onConfirm={(format) => { void handleDownloadChart(format); }}
+        onConfirm={(format) => {
+          void handleDownloadChart(format);
+        }}
       />
     </div>
   );

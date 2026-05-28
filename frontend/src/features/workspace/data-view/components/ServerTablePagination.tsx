@@ -35,7 +35,9 @@ export function ServerTablePagination<TData>({
 
   const currentPage = pageIndex + 1; // 0-indexed → 1-indexed for display
   const safeTotalPages = Math.max(pageCount, 1);
-  const normalizedOptions = Array.from(new Set([...pageSizeOptions, pageSize])).sort((a, b) => a - b);
+  const normalizedOptions = Array.from(new Set([...pageSizeOptions, pageSize])).sort(
+    (a, b) => a - b,
+  );
   const paginationRange = buildPaginationRange(currentPage, safeTotalPages);
   // ServerTablePagination's footer uses a tighter `py-1.5` row, so override
   // the default size-9 jump trigger to size-8 to keep visual proportions.
@@ -43,11 +45,11 @@ export function ServerTablePagination<TData>({
   const canPrev = table.getCanPreviousPage();
   const canNext = table.getCanNextPage();
 
-    /**
+  /**
    * Converts display page numbers back into TanStack's zero-based page index.
-     * Called by: ServerTablePagination internal event, effect, or helper flow.
-     * Why: because server-backed tables need pagination controls that update query state rather than slicing rows locally.
-     */
+   * Called by: ServerTablePagination internal event, effect, or helper flow.
+   * Why: because server-backed tables need pagination controls that update query state rather than slicing rows locally.
+   */
   const goToPage = (page: number) => {
     table.setPageIndex(page - 1); // 1-indexed → 0-indexed
   };
@@ -62,7 +64,9 @@ export function ServerTablePagination<TData>({
           className="h-7 rounded-md border border-input bg-background px-2 py-0.5 text-xs text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
         >
           {normalizedOptions.map((size) => (
-            <option key={size} value={size}>{size}</option>
+            <option key={size} value={size}>
+              {size}
+            </option>
           ))}
         </select>
       </div>

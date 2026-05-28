@@ -21,8 +21,7 @@ export const queryKeys = {
 
   /** Nodes list for a workspace; invalidated after graph-changing workspace mutations. */
   /** Consumed by: TanStack Query hooks and invalidation helpers because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
-  workspaceNodes: (workspaceId: string) =>
-    ['workspaces', workspaceId, 'nodes'] as const,
+  workspaceNodes: (workspaceId: string) => ['workspaces', workspaceId, 'nodes'] as const,
 
   /** Paginated node data. Includes page, size, sort, and filter for distinct cache entries. */
   /**
@@ -73,20 +72,15 @@ export const queryKeys = {
    * Workspace graph topology consumed by the graph/sidebar workspace view.
    * Why: importers need one shared normalization boundary to keep behavior consistent.
    */
-  workspaceGraph: (workspaceId: string) =>
-    ['workspaces', workspaceId, 'graph'] as const,
+  workspaceGraph: (workspaceId: string) => ['workspaces', workspaceId, 'graph'] as const,
 
   /** All file-tree queries. */
   files: ['files'] as const,
 
   /** Paginated preview of an unsaved file (sheets/CSV/etc). */
   /** Consumed by: TanStack Query hooks and invalidation helpers because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
-  filePreview: (
-    filename: string,
-    page: number,
-    pageSize: number,
-    selectedSheet: string | null,
-  ) => ['file-preview', filename, page, pageSize, selectedSheet] as const,
+  filePreview: (filename: string, page: number, pageSize: number, selectedSheet: string | null) =>
+    ['file-preview', filename, page, pageSize, selectedSheet] as const,
 
   /**
    * Per-column unique-value counts (used by sequential-analysis).
@@ -99,9 +93,6 @@ export const queryKeys = {
    * Per-(analysisType, workspace) server-request-lock used by useAnalysisServerRequestLock.
    * Why: importers need one shared normalization boundary to keep behavior consistent.
    */
-  analysisServerRequestLock: (
-    analysisType: string,
-    workspaceId: string | null,
-  ) => ['analysis', analysisType, 'server-request-lock', workspaceId] as const,
-
+  analysisServerRequestLock: (analysisType: string, workspaceId: string | null) =>
+    ['analysis', analysisType, 'server-request-lock', workspaceId] as const,
 };

@@ -30,7 +30,7 @@ export const WorkspaceSelectionTabs = ({
               'group flex min-w-35 max-w-60 items-center rounded-t-md border border-border/60 bg-muted/60 pr-1 text-xs font-medium transition-all',
               tab.isActive
                 ? 'border-b-transparent bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
             )}
           >
             <button
@@ -38,7 +38,7 @@ export const WorkspaceSelectionTabs = ({
               onClick={() => onTabChange(tab.id)}
               className={cn(
                 'flex-1 truncate px-3 py-2 text-left',
-                tab.isActive ? 'text-foreground' : 'text-muted-foreground'
+                tab.isActive ? 'text-foreground' : 'text-muted-foreground',
               )}
               aria-pressed={tab.isActive}
               aria-selected={tab.isActive}

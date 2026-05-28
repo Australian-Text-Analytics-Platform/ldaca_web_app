@@ -50,14 +50,15 @@ export function DocsEolBanner() {
     }
   };
 
-
   return (
     <div className="pointer-events-none fixed left-1/2 top-4 z-50 flex -translate-x-1/2 flex-col gap-2">
       <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-lg">
         <span className="font-medium">Docs version retired</span>
         <span className="text-xs text-amber-900/80">
-          {version ? `Documentation for v${version} is no longer maintained.` : 'This documentation version is no longer maintained.'}
-          {' '}Please upgrade to the latest app release.
+          {version
+            ? `Documentation for v${version} is no longer maintained.`
+            : 'This documentation version is no longer maintained.'}{' '}
+          Please upgrade to the latest app release.
         </span>
         <button
           type="button"

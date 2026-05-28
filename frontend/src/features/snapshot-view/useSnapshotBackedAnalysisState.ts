@@ -44,12 +44,9 @@ export function useSnapshotBackedAnalysisState<Payload>(
  * Used by: index module, useSnapshotBackedAnalysisState tests, ConcordanceFeature module (rg call sites/imports) because frozen manifests must supply the node cards normally read from live workspace data.
  * Flow: derive an even row-count fallback, pair manifest node ids with labels and per-block rows, then emit node-like records for snapshot-only panels.
  */
-export function snapshotSourceNodes(
-  source: SnapshotManifest['source'],
-): SnapshotSourceNode[] {
+export function snapshotSourceNodes(source: SnapshotManifest['source']): SnapshotSourceNode[] {
   const { node_ids, node_labels, per_block_rows, total_source_rows } = source;
-  const evenSplit =
-    node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
+  const evenSplit = node_ids.length > 0 ? Math.floor(total_source_rows / node_ids.length) : 0;
 
   return node_ids.map((id, index) => ({
     id,

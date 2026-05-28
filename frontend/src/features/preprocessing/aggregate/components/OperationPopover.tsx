@@ -90,9 +90,7 @@ export function OperationPopover({
             {loading && (
               <p className="px-2 py-3 text-center text-sm text-muted-foreground">Loading…</p>
             )}
-            {error && (
-              <p className="px-2 py-3 text-center text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="px-2 py-3 text-center text-sm text-destructive">{error}</p>}
             {operations && operations['str'] && (
               <div className="mb-2">
                 <p className="px-2 py-1 text-xs font-semibold text-muted-foreground">Special</p>
@@ -145,7 +143,9 @@ export function OperationPopover({
                 );
               })}
             {operations && Object.keys(operations).length === 0 && (
-              <p className="px-2 py-3 text-center text-sm text-muted-foreground">No operations available</p>
+              <p className="px-2 py-3 text-center text-sm text-muted-foreground">
+                No operations available
+              </p>
             )}
           </div>
         </ScrollArea>

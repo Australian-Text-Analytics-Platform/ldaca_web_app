@@ -193,19 +193,20 @@ export function TopicModelingBubbleChartSection({
     // Join all node names with '_' so the filename reflects both data blocks
     const nodeName = (nodeNames ?? []).filter(Boolean).join('_') || 'data';
     const topicSizeLabel =
-      topicSizeMode === 'min' ? 'Min Topic Size' :
-      topicSizeMode === 'exact' ? 'Exact Topics' :
-      'Target Topics';
+      topicSizeMode === 'min'
+        ? 'Min Topic Size'
+        : topicSizeMode === 'exact'
+          ? 'Exact Topics'
+          : 'Target Topics';
     const header: ChartExportHeaderItem[] = [
-      { label: 'Data Block',   value: nodeNames?.join(', ') ?? 'data' },
+      { label: 'Data Block', value: nodeNames?.join(', ') ?? 'data' },
       { label: topicSizeLabel, value: topicSizeValue != null ? String(topicSizeValue) : '—' },
-      { label: 'Random Seed',  value: randomSeed    != null ? String(randomSeed)    : '—' },
-      { label: 'Topics',       value: String(topics.length) },
+      { label: 'Random Seed', value: randomSeed != null ? String(randomSeed) : '—' },
+      { label: 'Topics', value: String(topics.length) },
     ];
 
     const includeCSV = extras['includeCSV'] ?? false;
-    const includeStopwords =
-      stopwordsDownloadEligible && (extras['includeStopwords'] ?? false);
+    const includeStopwords = stopwordsDownloadEligible && (extras['includeStopwords'] ?? false);
 
     try {
       // Anything beyond the image alone forces the zip path so the
@@ -221,8 +222,7 @@ export function TopicModelingBubbleChartSection({
           legend: [],
         });
 
-        const safeBaseName =
-          nodeName.replace(/[<>:"\\|?*/\s]+/g, '_').slice(0, 60) || 'data';
+        const safeBaseName = nodeName.replace(/[<>:"\\|?*/\s]+/g, '_').slice(0, 60) || 'data';
 
         const zip = new JSZip();
         zip.file(imageFilename, imageBlob);
@@ -257,9 +257,9 @@ export function TopicModelingBubbleChartSection({
           legend: [],
         }).then(({ blob, filename }) => saveBlob(blob, filename));
       }
-      } catch (error) {
-        const description = error instanceof Error ? error.message : String(error);
-        toast.error('Failed to export chart.', { description });
+    } catch (error) {
+      const description = error instanceof Error ? error.message : String(error);
+      toast.error('Failed to export chart.', { description });
     }
   };
 
@@ -302,8 +302,12 @@ export function TopicModelingBubbleChartSection({
             style={{ left: tooltip.x, top: tooltip.y }}
           >
             <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
-            <div className="mt-1 wrap-break-word text-[10px] leading-snug text-muted-foreground">{tooltip.topic.label}</div>
-            <div className="mt-2">{renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}</div>
+            <div className="mt-1 wrap-break-word text-[10px] leading-snug text-muted-foreground">
+              {tooltip.topic.label}
+            </div>
+            <div className="mt-2">
+              {renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}
+            </div>
           </div>
         )}
       </div>
@@ -329,7 +333,9 @@ export function TopicModelingBubbleChartSection({
         onOpenChange={setDownloadDialogOpen}
         title="Download Topic Model Chart"
         extraOptions={downloadExtraOptions}
-        onConfirm={(format, extras) => { void handleDownloadChart(format, extras); }}
+        onConfirm={(format, extras) => {
+          void handleDownloadChart(format, extras);
+        }}
       />
     </>
   );

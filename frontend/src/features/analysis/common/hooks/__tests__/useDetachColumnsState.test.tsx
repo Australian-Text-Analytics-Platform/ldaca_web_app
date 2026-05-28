@@ -73,7 +73,11 @@ describe('useDetachColumnsState', () => {
   describe('selectAllDetachColumns', () => {
     it('selects every available, non-disabled column for each node', () => {
       const options = buildNodeOptions([
-        { node_id: 'n1', available_columns: ['col_a', 'col_b', 'col_c'], disabled_columns: ['col_b'] },
+        {
+          node_id: 'n1',
+          available_columns: ['col_a', 'col_b', 'col_c'],
+          disabled_columns: ['col_b'],
+        },
         { node_id: 'n2', available_columns: ['col_x', 'col_y'], disabled_columns: [] },
       ]);
       const { result } = renderHook(() => useDetachColumnsState(options));

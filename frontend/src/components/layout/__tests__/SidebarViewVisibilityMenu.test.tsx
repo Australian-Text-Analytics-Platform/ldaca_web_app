@@ -1,4 +1,3 @@
-import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -73,17 +72,9 @@ vi.mock('@/hooks/useAuth', () => ({
 
 vi.mock('@/stores/analysisStore', () => ({
   /** Used by: Sidebar tests to expose an empty analysis-task store fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-  useAnalysisStore: (selector: (state: { tasks: []; setTasks: ReturnType<typeof vi.fn> }) => unknown) =>
-    selector({ tasks: [], setTasks: vi.fn() }),
-}));
-
-vi.mock('@/stores/quotationEngineStore', () => ({
-  /**
-   * Provides the dialog-open action consumed by sidebar quotation controls.
-   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
-   */
-  useQuotationEngineDialogStore: (selector: (state: { open: ReturnType<typeof vi.fn> }) => unknown) =>
-    selector({ open: vi.fn() }),
+  useAnalysisStore: (
+    selector: (state: { tasks: []; setTasks: ReturnType<typeof vi.fn> }) => unknown,
+  ) => selector({ tasks: [], setTasks: vi.fn() }),
 }));
 
 vi.mock('@/components/dialogs/DataFolderDialog', () => ({
@@ -101,7 +92,7 @@ const renderSidebar = () => {
       <SidebarProvider>
         <Sidebar />
       </SidebarProvider>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 };
 
@@ -181,7 +172,10 @@ describe('Sidebar view visibility menu', () => {
   it('resets dismissed hints from the views editor', async () => {
     const user = userEvent.setup();
 
-    useHintsStore.setState({ dismissedHints: ['preprocessing.filter.select-node'], hintsEnabled: true });
+    useHintsStore.setState({
+      dismissedHints: ['preprocessing.filter.select-node'],
+      hintsEnabled: true,
+    });
     useUIStore.setState((state) => ({
       ...state,
       sessionDismissedHints: new Set(['preprocessing.filter.select-column']),
@@ -194,7 +188,9 @@ describe('Sidebar view visibility menu', () => {
 
     expect(useHintsStore.getState().dismissedHints).toEqual([]);
     expect(Array.from(useUIStore.getState().sessionDismissedHints)).toEqual([]);
-    expect(toastMock).toHaveBeenCalledWith('All hints have been reset. Dismissed hints can appear again.');
+    expect(toastMock).toHaveBeenCalledWith(
+      'All hints have been reset. Dismissed hints can appear again.',
+    );
   });
 
   it('hides the working directory card in multi-user mode', () => {

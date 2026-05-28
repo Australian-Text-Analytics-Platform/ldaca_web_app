@@ -43,18 +43,20 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const uploadMutation = useMutation({
     /** Uploads a browser File object through the generated SDK for file panel actions. */
     /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
-    mutationFn: (file: File) => uploadFile({ body: { file }, headers: authHeaders, throwOnError: true }),
+    mutationFn: (file: File) =>
+      uploadFile({ body: { file }, headers: authHeaders, throwOnError: true }),
     onSuccess: invalidateFiles,
   });
 
   const deleteMutation = useMutation({
     /** Deletes the selected server-side file and lets mutation success refresh the tree. */
     /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
-    mutationFn: (filename: string) => deleteFile({
-      headers: authHeaders,
-      path: { filename },
-      throwOnError: true,
-    }),
+    mutationFn: (filename: string) =>
+      deleteFile({
+        headers: authHeaders,
+        path: { filename },
+        throwOnError: true,
+      }),
     onSuccess: invalidateFiles,
   });
 

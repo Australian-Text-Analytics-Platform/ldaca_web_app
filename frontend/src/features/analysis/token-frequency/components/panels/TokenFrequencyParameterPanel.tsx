@@ -1,11 +1,16 @@
-import NodeSelectionPanel, { type NodeSelectionColumnAddonArgs } from '@/features/analysis/common/components/NodeSelectionPanel';
+import NodeSelectionPanel, {
+  type NodeSelectionColumnAddonArgs,
+} from '@/features/analysis/common/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
 import { TokensColumnMismatchNotice } from '@/features/analysis/common/components/TokensColumnMismatchNotice';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
 import type { SnapshotToolKey } from '@/features/snapshot-view';
-import type { WorkspaceNodeLike, NodeColumnSource } from '@/features/analysis/common/nodeSelectionTypes';
+import type {
+  WorkspaceNodeLike,
+  NodeColumnSource,
+} from '@/features/analysis/common/nodeSelectionTypes';
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
 
@@ -19,7 +24,12 @@ type TokenFrequencyParameterPanelProps = {
   isLocked: boolean;
   getNodeColumns: (node: WorkspaceNodeLike, idx?: number) => NodeColumnSource;
   displayNodeCount: number;
-  actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string; runDisabledReason?: string };
+  actionState: {
+    runDisabled: boolean;
+    clearDisabled: boolean;
+    runLabel: string;
+    runDisabledReason?: string;
+  };
   isAnalyzing: boolean;
   onAnalyze: () => void;
   onStop?: () => void;
@@ -100,7 +110,8 @@ export const TokenFrequencyParameterPanel = ({
       help={{
         targetKey: 'analysis.token-frequency.parameters',
         label: 'Token frequency parameters',
-        tooltip: 'Choose up to two data blocks and the text columns to analyze. After the run, use the results panel to adjust stop words and displayed token limits.',
+        tooltip:
+          'Choose up to two data blocks and the text columns to analyze. After the run, use the results panel to adjust stop words and displayed token limits.',
       }}
       snapshot={snapshot}
       actions={{
@@ -134,7 +145,11 @@ export const TokenFrequencyParameterPanel = ({
                     return (
                       <DisabledReasonTooltip
                         key={option.id}
-                        reason={isLocked ? 'Clear results first to change the study data block' : undefined}
+                        reason={
+                          isLocked
+                            ? 'Clear results first to change the study data block'
+                            : undefined
+                        }
                       >
                         <label
                           className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors${isLocked ? ' cursor-not-allowed opacity-60' : ''}`}

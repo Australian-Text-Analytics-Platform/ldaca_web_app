@@ -1,148 +1,136 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Tooltip } from "recharts"
+import * as React from 'react';
+import { Tooltip } from 'recharts';
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils';
 
 export type ChartConfig = Record<
   string,
   {
-    label?: string
-    icon?: React.ComponentType<{ className?: string }>
-    color?: string
+    label?: string;
+    icon?: React.ComponentType<{ className?: string }>;
+    color?: string;
   }
->
+>;
 
 type ChartContextValue = {
-  config: ChartConfig
-}
+  config: ChartConfig;
+};
 
 /** Chart configuration context consumed by chart tooltip components. */
-const ChartContext = React.createContext<ChartContextValue | null>(null)
+const ChartContext = React.createContext<ChartContextValue | null>(null);
 
 /** Called by: chart tooltip render helpers that need ChartContainer config because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 const useChartContext = () => {
-  const context = React.useContext(ChartContext)
+  const context = React.useContext(ChartContext);
   if (!context) {
-    throw new Error("Chart components must be used within a <ChartContainer />")
+    throw new Error('Chart components must be used within a <ChartContainer />');
   }
-  return context
-}
+  return context;
+};
 
 /** Called by: ChartContainer and ChartTooltipContent when deriving series CSS variables because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-const slug = (key: string) => key.toString().toLowerCase().replace(/[^a-z0-9]+/g, "-")
+const slug = (key: string) =>
+  key
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
 
-interface ChartContainerProps
-  extends React.HTMLAttributes<HTMLDivElement> {
-  config: ChartConfig
+interface ChartContainerProps extends React.HTMLAttributes<HTMLDivElement> {
+  config: ChartConfig;
 }
 
 /** Chart wrapper that publishes series config and CSS color variables to Recharts children. */
 const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(
   ({ className, children, config, style, ...props }, ref) => {
     const cssVars: React.CSSProperties = (() => {
-      const entries = Object.entries(config).filter(([, value]) => value?.color)
-      if (!entries.length) return style ?? {}
+      const entries = Object.entries(config).filter(([, value]) => value?.color);
+      if (!entries.length) return style ?? {};
       const vars = entries.reduce<Record<string, string>>((acc, [key, value]) => {
-        const variable = `--color-${slug(key)}`
-        acc[variable] = value?.color ?? ""
-        return acc
-      }, {})
+        const variable = `--color-${slug(key)}`;
+        acc[variable] = value?.color ?? '';
+        return acc;
+      }, {});
       return {
         ...style,
         ...vars,
-      }
-    })()
+      };
+    })();
 
-    const contextValue = { config }
+    const contextValue = { config };
 
     return (
       <ChartContext.Provider value={contextValue}>
-        <div
-          ref={ref}
-          className={cn("relative", className)}
-          style={cssVars}
-          {...props}
-        >
+        <div ref={ref} className={cn('relative', className)} style={cssVars} {...props}>
           {children}
         </div>
       </ChartContext.Provider>
-    )
-  }
-)
-ChartContainer.displayName = "ChartContainer"
+    );
+  },
+);
+ChartContainer.displayName = 'ChartContainer';
 
-interface ChartTooltipProps
-  extends Omit<React.ComponentProps<typeof Tooltip>, "content"> {
-  content?: React.ComponentProps<typeof Tooltip>["content"]
+interface ChartTooltipProps extends Omit<React.ComponentProps<typeof Tooltip>, 'content'> {
+  content?: React.ComponentProps<typeof Tooltip>['content'];
 }
 
 /** Recharts tooltip wrapper that provides the app's default cursor and content renderer. */
 const ChartTooltip = React.forwardRef<HTMLDivElement, ChartTooltipProps>(
-  ({ content, cursor = { strokeDasharray: "3 3" }, ...props }, _ref) => {
+  ({ content, cursor = { strokeDasharray: '3 3' }, ...props }, _ref) => {
     return (
       <Tooltip
         {...props}
         cursor={cursor}
         content={content ?? <ChartTooltipContent />}
-        wrapperStyle={{ outline: "none" }}
+        wrapperStyle={{ outline: 'none' }}
       />
-    )
-  }
-)
-ChartTooltip.displayName = "ChartTooltip"
+    );
+  },
+);
+ChartTooltip.displayName = 'ChartTooltip';
 
 type TooltipItem = {
-  name?: string | number
-  value?: number
-  payload?: Record<string, unknown>
-  dataKey?: string | number
-  color?: string
-}
+  name?: string | number;
+  value?: number;
+  payload?: Record<string, unknown>;
+  dataKey?: string | number;
+  color?: string;
+};
 
 interface ChartTooltipContentProps {
-  active?: boolean
-  payload?: TooltipItem[]
-  label?: string | number
-  className?: string
-  indicator?: "dot" | "line"
-  hideLabel?: boolean
-  nameKey?: string
-  labelFormatter?: (value?: string | number) => React.ReactNode
+  active?: boolean;
+  payload?: TooltipItem[];
+  label?: string | number;
+  className?: string;
+  indicator?: 'dot' | 'line';
+  hideLabel?: boolean;
+  nameKey?: string;
+  labelFormatter?: (value?: string | number) => React.ReactNode;
 }
 
 /** Tooltip content renderer used by `ChartTooltip` to show configured labels, colors, and values. */
 const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContentProps>(
   (
-    {
-      active,
-      payload,
-      label,
-      className,
-      indicator = "dot",
-      hideLabel,
-      nameKey,
-      labelFormatter,
-    },
-    ref
+    { active, payload, label, className, indicator = 'dot', hideLabel, nameKey, labelFormatter },
+    ref,
   ) => {
-    const { config } = useChartContext()
+    const { config } = useChartContext();
 
-    const items = payload ?? []
+    const items = payload ?? [];
 
     if (!active || items.length === 0) {
-      return null
+      return null;
     }
 
-    const resolvedLabel = labelFormatter ? labelFormatter(label) : label
+    const resolvedLabel = labelFormatter ? labelFormatter(label) : label;
 
     return (
       <div
         ref={ref}
         className={cn(
-          "grid gap-2 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground shadow-lg supports-[backdrop-filter]:backdrop-blur",
-          className
+          'grid gap-2 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground shadow-lg supports-[backdrop-filter]:backdrop-blur',
+          className,
         )}
       >
         {!hideLabel && resolvedLabel && (
@@ -150,24 +138,20 @@ const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContent
         )}
         <div className="grid gap-1 text-xs text-muted-foreground">
           {items.map((item, index) => {
-            const key = String(item.dataKey ?? item.name ?? index)
-            const data = config[key] ?? config[item.name ?? ""]
-            const colorVariable = data?.color
-              ? `var(--color-${slug(key)})`
-              : item.color
+            const key = String(item.dataKey ?? item.name ?? index);
+            const data = config[key] ?? config[item.name ?? ''];
+            const colorVariable = data?.color ? `var(--color-${slug(key)})` : item.color;
 
-            const Icon = data?.icon
+            const Icon = data?.icon;
 
             return (
               <div key={key} className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
-                      "h-2 w-2 rounded-full",
-                      indicator === "line" && "h-[2px] w-4",
-                      indicator === "line" && colorVariable
-                        ? "rounded-none"
-                        : null
+                      'h-2 w-2 rounded-full',
+                      indicator === 'line' && 'h-[2px] w-4',
+                      indicator === 'line' && colorVariable ? 'rounded-none' : null,
                     )}
                     style={colorVariable ? { background: colorVariable } : undefined}
                   />
@@ -183,13 +167,13 @@ const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContent
                   {item.value?.toLocaleString?.() ?? item.value}
                 </span>
               </div>
-            )
+            );
           })}
         </div>
       </div>
-    )
-  }
-)
-ChartTooltipContent.displayName = "ChartTooltipContent"
+    );
+  },
+);
+ChartTooltipContent.displayName = 'ChartTooltipContent';
 
-export { ChartContainer, ChartTooltip, ChartTooltipContent }
+export { ChartContainer, ChartTooltip, ChartTooltipContent };

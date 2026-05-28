@@ -68,9 +68,7 @@ export function MetadataColumnSelector({
   const normalizedSelectedColumns = normalizeMetadataColumns(selectedColumns).filter((column) =>
     normalizedAvailableColumns.includes(column),
   );
-  const useSections =
-    Array.isArray(sections) &&
-    sections.length > 1;
+  const useSections = Array.isArray(sections) && sections.length > 1;
 
   // Columns that the user is allowed to toggle from this dropdown. Items in
   // sections marked `disabled` are excluded — they're shown but inert.
@@ -96,7 +94,9 @@ export function MetadataColumnSelector({
       return;
     }
 
-    onSelectedColumnsChange(normalizedSelectedColumns.filter((selectedColumn) => selectedColumn !== column));
+    onSelectedColumnsChange(
+      normalizedSelectedColumns.filter((selectedColumn) => selectedColumn !== column),
+    );
   };
 
   const triggerDisabled = Boolean(disabledReason);
@@ -180,4 +180,4 @@ export function MetadataColumnSelector({
       </DropdownMenu>
     </div>
   );
-};
+}

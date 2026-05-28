@@ -13,7 +13,10 @@ interface AnalysisTaskBannerProps {
 }
 
 /** Visual treatment map for queued versus actively running analysis task banners. */
-const statusStyles: Record<NonNullable<AnalysisTaskBannerProps['status']>, { card: string; text: string; badge: string }> = {
+const statusStyles: Record<
+  NonNullable<AnalysisTaskBannerProps['status']>,
+  { card: string; text: string; badge: string }
+> = {
   running: {
     card: 'border-amber-200 bg-amber-50/80',
     text: 'text-amber-900',
@@ -50,20 +53,25 @@ function AnalysisTaskBanner({
         aria-label={`${analysisName} task ${status}${taskId ? ` (task ${taskId})` : ''}`}
       >
         <div
-          className={cn('flex h-6 w-6 items-center justify-center rounded-full border', styles.badge)}
+          className={cn(
+            'flex h-6 w-6 items-center justify-center rounded-full border',
+            styles.badge,
+          )}
           data-testid="analysis-task-spinner"
         >
-          <Loader2 className="h-4 w-4 animate-spin" data-testid="analysis-task-spinner-icon" aria-hidden="true" />
+          <Loader2
+            className="h-4 w-4 animate-spin"
+            data-testid="analysis-task-spinner-icon"
+            aria-hidden="true"
+          />
         </div>
         <div className="space-y-1">
-          {trimmedMessage && (
-            <p className="leading-tight">{trimmedMessage}</p>
-          )}
+          {trimmedMessage && <p className="leading-tight">{trimmedMessage}</p>}
           {children}
         </div>
       </CardContent>
     </Card>
   );
-};
+}
 
 export default AnalysisTaskBanner;

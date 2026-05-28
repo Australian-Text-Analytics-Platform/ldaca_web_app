@@ -54,10 +54,7 @@ export type PaginationSource<TRow> =
        * to indicate "no comparator for this column" — the resolver
        * skips sorting in that case rather than picking an arbitrary
        * order. */
-      comparator?: (
-        sortBy: string,
-        descending: boolean,
-      ) => ((a: TRow, b: TRow) => number) | null;
+      comparator?: (sortBy: string, descending: boolean) => ((a: TRow, b: TRow) => number) | null;
     };
 
 /**
@@ -65,35 +62,31 @@ export type PaginationSource<TRow> =
  * Used by: index module, pagination tests (rg call sites/imports) because snapshot-backed results need live-table pagination semantics without fetching from the backend.
  * Flow: source rows and page state are clamped, sliced, and returned with pagination metadata that mirrors live API responses.
  */
-export function resolvePagination<TRow>(
-  source: PaginationSource<TRow>,
-): PaginationView<TRow> {
+export function resolvePagination<TRow>(source: PaginationSource<TRow>): PaginationView<TRow> {
   if (source.kind === 'server') {
     const { state, rows, total, setState } = source;
     return {
       rows,
       total,
       state,
-            /**
+      /**
        * Forwards server-page navigation to the owner state so React Query refetches.
-             * Consumed by: resolvePagination return object for feature components.
-             * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
-             */
+       * Consumed by: resolvePagination return object for feature components.
+       * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
+       */
       setCurrentPage: (page) => setState({ ...state, currentPage: page }),
-            /**
+      /**
        * Resets to the first server page when the page size changes.
-             * Consumed by: resolvePagination return object for feature components.
-             * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
-             */
-      setPageSize: (size) =>
-        setState({ ...state, pageSize: size, currentPage: 1 }),
-            /**
+       * Consumed by: resolvePagination return object for feature components.
+       * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
+       */
+      setPageSize: (size) => setState({ ...state, pageSize: size, currentPage: 1 }),
+      /**
        * Records server sort intent and resets paging for the sorted result.
-             * Consumed by: resolvePagination return object for feature components.
-             * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
-             */
-      setSort: (sortBy, descending) =>
-        setState({ ...state, sortBy, descending, currentPage: 1 }),
+       * Consumed by: resolvePagination return object for feature components.
+       * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
+       */
+      setSort: (sortBy, descending) => setState({ ...state, sortBy, descending, currentPage: 1 }),
       hasPrev: state.currentPage > 1,
       hasNext: state.currentPage * state.pageSize < total,
     };
@@ -120,26 +113,24 @@ export function resolvePagination<TRow>(
     rows,
     total,
     state,
-        /**
+    /**
      * Moves the client-side slice window without refetching data.
-         * Consumed by: resolvePagination return object for feature components.
-         * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
-         */
+     * Consumed by: resolvePagination return object for feature components.
+     * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
+     */
     setCurrentPage: (page) => setState({ ...state, currentPage: page }),
-        /**
+    /**
      * Changes the client-side slice size and restarts at the first page.
-         * Consumed by: resolvePagination return object for feature components.
-         * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
-         */
-    setPageSize: (size) =>
-      setState({ ...state, pageSize: size, currentPage: 1 }),
-        /**
+     * Consumed by: resolvePagination return object for feature components.
+     * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
+     */
+    setPageSize: (size) => setState({ ...state, pageSize: size, currentPage: 1 }),
+    /**
      * Stores client-side sort intent before the adapter reorders rows.
-         * Consumed by: resolvePagination return object for feature components.
-         * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
-         */
-    setSort: (sortBy, descending) =>
-      setState({ ...state, sortBy, descending, currentPage: 1 }),
+     * Consumed by: resolvePagination return object for feature components.
+     * Why: because snapshot-backed feature panels need live-like page metadata while reading from fixed snapshot rows.
+     */
+    setSort: (sortBy, descending) => setState({ ...state, sortBy, descending, currentPage: 1 }),
     hasPrev: state.currentPage > 1,
     hasNext: end < total,
   };

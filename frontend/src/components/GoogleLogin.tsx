@@ -13,7 +13,9 @@ export default function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
   return (
     <AuthProviderCard isLoading={isLoading} error={error}>
       <OAuthGoogleLogin
-        onSuccess={() => {/* redirect mode handled server-side */}}
+        onSuccess={() => {
+          /* redirect mode handled server-side */
+        }}
         ux_mode="redirect"
         login_uri={loginUri}
         size="large"

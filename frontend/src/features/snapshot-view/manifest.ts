@@ -162,11 +162,7 @@ export function parseManifest(raw: unknown): ParseResult {
   }
 
   const nodeColors = obj.node_colors;
-  if (
-    typeof nodeColors !== 'object' ||
-    nodeColors === null ||
-    Array.isArray(nodeColors)
-  ) {
+  if (typeof nodeColors !== 'object' || nodeColors === null || Array.isArray(nodeColors)) {
     return {
       ok: false,
       error: { kind: 'invalid-field-type', field: 'node_colors', expected: 'object' },

@@ -1,5 +1,11 @@
 import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 
@@ -45,7 +51,12 @@ export function NodeColumnSelector({
 }: NodeColumnSelectorProps) {
   if (!columns.length) {
     return (
-      <div className={cn('rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive', className)}>
+      <div
+        className={cn(
+          'rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive',
+          className,
+        )}
+      >
         {noColumnsMessage}
       </div>
     );
@@ -59,7 +70,9 @@ export function NodeColumnSelector({
   return (
     <div className={cn('space-y-1', className)}>
       {label && (
-        <span className={cn('block text-xs font-medium text-muted-foreground', labelClassName)}>{label}</span>
+        <span className={cn('block text-xs font-medium text-muted-foreground', labelClassName)}>
+          {label}
+        </span>
       )}
       <DisabledReasonTooltip reason={disabled ? disabledReason : undefined} className="w-full">
         <Select value={value} onValueChange={onChange} disabled={disabled}>
@@ -67,7 +80,9 @@ export function NodeColumnSelector({
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
-            {clearOptionValue && <SelectItem value={clearOptionValue}>{clearOptionLabel}</SelectItem>}
+            {clearOptionValue && (
+              <SelectItem value={clearOptionValue}>{clearOptionLabel}</SelectItem>
+            )}
             {optionValues.map((column) => (
               <SelectItem key={column} value={column}>
                 {column}
@@ -78,6 +93,6 @@ export function NodeColumnSelector({
       </DisabledReasonTooltip>
     </div>
   );
-};
+}
 
 export default NodeColumnSelector;

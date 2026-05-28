@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -51,7 +50,11 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
 describe('WorkspaceControls', () => {
   it('replaces Save with a Delete (n) batch button and disables it below the threshold', () => {
     selectionState.selectedNodeIds = ['a', 'b'];
-    render(<TooltipProvider><WorkspaceControls /></TooltipProvider>);
+    render(
+      <TooltipProvider>
+        <WorkspaceControls />
+      </TooltipProvider>,
+    );
 
     // Save is gone — the batch slot is repurposed for delete.
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
@@ -62,7 +65,11 @@ describe('WorkspaceControls', () => {
 
   it('enables the Delete button once 3+ nodes are selected', () => {
     selectionState.selectedNodeIds = ['a', 'b', 'c'];
-    render(<TooltipProvider><WorkspaceControls /></TooltipProvider>);
+    render(
+      <TooltipProvider>
+        <WorkspaceControls />
+      </TooltipProvider>,
+    );
 
     const deleteButton = screen.getByRole('button', { name: /delete \(3\)/i });
     expect(deleteButton).toBeEnabled();

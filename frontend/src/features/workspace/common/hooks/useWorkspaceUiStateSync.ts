@@ -75,10 +75,7 @@ export function useWorkspaceUiStateSync(
         // leave the store empty and let the user re-roll colours
         // session-locally. The next successful PUT will populate the
         // file for next time.
-        console.warn(
-          `Failed to hydrate workspace ui_state for ${currentWorkspaceId}:`,
-          err,
-        );
+        console.warn(`Failed to hydrate workspace ui_state for ${currentWorkspaceId}:`, err);
         hydrateColors({});
         hydratedWorkspaceIdRef.current = currentWorkspaceId;
       })
@@ -120,13 +117,9 @@ export function useWorkspaceUiStateSync(
           headers: getAuthHeaders(),
           path: { workspace_id: currentWorkspaceId },
           throwOnError: true,
-        })
-          .catch((err) => {
-            console.warn(
-              `Failed to persist workspace ui_state for ${currentWorkspaceId}:`,
-              err,
-            );
-          });
+        }).catch((err) => {
+          console.warn(`Failed to persist workspace ui_state for ${currentWorkspaceId}:`, err);
+        });
       }, DEBOUNCE_MS);
     });
     return () => {

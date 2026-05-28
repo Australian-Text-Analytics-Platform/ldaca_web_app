@@ -18,9 +18,7 @@ export function TokenFrequencySnapshotBanner() {
   const capturedAt = (() => {
     try {
       const d = new Date(manifest.captured_at);
-      return Number.isNaN(d.getTime())
-        ? manifest.captured_at
-        : d.toLocaleString();
+      return Number.isNaN(d.getTime()) ? manifest.captured_at : d.toLocaleString();
     } catch {
       return manifest.captured_at;
     }
@@ -31,9 +29,7 @@ export function TokenFrequencySnapshotBanner() {
       <CardContent className="flex items-center gap-3 py-3">
         <Camera className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">
-            Viewing snapshot: {manifest.title}
-          </div>
+          <div className="text-sm font-medium truncate">Viewing snapshot: {manifest.title}</div>
           <div className="text-xs text-muted-foreground truncate">
             Captured {capturedAt} · {manifest.tool_version}
             {manifest.source.workspace_name && ` · workspace ${manifest.source.workspace_name}`}

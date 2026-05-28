@@ -28,10 +28,11 @@ const buildAuthInfo = (overrides: Partial<AuthInfoResponse> = {}): AuthInfoRespo
 
 /** Builds config fixtures for auth-mode tests without repeating generated response fields. */
 /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-const buildConfig = (overrides: Partial<ConfigResponse> = {}): ConfigResponse => ({
-  multi_user_mode: true,
-  ...overrides,
-} as ConfigResponse);
+const buildConfig = (overrides: Partial<ConfigResponse> = {}): ConfigResponse =>
+  ({
+    multi_user_mode: true,
+    ...overrides,
+  }) as ConfigResponse;
 
 // Each test wants a clean module instance: the Zustand auth store is created
 // at module load, plus a few imperative module-locals (`bootstrapAttempts`,
@@ -123,7 +124,9 @@ describe('useAuth', () => {
   describe('getAuthHeaders', () => {
     it('returns Authorization Bearer when a token is in localStorage and auth is required', async () => {
       window.localStorage.setItem('auth_token', 'tok-123');
-      generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo({ requires_authentication: true }) });
+      generatedApiMock.getAuthInfo.mockResolvedValue({
+        data: buildAuthInfo({ requires_authentication: true }),
+      });
       generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig() });
 
       const { useAuth } = await importUseAuth();
@@ -135,7 +138,9 @@ describe('useAuth', () => {
     });
 
     it('returns {} when no token is stored', async () => {
-      generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo({ requires_authentication: true }) });
+      generatedApiMock.getAuthInfo.mockResolvedValue({
+        data: buildAuthInfo({ requires_authentication: true }),
+      });
       generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig() });
 
       const { useAuth } = await importUseAuth();
@@ -147,7 +152,9 @@ describe('useAuth', () => {
 
     it('returns {} when auth is not required even if a token is stored', async () => {
       window.localStorage.setItem('auth_token', 'tok-X');
-      generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo({ requires_authentication: false }) });
+      generatedApiMock.getAuthInfo.mockResolvedValue({
+        data: buildAuthInfo({ requires_authentication: false }),
+      });
       generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig() });
 
       const { useAuth } = await importUseAuth();
@@ -162,7 +169,9 @@ describe('useAuth', () => {
     it('calls generated logout with the current bearer headers, clears the token, and refetches', async () => {
       window.localStorage.setItem('auth_token', 'tok-9');
       generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo() });
-      generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig({ multi_user_mode: true }) });
+      generatedApiMock.getConfig.mockResolvedValue({
+        data: buildConfig({ multi_user_mode: true }),
+      });
       (generatedApiMock.logout as Mock).mockResolvedValue({ data: undefined });
 
       const { useAuth } = await importUseAuth();
@@ -170,7 +179,9 @@ describe('useAuth', () => {
       await waitFor(() => expect(result.current.phase.status).toBe('ready'));
 
       // The getAuthInfo call after logout returns an unauthenticated payload.
-      generatedApiMock.getAuthInfo.mockResolvedValueOnce({ data: buildAuthInfo({ authenticated: false, user: null }) });
+      generatedApiMock.getAuthInfo.mockResolvedValueOnce({
+        data: buildAuthInfo({ authenticated: false, user: null }),
+      });
 
       await act(async () => {
         await result.current.logout();
@@ -185,8 +196,12 @@ describe('useAuth', () => {
     });
 
     it('is a no-op in single-user mode', async () => {
-      generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo({ requires_authentication: false }) });
-      generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig({ multi_user_mode: false }) });
+      generatedApiMock.getAuthInfo.mockResolvedValue({
+        data: buildAuthInfo({ requires_authentication: false }),
+      });
+      generatedApiMock.getConfig.mockResolvedValue({
+        data: buildConfig({ multi_user_mode: false }),
+      });
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
@@ -202,8 +217,12 @@ describe('useAuth', () => {
 
   describe('loginWithGoogle', () => {
     it('rejects in single-user mode', async () => {
-      generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo({ requires_authentication: false }) });
-      generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig({ multi_user_mode: false }) });
+      generatedApiMock.getAuthInfo.mockResolvedValue({
+        data: buildAuthInfo({ requires_authentication: false }),
+      });
+      generatedApiMock.getConfig.mockResolvedValue({
+        data: buildConfig({ multi_user_mode: false }),
+      });
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
@@ -216,16 +235,24 @@ describe('useAuth', () => {
     });
 
     it('persists the access_token and triggers a re-bootstrap on success', async () => {
-      generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo({ authenticated: false, user: null }) });
-      generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig({ multi_user_mode: true }) });
-      (generatedApiMock.googleAuth as Mock).mockResolvedValue({ data: { access_token: 'gtok-abc' } });
+      generatedApiMock.getAuthInfo.mockResolvedValue({
+        data: buildAuthInfo({ authenticated: false, user: null }),
+      });
+      generatedApiMock.getConfig.mockResolvedValue({
+        data: buildConfig({ multi_user_mode: true }),
+      });
+      (generatedApiMock.googleAuth as Mock).mockResolvedValue({
+        data: { access_token: 'gtok-abc' },
+      });
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
       await waitFor(() => expect(generatedApiMock.getAuthInfo).toHaveBeenCalledTimes(1));
 
       // Post-login the second info call returns an authenticated payload.
-      generatedApiMock.getAuthInfo.mockResolvedValueOnce({ data: buildAuthInfo({ authenticated: true }) });
+      generatedApiMock.getAuthInfo.mockResolvedValueOnce({
+        data: buildAuthInfo({ authenticated: true }),
+      });
 
       await act(async () => {
         await result.current.loginWithGoogle('google-id-token');

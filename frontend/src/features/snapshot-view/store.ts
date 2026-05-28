@@ -79,7 +79,7 @@ export const useSnapshotViewStore = create<SnapshotViewState>((set, get) => ({
   /**
    * Hydrates a tool snapshot and enters its read-only snapshot mode together.
    * Called by: store object consumers because loaders need one atomic transition into snapshot-backed state.
-  * Flow: copy existing mode and snapshot maps, store the loaded payload for one tool, then set its demo/share mode in the same Zustand update.
+   * Flow: copy existing mode and snapshot maps, store the loaded payload for one tool, then set its demo/share mode in the same Zustand update.
    */
   loadSnapshot: (tool, snapshot, mode) => {
     set((state) => ({
@@ -91,7 +91,7 @@ export const useSnapshotViewStore = create<SnapshotViewState>((set, get) => ({
   /**
    * Returns one tool to live mode and clears its frozen snapshot payload.
    * Called by: store object consumers because exit controls need to clear mode and payload together.
-  * Flow: keep other tools untouched, replace the selected tool mode with live, and null out its snapshot slice.
+   * Flow: keep other tools untouched, replace the selected tool mode with live, and null out its snapshot slice.
    */
   exitSnapshot: (tool) => {
     set((state) => ({
@@ -103,14 +103,14 @@ export const useSnapshotViewStore = create<SnapshotViewState>((set, get) => ({
   /**
    * Lets loaders and analysis hooks read the frozen payload for a tool.
    * Called by: store object consumers because snapshot-backed analysis hooks need the payload paired with the active tool.
-  * Flow: read the sparse snapshot map, normalize an absent entry to null, and give callers a concrete loaded-or-empty value.
+   * Flow: read the sparse snapshot map, normalize an absent entry to null, and give callers a concrete loaded-or-empty value.
    */
   getSnapshot: (tool) => get().snapshots[tool] ?? null,
 
   /**
    * Clears all tool slices for tests and global cleanup flows.
    * Called by: store object consumers because tests and cleanup paths need a single reset boundary.
-  * Flow: replace both sparse maps with empty objects so every tool returns to live defaults on the next selector read.
+   * Flow: replace both sparse maps with empty objects so every tool returns to live defaults on the next selector read.
    */
   reset: () => set({ mode: {}, snapshots: {} }),
 }));

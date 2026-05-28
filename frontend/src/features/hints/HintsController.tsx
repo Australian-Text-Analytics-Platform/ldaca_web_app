@@ -15,8 +15,7 @@ const orderedHintRegistry = [...hintRegistry]
   .map((hint, index) => ({ hint, index }))
   .sort(
     (left, right) =>
-      (left.hint.priority ?? 100) - (right.hint.priority ?? 100) ||
-      left.index - right.index,
+      (left.hint.priority ?? 100) - (right.hint.priority ?? 100) || left.index - right.index,
   )
   .map(({ hint }) => hint);
 
@@ -26,15 +25,10 @@ const orderedHintRegistry = [...hintRegistry]
  * `data-hint-id` convention consumed by `pickActiveHint`.
  * Used by: local callers in hints/HintsController module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
-function resolveAnchor(
-  hint: HintDefinition,
-  ctx: HintResolverContext,
-): Element | null {
+function resolveAnchor(hint: HintDefinition, ctx: HintResolverContext): Element | null {
   if (hint.resolveAnchor) return hint.resolveAnchor(ctx);
   if (!hint.anchorHintId) return null;
-  return document.querySelector(
-    `[data-hint-id="${CSS.escape(hint.anchorHintId)}"]`,
-  );
+  return document.querySelector(`[data-hint-id="${CSS.escape(hint.anchorHintId)}"]`);
 }
 
 /**
@@ -130,10 +124,10 @@ export function HintsController() {
   useEffect(() => {
     if (!hintsEnabled) return;
 
-        /**
-         * Picks the currently eligible hint and nudges overlays to remeasure.
-         * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-         */
+    /**
+     * Picks the currently eligible hint and nudges overlays to remeasure.
+     * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
     const syncActiveHint = () => {
       const persistent = new Set(dismissedHints);
       const next = pickActiveHint(conditions, context, persistent, sessionDismissedHints);
@@ -144,23 +138,17 @@ export function HintsController() {
     syncActiveHint();
     const id = window.setInterval(syncActiveHint, POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [
-    hintsEnabled,
-    dismissedHints,
-    sessionDismissedHints,
-    conditions,
-    context,
-  ]);
+  }, [hintsEnabled, dismissedHints, sessionDismissedHints, conditions, context]);
 
   if (!hintsEnabled) return null;
   if (!active) return null;
 
   const { hint, target } = active;
 
-    /**
-     * Permanently dismisses a hint and clears upload state for upload-driven hints.
-     * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Permanently dismisses a hint and clears upload state for upload-driven hints.
+   * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleDismissPermanent = () => {
     dismissHint(hint.id);
     if (
@@ -170,10 +158,10 @@ export function HintsController() {
       setLastUploadedFilePath(null);
     }
   };
-    /**
-     * Session-dismisses a hint and clears upload state so it does not reopen.
-     * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Session-dismisses a hint and clears upload state so it does not reopen.
+   * Called by: HintsController internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleDismissSession = () => {
     sessionDismissHint(hint.id);
     if (

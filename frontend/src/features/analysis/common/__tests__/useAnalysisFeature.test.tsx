@@ -11,7 +11,7 @@ const { cancelTaskMock, clearAnalysisMock } = vi.hoisted(() => ({
 vi.mock('@tanstack/react-query', () => ({
   /** Called by: useAnalysisFeature under test when it requests a query client because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useQueryClient: () => ({
-    invalidateQueries: vi.fn(async () => undefined),
+    invalidateQueries: vi.fn(() => undefined),
   }),
 }));
 
@@ -26,7 +26,7 @@ vi.mock('@/api/generated/sdk.gen', () => ({
 vi.mock('../useAnalysisHydration', () => ({
   /** Called by: useAnalysisFeature under test while keeping hydration inert because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useAnalysisHydration: () => ({
-    hydrateFromServer: vi.fn(async () => undefined),
+    hydrateFromServer: vi.fn(() => undefined),
     hydrationState: { status: 'idle' as const },
   }),
 }));
@@ -54,7 +54,7 @@ describe('useAnalysisFeature', () => {
     cancelTaskMock.mockReset();
     cancelTaskMock.mockResolvedValue({ data: { state: 'successful' }, error: undefined });
     clearAnalysisMock.mockReset();
-    clearAnalysisMock.mockImplementation(async ({ onCleanup }) => {
+    clearAnalysisMock.mockImplementation(({ onCleanup }) => {
       onCleanup(['task-1']);
     });
   });
@@ -71,10 +71,10 @@ describe('useAnalysisFeature', () => {
         getAuthHeaders: () => ({}),
         isTabActive: true,
         resultRef: { current: null },
-        fetchResult: vi.fn(async () => null),
+        fetchResult: vi.fn(() => Promise.resolve(null)),
         onResultFetched: vi.fn(),
         onCleared,
-      })
+      }),
     );
 
     await act(async () => {
@@ -99,10 +99,10 @@ describe('useAnalysisFeature', () => {
         getAuthHeaders: () => headers,
         isTabActive: true,
         resultRef: { current: { metadata: { task_id: 'task-1' } } },
-        fetchResult: vi.fn(async () => null),
+        fetchResult: vi.fn(() => Promise.resolve(null)),
         onResultFetched: vi.fn(),
         onCleared: vi.fn(),
-      })
+      }),
     );
 
     await act(async () => {

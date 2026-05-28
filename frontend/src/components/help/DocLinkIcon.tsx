@@ -80,13 +80,7 @@ export interface DocLinkIconProps {
  * Why: help, info, warning, and reference affordances share registry lookup, missing-target feedback, and modal dispatch.
  * Flow: choose the icon config, resolve label and tooltip text, open the registry target or toast when missing, then render the icon button.
  */
-export function DocLinkIcon({
-  kind,
-  targetKey,
-  label,
-  tooltip,
-  className,
-}: DocLinkIconProps) {
+export function DocLinkIcon({ kind, targetKey, label, tooltip, className }: DocLinkIconProps) {
   const config = CONFIG[kind];
   const resolvedLabel = label ?? config.defaultLabel;
   const tooltipText = tooltip ?? resolvedLabel;

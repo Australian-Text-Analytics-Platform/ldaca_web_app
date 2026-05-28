@@ -15,7 +15,7 @@ export type { ServerLockAnalysisType };
  */
 export const analysisServerRequestLockQueryKey = (
   analysisType: ServerLockAnalysisType,
-  workspaceId: string | null
+  workspaceId: string | null,
 ) => queryKeys.analysisServerRequestLock(analysisType, workspaceId);
 
 type Args = {
@@ -34,7 +34,7 @@ export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAut
   const query = useQuery({
     queryKey: analysisServerRequestLockQueryKey(analysisType, workspaceId),
     enabled: Boolean(workspaceId),
-        /**
+    /**
      * Called by: TanStack Query when refreshing the analysis server-request lock because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
      * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
      */
@@ -50,7 +50,7 @@ export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAut
       const current = await getCurrentAnalysisTask(analysisType, getAuthHeaders());
       const taskIds = (current as Record<string, unknown>)?.task_ids;
       const currentTaskId = Array.isArray(taskIds)
-        ? taskIds.find((id) => typeof id === 'string' && id.length > 0) ?? null
+        ? (taskIds.find((id) => typeof id === 'string' && id.length > 0) ?? null)
         : null;
 
       const hasServerRequest = Boolean(currentTaskId);
@@ -58,7 +58,8 @@ export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAut
 
       if (currentTaskId) {
         const request = await getAnalysisTaskRequest(analysisType, currentTaskId, getAuthHeaders());
-        serverRequest = request && typeof request === 'object' ? (request as Record<string, unknown>) : null;
+        serverRequest =
+          request && typeof request === 'object' ? (request as Record<string, unknown>) : null;
       }
 
       return { hasServerRequest, currentTaskId, serverRequest };

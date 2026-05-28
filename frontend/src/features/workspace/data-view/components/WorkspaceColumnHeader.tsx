@@ -144,7 +144,9 @@ export function WorkspaceColumnHeader({
         <RenameInput
           column={column}
           disabled={isColumnBusy}
-          onSubmit={onSubmitRename}
+          onSubmit={(col, val) => {
+            void onSubmitRename(col, val);
+          }}
           onCancel={onCancelRename}
         />
       ) : (
@@ -153,14 +155,19 @@ export function WorkspaceColumnHeader({
             <button
               type="button"
               className="block max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-              onClick={() => { if (!isColumnBusy) onStartRename(); }}
+              onClick={() => {
+                if (!isColumnBusy) onStartRename();
+              }}
               disabled={isColumnBusy}
               title={column}
             >
               {column}
             </button>
           ) : (
-            <span className="block max-w-[160px] truncate text-xs font-medium text-foreground" title={column}>
+            <span
+              className="block max-w-[160px] truncate text-xs font-medium text-foreground"
+              title={column}
+            >
               {column}
             </span>
           )}
@@ -175,9 +182,11 @@ export function WorkspaceColumnHeader({
         aria-label={`Sort by ${column}`}
       >
         {sortState ? (
-          sortState.desc
-            ? <ArrowDown className="h-3.5 w-3.5 text-primary" />
-            : <ArrowUp className="h-3.5 w-3.5 text-primary" />
+          sortState.desc ? (
+            <ArrowDown className="h-3.5 w-3.5 text-primary" />
+          ) : (
+            <ArrowUp className="h-3.5 w-3.5 text-primary" />
+          )
         ) : (
           <ArrowUpDown className="h-3.5 w-3.5" />
         )}
@@ -198,15 +207,19 @@ export function WorkspaceColumnHeader({
             aria-label={`Change data type for column ${column}`}
           >
             <span className="truncate">{displayLabel}</span>
-            {isColumnBusy
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-              : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+            {isColumnBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-40 p-1">
           <DropdownMenuRadioGroup
             value={currentType}
-            onValueChange={(v) => { if (!isColumnBusy) onTypeChange(v); }}
+            onValueChange={(v) => {
+              if (!isColumnBusy) onTypeChange(v);
+            }}
           >
             {availableTypes.map((t) => (
               <DropdownMenuRadioItem key={t.value} value={t.value} className="text-xs">
@@ -227,9 +240,11 @@ export function WorkspaceColumnHeader({
           className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
           aria-label={isCollapsedColumn ? `Expand column ${column}` : `Collapse column ${column}`}
         >
-          {isCollapsedColumn
-            ? <Expand className="h-3.5 w-3.5" />
-            : <Minimize className="h-3.5 w-3.5" />}
+          {isCollapsedColumn ? (
+            <Expand className="h-3.5 w-3.5" />
+          ) : (
+            <Minimize className="h-3.5 w-3.5" />
+          )}
         </Button>
       )}
 
@@ -248,16 +263,20 @@ export function WorkspaceColumnHeader({
               )}
               aria-label={`Column settings for ${column}`}
             >
-              {isColumnBusy
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <Settings2 className="h-3.5 w-3.5" />}
+              {isColumnBusy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Settings2 className="h-3.5 w-3.5" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52 p-1">
             {canRename && (
               <DropdownMenuItem
                 disabled={isColumnBusy}
-                onSelect={() => { if (!isColumnBusy) onStartRename(); }}
+                onSelect={() => {
+                  if (!isColumnBusy) onStartRename();
+                }}
                 className="text-xs"
               >
                 Rename
@@ -266,7 +285,9 @@ export function WorkspaceColumnHeader({
             {canDelete && (
               <DropdownMenuItem
                 disabled={isColumnBusy}
-                onSelect={() => { if (!isColumnBusy) onRequestDelete(); }}
+                onSelect={() => {
+                  if (!isColumnBusy) onRequestDelete();
+                }}
                 className="text-xs text-destructive focus:text-destructive"
               >
                 Delete

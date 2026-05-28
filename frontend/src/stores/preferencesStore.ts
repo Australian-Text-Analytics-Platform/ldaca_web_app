@@ -41,8 +41,8 @@ interface PreferencesState {
   ldacaOniApiToken: string | null;
   /** Master switch for the demo-snapshot feature. When false, every
    * tool's Save/Load button is unmounted via the shared
-  * ``<AnalysisFeatureHeader>``. Default false; persisted to backend
-  * preferences. */
+   * ``<AnalysisFeatureHeader>``. Default false; persisted to backend
+   * preferences. */
   demoSnapshotsEnabled: boolean;
   /** True once the first backend fetch completes */
   hydrated: boolean;
@@ -76,7 +76,10 @@ interface PreferencesActions {
 
 type PreferencesStore = PreferencesState & PreferencesActions;
 
-type ResolvedQuotationPreferences = Omit<QuotationPreferencesOutput, 'engine' | 'last_remote_url'> & {
+type ResolvedQuotationPreferences = Omit<
+  QuotationPreferencesOutput,
+  'engine' | 'last_remote_url'
+> & {
   engine: QuotationEngineConfig;
   last_remote_url: string;
 };
@@ -102,7 +105,9 @@ type ResolvedUserPreferences = Omit<
 
 /** Converts frontend auth header casing to the generated preferences client contract. */
 /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-const getAuthorizationHeaders = (headers?: Record<string, string>): { authorization?: string } | undefined => {
+const getAuthorizationHeaders = (
+  headers?: Record<string, string>,
+): { authorization?: string } | undefined => {
   const authorization = headers?.Authorization ?? headers?.authorization;
   return authorization ? { authorization } : undefined;
 };

@@ -4,9 +4,7 @@ import { getNodeDocumentColumn } from '../documentColumn';
 
 describe('getNodeDocumentColumn', () => {
   it('returns a top-level document column when present', () => {
-    expect(
-      getNodeDocumentColumn({ document_column: 'body_text' }),
-    ).toBe('body_text');
+    expect(getNodeDocumentColumn({ document_column: 'body_text' })).toBe('body_text');
   });
 
   it('returns a nested graph-node document column when present', () => {

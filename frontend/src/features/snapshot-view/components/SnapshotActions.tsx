@@ -15,8 +15,8 @@ export interface SnapshotActionsProps {
   /** Called when the user clicks Save in the dialog with a validated
    * filename and the description text. The host feature (e.g.
    * ConcordanceFeature) implements this — it knows how to assemble
-  * the bundle from its in-memory state. If absent, the Save button
-  * doesn't render. */
+   * the bundle from its in-memory state. If absent, the Save button
+   * doesn't render. */
   onSave?: (filename: string, description: string) => Promise<void>;
   /** When set, the Save button is rendered disabled with this string
    * as a hover tooltip. Mirrors the ``runDisabledReason`` pattern
@@ -25,8 +25,8 @@ export interface SnapshotActionsProps {
    * rows; demo cap is 2 000.") and pass it in. */
   disabledReason?: string | null;
   /** Called when the user clicks Open on a snapshot row. The host
-    * decodes the bundle and engages snapshot view. If absent, the
-    * Open buttons in the load dialog show "view coming soon". */
+   * decodes the bundle and engages snapshot view. If absent, the
+   * Open buttons in the load dialog show "view coming soon". */
   onOpenSnapshot?: (filename: string) => Promise<void>;
   /** Display labels of the currently-selected data blocks. Used to
    * pre-populate the Save dialog's filename input with something
@@ -61,9 +61,9 @@ export interface SnapshotActionsProps {
  * filename: trim, drop filename-invalid characters, collapse
  * whitespace runs to hyphens. The Save dialog re-runs its own
  * sanitisation when it computes the on-disk filename, so this is
-   * just for the readable pre-populated string.  * Used by: local callers in snapshot-view/SnapshotActions module.
-   * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
-   */
+ * just for the readable pre-populated string.  * Used by: local callers in snapshot-view/SnapshotActions module.
+ * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
+ */
 function slugifyLabel(label: string): string {
   return label
     .trim()
@@ -71,16 +71,14 @@ function slugifyLabel(label: string): string {
     .replace(/\s+/g, '-');
 }
 
-  /**
+/**
  * Builds the initial save-dialog name from selected node labels and date.
-   * Used by: local callers in snapshot-view/SnapshotActions module.
-   * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
-   */
+ * Used by: local callers in snapshot-view/SnapshotActions module.
+ * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
+ */
 function buildDefaultName(nodeLabels: string[] | undefined): string {
   const date = new Date().toISOString().slice(0, 10);
-  const cleaned = (nodeLabels ?? [])
-    .map(slugifyLabel)
-    .filter((s) => s.length > 0);
+  const cleaned = (nodeLabels ?? []).map(slugifyLabel).filter((s) => s.length > 0);
   if (cleaned.length === 0) return `demo-${date}`;
   return `${cleaned.join('_')}-${date}`;
 }
@@ -116,11 +114,11 @@ export function SnapshotActions({
   //   - the Load button mounts only when ≥1 snapshot exists
   const { data: listData } = useQuery({
     queryKey: ['snapshots-list', tool],
-        /**
+    /**
      * Loads saved snapshots so Save can detect collisions and Load can mount.
-         * Called by: useQuery option object inside SnapshotActions.
-         * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
-         */
+     * Called by: useQuery option object inside SnapshotActions.
+     * Why: because snapshot action helpers need to keep labels, generated descriptions, and dialog transitions consistent across tools.
+     */
     queryFn: async () => {
       const { data } = await listSnapshots({
         headers: getAuthHeaders(),
@@ -183,27 +181,26 @@ export function SnapshotActions({
         </DisabledReasonTooltip>
       )}
 
-      {onSave && (
-        saveDialog
-          ? saveDialog({
-              open: saveOpen,
-              onOpenChange: setSaveOpen,
-              tool,
-              existingFilenames,
-              defaultName,
-              onSave: handleSave,
-            })
-          : (
-            <SaveSnapshotDialog
-              open={saveOpen}
-              onOpenChange={setSaveOpen}
-              tool={tool}
-              existingFilenames={existingFilenames}
-              defaultName={defaultName}
-              onSave={handleSave}
-            />
-          )
-      )}
+      {onSave &&
+        (saveDialog ? (
+          saveDialog({
+            open: saveOpen,
+            onOpenChange: setSaveOpen,
+            tool,
+            existingFilenames,
+            defaultName,
+            onSave: handleSave,
+          })
+        ) : (
+          <SaveSnapshotDialog
+            open={saveOpen}
+            onOpenChange={setSaveOpen}
+            tool={tool}
+            existingFilenames={existingFilenames}
+            defaultName={defaultName}
+            onSave={handleSave}
+          />
+        ))}
 
       <LoadSnapshotDialog
         open={loadOpen}
@@ -213,4 +210,4 @@ export function SnapshotActions({
       />
     </>
   );
-};
+}

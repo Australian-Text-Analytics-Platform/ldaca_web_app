@@ -15,9 +15,7 @@ import { useEffect, useState } from 'react';
  * Used by: src/features/analysis/token-frequency/components/results/TokenFrequencySingleTokenSection.tsx, src/features/analysis/token-frequency/components/results/TokenFrequencyUnifiedTokenSection.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
-export function useElementWidth(
-  ref: React.RefObject<HTMLElement | null>,
-): number {
+export function useElementWidth(ref: React.RefObject<HTMLElement | null>): number {
   const [width, setWidth] = useState(0);
 
   useEffect(() => {

@@ -76,7 +76,7 @@ function escapeRegExp(value: string) {
  * callback or selection state relevant to its regression.
  * Used by: detach dialog variant tests because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
  * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
-   * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
+ * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
  */
 function renderDialog(testCase: DetachDialogCase, overrides: Partial<DetachDialogProps> = {}) {
   const Dialog = testCase.Dialog;

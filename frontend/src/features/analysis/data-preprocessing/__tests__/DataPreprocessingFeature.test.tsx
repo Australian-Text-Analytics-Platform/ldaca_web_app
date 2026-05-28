@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -256,7 +255,10 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     await user.click(within(samplePanel).getByRole('tab', { name: 'Random Sample' }));
 
-    fireEvent.change(within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'), { target: { value: '0.4' } });
+    fireEvent.change(
+      within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'),
+      { target: { value: '0.4' } },
+    );
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
 
     await waitFor(() => {
@@ -288,10 +290,15 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     await user.click(within(samplePanel).getByRole('tab', { name: 'Random Sample' }));
 
-    fireEvent.change(within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'), { target: { value: '0.4' } });
+    fireEvent.change(
+      within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'),
+      { target: { value: '0.4' } },
+    );
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
 
-    const sampleNameInput = await screen.findByPlaceholderText('Corpus_sampled_fr_0_4_rs_7') as HTMLInputElement;
+    const sampleNameInput = (await screen.findByPlaceholderText(
+      'Corpus_sampled_fr_0_4_rs_7',
+    )) as HTMLInputElement;
     const addButton = within(samplePanel).getByRole('button', { name: 'Add to Workspace' });
 
     sampleNameInput.focus();
@@ -383,8 +390,9 @@ describe('DataPreprocessingFeature replace tab', () => {
      * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
      */
     const getAddButton = () =>
-      within(screen.getByRole('tabpanel', { name: 'Filter' }))
-        .getByRole('button', { name: 'Add to Workspace' });
+      within(screen.getByRole('tabpanel', { name: 'Filter' })).getByRole('button', {
+        name: 'Add to Workspace',
+      });
 
     const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
     expect(getAddButton()).toBeDisabled();

@@ -152,9 +152,9 @@ export const useStackedSplits = <KeyT extends string>(
       const rawMinRatio = minSectionPx / height;
       const safeMinCandidate = Math.min(Math.max(rawMinRatio, 0.02), pairTotal / 2 - 0.01);
       if (
-        !Number.isFinite(safeMinCandidate)
-        || safeMinCandidate <= 0
-        || pairTotal - safeMinCandidate <= safeMinCandidate
+        !Number.isFinite(safeMinCandidate) ||
+        safeMinCandidate <= 0 ||
+        pairTotal - safeMinCandidate <= safeMinCandidate
       ) {
         return;
       }
@@ -164,7 +164,7 @@ export const useStackedSplits = <KeyT extends string>(
 
       /**
        * Called by: the window mousemove listener installed by handleResizeStart because the interaction needs a single handler that validates state, runs the action, and updates feedback.
-        * Flow: convert mouse delta to section ratios, clamp the upper/lower pair, update heights, then scroll overflow when the drag hits a minimum bound.
+       * Flow: convert mouse delta to section ratios, clamp the upper/lower pair, update heights, then scroll overflow when the drag hits a minimum bound.
        */
       const onMove = (moveEvent: MouseEvent) => {
         const deltaY = moveEvent.clientY - startY;

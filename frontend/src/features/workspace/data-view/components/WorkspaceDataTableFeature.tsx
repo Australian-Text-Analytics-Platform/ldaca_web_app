@@ -61,7 +61,9 @@ const EmptyState = () => (
         />
       </svg>
       <h3 className="mt-3 text-sm font-semibold text-foreground">No Data Block Selected</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Select a data block from the graph to view its data.</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Select a data block from the graph to view its data.
+      </p>
     </div>
   </div>
 );

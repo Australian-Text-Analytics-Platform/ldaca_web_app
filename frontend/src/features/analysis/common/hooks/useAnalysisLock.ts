@@ -3,10 +3,7 @@ import {
   useAnalysisServerRequestLock,
   type ServerLockAnalysisType,
 } from './useAnalysisServerRequestLock';
-import {
-  useAnalysisLockMachine,
-  type AnalysisLockConfig,
-} from '../useAnalysisLockMachine';
+import { useAnalysisLockMachine, type AnalysisLockConfig } from '../useAnalysisLockMachine';
 
 export interface UseAnalysisLockConfig extends AnalysisLockConfig {
   analysisType: ServerLockAnalysisType;

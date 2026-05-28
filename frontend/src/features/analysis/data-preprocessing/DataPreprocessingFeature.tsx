@@ -4,7 +4,15 @@ import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWork
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FilterSubTab } from '../../preprocessing/filter/FilterSubTab';
 import { JoinSubTab } from '../../preprocessing/join/JoinSubTab';
@@ -59,7 +67,9 @@ function DataPreprocessingFeature() {
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-semibold leading-none tracking-tight text-foreground">Data Preprocessing</h1>
+            <h1 className="font-semibold leading-none tracking-tight text-foreground">
+              Data Preprocessing
+            </h1>
             <InfoIcon
               targetKey="preprocessing.overview"
               label="About Data Preprocessing"
@@ -71,20 +81,41 @@ function DataPreprocessingFeature() {
           </p>
         </div>
       </div>
-      
+
       <Tabs
         value={activeSubtab}
         onValueChange={(value) => setActiveSubtab(value as DataPrepSubtab)}
         className="space-y-4"
       >
         <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
-          <TabsTrigger value="filter"><Filter className="mr-1.5 h-4 w-4" />Filter</TabsTrigger>
-          <TabsTrigger value="slice"><Shuffle className="mr-1.5 h-4 w-4" />Sample</TabsTrigger>
-          <TabsTrigger value="join"><Merge className="mr-1.5 h-4 w-4" />Join</TabsTrigger>
-          <TabsTrigger value="concat"><Layers className="mr-1.5 h-4 w-4" />Stack</TabsTrigger>
-          <TabsTrigger value="find"><Search className="mr-1.5 h-4 w-4" />Find</TabsTrigger>
-          <TabsTrigger value="aggregate"><Calculator className="mr-1.5 h-4 w-4" />Create</TabsTrigger>
-          <TabsTrigger value="expression"><Code2 className="mr-1.5 h-4 w-4" />Polars Expression</TabsTrigger>
+          <TabsTrigger value="filter">
+            <Filter className="mr-1.5 h-4 w-4" />
+            Filter
+          </TabsTrigger>
+          <TabsTrigger value="slice">
+            <Shuffle className="mr-1.5 h-4 w-4" />
+            Sample
+          </TabsTrigger>
+          <TabsTrigger value="join">
+            <Merge className="mr-1.5 h-4 w-4" />
+            Join
+          </TabsTrigger>
+          <TabsTrigger value="concat">
+            <Layers className="mr-1.5 h-4 w-4" />
+            Stack
+          </TabsTrigger>
+          <TabsTrigger value="find">
+            <Search className="mr-1.5 h-4 w-4" />
+            Find
+          </TabsTrigger>
+          <TabsTrigger value="aggregate">
+            <Calculator className="mr-1.5 h-4 w-4" />
+            Create
+          </TabsTrigger>
+          <TabsTrigger value="expression">
+            <Code2 className="mr-1.5 h-4 w-4" />
+            Polars Expression
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="filter" className="space-y-4">
@@ -183,9 +214,7 @@ function DataPreprocessingFeature() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Alert</AlertDialogTitle>
-            <AlertDialogDescription>
-              {alertMessage}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{alertMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setAlertOpen(false)}>OK</AlertDialogAction>

@@ -23,13 +23,15 @@ vi.mock('../usePreprocessingPreview', () => ({
   usePreprocessingPreview: usePreprocessingPreviewMock,
 }));
 
-const useAuthMock = vi.hoisted(() => vi.fn(() => ({
+const useAuthMock = vi.hoisted(() =>
+  vi.fn(() => ({
     /**
      * Supplies stable headers for preview fallback SDK calls under test.
      * Used by: test mock object in preprocessing/useNodePreviewWithRawFallback because the test needs a stable fixture or assertion helper for this scenario.
      */
-  getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
-})));
+    getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
+  })),
+);
 vi.mock('@/hooks/useAuth', () => ({ useAuth: useAuthMock }));
 
 const getNodeDataMock = vi.hoisted(() => vi.fn());

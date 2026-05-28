@@ -4,6 +4,9 @@ import './index.css';
 import { RouterProvider } from '@tanstack/react-router';
 import { router } from './router';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { initSentry } from './lib/sentry';
+
+initSentry();
 
 // Silence the harmless "ResizeObserver loop completed with undelivered
 // notifications" message before any module-level code (and Vite's HMR
@@ -16,8 +19,7 @@ if (typeof window !== 'undefined') {
   /** Filters only the ResizeObserver loop warning that Vite should ignore. */
   /** Called by: the global error listener before React renders the router because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const isResizeObserverLoopMessage = (msg: unknown): boolean =>
-    typeof msg === 'string' &&
-    msg.includes('ResizeObserver loop');
+    typeof msg === 'string' && msg.includes('ResizeObserver loop');
   window.addEventListener('error', (event) => {
     if (isResizeObserverLoopMessage(event.message)) {
       event.stopImmediatePropagation();
@@ -37,11 +39,6 @@ const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   '460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com';
 
-// CILogon uses server-side OIDC; __CILOGON_CLIENT_ID__ is injected for
-// informational use only — the actual auth flow starts at /api/auth/cilogon/login.
-const _CILOGON_CLIENT_ID =
-  typeof window !== 'undefined' ? window.__CILOGON_CLIENT_ID__ : undefined;
-
 const container = document.getElementById('root');
 if (!container) {
   throw new Error('Root container #root not found');
@@ -52,5 +49,5 @@ root.render(
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <RouterProvider router={router} />
     </GoogleOAuthProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

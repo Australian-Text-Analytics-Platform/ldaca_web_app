@@ -84,19 +84,14 @@ export type SnapshotIneligibilityReason =
  * Why: because snapshot actions need capability checks before offering capture or load paths the current mode cannot support.
  * Flow: row counts are compared to hard caps first, then soft warnings are accumulated for confirmable captures.
  */
-export function checkSnapshotEligibility(
-  input: EligibilityInput,
-): EligibilityResult {
+export function checkSnapshotEligibility(input: EligibilityInput): EligibilityResult {
   const caps = SNAPSHOT_CAPS[input.mode];
   const largestBlock = input.perBlockSourceRows.reduce(
     (max, n) => (Number.isFinite(n) && n > max ? n : max),
     0,
   );
 
-  if (
-    caps.maxSourceRowsPerBlock !== null &&
-    largestBlock > caps.maxSourceRowsPerBlock
-  ) {
+  if (caps.maxSourceRowsPerBlock !== null && largestBlock > caps.maxSourceRowsPerBlock) {
     return {
       ok: false,
       reason: {

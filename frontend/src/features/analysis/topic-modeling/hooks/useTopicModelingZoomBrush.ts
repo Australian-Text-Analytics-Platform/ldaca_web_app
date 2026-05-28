@@ -69,8 +69,8 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
   // Animates the chart domain so zoom and reset transitions remain spatially legible.
   /**
    * Called by: useTopicModelingZoomBrush during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
- */
+   * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+   */
   const animateDomainTo = (target: ZoomDomain) => {
     const animationTopics = topics;
     const start = activeDomain ?? target;
@@ -90,7 +90,7 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     // Advances one animation frame of the zoom-domain interpolation.
     /**
      * Called by: animateDomainTo during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-           * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+     * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
      */
     const step = (now: number) => {
       const raw = (now - startAt) / durationMs;
@@ -164,8 +164,8 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
   // Converts the finished brush rectangle back into topic-coordinate zoom bounds.
   /**
    * Called by: useTopicModelingZoomBrush through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
- */
+   * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+   */
   const handleBrushEnd = () => {
     if (!isBrushing || !brushRect || !activeDomain) {
       setIsBrushing(false);
@@ -191,7 +191,8 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     /**
      * Called by: handleBrushEnd as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
      */
-    const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
+    const clamp = (value: number, low: number, high: number) =>
+      Math.min(high, Math.max(low, value));
 
     // Converts an SVG x-coordinate back into topic-domain coordinates.
     /**

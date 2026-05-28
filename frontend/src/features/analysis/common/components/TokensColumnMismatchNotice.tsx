@@ -66,8 +66,11 @@ export function TokensColumnMismatchNotice({
       )}
       role="note"
     >
-      <strong className="font-semibold">No tokenizer model for <code>{mismatch.selectedColumn}</code>.</strong>{' '}
-      Tokenizer models are saved for: {mismatch.tokenizerModelSources.map((src, i) => (
+      <strong className="font-semibold">
+        No tokenizer model for <code>{mismatch.selectedColumn}</code>.
+      </strong>{' '}
+      Tokenizer models are saved for:{' '}
+      {mismatch.tokenizerModelSources.map((src, i) => (
         <React.Fragment key={src}>
           {i > 0 ? ', ' : ''}
           <code>{src}</code>
@@ -77,6 +80,6 @@ export function TokensColumnMismatchNotice({
       <code>{mismatch.selectedColumn}</code>.
     </div>
   );
-};
+}
 
 export default TokensColumnMismatchNotice;

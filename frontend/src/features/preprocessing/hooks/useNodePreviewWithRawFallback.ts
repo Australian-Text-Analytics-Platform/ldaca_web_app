@@ -56,20 +56,27 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
 }
 
 /**
-   * Standardises the "operation preview, with raw-data fallback when the
-   * payload is incomplete" pattern that every preprocessing sub-tab implements.
-   *
-   * Replaces ~5 hand-rolled copies of: request shape with `payload: null`,
-   * a manual signature builder with `disabled`/`::raw`/`::<json>` branches,
-   * and a fetcher that branches on `payload === null` to call `getNodeData`.
-   * Used by: useFilterSubTabSections hook, useAggregateSubTab hook, useSliceSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
-   * Flow: call preprocessing preview first, fall back to raw node preview when no request is
-   * ready, and expose one preview state shape to callers.
-   */
+ * Standardises the "operation preview, with raw-data fallback when the
+ * payload is incomplete" pattern that every preprocessing sub-tab implements.
+ *
+ * Replaces ~5 hand-rolled copies of: request shape with `payload: null`,
+ * a manual signature builder with `disabled`/`::raw`/`::<json>` branches,
+ * and a fetcher that branches on `payload === null` to call `getNodeData`.
+ * Used by: useFilterSubTabSections hook, useAggregateSubTab hook, useSliceSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Flow: call preprocessing preview first, fall back to raw node preview when no request is
+ * ready, and expose one preview state shape to callers.
+ */
 export const useNodePreviewWithRawFallback = <P>(
   opts: UseNodePreviewWithRawFallbackOptions<P>,
 ): UsePreprocessingPreviewResult<PreviewRow> => {
-  const { nodeId, operationPayload, operationFetch, signaturePrefix, enabled = true, debounceMs } = opts;
+  const {
+    nodeId,
+    operationPayload,
+    operationFetch,
+    signaturePrefix,
+    enabled = true,
+    debounceMs,
+  } = opts;
   const { getAuthHeaders } = useAuth();
 
   const request: PreviewRequest<P> | null =
@@ -103,9 +110,7 @@ export const useNodePreviewWithRawFallback = <P>(
         query: { page, page_size: pageSize },
         throwOnError: true,
       });
-      return normaliseResponse(
-        data,
-      );
+      return normaliseResponse(data);
     },
   });
 };

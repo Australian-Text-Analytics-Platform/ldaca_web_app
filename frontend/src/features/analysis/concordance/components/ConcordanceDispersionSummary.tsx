@@ -93,15 +93,12 @@ const X_AXIS_TICKS = [0, 20, 40, 60, 80, 100];
  * (≥ 2 % each, i.e. binCount ≤ 50) we use non-overlapping integer ranges with
  * a +1 increment ("0-5%", "6-10%"). For narrower bins we fall back to
  * one-decimal fractional ranges so the labels stay accurate.
-   * Flow: clamp bin count, derive the bin index and width from the center value, then return integer or one-decimal percentage ranges based on bin width.
+ * Flow: clamp bin count, derive the bin index and width from the center value, then return integer or one-decimal percentage ranges based on bin width.
  */
 const formatBinRange = (binCenter: number, binCount: number): string => {
   const safeBinCount = Math.max(1, Math.floor(binCount));
   const width = 100 / safeBinCount;
-  const idx = Math.min(
-    safeBinCount - 1,
-    Math.max(0, Math.floor((binCenter * safeBinCount) / 100)),
-  );
+  const idx = Math.min(safeBinCount - 1, Math.max(0, Math.floor((binCenter * safeBinCount) / 100)));
   if (width >= 2) {
     const lower = idx === 0 ? 0 : Math.round(idx * width) + 1;
     const upper = Math.round((idx + 1) * width);
@@ -163,7 +160,8 @@ export function ConcordanceDispersionSummary({
   // flip in `materialisedBins` (e.g. workspace navigation) would re-select
   // an option the user had just deselected. React-blessed render-time
   // set-state pattern, gated by a sticky flag.
-  const [hasAutoEnabledShowAll, setHasAutoEnabledShowAll] = useState<boolean>(materialisedBinsReady);
+  const [hasAutoEnabledShowAll, setHasAutoEnabledShowAll] =
+    useState<boolean>(materialisedBinsReady);
   if (materialisedBinsReady && !hasAutoEnabledShowAll) {
     setHasAutoEnabledShowAll(true);
     setShowAllProcessed(true);
@@ -187,7 +185,16 @@ export function ConcordanceDispersionSummary({
       splitBySource,
       aggregateAll,
     });
-  }, [useMaterialised, materialisedBins, rows, textColumn, binCount, lowercaseMatches, splitBySource, aggregateAll]);
+  }, [
+    useMaterialised,
+    materialisedBins,
+    rows,
+    textColumn,
+    binCount,
+    lowercaseMatches,
+    splitBySource,
+    aggregateAll,
+  ]);
 
   /**
    * Per-matched-text totals across every bin in the displayed graph.
@@ -297,7 +304,7 @@ export function ConcordanceDispersionSummary({
     return out;
   }, [aggregateAll, visibleTexts, matchedTextColors, splitBySource, sources]);
 
-    /**
+  /**
    * Called by: ConcordanceDispersionSummary download dialog to export the rendered chart because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: verify the chart SVG exists, assemble export header and legend metadata, then download the dispersion chart or show a toast error.
    */
@@ -352,9 +359,9 @@ export function ConcordanceDispersionSummary({
         header,
         legend,
       });
-      } catch (error) {
-        const description = error instanceof Error ? error.message : String(error);
-        toast.error('Failed to export chart.', { description });
+    } catch (error) {
+      const description = error instanceof Error ? error.message : String(error);
+      toast.error('Failed to export chart.', { description });
     }
   };
 
@@ -362,12 +369,7 @@ export function ConcordanceDispersionSummary({
     <div className="mt-4 space-y-2">
       <div className="flex flex-wrap items-center justify-end gap-3">
         {selection && selection.selectedIndices.size > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={selection.onClear}
-          >
+          <Button type="button" variant="outline" size="sm" onClick={selection.onClear}>
             Clear Selection ({selection.selectedIndices.size})
           </Button>
         )}
@@ -377,15 +379,8 @@ export function ConcordanceDispersionSummary({
             <select
               value={binCount}
               onChange={(e) => {
-                const parsed = Number.parseInt(
-                  e.target.value,
-                  10,
-                ) as DispersionDisplayBinCount;
-                if (
-                  (DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(
-                    parsed,
-                  )
-                ) {
+                const parsed = Number.parseInt(e.target.value, 10) as DispersionDisplayBinCount;
+                if ((DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(parsed)) {
                   onBinCountChange(parsed);
                 }
               }}
@@ -404,9 +399,7 @@ export function ConcordanceDispersionSummary({
             <span>Chart</span>
             <select
               value={chartType}
-              onChange={(e) =>
-                onChartTypeChange(e.target.value as MultiSeriesChartType)
-              }
+              onChange={(e) => onChartTypeChange(e.target.value as MultiSeriesChartType)}
               className="h-7 rounded border border-input bg-background px-2 text-sm"
             >
               <option value="line">Line</option>
@@ -440,17 +433,12 @@ export function ConcordanceDispersionSummary({
         }}
         yAxis={{ allowDecimals: false }}
         tooltip={{
-          labelFormatter: ((label: unknown) =>
-            formatBinRange(Number(label), binCount)) as never,
+          labelFormatter: ((label: unknown) => formatBinRange(Number(label), binCount)) as never,
           valueFormatter: ((value: unknown, name: unknown) => {
             const rawName = String(name);
             const { text, source } = stripSeriesKey(rawName);
-            const displayText =
-              text === DISPERSION_AGGREGATE_KEY ? AGGREGATE_LINE_LABEL : text;
-            return [
-              value as number,
-              source ? `${displayText} (${source})` : displayText,
-            ];
+            const displayText = text === DISPERSION_AGGREGATE_KEY ? AGGREGATE_LINE_LABEL : text;
+            return [value as number, source ? `${displayText} (${source})` : displayText];
           }) as never,
         }}
         selection={
@@ -467,9 +455,7 @@ export function ConcordanceDispersionSummary({
         containerRef={chartContainerRef}
       />
       <div className="flex flex-wrap items-center justify-center gap-2 text-center text-sm font-medium text-foreground">
-        <span>
-          {dataBlockLabel}: aggregated matches at relative locations of documents from
-        </span>
+        <span>{dataBlockLabel}: aggregated matches at relative locations of documents from</span>
         <select
           value={showAllProcessed ? 'whole' : 'page'}
           disabled={!materialisedBinsReady}
@@ -478,9 +464,7 @@ export function ConcordanceDispersionSummary({
           aria-label="Aggregation scope"
         >
           <option value="page">page above</option>
-          {materialisedBinsReady && (
-            <option value="whole">whole data block</option>
-          )}
+          {materialisedBinsReady && <option value="whole">whole data block</option>}
         </select>
       </div>
       {splitBySource && sources.length > 0 && (

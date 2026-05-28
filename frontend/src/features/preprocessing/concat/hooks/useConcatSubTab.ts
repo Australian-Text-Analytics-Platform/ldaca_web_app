@@ -1,6 +1,9 @@
 import { useState } from 'react';
 
-import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
+import type {
+  NodeColumnSelection,
+  WorkspaceNodeLike,
+} from '@/features/analysis/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   ConcatNodeSummary,
@@ -10,10 +13,25 @@ import type {
   PreviewRow,
 } from '../../types';
 import { MAX_CONCAT_NODES } from '../../types';
-import { buildWorkspaceNodeMap, deriveNodeLabel, extractNodeColumns, extractNodeDtypes, getNodeKey } from '../../utils/nodeMetadata';
+import {
+  buildWorkspaceNodeMap,
+  deriveNodeLabel,
+  extractNodeColumns,
+  extractNodeDtypes,
+  getNodeKey,
+} from '../../utils/nodeMetadata';
 import { dedupeNodeIds, takeMostRecent } from '@/utils/selectionUtils';
 
-const DEFAULT_CONCAT_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9', '#f59e0b', '#14b8a6'];
+const DEFAULT_CONCAT_PALETTE = [
+  '#2563eb',
+  '#dc2626',
+  '#16a34a',
+  '#f97316',
+  '#d946ef',
+  '#0ea5e9',
+  '#f59e0b',
+  '#14b8a6',
+];
 
 export interface ConcatSubTabProps {
   selectedNodeIds: string[];
@@ -197,7 +215,10 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
     if (typeMismatches.length) {
       const mismatchText = typeMismatches
         .sort()
-        .map((column) => `${column} (${baseDtypes[column] || 'unknown'} vs ${summary.dtypes[column] || 'unknown'})`)
+        .map(
+          (column) =>
+            `${column} (${baseDtypes[column] || 'unknown'} vs ${summary.dtypes[column] || 'unknown'})`,
+        )
         .join(', ');
       details.push(`Type mismatches: ${mismatchText}`);
     }
@@ -294,7 +315,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
    * Adapts the workspace concat preview callback to the generic preprocessing
    * preview hook result shape.
    * Called by: useConcatSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-  * Flow: call concat preview with ordered node ids, page and dedupe settings, then normalize rows, columns, and pagination for the shared preview hook.
+   * Flow: call concat preview with ordered node ids, page and dedupe settings, then normalize rows, columns, and pagination for the shared preview hook.
    */
   const concatPreviewFetcher = async ({
     request,
@@ -332,32 +353,38 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
 
   const concatPreviewColumnsToRender = (() => {
     if (concatPreviewColumns.length > 0) return concatPreviewColumns;
-    if (concatPreviewData.length > 0 && typeof concatPreviewData[0] === 'object' && concatPreviewData[0] !== null) {
+    if (
+      concatPreviewData.length > 0 &&
+      typeof concatPreviewData[0] === 'object' &&
+      concatPreviewData[0] !== null
+    ) {
       return Object.keys(concatPreviewData[0]);
     }
     return [];
   })();
 
-    /**
-     * Resets preview pagination when the user changes rows per page.
-     * Called by: useConcatSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Resets preview pagination when the user changes rows per page.
+   * Called by: useConcatSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleConcatPreviewPageSizeChange = (size: number) => {
     if (!Number.isNaN(size)) {
       setConcatPreviewPageSize(size);
     }
   };
 
-  const readyMessage = concatAnalysis.summaries.length < 2
-    ? 'Select at least two data blocks to generate a stack preview.'
-    : concatAnalysis.issues;
+  const readyMessage =
+    concatAnalysis.summaries.length < 2
+      ? 'Select at least two data blocks to generate a stack preview.'
+      : concatAnalysis.issues;
 
   const applyDisabled =
     !concatAnalysis.ready || !currentWorkspaceId || isConcatenating || isLoading.operations;
 
   const applyDisabledReason: string | undefined = (() => {
     if (isConcatenating || isLoading.operations) return undefined;
-    if (!concatAnalysis.ready) return concatAnalysis.issues || 'Select at least two compatible data blocks to stack';
+    if (!concatAnalysis.ready)
+      return concatAnalysis.issues || 'Select at least two compatible data blocks to stack';
     return undefined;
   })();
 
@@ -408,9 +435,10 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     onColorChange: noop,
   };
 
-  const extraSelectionMessage = concatOriginalCount > MAX_CONCAT_NODES
-    ? `Using the most recent ${MAX_CONCAT_NODES} of ${concatOriginalCount} selected data blocks. Deselect extras to choose which ones to include.`
-    : null;
+  const extraSelectionMessage =
+    concatOriginalCount > MAX_CONCAT_NODES
+      ? `Using the most recent ${MAX_CONCAT_NODES} of ${concatOriginalCount} selected data blocks. Deselect extras to choose which ones to include.`
+      : null;
 
   return {
     selectionPanel,

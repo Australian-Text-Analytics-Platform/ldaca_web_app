@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  resolvePagination,
-  type PaginationSource,
-  type PaginationState,
-} from '../pagination';
+import { resolvePagination, type PaginationSource, type PaginationState } from '../pagination';
 
 interface Row {
   id: number;
@@ -116,11 +112,11 @@ describe('resolvePagination — client mode', () => {
       kind: 'client',
       state: defaultState({ pageSize: 5 }),
       rows: fullRows,
-            /**
+      /**
        * Keeps only even rows so the test proves filtering precedes slicing.
-             * Used by: test mock object in snapshot-view/pagination.
-             * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
-             */
+       * Used by: test mock object in snapshot-view/pagination.
+       * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+       */
       filter: (r) => r.id % 2 === 0,
       setState: vi.fn(),
     });
@@ -133,11 +129,11 @@ describe('resolvePagination — client mode', () => {
       kind: 'client',
       state: defaultState({ pageSize: 3, sortBy: 'id', descending: true }),
       rows: fullRows,
-            /**
+      /**
        * Sorts by id in the requested direction for the client resolver test.
-             * Used by: test mock object in snapshot-view/pagination.
-             * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
-             */
+       * Used by: test mock object in snapshot-view/pagination.
+       * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+       */
       comparator: (sortBy, descending) => {
         if (sortBy !== 'id') return null;
         return (a, b) => (descending ? b.id - a.id : a.id - b.id);
@@ -152,11 +148,11 @@ describe('resolvePagination — client mode', () => {
       kind: 'client',
       state: defaultState({ pageSize: 3, sortBy: 'unknown_column' }),
       rows: fullRows,
-            /**
+      /**
        * Returns null so the resolver's no-comparator path is exercised.
-             * Used by: test mock object in snapshot-view/pagination.
-             * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
-             */
+       * Used by: test mock object in snapshot-view/pagination.
+       * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
+       */
       comparator: () => null,
       setState: vi.fn(),
     });

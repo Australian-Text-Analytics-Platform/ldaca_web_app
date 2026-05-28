@@ -1,7 +1,12 @@
 import { useState } from 'react';
 
 import type { WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
-import type { FilterPreviewResponse, PolarsExpressionRequest, PolarsExpressionApplyResponse, PolarsExpressionContext } from '@/api/generated/types.gen';
+import type {
+  FilterPreviewResponse,
+  PolarsExpressionRequest,
+  PolarsExpressionApplyResponse,
+  PolarsExpressionContext,
+} from '@/api/generated/types.gen';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { takeMostRecent } from '@/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
@@ -34,7 +39,7 @@ export interface GroupByAggState {
  * Used by: local callers in preprocessing/usePolarsExpressionSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
 const newId = () =>
-  (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -47,7 +52,11 @@ export const blankExpression = (): ExpressionItem => ({ id: newId(), code: '' })
  * Creates an empty sort expression row with a stable id and default direction.
  * Used by: PolarsExpressionSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
-export const blankSortExpression = (): SortExpressionItem => ({ id: newId(), code: '', descending: false });
+export const blankSortExpression = (): SortExpressionItem => ({
+  id: newId(),
+  code: '',
+  descending: false,
+});
 
 export interface PolarsExpressionSubTabProps {
   selectedNodeId: string | null;
@@ -79,7 +88,13 @@ const DEFAULT_PALETTE = ['#2563eb'];
  * APIs, and expose tab/editor actions to the component.
  */
 export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
-  const { selectedNodes, onAlert, polarsExpressionPreview, polarsExpressionApply, refreshNodeSchema } = props;
+  const {
+    selectedNodes,
+    onAlert,
+    polarsExpressionPreview,
+    polarsExpressionApply,
+    refreshNodeSchema,
+  } = props;
 
   const effectiveNode = takeMostRecent(selectedNodes, 1)[0] ?? null;
   const nodeId = effectiveNode?.id ?? null;
@@ -97,9 +112,14 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   // add/remove/reorder without losing CodeEditor focus on the wrong row.
   const [filterCode, setFilterCode] = useState('');
   const [withColumns, setWithColumns] = useState<ExpressionItem[]>(() => [blankExpression()]);
-  const [selectExpressions, setSelectExpressions] = useState<ExpressionItem[]>(() => [blankExpression()]);
+  const [selectExpressions, setSelectExpressions] = useState<ExpressionItem[]>(() => [
+    blankExpression(),
+  ]);
   const [sortItems, setSortItems] = useState<SortExpressionItem[]>(() => [blankSortExpression()]);
-  const [groupByState, setGroupByState] = useState<GroupByAggState>(() => ({ keyCode: '', aggExpressions: [blankExpression()] }));
+  const [groupByState, setGroupByState] = useState<GroupByAggState>(() => ({
+    keyCode: '',
+    aggExpressions: [blankExpression()],
+  }));
 
   // Serialized expressions (after eval)
   const [serializedRequest, setSerializedRequest] = useState<PolarsExpressionRequest | null>(null);
@@ -114,7 +134,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
    * Steps: build the request payload from committed expressions, call preview for the current
    * node/page, and adapt backend rows into preview state.
    */
-  const evalExpressions = async () => {
+  const evalExpressions = () => {
     setEvalError(null);
     setSerializedRequest(null);
 

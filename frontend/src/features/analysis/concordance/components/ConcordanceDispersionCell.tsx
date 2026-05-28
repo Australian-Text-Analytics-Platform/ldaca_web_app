@@ -1,12 +1,5 @@
-
-
 type ConcordanceGroupedRow = Record<string, unknown>[];
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CONCORDANCE_COLUMN_KEYS } from '../../generatedColumns';
 
 type Props = {

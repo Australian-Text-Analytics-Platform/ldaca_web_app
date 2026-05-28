@@ -36,10 +36,11 @@ export const getTaskTypeCandidates = (taskType: string): string[] => {
 /** Used by: src/features/analysis/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const normalizeTaskDedupeKey = (
   taskId: string | null | undefined,
-  state: string | null | undefined
+  state: string | null | undefined,
 ): string | null => {
   const normalizedTaskId = normalizeTaskId(taskId);
-  const normalizedState = typeof state === 'string' && state.trim().length > 0 ? state.trim() : null;
+  const normalizedState =
+    typeof state === 'string' && state.trim().length > 0 ? state.trim() : null;
   if (!normalizedTaskId || !normalizedState) {
     return null;
   }
@@ -106,7 +107,7 @@ export const resolveAnalysisTaskId = async ({
 /** Used by: src/features/analysis/concordance/ConcordanceFeature.tsx, src/features/analysis/token-frequency/TokenFrequencyFeature.tsx, src/features/analysis/topic-modeling/TopicModelingFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const pruneTasksById = <T extends Pick<TaskItem, 'task_id'>>(
   tasks: T[],
-  taskIds: string[]
+  taskIds: string[],
 ): T[] => {
   const blocked = new Set(collectTaskIds(taskIds));
   if (blocked.size === 0) {

@@ -147,12 +147,7 @@ describe('createNodeSnapshot', () => {
     });
 
     const queryClient = new QueryClient();
-    const snapshot = await createNodeSnapshot(
-      'ws-1',
-      'node-fallback',
-      () => ({}),
-      queryClient,
-    );
+    const snapshot = await createNodeSnapshot('ws-1', 'node-fallback', () => ({}), queryClient);
 
     expect(snapshot.name).toBe('node-fallback');
     expect(snapshot.columns).toEqual([]);

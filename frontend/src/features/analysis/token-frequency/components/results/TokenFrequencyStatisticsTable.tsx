@@ -67,7 +67,7 @@ const parseStatisticsNumericValue = (value: unknown): number => {
 /** Used by: TokenFrequencyStatisticsTable column cells to format compact statistic values because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const formatNumber = (
   value: unknown,
-  options: { decimals?: number; suffix?: string; multiplier?: number; fallback?: string } = {}
+  options: { decimals?: number; suffix?: string; multiplier?: number; fallback?: string } = {},
 ) => {
   const { decimals = 2, suffix = '', multiplier = 1, fallback = 'N/A' } = options;
   if (value === '+Inf') return `+∞${suffix}`;
@@ -145,9 +145,7 @@ const buildColumns = () => [
     /** Used by: TanStack Table Overuse column to render direction as a compact colored badge because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     cell: (info) => {
       const isOveruse = Boolean(info.getValue());
-      const cls = isOveruse
-        ? 'bg-emerald-100 text-emerald-800'
-        : 'bg-rose-100 text-rose-800';
+      const cls = isOveruse ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
       return (
         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>
           {isOveruse ? 'Over' : 'Under'}
@@ -158,15 +156,14 @@ const buildColumns = () => [
   columnHelper.accessor('signed_ll', {
     header: 'Signed LL',
     /** Used by: TanStack Table Signed LL column after overuse direction has been applied because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    cell: (info) => (
-      <span className="tabular-nums">{formatSignedLL(info.getValue())}</span>
-    ),
+    cell: (info) => <span className="tabular-nums">{formatSignedLL(info.getValue())}</span>,
   }),
   columnHelper.accessor('sort_percent_diff', {
     id: 'percent_diff',
     header: '%DIFF',
     /** Used by: TanStack Table %DIFF column to render percent difference as a percentage value because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    cell: (info) => formatNumber(info.row.original.percent_diff, { decimals: 2, suffix: '%', multiplier: 100 }),
+    cell: (info) =>
+      formatNumber(info.row.original.percent_diff, { decimals: 2, suffix: '%', multiplier: 100 }),
   }),
   columnHelper.accessor('sort_bayes_factor_bic', {
     id: 'bayes_factor_bic',
@@ -215,7 +212,9 @@ const buildColumns = () => [
                 ? 'bg-green-100 text-green-800'
                 : 'bg-muted text-muted-foreground';
       return (
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}>
+        <span
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}
+        >
           {significance || 'n.s.'}
         </span>
       );
@@ -299,13 +298,14 @@ export const TokenFrequencyStatisticsTable = ({
     enableMultiSort: false,
   });
 
-    /**
+  /**
    * Called by: TokenFrequencyStatisticsTable download button to export filtered or sorted keyness rows because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: choose sorted rows, filtered rows, or full data based on table state and token filter, then delegate CSV download with the keyness label.
    */
   const handleDownload = () => {
-    const rows = table.getSortedRowModel().rows
-      .filter((row) => row.getIsAllParentsExpanded())
+    const rows = table
+      .getSortedRowModel()
+      .rows.filter((row) => row.getIsAllParentsExpanded())
       .map((row) => row.original);
     const effectiveRows = table.getFilteredRowModel().rows.map((row) => row.original);
     const downloadRows = tokenFilter.trim() ? effectiveRows : rows.length > 0 ? rows : data;
@@ -335,20 +335,17 @@ export const TokenFrequencyStatisticsTable = ({
           {hasCorpusCaption ? (
             <p className="text-xs text-muted-foreground">
               <span>Reference corpus: </span>
-              <span
-                className="font-medium"
-                style={{ color: referenceColor || undefined }}
-              >
+              <span className="font-medium" style={{ color: referenceColor || undefined }}>
                 {referenceNodeName ?? '—'}
               </span>
               <span>; Study corpus: </span>
-              <span
-                className="font-medium"
-                style={{ color: studyColor || undefined }}
-              >
+              <span className="font-medium" style={{ color: studyColor || undefined }}>
                 {studyNodeName ?? '—'}
               </span>
-              <span>; The Overuse column indicates how frequently a token appears in the study corpus compared to the reference corpus.</span>
+              <span>
+                ; The Overuse column indicates how frequently a token appears in the study corpus
+                compared to the reference corpus.
+              </span>
             </p>
           ) : null}
         </div>

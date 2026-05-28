@@ -38,9 +38,9 @@ export interface HintDefinition {
   /** When this condition is `true`, the hint becomes eligible to show. */
   condition: HintConditionId;
   /**
- * Default anchor: a `data-hint-id` attribute value on a DOM element.
- * Use `resolveAnchor` for dynamic targets (e.g. a specific list row).
- */
+   * Default anchor: a `data-hint-id` attribute value on a DOM element.
+   * Use `resolveAnchor` for dynamic targets (e.g. a specific list row).
+   */
   anchorHintId?: string;
   /**
    * Custom anchor resolver. Returns the element to highlight, or `null` if

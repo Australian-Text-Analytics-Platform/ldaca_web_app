@@ -35,7 +35,9 @@ export function formatErrorDetail(detail: unknown): string | null {
     const parts = detail.map((entry) => {
       if (entry && typeof entry === 'object') {
         const error = entry as { loc?: unknown; msg?: unknown };
-        const loc = Array.isArray(error.loc) ? error.loc.filter((value) => value !== 'body').join('.') : '';
+        const loc = Array.isArray(error.loc)
+          ? error.loc.filter((value) => value !== 'body').join('.')
+          : '';
         const msg = typeof error.msg === 'string' ? error.msg : '';
         if (loc && msg) return `${loc}: ${msg}`;
         if (msg) return msg;

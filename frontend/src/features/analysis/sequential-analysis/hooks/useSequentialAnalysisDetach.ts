@@ -46,7 +46,9 @@ export function useSequentialAnalysisDetach({
   const rawRows = Array.isArray(results?.data)
     ? (results.data as Array<Record<string, unknown>>)
     : [];
-  const groupByColumns = Array.isArray((results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns)
+  const groupByColumns = Array.isArray(
+    (results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns,
+  )
     ? ((results?.analysis_params as Record<string, unknown>).group_by_columns as string[])
     : [];
 
@@ -60,7 +62,9 @@ export function useSequentialAnalysisDetach({
         return;
       }
 
-      const values = Object.fromEntries(groupByColumns.map((column) => [column, row[column] ?? null]));
+      const values = Object.fromEntries(
+        groupByColumns.map((column) => [column, row[column] ?? null]),
+      );
       const dedupeKey = JSON.stringify(groupByColumns.map((column) => row[column] ?? null));
       dedupedVisibleGroups.set(dedupeKey, values);
     });
@@ -74,8 +78,8 @@ export function useSequentialAnalysisDetach({
   // Sends the selected periods and visible groups to the backend detach task.
   /**
    * Called by: useSequentialAnalysisDetach through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
- */
+   * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+   */
   const handleDetach = async () => {
     if (!currentWorkspaceId) return;
     if (selectedPeriodIndices.size === 0 || selectedPeriodIndices.size >= chartData.length) {

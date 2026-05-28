@@ -86,8 +86,8 @@ export function RowDetailPanel({
   const excludeSet = new Set(excludeMetadataColumns ?? []);
   if (textColumn) excludeSet.add(textColumn);
 
-  const rawText = fullText
-    ?? (textColumn && record[textColumn] != null ? String(record[textColumn]) : undefined);
+  const rawText =
+    fullText ?? (textColumn && record[textColumn] != null ? String(record[textColumn]) : undefined);
 
   const titleSuffix = customization?.label ? ` (${customization.label})` : '';
 
@@ -99,9 +99,7 @@ export function RowDetailPanel({
     return rawText;
   })();
 
-  const metadataEntries = Object.entries(record).filter(
-    ([key]) => !excludeSet.has(key),
-  );
+  const metadataEntries = Object.entries(record).filter(([key]) => !excludeSet.has(key));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -120,7 +118,9 @@ export function RowDetailPanel({
               {customization.summaryFields.map((field) => (
                 <div key={String(field.label)}>
                   <span className="font-medium text-gray-700">{field.label}:</span>
-                  <span className={`ml-2 ${field.highlight ? 'font-mono bg-yellow-100 px-1 rounded' : ''}`}>
+                  <span
+                    className={`ml-2 ${field.highlight ? 'font-mono bg-yellow-100 px-1 rounded' : ''}`}
+                  >
                     {field.value}
                   </span>
                 </div>
@@ -187,6 +187,6 @@ export function RowDetailPanel({
       </DialogContent>
     </Dialog>
   );
-};
+}
 
 export default RowDetailPanel;

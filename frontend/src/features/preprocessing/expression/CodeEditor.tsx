@@ -2,10 +2,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { EditorView } from '@codemirror/view';
 
-const extensions = [
-  python(),
-  EditorView.lineWrapping,
-];
+const extensions = [python(), EditorView.lineWrapping];
 
 // Match the app's input styling (border, radius, font, focus ring)
 const baseTheme = EditorView.theme({

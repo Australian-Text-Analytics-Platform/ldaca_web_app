@@ -93,7 +93,7 @@ function ExportFeature() {
   // Best-effort helpers for node display
   /**
    * Called by: ExportFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-     * Flow: read node id/name from graph and data aliases, format optional shape dimensions, then return the compact export display model.
+   * Flow: read node id/name from graph and data aliases, format optional shape dimensions, then return the compact export display model.
    */
   const toDisplay = (n: GraphNode) => {
     const data = n.data as Record<string, unknown> | undefined;
@@ -143,7 +143,7 @@ function ExportFeature() {
   // download/export failure toasts instead of a generic "Failed to ...".
   /**
    * Called by: ExportFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const describeResponseError = async (resp: Response): Promise<string> => {
     try {
@@ -164,8 +164,8 @@ function ExportFeature() {
   // Export all selected nodes in the requested format (zip when multiple)
   /**
    * Called by: ExportFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const handleExportAll = async () => {
     if (!currentWorkspaceId || nodeIds.length === 0) return;
     setExporting(true);
@@ -194,8 +194,8 @@ function ExportFeature() {
       }
       const blob = await resp.blob();
       await saveBlob(blob, filename);
-      } catch (error) {
-        const description = error instanceof Error ? error.message : String(error);
+    } catch (error) {
+      const description = error instanceof Error ? error.message : String(error);
       toast.error('Failed to export data blocks', { description });
     } finally {
       setExporting(false);
@@ -205,7 +205,7 @@ function ExportFeature() {
   // Download a single node in the selected format
   /**
    * Called by: ExportFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-     * Flow: resolve node id/name, build the workspace export URL and filename, stream via Tauri on desktop or fetch a Blob in web, then reset per-node download state.
+   * Flow: resolve node id/name, build the workspace export URL and filename, stream via Tauri on desktop or fetch a Blob in web, then reset per-node download state.
    */
   const handleDownloadOne = async (node: GraphNode) => {
     if (!currentWorkspaceId) return;
@@ -234,8 +234,8 @@ function ExportFeature() {
       }
       const blob = await resp.blob();
       await saveBlob(blob, filename);
-      } catch (error) {
-        const description = error instanceof Error ? error.message : String(error);
+    } catch (error) {
+      const description = error instanceof Error ? error.message : String(error);
       toast.error('Failed to download data block', { description });
     } finally {
       setDownloadingIds((s) => ({ ...s, [id]: 'idle' }));
@@ -264,9 +264,7 @@ function ExportFeature() {
           <div className="border-border/50 bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
             <div className="text-muted-foreground text-sm">
               Workspace:{' '}
-              <span className="text-foreground font-medium">
-                {currentWorkspace?.name ?? '—'}
-              </span>
+              <span className="text-foreground font-medium">{currentWorkspace?.name ?? '—'}</span>
             </div>
             <Badge variant={selectedNodes.length ? 'default' : 'outline'}>
               {selectedNodes.length
@@ -310,7 +308,9 @@ function ExportFeature() {
                       size="sm"
                       variant="outline"
                       disabled={isDownloading}
-                      onClick={() => handleDownloadOne(n)}
+                      onClick={() => {
+                        void handleDownloadOne(n);
+                      }}
                       className="gap-1"
                     >
                       <Download className="h-4 w-4" />
@@ -343,7 +343,9 @@ function ExportFeature() {
             </div>
             <div className="flex items-center gap-2">
               <Button
-                onClick={handleExportAll}
+                onClick={() => {
+                  void handleExportAll();
+                }}
                 disabled={exporting || nodeIds.length === 0 || !currentWorkspaceId}
                 className="gap-2"
               >

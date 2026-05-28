@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { DemoSnapshotsToggleItem } from '../components/DemoSnapshotsToggleItem';
 

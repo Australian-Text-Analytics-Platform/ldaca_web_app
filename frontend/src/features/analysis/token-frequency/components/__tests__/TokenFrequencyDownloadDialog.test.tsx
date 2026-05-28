@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,14 +13,16 @@ describe('TokenFrequencyDownloadDialog', () => {
         onOpenChange={vi.fn()}
         mode="wordcloud"
         onConfirm={vi.fn()}
-      />
+      />,
     );
 
     await user.click(screen.getByRole('checkbox', { name: 'SVG' }));
     await user.click(screen.getByRole('checkbox', { name: /download stop words as well/i }));
 
     expect(screen.getByRole('checkbox', { name: 'SVG' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /download stop words as well/i })).not.toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: /download stop words as well/i }),
+    ).not.toBeChecked();
 
     rerender(
       <TokenFrequencyDownloadDialog
@@ -29,7 +30,7 @@ describe('TokenFrequencyDownloadDialog', () => {
         onOpenChange={vi.fn()}
         mode="wordcloud"
         onConfirm={vi.fn()}
-      />
+      />,
     );
 
     rerender(
@@ -38,7 +39,7 @@ describe('TokenFrequencyDownloadDialog', () => {
         onOpenChange={vi.fn()}
         mode="frequencies"
         onConfirm={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByRole('checkbox', { name: 'CSV' })).toBeChecked();

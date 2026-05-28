@@ -10,7 +10,11 @@ import type {
   QuotationMaterializeRequest,
   AnalysisTaskActionResponse,
 } from '@/api/generated/types.gen';
-import { getNodeIdentifier, restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
+import {
+  getNodeIdentifier,
+  restoreAnalysisLockFromRequest,
+  extractAndSetTaskId,
+} from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -32,7 +36,7 @@ type ResolvedEnginePayload =
 /** Extracts the most useful backend error detail for quotation dialogs. */
 /**
  * Called by: useQuotationTaskFlow hook as a local helper in this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-   * Flow: inspect response.data, error.data, and body detail fields, stringify object details when possible, then fall back to message or a quotation-specific default.
+ * Flow: inspect response.data, error.data, and body detail fields, stringify object details when possible, then fall back to message or a quotation-specific default.
  */
 function getErrorMessage(error: unknown): string {
   const err = error as Record<string, unknown> | null | undefined;
@@ -40,10 +44,7 @@ function getErrorMessage(error: unknown): string {
   const responseData = response?.data as Record<string, unknown> | undefined;
   const body = err?.body as Record<string, unknown> | undefined;
   const errData = err?.data as Record<string, unknown> | undefined;
-  const detail =
-    responseData?.detail ??
-    errData?.detail ??
-    body?.detail;
+  const detail = responseData?.detail ?? errData?.detail ?? body?.detail;
   if (typeof detail === 'string' && detail.trim().length) return detail;
   if (detail && typeof detail === 'object') {
     try {
@@ -52,7 +53,10 @@ function getErrorMessage(error: unknown): string {
       /* ignore */
     }
   }
-  if (typeof (err as Record<string, unknown>)?.message === 'string' && ((err as Record<string, unknown>)?.message as string).trim().length)
+  if (
+    typeof (err as Record<string, unknown>)?.message === 'string' &&
+    ((err as Record<string, unknown>)?.message as string).trim().length
+  )
     return (err as Record<string, unknown>).message as string;
   return 'An unexpected error occurred while loading quotations.';
 }
@@ -88,15 +92,16 @@ interface QuotationActions {
 
 interface QuotationLock {
   getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (
-    snapshots: Array<{ id: string; name?: string; columns?: string[] }>,
-  ) => void;
+  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   resolveTaskId: () => Promise<string | null>;
   quotationSearch: (
     nodeId: string,
     request: QuotationRequest,
   ) => Promise<QuotationAnalysisResponse>;
-  detachQuotation: (nodeId: string, request: QuotationDetachRequest) => Promise<AnalysisTaskActionResponse>;
+  detachQuotation: (
+    nodeId: string,
+    request: QuotationDetachRequest,
+  ) => Promise<AnalysisTaskActionResponse>;
   materializeQuotation?: (
     nodeId: string,
     request: QuotationMaterializeRequest,
@@ -171,7 +176,8 @@ export function useQuotationTaskFlow({
    * Called by: useQuotationTaskFlow as a local helper in this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
    */
   const resolveNodeLabel = (nodeId: string): string => {
-    const candidates = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot : displayedNodes);
+    const candidates =
+      isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot : displayedNodes;
     const match = candidates.find((node, idx) => getNodeIdentifier(node, idx) === nodeId);
     const rawLabel = match?.name || match?.label || match?.id || nodeId;
     return String(rawLabel);
@@ -179,7 +185,7 @@ export function useQuotationTaskFlow({
   // Converts the UI engine selection into the backend request shape, validating remote URLs first.
   /**
    * Called by: useQuotationTaskFlow as a local helper in this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-     * Flow: validate remote engine URLs, normalize and persist corrected URLs, clear or set engine errors, then return local or remote engine payloads.
+   * Flow: validate remote engine URLs, normalize and persist corrected URLs, clear or set engine errors, then return local or remote engine payloads.
    */
   const buildEngineRequest = (): EngineRequestPayload | null => {
     if (resolvedEnginePayload.type === 'remote') {
@@ -217,11 +223,8 @@ export function useQuotationTaskFlow({
     nodeId: string;
     column: string;
   } | null => {
-    const sourceNode = (
-      isLocked && lockedNodesSnapshot.length
-        ? lockedNodesSnapshot[0]
-        : displayedNodes[0]
-    );
+    const sourceNode =
+      isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0];
     if (!sourceNode) return null;
     const nodeId = getNodeIdentifier(sourceNode, 0);
     const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
@@ -249,8 +252,8 @@ export function useQuotationTaskFlow({
   // Runs or refreshes quotation extraction for one node using active paging and engine state.
   /**
    * Called by: useQuotationTaskFlow as a local helper in this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
   const fetchQuotations = async (
     nodeId: string,
     overrides?: {
@@ -270,8 +273,7 @@ export function useQuotationTaskFlow({
     const page = overrides?.page ?? st?.currentPage ?? 1;
     const pageSize = overrides?.pageSize ?? st?.pageSize;
     const sortBy = overrides?.sortBy ?? st?.sortBy;
-    const descending: boolean =
-      overrides?.descending ?? st?.descending ?? false;
+    const descending: boolean = overrides?.descending ?? st?.descending ?? false;
 
     const enginePayload = buildEngineRequest();
     if (!enginePayload) {
@@ -308,9 +310,7 @@ export function useQuotationTaskFlow({
         descending: requestPayload.descending,
         engine_type: engineConfigForRequest.type,
         engine_url:
-          engineConfigForRequest.type === 'remote'
-            ? (engineConfigForRequest.url ?? '')
-            : null,
+          engineConfigForRequest.type === 'remote' ? (engineConfigForRequest.url ?? '') : null,
       };
     } catch (error: unknown) {
       console.error('Failed to fetch quotations', error);
@@ -322,11 +322,9 @@ export function useQuotationTaskFlow({
   // Updates an existing stored task result without creating a new quotation task.
   /**
    * Called by: useQuotationTaskFlow during this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
-  const updateStoredQuotationResult = async (
-    overrides: Partial<QuotationResultQuery> = {},
-  ) => {
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
+  const updateStoredQuotationResult = async (overrides: Partial<QuotationResultQuery> = {}) => {
     if (!currentWorkspaceId) return null;
     const context = resolveLockedNodeContext();
     if (!context) return null;
@@ -370,8 +368,8 @@ export function useQuotationTaskFlow({
   // Starts the initial quotation search and locks the selected node/column context afterward.
   /**
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
   const handleSearchAll = async () => {
     const targetNode = displayedNodes[0];
     const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
@@ -386,12 +384,13 @@ export function useQuotationTaskFlow({
         const lockedSelections = activeSelections.filter(
           (sel) => sel.nodeId === nodeId && sel.column,
         );
-        const columnMap = lockedSelections.reduce<
-          Record<string, string | undefined>
-        >((acc, sel) => {
-          acc[sel.nodeId] = sel.column;
-          return acc;
-        }, {});
+        const columnMap = lockedSelections.reduce<Record<string, string | undefined>>(
+          (acc, sel) => {
+            acc[sel.nodeId] = sel.column;
+            return acc;
+          },
+          {},
+        );
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
           requestData: {
@@ -416,11 +415,8 @@ export function useQuotationTaskFlow({
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
    */
   const handlePageChange = async (newPage: number) => {
-    const targetNode = (
-      isLocked && lockedNodesSnapshot.length
-        ? lockedNodesSnapshot[0]
-        : displayedNodes[0]
-    );
+    const targetNode =
+      isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0];
     const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageChange(newPage);
@@ -439,11 +435,8 @@ export function useQuotationTaskFlow({
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
    */
   const handlePageSizeChange = async (pageSize: number) => {
-    const targetNode = (
-      isLocked && lockedNodesSnapshot.length
-        ? lockedNodesSnapshot[0]
-        : displayedNodes[0]
-    );
+    const targetNode =
+      isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0];
     const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageSizeChange(pageSize);
@@ -463,7 +456,7 @@ export function useQuotationTaskFlow({
   // Applies sortable-column requests either through a fresh search or stored result update.
   /**
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-     * Flow: ignore non-sortable columns, toggle sort direction for repeated columns, then fetch fresh unlocked results or update locked stored results.
+   * Flow: ignore non-sortable columns, toggle sort direction for repeated columns, then fetch fresh unlocked results or update locked stored results.
    */
   const handleSort = async (nodeId: string, column: string) => {
     const sortableColumns = new Set(originalColumnsByNode[nodeId] || []);
@@ -494,9 +487,13 @@ export function useQuotationTaskFlow({
   // Detaches quotation results into a workspace node, including optional source columns.
   /**
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-     * Flow: find the active node column, build local or remote engine payload, send the quotation detach request with optional columns/path, then clear node detaching state.
+   * Flow: find the active node column, build local or remote engine payload, send the quotation detach request with optional columns/path, then clear node detaching state.
    */
-  const handleDetach = async (nodeId: string, selectedColumns?: string[], materializedPath?: string | null) => {
+  const handleDetach = async (
+    nodeId: string,
+    selectedColumns?: string[],
+    materializedPath?: string | null,
+  ) => {
     const selection = activeSelections.find((s) => s.nodeId === nodeId);
     if (!selection?.column) return;
     setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
@@ -514,7 +511,9 @@ export function useQuotationTaskFlow({
           enginePayload.type === 'remote'
             ? { type: 'remote', url: enginePayload.url }
             : { type: 'local' },
-        ...(selectedColumns && selectedColumns.length > 0 ? { selected_columns: selectedColumns } : {}),
+        ...(selectedColumns && selectedColumns.length > 0
+          ? { selected_columns: selectedColumns }
+          : {}),
         ...(materializedPath ? { materialized_path: materializedPath } : {}),
       });
     } catch (e: unknown) {
@@ -527,8 +526,8 @@ export function useQuotationTaskFlow({
   // Starts backend materialization for full quotation results before detach or snapshot use.
   /**
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
   const handleMaterialize = async (nodeId: string) => {
     const selection = activeSelections.find((s) => s.nodeId === nodeId);
     if (!selection?.column) return;

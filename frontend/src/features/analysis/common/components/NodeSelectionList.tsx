@@ -77,13 +77,14 @@ export function NodeSelectionList({
       className={cn(
         'flex gap-2.5 px-3 pb-2 pt-0',
         nodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden',
-        className
+        className,
       )}
     >
       {nodes.map((node, index) => {
         const nodeId = derivedNodeIds[index];
         if (!nodeId) return null;
-        const color = (nodeColors[nodeId] || (palette.length ? palette[index % palette.length] : '#000000')) as string;
+        const color = (nodeColors[nodeId] ||
+          (palette.length ? palette[index % palette.length] : '#000000')) as string;
         const title = getNodeTitle(node, nodeId, index);
         return (
           <Card
@@ -91,7 +92,7 @@ export function NodeSelectionList({
             className={cn(
               'relative border border-border/60 bg-card shadow-sm transition-colors',
               nodes.length > maxCompare ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0',
-              cardClassName
+              cardClassName,
             )}
           >
             {showColorPicker && onColorChange && (
@@ -103,7 +104,9 @@ export function NodeSelectionList({
                 />
               </div>
             )}
-            <CardHeader className={cn('space-y-1 px-3 pb-1.5', showColorPicker ? 'pt-3' : 'pt-2.5')}>
+            <CardHeader
+              className={cn('space-y-1 px-3 pb-1.5', showColorPicker ? 'pt-3' : 'pt-2.5')}
+            >
               <div
                 className="max-w-full wrap-break-word pr-2 text-sm font-semibold leading-snug text-foreground"
                 style={showColorPicker ? { color } : undefined}
@@ -128,6 +131,6 @@ export function NodeSelectionList({
       })}
     </div>
   );
-};
+}
 
 export default NodeSelectionList;

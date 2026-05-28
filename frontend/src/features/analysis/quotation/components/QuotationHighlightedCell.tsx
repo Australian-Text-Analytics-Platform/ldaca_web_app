@@ -7,10 +7,7 @@ import {
   TYPE_COLORS,
   type QuotationHighlightType,
 } from '../quotationHighlight';
-import {
-  clipTextAroundSpans,
-  type HighlightSpan,
-} from '../quotationTextClip';
+import { clipTextAroundSpans, type HighlightSpan } from '../quotationTextClip';
 
 export interface QuotationHoverState {
   key: string;
@@ -62,12 +59,12 @@ export function QuotationHighlightedCell({
   // Used by: QuotationHighlightedCell to convert backend span coordinates into clipped table-cell ranges because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const addSpan = (start?: unknown, end?: unknown, type?: string) => {
     if (
-      type
-      && Number.isFinite(start)
-      && Number.isFinite(end)
-      && (start as number) < (end as number)
-      && (start as number) >= 0
-      && (end as number) <= text.length
+      type &&
+      Number.isFinite(start) &&
+      Number.isFinite(end) &&
+      (start as number) < (end as number) &&
+      (start as number) >= 0 &&
+      (end as number) <= text.length
     ) {
       spans.push({ start: Number(start), end: Number(end), types: [type] });
     }
@@ -78,9 +75,21 @@ export function QuotationHighlightedCell({
       addSpan(s?.start, s?.end, s?.type as string | undefined),
     );
   } else {
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
+    addSpan(
+      row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx],
+      row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx],
+      'speaker',
+    );
+    addSpan(
+      row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx],
+      row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx],
+      'quote',
+    );
+    addSpan(
+      row?.[QUOTATION_COLUMN_KEYS.verbStartIdx],
+      row?.[QUOTATION_COLUMN_KEYS.verbEndIdx],
+      'verb',
+    );
   }
 
   if (!spans.length) return <>{text}</>;
@@ -112,7 +121,9 @@ export function QuotationHighlightedCell({
     const s = points[i]!;
     const e = points[i + 1]!;
     if (e <= s) continue;
-    const covering = workingSpans.filter((sp) => sp.start < e && sp.end > s).flatMap((sp) => sp.types);
+    const covering = workingSpans
+      .filter((sp) => sp.start < e && sp.end > s)
+      .flatMap((sp) => sp.types);
     segs.push({ start: s, end: e, types: Array.from(new Set(covering)) });
   }
 
@@ -127,10 +138,10 @@ export function QuotationHighlightedCell({
           color: '#0f172a',
           borderColor: TYPE_COLORS[t] || '#334155',
           backgroundColor:
-            hoverState
-            && hoverState.key === cellKey
-            && hoverState.segIndex === segIndex
-            && hoverState.type === t
+            hoverState &&
+            hoverState.key === cellKey &&
+            hoverState.segIndex === segIndex &&
+            hoverState.type === t
               ? hexToRgba(TYPE_COLORS[t] || '#cbd5e1', 0.28)
               : '#f1f5f9',
         }}
@@ -151,7 +162,11 @@ export function QuotationHighlightedCell({
         const str = workingText.slice(seg.start, seg.end);
         if (!seg.types.length) return <span key={i}>{str}</span>;
         const style = buildUnderlineStyle(seg.types);
-        const isHoveredSeg = !!(hoverState && hoverState.key === cellKey && hoverState.segIndex === i);
+        const isHoveredSeg = !!(
+          hoverState &&
+          hoverState.key === cellKey &&
+          hoverState.segIndex === i
+        );
         const colorForSeg =
           hoverState?.type && isHoveredSeg && seg.types.includes(hoverState.type)
             ? hoverState.type
@@ -186,4 +201,4 @@ export function QuotationHighlightedCell({
       ) : null}
     </span>
   );
-};
+}

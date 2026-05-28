@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  getOperatorsForType,
-  normalizeTypeName as normalizePreprocessingType,
-} from '../typeUtils';
+import { getOperatorsForType, normalizeTypeName as normalizePreprocessingType } from '../typeUtils';
 import { normalizeTypeName as normalizeSharedType } from '@/utils/columnTypes';
 
 describe('preprocessing type utils', () => {
@@ -17,9 +14,7 @@ describe('preprocessing type utils', () => {
   });
 
   it('offers checklist operator set for list_string', () => {
-    expect(getOperatorsForType('list_string')).toEqual([
-      { value: 'in', label: 'contains any of' },
-    ]);
+    expect(getOperatorsForType('list_string')).toEqual([{ value: 'in', label: 'contains any of' }]);
   });
 });
 

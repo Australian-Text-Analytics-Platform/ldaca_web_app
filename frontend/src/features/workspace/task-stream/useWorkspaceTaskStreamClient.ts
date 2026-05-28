@@ -72,7 +72,7 @@ const buildStreamUrl = (authHeaders: Record<string, string>) => {
  * Flow: initialize connection state and callback refs, keep the latest event handler installed, run the EventSource lifecycle effect, and expose manual reconnect.
  */
 export const useWorkspaceTaskStreamClient = (
-  options: WorkspaceTaskStreamClientOptions = {}
+  options: WorkspaceTaskStreamClientOptions = {},
 ): WorkspaceTaskStreamClientState => {
   const { enabled = true, getAuthHeaders = () => ({}), onEvent } = options;
   const [state, setState] = useState<TaskStreamState>({
@@ -90,11 +90,11 @@ export const useWorkspaceTaskStreamClient = (
   }, [onEvent]);
 
   const reconnect = (() => {
-        /**
+    /**
      * Keeps the reconnect callback stable while the ref target changes.
-         * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-         * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
-         */
+     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
+     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     */
     const fn = () => reconnectRef.current();
     return fn;
   })();
@@ -111,11 +111,11 @@ export const useWorkspaceTaskStreamClient = (
     let es: EventSource | null = null;
     let reconnectTimer: number | null = null;
 
-        /**
+    /**
      * Clears any pending manual reconnect timer.
-         * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-         * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
-         */
+     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
+     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     */
     const cleanupTimers = () => {
       if (reconnectTimer !== null) {
         window.clearTimeout(reconnectTimer);
@@ -123,11 +123,11 @@ export const useWorkspaceTaskStreamClient = (
       }
     };
 
-        /**
+    /**
      * Closes the current EventSource and pending reconnect work.
-         * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-         * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
-         */
+     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
+     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     */
     const closeStream = () => {
       if (es) {
         es.close();
@@ -136,11 +136,11 @@ export const useWorkspaceTaskStreamClient = (
       cleanupTimers();
     };
 
-        /**
+    /**
      * Schedules the next connection attempt using capped backoff.
-         * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-         * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
-         */
+     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
+     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     */
     const scheduleReconnect = (attempt: number) => {
       cleanupTimers();
       const delay = clampRetryDelay(attempt);
@@ -150,11 +150,11 @@ export const useWorkspaceTaskStreamClient = (
       }, delay);
     };
 
-        /**
+    /**
      * Delivers a parsed stream payload to the latest caller callback.
-         * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-         * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
-         */
+     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
+     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     */
     const invokeOnEvent = (payload: TaskEventPayload) => {
       const rawTimestamp = (payload as { timestamp?: number }).timestamp;
       const timestamp = typeof rawTimestamp === 'number' ? rawTimestamp : Date.now();
@@ -166,16 +166,21 @@ export const useWorkspaceTaskStreamClient = (
       }
     };
 
-      /**
+    /**
      * Opens an EventSource connection for one reconnect attempt.
-       * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-       * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
-       * Flow: close any prior stream, build the authenticated URL, wire EventSource handlers, and schedule reconnects on failure.
-       */
+     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
+     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     * Flow: close any prior stream, build the authenticated URL, wire EventSource handlers, and schedule reconnects on failure.
+     */
     const connect = (attempt: number) => {
       if (!active) return;
       closeStream();
-      setState({ status: 'connecting', error: null, reconnectAttempt: attempt, lastEventTimestamp: null });
+      setState({
+        status: 'connecting',
+        error: null,
+        reconnectAttempt: attempt,
+        lastEventTimestamp: null,
+      });
 
       try {
         const url = buildStreamUrl(getAuthHeaders());
@@ -183,12 +188,23 @@ export const useWorkspaceTaskStreamClient = (
         es = source;
 
         source.onopen = () => {
-          if (!active) { source.close(); return; }
-          setState({ status: 'open', error: null, reconnectAttempt: 0, lastEventTimestamp: Date.now() });
+          if (!active) {
+            source.close();
+            return;
+          }
+          setState({
+            status: 'open',
+            error: null,
+            reconnectAttempt: 0,
+            lastEventTimestamp: Date.now(),
+          });
         };
 
         source.onmessage = (event: MessageEvent<string>) => {
-          if (!active) { source.close(); return; }
+          if (!active) {
+            source.close();
+            return;
+          }
           try {
             const parsed = JSON.parse(event.data) as TaskEventPayload;
             invokeOnEvent(parsed);
@@ -199,7 +215,10 @@ export const useWorkspaceTaskStreamClient = (
 
         // Disable EventSource auto-reconnect — use our own backoff logic.
         source.onerror = () => {
-          if (!active) { source.close(); return; }
+          if (!active) {
+            source.close();
+            return;
+          }
           source.close();
           es = null;
           setState({
@@ -213,7 +232,12 @@ export const useWorkspaceTaskStreamClient = (
       } catch (error) {
         if (!active) return;
         const message = error instanceof Error ? error.message : 'Connection error';
-        setState({ status: 'error', error: message, reconnectAttempt: attempt, lastEventTimestamp: Date.now() });
+        setState({
+          status: 'error',
+          error: message,
+          reconnectAttempt: attempt,
+          lastEventTimestamp: Date.now(),
+        });
         scheduleReconnect(attempt);
       }
     };

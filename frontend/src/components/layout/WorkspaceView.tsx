@@ -15,7 +15,12 @@ import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
 function WorkspaceView() {
   const topRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const { containerRef, value: ratio, isDragging, splitterProps } = useResizableSplit({
+  const {
+    containerRef,
+    value: ratio,
+    isDragging,
+    splitterProps,
+  } = useResizableSplit({
     defaultValue: 0.5,
     min: 0.2,
     max: 0.8,

@@ -56,10 +56,8 @@ export function resolveTokenFrequencyNodeContext({
 }: TokenFrequencyNodeContextArgs): TokenFrequencyNodeContext {
   const orderedCandidates = dedupePreserveOrder([
     ...lastCompareNodeIds.filter(isValidId),
-    ...((analysisParams?.node_ids ?? []).filter(isValidId)),
-    ...selectedNodes
-      .map((node) => node?.id)
-      .filter(isValidId),
+    ...(analysisParams?.node_ids ?? []).filter(isValidId),
+    ...selectedNodes.map((node) => node?.id).filter(isValidId),
   ]);
 
   const candidateIds = orderedCandidates.slice(0, maxNodes);
@@ -112,7 +110,7 @@ export function createConcordanceSeedRequest(
     numLeftTokens = 10,
     numRightTokens = 10,
     combined = false,
-  }: ConcordanceSeedParams
+  }: ConcordanceSeedParams,
 ): ConcordanceAnalysisRequest | null {
   const trimmedToken = token?.toString().trim();
   if (!trimmedToken) {

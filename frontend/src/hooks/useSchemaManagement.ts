@@ -22,20 +22,20 @@ export interface NodeSnapshot {
  */
 export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
   const rawSchema = (info as Record<string, unknown>)?.schema;
-  
+
   if (Array.isArray(rawSchema)) {
     return Object.fromEntries(
-      rawSchema.map((c: Record<string, unknown>) => [c.name, c.js_type || 'string'])
+      rawSchema.map((c: Record<string, unknown>) => [c.name, c.js_type || 'string']),
     );
   } else if (rawSchema && typeof rawSchema === 'object') {
     return Object.fromEntries(
       Object.entries(rawSchema).map(([k, v]) => [
         k,
         typeof v === 'string' ? normalizeTypeName(v) : 'string',
-      ])
+      ]),
     );
   }
-  
+
   return {};
 }
 
@@ -92,7 +92,7 @@ export async function createNodeSnapshots(
           schema: {} as Record<string, string>,
         };
       }
-    })
+    }),
   );
 
   return snapshots;
@@ -105,18 +105,21 @@ export async function createNodeSnapshots(
  */
 export function applySelectedColumnsToSnapshots<T extends { id: string; columns?: string[] }>(
   snapshots: T[],
-  selectedColumns: Record<string, string | undefined>
+  selectedColumns: Record<string, string | undefined>,
 ): T[] {
   return snapshots.map((snapshot) => {
     const chosen = selectedColumns[snapshot.id];
     const fallback = Array.isArray(snapshot.columns)
-      ? snapshot.columns.filter((col): col is string => typeof col === 'string' && col.trim().length > 0)
+      ? snapshot.columns.filter(
+          (col): col is string => typeof col === 'string' && col.trim().length > 0,
+        )
       : [];
-    const columns = typeof chosen === 'string' && chosen.trim().length > 0
-      ? [chosen]
-      : fallback.length > 0
-      ? [fallback[0]]
-      : [];
+    const columns =
+      typeof chosen === 'string' && chosen.trim().length > 0
+        ? [chosen]
+        : fallback.length > 0
+          ? [fallback[0]]
+          : [];
     return {
       ...snapshot,
       columns,
@@ -129,27 +132,27 @@ interface SchemaManagementConfig {
    * The currently selected/active node ID
    */
   nodeId: string | null | undefined;
-  
+
   /**
    * Whether the analysis is currently locked
    */
   isLocked: boolean;
-  
+
   /**
    * Current workspace ID
    */
   workspaceId: string | undefined;
-  
+
   /**
    * Function to get auth headers
    */
   getAuthHeaders: () => Record<string, string>;
-  
+
   /**
    * Optional fallback node data (from workspace selection)
    */
   nodeData?: Record<string, unknown>;
-  
+
   /**
    * Optional fallback selected node (from workspace selection)
    */
@@ -158,14 +161,14 @@ interface SchemaManagementConfig {
 
 /**
  * Hook for managing schema state in analysis tabs.
- * 
+ *
  * Handles:
  * - Fetching schema when node changes (if not locked)
  * - Maintaining current and locked schema states
  * - Providing effective schema (locked or current)
  * - Deriving available columns with type information
  * - Ref for accessing schema in async contexts
- * 
+ *
  * @param config - Configuration object
  * @returns Schema state and utilities
  */
@@ -189,7 +192,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
 
   // Fetch schema via React Query so invalidation (e.g. after cast) triggers re-fetch
   const schemaQuery = useQuery({
-    queryKey: (nodeId && workspaceId) ? queryKeys.nodeSchema(workspaceId, nodeId) : ['_no_schema_'],
+    queryKey: nodeId && workspaceId ? queryKeys.nodeSchema(workspaceId, nodeId) : ['_no_schema_'],
     /** Fetches schema through node-info cache so cast/preprocessing invalidations refresh column types. */
     /** Called by: TanStack Query inside useSchemaManagement because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
     queryFn: async () => {
@@ -210,7 +213,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /** Schema seen by task builders: locked while a task is running, live otherwise. */
-  const effectiveSchema = isLocked ? (lockedSchema || currentSchema) : currentSchema;
+  const effectiveSchema = isLocked ? lockedSchema || currentSchema : currentSchema;
 
   /** Column options for parameter panels, with node payload fallbacks while schema fetches. */
   const availableColumns = (() => {
@@ -247,7 +250,9 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
         // selectedNode.data.schema may be array or mapping
         const schemaObj = Array.isArray(dataObj.schema)
           ? Object.fromEntries(
-              (dataObj.schema as Array<Record<string, unknown>>).map((c: Record<string, unknown>) => [c.name, c.js_type || 'string'])
+              (dataObj.schema as Array<Record<string, unknown>>).map(
+                (c: Record<string, unknown>) => [c.name, c.js_type || 'string'],
+              ),
             )
           : dataObj.schema;
         Object.entries(schemaObj as Record<string, unknown>).forEach(([colName, jsType]) => {

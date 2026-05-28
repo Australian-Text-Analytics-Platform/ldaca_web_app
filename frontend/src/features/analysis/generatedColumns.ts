@@ -8,10 +8,7 @@ export const CONCORDANCE_CORE_COLUMNS = [
   'CONC_r1',
 ] as const;
 
-export const CONCORDANCE_FREQ_COLUMNS = [
-  'CONC_l1_freq',
-  'CONC_r1_freq',
-] as const;
+export const CONCORDANCE_FREQ_COLUMNS = ['CONC_l1_freq', 'CONC_r1_freq'] as const;
 
 export const CONCORDANCE_MATERIALIZED_COLUMNS = [
   ...CONCORDANCE_CORE_COLUMNS,

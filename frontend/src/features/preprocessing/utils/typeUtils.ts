@@ -19,13 +19,9 @@ export const getOperatorsForType = (dataType: string) => {
         { value: 'is_null', label: 'is null' },
       ];
     case 'categorical':
-      return [
-        { value: 'in', label: 'is one of' },
-      ];
+      return [{ value: 'in', label: 'is one of' }];
     case 'list_string':
-      return [
-        { value: 'in', label: 'contains any of' },
-      ];
+      return [{ value: 'in', label: 'contains any of' }];
     case 'integer':
     case 'float':
       return [

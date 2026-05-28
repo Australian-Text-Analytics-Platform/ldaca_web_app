@@ -2,11 +2,24 @@ import { useState, type ReactNode } from 'react';
 
 import { joinNodesPreview } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
-import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
+import type {
+  NodeColumnSelection,
+  WorkspaceNodeLike,
+} from '@/features/analysis/common/components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
-import type { JoinPreviewRequestPayload, JoinType, PreviewPagination, PreviewRow } from '../../types';
+import type {
+  JoinPreviewRequestPayload,
+  JoinType,
+  PreviewPagination,
+  PreviewRow,
+} from '../../types';
 import { JOIN_TYPE_OPTIONS } from '../../types';
-import { buildWorkspaceNodeMap, deriveNodeLabel, extractNodeColumns, getNodeKey } from '../../utils/nodeMetadata';
+import {
+  buildWorkspaceNodeMap,
+  deriveNodeLabel,
+  extractNodeColumns,
+  getNodeKey,
+} from '../../utils/nodeMetadata';
 import { dedupeNodeIds, takeMostRecent } from '@/utils/selectionUtils';
 import { MAX_JOIN_NODES } from '../../types';
 
@@ -136,7 +149,8 @@ const resolveJoinColumn = (
  * and keep auto-generated node names in sync with selections.
  */
 export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
-  const { selectedNodeIds, currentWorkspaceId, workspaceNodes, joinNodes, isLoading, onAlert } = props;
+  const { selectedNodeIds, currentWorkspaceId, workspaceNodes, joinNodes, isLoading, onAlert } =
+    props;
   const { getAuthHeaders } = useAuth();
 
   const [joinLeftColumnDraft, setJoinLeftColumnDraft] = useState<JoinColumnDraft | null>(null);
@@ -159,19 +173,19 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       .filter((node): node is WorkspaceNodeLike => Boolean(node));
   })();
 
-    /**
-     * Reads available columns for a node selected in the join panel.
-     * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Reads available columns for a node selected in the join panel.
+   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const getNodeColumnsForJoin = (nodeId: string): string[] => {
     const node = workspaceNodeMap.get(nodeId);
     return extractNodeColumns(node);
   };
 
-    /**
-     * Labels the left and right column selectors in the shared node panel.
-     * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Labels the left and right column selectors in the shared node panel.
+   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const columnLabelFn = (node: WorkspaceNodeLike) => {
     const nodeId = getNodeKey(node);
     if (nodeId === joinLeftNodeId) return 'Left column:';
@@ -289,8 +303,8 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
    * Adapts the generated join preview endpoint to the shared preprocessing
    * preview hook result shape.
    * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-  * Steps: translate the request into generated-client query params, call the preview API,
-  * and normalize rows/columns/pagination for the shared preview table.
+   * Steps: translate the request into generated-client query params, call the preview API,
+   * and normalize rows/columns/pagination for the shared preview table.
    */
   const joinPreviewFetcher = async ({
     request,
@@ -341,26 +355,31 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   const joinPreviewColumnsToRender = (() => {
     if (joinPreviewColumns.length > 0) return joinPreviewColumns;
-    if (joinPreviewData.length > 0 && typeof joinPreviewData[0] === 'object' && joinPreviewData[0] !== null) {
+    if (
+      joinPreviewData.length > 0 &&
+      typeof joinPreviewData[0] === 'object' &&
+      joinPreviewData[0] !== null
+    ) {
       return Object.keys(joinPreviewData[0]);
     }
     return [];
   })();
 
-    /**
-     * Updates preview rows-per-page for the join preview table.
-     * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Updates preview rows-per-page for the join preview table.
+   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleJoinPreviewPageSizeChange = (size: number) => {
     setJoinPreviewPageSize(size);
   };
 
-  const readyMessage = joinConfigIssues || 'Select two data blocks and configure the join to view a preview.';
+  const readyMessage =
+    joinConfigIssues || 'Select two data blocks and configure the join to view a preview.';
 
-    /**
-     * Persists the user's left/right join column override for the active schema.
-     * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Persists the user's left/right join column override for the active schema.
+   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleJoinColumnChange = (nodeId: string, column: string) => {
     if (nodeId === joinLeftNodeId) {
       setJoinLeftColumnDraft({ nodeId, columnsKey: columnsKey(leftColumns), value: column });
@@ -369,18 +388,18 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     }
   };
 
-    /**
-     * Placeholder color handler because join uses fixed left/right colors.
-     * Called by: useJoinSubTab internal event, effect, or helper flow.
-     */
+  /**
+   * Placeholder color handler because join uses fixed left/right colors.
+   * Called by: useJoinSubTab internal event, effect, or helper flow.
+   */
   const handleJoinColorChange = () => undefined;
 
   /**
    * Applies the join with the current node pair, join type, selected columns,
    * and optional output name.
    * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-  * Steps: validate join readiness, derive column arrays and output name, run the mutation,
-  * and restore loading state.
+   * Steps: validate join readiness, derive column arrays and output name, run the mutation,
+   * and restore loading state.
    */
   const handleApplyJoin = async () => {
     if (!joinConfigReady) {
@@ -392,7 +411,14 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     const requestedName = joinNewNodeName.trim() || autoJoinName || undefined;
     try {
       setIsJoining(true);
-      await joinNodes(joinLeftNodeId, joinRightNodeId, joinType, leftColumns, rightColumns, requestedName);
+      await joinNodes(
+        joinLeftNodeId,
+        joinRightNodeId,
+        joinType,
+        leftColumns,
+        rightColumns,
+        requestedName,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error applying join';
       onAlert(`Error applying join: ${message}`);
@@ -401,10 +427,10 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     }
   };
 
-    /**
-     * Packages join selection state for the shared preprocessing panel consumer.
-     * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Packages join selection state for the shared preprocessing panel consumer.
+   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const selectionPanel: JoinSelectionPanelConfig = {
     selectedNodes: joinSelectedNodes,
     nodeColumnSelections: joinNodeSelections,
@@ -444,20 +470,27 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       : joinPreviewData.length === 0);
 
   const applyDisabled =
-    !joinConfigReady || !currentWorkspaceId || isJoining || isLoading.operations || previewIsEmpty || !!joinPreviewError;
+    !joinConfigReady ||
+    !currentWorkspaceId ||
+    isJoining ||
+    isLoading.operations ||
+    previewIsEmpty ||
+    !!joinPreviewError;
 
   const applyDisabledReason: string | undefined = (() => {
     if (isJoining || isLoading.operations) return undefined;
     if (!joinConfigReady) return joinConfigIssues || 'Configure the join first';
-    if (joinPreviewError) return 'Fix the error shown in Preview join output before adding to workspace';
-    if (previewIsEmpty) return 'The current join produces no matching rows — adjust the join type or key columns';
+    if (joinPreviewError)
+      return 'Fix the error shown in Preview join output before adding to workspace';
+    if (previewIsEmpty)
+      return 'The current join produces no matching rows — adjust the join type or key columns';
     return undefined;
   })();
 
-    /**
-     * Wraps join type state so the return object exposes a named setter.
-     * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Wraps join type state so the return object exposes a named setter.
+   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleSetJoinType = (value: JoinType) => {
     setJoinType(value);
   };

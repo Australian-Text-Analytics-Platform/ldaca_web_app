@@ -49,7 +49,8 @@ const stopwordExports = stopwordLists as StopwordExports;
 
 /** Converts UI/user language strings to the primary code used for stopword lookup. */
 /** Called by: resolveMergedStopwords and loadMergedStopwords in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-const normaliseLanguageCode = (raw: string): string => raw.trim().toLowerCase().split(/[-_]/)[0] ?? '';
+const normaliseLanguageCode = (raw: string): string =>
+  raw.trim().toLowerCase().split(/[-_]/)[0] ?? '';
 
 const iso6393ByIso6391 = new Map(
   iso6393
@@ -119,6 +120,7 @@ export function resolveMergedStopwords(
 
 /** Async facade for UI actions that may later load stopword sources dynamically. */
 /** Used by: src/features/analysis/token-frequency/hooks/useTokenFrequencyPreferences.ts, src/lib/__tests__/loadMergedStopwords.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function loadMergedStopwords(args: {
   languages: ReadonlyArray<string | null | undefined>;
 }): Promise<MergedStopwordsResult> {

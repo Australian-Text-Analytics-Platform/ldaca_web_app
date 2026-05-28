@@ -1,4 +1,3 @@
-
 import { Search } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -7,7 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
@@ -77,7 +82,9 @@ export function ReplaceSubTab(props: ReplaceSubTabProps) {
         <CardContent className="space-y-4 pt-0">
           <NodeSelectionPanel
             selectedNodes={effectiveNodes}
-            nodeColumnSelections={activeNodeId ? [{ nodeId: activeNodeId, column: selectedColumn }] : []}
+            nodeColumnSelections={
+              activeNodeId ? [{ nodeId: activeNodeId, column: selectedColumn }] : []
+            }
             onColumnChange={(nodeId, column) => {
               if (nodeId === activeNodeId) {
                 setSelectedColumn(column);
@@ -113,7 +120,11 @@ export function ReplaceSubTab(props: ReplaceSubTabProps) {
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-32 space-y-2">
               <Label htmlFor="find-mode">Mode</Label>
-              <Select value={mode} onValueChange={(value: 'replace' | 'extract') => setMode(value)} disabled={controlsDisabled || !selectedColumn}>
+              <Select
+                value={mode}
+                onValueChange={(value: 'replace' | 'extract') => setMode(value)}
+                disabled={controlsDisabled || !selectedColumn}
+              >
                 <SelectTrigger id="find-mode">
                   <SelectValue />
                 </SelectTrigger>
@@ -181,19 +192,33 @@ export function ReplaceSubTab(props: ReplaceSubTabProps) {
         </CardContent>
         <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
           <div className="flex flex-1 items-center gap-2">
-            <Label htmlFor="replace-output-column" className="shrink-0">Output column name</Label>
+            <Label htmlFor="replace-output-column" className="shrink-0">
+              Output column name
+            </Label>
             <Input
               id="replace-output-column"
               value={outputColumnName}
               onChange={(event) => setOutputColumnName(event.target.value)}
-              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: outputColumnName, setValue: setOutputColumnName })}
+              onKeyDown={(event) =>
+                acceptPlaceholderOnTab({
+                  event,
+                  value: outputColumnName,
+                  setValue: setOutputColumnName,
+                })
+              }
               placeholder={selectedColumn || 'Leave blank to overwrite the selected column'}
               disabled={controlsDisabled || !selectedColumn}
               className="min-w-0 flex-1"
             />
           </div>
           <DisabledReasonTooltip reason={applyDisabledReason}>
-            <Button type="button" size="sm" onClick={() => void handleApply()} disabled={!canApply} className="shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleApply()}
+              disabled={!canApply}
+              className="shrink-0"
+            >
               {applyLoading ? 'Applying…' : 'Add to Data Block'}
             </Button>
           </DisabledReasonTooltip>

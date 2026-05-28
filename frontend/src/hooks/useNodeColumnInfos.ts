@@ -18,13 +18,7 @@ export type NodeLike = Record<string, unknown> & {
 /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const resolveNodeId = (node: NodeLike | null | undefined, fallbackIndex: number): string | null => {
   if (!node) return null;
-  const candidates = [
-    node.id,
-    node.node_id,
-    node.data?.id,
-    node.data?.node_id,
-    node.unique_id,
-  ];
+  const candidates = [node.id, node.node_id, node.data?.id, node.data?.node_id, node.unique_id];
   for (const candidate of candidates) {
     if (typeof candidate === 'string' && candidate.length) {
       return candidate;
@@ -55,17 +49,17 @@ export interface UseNodeColumnInfosResult {
  * Used by: src/features/analysis/ai-annotator/AiAnnotatorFeature.tsx, src/features/analysis/common/useAnalysisLockMachine.ts, src/features/analysis/concordance/ConcordanceFeature.tsx and 3 other importers because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: resolve node ids, issue node-info queries, build a typed column cache, then return a fallback-aware getter and loading flag.
  */
-export const useNodeColumnInfos = (
-  params: {
-    workspaceId?: string | null;
-    nodes: NodeLike[];
-    enabled?: boolean;
-  },
-): UseNodeColumnInfosResult => {
+export const useNodeColumnInfos = (params: {
+  workspaceId?: string | null;
+  nodes: NodeLike[];
+  enabled?: boolean;
+}): UseNodeColumnInfosResult => {
   const { workspaceId, nodes, enabled = true } = params;
   const { getAuthHeaders } = useAuth();
 
-  const nodeIds = nodes.map((node, idx) => resolveNodeId(node, idx)).filter((id): id is string => !!id);
+  const nodeIds = nodes
+    .map((node, idx) => resolveNodeId(node, idx))
+    .filter((id): id is string => !!id);
 
   const queryEnabled = enabled && Boolean(workspaceId);
   const results = useQueries({

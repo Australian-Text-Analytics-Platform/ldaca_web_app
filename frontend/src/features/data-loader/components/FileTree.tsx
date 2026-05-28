@@ -86,7 +86,10 @@ export function FileTree({
    * handlers use this before showing an active target or calling the API.
    * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const canDropFileIntoDirectory = (sourcePath: string | null, targetDirectoryPath: string): boolean => {
+  const canDropFileIntoDirectory = (
+    sourcePath: string | null,
+    targetDirectoryPath: string,
+  ): boolean => {
     if (!sourcePath) return false;
     return getParentDirectoryPath(sourcePath) !== targetDirectoryPath;
   };
@@ -160,7 +163,10 @@ export function FileTree({
    * this drop path through the parent `onMoveFile` callback.
    * Called by: FileTree internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const handleDirectoryDrop = async (targetDirectoryPath: string, event: React.DragEvent<HTMLElement>) => {
+  const handleDirectoryDrop = async (
+    targetDirectoryPath: string,
+    event: React.DragEvent<HTMLElement>,
+  ) => {
     const sourcePath = getDraggedFilePath(event);
     if (!canDropFileIntoDirectory(sourcePath, targetDirectoryPath)) return;
     if (!sourcePath) return;
@@ -185,8 +191,12 @@ export function FileTree({
       data-testid={`file-row-${file.path}`}
       onDragStart={(event) => handleTreeFileDragStart(event, file.path)}
       onDragEnd={handleTreeFileDragEnd}
-      onDragEnter={(event) => handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)}
-      onDragOver={(event) => handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)}
+      onDragEnter={(event) =>
+        handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)
+      }
+      onDragOver={(event) =>
+        handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)
+      }
       onDragLeave={(event) => handleDirectoryDragLeave(`file:${file.path}`, event)}
       onDrop={(event) => void handleDirectoryDrop(parentDirectoryPath, event)}
       className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 ${
@@ -208,7 +218,12 @@ export function FileTree({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onPreviewFile(file.path)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            onClick={() => onPreviewFile(file.path)}
+          >
             <Eye className="h-3.5 w-3.5" />
             <span className="hidden lg:inline">Preview</span>
           </Button>
@@ -230,7 +245,12 @@ export function FileTree({
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden lg:inline">Add</span>
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onDownloadFile(file.path)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            onClick={() => onDownloadFile(file.path)}
+          >
             <DownloadIcon className="h-3.5 w-3.5" />
             <span className="hidden xl:inline">Download</span>
           </Button>
@@ -326,6 +346,6 @@ export function FileTree({
   };
 
   return <>{nodes.map((node) => renderNode(node))}</>;
-};
+}
 
 export default FileTree;

@@ -47,9 +47,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
    * Steps: copy the selected list, skip empty batches, upload files sequentially so
    * notifications match actual outcomes, then reset busy/drop state.
    */
-  const uploadSelectedFiles = async (
-    filesToUpload: FileList | File[] | null | undefined,
-  ) => {
+  const uploadSelectedFiles = async (filesToUpload: FileList | File[] | null | undefined) => {
     const selectedFiles = Array.from(filesToUpload ?? []);
     if (selectedFiles.length === 0) {
       return;

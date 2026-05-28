@@ -119,20 +119,20 @@ export const invalidateNodeInfoQuery = (
   nodeId?: string,
 ): void => {
   if (nodeId) {
-    queryClient.invalidateQueries({ queryKey: queryKeys.nodeInfo(workspaceId, nodeId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.nodeInfo(workspaceId, nodeId) });
     return;
   }
-  queryClient.invalidateQueries({
+  void queryClient.invalidateQueries({
     /** Limits broad invalidation to node-info records under the requested workspace. */
     /** Called by: TanStack Query cache invalidation filtering because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
     predicate: (query) => {
       const key = query.queryKey;
       return (
-        Array.isArray(key)
-        && key[0] === 'workspaces'
-        && key[1] === workspaceId
-        && key[2] === 'nodes'
-        && key[4] === 'info'
+        Array.isArray(key) &&
+        key[0] === 'workspaces' &&
+        key[1] === workspaceId &&
+        key[2] === 'nodes' &&
+        key[4] === 'info'
       );
     },
   });

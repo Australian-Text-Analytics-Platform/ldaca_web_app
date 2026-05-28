@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
+import {
+  type NodeProps,
+  Handle,
+  Position,
+  useStore,
+  type Node as ReactFlowNode,
+} from '@xyflow/react';
 import { Settings2, Copy, Check } from 'lucide-react';
 import {
   AlertDialog,
@@ -45,7 +51,17 @@ const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
  * Flow: React Flow passes node data, zoom and selection choose compact or full rendering, and actions invoke workspace mutations.
  */
 function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
-  const { node, isMultiSelected = false, visualInfo, isFresh = false, onDelete, onRename, onCopy, onUndo, onRedo } = data;
+  const {
+    node,
+    isMultiSelected = false,
+    visualInfo,
+    isFresh = false,
+    onDelete,
+    onRename,
+    onCopy,
+    onUndo,
+    onRedo,
+  } = data;
   // Fall back to the unselected-grey treatment if no visual info was
   // attached (defensive — useWorkspaceGraph always provides one now,
   // but CustomNode tests render without it).
@@ -70,11 +86,11 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   // Close menu when clicking outside (capture to beat React Flow internal handlers)
   useEffect(() => {
     if (!showMenu) return;
-        /**
+    /**
      * Closes the node menu when a captured pointer event lands outside it.
-         * Called by: CustomNode internal event, effect, or helper flow.
-         * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-         */
+     * Called by: CustomNode internal event, effect, or helper flow.
+     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+     */
     const handlePointerDown = (event: Event) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false);
@@ -84,22 +100,22 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     return () => document.removeEventListener('pointerdown', handlePointerDown, { capture: true });
   }, [showMenu]);
 
-    /**
+  /**
    * Opens delete confirmation without letting the graph select the node.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
     setShowDeleteConfirm(true);
   };
 
-    /**
+  /**
    * Confirms deletion through the graph action passed from useWorkspaceGraph.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleDeleteConfirm = () => {
     if (node?.node_id) {
       onDelete(node.node_id);
@@ -107,11 +123,11 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     setShowDeleteConfirm(false);
   };
 
-    /**
+  /**
    * Starts inline rename mode from the node settings menu.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleRenameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
@@ -123,11 +139,11 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     }, 10);
   };
 
-    /**
+  /**
    * Submits the inline node rename form.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleRenameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -138,32 +154,32 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     setNewName('');
   };
 
-    /**
+  /**
    * Leaves inline rename mode without changing the node name.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleRenameCancel = () => {
     setIsRenaming(false);
     setNewName('');
   };
 
-    /**
+  /**
    * Lets Escape cancel inline rename without graph interaction.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleRenameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       handleRenameCancel();
     }
   };
 
-    /**
+  /**
    * Clones the node from the settings menu.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleCopyNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
@@ -172,11 +188,11 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     }
   };
 
-    /**
+  /**
    * Runs node undo when the backend reports it is available.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleUndoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
@@ -185,11 +201,11 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     }
   };
 
-    /**
+  /**
    * Runs node redo when the backend reports it is available.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleRedoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
@@ -198,15 +214,15 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     }
   };
 
-    /**
+  /**
    * Copies the node id for debugging and user support workflows.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const handleCopyId = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (node?.node_id) {
-      navigator.clipboard.writeText(node.node_id);
+      void navigator.clipboard.writeText(node.node_id);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -219,7 +235,8 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   // ``selected`` from React Flow (single-click highlight) is treated as
   // Focus visually when the node isn't already in the analysis window.
   const isHighlighted = isActive || isFocus || selected;
-  const nodeClasses = 'w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out shadow-md';
+  const nodeClasses =
+    'w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out shadow-md';
   // Stroke and ring follow Active > Focus/selected > Unselected.
   const nodeBorderColor = isActive
     ? nodeColorPair.X
@@ -233,17 +250,14 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   // displayed name with X so the node's identity is recognisable at
   // rest. Default-grey unselected nodes keep the standard foreground
   // so never-analysed blocks stay visually quiet.
-  const hasAssignedColour = visualInfo
-    ? visualInfo.pair.X !== DEFAULT_GREY_PAIR.X
-    : false;
-  const nameColour =
-    !isHighlighted && hasAssignedColour ? nodeColorPair.X : undefined;
+  const hasAssignedColour = visualInfo ? visualInfo.pair.X !== DEFAULT_GREY_PAIR.X : false;
+  const nameColour = !isHighlighted && hasAssignedColour ? nodeColorPair.X : undefined;
 
-    /**
+  /**
    * Formats row/column counts for the node shape label.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
-     */
+   * Called by: CustomNode internal event, effect, or helper flow.
+   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
+   */
   const formatShapePart = (value: number | null | undefined) =>
     typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
 
@@ -251,7 +265,8 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     ? `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`
     : null;
 
-  const menuButtonClassName = 'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
+  const menuButtonClassName =
+    'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
 
   const nodeActionControls = (
     <div className="flex items-center space-x-1 shrink-0">
@@ -323,7 +338,10 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-white hover:bg-destructive/90">
+          <AlertDialogAction
+            onClick={handleDeleteConfirm}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -333,7 +351,8 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
 
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
-    const compactClasses = 'flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out shadow-md';
+    const compactClasses =
+      'flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out shadow-md';
     const compactBg = isHighlighted ? nodeColorPair.Y : undefined;
     return (
       <div
@@ -351,9 +370,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
           ...(isFresh ? { outline: '3px solid #000', outlineOffset: '2px' } : {}),
         }}
       >
-        <div className="absolute right-2 top-2 z-10">
-          {nodeActionControls}
-        </div>
+        <div className="absolute right-2 top-2 z-10">{nodeActionControls}</div>
         {isHighlighted && (
           <div
             className="w-3 h-3 rounded-full mr-2.5 mt-2 shrink-0"
@@ -372,8 +389,16 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         >
           {nodeName}
         </div>
-        <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
-        <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
+        />
         {deleteDialog}
       </div>
     );
@@ -429,9 +454,9 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 className="nodrag nopan relative z-50 w-full rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-bold focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                style={{ 
+                style={{
                   fontSize: '14px',
-                  lineHeight: '1.2'
+                  lineHeight: '1.2',
                 }}
               />
             </form>
@@ -464,7 +489,11 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
             className="p-1 hover:bg-gray-100 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
             title="Copy ID"
           >
-            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+            {copied ? (
+              <Check className="h-3 w-3 text-green-500" />
+            ) : (
+              <Copy className="h-3 w-3 text-gray-400" />
+            )}
           </button>
         </div>
         {shapeLabel ? (
@@ -475,11 +504,19 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       </div>
 
       {/* Passive handles so backend edges can attach; UI connections remain disabled by parent ReactFlow props */}
-      <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
-      <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
+      />
       {deleteDialog}
     </div>
   );
-};
+}
 
 export default CustomNode;

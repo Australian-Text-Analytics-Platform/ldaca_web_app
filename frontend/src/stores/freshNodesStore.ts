@@ -20,6 +20,10 @@
  * just produced this session via detach / join / stack / clone / etc.
  */
 import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
+import { enableMapSet } from 'immer';
+
+enableMapSet();
 
 interface FreshNodesState {
   seenIds: Set<string>;
@@ -38,73 +42,61 @@ interface FreshNodesState {
   reset(): void;
 }
 
-export const useFreshNodesStore = create<FreshNodesState>((set) => ({
-  seenIds: new Set<string>(),
-  freshIds: new Set<string>(),
+export const useFreshNodesStore = create<FreshNodesState>()(
+  immer((set) => ({
+    seenIds: new Set<string>(),
+    freshIds: new Set<string>(),
 
-  /** Observes a graph payload and marks only mid-session arrivals as fresh. */
-  /**
-   * Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
-    * Flow: copy seen/fresh sets, treat the first graph payload as baseline, then mark later unseen node ids as fresh highlights.
-   */
-  observeNodeIds: (currentIds) => {
-    set((state) => {
-      const wasEmpty = state.seenIds.size === 0;
-      const nextSeen = new Set(state.seenIds);
-      const nextFresh = new Set(state.freshIds);
-      let mutated = false;
-      for (const id of currentIds) {
-        if (!id) continue;
-        if (!nextSeen.has(id)) {
-          nextSeen.add(id);
-          if (!wasEmpty) {
-            // Genuinely new mid-session arrival → flag it.
-            nextFresh.add(id);
+    /** Observes a graph payload and marks only mid-session arrivals as fresh. */
+    /**
+     * Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Flow: copy seen/fresh sets, treat the first graph payload as baseline, then mark later unseen node ids as fresh highlights.
+     */
+    observeNodeIds: (currentIds) => {
+      set((state) => {
+        const wasEmpty = state.seenIds.size === 0;
+        for (const id of currentIds) {
+          if (!id) continue;
+          if (!state.seenIds.has(id)) {
+            state.seenIds.add(id);
+            if (!wasEmpty) state.freshIds.add(id);
           }
-          mutated = true;
         }
-      }
-      if (!mutated) return state;
-      return { seenIds: nextSeen, freshIds: nextFresh };
-    });
-  },
+      });
+    },
 
-  /** Removes the fresh highlight once graph/sidebar interactions prove the user noticed nodes. */
-  /** Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  markInteracted: (nodeIds) => {
-    set((state) => {
-      if (nodeIds.length === 0 || state.freshIds.size === 0) return state;
-      const nextFresh = new Set(state.freshIds);
-      let mutated = false;
-      for (const id of nodeIds) {
-        if (id && nextFresh.delete(id)) mutated = true;
-      }
-      if (!mutated) return state;
-      return { freshIds: nextFresh };
-    });
-  },
+    /** Removes the fresh highlight once graph/sidebar interactions prove the user noticed nodes. */
+    /** Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    markInteracted: (nodeIds) => {
+      set((state) => {
+        for (const id of nodeIds) {
+          if (id) state.freshIds.delete(id);
+        }
+      });
+    },
 
-  /** Drops deleted nodes from tracking so future same-id arrivals can be highlighted again. */
-  /**
-   * Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
-    * Flow: copy tracking sets, remove deleted ids from seen and fresh state, then return the original state when no tracked id changed.
-   */
-  forgetNodeIds: (nodeIds) => {
-    set((state) => {
-      if (nodeIds.length === 0) return state;
-      const nextSeen = new Set(state.seenIds);
-      const nextFresh = new Set(state.freshIds);
-      let mutated = false;
-      for (const id of nodeIds) {
-        if (id && nextSeen.delete(id)) mutated = true;
-        if (id) nextFresh.delete(id);
-      }
-      if (!mutated) return state;
-      return { seenIds: nextSeen, freshIds: nextFresh };
-    });
-  },
+    /** Drops deleted nodes from tracking so future same-id arrivals can be highlighted again. */
+    /**
+     * Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Flow: copy tracking sets, remove deleted ids from seen and fresh state, then return the original state when no tracked id changed.
+     */
+    forgetNodeIds: (nodeIds) => {
+      set((state) => {
+        for (const id of nodeIds) {
+          if (id) {
+            state.seenIds.delete(id);
+            state.freshIds.delete(id);
+          }
+        }
+      });
+    },
 
-  /** Resets session-only freshness state for tests and workspace-session resets. */
-  /** Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-  reset: () => set({ seenIds: new Set(), freshIds: new Set() }),
-}));
+    /** Resets session-only freshness state for tests and workspace-session resets. */
+    /** Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    reset: () =>
+      set((state) => {
+        state.seenIds = new Set();
+        state.freshIds = new Set();
+      }),
+  })),
+);

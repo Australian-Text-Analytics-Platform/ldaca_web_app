@@ -15,7 +15,11 @@ export interface BlockingCopy {
  */
 export const formatTimestamp = (value?: number | null): string | null => {
   if (!value) return null;
-  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date(value).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 };
 
 /** Called by: authPhaseCopy status builders and RefreshStatusBanner retry copy because the caller needs one documented boundary for the lookup, event, or state handoff step. */
@@ -29,7 +33,10 @@ export const formatAttemptLabel = (attempts: number): string =>
  * Why: blocking screens and banners should describe the same auth phase with consistent retry timing language.
  * Flow: branch bootstrapping and fatal phases, format attempts/timestamps, then return BlockingScreen copy or null.
  */
-export const getBlockingCopy = (phase: AuthPhase, showLaggingHint: boolean): BlockingCopy | null => {
+export const getBlockingCopy = (
+  phase: AuthPhase,
+  showLaggingHint: boolean,
+): BlockingCopy | null => {
   if (phase.status === 'bootstrapping') {
     return {
       title: 'Signing you in',
@@ -45,7 +52,8 @@ export const getBlockingCopy = (phase: AuthPhase, showLaggingHint: boolean): Blo
   if (phase.status === 'fatal') {
     return {
       title: 'Reconnecting your session',
-      description: 'Multiple background refresh attempts failed, so we paused the workspace until the backend responds again.',
+      description:
+        'Multiple background refresh attempts failed, so we paused the workspace until the backend responds again.',
       status: `Retrying (${formatAttemptLabel(phase.attempts)})…`,
       hint: formatTimestamp(phase.lastFailureAt)
         ? `Last failure at ${formatTimestamp(phase.lastFailureAt)}. Check your connection or restart the backend, then retry below.`

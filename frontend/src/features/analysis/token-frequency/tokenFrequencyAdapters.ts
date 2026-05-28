@@ -3,7 +3,9 @@ import { isNonEmptyString } from '../common';
 
 export type TokenFrequencyRow = { token: string; frequency: number };
 
-export type TokenFrequencyStatisticsEntry = NonNullable<TokenFrequencyResponse['statistics']>[number];
+export type TokenFrequencyStatisticsEntry = NonNullable<
+  TokenFrequencyResponse['statistics']
+>[number];
 
 export type NormalizedNodeResult = {
   nodeId: string;
@@ -60,7 +62,7 @@ export const extractMetadata = (entry: unknown): Record<string, unknown> => {
 /**
  * Used by: tokenFrequencyAdapters analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
  */
-export const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: number): number => {
+export const maxBy = <T>(items: T[], selector: (item: T) => number, fallback: number): number => {
   let max = fallback;
   for (const item of items) {
     const value = selector(item);
@@ -74,11 +76,14 @@ export const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: n
 /** Builds node display-name hints from response metadata before UI-level fallback naming runs. */
 /**
  * Used by: TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
-   * Flow: read metadata node_display_names, scan per-node result metadata for node/display-name pairs, then return the hint map.
+ * Flow: read metadata node_display_names, scan per-node result metadata for node/display-name pairs, then return the hint map.
  */
-export const buildResponseDisplayNameHints = (results?: TokenFrequencyResponse | null): Record<string, string> => {
+export const buildResponseDisplayNameHints = (
+  results?: TokenFrequencyResponse | null,
+): Record<string, string> => {
   const mapping: Record<string, string> = {};
-  const metadataNodeNames = ((results?.metadata as Record<string, unknown> | null | undefined)?.node_display_names ?? {}) as Record<string, unknown>;
+  const metadataNodeNames = ((results?.metadata as Record<string, unknown> | null | undefined)
+    ?.node_display_names ?? {}) as Record<string, unknown>;
   if (metadataNodeNames && typeof metadataNodeNames === 'object') {
     Object.entries(metadataNodeNames).forEach(([id, name]) => {
       if (isNonEmptyString(name)) {
@@ -104,12 +109,12 @@ export const buildResponseDisplayNameHints = (results?: TokenFrequencyResponse |
 /** Resolves the node ordering that downstream adapters should use for result display. */
 /**
  * Used by: TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
-   * Flow: combine request node_ids, previous comparison ids, and selected node ids, then keep first nonempty occurrence of each id.
+ * Flow: combine request node_ids, previous comparison ids, and selected node ids, then keep first nonempty occurrence of each id.
  */
 export const computeAnalysisNodeIds = (
   paramsNodeIds: unknown,
   lastCompareNodeIds: string[],
-  nodeColumnSelections: Array<{ nodeId: string }>
+  nodeColumnSelections: Array<{ nodeId: string }>,
 ): string[] => {
   const combined: Array<string | null | undefined> = [];
   if (Array.isArray(paramsNodeIds)) {
@@ -137,7 +142,7 @@ export const computeAnalysisNodeIds = (
 export const normalizeNodeResults = (
   data: unknown,
   analysisNodeIds: string[],
-  computeDisplayName: (nodeId: string, fallbackKey?: string) => string
+  computeDisplayName: (nodeId: string, fallbackKey?: string) => string,
 ): NormalizedNodeResult[] => {
   if (!data || typeof data !== 'object') {
     return [];
@@ -163,7 +168,7 @@ export const normalizeNodeResults = (
     const fallbackKey = entries[index]?.[0];
     const displayName = computeDisplayName(nodeId, fallbackKey);
     const directKey = [nodeId, displayName].find(
-      (key) => !!key && Object.prototype.hasOwnProperty.call(dataRecord, key) && !usedKeys.has(key)
+      (key) => !!key && Object.prototype.hasOwnProperty.call(dataRecord, key) && !usedKeys.has(key),
     );
 
     const matchedEntry =
@@ -202,7 +207,7 @@ export const normalizeNodeResults = (
 export const deriveNodeDisplayResults = (
   normalizedNodeResults: NormalizedNodeResult[],
   appliedStopSet: Set<string>,
-  effectiveTokenLimit: number | null
+  effectiveTokenLimit: number | null,
 ): NodeResultView[] => {
   const normalizedLimit =
     typeof effectiveTokenLimit === 'number' && Number.isFinite(effectiveTokenLimit)
@@ -239,7 +244,8 @@ export const deriveNodeDisplayResults = (
       displayRows = limitedRows;
     }
 
-    const maxFrequencyRaw = rawRows.length > 0 ? maxBy(rawRows, (r) => Number(r?.frequency) || 0, 0) : 0;
+    const maxFrequencyRaw =
+      rawRows.length > 0 ? maxBy(rawRows, (r) => Number(r?.frequency) || 0, 0) : 0;
     const maxFrequency = maxFrequencyRaw > 0 ? maxFrequencyRaw : 1;
 
     return {
@@ -269,4 +275,3 @@ export const wildcardToRegExp = (pattern: string): RegExp | null => {
     .replace(/\?/g, '.');
   return new RegExp(`^${escaped}$`, 'i');
 };
-

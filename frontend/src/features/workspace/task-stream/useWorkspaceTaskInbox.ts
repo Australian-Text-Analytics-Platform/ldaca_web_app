@@ -47,10 +47,18 @@ const normalizeTimestamp = (value: unknown): number => {
 const sortTasksByTime = (tasks: TaskItem[] = []) =>
   tasks.toSorted((a, b) => {
     const tb = normalizeTimestamp(
-      (b as InternalTask)?.__event_timestamp ?? b?.finished_at ?? b?.started_at ?? b?.created_at ?? 0
+      (b as InternalTask)?.__event_timestamp ??
+        b?.finished_at ??
+        b?.started_at ??
+        b?.created_at ??
+        0,
     );
     const ta = normalizeTimestamp(
-      (a as InternalTask)?.__event_timestamp ?? a?.finished_at ?? a?.started_at ?? a?.created_at ?? 0
+      (a as InternalTask)?.__event_timestamp ??
+        a?.finished_at ??
+        a?.started_at ??
+        a?.created_at ??
+        0,
     );
     return tb - ta;
   });
@@ -160,7 +168,7 @@ const chooseByEventOrder = (existing: TaskItem | undefined, incoming: TaskItem):
 const mergeTaskUpdates = (
   previousTasks: TaskItem[] = [],
   updates: TaskMergeUpdate[] = [],
-  options: { replaceAll?: boolean } = {}
+  options: { replaceAll?: boolean } = {},
 ) => {
   if (!updates.length && !options.replaceAll) {
     return sortTasksByTime(previousTasks);
@@ -216,7 +224,7 @@ const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
  * Flow: subscribe to the authenticated SSE client, route payloads into task/cache/materialization handlers, and expose transient stream errors as inbox status.
  */
 export const useWorkspaceTaskInbox = (
-  workspaceId: string | null
+  workspaceId: string | null,
 ): WorkspaceTaskStreamClientState => {
   const queryClient = useQueryClient();
   const { getAuthHeaders } = useAuth();
@@ -225,11 +233,11 @@ export const useWorkspaceTaskInbox = (
   const [transientError, setTransientError] = useState<string | null>(null);
   const eventSequenceRef = useRef(0);
 
-    /**
+  /**
    * Assigns a local sequence to incoming SSE events for deterministic merges.
-     * Called by: useWorkspaceTaskInbox internal event, effect, or helper flow.
-     * Why: because the inbox reducer needs shared helpers to keep streaming events ordered and unread state consistent.
-     */
+   * Called by: useWorkspaceTaskInbox internal event, effect, or helper flow.
+   * Why: because the inbox reducer needs shared helpers to keep streaming events ordered and unread state consistent.
+   */
   const nextEventSequence = () => {
     eventSequenceRef.current += 1;
     return eventSequenceRef.current;
@@ -242,111 +250,114 @@ export const useWorkspaceTaskInbox = (
    * Flow: clear transient errors, branch by event type, merge task updates, then invalidate affected workspace queries.
    */
   const handlePayload = (payload: TaskEventPayload) => {
-      if (payload.type !== 'analysis_save_failed' && payload.type !== 'error') {
-        setTransientError(null);
-      }
+    if (payload.type !== 'analysis_save_failed' && payload.type !== 'error') {
+      setTransientError(null);
+    }
 
-      switch (payload.type) {
-        case 'workspace_updated': {
-          if (workspaceId) {
-            // invalidateQueries with the default refetchType:'active' already
-            // refetches any observed query, so we do not also call refetchQueries.
-            queryClient.invalidateQueries({
+    switch (payload.type) {
+      case 'workspace_updated': {
+        if (workspaceId) {
+          // invalidateQueries with the default refetchType:'active' already
+          // refetches any observed query, so we do not also call refetchQueries.
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.workspaceGraph(workspaceId),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.workspaceNodes(workspaceId),
+          });
+        }
+        break;
+      }
+      case 'tasks_snapshot': {
+        const snapshotTasks = payload.tasks;
+        if (Array.isArray(snapshotTasks)) {
+          const seq = nextEventSequence();
+          const eventTimestamp = normalizeTimestamp(payload.timestamp);
+          setTasks((prevTasks: TaskItem[]) =>
+            mergeTaskUpdates(
+              prevTasks,
+              snapshotTasks.map((task: TaskItem) => ({
+                task,
+                eventTimestamp,
+                eventSequence: seq,
+              })),
+              { replaceAll: true },
+            ),
+          );
+        }
+        break;
+      }
+      case 'task_changed': {
+        if (payload.task) {
+          const seq = nextEventSequence();
+          const eventTimestamp = normalizeTimestamp(payload.timestamp);
+          setTasks((prevTasks: TaskItem[]) =>
+            mergeTaskUpdates(prevTasks, [
+              {
+                task: payload.task as TaskItem,
+                eventTimestamp,
+                eventSequence: seq,
+              },
+            ]),
+          );
+
+          if (payload.task?.task_type === 'ldaca_import' && payload.task.state === 'successful') {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.files });
+          }
+
+          if (workspaceId && shouldRefreshGraphFallback(payload.task as TaskItem)) {
+            void queryClient.invalidateQueries({
               queryKey: queryKeys.workspaceGraph(workspaceId),
             });
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.workspaceNodes(workspaceId),
-            });
           }
-          break;
         }
-        case 'tasks_snapshot': {
-          const snapshotTasks = payload.tasks;
-          if (Array.isArray(snapshotTasks)) {
-            const seq = nextEventSequence();
-            const eventTimestamp = normalizeTimestamp(payload.timestamp);
-            setTasks((prevTasks: TaskItem[]) =>
-              mergeTaskUpdates(
-                prevTasks,
-                snapshotTasks.map((task: TaskItem) => ({
-                  task,
-                  eventTimestamp,
-                  eventSequence: seq,
-                })),
-                { replaceAll: true }
-              )
-            );
-          }
-          break;
-        }
-        case 'task_changed': {
-          if (payload.task) {
-            const seq = nextEventSequence();
-            const eventTimestamp = normalizeTimestamp(payload.timestamp);
-            setTasks((prevTasks: TaskItem[]) =>
-              mergeTaskUpdates(prevTasks, [
-                {
-                  task: payload.task as TaskItem,
-                  eventTimestamp,
-                  eventSequence: seq,
-                },
-              ])
-            );
-
-            if (payload.task?.task_type === 'ldaca_import' && payload.task.state === 'successful') {
-              queryClient.invalidateQueries({ queryKey: queryKeys.files });
-            }
-
-            if (workspaceId && shouldRefreshGraphFallback(payload.task as TaskItem)) {
-              queryClient.invalidateQueries({
-                queryKey: queryKeys.workspaceGraph(workspaceId),
-              });
-            }
-          }
-          break;
-        }
-        case 'task_removed': {
-          if (payload.task_id) {
-            setTasks((prevTasks: TaskItem[]) =>
-              prevTasks.filter((task) => task.task_id !== payload.task_id)
-            );
-          }
-          break;
-        }
-        case 'analysis_materialized': {
-          const taskType = typeof payload.task_type === 'string' ? payload.task_type : '';
-          const taskId = typeof payload.task_id === 'string' ? payload.task_id : '';
-          const parentTaskId = typeof payload.parent_task_id === 'string' ? payload.parent_task_id : '';
-          const parentNodeId = typeof payload.parent_node_id === 'string' ? payload.parent_node_id : '';
-          const materializedPath = typeof payload.materialized_path === 'string' ? payload.materialized_path : '';
-          if (taskType && parentTaskId && parentNodeId && materializedPath) {
-            pushMaterializedEvent({
-              taskType,
-              taskId,
-              parentTaskId,
-              parentNodeId,
-              materializedPath,
-              timestamp: normalizeTimestamp(payload.timestamp) ?? Date.now(),
-            });
-          }
-          break;
-        }
-        case 'analysis_save_failed': {
-          if (payload.task_type === 'topic_modeling') {
-            setTransientError(payload.message || 'Analysis save failed');
-          }
-          break;
-        }
-        case 'error': {
-          setTransientError(payload.message || 'Task stream error');
-          break;
-        }
-        default: {
-          // noop
-          break;
-        }
+        break;
       }
-    };
+      case 'task_removed': {
+        if (payload.task_id) {
+          setTasks((prevTasks: TaskItem[]) =>
+            prevTasks.filter((task) => task.task_id !== payload.task_id),
+          );
+        }
+        break;
+      }
+      case 'analysis_materialized': {
+        const taskType = typeof payload.task_type === 'string' ? payload.task_type : '';
+        const taskId = typeof payload.task_id === 'string' ? payload.task_id : '';
+        const parentTaskId =
+          typeof payload.parent_task_id === 'string' ? payload.parent_task_id : '';
+        const parentNodeId =
+          typeof payload.parent_node_id === 'string' ? payload.parent_node_id : '';
+        const materializedPath =
+          typeof payload.materialized_path === 'string' ? payload.materialized_path : '';
+        if (taskType && parentTaskId && parentNodeId && materializedPath) {
+          pushMaterializedEvent({
+            taskType,
+            taskId,
+            parentTaskId,
+            parentNodeId,
+            materializedPath,
+            timestamp: normalizeTimestamp(payload.timestamp) ?? Date.now(),
+          });
+        }
+        break;
+      }
+      case 'analysis_save_failed': {
+        if (payload.task_type === 'topic_modeling') {
+          setTransientError(payload.message || 'Analysis save failed');
+        }
+        break;
+      }
+      case 'error': {
+        setTransientError(payload.message || 'Task stream error');
+        break;
+      }
+      default: {
+        // noop
+        break;
+      }
+    }
+  };
 
   const clientState = useWorkspaceTaskStreamClient({
     enabled: true,

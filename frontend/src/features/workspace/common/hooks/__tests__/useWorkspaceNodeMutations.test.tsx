@@ -75,11 +75,11 @@ const createTestClient = () =>
  * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const wrapWithClient = (client: QueryClient) => {
-    /**
+  /**
    * Provides the caller's QueryClient to the mutation hook render.
-     * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
-     * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
-     */
+   * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
+   * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
+   */
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
@@ -149,9 +149,9 @@ const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => (
   // the no-workspace-selected branches; `?? 'ws-1'` would silently coerce
   // nullish overrides back to 'ws-1'. The cast preserves the
   // `WorkspaceNodeMutationsParams` shape (which doesn't allow undefined).
-  currentWorkspaceId: ('currentWorkspaceId' in overrides
-    ? overrides.currentWorkspaceId
-    : 'ws-1') as string | null,
+  currentWorkspaceId: ('currentWorkspaceId' in overrides ? overrides.currentWorkspaceId : 'ws-1') as
+    | string
+    | null,
   selectedNodeId: overrides.selectedNodeId ?? null,
   setCurrentWorkspaceId: overrides.setCurrentWorkspaceId ?? mkSetWorkspaceId(),
   setSelectedNodes: overrides.setSelectedNodes ?? mkSetSelectedNodes(),
@@ -206,13 +206,14 @@ describe('useWorkspaceNodeMutations', () => {
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
       const startOperation = mkOperationFn();
       const endOperation = mkOperationFn();
-      workspaceSdkMock.createWorkspace.mockResolvedValue({ data: { id: 'ws-new' }, error: undefined });
+      workspaceSdkMock.createWorkspace.mockResolvedValue({
+        data: { id: 'ws-new' },
+        error: undefined,
+      });
 
       const { result } = renderHook(
         () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { startOperation, endOperation }),
-          ),
+          useWorkspaceNodeMutations(buildHookArgs(queryClient, { startOperation, endOperation })),
         { wrapper: wrapWithClient(queryClient) },
       );
 
@@ -245,9 +246,7 @@ describe('useWorkspaceNodeMutations', () => {
       );
 
       await act(async () => {
-        await result.current.actions
-          .createWorkspace('ws', 'd')
-          .catch(() => undefined);
+        await result.current.actions.createWorkspace('ws', 'd').catch(() => undefined);
       });
 
       expect(setOperationError).toHaveBeenCalledWith('createWorkspace', 'server down');
@@ -258,7 +257,10 @@ describe('useWorkspaceNodeMutations', () => {
   describe('setCurrentWorkspace', () => {
     it('writes the new id to the selectionStore setter and clears node selection', async () => {
       const queryClient = createTestClient();
-      workspaceSdkMock.setCurrentWorkspace.mockResolvedValue({ data: { state: 'successful', id: 'ws-2' }, error: undefined });
+      workspaceSdkMock.setCurrentWorkspace.mockResolvedValue({
+        data: { state: 'successful', id: 'ws-2' },
+        error: undefined,
+      });
       const setCurrentWorkspaceId = mkSetWorkspaceId();
       const clearSelection = mkClearSelection();
 
@@ -289,7 +291,10 @@ describe('useWorkspaceNodeMutations', () => {
       const queryClient = createTestClient();
       const setCurrentWorkspaceId = mkSetWorkspaceId();
       const clearSelection = mkClearSelection();
-      workspaceSdkMock.deleteWorkspace.mockResolvedValue({ data: { id: 'ws-1' }, error: undefined });
+      workspaceSdkMock.deleteWorkspace.mockResolvedValue({
+        data: { id: 'ws-1' },
+        error: undefined,
+      });
 
       const { result } = renderHook(
         () =>
@@ -313,10 +318,9 @@ describe('useWorkspaceNodeMutations', () => {
 
     it('rejects when called with an empty id', async () => {
       const queryClient = createTestClient();
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
-        { wrapper: wrapWithClient(queryClient) },
-      );
+      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
+        wrapper: wrapWithClient(queryClient),
+      });
 
       await expect(result.current.actions.deleteWorkspace('   ')).rejects.toThrow(
         /workspaceId is required/,
@@ -329,10 +333,7 @@ describe('useWorkspaceNodeMutations', () => {
     it('returns null when no workspace is selected without calling fetchNodeInfo', async () => {
       const queryClient = createTestClient();
       const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { currentWorkspaceId: null }),
-          ),
+        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { currentWorkspaceId: null })),
         { wrapper: wrapWithClient(queryClient) },
       );
 
@@ -346,10 +347,9 @@ describe('useWorkspaceNodeMutations', () => {
       queryClient.setQueryData(['workspaces', 'ws-1', 'graph'], {
         nodes: [{ id: 'node-other' }],
       });
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
-        { wrapper: wrapWithClient(queryClient) },
-      );
+      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
+        wrapper: wrapWithClient(queryClient),
+      });
 
       const schema = await result.current.actions.refreshNodeSchema('node-missing');
       expect(schema).toBeNull();
@@ -363,10 +363,9 @@ describe('useWorkspaceNodeMutations', () => {
       });
       fetchNodeInfoMock.mockResolvedValue({ schema: { col_a: 'string', col_b: 'integer' } });
 
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
-        { wrapper: wrapWithClient(queryClient) },
-      );
+      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
+        wrapper: wrapWithClient(queryClient),
+      });
 
       const schema = await result.current.actions.refreshNodeSchema('node-1');
 
@@ -393,10 +392,9 @@ describe('useWorkspaceNodeMutations', () => {
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
       workspaceSdkMock.castNode.mockResolvedValue({ data: {}, error: undefined });
 
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
-        { wrapper: wrapWithClient(queryClient) },
-      );
+      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
+        wrapper: wrapWithClient(queryClient),
+      });
 
       await act(async () => {
         await result.current.actions.castColumn('node-1', 'col_a', 'integer');
@@ -466,10 +464,7 @@ describe('useWorkspaceNodeMutations', () => {
       // promise — keep this assertion tight (() => …) instead of awaiting.
       const queryClient = createTestClient();
       const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { currentWorkspaceId: null }),
-          ),
+        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { currentWorkspaceId: null })),
         { wrapper: wrapWithClient(queryClient) },
       );
 
@@ -488,10 +483,9 @@ describe('useWorkspaceNodeMutations', () => {
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
       workspaceSdkMock.detachConcordance.mockResolvedValue({ data: {}, error: undefined });
 
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient)),
-        { wrapper: wrapWithClient(queryClient) },
-      );
+      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
+        wrapper: wrapWithClient(queryClient),
+      });
 
       await act(async () => {
         await result.current.actions.detachConcordance('node-1', {
@@ -522,10 +516,7 @@ describe('useWorkspaceNodeMutations', () => {
       workspaceSdkMock.getQuotation.mockResolvedValue({ data: { rows: [] }, error: undefined });
 
       const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { currentWorkspaceId: null }),
-          ),
+        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { currentWorkspaceId: null })),
         { wrapper: wrapWithClient(queryClient) },
       );
 

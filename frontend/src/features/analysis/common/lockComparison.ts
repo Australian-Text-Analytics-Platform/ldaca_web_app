@@ -4,7 +4,7 @@ export type ServerRequestLike = Record<string, unknown>;
  * Produces deterministic structural strings for request comparisons where key
  * order from backend JSON should not mark locked parameters as changed.
  * Called by: hasParameterDiff when comparing current form state to server requests because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
-   * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 const stableSerialize = (value: unknown): string => {
   if (value == null || typeof value !== 'object') {
@@ -57,7 +57,10 @@ export const hasLockedParameterDiff = <TRequest extends ServerRequestLike>({
  * Used by: lock comparison helpers and multi-node parameter diffing because user and server selections must compare after trimming blanks and sorting.
  */
 export const normalizeStringArray = (values: string[]): string[] =>
-  [...values].map((value) => value.trim()).filter(Boolean).sort();
+  [...values]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .sort();
 
 /**
  * Safely extracts string arrays from untyped server request payloads consumed by
@@ -72,7 +75,7 @@ export const normalizeUnknownStringArray = (value: unknown): string[] => {
   return normalizeStringArray(
     value
       .map((item) => (typeof item === 'string' ? item : null))
-      .filter((item): item is string => item !== null)
+      .filter((item): item is string => item !== null),
   );
 };
 
@@ -88,7 +91,7 @@ export const areStringArraysEqual = (left: string[], right: string[]): boolean =
  * Finds the primary node id across old and current request shapes so analysis
  * features can diff locks without caring which backend schema produced them.
  * Used by: task hydration and lock comparison helpers because legacy requests may store the primary node as node_id, nodeId, or first node_ids entry.
-   * Flow: return empty for missing requests, check node_id and nodeId aliases, then fall back to the first string in node_ids.
+ * Flow: return empty for missing requests, check node_id and nodeId aliases, then fall back to the first string in node_ids.
  */
 export const getServerPrimaryNodeId = (request: ServerRequestLike | null | undefined): string => {
   if (!request) {
@@ -142,8 +145,11 @@ export const getServerNodeIds = (request: ServerRequestLike | null | undefined):
  */
 export const normalizeNodeColumns = (
   nodeIds: string[],
-  nodeColumns: Record<string, string>
-): Record<string, string> => Object.fromEntries(normalizeStringArray(nodeIds).map((nodeId) => [nodeId, nodeColumns[nodeId] || '']));
+  nodeColumns: Record<string, string>,
+): Record<string, string> =>
+  Object.fromEntries(
+    normalizeStringArray(nodeIds).map((nodeId) => [nodeId, nodeColumns[nodeId] || '']),
+  );
 
 /**
  * Detects whether the current node selection differs from the task request that
@@ -162,7 +168,7 @@ export const hasNodeColumnDiff = (
   currentNodeIds: string[],
   currentNodeColumns: Record<string, string>,
   serverNodeIds: string[],
-  serverNodeColumns: Record<string, string>
+  serverNodeColumns: Record<string, string>,
 ): boolean => {
   const current = normalizeNodeColumns(currentNodeIds, currentNodeColumns);
   const server = normalizeNodeColumns(serverNodeIds, serverNodeColumns);
@@ -179,7 +185,7 @@ export const normalizeCommaSeparatedWords = (value: string): string[] =>
     value
       .split(',')
       .map((word) => word.trim().toLowerCase())
-      .filter(Boolean)
+      .filter(Boolean),
   );
 
 /**
@@ -199,30 +205,36 @@ export type ServerEngineConfig = {
  * Reads engine settings from both nested and legacy flat request payloads so AI
  * analysis panels can restore remote/local execution choices after hydration.
  * Used by: quotation lock comparison and hydration paths because both nested engine objects and legacy flat fields must restore the submitted execution target.
-   * Flow: read nested and root engine type/url fields, default to local execution, normalize remote URLs when requested, then return comparable engine settings.
+ * Flow: read nested and root engine type/url fields, default to local execution, normalize remote URLs when requested, then return comparable engine settings.
  */
 export const getServerEngineConfig = (
   request: ServerRequestLike,
-  normalizeUrl?: (url: string) => string
+  normalizeUrl?: (url: string) => string,
 ): ServerEngineConfig => {
   const requestEngine = (request as { engine?: unknown }).engine;
   const requestEngineRecord =
-    requestEngine && typeof requestEngine === 'object' ? (requestEngine as Record<string, unknown>) : null;
+    requestEngine && typeof requestEngine === 'object'
+      ? (requestEngine as Record<string, unknown>)
+      : null;
 
-  const typeFromEngine = requestEngineRecord && typeof requestEngineRecord.type === 'string'
-    ? requestEngineRecord.type
-    : null;
-  const typeFromRoot = typeof (request as { engine_type?: unknown }).engine_type === 'string'
-    ? (request as { engine_type: string }).engine_type
-    : null;
+  const typeFromEngine =
+    requestEngineRecord && typeof requestEngineRecord.type === 'string'
+      ? requestEngineRecord.type
+      : null;
+  const typeFromRoot =
+    typeof (request as { engine_type?: unknown }).engine_type === 'string'
+      ? (request as { engine_type: string }).engine_type
+      : null;
   const type = (typeFromEngine || typeFromRoot || 'local') === 'remote' ? 'remote' : 'local';
 
-  const urlFromEngine = requestEngineRecord && typeof requestEngineRecord.url === 'string'
-    ? requestEngineRecord.url
-    : null;
-  const urlFromRoot = typeof (request as { engine_url?: unknown }).engine_url === 'string'
-    ? (request as { engine_url: string }).engine_url
-    : null;
+  const urlFromEngine =
+    requestEngineRecord && typeof requestEngineRecord.url === 'string'
+      ? requestEngineRecord.url
+      : null;
+  const urlFromRoot =
+    typeof (request as { engine_url?: unknown }).engine_url === 'string'
+      ? (request as { engine_url: string }).engine_url
+      : null;
   const rawUrl = urlFromEngine || urlFromRoot;
 
   if (type !== 'remote' || !rawUrl) {

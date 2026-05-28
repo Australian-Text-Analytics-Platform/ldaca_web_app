@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -40,13 +39,17 @@ export function SnapshotDescriptionDialog({
   onClose,
 }: SnapshotDescriptionDialogProps) {
   const { getAuthHeaders } = useAuth();
-  const { data: content, isLoading, isError } = useQuery({
+  const {
+    data: content,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['snapshot-description', filename],
-        /**
+    /**
      * Fetches markdown description text for the selected snapshot row.
-         * Called by: useQuery option object inside SnapshotDescriptionDialog.
-         * Why: because snapshot loaders and sample panels need a compact metadata surface before users decide to inspect or load a snapshot.
-         */
+     * Called by: useQuery option object inside SnapshotDescriptionDialog.
+     * Why: because snapshot loaders and sample panels need a compact metadata surface before users decide to inspect or load a snapshot.
+     */
     queryFn: async () => {
       const { data } = await getSnapshotDescription({
         headers: getAuthHeaders(),
@@ -82,11 +85,7 @@ export function SnapshotDescriptionDialog({
               <Skeleton className="h-4 w-5/6" />
             </div>
           )}
-          {isError && (
-            <p className="text-sm text-destructive py-2">
-              Could not load description.
-            </p>
-          )}
+          {isError && <p className="text-sm text-destructive py-2">Could not load description.</p>}
           {!isLoading && !isError && content && (
             <div className="prose prose-sm prose-slate dark:prose-invert max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
@@ -43,12 +43,24 @@ describe('MetadataColumnSelector', () => {
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /select all/i }));
 
-    expect(screen.getByRole('menuitemcheckbox', { name: /document/i })).toHaveAttribute('data-state', 'checked');
-    expect(screen.getByRole('menuitemcheckbox', { name: /speaker/i })).toHaveAttribute('data-state', 'checked');
+    expect(screen.getByRole('menuitemcheckbox', { name: /document/i })).toHaveAttribute(
+      'data-state',
+      'checked',
+    );
+    expect(screen.getByRole('menuitemcheckbox', { name: /speaker/i })).toHaveAttribute(
+      'data-state',
+      'checked',
+    );
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /speaker/i }));
 
-    expect(screen.getByRole('menuitemcheckbox', { name: /document/i })).toHaveAttribute('data-state', 'checked');
-    expect(screen.getByRole('menuitemcheckbox', { name: /speaker/i })).toHaveAttribute('data-state', 'unchecked');
+    expect(screen.getByRole('menuitemcheckbox', { name: /document/i })).toHaveAttribute(
+      'data-state',
+      'checked',
+    );
+    expect(screen.getByRole('menuitemcheckbox', { name: /speaker/i })).toHaveAttribute(
+      'data-state',
+      'unchecked',
+    );
   });
 });

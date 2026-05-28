@@ -16,6 +16,8 @@ export default tseslint.config([
       globals: globals.browser,
       parserOptions: {
         ecmaFeatures: { jsx: true },
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
       },
     },
     plugins: {
@@ -56,9 +58,17 @@ export default tseslint.config([
       'no-var': 'error',
       'object-shorthand': ['error', 'always'],
 
-      // noUncheckedIndexedAccess (tsconfig) is the type-level safety net for
-      // array/object indexing — `!` assertions added at logically-guaranteed
-      // access sites are intentional and correct.
+      // Async safety — catch the most common AI-generated promise bugs.
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksConditionals: true, checksVoidReturn: true },
+      ],
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/require-await': 'error',
+
+      // noUncheckedIndexedAccess (tsconfig) covers array/object indexing safety.
+      // Non-null assertions are allowed at logically-guaranteed access sites.
       '@typescript-eslint/no-non-null-assertion': 'off',
 
       // React Refresh — warn-only; constant exports are fine (e.g. queryKeys)

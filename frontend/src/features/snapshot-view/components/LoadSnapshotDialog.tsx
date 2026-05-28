@@ -35,9 +35,9 @@ export interface LoadSnapshotDialogProps {
 
 /**
  * Short human label for a captured-at ISO string.
-   * Used by: local callers in snapshot-view/LoadSnapshotDialog module.
-   * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-   */
+ * Used by: local callers in snapshot-view/LoadSnapshotDialog module.
+ * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+ */
 function formatCapturedAt(iso: string): string {
   try {
     const d = new Date(iso);
@@ -84,11 +84,11 @@ export function LoadSnapshotDialog({
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['snapshots-list', tool],
-        /**
+    /**
      * Loads the tool-specific snapshot index when the dialog is open.
-         * Called by: useQuery option object inside LoadSnapshotDialog.
-         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-         */
+     * Called by: useQuery option object inside LoadSnapshotDialog.
+     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+     */
     queryFn: async () => {
       const { data } = await listSnapshots({
         headers: getAuthHeaders(),
@@ -103,11 +103,7 @@ export function LoadSnapshotDialog({
 
   const decorated: DecoratedItem[] = (data?.items ?? []).map((item) => ({
     item,
-    compatible: isCompatibleSnapshot(
-      item.manifest.tool_version,
-      tool,
-      currentVersion,
-    ),
+    compatible: isCompatibleSnapshot(item.manifest.tool_version, tool, currentVersion),
   }));
 
   const incompatibleCount = decorated.filter((d) => !d.compatible).length;
@@ -123,11 +119,11 @@ export function LoadSnapshotDialog({
 
   // Per-snapshot delete mutation.
   const deleteOneMutation = useMutation({
-        /**
+    /**
      * Deletes the row selected by the user from the snapshot store.
-         * Called by: useMutation option object inside LoadSnapshotDialog.
-         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-         */
+     * Called by: useMutation option object inside LoadSnapshotDialog.
+     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+     */
     mutationFn: async (filename: string) => {
       const { data } = await deleteSnapshot({
         headers: getAuthHeaders(),
@@ -136,21 +132,21 @@ export function LoadSnapshotDialog({
       });
       return data;
     },
-        /**
+    /**
      * Refreshes the list after a successful row-level delete.
-         * Called by: useMutation option object inside LoadSnapshotDialog.
-         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-         */
+     * Called by: useMutation option object inside LoadSnapshotDialog.
+     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+     */
     onSuccess: (_res, filename) => {
       toast.success(`Snapshot deleted.`);
       void queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
       void filename;
     },
-        /**
+    /**
      * Reports delete failures through the shared toast surface.
-         * Called by: useMutation option object inside LoadSnapshotDialog.
-         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-         */
+     * Called by: useMutation option object inside LoadSnapshotDialog.
+     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+     */
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Failed to delete snapshots.');
     },
@@ -159,11 +155,11 @@ export function LoadSnapshotDialog({
   // Batch delete mutation. The variant decides whether to send
   // `incompatible_with` for the stale-only path.
   const deleteBatchMutation = useMutation({
-        /**
+    /**
      * Deletes either stale or all snapshots, depending on the batch action.
-         * Called by: useMutation option object inside LoadSnapshotDialog.
-         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-         */
+     * Called by: useMutation option object inside LoadSnapshotDialog.
+     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+     */
     mutationFn: async ({ variant }: { variant: 'stale' | 'all' }) => {
       const { data } = await batchDeleteSnapshots({
         headers: getAuthHeaders(),
@@ -172,31 +168,31 @@ export function LoadSnapshotDialog({
       });
       return data;
     },
-        /**
+    /**
      * Refreshes the snapshot index after the batch delete completes.
-         * Called by: useMutation option object inside LoadSnapshotDialog.
-         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-         */
+     * Called by: useMutation option object inside LoadSnapshotDialog.
+     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+     */
     onSuccess: (res) => {
       const n = res.deleted.length;
       toast.success(`Deleted ${n} snapshot${n === 1 ? '' : 's'}.`);
       void queryClient.invalidateQueries({ queryKey: ['snapshots-list', tool] });
     },
-        /**
+    /**
      * Reports batch delete failures through the shared toast surface.
-         * Called by: useMutation option object inside LoadSnapshotDialog.
-         * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-         */
+     * Called by: useMutation option object inside LoadSnapshotDialog.
+     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+     */
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Failed to delete snapshots.');
     },
   });
 
-    /**
+  /**
    * Opens a compatible snapshot or reports that loading is not wired yet.
-     * Called by: LoadSnapshotDialog internal event, effect, or helper flow.
-     * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
-     */
+   * Called by: LoadSnapshotDialog internal event, effect, or helper flow.
+   * Why: because load flow helpers need to separate file parsing, compatibility reporting, and selected snapshot hydration.
+   */
   const handleOpen = async (filename: string) => {
     if (!onOpenSnapshot) {
       toast.info('Snapshot view coming in the next release.');
@@ -236,9 +232,7 @@ export function LoadSnapshotDialog({
               </div>
             )}
             {isError && (
-              <p className="text-sm text-destructive py-2 px-3">
-                Could not load snapshots.
-              </p>
+              <p className="text-sm text-destructive py-2 px-3">Could not load snapshots.</p>
             )}
             {!isLoading && !isError && decorated.length === 0 && (
               <p className="text-sm text-muted-foreground py-6 px-3 text-center">
@@ -248,10 +242,7 @@ export function LoadSnapshotDialog({
             {!isLoading && !isError && decorated.length > 0 && (
               <ul className="divide-y">
                 {decorated.map(({ item, compatible }) => (
-                  <li
-                    key={item.filename}
-                    className="flex items-center gap-2 px-3 py-2.5"
-                  >
+                  <li key={item.filename} className="flex items-center gap-2 px-3 py-2.5">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">
                         {item.manifest.title || item.filename}
@@ -303,7 +294,9 @@ export function LoadSnapshotDialog({
                       size="sm"
                       variant={compatible ? 'default' : 'outline'}
                       disabled={!compatible || openingFilename === item.filename}
-                      onClick={() => handleOpen(item.filename)}
+                      onClick={() => {
+                        void handleOpen(item.filename);
+                      }}
                       title={
                         compatible
                           ? 'Open this snapshot in read-only view'
@@ -324,9 +317,7 @@ export function LoadSnapshotDialog({
                 <>
                   <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span>
-                    {totalCount === 1
-                      ? '1 snapshot saved.'
-                      : `${totalCount} snapshots saved.`}
+                    {totalCount === 1 ? '1 snapshot saved.' : `${totalCount} snapshots saved.`}
                     {incompatibleCount > 0 && (
                       <>
                         {' '}
@@ -390,11 +381,7 @@ export function LoadSnapshotDialog({
       <ConfirmDialog
         open={pendingBatchDelete}
         onOpenChange={setPendingBatchDelete}
-        title={
-          batchVariant === 'stale'
-            ? 'Delete stale snapshots?'
-            : 'Delete all snapshots?'
-        }
+        title={batchVariant === 'stale' ? 'Delete stale snapshots?' : 'Delete all snapshots?'}
         description={
           batchVariant === 'stale'
             ? `${incompatibleCount} snapshot${incompatibleCount === 1 ? '' : 's'} saved in versions ` +

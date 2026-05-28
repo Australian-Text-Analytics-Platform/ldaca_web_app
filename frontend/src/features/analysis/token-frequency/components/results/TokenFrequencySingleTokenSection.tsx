@@ -34,7 +34,8 @@ type TokenFrequencySingleTokenSectionProps = {
 const VISIBLE_BAR_ROWS = 10;
 const BAR_ROW_HEIGHT_REM = 2;
 const BAR_ROW_GAP_REM = 0.5;
-const BAR_LIST_MAX_HEIGHT_REM = VISIBLE_BAR_ROWS * BAR_ROW_HEIGHT_REM + (VISIBLE_BAR_ROWS - 1) * BAR_ROW_GAP_REM;
+const BAR_LIST_MAX_HEIGHT_REM =
+  VISIBLE_BAR_ROWS * BAR_ROW_HEIGHT_REM + (VISIBLE_BAR_ROWS - 1) * BAR_ROW_GAP_REM;
 
 // Aspect ratio applied when the per-card cloud is sized from the container
 // width — keeps the cloud landscape-ish without dominating tall layouts.
@@ -65,91 +66,93 @@ type SingleNodeWordCloudProps = {
  * ResizeObserver. Extracted from the map body so the hook (which can't be
  * called inside a loop) sits at the top level of a component.
  */
-const SingleNodeWordCloud = memo(({
-  nodeKey,
-  words,
-  color,
-  registerWordCloudRef,
-  onTokenClick,
-  onTokenRightClick,
-}: SingleNodeWordCloudProps) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const measuredWidth = useElementWidth(containerRef);
-  const cloudWidth = Math.max(SINGLE_CLOUD_MIN_WIDTH, measuredWidth || SINGLE_CLOUD_MIN_WIDTH);
-  const cloudHeight = Math.round(cloudWidth * SINGLE_CLOUD_ASPECT_RATIO);
-  const wordCount = words.length;
-  // Font-size envelope tied to the cloud width: the biggest word claims
-  // ~14 % of the canvas width, which gives the spiral algorithm enough room
-  // to spread its placements out across the SVG rather than clustering in
-  // the centre. The floor and ceiling stop the cap from collapsing in tiny
-  // panels or going absurd in ultrawide layouts.
-  const maxFontSize = Math.max(
-    SINGLE_CLOUD_MAX_FONT_FLOOR,
-    Math.min(
-      SINGLE_CLOUD_MAX_FONT_CEILING,
-      Math.round(cloudWidth * SINGLE_CLOUD_MAX_FONT_FRACTION),
-    ),
-  );
-  const minFontSize = Math.max(SINGLE_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
-  const maxFrequency = Math.max(1, ...words.map((w) => w.value));
-  /** Used by: SingleNodeWordCloud Wordcloud prop to scale each cloud word by frequency because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-  const fontSizeSetter = (datum: { value: number }) =>
-    Math.max(
-      minFontSize,
+const SingleNodeWordCloud = memo(
+  ({
+    nodeKey,
+    words,
+    color,
+    registerWordCloudRef,
+    onTokenClick,
+    onTokenRightClick,
+  }: SingleNodeWordCloudProps) => {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const measuredWidth = useElementWidth(containerRef);
+    const cloudWidth = Math.max(SINGLE_CLOUD_MIN_WIDTH, measuredWidth || SINGLE_CLOUD_MIN_WIDTH);
+    const cloudHeight = Math.round(cloudWidth * SINGLE_CLOUD_ASPECT_RATIO);
+    const wordCount = words.length;
+    // Font-size envelope tied to the cloud width: the biggest word claims
+    // ~14 % of the canvas width, which gives the spiral algorithm enough room
+    // to spread its placements out across the SVG rather than clustering in
+    // the centre. The floor and ceiling stop the cap from collapsing in tiny
+    // panels or going absurd in ultrawide layouts.
+    const maxFontSize = Math.max(
+      SINGLE_CLOUD_MAX_FONT_FLOOR,
       Math.min(
-        maxFontSize,
-        (datum.value / maxFrequency) * (maxFontSize - minFontSize) + minFontSize,
+        SINGLE_CLOUD_MAX_FONT_CEILING,
+        Math.round(cloudWidth * SINGLE_CLOUD_MAX_FONT_FRACTION),
       ),
     );
-  return (
-    <div ref={containerRef} className="w-full">
-      <svg
-        ref={(element) => registerWordCloudRef(nodeKey, element)}
-        width={cloudWidth}
-        height={cloudHeight}
-        className="overflow-visible"
-        style={{ overflow: 'visible' }}
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <Wordcloud
-          words={words}
+    const minFontSize = Math.max(SINGLE_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
+    const maxFrequency = Math.max(1, ...words.map((w) => w.value));
+    /** Used by: SingleNodeWordCloud Wordcloud prop to scale each cloud word by frequency because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    const fontSizeSetter = (datum: { value: number }) =>
+      Math.max(
+        minFontSize,
+        Math.min(
+          maxFontSize,
+          (datum.value / maxFrequency) * (maxFontSize - minFontSize) + minFontSize,
+        ),
+      );
+    return (
+      <div ref={containerRef} className="w-full">
+        <svg
+          ref={(element) => registerWordCloudRef(nodeKey, element)}
           width={cloudWidth}
           height={cloudHeight}
-          fontSize={fontSizeSetter}
-          font="Segoe UI, Roboto, sans-serif"
-          padding={wordCount > 60 ? 1 : 2}
-          spiral="archimedean"
-          rotate={0}
-          random={() => 0.5}
+          className="overflow-visible"
+          style={{ overflow: 'visible' }}
+          xmlns="http://www.w3.org/2000/svg"
         >
-          {(cloudWords) =>
-            cloudWords.map((word) => (
-              <Text
-                key={word.text}
-                fill={color}
-                textAnchor="middle"
-                transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
-                fontSize={word.size}
-                fontFamily={word.font}
-                className="cursor-pointer transition-colors"
-                onClick={() => word.text && onTokenClick(word.text)}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  if (word.text) {
-                    onTokenRightClick(word.text, event);
-                  }
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                {word.text || ''}
-              </Text>
-            ))
-          }
-        </Wordcloud>
-      </svg>
-    </div>
-  );
-});
+          <Wordcloud
+            words={words}
+            width={cloudWidth}
+            height={cloudHeight}
+            fontSize={fontSizeSetter}
+            font="Segoe UI, Roboto, sans-serif"
+            padding={wordCount > 60 ? 1 : 2}
+            spiral="archimedean"
+            rotate={0}
+            random={() => 0.5}
+          >
+            {(cloudWords) =>
+              cloudWords.map((word) => (
+                <Text
+                  key={word.text}
+                  fill={color}
+                  textAnchor="middle"
+                  transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
+                  fontSize={word.size}
+                  fontFamily={word.font}
+                  className="cursor-pointer transition-colors"
+                  onClick={() => word.text && onTokenClick(word.text)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    if (word.text) {
+                      onTokenRightClick(word.text, event);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {word.text || ''}
+                </Text>
+              ))
+            }
+          </Wordcloud>
+        </svg>
+      </div>
+    );
+  },
+);
 SingleNodeWordCloud.displayName = 'SingleNodeWordCloud';
 
 /**
@@ -174,7 +177,7 @@ const TokenFrequencySingleTokenSectionInner = ({
   const listScrollRefs = useRef<Array<HTMLDivElement | null>>([]);
   const isSyncingScrollRef = useRef(false);
 
-    /**
+  /**
    * Called by: per-node token list scroll containers to keep rows visually aligned across cards because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: ignore recursive sync events, copy the source scrollTop to sibling token lists, then release the sync guard.
    */
@@ -198,9 +201,10 @@ const TokenFrequencySingleTokenSectionInner = ({
     }
   };
 
-  const singleNodeLayoutClassName = nodeDisplayResults.length <= 1
-    ? 'grid grid-cols-1 gap-4'
-    : 'grid grid-cols-1 gap-4 lg:grid-cols-2';
+  const singleNodeLayoutClassName =
+    nodeDisplayResults.length <= 1
+      ? 'grid grid-cols-1 gap-4'
+      : 'grid grid-cols-1 gap-4 lg:grid-cols-2';
 
   // Width (in ch) of the rank gutter inside each list card. Sized to the
   // largest *original* list length (after stop-word filtering, capped by the
@@ -215,9 +219,10 @@ const TokenFrequencySingleTokenSectionInner = ({
     }
     return tokenFilterRegex.test(token);
   };
-  const listSliceCapForGutter = typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
-    ? Math.floor(listLimit)
-    : Number.POSITIVE_INFINITY;
+  const listSliceCapForGutter =
+    typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
+      ? Math.floor(listLimit)
+      : Number.POSITIVE_INFINITY;
   const maxRowCount = nodeDisplayResults.reduce((acc, item) => {
     const filtered = Array.isArray(item.filteredRows) ? item.filteredRows : [];
     const listed = Math.min(filtered.length, listSliceCapForGutter);
@@ -235,17 +240,24 @@ const TokenFrequencySingleTokenSectionInner = ({
         // List view uses its own (typically larger) cap on the full
         // stop-word-filtered list, so it can show more rows than the cloud.
         // Falls back to the cloud cap when no list limit is provided.
-        const filteredRowsAll = Array.isArray(result.filteredRows) ? result.filteredRows : displayRows;
-        const listSliceCap = typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
-          ? Math.floor(listLimit)
-          : displayRows.length;
+        const filteredRowsAll = Array.isArray(result.filteredRows)
+          ? result.filteredRows
+          : displayRows;
+        const listSliceCap =
+          typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
+            ? Math.floor(listLimit)
+            : displayRows.length;
         const listSourceRows = filteredRowsAll.slice(0, listSliceCap);
         // Then apply the wildcard filter for list view; cloud view stays unaffected.
         // Preserve each row's original 1-based rank so filtering doesn't renumber rows.
-        const filteredListRows: Array<{ row: typeof listSourceRows[number]; rank: number }> = listSourceRows
-          .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
-          .filter(({ row }) => matchesTokenFilter(String(row?.token ?? '')));
-        const listMaxFrequency = Math.max(1, ...filteredListRows.map(({ row }) => Number(row.frequency) || 0));
+        const filteredListRows: Array<{ row: (typeof listSourceRows)[number]; rank: number }> =
+          listSourceRows
+            .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
+            .filter(({ row }) => matchesTokenFilter(String(row?.token ?? '')));
+        const listMaxFrequency = Math.max(
+          1,
+          ...filteredListRows.map(({ row }) => Number(row.frequency) || 0),
+        );
         const words = displayRows.map((item) => ({
           text: String(item?.token ?? ''),
           value: Number(item?.frequency) || 0,
@@ -258,7 +270,10 @@ const TokenFrequencySingleTokenSectionInner = ({
                 <CardTitle className="min-w-0 flex-1 wrap-anywhere whitespace-normal text-base font-semibold">
                   {result.displayName}
                 </CardTitle>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end" data-testid={`token-frequency-actions-${nodeKey}`}>
+                <div
+                  className="flex flex-wrap items-center gap-2 sm:justify-end"
+                  data-testid={`token-frequency-actions-${nodeKey}`}
+                >
                   {view === 'cloud' ? (
                     <Button
                       variant="outline"
@@ -276,7 +291,12 @@ const TokenFrequencySingleTokenSectionInner = ({
                       size="sm"
                       aria-label="Download frequencies"
                       title="Download frequencies"
-                      onClick={() => onDownloadFrequencyCsv(result.displayName, Array.isArray(result.filteredRows) ? result.filteredRows : result.rows)}
+                      onClick={() =>
+                        onDownloadFrequencyCsv(
+                          result.displayName,
+                          Array.isArray(result.filteredRows) ? result.filteredRows : result.rows,
+                        )
+                      }
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -286,7 +306,11 @@ const TokenFrequencySingleTokenSectionInner = ({
             </CardHeader>
 
             <CardContent className="space-y-2">
-              <div className={view === 'cloud' ? 'mb-4 flex w-full justify-center overflow-visible' : 'hidden'}>
+              <div
+                className={
+                  view === 'cloud' ? 'mb-4 flex w-full justify-center overflow-visible' : 'hidden'
+                }
+              >
                 <SingleNodeWordCloud
                   nodeKey={nodeKey}
                   words={words}
@@ -331,9 +355,13 @@ const TokenFrequencySingleTokenSectionInner = ({
                           className="absolute inset-y-0 left-0 rounded bg-primary/20 group-hover:bg-primary/30"
                           style={{ width: `${widthPct}%`, backgroundColor: color }}
                         />
-                        <span className="relative z-10 block truncate px-2 text-sm font-medium">{row.token}</span>
+                        <span className="relative z-10 block truncate px-2 text-sm font-medium">
+                          {row.token}
+                        </span>
                       </button>
-                      <span className="text-right text-xs tabular-nums text-muted-foreground">{frequency}</span>
+                      <span className="text-right text-xs tabular-nums text-muted-foreground">
+                        {frequency}
+                      </span>
                     </div>
                   );
                 })}
@@ -354,6 +382,4 @@ const TokenFrequencySingleTokenSectionInner = ({
  * re-render entirely when only ``stopWords`` (which this component
  * doesn't take) changed.
  */
-export const TokenFrequencySingleTokenSection = memo(
-  TokenFrequencySingleTokenSectionInner,
-);
+export const TokenFrequencySingleTokenSection = memo(TokenFrequencySingleTokenSectionInner);

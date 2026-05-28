@@ -10,7 +10,14 @@ import { AnalysisCardLayout } from '@/features/analysis/common/components/Analys
 import { AnalysisRunningStateCard } from '@/features/analysis/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
-type TopicModelingTopic = { id: number; label: string; size: number[]; total_size: number; x: number; y: number };
+type TopicModelingTopic = {
+  id: number;
+  label: string;
+  size: number[];
+  total_size: number;
+  x: number;
+  y: number;
+};
 type TopicModelingResult = {
   state?: string | null;
   data?: {
@@ -69,7 +76,18 @@ function ExactTopicCountSlider({
 
   // Called by: ExactTopicCountSlider keyup handler for keyboard-driven slider commits because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleExactTopicCountKeyUp = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+    if (
+      ![
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+        'Home',
+        'End',
+        'PageUp',
+        'PageDown',
+      ].includes(event.key)
+    ) {
       return;
     }
     commitExactTopicCount(event.currentTarget.value, event.currentTarget);
@@ -79,8 +97,12 @@ function ExactTopicCountSlider({
     <div className="relative flex min-w-0 flex-1 items-center gap-3">
       <div className="pointer-events-none absolute bottom-full right-0 mb-1 flex min-h-5 items-center justify-end gap-2 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">
-          <Loader2 className={`h-3.5 w-3.5 animate-spin ${isUpdatingExactTopicCount ? 'opacity-100' : 'opacity-0'}`} />
-          <span className={isUpdatingExactTopicCount ? 'opacity-100' : 'opacity-0'}>Re-aggregating</span>
+          <Loader2
+            className={`h-3.5 w-3.5 animate-spin ${isUpdatingExactTopicCount ? 'opacity-100' : 'opacity-0'}`}
+          />
+          <span className={isUpdatingExactTopicCount ? 'opacity-100' : 'opacity-0'}>
+            Re-aggregating
+          </span>
         </span>
       </div>
       <span className="shrink-0 text-sm font-medium text-foreground">Exact Topic No.</span>
@@ -134,7 +156,11 @@ function ExactTopicCountSlider({
 }
 
 type Props = {
-  topicWaitingBanner: { status: 'running' | 'queued'; taskId: string | null; message?: string } | null;
+  topicWaitingBanner: {
+    status: 'running' | 'queued';
+    taskId: string | null;
+    message?: string;
+  } | null;
   runningTask?: {
     task_id: string;
     state?: string;
@@ -179,7 +205,12 @@ type Props = {
   onUpdateExactTopicCount: (value: number) => Promise<void> | void;
   detachDialogOpen: boolean;
   setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  detachNodeOptions: Array<{ node_id: string; node_name: string; available_columns: string[]; disabled_columns?: string[] }>;
+  detachNodeOptions: Array<{
+    node_id: string;
+    node_name: string;
+    available_columns: string[];
+    disabled_columns?: string[];
+  }>;
   selectedDetachColumns: Record<string, string[]>;
   toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
   selectAllDetachColumns: () => void;
@@ -271,7 +302,8 @@ export function TopicModelingResultsPanel({
   const [isAppliedStopwordsDialogOpen, setIsAppliedStopwordsDialogOpen] = useState(false);
   const appliedStopwordsCount = stopwordFilterSet?.size ?? 0;
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
-  const runningMessage = runningTask?.message || topicWaitingBanner?.message || result?.message || 'Task running';
+  const runningMessage =
+    runningTask?.message || topicWaitingBanner?.message || result?.message || 'Task running';
   const runningTaskId = runningTask?.task_id || topicWaitingBanner?.taskId;
   const runningProgress = typeof runningTask?.progress === 'number' ? runningTask.progress : null;
   const isFailedState = result?.state === 'failed' && !isRunningState;
@@ -287,9 +319,9 @@ export function TopicModelingResultsPanel({
   };
   const showExactTopicCountControl = Boolean(
     isSuccessfulState &&
-    topicSizeMode === 'exact' &&
-    exactTopicCountRange &&
-    exactTopicCountRange.max >= exactTopicCountRange.min
+      topicSizeMode === 'exact' &&
+      exactTopicCountRange &&
+      exactTopicCountRange.max >= exactTopicCountRange.min,
   );
 
   return (
@@ -310,12 +342,12 @@ export function TopicModelingResultsPanel({
         ) : null}
 
         {isFailedState ? (
-          <p className="text-sm text-muted-foreground">{result.message || 'Topic modeling failed'}</p>
+          <p className="text-sm text-muted-foreground">
+            {result.message || 'Topic modeling failed'}
+          </p>
         ) : null}
 
-        {isErrorState ? (
-          <p className="text-sm text-muted-foreground">{error}</p>
-        ) : null}
+        {isErrorState ? <p className="text-sm text-muted-foreground">{error}</p> : null}
 
         {isSuccessfulState ? (
           <div className="space-y-4">
@@ -354,7 +386,9 @@ export function TopicModelingResultsPanel({
                             onChange={(e) => onStopwordFilterToggle(e.target.checked)}
                             className="h-3.5 w-3.5 rounded border-input"
                           />
-                          Hide {stopwordFilterLanguage ? `${stopwordFilterLanguage.toUpperCase()} ` : ''}stopwords
+                          Hide{' '}
+                          {stopwordFilterLanguage ? `${stopwordFilterLanguage.toUpperCase()} ` : ''}
+                          stopwords
                         </label>
                         {appliedStopwordsCount > 0 ? (
                           <button
@@ -389,7 +423,9 @@ export function TopicModelingResultsPanel({
                       size="sm"
                       className="w-full shrink-0 lg:w-auto"
                       onClick={() => void openDetachDialog()}
-                      disabled={isDetachLoading || isDetaching || isUpdatingExactTopicCount || readOnly}
+                      disabled={
+                        isDetachLoading || isDetaching || isUpdatingExactTopicCount || readOnly
+                      }
                     >
                       {isDetachLoading ? (
                         <>

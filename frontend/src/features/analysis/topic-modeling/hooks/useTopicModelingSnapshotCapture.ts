@@ -66,7 +66,7 @@ function captureError(reason: string, message: string): CaptureError {
 /** Builds the topic-modeling preview block shown in snapshot load dialogs. */
 /**
  * Called by: useTopicModelingSnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
-   * Flow: count topics, collect unique representative words as a vocabulary proxy, set the model label and words-per-topic, then return preview metadata.
+ * Flow: count topics, collect unique representative words as a vocabulary proxy, set the model label and words-per-topic, then return preview metadata.
  */
 function buildTopicModelingPreview(
   result: TopicModelingResponse,
@@ -107,9 +107,7 @@ function buildTopicModelingPreview(
  * Used by: TopicModelingFeature.tsx, useTopicModelingSnapshotLoad.ts because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
  * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
  */
-export function useTopicModelingSnapshotCapture(
-  input: UseTopicModelingSnapshotCaptureInput,
-) {
+export function useTopicModelingSnapshotCapture(input: UseTopicModelingSnapshotCaptureInput) {
   const {
     workspaceId,
     workspaceName,
@@ -179,9 +177,7 @@ export function useTopicModelingSnapshotCapture(
         tool: 'topic_modeling',
         tool_version: getCurrentAppVersion() || 'v0.0.0-dev',
         captured_at: new Date().toISOString(),
-        title: filename
-          .replace(/^topic_modeling-/, '')
-          .replace(/\.ldaca-snapshot$/, ''),
+        title: filename.replace(/^topic_modeling-/, '').replace(/\.ldaca-snapshot$/, ''),
         source: {
           workspace_id: workspaceId,
           workspace_name: workspaceName,
@@ -200,9 +196,7 @@ export function useTopicModelingSnapshotCapture(
         preview: buildTopicModelingPreview(results, request),
         payloads: [
           { kind: 'result', path: RESULT_PAYLOAD_PATH },
-          ...(request
-            ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const)
-            : []),
+          ...(request ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const) : []),
         ],
         node_colors: nodeColorsForSnapshot,
       };
@@ -227,14 +221,6 @@ export function useTopicModelingSnapshotCapture(
         throwOnError: true,
       });
     },
-    [
-      workspaceId,
-      workspaceName,
-      request,
-      results,
-      selectedNodes,
-      getNodeRowCount,
-      getAuthHeaders,
-    ],
+    [workspaceId, workspaceName, request, results, selectedNodes, getNodeRowCount, getAuthHeaders],
   );
 }

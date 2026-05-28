@@ -54,18 +54,23 @@ export function ClearEmbeddingCacheMenuItem() {
       if (files === 0) {
         toast('Embedding cache was already empty.');
       } else {
-        toast(`Cleared ${files} cached embedding ${files === 1 ? 'file' : 'files'} (${formatBytes(freed)} reclaimed).`);
+        toast(
+          `Cleared ${files} cached embedding ${files === 1 ? 'file' : 'files'} (${formatBytes(freed)} reclaimed).`,
+        );
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to clear embedding cache.');
     }
   };
 
-  const description = (() => {
-    if (stats === null) return 'Calculating size of cached embeddings…\n\n';
-    if (stats.files === 0) return 'The embedding cache is currently empty — nothing to clear.\n\n';
-    return `${stats.files} cached embedding ${stats.files === 1 ? 'file' : 'files'} will be deleted, freeing ${formatBytes(stats.bytes)} of disk space.\n\n`;
-  })() + 'Topic modelling caches per-document embeddings so re-running on the same texts is fast. Clearing this cache means future topic modelling on those texts will need to recompute every embedding from scratch and may take noticeably longer (especially for large corpora).';
+  const description =
+    (() => {
+      if (stats === null) return 'Calculating size of cached embeddings…\n\n';
+      if (stats.files === 0)
+        return 'The embedding cache is currently empty — nothing to clear.\n\n';
+      return `${stats.files} cached embedding ${stats.files === 1 ? 'file' : 'files'} will be deleted, freeing ${formatBytes(stats.bytes)} of disk space.\n\n`;
+    })() +
+    'Topic modelling caches per-document embeddings so re-running on the same texts is fast. Clearing this cache means future topic modelling on those texts will need to recompute every embedding from scratch and may take noticeably longer (especially for large corpora).';
 
   return (
     <>
@@ -86,7 +91,9 @@ export function ClearEmbeddingCacheMenuItem() {
         description={description}
         confirmText="Clear cache"
         cancelText="Cancel"
-        onConfirm={handleConfirm}
+        onConfirm={() => {
+          void handleConfirm();
+        }}
         variant="destructive"
       />
     </>

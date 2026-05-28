@@ -2,9 +2,7 @@ import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
 import { runSequentialAnalysis, updateSequentialAnalysisTaskResult } from '@/api/generated/sdk.gen';
 import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
-import {
-  type ChartConfig,
-} from '@/components/ui/chart';
+import { type ChartConfig } from '@/components/ui/chart';
 import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
 
 type SequentialAnalysisRequest = SequentialAnalysisRequestInput;
@@ -26,8 +24,16 @@ export const isChartTypeOption = (value: unknown): value is ChartTypeOption =>
   typeof value === 'string' && CHART_TYPE_OPTIONS.includes(value as ChartTypeOption);
 
 export const SEQUENTIAL_ANALYSIS_PALETTE = [
-  '#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#14b8a6', '#f97316', '#ec4899', '#0ea5e9', '#22c55e',
+  '#2563eb',
+  '#16a34a',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#14b8a6',
+  '#f97316',
+  '#ec4899',
+  '#0ea5e9',
+  '#22c55e',
 ] as const;
 
 // Provides deterministic colours for generated chart series.
@@ -42,7 +48,7 @@ const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_en
 // Compares period boundary values so grouped rows retain their earliest start and latest end.
 /**
  * Called by: useSequentialAnalysisTaskFlow hook during this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-   * Flow: order nullish values last, compare numeric bounds directly, compare parseable dates by time, then fall back to string ordering.
+ * Flow: order nullish values last, compare numeric bounds directly, compare parseable dates by time, then fall back to string ordering.
  */
 const comparePeriodBounds = (left: unknown, right: unknown): number => {
   if (left === right) return 0;
@@ -65,7 +71,7 @@ const comparePeriodBounds = (left: unknown, right: unknown): number => {
 // Formats sequential chart x-axis labels for timestamps while preserving raw non-date values.
 /**
  * Used by: SequentialChart.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-   * Flow: return a placeholder for empty values, format parseable dates with month/year/day detail, then preserve raw non-date labels.
+ * Flow: return a placeholder for empty values, format parseable dates with month/year/day detail, then preserve raw non-date labels.
  */
 export const formatTimeLabel = (value?: string | number) => {
   if (value === undefined || value === null || value === '') return '—';
@@ -74,11 +80,12 @@ export const formatTimeLabel = (value?: string | number) => {
   // directly — stringifying first would yield e.g. `"846764800000"`,
   // which `Date.parse` doesn't recognise as a date and falls through to
   // the raw number, putting epoch-ms on the axis ticks.
-  const parsed =
-    typeof value === 'number' ? new Date(value) : new Date(String(value));
+  const parsed = typeof value === 'number' ? new Date(value) : new Date(String(value));
   if (!Number.isNaN(parsed.getTime())) {
     const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short' };
-    if (!(parsed.getUTCDate() === 1 && parsed.getUTCHours() === 0 && parsed.getUTCMinutes() === 0)) {
+    if (
+      !(parsed.getUTCDate() === 1 && parsed.getUTCHours() === 0 && parsed.getUTCMinutes() === 0)
+    ) {
       options.day = 'numeric';
     }
     return parsed.toLocaleString(undefined, options);
@@ -106,7 +113,12 @@ interface SequentialAnalysisState {
 
 interface SequentialAnalysisActions {
   setIsAnalyzing: (value: boolean) => void;
-  setResults: (value: Record<string, unknown> | null | ((prev: Record<string, unknown> | null) => Record<string, unknown> | null)) => void;
+  setResults: (
+    value:
+      | Record<string, unknown>
+      | null
+      | ((prev: Record<string, unknown> | null) => Record<string, unknown> | null),
+  ) => void;
   setChartType: (value: ChartTypeOption) => void;
   setLocalTaskId: (value: string | null) => void;
   setNodeColumnSelections: (selections: Array<{ nodeId: string; column: string }>) => void;
@@ -168,8 +180,8 @@ export function useSequentialAnalysisTaskFlow({
   // Validates current parameters, submits the analysis request, and locks the selected node.
   /**
    * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
- */
+   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   */
   const handleAnalyze = async () => {
     const nodeIdForAnalysis = activeNodeId;
     if (!nodeIdForAnalysis || !currentWorkspaceId) {
@@ -180,7 +192,9 @@ export function useSequentialAnalysisTaskFlow({
     const picked =
       nodeColumnSelections.find((s) => s.nodeId === nodeIdForAnalysis)?.column ||
       timeColumn ||
-      ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as string | undefined) ||
+      ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as
+        | string
+        | undefined) ||
       '';
     if (!picked) {
       toast.error('Please select a time column');
@@ -236,9 +250,7 @@ export function useSequentialAnalysisTaskFlow({
       setIsAnalyzing(true);
       const authHeaders = getAuthHeaders();
       const headers =
-        Object.keys(authHeaders).length > 0
-          ? (authHeaders as Record<string, string>)
-          : {};
+        Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
       const { data: result } = await runSequentialAnalysis({
         body: request,
         headers,
@@ -249,7 +261,7 @@ export function useSequentialAnalysisTaskFlow({
       const enrichedResult = {
         ...result,
         analysis_params: {
-          ...(result as Record<string, unknown>)?.analysis_params as Record<string, unknown>,
+          ...((result as Record<string, unknown>)?.analysis_params as Record<string, unknown>),
           group_by_columns: validGroupByColumns,
           time_column: picked,
           frequency,
@@ -261,8 +273,10 @@ export function useSequentialAnalysisTaskFlow({
           case_sensitive: caseSensitive,
         },
       };
-      const resolvedChartType = isChartTypeOption((enrichedResult as Record<string, unknown>)?.chart_type)
-        ? (enrichedResult as Record<string, unknown>).chart_type as ChartTypeOption
+      const resolvedChartType = isChartTypeOption(
+        (enrichedResult as Record<string, unknown>)?.chart_type,
+      )
+        ? ((enrichedResult as Record<string, unknown>).chart_type as ChartTypeOption)
         : chartType;
       const normalizedResult = { ...enrichedResult, chart_type: resolvedChartType };
       setResults(normalizedResult);
@@ -271,7 +285,10 @@ export function useSequentialAnalysisTaskFlow({
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
-          requestData: { node_ids: [nodeIdForAnalysis], node_columns: { [nodeIdForAnalysis]: picked } },
+          requestData: {
+            node_ids: [nodeIdForAnalysis],
+            node_columns: { [nodeIdForAnalysis]: picked },
+          },
           getAuthHeaders,
           lockWithSnapshots,
           queryClient,
@@ -302,18 +319,18 @@ export function useSequentialAnalysisTaskFlow({
   // Persists chart-type changes onto both local result state and the stored task result.
   /**
    * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-       * Flow: derive display state, bind user actions, then render the analysis UI.
+   * Flow: derive display state, bind user actions, then render the analysis UI.
    */
   const handleChartTypeChange = async (value: ChartTypeOption) => {
     setChartType(value);
-    setResults((prev: Record<string, unknown> | null) => (prev ? { ...prev, chart_type: value } : prev));
+    setResults((prev: Record<string, unknown> | null) =>
+      prev ? { ...prev, chart_type: value } : prev,
+    );
 
     if (!currentWorkspaceId) return;
     const authHeaders = getAuthHeaders();
     const headers =
-      Object.keys(authHeaders).length > 0
-        ? (authHeaders as Record<string, string>)
-        : {};
+      Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return;
@@ -331,7 +348,8 @@ export function useSequentialAnalysisTaskFlow({
   const chartData = (() => {
     if (!results?.data || !Array.isArray(results.data)) return [];
 
-    const groupingColumns = (results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns;
+    const groupingColumns = (results?.analysis_params as Record<string, unknown> | undefined)
+      ?.group_by_columns;
     const effectiveGroupColumns = Array.isArray(groupingColumns)
       ? groupingColumns
       : groupByColumns.length
@@ -400,7 +418,8 @@ export function useSequentialAnalysisTaskFlow({
   })();
 
   const groupKeys = (() => {
-    const groupingColumns = (results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns;
+    const groupingColumns = (results?.analysis_params as Record<string, unknown> | undefined)
+      ?.group_by_columns;
     const effectiveGroupColumns = Array.isArray(groupingColumns)
       ? groupingColumns
       : groupByColumns.length

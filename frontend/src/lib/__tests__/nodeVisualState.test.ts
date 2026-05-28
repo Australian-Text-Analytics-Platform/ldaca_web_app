@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_GREY_PAIR } from '../color';
-import {
-  PER_VIEW_ACTIVE_LIMIT,
-  activeSetForContext,
-  nodeVisualInfo,
-} from '../nodeVisualState';
+import { PER_VIEW_ACTIVE_LIMIT, activeSetForContext, nodeVisualInfo } from '../nodeVisualState';
 
 /** Shared assigned-colour fixture used by visual-state tests that assert focus/active colours. */
 const BASE_ASSIGNED = { 'n-a': '#2563eb', 'n-b': '#dc2626' };

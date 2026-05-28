@@ -10,9 +10,7 @@ import { SaveSnapshotDialog } from '../components/SaveSnapshotDialog';
  * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  * Flow: create default save/open spies, render the dialog with toaster support, apply per-test overrides, and return spies for assertions.
  */
-function setup(
-  overrides: Partial<React.ComponentProps<typeof SaveSnapshotDialog>> = {},
-) {
+function setup(overrides: Partial<React.ComponentProps<typeof SaveSnapshotDialog>> = {}) {
   const onSave = overrides.onSave ?? vi.fn().mockResolvedValue(undefined);
   const onOpenChange = overrides.onOpenChange ?? vi.fn();
   render(
@@ -95,10 +93,7 @@ describe('SaveSnapshotDialog', () => {
     await user.click(save);
 
     await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith(
-        'concordance-pride.ldaca-snapshot',
-        'A short demo.',
-      );
+      expect(onSave).toHaveBeenCalledWith('concordance-pride.ldaca-snapshot', 'A short demo.');
     });
   });
 

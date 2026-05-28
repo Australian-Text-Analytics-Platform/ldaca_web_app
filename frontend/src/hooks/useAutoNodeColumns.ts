@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { type ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
+import {
+  type ColumnInfo,
+  filterColumnsByType,
+  mapColumnsToInfo,
+  normalizeTypeName,
+} from '../utils/columnTypes';
 import columnPersistence from '../utils/columnPersistence';
 import type { NodeLike } from './useNodeColumnInfos';
 import { extractDocumentColumn } from '@/lib/documentColumn';
@@ -74,13 +79,8 @@ export const useAutoNodeColumns = ({
   getNodeColumns,
   fallbackToAllColumns = true,
 }: UseAutoNodeColumnsOptions) => {
-  const {
-    selections,
-    setSelections,
-    setSelection,
-    setSelectionsState,
-    lastSelectedIdsRef,
-  } = useNodeColumnPersistence({ persist, workspaceId, storageScope });
+  const { selections, setSelections, setSelection, setSelectionsState, lastSelectedIdsRef } =
+    useNodeColumnPersistence({ persist, workspaceId, storageScope });
 
   const selectedNodesRef = useRef(selectedNodes);
   const maxNodesRef = useRef(maxNodes);
@@ -125,7 +125,10 @@ export const useAutoNodeColumns = ({
   const recomputeAutoColumns = useCallback(() => {
     if (isLockedRef.current) return;
     const nodes = selectedNodesRef.current;
-    const ids = nodes.slice(0, maxNodesRef.current).map((n, idx) => resolveNodeId(n, idx)).filter(Boolean);
+    const ids = nodes
+      .slice(0, maxNodesRef.current)
+      .map((n, idx) => resolveNodeId(n, idx))
+      .filter(Boolean);
     lastSelectedIdsRef.current = ids;
 
     /** Derives columns during auto-selection using refs so locked task params do not drift mid-run. */
@@ -180,7 +183,11 @@ export const useAutoNodeColumns = ({
     });
   }, [persist, workspaceId, storageScope, setSelectionsState, lastSelectedIdsRef]);
 
-  const selectedNodeIdsKey = selectedNodes.slice(0, maxNodes).map((n, idx) => resolveNodeId(n, idx)).filter(Boolean).join(',');
+  const selectedNodeIdsKey = selectedNodes
+    .slice(0, maxNodes)
+    .map((n, idx) => resolveNodeId(n, idx))
+    .filter(Boolean)
+    .join(',');
 
   useEffect(() => {
     const currIds = selectedNodeIdsKey.split(',').filter(Boolean);
@@ -191,37 +198,43 @@ export const useAutoNodeColumns = ({
   }, [selectedNodeIdsKey, recomputeAutoColumns, lastSelectedIdsRef]);
 
   const columnOptions = (() => {
-      /** Derives render-time column options from current props so dropdowns reflect fresh metadata. */
-      const deriveColumnInfosForRender = (node: NodeLike): ColumnInfo[] => {
-        let infos: ColumnInfo[] = [];
-        if (getNodeColumns) {
-          infos = normalizeColumnInfos(getNodeColumns(node));
-        }
-        if (!infos.length) {
-          infos = mapColumnsToInfo(node);
-        }
-        if (!infos.length && fallbackToAllColumns && Array.isArray(node?.columns)) {
-          infos = normalizeColumnInfos(node.columns as NodeColumnSource);
-        }
-        if (allowedDataTypes?.length) {
-          const filtered = filterColumnsByType(infos, allowedDataTypes);
-          if (filtered.length > 0) return filtered;
-        }
-        return infos;
-      };
+    /** Derives render-time column options from current props so dropdowns reflect fresh metadata. */
+    const deriveColumnInfosForRender = (node: NodeLike): ColumnInfo[] => {
+      let infos: ColumnInfo[] = [];
+      if (getNodeColumns) {
+        infos = normalizeColumnInfos(getNodeColumns(node));
+      }
+      if (!infos.length) {
+        infos = mapColumnsToInfo(node);
+      }
+      if (!infos.length && fallbackToAllColumns && Array.isArray(node?.columns)) {
+        infos = normalizeColumnInfos(node.columns as NodeColumnSource);
+      }
+      if (allowedDataTypes?.length) {
+        const filtered = filterColumnsByType(infos, allowedDataTypes);
+        if (filtered.length > 0) return filtered;
+      }
+      return infos;
+    };
 
-      return selectedNodes.slice(0, maxNodes).reduce<Record<string, ColumnOptionInfo>>((acc, node, idx) => {
+    return selectedNodes
+      .slice(0, maxNodes)
+      .reduce<Record<string, ColumnOptionInfo>>((acc, node, idx) => {
         const nodeId = resolveNodeId(node, idx);
         const infos = normalizeColumns(deriveColumnInfosForRender(node));
-        const filtered = allowedDataTypes?.length ? filterColumnsByType(infos, allowedDataTypes) : infos;
-        const filteredOutByType = Boolean(allowedDataTypes?.length && infos.length && filtered.length === 0);
+        const filtered = allowedDataTypes?.length
+          ? filterColumnsByType(infos, allowedDataTypes)
+          : infos;
+        const filteredOutByType = Boolean(
+          allowedDataTypes?.length && infos.length && filtered.length === 0,
+        );
         acc[nodeId] = {
           columns: filtered.length ? filtered : infos,
           filteredOutByType,
         };
         return acc;
       }, {});
-    })();
+  })();
 
   return {
     selections,

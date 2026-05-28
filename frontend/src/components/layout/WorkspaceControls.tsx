@@ -68,9 +68,7 @@ export function WorkspaceControls() {
       // Settled, not all: if the backend cascades on parent removal, a
       // later child deletion may 404 — that's still the outcome the
       // user asked for, so don't abort the rest of the batch.
-      await Promise.allSettled(
-        selectedForDelete.map((item) => deleteNode(item.id)),
-      );
+      await Promise.allSettled(selectedForDelete.map((item) => deleteNode(item.id)));
       clearSelection?.();
       setDeleteConfirmOpen(false);
     } finally {
@@ -112,17 +110,25 @@ export function WorkspaceControls() {
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <h3 className="text-sm font-medium text-gray-700">Workspace Graph View</h3>
-      <HelpIcon targetKey="ui.workspace-graph-view" label="Workspace Graph View" className="h-5 w-5 text-muted-foreground" />
+      <HelpIcon
+        targetKey="ui.workspace-graph-view"
+        label="Workspace Graph View"
+        className="h-5 w-5 text-muted-foreground"
+      />
       <span className="text-gray-300">|</span>
-      
+
       {isEditing ? (
         <input
           className="px-2 py-1 border rounded text-sm"
           value={renameDraft.value}
-          onChange={(e) => setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value })}
-          onBlur={handleRenameCommit}
+          onChange={(e) =>
+            setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value })
+          }
+          onBlur={() => {
+            void handleRenameCommit();
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') handleRenameCommit();
+            if (e.key === 'Enter') void handleRenameCommit();
             if (e.key === 'Escape') setRenameDraft(undefined);
           }}
           autoFocus
@@ -143,7 +149,12 @@ export function WorkspaceControls() {
             title="Rename"
             aria-label="Rename workspace"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-3 h-3"
+            >
               <path d="M16.862 3.487a1.5 1.5 0 0 1 2.121 0l1.53 1.53a1.5 1.5 0 0 1 0 2.122l-9.9 9.9a1.5 1.5 0 0 1-.53.352l-4.18 1.393a.75.75 0 0 1-.948-.948l1.392-4.18a1.5 1.5 0 0 1 .352-.53l9.9-9.9Z" />
               <path d="M18.26 2.08a3 3 0 0 1 4.243 0l.53.53a3 3 0 0 1 0 4.243l-1.06 1.06-4.773-4.773 1.06-1.06Z" />
             </svg>
@@ -179,20 +190,17 @@ export function WorkspaceControls() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {selectedForDelete.length} data block{selectedForDelete.length === 1 ? '' : 's'}?
+              Delete {selectedForDelete.length} data block
+              {selectedForDelete.length === 1 ? '' : 's'}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. The following data blocks will be removed
-              (root blocks — those with no parent — are bolded; deleting a
-              root cascades to any downstream blocks too):
+              This cannot be undone. The following data blocks will be removed (root blocks — those
+              with no parent — are bolded; deleting a root cascades to any downstream blocks too):
             </AlertDialogDescription>
           </AlertDialogHeader>
           <ul className="max-h-60 overflow-y-auto rounded border bg-muted/40 p-2 text-sm">
             {selectedForDelete.map((item) => (
-              <li
-                key={item.id}
-                className={item.isRoot ? 'font-semibold' : undefined}
-              >
+              <li key={item.id} className={item.isRoot ? 'font-semibold' : undefined}>
                 {item.name}
               </li>
             ))}
@@ -219,7 +227,8 @@ export function WorkspaceControls() {
           <AlertDialogHeader>
             <AlertDialogTitle>Invalid workspace name</AlertDialogTitle>
             <AlertDialogDescription>
-              {nameAlertMessage || 'Workspace names cannot include path separators or traversal sequences.'}
+              {nameAlertMessage ||
+                'Workspace names cannot include path separators or traversal sequences.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

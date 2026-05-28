@@ -187,10 +187,7 @@ describe('loadRemoteRegistry — network path', () => {
     localStorage.setItem(__CACHE_KEY_FOR_TESTS, JSON.stringify(cached));
 
     vi.stubEnv('VITE_DOCS_BASE_URL', 'https://docs.example.com/v0.3');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new Error('network down')),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 
     await loadRemoteRegistry();
 
@@ -210,11 +207,7 @@ describe('loadRemoteRegistry — network path', () => {
     });
     vi.stubGlobal('fetch', fetchSpy);
 
-    await Promise.all([
-      loadRemoteRegistry(),
-      loadRemoteRegistry(),
-      loadRemoteRegistry(),
-    ]);
+    await Promise.all([loadRemoteRegistry(), loadRemoteRegistry(), loadRemoteRegistry()]);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });

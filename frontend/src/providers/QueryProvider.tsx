@@ -15,8 +15,8 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 min — after this, next read refetches.
-      gcTime: 10 * 60 * 1000,   // 10 min — time a cache entry lingers when unused.
-      retry: false,              // Avoid duplicate backend calls on transient errors.
+      gcTime: 10 * 60 * 1000, // 10 min — time a cache entry lingers when unused.
+      retry: false, // Avoid duplicate backend calls on transient errors.
       refetchOnWindowFocus: true,
       refetchOnReconnect: false,
     },

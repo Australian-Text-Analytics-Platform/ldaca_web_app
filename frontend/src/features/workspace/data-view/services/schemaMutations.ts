@@ -21,7 +21,7 @@ export const DATA_TYPES = [
  * Why: because column mutation UI needs backend schema types normalized before rendering cast options and labels.
  */
 export const extractColumnTypes = (
-  schema: NodeSchemaResponse | null | undefined
+  schema: NodeSchemaResponse | null | undefined,
 ): Record<string, string> => {
   if (!schema) {
     return {};

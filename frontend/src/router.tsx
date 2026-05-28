@@ -32,9 +32,8 @@ export const validateAppSearch = (search: Record<string, unknown>): AppSearch =>
 
 /** Omits the default data-loader view to keep canonical app URLs short. */
 /** Used by: App route construction and URL search helpers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-export const viewSearchFor = (view: ViewType): AppSearch => (
-  view === 'data-loader' ? {} : { view }
-);
+export const viewSearchFor = (view: ViewType): AppSearch =>
+  view === 'data-loader' ? {} : { view };
 
 const indexRoute = createRoute({
   /** Connects the single SPA route to the shared root route. */

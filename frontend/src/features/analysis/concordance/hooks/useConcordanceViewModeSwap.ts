@@ -7,7 +7,10 @@ import {
   type RefObject,
   type SetStateAction,
 } from 'react';
-import type { ConcordanceAnalysisResponse, ConcordanceResultQuery } from '@/api/generated/types.gen';
+import type {
+  ConcordanceAnalysisResponse,
+  ConcordanceResultQuery,
+} from '@/api/generated/types.gen';
 
 type Params = {
   viewMode: 'separated' | 'combined';
@@ -15,9 +18,7 @@ type Params = {
   results: ConcordanceAnalysisResponse | null;
   combinedPage: number;
   globalPageSize: number;
-  updateStoredResult: (
-    query: Partial<ConcordanceResultQuery>,
-  ) => Promise<unknown>;
+  updateStoredResult: (query: Partial<ConcordanceResultQuery>) => Promise<unknown>;
   resultsRef: RefObject<HTMLDivElement | null>;
 };
 
@@ -75,9 +76,9 @@ export function useConcordanceViewModeSwap({
       return;
     }
     const taskId =
-      results?.metadata?.task_id
-      ?? (results?.metadata as Record<string, unknown> | undefined)?.taskId
-      ?? '';
+      results?.metadata?.task_id ??
+      (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
+      '';
     const key = `${taskId}|${combinedPage}|${globalPageSize}`;
     if (lastCombinedQueryRef.current === key) {
       return;
@@ -103,31 +104,34 @@ export function useConcordanceViewModeSwap({
 
         setTimeout(() => {
           const prevTop =
-            prevAnchor?.getBoundingClientRect().top
-            ?? resultsRef.current?.getBoundingClientRect().top
-            ?? 0;
+            prevAnchor?.getBoundingClientRect().top ??
+            resultsRef.current?.getBoundingClientRect().top ??
+            0;
           const prevScrollY = window.scrollY;
 
           setCombinedLoading(true);
-          updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize })
-            .finally(() => {
-              setCombinedLoading(false);
+          void updateStoredResult({
+            combined: true,
+            page: combinedPage,
+            page_size: globalPageSize,
+          }).finally(() => {
+            setCombinedLoading(false);
+            requestAnimationFrame(() => {
               requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  const newAnchor = resultsRef.current;
-                  if (newAnchor) {
-                    const newTop = newAnchor.getBoundingClientRect().top;
-                    const delta = newTop - prevTop;
-                    if (Math.abs(delta) > 1) {
-                      window.scrollTo({ top: prevScrollY + delta });
-                    }
-                    newAnchor.style.minHeight = '';
-                  } else {
-                    window.scrollTo({ top: prevScrollY });
+                const newAnchor = resultsRef.current;
+                if (newAnchor) {
+                  const newTop = newAnchor.getBoundingClientRect().top;
+                  const delta = newTop - prevTop;
+                  if (Math.abs(delta) > 1) {
+                    window.scrollTo({ top: prevScrollY + delta });
                   }
-                });
+                  newAnchor.style.minHeight = '';
+                } else {
+                  window.scrollTo({ top: prevScrollY });
+                }
               });
             });
+          });
         }, 30);
 
         return;
@@ -138,7 +142,7 @@ export function useConcordanceViewModeSwap({
         const prevTop = prevAnchor?.getBoundingClientRect().top ?? 0;
         const prevScrollY = window.scrollY;
 
-        updateStoredResult({ combined: false, page: 1, page_size: globalPageSize }).finally(() => {
+        void updateStoredResult({ combined: false, page: 1, page_size: globalPageSize }).finally(() => {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               const newAnchor = resultsRef.current;
@@ -157,15 +161,7 @@ export function useConcordanceViewModeSwap({
         });
       }
     },
-    [
-      viewMode,
-      setViewMode,
-      results,
-      resultsRef,
-      updateStoredResult,
-      combinedPage,
-      globalPageSize,
-    ],
+    [viewMode, setViewMode, results, resultsRef, updateStoredResult, combinedPage, globalPageSize],
   );
 
   return { combinedLoading, handleViewModeChange };

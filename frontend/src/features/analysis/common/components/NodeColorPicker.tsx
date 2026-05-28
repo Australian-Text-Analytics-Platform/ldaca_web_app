@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -45,7 +49,7 @@ export function NodeColorPicker({
           type="button"
           className={cn(
             'h-6 w-6 aspect-square rounded-full ring-2 ring-border outline outline-background transition-shadow hover:ring-primary focus-visible:outline-hidden focus-visible:ring-primary shadow-sm',
-            triggerClassName
+            triggerClassName,
           )}
           style={{ backgroundColor: color }}
           aria-label={ariaLabel}
@@ -54,7 +58,9 @@ export function NodeColorPicker({
       <DropdownMenuContent align="end" className="w-56 space-y-3 p-3">
         <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
           <span>Pick color</span>
-          <span className="font-mono text-[10px] text-muted-foreground/80">{color.toUpperCase()}</span>
+          <span className="font-mono text-[10px] text-muted-foreground/80">
+            {color.toUpperCase()}
+          </span>
         </div>
         <div className="grid grid-cols-6 gap-1">
           {palette.map((swatch) => (
@@ -63,7 +69,7 @@ export function NodeColorPicker({
               type="button"
               className={cn(
                 'h-5 w-5 rounded-full border border-white shadow-sm transition-transform hover:scale-105 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary',
-                swatch.toLowerCase() === color.toLowerCase() && 'ring-2 ring-primary'
+                swatch.toLowerCase() === color.toLowerCase() && 'ring-2 ring-primary',
               )}
               style={{ backgroundColor: swatch }}
               onClick={() => onChange(swatch)}

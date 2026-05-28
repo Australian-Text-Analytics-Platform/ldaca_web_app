@@ -59,7 +59,7 @@ const resolvePanelColor = (
   fallback: string,
   panelNodeIds: string[],
   nodeColors: Record<string, string>,
-  defaultPalette: string[]
+  defaultPalette: string[],
 ) => {
   const nodeId = panelNodeIds[index];
   if (nodeId) {
@@ -104,30 +104,63 @@ export function useTopicModelingBubbleChart({
   // Renders per-corpus size chips using the same colours as the node palette.
   /**
    * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-     * Flow: handle missing or single-corpus sizes, resolve palette colors and readable text, then render colored corpus size chips with totals.
+   * Flow: handle missing or single-corpus sizes, resolve palette colors and readable text, then render colored corpus size chips with totals.
    */
   const renderSizeComposition = (sizes: number[] | undefined, total?: number | null) => {
     if (corpusCount === 0 || !sizes) return null;
     if (sizes.length === 1) {
-      const color = resolvePanelColor(0, fallbackPrimaryColor, panelNodeIds, nodeColors, defaultPalette);
+      const color = resolvePanelColor(
+        0,
+        fallbackPrimaryColor,
+        panelNodeIds,
+        nodeColors,
+        defaultPalette,
+      );
       const fg = getReadableTextColor(color);
       return (
         <span className="inline-flex items-center gap-1">
-          <span style={{ background: color, color: fg }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
+          <span
+            style={{ background: color, color: fg }}
+            className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+          >
+            {sizes[0]}
+          </span>
           <span className="text-[10px] text-gray-500">= {total}</span>
         </span>
       );
     }
 
-    const colorA = resolvePanelColor(0, fallbackPrimaryColor, panelNodeIds, nodeColors, defaultPalette);
-    const colorB = resolvePanelColor(1, fallbackSecondaryColor, panelNodeIds, nodeColors, defaultPalette);
+    const colorA = resolvePanelColor(
+      0,
+      fallbackPrimaryColor,
+      panelNodeIds,
+      nodeColors,
+      defaultPalette,
+    );
+    const colorB = resolvePanelColor(
+      1,
+      fallbackSecondaryColor,
+      panelNodeIds,
+      nodeColors,
+      defaultPalette,
+    );
     const fgA = getReadableTextColor(colorA);
     const fgB = getReadableTextColor(colorB);
     return (
       <span className="inline-flex items-center gap-1 flex-wrap">
-        <span style={{ background: colorA, color: fgA }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
+        <span
+          style={{ background: colorA, color: fgA }}
+          className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+        >
+          {sizes[0]}
+        </span>
         <span className="text-[10px] text-gray-500">+</span>
-        <span style={{ background: colorB, color: fgB }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[1]}</span>
+        <span
+          style={{ background: colorB, color: fgB }}
+          className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+        >
+          {sizes[1]}
+        </span>
         <span className="text-[10px] text-gray-500">= {total}</span>
       </span>
     );
@@ -142,12 +175,18 @@ export function useTopicModelingBubbleChart({
     /**
      * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
      */
-    const scaleX = (x: number) => ((x - activeDomain.xMin) / (activeDomain.xMax - activeDomain.xMin || 1)) * (width - 2 * chartPadding) + chartPadding;
+    const scaleX = (x: number) =>
+      ((x - activeDomain.xMin) / (activeDomain.xMax - activeDomain.xMin || 1)) *
+        (width - 2 * chartPadding) +
+      chartPadding;
     // Maps topic embedding y-coordinates into the SVG plotting area.
     /**
      * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
      */
-    const scaleY = (y: number) => ((y - activeDomain.yMin) / (activeDomain.yMax - activeDomain.yMin || 1)) * (height - 2 * chartPadding) + chartPadding;
+    const scaleY = (y: number) =>
+      ((y - activeDomain.yMin) / (activeDomain.yMax - activeDomain.yMin || 1)) *
+        (height - 2 * chartPadding) +
+      chartPadding;
     const maxSize = Math.max(...topics.map((topic) => topic.total_size));
     const hasSearchFilter = topicSearchQuery.trim().length > 0;
 
@@ -189,21 +228,29 @@ export function useTopicModelingBubbleChart({
         {topics.map((topic) => {
           const sizes = topic.size || [];
           const proportion =
-            corpusCount === 2 && topic.total_size > 0
-              ? (sizes[1] ?? 0) / topic.total_size
-              : 0.5;
-          const colorA = resolvePanelColor(0, fallbackPrimaryColor, panelNodeIds, nodeColors, defaultPalette);
-          const colorB = resolvePanelColor(1, fallbackSecondaryColor, panelNodeIds, nodeColors, defaultPalette);
-          const fill =
-            corpusCount <= 1
-              ? colorA
-              : interpolateColor(colorA, colorB, proportion);
+            corpusCount === 2 && topic.total_size > 0 ? (sizes[1] ?? 0) / topic.total_size : 0.5;
+          const colorA = resolvePanelColor(
+            0,
+            fallbackPrimaryColor,
+            panelNodeIds,
+            nodeColors,
+            defaultPalette,
+          );
+          const colorB = resolvePanelColor(
+            1,
+            fallbackSecondaryColor,
+            panelNodeIds,
+            nodeColors,
+            defaultPalette,
+          );
+          const fill = corpusCount <= 1 ? colorA : interpolateColor(colorA, colorB, proportion);
           const radius = 10 + 40 * Math.sqrt(topic.total_size / (maxSize || 1));
           const cx = scaleX(topic.x);
           const cy = scaleY(topic.y);
           const isHovered = hoveredTopicId === topic.id;
           const isSelected = selectedTopicIds.has(topic.id);
-          const isFilteredOut = hasSearchFilter && !matchChecklistOption(topic.label, topicSearchQuery);
+          const isFilteredOut =
+            hasSearchFilter && !matchChecklistOption(topic.label, topicSearchQuery);
           const displayRadius = isHovered && !isFilteredOut ? radius + 2 : radius;
 
           return (
@@ -229,8 +276,12 @@ export function useTopicModelingBubbleChart({
                 const bounds = chartRef.current.getBoundingClientRect();
                 setTooltip((previous) =>
                   previous.topic && previous.topic.id === topic.id
-                    ? { x: event.clientX - bounds.left + 12, y: event.clientY - bounds.top + 12, topic }
-                    : previous
+                    ? {
+                        x: event.clientX - bounds.left + 12,
+                        y: event.clientY - bounds.top + 12,
+                        topic,
+                      }
+                    : previous,
                 );
               }}
               onMouseLeave={() => {
@@ -257,14 +308,16 @@ export function useTopicModelingBubbleChart({
                 r={displayRadius}
                 fill={fill}
                 fillOpacity={isHovered ? 0.88 : isSelected ? 0.78 : 0.6}
-                stroke={
-                  isSelected ? '#16a34a'
-                  : isHovered ? '#3b82f6'
-                  : '#94a3b8'
-                }
+                stroke={isSelected ? '#16a34a' : isHovered ? '#3b82f6' : '#94a3b8'}
                 strokeWidth={isSelected ? 2 : isHovered ? 2 : 1}
               />
-              <text textAnchor="middle" dy={4} fontSize={12} className="pointer-events-none select-none" fill="#1e293b">
+              <text
+                textAnchor="middle"
+                dy={4}
+                fontSize={12}
+                className="pointer-events-none select-none"
+                fill="#1e293b"
+              >
                 {`T${topic.id}`}
               </text>
             </g>

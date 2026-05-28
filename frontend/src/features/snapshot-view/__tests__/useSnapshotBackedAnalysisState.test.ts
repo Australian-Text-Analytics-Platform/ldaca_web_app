@@ -64,9 +64,7 @@ describe('useSnapshotBackedAnalysisState', () => {
   });
 
   it('defaults to live mode with no loaded snapshot', () => {
-    const { result } = renderHook(() =>
-      useSnapshotBackedAnalysisState('concordance'),
-    );
+    const { result } = renderHook(() => useSnapshotBackedAnalysisState('concordance'));
 
     expect(result.current.snapshotMode).toEqual(LIVE_MODE);
     expect(result.current.loadedSnapshot).toBeNull();
@@ -82,9 +80,7 @@ describe('useSnapshotBackedAnalysisState', () => {
     );
 
     act(() => {
-      useSnapshotViewStore
-        .getState()
-        .loadSnapshot('concordance', snapshot, DEMO_SNAPSHOT_MODE);
+      useSnapshotViewStore.getState().loadSnapshot('concordance', snapshot, DEMO_SNAPSHOT_MODE);
     });
 
     expect(result.current.snapshotMode).toEqual(DEMO_SNAPSHOT_MODE);
@@ -98,9 +94,7 @@ describe('useSnapshotBackedAnalysisState', () => {
       useSnapshotViewStore.getState().setMode('concordance', DEMO_SNAPSHOT_MODE);
     });
 
-    const { result } = renderHook(() =>
-      useSnapshotBackedAnalysisState('concordance'),
-    );
+    const { result } = renderHook(() => useSnapshotBackedAnalysisState('concordance'));
 
     expect(result.current.snapshotMode).toEqual(DEMO_SNAPSHOT_MODE);
     expect(result.current.loadedSnapshot).toBeNull();
@@ -112,14 +106,10 @@ describe('useSnapshotBackedAnalysisState', () => {
     const snapshot = snapshotForTool('quotation', { result: ['quote'] });
 
     act(() => {
-      useSnapshotViewStore
-        .getState()
-        .loadSnapshot('quotation', snapshot, DEMO_SNAPSHOT_MODE);
+      useSnapshotViewStore.getState().loadSnapshot('quotation', snapshot, DEMO_SNAPSHOT_MODE);
     });
 
-    const { result } = renderHook(() =>
-      useSnapshotBackedAnalysisState('concordance'),
-    );
+    const { result } = renderHook(() => useSnapshotBackedAnalysisState('concordance'));
 
     expect(result.current.snapshotMode).toEqual(LIVE_MODE);
     expect(result.current.loadedSnapshot).toBeNull();

@@ -1,9 +1,18 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { describeColumn, getColumnUniqueValues } from '@/api/generated/sdk.gen';
 import { useAuth } from '@/hooks/useAuth';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/components/NodeSelectionPanel';
+import type {
+  NodeColumnSelection,
+  WorkspaceNodeLike,
+} from '@/features/analysis/common/components/NodeSelectionPanel';
 import { DateTimePickerField } from '../../utils/dateTimeUtils';
 import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from '../../utils/typeUtils';
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';
@@ -69,9 +78,16 @@ interface FilterConditionBuilderConfig {
   setLogic: (logic: 'and' | 'or') => void;
   onAddCondition: () => void;
   onRemoveCondition: (id: string) => void;
-  onConditionChange: <Key extends keyof FilterConditionWithId>(id: string, field: Key, value: FilterConditionWithId[Key]) => void;
+  onConditionChange: <Key extends keyof FilterConditionWithId>(
+    id: string,
+    field: Key,
+    value: FilterConditionWithId[Key],
+  ) => void;
   renderValueInput: (condition: FilterConditionWithId, disabled: boolean) => React.ReactNode;
-  renderConditionMetadata: (condition: FilterConditionWithId, rowDisabled: boolean) => React.ReactNode;
+  renderConditionMetadata: (
+    condition: FilterConditionWithId,
+    rowDisabled: boolean,
+  ) => React.ReactNode;
   shouldHideOperatorSelect: (condition: FilterConditionWithId) => boolean;
   getOperatorOptions: (condition: FilterConditionWithId) => ReturnType<typeof getOperatorsForType>;
 }
@@ -208,7 +224,9 @@ const buildCategoricalOptionEntries = (
  * Flow: derive selected nodes/schema, manage condition rows and categorical options, prefill
  * typed inputs, request previews, and apply complete filter payloads.
  */
-export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubTabSectionsResult => {
+export const useFilterSubTabSections = (
+  props: FilterSubTabProps,
+): UseFilterSubTabSectionsResult => {
   const {
     selectedNodeId,
     selectedNode,
@@ -222,24 +240,31 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     onAlert,
   } = props;
   const { getAuthHeaders } = useAuth();
-  const [conditions, setConditions] = useState<FilterConditionWithId[]>([{
-    id: '1',
-    column: '',
-    operator: 'eq',
-    value: '',
-    negate: false,
-    regex: false,
-    caseSensitive: false,
-  }]);
+  const [conditions, setConditions] = useState<FilterConditionWithId[]>([
+    {
+      id: '1',
+      column: '',
+      operator: 'eq',
+      value: '',
+      negate: false,
+      regex: false,
+      caseSensitive: false,
+    },
+  ]);
   const [logic, setLogic] = useState<'and' | 'or'>('and');
   const [newNodeName, setNewNodeName] = useState('');
   const [isFiltering, setIsFiltering] = useState(false);
-  const [categoricalOptions, setCategoricalOptions] = useState<Record<string, {
-    options: CategoricalOptionEntry[];
-    hasNull: boolean;
-    loading: boolean;
-    error: string | null;
-  }>>({});
+  const [categoricalOptions, setCategoricalOptions] = useState<
+    Record<
+      string,
+      {
+        options: CategoricalOptionEntry[];
+        hasNull: boolean;
+        loading: boolean;
+        error: string | null;
+      }
+    >
+  >({});
   const [optionSearchQueries, setOptionSearchQueries] = useState<Record<string, string>>({});
   const categoricalOptionsRef = useRef(categoricalOptions);
   categoricalOptionsRef.current = categoricalOptions;
@@ -279,7 +304,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   const workspaceNodeMap = (() => {
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node: WorkspaceNodeLike) => {
-      const key = (node.id as string | undefined) ?? ((node as Record<string, unknown>).node_id as string | undefined);
+      const key =
+        (node.id as string | undefined) ??
+        ((node as Record<string, unknown>).node_id as string | undefined);
       if (key) {
         map.set(key, node);
       }
@@ -294,13 +321,17 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   })();
 
   /** Keys cached categorical options by workspace, node, and column. */
-  const getCategoricalKey = useCallback((column: string) => `${currentWorkspaceId ?? 'none'}::${selectedNodeId ?? 'none'}::${column}`, [currentWorkspaceId, selectedNodeId]);
+  const getCategoricalKey = useCallback(
+    (column: string) => `${currentWorkspaceId ?? 'none'}::${selectedNodeId ?? 'none'}::${column}`,
+    [currentWorkspaceId, selectedNodeId],
+  );
 
   /**
    * Loads categorical/list-string values on demand for checklist conditions.
    * Condition changes and retry buttons call this to populate option state.
    */
-  const ensureCategoricalOptions = useCallback(async (column: string, dataType: string) => {
+  const ensureCategoricalOptions = useCallback(
+    async (column: string, dataType: string) => {
       if (!currentWorkspaceId || !selectedNodeId || !column) {
         return;
       }
@@ -328,7 +359,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           path: { column_name: column, node_id: selectedNodeId },
           throwOnError: true,
         });
-        const rawValues: unknown[] = Array.isArray(response?.unique_values) ? response.unique_values : [];
+        const rawValues: unknown[] = Array.isArray(response?.unique_values)
+          ? response.unique_values
+          : [];
         const includeNullOption = dataType === 'categorical';
         const hasNullFromResponse = includeNullOption && Boolean(response?.has_null);
         const optionList = buildCategoricalOptionEntries(rawValues, hasNullFromResponse);
@@ -353,7 +386,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           },
         }));
       }
-    }, [getCategoricalKey, currentWorkspaceId, selectedNodeId, getAuthHeaders]);
+    },
+    [getCategoricalKey, currentWorkspaceId, selectedNodeId, getAuthHeaders],
+  );
 
   const filterDefaultPalette = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'];
 
@@ -362,17 +397,19 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     return { [selectedNodeId]: filterDefaultPalette[0] ?? '#2563eb' };
   })();
 
-  const filterNodeSelections: NodeColumnSelection[] = selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : [];
+  const filterNodeSelections: NodeColumnSelection[] = selectedNodeId
+    ? [{ nodeId: selectedNodeId, column: '' }]
+    : [];
 
-    /**
-     * Placeholder color handler because the filter panel uses one fixed color.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow.
-     */
+  /**
+   * Placeholder color handler because the filter panel uses one fixed color.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow.
+   */
   const handleFilterColorChange = () => undefined;
-    /**
-     * Placeholder column handler because filter columns are edited in conditions.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow.
-     */
+  /**
+   * Placeholder column handler because filter columns are edited in conditions.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow.
+   */
   const handleFilterColumnChange = () => undefined;
 
   useEffect(() => {
@@ -439,12 +476,12 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
 
-    /**
-     * Adds a new filter condition seeded from the first available column.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-      * Steps: pick the first column, choose its default operator/value, create a stable row id,
-      * and append the new condition.
-     */
+  /**
+   * Adds a new filter condition seeded from the first available column.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: pick the first column, choose its default operator/value, create a stable row id,
+   * and append the new condition.
+   */
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
     const defaultOperator = firstColumn ? getDefaultOperatorForType(firstColumn.dataType) : 'eq';
@@ -462,13 +499,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     setConditions([...conditions, newCondition]);
   };
 
-    /**
-     * Removes a condition row and its associated checklist search state.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Removes a condition row and its associated checklist search state.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const handleRemoveCondition = (id: string) => {
     if (conditions.length > 1) {
-      setConditions(conditions.filter(c => c.id !== id));
+      setConditions(conditions.filter((c) => c.id !== id));
       setOptionSearchQueries((prev) => {
         const { [id]: _, ...next } = prev;
         return next;
@@ -486,83 +523,85 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   const handleConditionChange = <Key extends keyof FilterConditionWithId>(
     id: string,
     field: Key,
-    value: FilterConditionWithId[Key]
+    value: FilterConditionWithId[Key],
   ) => {
     let nextCategoricalColumnToLoad: string | null = null;
 
-    setConditions(conditions.map((c) => {
-      if (c.id !== id) return c;
-      
-      const updated = { ...c, [field]: value };
-      
-      if (field === 'column') {
-        const columnInfo = availableColumns.find(col => col.name === value);
-        if (columnInfo) {
-          updated.dataType = columnInfo.dataType;
-          const nextOperator = getDefaultOperatorForType(columnInfo.dataType);
-          updated.operator = nextOperator;
-          updated.value = nextOperator === 'in' ? [] : '';
-          updated.regex = false;
-          updated.caseSensitive = false;
+    setConditions(
+      conditions.map((c) => {
+        if (c.id !== id) return c;
 
-          if (columnInfo.dataType === 'categorical' || columnInfo.dataType === 'list_string') {
-            nextCategoricalColumnToLoad = columnInfo.name;
+        const updated = { ...c, [field]: value };
+
+        if (field === 'column') {
+          const columnInfo = availableColumns.find((col) => col.name === value);
+          if (columnInfo) {
+            updated.dataType = columnInfo.dataType;
+            const nextOperator = getDefaultOperatorForType(columnInfo.dataType);
+            updated.operator = nextOperator;
+            updated.value = nextOperator === 'in' ? [] : '';
+            updated.regex = false;
+            updated.caseSensitive = false;
+
+            if (columnInfo.dataType === 'categorical' || columnInfo.dataType === 'list_string') {
+              nextCategoricalColumnToLoad = columnInfo.name;
+            }
+
+            if (
+              columnInfo.dataType === 'datetime' &&
+              selectedNodeId &&
+              currentWorkspaceId &&
+              nextOperator !== 'is_null'
+            ) {
+              void prefillDatetimeValue(id, columnInfo.name, nextOperator);
+            } else if (
+              (columnInfo.dataType === 'integer' || columnInfo.dataType === 'float') &&
+              selectedNodeId &&
+              currentWorkspaceId &&
+              (nextOperator === 'gte' || nextOperator === 'lte')
+            ) {
+              void prefillNumericValue(id, columnInfo.name, nextOperator);
+            }
           }
-          
+        }
+
+        if (field === 'operator') {
+          if (value === 'in') {
+            updated.value = Array.isArray(updated.value) ? updated.value : [];
+            if (
+              (updated.dataType === 'categorical' || updated.dataType === 'list_string') &&
+              updated.column
+            ) {
+              nextCategoricalColumnToLoad = updated.column;
+            }
+          } else if (updated.dataType === 'categorical' && Array.isArray(updated.value)) {
+            updated.value = updated.value[0] ?? '';
+          }
+
           if (
-            columnInfo.dataType === 'datetime' &&
+            updated.dataType === 'datetime' &&
+            updated.column &&
             selectedNodeId &&
-            currentWorkspaceId &&
-            nextOperator !== 'is_null'
+            currentWorkspaceId
           ) {
-            prefillDatetimeValue(id, columnInfo.name, nextOperator);
+            updated.value = '';
+            if (value !== 'is_null') {
+              void prefillDatetimeValue(id, updated.column, value as FilterCondition['operator']);
+            }
           } else if (
-            (columnInfo.dataType === 'integer' || columnInfo.dataType === 'float') &&
+            (updated.dataType === 'integer' || updated.dataType === 'float') &&
+            updated.column &&
             selectedNodeId &&
             currentWorkspaceId &&
-            (nextOperator === 'gte' || nextOperator === 'lte')
+            (value === 'gte' || value === 'lte')
           ) {
-            prefillNumericValue(id, columnInfo.name, nextOperator);
+              void prefillNumericValue(id, updated.column, value as FilterCondition['operator']);
           }
-        }
-      }
-      
-      if (field === 'operator') {
-        if (value === 'in') {
-          updated.value = Array.isArray(updated.value) ? updated.value : [];
-          if (
-            (updated.dataType === 'categorical' || updated.dataType === 'list_string') &&
-            updated.column
-          ) {
-            nextCategoricalColumnToLoad = updated.column;
-          }
-        } else if (updated.dataType === 'categorical' && Array.isArray(updated.value)) {
-          updated.value = updated.value[0] ?? '';
         }
 
-        if (
-          updated.dataType === 'datetime' &&
-          updated.column &&
-          selectedNodeId &&
-          currentWorkspaceId
-        ) {
-          updated.value = '';
-          if (value !== 'is_null') {
-            prefillDatetimeValue(id, updated.column, value as FilterCondition['operator']);
-          }
-        } else if (
-          (updated.dataType === 'integer' || updated.dataType === 'float') &&
-          updated.column &&
-          selectedNodeId &&
-          currentWorkspaceId &&
-          (value === 'gte' || value === 'lte')
-        ) {
-          prefillNumericValue(id, updated.column, value as FilterCondition['operator']);
-        }
-      }
-      
-      return updated;
-    }));
+        return updated;
+      }),
+    );
 
     if (field === 'column' || field === 'operator') {
       setOptionSearchQueries((prev) => ({ ...prev, [id]: '' }));
@@ -576,26 +615,26 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           : targetCondition?.dataType;
       void ensureCategoricalOptions(
         nextCategoricalColumnToLoad,
-        targetType === 'categorical' || targetType === 'list_string'
-          ? targetType
-          : 'categorical',
+        targetType === 'categorical' || targetType === 'list_string' ? targetType : 'categorical',
       );
     }
   };
 
-    /**
-     * Renders row-level filter flags used by string and negated conditions.
-     * Rendered by: useFilterSubTabSections JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
-     * Flow: inspect the condition type/operator, fetch checklist state when relevant, and
-     * render loading/error/search metadata beside the condition.
-     */
+  /**
+   * Renders row-level filter flags used by string and negated conditions.
+   * Rendered by: useFilterSubTabSections JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
+   * Flow: inspect the condition type/operator, fetch checklist state when relevant, and
+   * render loading/error/search metadata beside the condition.
+   */
   const renderConditionMetadata = (condition: FilterConditionWithId, rowDisabled: boolean) => (
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
       <label className="flex items-center gap-1.5">
         <Checkbox
           id={`negate-${condition.id}`}
           checked={Boolean(condition.negate)}
-          onCheckedChange={(checked) => handleConditionChange(condition.id, 'negate', checked === true)}
+          onCheckedChange={(checked) =>
+            handleConditionChange(condition.id, 'negate', checked === true)
+          }
           disabled={rowDisabled}
         />
         <span>negate</span>
@@ -607,7 +646,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
             <Checkbox
               id={`regex-${condition.id}`}
               checked={Boolean(condition.regex)}
-              onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
+              onCheckedChange={(checked) =>
+                handleConditionChange(condition.id, 'regex', checked === true)
+              }
               disabled={rowDisabled}
             />
             <span>regex</span>
@@ -616,7 +657,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
             <Checkbox
               id={`case-sensitive-${condition.id}`}
               checked={Boolean(condition.caseSensitive)}
-              onCheckedChange={(checked) => handleConditionChange(condition.id, 'caseSensitive', checked === true)}
+              onCheckedChange={(checked) =>
+                handleConditionChange(condition.id, 'caseSensitive', checked === true)
+              }
               disabled={rowDisabled}
             />
             <span>case sensitive</span>
@@ -626,84 +669,84 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     </div>
   );
 
-    /**
-     * Categorical/list filters use checklist UI instead of an operator select.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
-  const shouldHideOperatorSelect = (condition: FilterConditionWithId) => (
-    condition.dataType === 'categorical' || condition.dataType === 'list_string'
-  );
+  /**
+   * Categorical/list filters use checklist UI instead of an operator select.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
+  const shouldHideOperatorSelect = (condition: FilterConditionWithId) =>
+    condition.dataType === 'categorical' || condition.dataType === 'list_string';
 
-    /**
-     * Supplies type-aware operator options to the shared ConditionBuilder.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
-  const getConditionOperatorOptions = (condition: FilterConditionWithId) => (
-    getOperatorsForType(condition.dataType || 'string')
-  );
+  /**
+   * Supplies type-aware operator options to the shared ConditionBuilder.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
+  const getConditionOperatorOptions = (condition: FilterConditionWithId) =>
+    getOperatorsForType(condition.dataType || 'string');
 
-    /**
-     * Prefills datetime filters from column stats to reduce empty preview states.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     * Steps: reuse an existing date/time value when present, otherwise fetch column stats and
-     * seed the condition from backend min/max values.
-     */
+  /**
+   * Prefills datetime filters from column stats to reduce empty preview states.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: reuse an existing date/time value when present, otherwise fetch column stats and
+   * seed the condition from backend min/max values.
+   */
   const prefillDatetimeValue = async (
     conditionId: string,
     column: string,
-    operator: FilterCondition['operator']
+    operator: FilterCondition['operator'],
   ) => {
     if (!selectedNodeId || !currentWorkspaceId) return;
-    
+
     try {
       const { data: describeData } = await describeColumn({
         headers: getAuthHeaders(),
         path: { column_name: column, node_id: selectedNodeId },
         throwOnError: true,
       });
-      
-      setConditions(prev => prev.map(c => {
-        if (c.id !== conditionId) return c;
-        
-        let newValue: ConditionValue;
-        
-        switch (operator) {
-          case 'eq':
-            newValue = describeData.median || describeData.min || '';
-            break;
-          case 'gte':
-            newValue = describeData.min || '';
-            break;
-          case 'lte':
-            newValue = describeData.max || '';
-            break;
-          case 'between':
-            newValue = {
-              start: (describeData.min as ConditionRange['start']) || '',
-              end: (describeData.max as ConditionRange['end']) || ''
-            };
-            break;
-          default:
-            newValue = '';
-        }
-        
-        return { ...c, value: newValue };
-      }));
+
+      setConditions((prev) =>
+        prev.map((c) => {
+          if (c.id !== conditionId) return c;
+
+          let newValue: ConditionValue;
+
+          switch (operator) {
+            case 'eq':
+              newValue = describeData.median || describeData.min || '';
+              break;
+            case 'gte':
+              newValue = describeData.min || '';
+              break;
+            case 'lte':
+              newValue = describeData.max || '';
+              break;
+            case 'between':
+              newValue = {
+                start: (describeData.min as ConditionRange['start']) || '',
+                end: (describeData.max as ConditionRange['end']) || '',
+              };
+              break;
+            default:
+              newValue = '';
+          }
+
+          return { ...c, value: newValue };
+        }),
+      );
     } catch {
       // Best-effort prefill; leave the current value unchanged on failure.
     }
   };
 
-    /**
-     * Prefills numeric range filters from column min/max stats when available.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     * Steps: reuse existing numeric bounds when present, otherwise describe the column and seed
-     * range/equality inputs from backend min/max values.
-     */
+  /**
+   * Prefills numeric range filters from column min/max stats when available.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: reuse existing numeric bounds when present, otherwise describe the column and seed
+   * range/equality inputs from backend min/max values.
+   */
   const prefillNumericValue = async (
     conditionId: string,
     column: string,
-    operator: FilterCondition['operator']
+    operator: FilterCondition['operator'],
   ) => {
     if (!selectedNodeId || !currentWorkspaceId) return;
 
@@ -714,26 +757,28 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         throwOnError: true,
       });
 
-      setConditions(prev => prev.map(c => {
-        if (c.id !== conditionId) return c;
+      setConditions((prev) =>
+        prev.map((c) => {
+          if (c.id !== conditionId) return c;
 
-        let newValue: ConditionValue = (c.value as string | number) ?? '';
+          let newValue: ConditionValue = (c.value as string | number) ?? '';
 
-        switch (operator) {
-          case 'gte':
-            if (describeData.min !== undefined && describeData.min !== null) {
-              newValue = describeData.min;
-            }
-            break;
-          case 'lte':
-            if (describeData.max !== undefined && describeData.max !== null) {
-              newValue = describeData.max;
-            }
-            break;
-        }
+          switch (operator) {
+            case 'gte':
+              if (describeData.min !== undefined && describeData.min !== null) {
+                newValue = describeData.min;
+              }
+              break;
+            case 'lte':
+              if (describeData.max !== undefined && describeData.max !== null) {
+                newValue = describeData.max;
+              }
+              break;
+          }
 
-        return { ...c, value: newValue };
-      }));
+          return { ...c, value: newValue };
+        }),
+      );
     } catch {
       // Best-effort prefill; leave the current value unchanged on failure.
     }
@@ -753,7 +798,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           type="text"
           value={condition.operator === 'between' ? '' : String(condition.value ?? '')}
           disabled
-          placeholder={hasSelection ? 'Select a column' : 'Select a data block to configure filters'}
+          placeholder={
+            hasSelection ? 'Select a column' : 'Select a data block to configure filters'
+          }
           className="flex-1 rounded-md border border-border/70 bg-muted px-2 py-1 text-sm text-muted-foreground"
         />
       );
@@ -774,18 +821,18 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       const isLoadingOptions = optionState?.loading ?? false;
       const optionError = optionState?.error ?? null;
 
-            /**
-             * Writes checklist selections back into the condition value field.
-             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-             */
+      /**
+       * Writes checklist selections back into the condition value field.
+       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+       */
       const updateSelections = (nextSelections: CategoricalPrimitive[]) => {
         handleConditionChange(condition.id, 'value', nextSelections);
       };
 
-            /**
-             * Toggles one categorical/list-string option in the condition value.
-             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-             */
+      /**
+       * Toggles one categorical/list-string option in the condition value.
+       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+       */
       const toggleValue = (entry: FilterChecklistOption, nextChecked: boolean) => {
         if (disabled) return;
         if (nextChecked) {
@@ -793,26 +840,24 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           updateSelections([...selectedValues, toCategoricalPrimitive(entry.value)]);
         } else {
           updateSelections(
-            selectedValues.filter(
-              (current) => getCategoricalOptionKey(current) !== entry.key,
-            ),
+            selectedValues.filter((current) => getCategoricalOptionKey(current) !== entry.key),
           );
         }
       };
 
-            /**
-             * Selects all loaded options for the current checklist condition.
-             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-             */
+      /**
+       * Selects all loaded options for the current checklist condition.
+       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+       */
       const handleSelectAll = () => {
         if (disabled) return;
         updateSelections(optionEntries.map((entry) => entry.value));
       };
 
-            /**
-             * Adds only the currently visible search results to the selection.
-             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-             */
+      /**
+       * Adds only the currently visible search results to the selection.
+       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+       */
       const handleSelectVisible = (visibleOptions: FilterChecklistOption[]) => {
         if (disabled) return;
         const merged = new Map<string, CategoricalPrimitive>(
@@ -824,16 +869,17 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         updateSelections(Array.from(merged.values()));
       };
 
-            /**
-             * Clears all selected values for the current checklist condition.
-             * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-             */
+      /**
+       * Clears all selected values for the current checklist condition.
+       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+       */
       const handleClearAll = () => {
         if (disabled) return;
         updateSelections([]);
       };
 
-      const onSelectAllForMode = searchQuery.trim().length > 0 ? handleSelectVisible : () => handleSelectAll();
+      const onSelectAllForMode =
+        searchQuery.trim().length > 0 ? handleSelectVisible : () => handleSelectAll();
 
       return (
         <FilterValueChecklist
@@ -844,11 +890,15 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           loading={isLoadingOptions}
           error={optionError}
           searchQuery={searchQuery}
-          onSearchQueryChange={(query) => setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query }))}
+          onSearchQueryChange={(query) =>
+            setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query }))
+          }
           onToggleOption={toggleValue}
           onSelectAll={onSelectAllForMode}
           onClearAll={handleClearAll}
-          onRetry={column ? () => ensureCategoricalOptions(column, dataType) : undefined}
+          onRetry={column ? () => {
+            void ensureCategoricalOptions(column, dataType);
+          } : undefined}
         />
       );
     }
@@ -874,7 +924,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (dataType === 'datetime') {
       if (condition.operator === 'between') {
         const rangeValue: ConditionRange =
-          condition.value && typeof condition.value === 'object' && 'start' in (condition.value as Record<string, unknown>)
+          condition.value &&
+          typeof condition.value === 'object' &&
+          'start' in (condition.value as Record<string, unknown>)
             ? (condition.value as ConditionRange)
             : { start: null, end: null };
         const startStr =
@@ -967,19 +1019,22 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     );
   };
 
-    /**
-     * Validates and applies the configured filter as a new workspace node.
-     * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-      * Steps: require a selected node and complete conditions, serialize the request, call the
-      * filter mutation, and clear loading state.
-     */
+  /**
+   * Validates and applies the configured filter as a new workspace node.
+   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Steps: require a selected node and complete conditions, serialize the request, call the
+   * filter mutation, and clear loading state.
+   */
   const handleApplyFilter = async () => {
     if (!selectedNodeId) {
       onAlert('Please select a data block first');
       return;
     }
 
-    if (conditions.length === 0 || conditions.some((condition) => !isConditionComplete(condition))) {
+    if (
+      conditions.length === 0 ||
+      conditions.some((condition) => !isConditionComplete(condition))
+    ) {
       onAlert('Please fill in all filter conditions');
       return;
     }
@@ -1000,23 +1055,23 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     ? 'Select a data block to preview filtered results.'
     : 'Showing original data. Configure conditions to preview filtered results.';
 
-  const summaryText = conditions.length === 0
-    ? 'Define at least one condition to enable preview and filtering.'
-    : `${conditions.length} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`;
+  const summaryText =
+    conditions.length === 0
+      ? 'Define at least one condition to enable preview and filtering.'
+      : `${conditions.length} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`;
 
-  const hasApplicablePreviewRows = conditionsComplete && !previewLoading && !previewError && previewData.length > 0;
+  const hasApplicablePreviewRows =
+    conditionsComplete && !previewLoading && !previewError && previewData.length > 0;
 
   const applyButtonDisabled =
-    isConfigDisabled ||
-    isFiltering ||
-    isLoading.operations ||
-    !hasApplicablePreviewRows;
+    isConfigDisabled || isFiltering || isLoading.operations || !hasApplicablePreviewRows;
 
   const applyButtonDisabledReason: string | undefined = (() => {
     if (isFiltering || isLoading.operations) return undefined;
     if (!hasSelection) return 'Select a data block first';
     if (!conditionsComplete) return 'Set at least one complete filtering condition';
-    if (!hasApplicablePreviewRows) return 'Adjust your conditions until at least one result appears in Preview filtered results';
+    if (!hasApplicablePreviewRows)
+      return 'Adjust your conditions until at least one result appears in Preview filtered results';
     return undefined;
   })();
 

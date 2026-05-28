@@ -20,7 +20,9 @@ export default function CILogonLogin({ isLoading, error }: CILogonLoginProps) {
             src="https://www.cilogon.org/favicon.ico"
             alt=""
             className="w-5 h-5"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
           />
           Sign in with CILogon
         </button>

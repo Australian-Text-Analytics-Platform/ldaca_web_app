@@ -1,34 +1,29 @@
-import * as React from "react"
-import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
+import * as React from 'react';
+import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils';
 
-type ScrollAreaScrollbarOption = "vertical" | "horizontal" | "both" | "none"
+type ScrollAreaScrollbarOption = 'vertical' | 'horizontal' | 'both' | 'none';
 
 type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
-  scrollbars?: ScrollAreaScrollbarOption
-  children?: React.ReactNode
-  className?: string
-}
+  scrollbars?: ScrollAreaScrollbarOption;
+  children?: React.ReactNode;
+  className?: string;
+};
 
 /**
  * Scroll area wrapper used by overflow-heavy panels that need styled Radix scrollbars.
  * Why: overflow panels need Radix scrollbars with app styling while preserving the caller's viewport content.
  * Flow: render Root and Viewport, conditionally mount vertical/horizontal ScrollBar primitives, then add the Radix corner when both axes show.
  */
-function ScrollArea({
-  className,
-  children,
-  scrollbars = "vertical",
-  ...props
-}: ScrollAreaProps) {
-  const showVertical = scrollbars === "vertical" || scrollbars === "both"
-  const showHorizontal = scrollbars === "horizontal" || scrollbars === "both"
+function ScrollArea({ className, children, scrollbars = 'vertical', ...props }: ScrollAreaProps) {
+  const showVertical = scrollbars === 'vertical' || scrollbars === 'both';
+  const showHorizontal = scrollbars === 'horizontal' || scrollbars === 'both';
 
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
-      className={cn("group relative overflow-hidden", className)}
+      className={cn('group relative overflow-hidden', className)}
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
@@ -38,12 +33,10 @@ function ScrollArea({
         {children}
       </ScrollAreaPrimitive.Viewport>
       {showVertical ? <ScrollBar forceMount /> : null}
-      {showHorizontal ? (
-        <ScrollBar forceMount orientation="horizontal" />
-      ) : null}
+      {showHorizontal ? <ScrollBar forceMount orientation="horizontal" /> : null}
       {showVertical && showHorizontal ? <ScrollAreaPrimitive.Corner /> : null}
     </ScrollAreaPrimitive.Root>
-  )
+  );
 }
 
 /**
@@ -53,7 +46,7 @@ function ScrollArea({
  */
 function ScrollBar({
   className,
-  orientation = "vertical",
+  orientation = 'vertical',
   forceMount,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
@@ -63,12 +56,10 @@ function ScrollBar({
       orientation={orientation}
       forceMount={forceMount}
       className={cn(
-        "z-10 flex select-none touch-none p-px opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100",
-        orientation === "vertical" &&
-          "h-full w-2.5 border-l border-l-transparent",
-        orientation === "horizontal" &&
-          "h-2.5 flex-col border-t border-t-transparent opacity-100",
-        className
+        'z-10 flex select-none touch-none p-px opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100',
+        orientation === 'vertical' && 'h-full w-2.5 border-l border-l-transparent',
+        orientation === 'horizontal' && 'h-2.5 flex-col border-t border-t-transparent opacity-100',
+        className,
       )}
       {...props}
     >
@@ -77,7 +68,7 @@ function ScrollBar({
         className="bg-border relative flex-1 rounded-full"
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
-  )
+  );
 }
 
-export { ScrollArea, ScrollBar }
+export { ScrollArea, ScrollBar };

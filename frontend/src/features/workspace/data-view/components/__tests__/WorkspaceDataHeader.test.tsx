@@ -25,7 +25,7 @@ describe('WorkspaceDataHeader', () => {
           canUndo
           canRedo={false}
         />
-      </TooltipProvider>
+      </TooltipProvider>,
     );
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));

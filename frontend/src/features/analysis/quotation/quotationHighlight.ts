@@ -10,18 +10,26 @@ export type QuotationHighlightType = 'speaker' | 'quote' | 'verb';
 
 export const TYPE_COLORS: Record<string, string> = {
   speaker: '#2563eb', // blue-600
-  quote: '#059669',   // emerald-600
-  verb: '#7c3aed',    // violet-600
+  quote: '#059669', // emerald-600
+  verb: '#7c3aed', // violet-600
 };
 
 // Converts palette colours to translucent backgrounds used by hover highlights.
 /**
  * Used by: QuotationHighlightedCell because hover and segment backgrounds need translucent versions of the quotation highlight palette.
-   * Flow: expand shorthand hex colors, parse RGB channels, then return an rgba string with the requested alpha.
+ * Flow: expand shorthand hex colors, parse RGB channels, then return an rgba string with the requested alpha.
  */
 export const hexToRgba = (hex: string, alpha = 0.18): string => {
   const h = hex.replace('#', '');
-  const bigint = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  const bigint = parseInt(
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h,
+    16,
+  );
   const r = (bigint >> 16) & 255;
   const g = (bigint >> 8) & 255;
   const b = bigint & 255;

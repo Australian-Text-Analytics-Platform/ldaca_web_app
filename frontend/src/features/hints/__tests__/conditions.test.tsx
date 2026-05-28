@@ -27,26 +27,26 @@ const mockUIState = vi.hoisted(() => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-    /**
-     * Supplies mutable workspace context for condition checks under test.
-     * Used by: test mock object in hints/conditions because the test needs a stable fixture or assertion helper for this scenario.
-     */
+  /**
+   * Supplies mutable workspace context for condition checks under test.
+   * Used by: test mock object in hints/conditions because the test needs a stable fixture or assertion helper for this scenario.
+   */
   useWorkspaceData: () => mockWorkspaceData,
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
-    /**
-     * Supplies mutable selection context for node-dependent hint conditions.
-     * Used by: test mock object in hints/conditions because the test needs a stable fixture or assertion helper for this scenario.
-     */
+  /**
+   * Supplies mutable selection context for node-dependent hint conditions.
+   * Used by: test mock object in hints/conditions because the test needs a stable fixture or assertion helper for this scenario.
+   */
   useWorkspaceSelection: () => mockSelection,
 }));
 
 vi.mock('@/stores/uiStore', () => ({
-    /**
-     * Runs selectors against the mutable UI fixture used by each condition test.
-     * Used by: test mock object in hints/conditions because the test needs a stable fixture or assertion helper for this scenario.
-     */
+  /**
+   * Runs selectors against the mutable UI fixture used by each condition test.
+   * Used by: test mock object in hints/conditions because the test needs a stable fixture or assertion helper for this scenario.
+   */
   useUIStore: (selector: (state: typeof mockUIState) => unknown) => selector(mockUIState),
 }));
 

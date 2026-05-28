@@ -101,21 +101,13 @@ export function AnalysisCardLayout({
           <CardTitle className="flex items-center gap-2">
             {title}
             {info ? (
-              <InfoIcon
-                targetKey={info.targetKey}
-                label={info.label}
-                tooltip={info.tooltip}
-              />
+              <InfoIcon targetKey={info.targetKey} label={info.label} tooltip={info.tooltip} />
             ) : null}
             {help ? (
-              <HelpIcon
-                targetKey={help.targetKey}
-                label={help.label}
-                tooltip={help.tooltip}
-              />
+              <HelpIcon targetKey={help.targetKey} label={help.label} tooltip={help.tooltip} />
             ) : null}
           </CardTitle>
-          {(headerActions || snapshot) ? (
+          {headerActions || snapshot ? (
             <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
               {headerActions}
               {snapshot ? (
@@ -144,8 +136,18 @@ export function AnalysisCardLayout({
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
           <div className="flex items-center gap-2">
             <DisabledReasonTooltip reason={actions.runDisabledReason}>
-              <Button onClick={actions.onRun} disabled={actions.runDisabled} className="w-full sm:w-auto">
-                {actions.isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+              <Button
+                onClick={() => {
+                  void actions.onRun();
+                }}
+                disabled={actions.runDisabled}
+                className="w-full sm:w-auto"
+              >
+                {actions.isRunning ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-2 h-4 w-4" />
+                )}
                 {runLabel}
               </Button>
             </DisabledReasonTooltip>
@@ -161,11 +163,17 @@ export function AnalysisCardLayout({
           {actions.onStop && actions.isRunning ? (
             <div className="flex items-center gap-2">
               <Button
-                onClick={actions.onStop}
+                onClick={() => {
+                  void actions.onStop!();
+                }}
                 variant="outline"
                 disabled={actions.stopDisabled || actions.isStopping}
               >
-                {actions.isStopping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
+                {actions.isStopping ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="mr-2 h-4 w-4" />
+                )}
                 Stop
               </Button>
               {actions.stopHelp ? (
@@ -179,8 +187,18 @@ export function AnalysisCardLayout({
           ) : null}
 
           <div className="flex items-center gap-2">
-            <Button onClick={actions.onClear} variant="destructive" disabled={actions.clearDisabled}>
-              {actions.isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+            <Button
+                onClick={() => {
+                  void actions.onClear();
+                }}
+              variant="destructive"
+              disabled={actions.clearDisabled}
+            >
+              {actions.isClearing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
               Clear Results
             </Button>
             {actions.clearHelp ? (

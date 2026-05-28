@@ -15,7 +15,9 @@ import type {
  * Used by: useAnalysisFeature to bridge global task status into feature UI state because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
  * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
  */
-export const useAnalysisTaskFlow = (options: UseAnalysisTaskFlowOptions): UseAnalysisTaskFlowResult => {
+export const useAnalysisTaskFlow = (
+  options: UseAnalysisTaskFlowOptions,
+): UseAnalysisTaskFlowResult => {
   const {
     taskType,
     isTabActive = true,
@@ -77,7 +79,7 @@ export const useAnalysisTaskFlow = (options: UseAnalysisTaskFlowOptions): UseAna
   /**
    * Exposes an imperative refresh path for callers that need to reapply results
    * outside the automatic terminal-task effect.
-    * Called by: consumers of useAnalysisTaskFlow through the refreshNow return value because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Called by: consumers of useAnalysisTaskFlow through the refreshNow return value because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
    */
   const refreshNow = async (reason: AnalysisTaskFlowRefreshContext['reason'] = 'terminal') => {
     if (!workspaceId || !refreshResultsRef.current) {
@@ -140,7 +142,7 @@ export const useAnalysisTaskFlow = (options: UseAnalysisTaskFlowOptions): UseAna
       status.runningTask?.task_id ||
       status.queuedTask?.task_id ||
       status.terminalTask?.task_id ||
-      status.tasks.length > 0
+      status.tasks.length > 0,
   );
 
   return {

@@ -1,6 +1,11 @@
 import { useState, useRef, useCallback } from 'react';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
-import { ASIDE_PANEL_DEFAULT_RATIO, ASIDE_PANEL_MIN_RATIO, ASIDE_PANEL_MAX_RATIO, ASIDE_PANEL_MAX_PIXELS } from '@/config/layout';
+import {
+  ASIDE_PANEL_DEFAULT_RATIO,
+  ASIDE_PANEL_MIN_RATIO,
+  ASIDE_PANEL_MAX_RATIO,
+  ASIDE_PANEL_MAX_PIXELS,
+} from '@/config/layout';
 
 /**
  * Percent-based right panel resize + collapse toggle.

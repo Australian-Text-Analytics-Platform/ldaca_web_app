@@ -15,10 +15,7 @@ import type {
   SequentialAnalysisDatum,
   ChartTypeOption,
 } from '../hooks/useSequentialAnalysisTaskFlow';
-import {
-  getPaletteColor,
-  formatTimeLabel,
-} from '../hooks/useSequentialAnalysisTaskFlow';
+import { getPaletteColor, formatTimeLabel } from '../hooks/useSequentialAnalysisTaskFlow';
 
 export type SequentialXAxisType = 'category' | 'number';
 
@@ -156,7 +153,13 @@ export function SequentialChart({
                 className="min-w-0 flex-1"
               />
             </div>
-            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : 'No groups meet the current minimum group size — adjust the filter to enable selecting periods.'}>
+            <DisabledReasonTooltip
+              reason={
+                readOnly
+                  ? SNAPSHOT_DISABLED_REASON
+                  : 'No groups meet the current minimum group size — adjust the filter to enable selecting periods.'
+              }
+            >
               <Button
                 type="button"
                 size="sm"
@@ -341,4 +344,4 @@ export function SequentialChart({
       </div>
     </div>
   );
-};
+}

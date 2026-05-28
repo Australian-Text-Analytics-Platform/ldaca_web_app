@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  colorPairFor,
-  DEFAULT_GREY_PAIR,
-  deriveLightVariant,
-} from '../color';
+import { colorPairFor, DEFAULT_GREY_PAIR, deriveLightVariant } from '../color';
 
 /** Tailwind / hex inspection helpers — converted inline so the tests
  * stay decoupled from the colour module's internal HSL plumbing. */

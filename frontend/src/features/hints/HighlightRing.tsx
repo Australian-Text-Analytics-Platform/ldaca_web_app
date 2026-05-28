@@ -10,27 +10,23 @@ interface HighlightRingProps {
 }
 
 /**
-   * A non-interactive highlight ring portalled to <body> and absolutely
-   * positioned over the target element's bounding rect. Updates on scroll,
-   * resize, and external `tick` changes. Pure presentational — does not own
-   * lifecycle of the target.
-   * Rendered by: HintsController module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
-   * Flow: measure the target on every tick/resize/scroll, store viewport-relative bounds, and
-   * render an overlay only while the anchor is still attached.
-   */
-export function HighlightRing({
-  target,
-  tick,
-  className,
-}: HighlightRingProps) {
+ * A non-interactive highlight ring portalled to <body> and absolutely
+ * positioned over the target element's bounding rect. Updates on scroll,
+ * resize, and external `tick` changes. Pure presentational — does not own
+ * lifecycle of the target.
+ * Rendered by: HintsController module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: measure the target on every tick/resize/scroll, store viewport-relative bounds, and
+ * render an overlay only while the anchor is still attached.
+ */
+export function HighlightRing({ target, tick, className }: HighlightRingProps) {
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   useEffect(() => {
     let raf = 0;
-        /**
-         * Remeasures the highlighted target for scroll, resize, and layout changes.
-         * Called by: HighlightRing internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-         */
+    /**
+     * Remeasures the highlighted target for scroll, resize, and layout changes.
+     * Called by: HighlightRing internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     */
     const measure = () => {
       raf = requestAnimationFrame(() => setRect(target.getBoundingClientRect()));
     };

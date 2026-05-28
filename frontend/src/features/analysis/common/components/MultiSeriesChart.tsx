@@ -68,10 +68,7 @@ export interface MultiSeriesChartTooltipConfig {
   content?: React.ReactElement;
   labelFormatter?: (label: never, payload?: never) => React.ReactNode;
   /** Only used when `shadcn` is false (default). */
-  valueFormatter?: (
-    value: never,
-    name: never,
-  ) => [React.ReactNode, React.ReactNode];
+  valueFormatter?: (value: never, name: never) => [React.ReactNode, React.ReactNode];
   /** Use shadcn ChartTooltipContent. Default false (= plain Recharts Tooltip). */
   shadcn?: boolean;
   /** Only used with `shadcn=true`. */
@@ -171,9 +168,7 @@ export function MultiSeriesChart({
     return () => ro.disconnect();
   }, []);
   const showOverflowWarning =
-    !suppressOverflowWarning &&
-    chartPixelWidth > 0 &&
-    data.length > chartPixelWidth;
+    !suppressOverflowWarning && chartPixelWidth > 0 && data.length > chartPixelWidth;
 
   const xAxisType = xAxis?.type ?? 'category';
   const hasSelection = !!selection && selection.selectedIndices.size > 0;
@@ -199,7 +194,7 @@ export function MultiSeriesChart({
 
   type DotProps = { cx?: number; cy?: number; index?: number };
 
-    /**
+  /**
    * Called by: dotFor when line/area series need custom point rendering because selection state must alter point visibility without duplicating Recharts dot branches.
    * Flow: reject incomplete Recharts point props, draw the single-point marker when no selection exists, then emphasize selected indices and fade other points.
    */
@@ -212,9 +207,7 @@ export function MultiSeriesChart({
       return singlePoint ? <circle cx={cx} cy={cy} r={4} fill={color} /> : null;
     }
     if (selection!.selectedIndices.has(index)) {
-      return (
-        <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />
-      );
+      return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
     }
     return <circle cx={cx} cy={cy} r={3} fill={color} fillOpacity={0.25} />;
   };
@@ -281,20 +274,16 @@ export function MultiSeriesChart({
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
-              {data.length.toLocaleString()} data points but only {chartPixelWidth} px of
-              chart width — points will overlap and rendering may be slow. Consider
-              increasing the bin size or aggregation granularity for a clearer view.
+              {data.length.toLocaleString()} data points but only {chartPixelWidth} px of chart
+              width — points will overlap and rendering may be slow. Consider increasing the bin
+              size or aggregation granularity for a clearer view.
             </span>
           </div>
         )}
         <div ref={plotMeasureRef} className="w-full" style={heightStyle}>
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             {chartType === 'bar' ? (
-              <BarChart
-                data={data as never}
-                margin={margin}
-                onClick={handleChartClick as never}
-              >
+              <BarChart data={data as never} margin={margin} onClick={handleChartClick as never}>
                 <CartesianGrid strokeDasharray="3 3" />
                 {xAxisElement}
                 {yAxisElement}
@@ -322,11 +311,7 @@ export function MultiSeriesChart({
                 ))}
               </BarChart>
             ) : chartType === 'area' ? (
-              <AreaChart
-                data={data as never}
-                margin={margin}
-                onClick={handleChartClick as never}
-              >
+              <AreaChart data={data as never} margin={margin} onClick={handleChartClick as never}>
                 <CartesianGrid strokeDasharray="3 3" />
                 {xAxisElement}
                 {yAxisElement}
@@ -350,11 +335,7 @@ export function MultiSeriesChart({
                 ))}
               </AreaChart>
             ) : (
-              <LineChart
-                data={data as never}
-                margin={margin}
-                onClick={handleChartClick as never}
-              >
+              <LineChart data={data as never} margin={margin} onClick={handleChartClick as never}>
                 <CartesianGrid strokeDasharray="3 3" />
                 {xAxisElement}
                 {yAxisElement}
@@ -381,4 +362,4 @@ export function MultiSeriesChart({
       </ChartContainer>
     </div>
   );
-};
+}

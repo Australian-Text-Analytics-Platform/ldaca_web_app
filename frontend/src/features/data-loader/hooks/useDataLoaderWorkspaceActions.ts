@@ -38,8 +38,7 @@ export function useDataLoaderWorkspaceActions({
 }: UseDataLoaderWorkspaceActionsParams) {
   const queryClient = useQueryClient();
   const workspaceActions = useWorkspaceActions();
-  const [workspaceToDelete, setWorkspaceToDelete] =
-    useState<DeleteWorkspaceTarget | null>(null);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<DeleteWorkspaceTarget | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
   const [workspaceNameAlert, setWorkspaceNameAlert] = useState<string | null>(null);
   const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
@@ -49,12 +48,9 @@ export function useDataLoaderWorkspaceActions({
    * Creates a workspace from the card form and reports validation errors back
    * through the dialog state the Data Loader owns.
    * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-  * Flow: reject empty names, call the workspace action, surface invalid-name errors inline, and notify success or failure.
+   * Flow: reject empty names, call the workspace action, surface invalid-name errors inline, and notify success or failure.
    */
-  const handleCreateWorkspace = async (
-    name: string,
-    description: string,
-  ): Promise<boolean> => {
+  const handleCreateWorkspace = async (name: string, description: string): Promise<boolean> => {
     if (!name) return false;
     try {
       await workspaceActions.createWorkspace(name, description || undefined);
@@ -127,10 +123,7 @@ export function useDataLoaderWorkspaceActions({
       await workspaceActions.updateWorkspaceDescription(value);
       notify('success', 'Workspace description updated.');
     } catch (error) {
-      notify(
-        'error',
-        (error as Error).message || 'Failed to update workspace description.',
-      );
+      notify('error', (error as Error).message || 'Failed to update workspace description.');
     }
   };
 
@@ -187,7 +180,7 @@ export function useDataLoaderWorkspaceActions({
    * Uploads a saved workspace archive and refreshes workspace summaries so the
    * manager can show the imported workspace immediately.
    * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-  * Flow: mark upload busy, send the ZIP through the generated API, refetch workspace summaries, notify the user, and always clear busy state.
+   * Flow: mark upload busy, send the ZIP through the generated API, refetch workspace summaries, notify the user, and always clear busy state.
    */
   const handleUploadWorkspaceZip = async (file: File) => {
     setUploadingWorkspaceZip(true);
@@ -207,10 +200,7 @@ export function useDataLoaderWorkspaceActions({
    * hints when the selected file matches the last uploaded path.
    * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const handleAddFileToWorkspace = async (
-    filename: string,
-    selectedSheet?: string | null,
-  ) => {
+  const handleAddFileToWorkspace = async (filename: string, selectedSheet?: string | null) => {
     await workspaceActions.createNodeFromFile(filename, selectedSheet ?? undefined);
     notify('success', `${filename} added to workspace.`);
     const lastUploaded = useUIStore.getState().lastUploadedFilePath;
@@ -229,10 +219,10 @@ export function useDataLoaderWorkspaceActions({
     // `DataLoaderDialogs` owns only presentation, not workspace state.
     // Consumed by: useDataLoaderWorkspaceActions return object for feature components because consumers need this returned value or action without owning the hook internals.
     closeWorkspaceNameAlert: () => setWorkspaceNameAlert(null),
-        /**
-         * Clears the workspace pending deletion target after cancel or success.
-         * Consumed by: useDataLoaderWorkspaceActions return object for feature components because consumers need this returned value or action without owning the hook internals.
-         */
+    /**
+     * Clears the workspace pending deletion target after cancel or success.
+     * Consumed by: useDataLoaderWorkspaceActions return object for feature components because consumers need this returned value or action without owning the hook internals.
+     */
     closeDeleteWorkspaceDialog: () => setWorkspaceToDelete(null),
     handleCreateWorkspace,
     handleRenameWorkspace,

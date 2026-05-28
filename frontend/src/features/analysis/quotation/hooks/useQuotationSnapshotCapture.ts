@@ -8,10 +8,7 @@
 import { useCallback } from 'react';
 import JSZip from 'jszip';
 import { updateQuotationTaskResult, uploadSnapshot } from '@/api/generated/sdk.gen';
-import type {
-  QuotationAnalysisResponse,
-  QuotationRequestInput,
-} from '@/api/generated/types.gen';
+import type { QuotationAnalysisResponse, QuotationRequestInput } from '@/api/generated/types.gen';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import {
   checkSnapshotEligibility,
@@ -71,9 +68,7 @@ function captureError(reason: string, message: string): CaptureError {
 /**
  * Called by: useQuotationSnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
  */
-function buildQuotationPreview(
-  resp: QuotationAnalysisResponse,
-): SnapshotManifest['preview'] {
+function buildQuotationPreview(resp: QuotationAnalysisResponse): SnapshotManifest['preview'] {
   const totalHits = resp.pagination?.total_source_rows ?? resp.data?.length ?? 0;
   const displayColumns = Array.isArray(resp.columns) ? resp.columns : [];
   // Quotation extracts opening/closing patterns aren't user-configured
@@ -94,9 +89,7 @@ function buildQuotationPreview(
  * Used by: compat.ts, QuotationFeature.tsx, useQuotationSnapshotLoad.ts because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
  * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
  */
-export function useQuotationSnapshotCapture(
-  input: UseQuotationSnapshotCaptureInput,
-) {
+export function useQuotationSnapshotCapture(input: UseQuotationSnapshotCaptureInput) {
   const {
     workspaceId,
     workspaceName,
@@ -179,9 +172,7 @@ export function useQuotationSnapshotCapture(
         tool: 'quotation',
         tool_version: getCurrentAppVersion() || 'v0.0.0-dev',
         captured_at: new Date().toISOString(),
-        title: filename
-          .replace(/^quotation-/, '')
-          .replace(/\.ldaca-snapshot$/, ''),
+        title: filename.replace(/^quotation-/, '').replace(/\.ldaca-snapshot$/, ''),
         source: {
           workspace_id: workspaceId,
           workspace_name: workspaceName,
@@ -200,9 +191,7 @@ export function useQuotationSnapshotCapture(
         preview: buildQuotationPreview(fullResult),
         payloads: [
           { kind: 'result', path: RESULT_PAYLOAD_PATH },
-          ...(request
-            ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const)
-            : []),
+          ...(request ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const) : []),
         ],
         node_colors: nodeColorsForSnapshot,
       };

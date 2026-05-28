@@ -106,7 +106,10 @@ describe('useAutoNodeColumns', () => {
 
       act(() => {
         result.current.setSelections(
-          [{ nodeId: 'n1', column: 'c1' }, { nodeId: 'n2', column: 'c2' }],
+          [
+            { nodeId: 'n1', column: 'c1' },
+            { nodeId: 'n2', column: 'c2' },
+          ],
           { replace: true },
         );
       });
@@ -173,10 +176,10 @@ describe('useAutoNodeColumns', () => {
       window.sessionStorage.clear();
 
       act(() => {
-        result.current.setSelections(
-          [{ nodeId: 'n1', column: 'changed' }],
-          { replace: true, persist: false },
-        );
+        result.current.setSelections([{ nodeId: 'n1', column: 'changed' }], {
+          replace: true,
+          persist: false,
+        });
       });
 
       expect(window.sessionStorage.getItem(STORAGE_KEY('ws-skip'))).toBeNull();
@@ -202,17 +205,13 @@ describe('useAutoNodeColumns', () => {
       );
 
       // The auto-recompute fires on mount via the selectedNodeIdsKey effect.
-      expect(result.current.selections).toEqual([
-        { nodeId: 'n1', column: 'doc_col' },
-      ]);
+      expect(result.current.selections).toEqual([{ nodeId: 'n1', column: 'doc_col' }]);
     });
 
     it('falls back to the first column when no document column is exposed and docTypeOnly is false', () => {
       const { result } = renderHook(() =>
         useAutoNodeColumns({
-          selectedNodes: [
-            buildNode({ id: 'n1', columns: ['first', 'second'] }),
-          ],
+          selectedNodes: [buildNode({ id: 'n1', columns: ['first', 'second'] })],
           workspaceId: 'ws-first',
           /** Returns columns for the first-column fallback path. */
           /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
@@ -220,9 +219,7 @@ describe('useAutoNodeColumns', () => {
         }),
       );
 
-      expect(result.current.selections).toEqual([
-        { nodeId: 'n1', column: 'first' },
-      ]);
+      expect(result.current.selections).toEqual([{ nodeId: 'n1', column: 'first' }]);
     });
 
     it('leaves column blank when docTypeOnly is true and no document column is present', () => {

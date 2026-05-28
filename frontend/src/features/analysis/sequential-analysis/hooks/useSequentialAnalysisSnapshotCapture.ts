@@ -31,9 +31,7 @@ import {
   type SnapshotManifest,
 } from '@/features/snapshot-view';
 import type { WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
-import {
-  SNAPSHOT_ROW_HARD_CAP,
-} from '../components/TrendsSnapshotConfigDialog';
+import { SNAPSHOT_ROW_HARD_CAP } from '../components/TrendsSnapshotConfigDialog';
 import type { TrendsSnapshotConfig } from '../trendsSnapshotConfig';
 
 const RESULT_PAYLOAD_PATH = 'tables/result.json';
@@ -70,7 +68,7 @@ function captureError(reason: string, message: string): CaptureError {
 /** Builds the manifest preview summary from captured trends rows and request settings. */
 /**
  * Called by: useSequentialAnalysisSnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
-   * Flow: scan captured rows for unique periods and group keys, derive series and bucket counts, read chart type, then return snapshot preview metadata.
+ * Flow: scan captured rows for unique periods and group keys, derive series and bucket counts, read chart type, then return snapshot preview metadata.
  */
 function buildSequentialPreview(
   result: Record<string, unknown>,
@@ -94,8 +92,7 @@ function buildSequentialPreview(
     }
   }
   const seriesCount = groupingColumns.length === 0 ? 1 : groupKeys.size;
-  const chartType =
-    typeof result.chart_type === 'string' ? (result.chart_type as string) : 'line';
+  const chartType = typeof result.chart_type === 'string' ? (result.chart_type as string) : 'line';
   return {
     tool: 'sequential_analysis',
     seriesCount,
@@ -111,7 +108,7 @@ function buildSequentialPreview(
  * dialog enforces this. */
 /**
  * Used by: SequentialAnalysisFeature.tsx because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
-   * Flow: choose numeric or datetime request shape, convert empty group lists to null, force sorted and case-sensitive capture, then return the backend request.
+ * Flow: choose numeric or datetime request shape, convert empty group lists to null, force sorted and case-sensitive capture, then return the backend request.
  */
 export function buildCaptureRequest(
   timeColumn: string,
@@ -159,11 +156,7 @@ export function useSequentialAnalysisSnapshotCapture(
   } = input;
 
   return useCallback(
-    async (
-      filename: string,
-      description: string,
-      config: TrendsSnapshotConfig,
-    ): Promise<void> => {
+    async (filename: string, description: string, config: TrendsSnapshotConfig): Promise<void> => {
       if (!selectedNode) {
         throw captureError('no-selection', 'Select a data block first.');
       }
@@ -190,7 +183,10 @@ export function useSequentialAnalysisSnapshotCapture(
         throw captureError('no-workspace', 'Cannot snapshot without an active workspace.');
       }
 
-      const nodeId = (selectedNode.id as string | undefined) ?? (selectedNode.node_id as string | undefined) ?? '';
+      const nodeId =
+        (selectedNode.id as string | undefined) ??
+        (selectedNode.node_id as string | undefined) ??
+        '';
       if (!nodeId) {
         throw captureError('no-node-id', 'Selected data block has no usable identifier.');
       }
@@ -233,9 +229,7 @@ export function useSequentialAnalysisSnapshotCapture(
         tool: 'sequential_analysis',
         tool_version: getCurrentAppVersion() || 'v0.0.0-dev',
         captured_at: new Date().toISOString(),
-        title: filename
-          .replace(/^sequential_analysis-/, '')
-          .replace(/\.ldaca-snapshot$/, ''),
+        title: filename.replace(/^sequential_analysis-/, '').replace(/\.ldaca-snapshot$/, ''),
         source: {
           workspace_id: workspaceId,
           workspace_name: workspaceName,

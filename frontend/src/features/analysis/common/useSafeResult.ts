@@ -32,10 +32,10 @@ function resultStateRank(state: string | null | undefined): number {
  * poll resolves after a newer terminal response has already been rendered.
  * Used by: useSafeResult and stale-result regression tests because polling should not replace terminal task outcomes with older in-flight responses.
  */
-export function isStaleAnalysisResult<
-  Current extends ResultLike,
-  Next extends ResultLike,
->(current: Current | null, next: Next | null): boolean {
+export function isStaleAnalysisResult<Current extends ResultLike, Next extends ResultLike>(
+  current: Current | null,
+  next: Next | null,
+): boolean {
   if (!current || !next) {
     return false;
   }

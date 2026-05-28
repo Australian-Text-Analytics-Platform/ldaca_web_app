@@ -7,10 +7,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { takeMostRecent } from '@/utils/selectionUtils';
-import {
-  snapshotSourceNodes,
-  useSnapshotBackedAnalysisState,
-} from '@/features/snapshot-view';
+import { snapshotSourceNodes, useSnapshotBackedAnalysisState } from '@/features/snapshot-view';
 import { useTokenFrequencySnapshotCapture } from './hooks/useTokenFrequencySnapshotCapture';
 import { useTokenFrequencySnapshotLoad } from './hooks/useTokenFrequencySnapshotLoad';
 import type { TokenFrequencySnapshotPayload } from './hooks/useTokenFrequencySnapshotLoad';
@@ -32,7 +29,12 @@ import {
   deriveNodeDisplayResults,
   normalizeNodeResults,
 } from './tokenFrequencyAdapters';
-import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLimit, type NodeNameEntry } from './tokenFrequencyUtils';
+import {
+  buildSelectionNameById,
+  deriveBackendStopWordsKey,
+  deriveBackendTokenLimit,
+  type NodeNameEntry,
+} from './tokenFrequencyUtils';
 import {
   buildTokenFrequencyZipFilename,
   buildFrequencyExportFile,
@@ -45,7 +47,10 @@ import {
   type FrequencyFormat,
   type WordCloudFormat,
 } from './tokenFrequencyExport';
-import { TokenFrequencyDownloadDialog, type DownloadDialogMode } from './components/TokenFrequencyDownloadDialog';
+import {
+  TokenFrequencyDownloadDialog,
+  type DownloadDialogMode,
+} from './components/TokenFrequencyDownloadDialog';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
 import {
@@ -73,7 +78,7 @@ type TokenFrequencyRequest = TokenFrequencyRequestInput;
 /** Reconstructs per-node tokenizer choices from live or snapshot settings for selector state. */
 /**
  * Called by: TokenFrequencyFeature analysis panel during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   * Flow: read per-node tokenizer model overrides, trim valid model ids, apply legacy fallback tokenizer_model to missing node ids, then return the node map.
+ * Flow: read per-node tokenizer model overrides, trim valid model ids, apply legacy fallback tokenizer_model to missing node ids, then return the node map.
  */
 function extractNodeTokenizerModels(
   settings: Record<string, unknown> | null | undefined,
@@ -88,7 +93,8 @@ function extractNodeTokenizerModels(
       }
     }
   }
-  const fallbackModel = typeof settings?.tokenizer_model === 'string' ? settings.tokenizer_model.trim() : '';
+  const fallbackModel =
+    typeof settings?.tokenizer_model === 'string' ? settings.tokenizer_model.trim() : '';
   if (fallbackModel) {
     for (const nodeId of nodeIds) {
       models[nodeId] = models[nodeId] ?? fallbackModel;
@@ -103,8 +109,12 @@ function extractNodeTokenizerModels(
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
 const TokenFrequencyFeature = () => {
-  const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<Record<string, string>>({});
-  const [liveTokenizerLanguagesByNode, setLiveTokenizerLanguagesByNode] = useState<Record<string, string | null>>({});
+  const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
+    Record<string, string>
+  >({});
+  const [liveTokenizerLanguagesByNode, setLiveTokenizerLanguagesByNode] = useState<
+    Record<string, string | null>
+  >({});
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspaceData();
@@ -143,7 +153,8 @@ const TokenFrequencyFeature = () => {
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
   const setTasks = useAnalysisStore((state) => state.setTasks);
 
-  const [liveResults, resultRef, setResultSafely, setResults] = useSafeResult<TokenFrequencyResponse>();
+  const [liveResults, resultRef, setResultSafely, setResults] =
+    useSafeResult<TokenFrequencyResponse>();
   const [liveLastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
   const [liveStudyNodeId, setStudyNodeId] = useState<string | null>(null);
 
@@ -153,9 +164,7 @@ const TokenFrequencyFeature = () => {
   // ``effectiveNodeColumnSelections`` etc. without caring whether
   // they came from live or from a loaded snapshot.
   const { loadedSnapshot, inSnapshotMode } =
-    useSnapshotBackedAnalysisState<TokenFrequencySnapshotPayload>(
-      'token_frequencies',
-    );
+    useSnapshotBackedAnalysisState<TokenFrequencySnapshotPayload>('token_frequencies');
 
   const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
     if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
@@ -181,7 +190,11 @@ const TokenFrequencyFeature = () => {
   // remain correct since they're frozen in the payload.
   const studyNodeId = useMemo<string | null>(() => {
     if (!inSnapshotMode || !loadedSnapshot) return liveStudyNodeId;
-    return loadedSnapshot.payload.settings?.node_ids[1] ?? loadedSnapshot.manifest.source.node_ids[1] ?? null;
+    return (
+      loadedSnapshot.payload.settings?.node_ids[1] ??
+      loadedSnapshot.manifest.source.node_ids[1] ??
+      null
+    );
   }, [inSnapshotMode, loadedSnapshot, liveStudyNodeId]);
 
   const panelNodeIds = useMemo(
@@ -194,9 +207,7 @@ const TokenFrequencyFeature = () => {
 
   const effectiveStudyNodeId = useMemo(
     () =>
-      studyNodeId && panelNodeIds.includes(studyNodeId)
-        ? studyNodeId
-        : panelNodeIds[0] ?? null,
+      studyNodeId && panelNodeIds.includes(studyNodeId) ? studyNodeId : (panelNodeIds[0] ?? null),
     [studyNodeId, panelNodeIds],
   );
 
@@ -212,11 +223,15 @@ const TokenFrequencyFeature = () => {
   // ``promoteTempColors`` is called from ``handleAnalyzeWithPromote``
   // below so a Run commits the preview to the global assigned store.
   const tokenActiveNodeIds = takeMostRecent(panelNodeIds, 2);
-  const { nodeColors: liveNodeColors, handleColorChange, defaultPalette, promoteTempColors } =
-    useNodeColorManagement({
-      activeNodeIds: tokenActiveNodeIds,
-      tabKey: 'token-frequency',
-    });
+  const {
+    nodeColors: liveNodeColors,
+    handleColorChange,
+    defaultPalette,
+    promoteTempColors,
+  } = useNodeColorManagement({
+    activeNodeIds: tokenActiveNodeIds,
+    tabKey: 'token-frequency',
+  });
   // In snapshot mode the live colour store has no entries for the
   // captured node IDs (they may not exist in this workspace at all).
   // Shadow ``nodeColors`` with the frozen ``manifest.node_colors`` so
@@ -302,8 +317,11 @@ const TokenFrequencyFeature = () => {
       const req = raw?.data ?? raw;
       if (!req || typeof req !== 'object') return;
       const reqObj = req as Record<string, unknown>;
-      const nodeIds: string[] = Array.isArray(reqObj.node_ids) ? (reqObj.node_ids as string[]).slice(0, 2) : [];
-      const node_columns: Record<string, string> = (reqObj.node_columns as Record<string, string>) || {};
+      const nodeIds: string[] = Array.isArray(reqObj.node_ids)
+        ? (reqObj.node_ids as string[]).slice(0, 2)
+        : [];
+      const node_columns: Record<string, string> =
+        (reqObj.node_columns as Record<string, string>) || {};
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
       setStudyNodeId(nodeIds[1] ?? null);
@@ -317,7 +335,9 @@ const TokenFrequencyFeature = () => {
             queryClient,
             maxNodes: 2,
           });
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     },
     /** Clears local result and selection state when the feature reset action runs. */
@@ -332,9 +352,7 @@ const TokenFrequencyFeature = () => {
     /** Removes token-frequency tasks from the shared analysis store after local cleanup. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     pruneGlobalTasks: (taskIds) =>
-      setTasks((prev) =>
-        Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev,
-      ),
+      setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)),
   });
 
   const effectiveNodeColumnSelections = useMemo(() => {
@@ -368,7 +386,13 @@ const TokenFrequencyFeature = () => {
       if (stored) fromNodes[sel.nodeId] = stored;
     }
     return { ...fromNodes, ...liveTokenizerModelsByNode };
-  }, [inSnapshotMode, loadedSnapshot, effectiveNodeColumnSelections, panelSelectedNodes, liveTokenizerModelsByNode]);
+  }, [
+    inSnapshotMode,
+    loadedSnapshot,
+    effectiveNodeColumnSelections,
+    panelSelectedNodes,
+    liveTokenizerModelsByNode,
+  ]);
 
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,
@@ -487,10 +511,7 @@ const TokenFrequencyFeature = () => {
     },
   });
 
-  const responseDisplayNameHints = useMemo(
-    () => buildResponseDisplayNameHints(results),
-    [results],
-  );
+  const responseDisplayNameHints = useMemo(() => buildResponseDisplayNameHints(results), [results]);
 
   const displayNameMap = useMemo(
     () => ({
@@ -530,21 +551,17 @@ const TokenFrequencyFeature = () => {
   );
 
   const nodeDisplayResults = useMemo(
-    () =>
-      deriveNodeDisplayResults(normalizedNodeResults, appliedStopSet, effectiveTokenLimit),
+    () => deriveNodeDisplayResults(normalizedNodeResults, appliedStopSet, effectiveTokenLimit),
     [normalizedNodeResults, appliedStopSet, effectiveTokenLimit],
   );
 
-  const registerWordCloudRef = useCallback(
-    (nodeKey: string, element: SVGSVGElement | null) => {
-      if (!element) {
-        Reflect.deleteProperty(wordCloudRefs.current, nodeKey);
-        return;
-      }
-      wordCloudRefs.current[nodeKey] = element;
-    },
-    [],
-  );
+  const registerWordCloudRef = useCallback((nodeKey: string, element: SVGSVGElement | null) => {
+    if (!element) {
+      Reflect.deleteProperty(wordCloudRefs.current, nodeKey);
+      return;
+    }
+    wordCloudRefs.current[nodeKey] = element;
+  }, []);
 
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [downloadDialogMode, setDownloadDialogMode] = useState<DownloadDialogMode>('wordcloud');
@@ -556,14 +573,11 @@ const TokenFrequencyFeature = () => {
     label?: string;
   } | null>(null);
 
-  const handleDownloadWordCloud = useCallback(
-    (nodeKey: string, displayName: string) => {
-      pendingDownloadRef.current = { mode: 'wordcloud', nodeKey, displayName };
-      setDownloadDialogMode('wordcloud');
-      setDownloadDialogOpen(true);
-    },
-    [],
-  );
+  const handleDownloadWordCloud = useCallback((nodeKey: string, displayName: string) => {
+    pendingDownloadRef.current = { mode: 'wordcloud', nodeKey, displayName };
+    setDownloadDialogMode('wordcloud');
+    setDownloadDialogOpen(true);
+  }, []);
 
   const renameStatisticsKeysForExport = useCallback(
     (rows: unknown[]): unknown[] => {
@@ -608,9 +622,15 @@ const TokenFrequencyFeature = () => {
   /** Completes the download dialog action by exporting the pending cloud, rows, or stop words. */
   /**
    * Called by: TokenFrequencyFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
-  const handleDownloadConfirm = async ({ format, includeStopWords }: { format: string; includeStopWords: boolean }) => {
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
+  const handleDownloadConfirm = async ({
+    format,
+    includeStopWords,
+  }: {
+    format: string;
+    includeStopWords: boolean;
+  }) => {
     const ctx = pendingDownloadRef.current;
     if (!ctx) return;
 
@@ -632,9 +652,10 @@ const TokenFrequencyFeature = () => {
               scale: 3,
             });
 
-            const zipFilename = ctx.nodeKey === 'unified'
-              ? buildTokenFrequencyZipFilename(comparisonArchiveLabels)
-              : buildTokenFrequencyZipFilename([archiveLabel]);
+            const zipFilename =
+              ctx.nodeKey === 'unified'
+                ? buildTokenFrequencyZipFilename(comparisonArchiveLabels)
+                : buildTokenFrequencyZipFilename([archiveLabel]);
 
             await downloadExportBundleAsZip(zipFilename, [
               primaryFile,
@@ -682,10 +703,14 @@ const TokenFrequencyFeature = () => {
     applyStopSetFromText(stopWords);
   };
 
-  const hasIncompleteSelections = effectiveNodeColumnSelections.some((selection) => !selection.column);
+  const hasIncompleteSelections = effectiveNodeColumnSelections.some(
+    (selection) => !selection.column,
+  );
   const displayNodeCount = panelSelectedNodes.length;
   const selectedNodeIdsWithColumns = orderedPanelNodeIds.filter((nodeId) =>
-    effectiveNodeColumnSelections.some((selection) => selection.nodeId === nodeId && selection.column),
+    effectiveNodeColumnSelections.some(
+      (selection) => selection.nodeId === nodeId && selection.column,
+    ),
   );
   const missingTokenizerModelNodeIds = selectedNodeIdsWithColumns.filter(
     (nodeId) => !(effectiveTokenizerModelsByNode[nodeId] ?? '').trim(),
@@ -732,7 +757,12 @@ const TokenFrequencyFeature = () => {
   /**
    * Called by: TokenFrequencyFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
-  const handleTokenizerModelChange = (nodeId: string, column: string, model: string, language: string | null) => {
+  const handleTokenizerModelChange = (
+    nodeId: string,
+    column: string,
+    model: string,
+    language: string | null,
+  ) => {
     if (isLocked || inSnapshotMode) return;
     setLiveTokenizerModelsByNode((prev) => {
       if (model) return { ...prev, [nodeId]: model };
@@ -763,8 +793,8 @@ const TokenFrequencyFeature = () => {
   // mode (the Save button is disabled there anyway).
   const captureRequest = useMemo<TokenFrequencyRequest | null>(() => {
     if (inSnapshotMode) return null;
-    const orderedIds = orderedPanelNodeIds.filter(
-      (id) => effectiveNodeColumnSelections.some((s) => s.nodeId === id && s.column),
+    const orderedIds = orderedPanelNodeIds.filter((id) =>
+      effectiveNodeColumnSelections.some((s) => s.nodeId === id && s.column),
     );
     if (orderedIds.length === 0) return null;
     const nodeColumns: Record<string, string> = {};
@@ -785,7 +815,12 @@ const TokenFrequencyFeature = () => {
       tokenizer_model: uniqueModels.length === 1 ? uniqueModels[0] : undefined,
     };
     return req;
-  }, [inSnapshotMode, orderedPanelNodeIds, effectiveNodeColumnSelections, effectiveTokenizerModelsByNode]);
+  }, [
+    inSnapshotMode,
+    orderedPanelNodeIds,
+    effectiveNodeColumnSelections,
+    effectiveTokenizerModelsByNode,
+  ]);
 
   // Order ``selectedNodes`` reference-first so the manifest's
   // ``node_ids`` list matches the captured request's ordering. The
@@ -861,13 +896,7 @@ const TokenFrequencyFeature = () => {
       }
       const updated = [token, ...current];
       setStopWords(updated.join(', '));
-      setAppliedStopSet(
-        new Set(
-          updated
-            .map((word) => word.trim().toLowerCase())
-            .filter(Boolean),
-        ),
-      );
+      setAppliedStopSet(new Set(updated.map((word) => word.trim().toLowerCase()).filter(Boolean)));
     },
     [stopWords, setStopWords, setAppliedStopSet],
   );
@@ -888,9 +917,7 @@ const TokenFrequencyFeature = () => {
         defaultPalette={defaultPalette}
         isLocked={isLocked || inSnapshotMode}
         lockedMessage={
-          inSnapshotMode
-            ? 'Viewing a saved snapshot — selection is frozen.'
-            : undefined
+          inSnapshotMode ? 'Viewing a saved snapshot — selection is frozen.' : undefined
         }
         snapshot={{
           tool: 'token_frequencies',
@@ -912,14 +939,14 @@ const TokenFrequencyFeature = () => {
           // the analysis runs; the strategy doc treats Run as the
           // commit trigger.
           promoteTempColors(tokenActiveNodeIds);
-          return handleAnalyze();
+          void handleAnalyze();
         }}
         onStop={() => {
           void stopTask();
         }}
         onClearResults={() => {
           if (inSnapshotMode) return;
-          clearResults();
+          void clearResults();
         }}
         hasIncompleteSelections={hasIncompleteSelections}
         appliedStopCount={appliedStopSet.size}
@@ -960,7 +987,9 @@ const TokenFrequencyFeature = () => {
         onStopWordsChange={setStopWords}
         onStopWordsApply={handleApplyStopWords}
         isLoadingStopWords={isLoadingStopWords}
-        onFillDefaultStopWords={handleFillDefaultStopWords}
+        onFillDefaultStopWords={() => {
+          void handleFillDefaultStopWords();
+        }}
         onSortStopWords={sortStopWords}
         tokenLimitInput={tokenLimitInput}
         onTokenLimitInputChange={handleTokenLimitInputChange}
@@ -991,7 +1020,9 @@ const TokenFrequencyFeature = () => {
         open={downloadDialogOpen}
         onOpenChange={setDownloadDialogOpen}
         mode={downloadDialogMode}
-        onConfirm={handleDownloadConfirm}
+        onConfirm={(options) => {
+          void handleDownloadConfirm(options);
+        }}
       />
     </div>
   );

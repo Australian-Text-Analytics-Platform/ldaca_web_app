@@ -9,7 +9,7 @@ import { queryKeys } from '@/lib/queryKeys';
  * Updates both node-info and graph caches after node preference writes so graph
  * panels and analysis selectors immediately see the persisted metadata.
  * Called by: node document-column and tokenization preference persistence hooks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-  * Flow: write node-info and workspace-graph query data with the new node info, then invalidate both caches so selectors and graph panels refetch if needed.
+ * Flow: write node-info and workspace-graph query data with the new node info, then invalidate both caches so selectors and graph panels refetch if needed.
  */
 export function updateWorkspaceNodeInfoCache(
   queryClient: QueryClient,
@@ -40,7 +40,7 @@ export function updateWorkspaceNodeInfoCache(
  * Returns the mutation used by node/column selectors to persist a preferred
  * document column and keep cached workspace metadata in sync.
  * Used by: analysis selectors that let users choose a document column per node because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-  * Flow: capture QueryClient and auth context, return a document-column mutation that trims empty values, writes the backend preference, updates caches, and shows a toast on failure.
+ * Flow: capture QueryClient and auth context, return a document-column mutation that trims empty values, writes the backend preference, updates caches, and shows a toast on failure.
  */
 export function usePersistNodeDocumentColumn({
   workspaceId,
@@ -88,12 +88,7 @@ export function usePersistNodeTokenizationPreference({
   const queryClient = useQueryClient();
 
   return useCallback(
-    async (
-      nodeId: string,
-      column: string,
-      model: string,
-      language: string | null,
-    ) => {
+    async (nodeId: string, column: string, model: string, language: string | null) => {
       if (!workspaceId) return null;
       try {
         const trimmedModel = model.trim();

@@ -17,10 +17,7 @@ import {
   useSnapshotViewStore,
   type LoadedSnapshot,
 } from '@/features/snapshot-view';
-import type {
-  QuotationAnalysisResponse,
-  QuotationRequestInput,
-} from '@/api/generated/types.gen';
+import type { QuotationAnalysisResponse, QuotationRequestInput } from '@/api/generated/types.gen';
 
 type QuotationRequest = QuotationRequestInput;
 

@@ -2,11 +2,7 @@
  * Frontend language resolver for per-tool UI defaults.
  */
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_LANGUAGE,
-  effectiveNodeLanguage,
-  isEnglish,
-} from '../effectiveNodeLanguage';
+import { DEFAULT_LANGUAGE, effectiveNodeLanguage, isEnglish } from '../effectiveNodeLanguage';
 
 describe('effectiveNodeLanguage', () => {
   it('returns the explicit override when provided', () => {

@@ -14,9 +14,7 @@ import type { SnapshotManifest } from '../types';
  * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  * Flow: defaults define every required manifest block, then tests mutate one block to exercise validation.
  */
-function demoManifest(
-  overrides: Partial<SnapshotManifest> = {},
-): SnapshotManifest {
+function demoManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManifest {
   return {
     schema_version: 1,
     mode: 'demo',
@@ -148,7 +146,10 @@ describe('parseManifest — fatal errors', () => {
 
   it('rejects a manifest with malformed capabilities', () => {
     const m = demoManifest();
-    const bad = { ...m, capabilities: { ...m.capabilities, canExport: 'yes' as unknown as boolean } };
+    const bad = {
+      ...m,
+      capabilities: { ...m.capabilities, canExport: 'yes' as unknown as boolean },
+    };
     const result = parseManifest(bad);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe('invalid-field-type');
@@ -169,10 +170,7 @@ describe('parseManifest — additive forward-compat', () => {
     const m = demoManifest();
     const raw = {
       ...m,
-      payloads: [
-        ...m.payloads,
-        { kind: 'future-supplement', path: 'tables/future.parquet' },
-      ],
+      payloads: [...m.payloads, { kind: 'future-supplement', path: 'tables/future.parquet' }],
     };
     const result = parseManifest(raw);
     expect(result.ok).toBe(true);

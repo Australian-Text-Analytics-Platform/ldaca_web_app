@@ -9,7 +9,8 @@ export const normalizeIsoDraft = (txt: string): string => {
   let s = txt.trim();
   if (!s) return s;
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s += 'T00:00:00+00:00';
-  if (/T\d{2}:\d{2}(\+00:00)?$/.test(s)) s = s.replace(/T(\d{2}:\d{2})(\+00:00)?$/, (m, hm, tz) => `T${hm}:00${tz || '+00:00'}`);
+  if (/T\d{2}:\d{2}(\+00:00)?$/.test(s))
+    s = s.replace(/T(\d{2}:\d{2})(\+00:00)?$/, (_m, hm, tz) => `T${hm}:00${tz || '+00:00'}`);
   if (/T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) s += '+00:00';
   s = s.replace(/Z$/, '+00:00');
   return s;
@@ -28,7 +29,10 @@ export const parseIsoToLocalDate = (input: string): Date | null => {
     candidate += 'T00:00:00+00:00';
   }
   if (/T\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2})?$/.test(candidate)) {
-    candidate = candidate.replace(/T(\d{2}:\d{2})(Z|[+-]\d{2}:?\d{2})?$/, (m, hm, tz) => `T${hm}:00${tz || '+00:00'}`);
+    candidate = candidate.replace(
+      /T(\d{2}:\d{2})(Z|[+-]\d{2}:?\d{2})?$/,
+      (_m, hm, tz) => `T${hm}:00${tz || '+00:00'}`,
+    );
   }
   if (/T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(candidate)) {
     candidate += '+00:00';

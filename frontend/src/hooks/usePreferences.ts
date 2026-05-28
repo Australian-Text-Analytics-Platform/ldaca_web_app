@@ -84,7 +84,7 @@ export function usePreferencesInit() {
   useEffect(() => {
     if (hydrated) return;
     const headers = isAuthenticated ? getAuthHeaders() : undefined;
-    loadFromBackend(headers);
+    void loadFromBackend(headers);
   }, [hydrated, isAuthenticated, getAuthHeaders, loadFromBackend]);
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export function usePreferencesInit() {
       if (pending !== null) clearTimeout(pending);
       pending = setTimeout(() => {
         pending = null;
-        usePreferencesStore.getState().syncToBackend(getAuthHeaders());
+        void usePreferencesStore.getState().syncToBackend(getAuthHeaders());
       }, SYNC_DEBOUNCE_MS);
     });
 

@@ -43,6 +43,8 @@ export type WorkspaceActionsSlice = WorkspaceInternal['actions'];
  * "must-be-inside-WorkspaceProvider" runtime check.
  */
 export const WorkspaceDataContext = createContext<WorkspaceDataSlice | undefined>(undefined);
-export const WorkspaceSelectionContext = createContext<WorkspaceSelectionSlice | undefined>(undefined);
+export const WorkspaceSelectionContext = createContext<WorkspaceSelectionSlice | undefined>(
+  undefined,
+);
 export const WorkspaceStatusContext = createContext<WorkspaceStatusSlice | undefined>(undefined);
 export const WorkspaceActionsContext = createContext<WorkspaceActionsSlice | undefined>(undefined);

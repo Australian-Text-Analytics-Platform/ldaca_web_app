@@ -42,8 +42,8 @@ export const ViewRouteSync = () => {
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
   const routeViewAllowed = Boolean(
     routeView &&
-    visibleViews.includes(routeView) &&
-    (routeView === 'data-loader' || isWorkspaceLoaded),
+      visibleViews.includes(routeView) &&
+      (routeView === 'data-loader' || isWorkspaceLoaded),
   );
 
   // Tracks the routeView from the previous effect run to distinguish URL-driven
@@ -70,7 +70,15 @@ export const ViewRouteSync = () => {
     const nextSearch = viewSearchFor(nextView);
     if (routeView === nextSearch.view) return;
     void navigate({ search: nextSearch });
-  }, [currentView, isWorkspaceLoaded, navigate, routeView, routeViewAllowed, setCurrentView, visibleViews]);
+  }, [
+    currentView,
+    isWorkspaceLoaded,
+    navigate,
+    routeView,
+    routeViewAllowed,
+    setCurrentView,
+    visibleViews,
+  ]);
 
   return null;
 };

@@ -74,4 +74,3 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
     reset,
   };
 };
-

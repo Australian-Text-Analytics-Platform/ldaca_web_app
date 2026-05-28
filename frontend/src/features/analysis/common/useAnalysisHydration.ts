@@ -35,7 +35,10 @@ type MaybePromise<T> = T | Promise<T>;
 type Nullable<T> = T | null | undefined;
 
 /** Called by: useAnalysisHydration before returning public hydration state because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
-const toHydrationState = ({ workspaceId: _workspaceId, ...state }: HydrationInternalState): HydrationState => state;
+const toHydrationState = ({
+  workspaceId: _workspaceId,
+  ...state
+}: HydrationInternalState): HydrationState => state;
 
 export interface UseAnalysisHydrationConfig<TRequest, TResult, TPreferences> {
   workspaceId?: string | null;
@@ -61,10 +64,10 @@ export interface UseAnalysisHydrationReturn<TPreferences> {
  * Normalizes preference field names before persisting them so older feature code
  * and backend preference payloads continue to speak the same snake_case shape.
  * Called by: persistPreferencesSafe before invoking feature-provided persistence because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
-   * Flow: copy the partial preference payload, map tokenLimit and stopWords aliases to backend snake_case fields, clamp token limits, then return the normalized object.
+ * Flow: copy the partial preference payload, map tokenLimit and stopWords aliases to backend snake_case fields, clamp token limits, then return the normalized object.
  */
 const normalizePreferencePayload = <TPreferences extends Record<string, unknown>>(
-  partial: TPreferences
+  partial: TPreferences,
 ): TPreferences => {
   if (!partial) return partial;
   const normalized: Record<string, unknown> = { ...partial };
@@ -90,8 +93,12 @@ const normalizePreferencePayload = <TPreferences extends Record<string, unknown>
  * Used by: useAnalysisFeature and analysis hydration tests because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
-export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPreferences extends Record<string, unknown> = Record<string, unknown>>(
-  config: UseAnalysisHydrationConfig<TRequest, TResult, TPreferences>
+export function useAnalysisHydration<
+  TRequest = unknown,
+  TResult = unknown,
+  TPreferences extends Record<string, unknown> = Record<string, unknown>,
+>(
+  config: UseAnalysisHydrationConfig<TRequest, TResult, TPreferences>,
 ): UseAnalysisHydrationReturn<TPreferences> {
   const {
     workspaceId,
@@ -107,11 +114,15 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
     onHydrationError,
   } = config;
 
-  const [internalHydrationState, setHydrationState] = useState<HydrationInternalState>({ status: 'idle', workspaceId });
+  const [internalHydrationState, setHydrationState] = useState<HydrationInternalState>({
+    status: 'idle',
+    workspaceId,
+  });
   const inflightRef = useRef<InflightHydration | null>(null);
-  const hydrationState: HydrationState = internalHydrationState.workspaceId === workspaceId
-    ? toHydrationState(internalHydrationState)
-    : { status: 'idle' };
+  const hydrationState: HydrationState =
+    internalHydrationState.workspaceId === workspaceId
+      ? toHydrationState(internalHydrationState)
+      : { status: 'idle' };
 
   // Identity stability: used in useEffect dependency array and returned from hook
   const hydrateFromServer = useCallback(async () => {
@@ -125,16 +136,27 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
     }
 
     const inflight = (async () => {
-      setHydrationState((prev) => ({ ...prev, workspaceId: activeWorkspaceId, status: 'loading', error: undefined }));
+      setHydrationState((prev) => ({
+        ...prev,
+        workspaceId: activeWorkspaceId,
+        status: 'loading',
+        error: undefined,
+      }));
       try {
         let taskId: string | null = null;
         if (resolveTaskId) {
           taskId = await resolveTaskId();
         } else if (analysisKey && getAuthHeaders) {
           try {
-            const current = await getCurrentAnalysisTask(analysisKey, getAuthHeaders()) as Record<string, unknown>;
+            const current = (await getCurrentAnalysisTask(analysisKey, getAuthHeaders())) as Record<
+              string,
+              unknown
+            >;
             const currentTaskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-            taskId = typeof currentTaskId === 'string' && currentTaskId.trim().length > 0 ? currentTaskId : null;
+            taskId =
+              typeof currentTaskId === 'string' && currentTaskId.trim().length > 0
+                ? currentTaskId
+                : null;
           } catch {
             taskId = null;
           }
@@ -143,7 +165,11 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
         onTaskIdResolved?.(taskId ?? null);
 
         if (!taskId) {
-          setHydrationState({ status: 'idle', lastHydratedAt: Date.now(), workspaceId: activeWorkspaceId });
+          setHydrationState({
+            status: 'idle',
+            lastHydratedAt: Date.now(),
+            workspaceId: activeWorkspaceId,
+          });
           return;
         }
 
@@ -169,10 +195,18 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
 
         await Promise.allSettled([applyRequestPromise, applyResultPromise]);
 
-        setHydrationState({ status: 'idle', lastHydratedAt: Date.now(), workspaceId: activeWorkspaceId });
+        setHydrationState({
+          status: 'idle',
+          lastHydratedAt: Date.now(),
+          workspaceId: activeWorkspaceId,
+        });
       } catch (error) {
         logHydrationFailure('hydration failed', error);
-        setHydrationState({ status: 'error', error: error instanceof Error ? error.message : 'Unknown error', workspaceId: activeWorkspaceId });
+        setHydrationState({
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          workspaceId: activeWorkspaceId,
+        });
         onHydrationError?.(error);
       } finally {
         if (inflightRef.current?.workspaceId === activeWorkspaceId) {
@@ -183,7 +217,18 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
 
     inflightRef.current = { workspaceId: activeWorkspaceId, promise: inflight };
     await inflight;
-  }, [workspaceId, resolveTaskId, analysisKey, getAuthHeaders, onTaskIdResolved, fetchRequest, fetchResult, applyRequest, applyResult, onHydrationError]);
+  }, [
+    workspaceId,
+    resolveTaskId,
+    analysisKey,
+    getAuthHeaders,
+    onTaskIdResolved,
+    fetchRequest,
+    fetchResult,
+    applyRequest,
+    applyResult,
+    onHydrationError,
+  ]);
 
   /** Called by: analysis panels through the persistPreferences return value because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
   const persistPreferencesSafe = async (partial: TPreferences) => {

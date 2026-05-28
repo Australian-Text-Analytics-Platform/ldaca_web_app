@@ -14,10 +14,7 @@ import type {
   TopicModelingResponse,
   TopicModelingTopic,
 } from '@/api/generated/types.gen';
-import {
-  snapshotSourceNodes,
-  useSnapshotBackedAnalysisState,
-} from '@/features/snapshot-view';
+import { snapshotSourceNodes, useSnapshotBackedAnalysisState } from '@/features/snapshot-view';
 import { useTopicModelingSnapshotCapture } from './hooks/useTopicModelingSnapshotCapture';
 import { useTopicModelingSnapshotLoad } from './hooks/useTopicModelingSnapshotLoad';
 import type { TopicModelingSnapshotPayload } from './hooks/useTopicModelingSnapshotLoad';
@@ -43,7 +40,10 @@ import {
 import { useDefaultStopwords } from '../common/hooks/useDefaultStopwords';
 import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { TopicModelingParameterPanel, type CorpusSample } from './components/panels/TopicModelingParameterPanel';
+import {
+  TopicModelingParameterPanel,
+  type CorpusSample,
+} from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
@@ -94,26 +94,22 @@ function TopicModelingFeature() {
   // the shadowed names and naturally picks up snapshot data when in
   // snapshot mode.
   const { loadedSnapshot, inSnapshotMode } =
-    useSnapshotBackedAnalysisState<TopicModelingSnapshotPayload>(
-      'topic_modeling',
-    );
+    useSnapshotBackedAnalysisState<TopicModelingSnapshotPayload>('topic_modeling');
 
   const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
     if (!inSnapshotMode || !loadedSnapshot) return livePanelSelectedNodes;
     return snapshotSourceNodes(loadedSnapshot.manifest.source);
   }, [inSnapshotMode, loadedSnapshot, livePanelSelectedNodes]);
 
-  const typedServerRequest = serverRequest as
-    | {
-        node_ids?: string[];
-        node_columns?: Record<string, string>;
-        min_topic_size?: number;
-        random_seed?: number;
-        representative_words_count?: number;
-        topic_size_mode?: string;
-        topic_size_value?: number;
-      }
-    | null;
+  const typedServerRequest = serverRequest as {
+    node_ids?: string[];
+    node_columns?: Record<string, string>;
+    min_topic_size?: number;
+    random_seed?: number;
+    representative_words_count?: number;
+    topic_size_mode?: string;
+    topic_size_value?: number;
+  } | null;
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
   const setTasks = useAnalysisStore((state) => state.setTasks);
@@ -129,7 +125,7 @@ function TopicModelingFeature() {
   // a manual hint on a refinement-style dispatch.
   const result: TopicModelingResponse | null =
     inSnapshotMode && loadedSnapshot ? loadedSnapshot.payload.result : liveResult;
-  
+
   const [corpusSamples, setCorpusSamples] = useState<CorpusSample[]>([]);
   // Sample values reset on data-block change (auto-populate) but persist
   // through Clear Results if the user explicitly touched them, so the user
@@ -144,7 +140,11 @@ function TopicModelingFeature() {
   const [representativeWordsCount, setRepresentativeWordsCount] = useState(15);
   const [representativeWordsCountUserSet, setRepresentativeWordsCountUserSet] = useState(false);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
-  const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
+  const [tooltip, setTooltip] = useState<{
+    x: number;
+    y: number;
+    topic: TopicModelingTopic | null;
+  }>({ x: 0, y: 0, topic: null });
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
   const [topicSearchQuery, setTopicSearchQuery] = useState('');
   // Post-fit stopword filtering for non-English topic labels. CJK function
@@ -226,9 +226,14 @@ function TopicModelingFeature() {
     // Restores selected nodes, columns, and topic parameters from the stored request.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedRequest: async (requestPayload) => {
-      const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown>;
+      const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<
+        string,
+        unknown
+      >;
       if (!req) return;
-      const nodeIds: string[] = Array.isArray(req.node_ids) ? (req.node_ids as string[]).slice(0, 2) : [];
+      const nodeIds: string[] = Array.isArray(req.node_ids)
+        ? (req.node_ids as string[]).slice(0, 2)
+        : [];
       const node_columns = (req.node_columns || {}) as Record<string, string>;
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
@@ -252,7 +257,9 @@ function TopicModelingFeature() {
             queryClient,
             maxNodes: 2,
           });
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     },
     // Clears topic-specific result and error state after the shared lifecycle deletes results.
@@ -265,13 +272,17 @@ function TopicModelingFeature() {
     // Removes completed topic tasks from the global task list after clear/delete operations.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     pruneGlobalTasks: (taskIds) =>
-      setTasks((prev: TaskItem[]) => Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev),
+      setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)),
     // Finds task ids embedded in result metadata for status recovery.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    getExtraTaskIdCandidates: () => [(resultRef.current as TopicModelingResponse | null)?.metadata?.task_id],
+    getExtraTaskIdCandidates: () => [
+      (resultRef.current as TopicModelingResponse | null)?.metadata?.task_id,
+    ],
     // Finds task ids embedded in result metadata for clear operations.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    getClearTaskIdSources: () => [(resultRef.current as TopicModelingResponse | null)?.metadata?.task_id],
+    getClearTaskIdSources: () => [
+      (resultRef.current as TopicModelingResponse | null)?.metadata?.task_id,
+    ],
     // Treats hydrated running results as active tasks for shared banner/action state.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     isResultRunning: (r) => r?.state === 'running',
@@ -280,13 +291,13 @@ function TopicModelingFeature() {
   // Computes default per-corpus sampling controls from selected node row counts.
   /**
    * Called by: TopicModelingFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     * Flow: read the first two selected node row counts, compute a rounded sample percent capped at 100, then enable sampling only below full corpus.
+   * Flow: read the first two selected node row counts, compute a rounded sample percent capped at 100, then enable sampling only below full corpus.
    */
   const computeDefaultCorpusSamples = (): CorpusSample[] =>
     panelSelectedNodes.slice(0, 2).map((node) => {
       const nDocs = (node as { shape?: number[] }).shape?.[0] ?? 0;
       const autoPercent =
-        nDocs > 0 ? Math.min(100, Math.ceil((4000 / nDocs) * 100 / 10) * 10) : 100;
+        nDocs > 0 ? Math.min(100, Math.ceil(((4000 / nDocs) * 100) / 10) * 10) : 100;
       return { percent: String(autoPercent), enabled: autoPercent < 100 };
     });
 
@@ -368,9 +379,9 @@ function TopicModelingFeature() {
   const panelNodeIdsKey = panelNodeIds.join('|');
 
   // Observe container width for responsive sizing
-  useEffect(()=>{
+  useEffect(() => {
     const el = chartRef.current;
-    if(!el) return;
+    if (!el) return;
     // Debounces resize observer updates into a stable chart width state.
     /**
      * Called by: TopicModelingFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -380,7 +391,7 @@ function TopicModelingFeature() {
       if (!nextWidth) return;
       setChartWidth((prevWidth) => (prevWidth === nextWidth ? prevWidth : nextWidth));
     };
-    const observer = new ResizeObserver(entries => {
+    const observer = new ResizeObserver((entries) => {
       const latestEntry = entries.at(-1);
       if (!latestEntry) return;
       if (chartResizeFrameRef.current !== null) {
@@ -394,25 +405,29 @@ function TopicModelingFeature() {
     });
     observer.observe(el);
     updateChartWidth(el.getBoundingClientRect().width);
-    return ()=> {
+    return () => {
       observer.disconnect();
       if (chartResizeFrameRef.current !== null) {
         cancelAnimationFrame(chartResizeFrameRef.current);
         chartResizeFrameRef.current = null;
       }
     };
-  },[]);
+  }, []);
 
   const defaultPalette = DEFAULT_PALETTE;
 
   // ``tabKey`` routes colour changes through the per-tab temp layer
   // (commit on Run via ``promoteTempColors`` below).
   const topicActiveNodeIds = takeMostRecent(panelNodeIds, 2);
-  const { nodeColors: liveNodeColors, handleColorChange, defaultPalette: _dp, promoteTempColors } =
-    useNodeColorManagement({
-      activeNodeIds: topicActiveNodeIds,
-      tabKey: 'topic-modeling',
-    });
+  const {
+    nodeColors: liveNodeColors,
+    handleColorChange,
+    defaultPalette: _dp,
+    promoteTempColors,
+  } = useNodeColorManagement({
+    activeNodeIds: topicActiveNodeIds,
+    tabKey: 'topic-modeling',
+  });
   // In snapshot mode the live colour store has no entries for the
   // captured node IDs. Shadow with the frozen ``manifest.node_colors``
   // so the parameter-panel swatch and the bubble-chart corpus colours
@@ -474,10 +489,7 @@ function TopicModelingFeature() {
       // representative_words_count is a frontend display cap (bounded by
       // the originally-fitted value); changes within range don't require
       // a rerun and so are excluded here.
-      sample_fractions: normalizeSampleFractions(
-        currentSampleFractions,
-        panelNodeIds.length,
-      ),
+      sample_fractions: normalizeSampleFractions(currentSampleFractions, panelNodeIds.length),
     },
     // Extracts comparable server-side parameters from the stored topic-modeling request.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -509,7 +521,14 @@ function TopicModelingFeature() {
     if (!isLocked && panelNodeIds.length > 0 && nodeColumnSelections.length === 0) {
       recomputeAutoColumns();
     }
-  }, [inSnapshotMode, isLocked, panelNodeIdsKey, nodeColumnSelections.length, recomputeAutoColumns, panelNodeIds.length]);
+  }, [
+    inSnapshotMode,
+    isLocked,
+    panelNodeIdsKey,
+    nodeColumnSelections.length,
+    recomputeAutoColumns,
+    panelNodeIds.length,
+  ]);
 
   // Auto-populate sampling fractions when selected nodes change, and treat
   // these auto-values as not-user-set so Clear Results can re-derive them.
@@ -518,11 +537,11 @@ function TopicModelingFeature() {
   useEffect(() => {
     if (inSnapshotMode) return;
     const samples = computeDefaultCorpusSamples();
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       setCorpusSamples(samples);
       setCorpusSamplesUserSet(false);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inSnapshotMode, panelNodeIdsKey]);
 
   // Hydrate the parameter-panel state from the loaded snapshot when
@@ -545,7 +564,7 @@ function TopicModelingFeature() {
       }
       return { percent: '100', enabled: false };
     });
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       if (typeof settings.random_seed === 'number') {
         setRandomSeed(settings.random_seed);
         setRandomSeedUserSet(true);
@@ -582,12 +601,9 @@ function TopicModelingFeature() {
   };
 
   const nodeDocCounts = useMemo(
-    () =>
-      panelSelectedNodes
-        .slice(0, 2)
-        .map((n) => (n as { shape?: number[] }).shape?.[0] ?? 0),
+    () => panelSelectedNodes.slice(0, 2).map((n) => (n as { shape?: number[] }).shape?.[0] ?? 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panelNodeIdsKey]
+    [panelNodeIdsKey],
   );
 
   const effectiveDocCounts = useMemo(
@@ -598,7 +614,7 @@ function TopicModelingFeature() {
         const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
         return Math.max(1, Math.round((n * pct) / 100));
       }),
-    [nodeDocCounts, corpusSamples]
+    [nodeDocCounts, corpusSamples],
   );
 
   const combinedEffective = effectiveDocCounts.reduce((a, b) => a + b, 0);
@@ -618,7 +634,7 @@ function TopicModelingFeature() {
   useEffect(() => {
     if (topicSizeMode !== 'min' || topicSizeUserSet || combinedEffective <= 0) return;
     const autoMin = Math.max(2, Math.floor(combinedEffective / (10 * referenceTopicNo)));
-    Promise.resolve().then(() => setTopicSizeValue(autoMin));
+    void Promise.resolve().then(() => setTopicSizeValue(autoMin));
   }, [topicSizeMode, topicSizeUserSet, combinedEffective, referenceTopicNo]);
 
   const showSamplingWarning =
@@ -631,7 +647,7 @@ function TopicModelingFeature() {
         const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
         return pct >= 100 ? null : pct / 100;
       }),
-    [corpusSamples, panelNodeIds.length]
+    [corpusSamples, panelNodeIds.length],
   );
   const hasAnySampling = sampleFractionsForRequest.some((f) => f !== null);
 
@@ -660,9 +676,7 @@ function TopicModelingFeature() {
     const filterActive = stopwordFilterEnabled && stopwordFilterAvailable;
     const filtered: TopicModelingTopic[] = [];
     for (const topic of rawTopics) {
-      const words = Array.isArray(topic.representative_words)
-        ? topic.representative_words
-        : null;
+      const words = Array.isArray(topic.representative_words) ? topic.representative_words : null;
       if (!words || words.length === 0) {
         filtered.push(topic);
         continue;
@@ -683,7 +697,13 @@ function TopicModelingFeature() {
     }
     return filtered;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, representativeWordsCount, stopwordFilterEnabled, stopwordFilterAvailable, stopwordSet]);
+  }, [
+    result,
+    representativeWordsCount,
+    stopwordFilterEnabled,
+    stopwordFilterAvailable,
+    stopwordSet,
+  ]);
 
   // Task-flow hook is intentionally placed after ``topics`` so it can
   // receive the already-filtered display list as ``displayedTopics`` —
@@ -817,8 +837,8 @@ function TopicModelingFeature() {
   // Re-aggregates a completed exact-topic result without changing the next-run parameter input.
   /**
    * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const handleUpdateExactTopicCount = async (value: number) => {
     if (inSnapshotMode) return;
     if (topicSizeMode !== 'exact') return;
@@ -848,9 +868,7 @@ function TopicModelingFeature() {
       setTopicSearchQuery('');
     } catch (updateError: unknown) {
       setError(
-        updateError instanceof Error
-          ? updateError.message
-          : 'Failed to update exact topic count',
+        updateError instanceof Error ? updateError.message : 'Failed to update exact topic count',
       );
     } finally {
       setIsUpdatingExactTopicCount(false);
@@ -934,9 +952,7 @@ function TopicModelingFeature() {
         defaultPalette={defaultPalette}
         isLocked={!!isLocked || inSnapshotMode}
         lockedMessage={
-          inSnapshotMode
-            ? 'Viewing a saved snapshot — selection is frozen.'
-            : undefined
+          inSnapshotMode ? 'Viewing a saved snapshot — selection is frozen.' : undefined
         }
         snapshot={{
           tool: 'topic_modeling',
@@ -969,7 +985,10 @@ function TopicModelingFeature() {
         showSamplingWarning={showSamplingWarning}
         randomSeed={randomSeed}
         randomSeedUserSet={randomSeedUserSet}
-        onRandomSeedChange={(v) => { setRandomSeed(v); setRandomSeedUserSet(true); }}
+        onRandomSeedChange={(v) => {
+          setRandomSeed(v);
+          setRandomSeedUserSet(true);
+        }}
         representativeWordsCount={representativeWordsCount}
         representativeWordsCountUserSet={representativeWordsCountUserSet}
         representativeWordsCountServerMax={
@@ -987,13 +1006,17 @@ function TopicModelingFeature() {
                 // scaled up post-fit to that cap — not to the user's
                 // smaller fit-time pick. Mirror the cap formula the
                 // panel uses for the slider's ``max`` attribute.
-                const fitValue = Number(loadedSnapshot?.payload.settings?.representative_words_count) || 0;
+                const fitValue =
+                  Number(loadedSnapshot?.payload.settings?.representative_words_count) || 0;
                 const cap = Math.max(50, fitValue * 2);
                 return `Adjustable up to ${cap} words stored in this snapshot.`;
               })()
             : undefined
         }
-        onRepresentativeWordsCountChange={(v) => { setRepresentativeWordsCount(v); setRepresentativeWordsCountUserSet(true); }}
+        onRepresentativeWordsCountChange={(v) => {
+          setRepresentativeWordsCount(v);
+          setRepresentativeWordsCountUserSet(true);
+        }}
         isRunning={isRunning}
         isStopping={isStopping}
         isClearing={isClearing}
@@ -1031,9 +1054,11 @@ function TopicModelingFeature() {
           topicSearchQuery={topicSearchQuery}
           onTopicSearchQueryChange={setTopicSearchQuery}
           activeDomain={activeDomain}
-          nodeNames={panelSelectedNodes
-            .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
-            .filter(Boolean) as string[]}
+          nodeNames={
+            panelSelectedNodes
+              .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
+              .filter(Boolean) as string[]
+          }
           topicSizeMode={topicSizeMode}
           topicSizeValue={topicSizeValue}
           currentExactTopicCount={currentExactTopicCount}
@@ -1062,7 +1087,7 @@ function TopicModelingFeature() {
           readOnly={inSnapshotMode}
         />
       )}
-      </div>
+    </div>
   );
 }
 

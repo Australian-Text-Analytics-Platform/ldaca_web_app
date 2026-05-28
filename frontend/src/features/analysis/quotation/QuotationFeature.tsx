@@ -31,14 +31,26 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/analysis/common/components/AnalysisTaskBanner';
 import useNodeColumnInfos from '@/hooks/useNodeColumnInfos';
-import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { effectiveNodeLanguage, isEnglish } from '@/lib/effectiveNodeLanguage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import HelpIcon from '@/components/help/HelpIcon';
 import {
@@ -92,9 +104,7 @@ import {
   type QuotationHoverState,
 } from './components/QuotationHighlightedCell';
 import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
-import {
-  MetadataColumnSelector,
-} from '../common/components/MetadataColumnSelector';
+import { MetadataColumnSelector } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { PageSizeSelect } from '../common/components/PageSizeSelect';
@@ -149,25 +159,39 @@ function buildQuotationResultState(
   column: string,
 ): QuotationResultState {
   const groupedRows = result.data;
-  const rows = groupedRows.flatMap((group) => group).map((row) => {
-    const spans: { start: number; end: number; type: string }[] = [];
-    // Collects backend span offsets into the display row shape used by highlighted cells.
-    /**
-     * Called by: buildQuotationResultState during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-     */
-    const addSpan = (start?: unknown, end?: unknown, type?: string) => {
-      if (!type) return;
-      const s = Number(start);
-      const e = Number(end);
-      if (Number.isFinite(s) && Number.isFinite(e) && s < e) {
-        spans.push({ start: s, end: e, type });
-      }
-    };
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
-    return { ...row, __spans: spans };
-  }) as QuotationDisplayRow[];
+  const rows = groupedRows
+    .flatMap((group) => group)
+    .map((row) => {
+      const spans: { start: number; end: number; type: string }[] = [];
+      // Collects backend span offsets into the display row shape used by highlighted cells.
+      /**
+       * Called by: buildQuotationResultState during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+       */
+      const addSpan = (start?: unknown, end?: unknown, type?: string) => {
+        if (!type) return;
+        const s = Number(start);
+        const e = Number(end);
+        if (Number.isFinite(s) && Number.isFinite(e) && s < e) {
+          spans.push({ start: s, end: e, type });
+        }
+      };
+      addSpan(
+        row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx],
+        row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx],
+        'speaker',
+      );
+      addSpan(
+        row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx],
+        row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx],
+        'quote',
+      );
+      addSpan(
+        row?.[QUOTATION_COLUMN_KEYS.verbStartIdx],
+        row?.[QUOTATION_COLUMN_KEYS.verbEndIdx],
+        'verb',
+      );
+      return { ...row, __spans: spans };
+    }) as QuotationDisplayRow[];
 
   const metadata = result.metadata;
   const columns = metadata.all_columns.slice();
@@ -191,7 +215,11 @@ function buildQuotationResultState(
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
 function QuotationFeature() {
-  const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
+  const {
+    selectedNodes,
+    handlePageChange: baseHandlePageChange,
+    handlePageSizeChange: baseHandlePageSizeChange,
+  } = useWorkspaceSelection();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
@@ -230,10 +258,12 @@ function QuotationFeature() {
   const updateRemoteUrl = usePreferencesStore((state) => state.updateQuotationRemoteUrl);
   const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const [engineError, setEngineError] = useState<string | null>(null);
-  const engineDialogOpen = useQuotationEngineDialogStore((state) => state.isOpen);
-  const setEngineDialogOpen = useQuotationEngineDialogStore((state) => state.setOpen);
-  const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
-  const closeEngineDialog = useQuotationEngineDialogStore((state) => state.close);
+  const engineDialogOpen = useUIStore((state) => state.modals.quotationEngine);
+  const setEngineDialogOpen = useUIStore((state) => state.setModalOpen);
+  const openModal = useUIStore((state) => state.openModal);
+  const closeModal = useUIStore((state) => state.closeModal);
+  const openEngineDialog = () => openModal('quotationEngine');
+  const closeEngineDialog = () => closeModal('quotationEngine');
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   // Metadata visibility derives from the selected columns: any selection
   // shows the corresponding metadata columns in the results table.
@@ -247,7 +277,12 @@ function QuotationFeature() {
   const [isSavingContextLength, setIsSavingContextLength] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
-  const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
+  const {
+    detailPayload,
+    detailOpen,
+    setDetailOpen,
+    openDetail: openRowDetail,
+  } = useRowDetailDialog();
 
   // Snapshot view state hooks. Hoisted here so the effective-value
   // dispatch can shadow ``panelSelectedNodes`` / ``displayedNodes`` /
@@ -292,10 +327,14 @@ function QuotationFeature() {
   // ``tabKey`` routes colour changes through this tab's temp layer —
   // see the node-colour strategy doc. ``promoteTempColors`` is called
   // from ``handleRunOrUpdate`` below to commit the preview on Run.
-  const { nodeColors: liveNodeColors, handleColorChange, defaultPalette, promoteTempColors } =
-    useNodeColorManagement({
-      activeNodeIds,
-      tabKey: 'quotation',
+  const {
+    nodeColors: liveNodeColors,
+    handleColorChange,
+    defaultPalette,
+    promoteTempColors,
+  } = useNodeColorManagement({
+    activeNodeIds,
+    tabKey: 'quotation',
   });
   // In snapshot mode the live colour store has no entries for the
   // captured node IDs. Shadow with the frozen ``manifest.node_colors``
@@ -342,40 +381,41 @@ function QuotationFeature() {
     return { type: 'local' as const };
   })();
 
-  const engineReady = resolvedEnginePayload.type === 'local'
-    ? true
-    : resolvedEnginePayload.isValid;
+  const engineReady = resolvedEnginePayload.type === 'local' ? true : resolvedEnginePayload.isValid;
 
-  const engineBadgeLabel = resolvedEnginePayload.type === 'remote'
-    ? resolvedEnginePayload.isValid
-      ? 'Remote Engine'
-      : 'Remote Engine • Not configured'
-    : 'Local Engine';
+  const engineBadgeLabel =
+    resolvedEnginePayload.type === 'remote'
+      ? resolvedEnginePayload.isValid
+        ? 'Remote Engine'
+        : 'Remote Engine • Not configured'
+      : 'Local Engine';
 
-  const engineBadgeTitle = resolvedEnginePayload.type === 'remote'
-    ? resolvedEnginePayload.isValid && resolvedEnginePayload.normalizedUrl.length
-      ? `Remote Engine • ${resolvedEnginePayload.normalizedUrl}`
-      : 'Remote Engine • Not configured'
-    : 'Local Engine';
+  const engineBadgeTitle =
+    resolvedEnginePayload.type === 'remote'
+      ? resolvedEnginePayload.isValid && resolvedEnginePayload.normalizedUrl.length
+        ? `Remote Engine • ${resolvedEnginePayload.normalizedUrl}`
+        : 'Remote Engine • Not configured'
+      : 'Local Engine';
 
-  const engineDisplayUrl = resolvedEnginePayload.type === 'remote'
-    ? resolvedEnginePayload.isValid && resolvedEnginePayload.normalizedUrl.length
-      ? resolvedEnginePayload.normalizedUrl
-      : resolvedEnginePayload.rawUrl
-    : '';
+  const engineDisplayUrl =
+    resolvedEnginePayload.type === 'remote'
+      ? resolvedEnginePayload.isValid && resolvedEnginePayload.normalizedUrl.length
+        ? resolvedEnginePayload.normalizedUrl
+        : resolvedEnginePayload.rawUrl
+      : '';
 
   // Opens the shared error dialog with a fallback message for unexpected quotation failures.
   /**
    * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const showErrorDialog = (message: string) => {
     setErrorDialogMessage(message || 'An unexpected error occurred.');
     setErrorDialogOpen(true);
   };
 
   useEffect(() => {
-    Promise.resolve().then(() => setEngineError(null));
+    void Promise.resolve().then(() => setEngineError(null));
   }, [engineConfig.type, engineConfig.url]);
 
   const quotationResultRef = useRef<QuotationAnalysisResponse | null>(null);
@@ -420,7 +460,9 @@ function QuotationFeature() {
     onResultFetched: (result, _taskId) => {
       if (!result) return;
       const targetNode =
-        (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] as WorkspaceNodeLike : displayedNodes[0]);
+        isLocked && lockedNodesSnapshot.length
+          ? (lockedNodesSnapshot[0] as WorkspaceNodeLike)
+          : displayedNodes[0];
       const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
       const selection = activeSelections.find((s) => s.nodeId === nodeId);
       const column = selection?.column ?? '';
@@ -432,6 +474,7 @@ function QuotationFeature() {
     },
     // Rebuilds result state from a cached task payload when the quotation tab hydrates.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // eslint-disable-next-line @typescript-eslint/require-await
     onHydratedResult: async (resultPayload) => {
       const res = resultPayload;
       if (!res) return;
@@ -446,7 +489,8 @@ function QuotationFeature() {
     // Restores saved request settings, materialization metadata, and the analysis lock after reload.
     // Called by: useAnalysisFeature hydration because quotation restores must reapply engine settings, selected node/column, materialized path, and context length before rendering results. Flow: unwrap request data, normalize remote engine state, restore selection/materialization, then lock the submitted node.
     onHydratedRequest: async (requestPayload) => {
-      const requestData = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown> | null;
+      const requestData = ((requestPayload as Record<string, unknown>)?.data ??
+        requestPayload) as Record<string, unknown> | null;
       if (!requestData) return;
       const nodeId = String(requestData?.node_id || requestData?.nodeId || '');
       const column = String(requestData?.column || '');
@@ -467,7 +511,7 @@ function QuotationFeature() {
       setSelectedMetadataColumns([]);
       const matPath = requestData.materialized_path;
       if (typeof matPath === 'string' && matPath) {
-        setMaterializedPaths(prev => ({ ...prev, [nodeId]: matPath }));
+        setMaterializedPaths((prev) => ({ ...prev, [nodeId]: matPath }));
       }
       const matSummary = requestData.materialize_summary as Record<string, unknown> | undefined;
       if (matSummary) {
@@ -509,7 +553,9 @@ function QuotationFeature() {
   /**
    * Called by: QuotationFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
    */
-  const applyContextLengthPreferenceFromResult = (payload: QuotationAnalysisResponse | Record<string, unknown>) => {
+  const applyContextLengthPreferenceFromResult = (
+    payload: QuotationAnalysisResponse | Record<string, unknown>,
+  ) => {
     const prefs = payload?.preferences as Record<string, unknown> | undefined;
     const prefValue = Number(prefs?.context_length ?? prefs?.contextLength);
     if (!Number.isFinite(prefValue)) {
@@ -523,8 +569,8 @@ function QuotationFeature() {
   // Validates and optionally persists the context-length input used by quotation text clipping.
   /**
    * Called by: QuotationFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const applyContextLengthInput = async () => {
     const trimmed = contextLengthInput.trim();
     if (!trimmed.length) {
@@ -581,30 +627,38 @@ function QuotationFeature() {
     }
   };
 
-  const hasIncompleteSelections = !displayedNodes.length || displayedNodes.some((node, idx) => {
-    const nodeId = getNodeIdentifier(node, idx);
-    const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
-    return !selection || !selection.column;
-  });
+  const hasIncompleteSelections =
+    !displayedNodes.length ||
+    displayedNodes.some((node, idx) => {
+      const nodeId = getNodeIdentifier(node, idx);
+      const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
+      return !selection || !selection.column;
+    });
 
   const canRunQuotation =
-    Boolean(currentWorkspaceId)
-    && displayedNodes.length > 0
-    && !hasIncompleteSelections
-    && engineReady
-    && !quotationLanguageUnsupported;
+    Boolean(currentWorkspaceId) &&
+    displayedNodes.length > 0 &&
+    !hasIncompleteSelections &&
+    engineReady &&
+    !quotationLanguageUnsupported;
 
   // Per-node pagination and sorting state
   const [liveNodeState, setNodeState] = useState<Record<string, NodePaginationState>>({});
   // Snapshot-mode local pagination/sort state — separate from live so
   // that toggling page/sort in a snapshot doesn't pollute the live
   // session. Keyed by node id (same as ``liveNodeState``).
-  const [snapshotNodeState, setSnapshotNodeState] = useState<Record<string, NodePaginationState>>({});
+  const [snapshotNodeState, setSnapshotNodeState] = useState<Record<string, NodePaginationState>>(
+    {},
+  );
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
   const [liveMaterializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
-  const [liveMaterializeSummary, setMaterializeSummary] = useState<{ recordCount: number; uniqueDocuments: number; totalDocuments: number } | null>(null);
+  const [liveMaterializeSummary, setMaterializeSummary] = useState<{
+    recordCount: number;
+    uniqueDocuments: number;
+    totalDocuments: number;
+  } | null>(null);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
   const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
@@ -704,7 +758,7 @@ function QuotationFeature() {
     // groups while building rows, so single-hit groups
     // produce the same rendered output as the original document-grouped
     // shape (and the proportional dispersion view doesn't apply here).
-    const pagedGroups = pagedHits.map((h) => [h] as typeof allGroups[number]);
+    const pagedGroups = pagedHits.map((h) => [h] as (typeof allGroups)[number]);
 
     const slicedResponse: QuotationAnalysisResponse = {
       ...captured,
@@ -741,12 +795,12 @@ function QuotationFeature() {
     getServerParams: (request) => {
       const { type: serverEngineType, url: serverEngineUrl } = getServerEngineConfig(
         request,
-        (url) => normalizeRemoteUrl(url).normalized
+        (url) => normalizeRemoteUrl(url).normalized,
       );
 
       return {
         engine_type: serverEngineType,
-        engine_url: serverEngineType === 'remote' ? (serverEngineUrl || null) : null,
+        engine_url: serverEngineType === 'remote' ? serverEngineUrl || null : null,
       };
     },
   });
@@ -772,7 +826,13 @@ function QuotationFeature() {
     if (nodeColumnSelections.length === 0) {
       recomputeAutoColumns();
     }
-  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns, setNodeColumnSelections]);
+  }, [
+    isLocked,
+    selectedNodes,
+    nodeColumnSelections,
+    recomputeAutoColumns,
+    setNodeColumnSelections,
+  ]);
 
   // Updates the selected text column and persists it as the document column preference.
   /**
@@ -790,7 +850,11 @@ function QuotationFeature() {
   /**
    * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
    */
-  const updateResultState = (nodeId: string, column: string, result: QuotationAnalysisResponse): QuotationResultState => {
+  const updateResultState = (
+    nodeId: string,
+    column: string,
+    result: QuotationAnalysisResponse,
+  ): QuotationResultState => {
     const normalized = buildQuotationResultState(result, column);
     setResultsByNode((prev) => ({ ...prev, [nodeId]: normalized }));
     setNodeState((prev) => ({
@@ -859,43 +923,47 @@ function QuotationFeature() {
   // request to learn materialized_path, reset page_size to the default 20,
   // and refetch the current page (which now slices from the cached parquet
   // with occurrence-row semantics).
-  const handleQuotationMaterializeSuccess = useCallback(async (nodeId: string, _taskId: string) => {
-    void _taskId;
-    try {
-      const headers = getAuthHeaders();
-      const parentTaskId = await resolveTaskId();
-      if (parentTaskId) {
-        const { data: req } = await quotationTaskRequest({
-          headers,
-          path: { task_id: parentTaskId },
-          throwOnError: true,
-        });
-        const reqObj = (req as Record<string, unknown>) ?? {};
-        const path = typeof reqObj.materialized_path === 'string'
-          ? (reqObj.materialized_path as string)
-          : null;
-        if (path) {
-          setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
-        }
-        const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
-        if (summary) {
-          setMaterializeSummary({
-            recordCount: Number(summary.record_count) || 0,
-            uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
-            totalDocuments: Number(summary.total_source_documents) || 0,
+  const handleQuotationMaterializeSuccess = useCallback(
+    async (nodeId: string, _taskId: string) => {
+      void _taskId;
+      try {
+        const headers = getAuthHeaders();
+        const parentTaskId = await resolveTaskId();
+        if (parentTaskId) {
+          const { data: req } = await quotationTaskRequest({
+            headers,
+            path: { task_id: parentTaskId },
+            throwOnError: true,
           });
+          const reqObj = (req as Record<string, unknown>) ?? {};
+          const path =
+            typeof reqObj.materialized_path === 'string'
+              ? (reqObj.materialized_path as string)
+              : null;
+          if (path) {
+            setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
+          }
+          const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
+          if (summary) {
+            setMaterializeSummary({
+              recordCount: Number(summary.record_count) || 0,
+              uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
+              totalDocuments: Number(summary.total_source_documents) || 0,
+            });
+          }
         }
+      } catch (error) {
+        console.warn('Failed to refresh quotation task request after materialize', error);
       }
-    } catch (error) {
-      console.warn('Failed to refresh quotation task request after materialize', error);
-    }
 
-    try {
-      handlePageSizeChange(20);
-    } catch (error) {
-      console.warn('Failed to reset quotation page size after materialize', error);
-    }
-  }, [getAuthHeaders, resolveTaskId, handlePageSizeChange]);
+      try {
+        void handlePageSizeChange(20);
+      } catch (error) {
+        console.warn('Failed to reset quotation page size after materialize', error);
+      }
+    },
+    [getAuthHeaders, resolveTaskId, handlePageSizeChange],
+  );
 
   useMaterializeLifecycle({
     taskType: 'quotation_materialize',
@@ -920,8 +988,8 @@ function QuotationFeature() {
   // Loads available detach-column options before showing the quotation detach dialog.
   /**
    * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const openDetachDialog = async (nodeId: string) => {
     const selection = activeSelections.find((item) => item.nodeId === nodeId);
     if (!selection?.column) return;
@@ -943,7 +1011,8 @@ function QuotationFeature() {
       setSelectedDetachColumns(initialSelections);
       setDetachDialogOpen(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load quotation detach options';
+      const message =
+        error instanceof Error ? error.message : 'Failed to load quotation detach options';
       showErrorDialog(message);
     }
   };
@@ -955,7 +1024,11 @@ function QuotationFeature() {
   const handleDetachConfirm = async () => {
     if (!pendingDetachNodeId) return;
     const selectedColumns = selectedDetachColumns[pendingDetachNodeId] || [];
-    await handleDetach(pendingDetachNodeId, selectedColumns, materializedPaths[pendingDetachNodeId] ?? null);
+    await handleDetach(
+      pendingDetachNodeId,
+      selectedColumns,
+      materializedPaths[pendingDetachNodeId] ?? null,
+    );
     setDetachDialogOpen(false);
     setPendingDetachNodeId(null);
     setDetachNodeOptions([]);
@@ -1024,11 +1097,8 @@ function QuotationFeature() {
   })();
 
   // Pick the live node for the capture hook to read row count from.
-  const liveCaptureNode: WorkspaceNodeLike | null =
-    livePanelSelectedNodes[0] ?? null;
-  const liveCaptureNodeId = liveCaptureNode
-    ? getNodeIdentifier(liveCaptureNode, 0)
-    : '';
+  const liveCaptureNode: WorkspaceNodeLike | null = livePanelSelectedNodes[0] ?? null;
+  const liveCaptureNodeId = liveCaptureNode ? getNodeIdentifier(liveCaptureNode, 0) : '';
   const liveMaterialized = liveCaptureNodeId
     ? Boolean(liveMaterializedPaths[liveCaptureNodeId])
     : false;
@@ -1075,11 +1145,11 @@ function QuotationFeature() {
   // next render. No backend roundtrip.
   /**
    * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const effHandlePageChange = (newPage: number) => {
     if (!inSnapshotMode) {
-      handlePageChange(newPage);
+      void handlePageChange(newPage);
       return;
     }
     const nodeId =
@@ -1101,11 +1171,11 @@ function QuotationFeature() {
   // Applies page-size changes to live task results or local snapshot state as appropriate.
   /**
    * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const effHandlePageSizeChange = (newSize: number) => {
     if (!inSnapshotMode) {
-      handlePageSizeChange(newSize);
+      void handlePageSizeChange(newSize);
       return;
     }
     const nodeId =
@@ -1127,11 +1197,11 @@ function QuotationFeature() {
   // Applies column sorting to live task results or snapshot-local pagination state.
   /**
    * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-       * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const effHandleSort = (nodeId: string, columnName: string) => {
     if (!inSnapshotMode) {
-      handleSort(nodeId, columnName);
+      void handleSort(nodeId, columnName);
       return;
     }
     setSnapshotNodeState((prev) => {
@@ -1166,7 +1236,9 @@ function QuotationFeature() {
       return [] as string[];
     }
 
-    const baseColumns = resultState.metadata.metadata_columns.filter((column) => !column.startsWith('__'));
+    const baseColumns = resultState.metadata.metadata_columns.filter(
+      (column) => !column.startsWith('__'),
+    );
     const generatedMetadataColumns = [
       QUOTATION_COLUMN_KEYS.quote,
       QUOTATION_COLUMN_KEYS.speaker,
@@ -1193,15 +1265,22 @@ function QuotationFeature() {
 
   return (
     <>
-      <Dialog open={engineDialogOpen} onOpenChange={setEngineDialogOpen}>
+      <Dialog
+        open={engineDialogOpen}
+        onOpenChange={(open) => setEngineDialogOpen('quotationEngine', open)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Quotation Engine</DialogTitle>
-            <DialogDescription>Select which engine to use when extracting quotations.</DialogDescription>
+            <DialogDescription>
+              Select which engine to use when extracting quotations.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="quotation-engine-type" className="text-sm font-medium">Engine Source</label>
+              <label htmlFor="quotation-engine-type" className="text-sm font-medium">
+                Engine Source
+              </label>
               <Select
                 value={engineConfig.type}
                 onValueChange={(value) => {
@@ -1225,7 +1304,9 @@ function QuotationFeature() {
             </div>
             {engineConfig.type === 'remote' ? (
               <div className="space-y-2">
-                <label htmlFor="quotation-engine-url" className="text-sm font-medium">Service URL</label>
+                <label htmlFor="quotation-engine-url" className="text-sm font-medium">
+                  Service URL
+                </label>
                 <Input
                   id="quotation-engine-url"
                   value={engineConfig.url ?? ''}
@@ -1242,15 +1323,21 @@ function QuotationFeature() {
                 {engineError ? (
                   <p className="text-sm text-destructive">{engineError}</p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Include protocol and point to the remote quotation extractor base URL.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Include protocol and point to the remote quotation extractor base URL.
+                  </p>
                 )}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">The local extractor runs inside this workspace; no extra configuration required.</p>
+              <p className="text-xs text-muted-foreground">
+                The local extractor runs inside this workspace; no extra configuration required.
+              </p>
             )}
           </div>
           <DialogFooter className="sm:justify-end">
-            <Button variant="outline" onClick={closeEngineDialog}>Cancel</Button>
+            <Button variant="outline" onClick={closeEngineDialog}>
+              Cancel
+            </Button>
             <Button
               onClick={handleEngineDialogSave}
               disabled={engineConfig.type === 'remote' && !(engineConfig.url ?? '').trim().length}
@@ -1347,8 +1434,8 @@ function QuotationFeature() {
             extraContent: (
               <PageSizeSelect
                 value={
-                  nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']?.pageSize
-                  ?? DEFAULT_PAGE_SIZE
+                  nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']
+                    ?.pageSize ?? DEFAULT_PAGE_SIZE
                 }
                 onChange={effHandlePageSizeChange}
               />
@@ -1412,7 +1499,10 @@ function QuotationFeature() {
                       >
                         Context length (words per side)
                       </label>
-                      <HelpIcon targetKey="analysis.quotation.context-length" label="Quotation context length" />
+                      <HelpIcon
+                        targetKey="analysis.quotation.context-length"
+                        label="Quotation context length"
+                      />
                     </div>
                     <Input
                       id="quotation-context-length"
@@ -1440,8 +1530,11 @@ function QuotationFeature() {
                     )}
                   </div>
                 </div>
-                <span className={`text-xs ${contextLengthError ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  {contextLengthError ?? `Enter a whole number between 0 and ${MAX_CONTEXT_LENGTH}.`}
+                <span
+                  className={`text-xs ${contextLengthError ? 'text-destructive' : 'text-muted-foreground'}`}
+                >
+                  {contextLengthError ??
+                    `Enter a whole number between 0 and ${MAX_CONTEXT_LENGTH}.`}
                 </span>
               </div>
             </CardHeader>
@@ -1452,7 +1545,9 @@ function QuotationFeature() {
                 const textCol = selection?.column || '';
 
                 const resultState = resultsByNode[nodeId];
-                const rowsWithQuotes = (resultState?.rows ?? []).filter((row) => row?.[QUOTATION_COLUMN_KEYS.quote]);
+                const rowsWithQuotes = (resultState?.rows ?? []).filter(
+                  (row) => row?.[QUOTATION_COLUMN_KEYS.quote],
+                );
                 const visibleMetadataColumns = showMetadata ? resolvedMetadataColumns : [];
 
                 const cols = (() => {
@@ -1467,7 +1562,8 @@ function QuotationFeature() {
                   <section key={nodeId} className="space-y-4">
                     <div className="border-b border-border/60 pb-4">
                       <p className="text-sm text-muted-foreground">
-                        Text column: {textCol || 'Select a text column to view highlighted quotations.'}
+                        Text column:{' '}
+                        {textCol || 'Select a text column to view highlighted quotations.'}
                       </p>
                     </div>
 
@@ -1476,90 +1572,103 @@ function QuotationFeature() {
                         maxHeightClass="max-h-[70vh]"
                         contentClassName="min-w-max h-full"
                       >
-                          <Table className="min-w-full text-sm" disableContainer>
-                            <TableHeader className="bg-muted sticky top-0 z-10">
-                              <TableRow className="border-b border-border/60">
-                                {cols.map((c: string) => {
-                                  // Every column is sortable — in snapshot mode the client-side
-                                  // comparator handles any column; in live mode the backend
-                                  // materialised path sorts any column in schema (CONC_* columns
-                                  // for concordance had the same treatment).
-                                  const sortable = true;
-                                  const active = resultState?.sorting?.sort_by === c;
-                                  return (
-                                    <TableHead
-                                      key={c}
-                                      className={`h-10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/90 select-none whitespace-nowrap ${sortable ? 'cursor-pointer' : 'cursor-default opacity-75'}`}
-                                      onClick={sortable ? () => effHandleSort(nodeId, c) : undefined}
-                                    >
-                                      <div className="flex items-center gap-1.5">
-                                        <span>{c}</span>
-                                        {sortable && (
-                                          <ArrowUpDown className={`h-3 w-3 ${active ? 'text-foreground' : 'opacity-60'}`} />
-                                        )}
-                                      </div>
-                                    </TableHead>
-                                  );
-                                })}
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {rowsWithQuotes.length === 0 ? (
-                                <TableRow>
-                                  <TableCell className="h-24 text-center text-muted-foreground" colSpan={cols.length || 1}>
-                                    No quotations found on this page. Source rows without quotations are omitted.
-                                  </TableCell>
-                                </TableRow>
-                              ) : (
-                                rowsWithQuotes.map((row, rowIdx: number) => (
-                                  <TableRow
-                                    key={rowIdx}
-                                    className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer"
-                                    onClick={() => {
-                                      const record = { ...row };
-                                      const rawFullText = record[textCol];
-                                      const fullText = rawFullText == null ? undefined : String(rawFullText);
-                                      const quotationGeneratedCols = Object.values(QUOTATION_COLUMN_KEYS);
-                                      openRowDetail({
-                                        record,
-                                        textColumn: textCol,
-                                        fullText,
-                                        excludeMetadataColumns: [...quotationGeneratedCols, '__spans'],
-                                      });
-                                    }}
+                        <Table className="min-w-full text-sm" disableContainer>
+                          <TableHeader className="bg-muted sticky top-0 z-10">
+                            <TableRow className="border-b border-border/60">
+                              {cols.map((c: string) => {
+                                // Every column is sortable — in snapshot mode the client-side
+                                // comparator handles any column; in live mode the backend
+                                // materialised path sorts any column in schema (CONC_* columns
+                                // for concordance had the same treatment).
+                                const sortable = true;
+                                const active = resultState?.sorting?.sort_by === c;
+                                return (
+                                  <TableHead
+                                    key={c}
+                                    className={`h-10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/90 select-none whitespace-nowrap ${sortable ? 'cursor-pointer' : 'cursor-default opacity-75'}`}
+                                    onClick={sortable ? () => effHandleSort(nodeId, c) : undefined}
                                   >
-                                    {cols.map((c: string, cellIdx: number) => {
-                                      const val = c === QUOTATION_DOCUMENT_COLUMN ? row?.[textCol] : row?.[c];
-                                      const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
-                                      const shouldHighlight = Boolean(textCol) && c === QUOTATION_DOCUMENT_COLUMN;
-                                      const content = shouldHighlight
-                                        ? (
-                                          <QuotationHighlightedCell
-                                            text={typeof val === 'string' ? val : String(val ?? '')}
-                                            row={row}
-                                            cellKey={cellKey}
-                                            contextLength={contextLength}
-                                            hoverState={hoverState}
-                                            onHoverChange={setHoverState}
-                                          />
-                                        )
-                                        : val !== undefined && val !== null
-                                        ? String(val)
-                                        : '';
-                                      return (
-                                        <TableCell
-                                          key={cellIdx}
-                                          className="px-4 py-3 align-top text-sm leading-relaxed"
-                                        >
-                                          {content}
-                                        </TableCell>
-                                      );
-                                    })}
-                                  </TableRow>
-                                ))
-                              )}
-                            </TableBody>
-                          </Table>
+                                    <div className="flex items-center gap-1.5">
+                                      <span>{c}</span>
+                                      {sortable && (
+                                        <ArrowUpDown
+                                          className={`h-3 w-3 ${active ? 'text-foreground' : 'opacity-60'}`}
+                                        />
+                                      )}
+                                    </div>
+                                  </TableHead>
+                                );
+                              })}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rowsWithQuotes.length === 0 ? (
+                              <TableRow>
+                                <TableCell
+                                  className="h-24 text-center text-muted-foreground"
+                                  colSpan={cols.length || 1}
+                                >
+                                  No quotations found on this page. Source rows without quotations
+                                  are omitted.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              rowsWithQuotes.map((row, rowIdx: number) => (
+                                <TableRow
+                                  key={rowIdx}
+                                  className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer"
+                                  onClick={() => {
+                                    const record = { ...row };
+                                    const rawFullText = record[textCol];
+                                    const fullText =
+                                      rawFullText == null ? undefined : String(rawFullText);
+                                    const quotationGeneratedCols =
+                                      Object.values(QUOTATION_COLUMN_KEYS);
+                                    openRowDetail({
+                                      record,
+                                      textColumn: textCol,
+                                      fullText,
+                                      excludeMetadataColumns: [
+                                        ...quotationGeneratedCols,
+                                        '__spans',
+                                      ],
+                                    });
+                                  }}
+                                >
+                                  {cols.map((c: string, cellIdx: number) => {
+                                    const val =
+                                      c === QUOTATION_DOCUMENT_COLUMN ? row?.[textCol] : row?.[c];
+                                    const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
+                                    const shouldHighlight =
+                                      Boolean(textCol) && c === QUOTATION_DOCUMENT_COLUMN;
+                                    const content = shouldHighlight ? (
+                                      <QuotationHighlightedCell
+                                        text={typeof val === 'string' ? val : String(val ?? '')}
+                                        row={row}
+                                        cellKey={cellKey}
+                                        contextLength={contextLength}
+                                        hoverState={hoverState}
+                                        onHoverChange={setHoverState}
+                                      />
+                                    ) : val !== undefined && val !== null ? (
+                                      String(val)
+                                    ) : (
+                                      ''
+                                    );
+                                    return (
+                                      <TableCell
+                                        key={cellIdx}
+                                        className="px-4 py-3 align-top text-sm leading-relaxed"
+                                      >
+                                        {content}
+                                      </TableCell>
+                                    );
+                                  })}
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
                       </AnalysisTableScrollArea>
                     </div>
 
@@ -1567,18 +1676,22 @@ function QuotationFeature() {
                       page={resultState?.pagination?.page ?? 1}
                       pageSize={resultState?.pagination?.page_size ?? DEFAULT_PAGE_SIZE}
                       hasNext={resultState?.pagination?.has_next ?? false}
-                      hasPrev={resultState?.pagination?.has_prev ?? ((resultState?.pagination?.page ?? 1) > 1)}
+                      hasPrev={
+                        resultState?.pagination?.has_prev ??
+                        (resultState?.pagination?.page ?? 1) > 1
+                      }
                       totalPages={resultState?.pagination?.total_source_pages}
                       onPageChange={(newPage) => effHandlePageChange(newPage)}
-                      pageSizeSummary={materializedPaths[nodeId]
-                        ? (materializeSummary
-                          ? <GroupedResultsPageSizeSummary
+                      pageSizeSummary={
+                        materializedPaths[nodeId] ? (
+                          materializeSummary ? (
+                            <GroupedResultsPageSizeSummary
                               groups={[]}
                               totalInstances={materializeSummary.recordCount}
                               totalDocuments={materializeSummary.uniqueDocuments}
                               totalProcessed={materializeSummary.totalDocuments}
                             />
-                          : (
+                          ) : (
                             // Materialise summary not yet hydrated (e.g. the
                             // task-request fetch is mid-flight after Process All).
                             // Fall back to the pagination total — it's the same
@@ -1586,11 +1699,20 @@ function QuotationFeature() {
                             // report, so the line is correct, just missing the
                             // document breakdown until the summary lands.
                             <>
-                              (Found {(resultState?.pagination?.total_source_rows ?? 0).toLocaleString()} {(resultState?.pagination?.total_source_rows ?? 0) === 1 ? 'quotation' : 'quotations'} across the materialised corpus.)
+                              (Found{' '}
+                              {(resultState?.pagination?.total_source_rows ?? 0).toLocaleString()}{' '}
+                              {(resultState?.pagination?.total_source_rows ?? 0) === 1
+                                ? 'quotation'
+                                : 'quotations'}{' '}
+                              across the materialised corpus.)
                             </>
                           )
+                        ) : (
+                          <GroupedResultsPageSizeSummary
+                            groups={resultState?.groupedRows ?? []}
+                            totalProcessed={resultState?.pagination?.page_size}
+                          />
                         )
-                        : <GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} totalProcessed={resultState?.pagination?.page_size} />
                       }
                     >
                       <DisabledReasonTooltip
@@ -1602,13 +1724,17 @@ function QuotationFeature() {
                           variant="outline"
                           onClick={() => void handleMaterialize(nodeId)}
                           disabled={
-                            inSnapshotMode
-                            || Boolean(nodeMaterializing[nodeId])
-                            || Boolean(materializedPaths[nodeId])
-                            || Boolean(nodeDetaching[nodeId])
+                            inSnapshotMode ||
+                            Boolean(nodeMaterializing[nodeId]) ||
+                            Boolean(materializedPaths[nodeId]) ||
+                            Boolean(nodeDetaching[nodeId])
                           }
                           className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                          title={inSnapshotMode ? undefined : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
+                          title={
+                            inSnapshotMode
+                              ? undefined
+                              : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
+                          }
                         >
                           {nodeMaterializing[nodeId] ? (
                             <>
@@ -1684,33 +1810,37 @@ function QuotationFeature() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         payload={detailPayload}
-        customization={detailPayload ? {
-          label: 'Quotation',
-          summaryFields: [
-            {
-              label: 'Quote Type',
-              value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quoteType] ?? ''),
-            },
-            {
-              label: 'Speaker',
-              value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.speaker] ?? ''),
-            },
-            {
-              label: 'Verb',
-              value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.verb] ?? ''),
-            },
-            {
-              label: 'Quote',
-              value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quote] ?? ''),
-            },
-          ],
-          // Reuses the quotation detail renderer to show highlighted source text in the row panel.
-          // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-          renderDocumentText: (text, record) => renderQuotationDetailText(text, record),
-        } : undefined}
+        customization={
+          detailPayload
+            ? {
+                label: 'Quotation',
+                summaryFields: [
+                  {
+                    label: 'Quote Type',
+                    value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quoteType] ?? ''),
+                  },
+                  {
+                    label: 'Speaker',
+                    value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.speaker] ?? ''),
+                  },
+                  {
+                    label: 'Verb',
+                    value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.verb] ?? ''),
+                  },
+                  {
+                    label: 'Quote',
+                    value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quote] ?? ''),
+                  },
+                ],
+                // Reuses the quotation detail renderer to show highlighted source text in the row panel.
+                // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+                renderDocumentText: (text, record) => renderQuotationDetailText(text, record),
+              }
+            : undefined
+        }
       />
     </>
   );
-};
+}
 
 export default QuotationFeature;

@@ -1,11 +1,31 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { flexRender, type ColumnDef } from '@tanstack/react-table';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { RowDetailPanel } from '../../analysis/common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../../analysis/common/components/useRowDetailDialog';
 import { useServerTable } from '@/hooks/useServerTable';
@@ -32,19 +52,19 @@ interface PreviewTableProps {
 }
 
 /**
-   * Builds TanStack column definitions from backend-provided preview columns.
-   * `PreviewTable` uses it so all preprocessing tabs share the same value
-   * formatting in table cells.
-   * Used by: local callers in preprocessing/PreviewTable module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
-   */
+ * Builds TanStack column definitions from backend-provided preview columns.
+ * `PreviewTable` uses it so all preprocessing tabs share the same value
+ * formatting in table cells.
+ * Used by: local callers in preprocessing/PreviewTable module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ */
 function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow, unknown>[] {
   return columnsToRender.map((col) => ({
     accessorKey: col,
     header: col,
-        /**
-         * Formats backend preview values for shared preprocessing table cells.
-         * Called by: buildColumnDefs object consumers because consumers need this callback at the object boundary instead of recreating it inline.
-         */
+    /**
+     * Formats backend preview values for shared preprocessing table cells.
+     * Called by: buildColumnDefs object consumers because consumers need this callback at the object boundary instead of recreating it inline.
+     */
     cell: ({ getValue }) => formatPreviewValue(getValue()),
   }));
 }
@@ -74,7 +94,12 @@ export function PreviewTable({
   loadingBadge,
   documentColumn,
 }: PreviewTableProps) {
-  const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
+  const {
+    detailPayload,
+    detailOpen,
+    setDetailOpen,
+    openDetail: openRowDetail,
+  } = useRowDetailDialog();
   const columnsToRender =
     columns.length > 0
       ? columns
@@ -151,83 +176,94 @@ export function PreviewTable({
             {error}
           </div>
         ) : (
-          <ScrollArea type="always" scrollbars="horizontal" className="rounded-lg border border-border">
-              <Table disableContainer>
-                <TableHeader className="bg-muted/40">
-                  {columnsToRender.length > 0 ? (
-                    table.getHeaderGroups().map((headerGroup) => (
-                      <TableRow key={headerGroup.id}>
-                        {headerGroup.headers.map((header) => (
-                          <TableHead
-                            key={header.id}
-                            className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground"
-                          >
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(header.column.columnDef.header, header.getContext())}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableHead className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground">
-                        No columns
-                      </TableHead>
+          <ScrollArea
+            type="always"
+            scrollbars="horizontal"
+            className="rounded-lg border border-border"
+          >
+            <Table disableContainer>
+              <TableHeader className="bg-muted/40">
+                {columnsToRender.length > 0 ? (
+                  table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead
+                          key={header.id}
+                          className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground"
+                        >
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(header.column.columnDef.header, header.getContext())}
+                        </TableHead>
+                      ))}
                     </TableRow>
-                  )}
-                </TableHeader>
-                <TableBody>
-                  {loading && data.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={tableColSpan} className="px-3 py-6 text-center text-muted-foreground">
-                        <span className="inline-flex items-center gap-2">
-                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                          Loading preview…
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ) : data.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={tableColSpan} className="px-3 py-6 text-center text-muted-foreground">
-                        No rows match the current configuration.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    table.getRowModel().rows.map((row) => (
-                      <TableRow
-                        key={row.id}
-                        className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
-                        onClick={() => {
-                          const original = row.original;
-                          const detailTextColumn =
-                            documentColumn && Object.prototype.hasOwnProperty.call(original, documentColumn)
-                              ? documentColumn
-                              : undefined;
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableHead className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground">
+                      No columns
+                    </TableHead>
+                  </TableRow>
+                )}
+              </TableHeader>
+              <TableBody>
+                {loading && data.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={tableColSpan}
+                      className="px-3 py-6 text-center text-muted-foreground"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        Loading preview…
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ) : data.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={tableColSpan}
+                      className="px-3 py-6 text-center text-muted-foreground"
+                    >
+                      No rows match the current configuration.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
+                      onClick={() => {
+                        const original = row.original;
+                        const detailTextColumn =
+                          documentColumn &&
+                          Object.prototype.hasOwnProperty.call(original, documentColumn)
+                            ? documentColumn
+                            : undefined;
 
-                          openRowDetail({
-                            record: Object.assign({}, original),
-                            textColumn: detailTextColumn,
-                          });
-                        }}
-                      >
-                        {row.getVisibleCells().map((cell) => {
-                          const cellValue = cell.getValue();
-                          return (
-                            <TableCell
-                              key={cell.id}
-                              className="max-w-xs truncate px-3 py-2 font-mono text-xs text-foreground"
-                              title={String(cellValue ?? '')}
-                            >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                        openRowDetail({
+                          record: Object.assign({}, original),
+                          textColumn: detailTextColumn,
+                        });
+                      }}
+                    >
+                      {row.getVisibleCells().map((cell) => {
+                        const cellValue = cell.getValue();
+                        return (
+                          <TableCell
+                            key={cell.id}
+                            className="max-w-xs truncate px-3 py-2 font-mono text-xs text-foreground"
+                            title={String(cellValue ?? '')}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </ScrollArea>
         )}
       </CardContent>
@@ -262,11 +298,7 @@ export function PreviewTable({
         </CardFooter>
       )}
 
-      <RowDetailPanel
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        payload={detailPayload}
-      />
+      <RowDetailPanel open={detailOpen} onOpenChange={setDetailOpen} payload={detailPayload} />
     </Card>
   );
-};
+}

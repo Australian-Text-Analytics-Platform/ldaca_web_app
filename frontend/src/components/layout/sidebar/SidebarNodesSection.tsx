@@ -22,7 +22,11 @@ type SidebarNodesSectionProps = {
  * Why: sidebar node rows should use the same colour semantics as the graph while marking fresh nodes visibly.
  * Flow: derive fill from visual state, apply fresh-node outline when needed, then render the checkmark only for selected/focus states.
  */
-function NodeCheckIcon({ state, pair, isFresh }: {
+function NodeCheckIcon({
+  state,
+  pair,
+  isFresh,
+}: {
   state: NodeVisualState;
   pair: ColorPair;
   isFresh: boolean;
@@ -114,7 +118,9 @@ function SidebarNodesSection({
     const unselectedSorted = nodes
       .filter((node) => !selectedSet.has(node.id))
       .sort((a, b) =>
-        getNodeDisplayName(a).localeCompare(getNodeDisplayName(b), undefined, { sensitivity: 'base' }),
+        getNodeDisplayName(a).localeCompare(getNodeDisplayName(b), undefined, {
+          sensitivity: 'base',
+        }),
       );
     return [...selectedOrdered, ...unselectedSorted];
   })();
@@ -178,7 +184,9 @@ function SidebarNodesSection({
             );
           })
         ) : (
-          <div className="rounded-md bg-accent/40 px-2 py-2 text-xs text-muted-foreground">No data blocks</div>
+          <div className="rounded-md bg-accent/40 px-2 py-2 text-xs text-muted-foreground">
+            No data blocks
+          </div>
         )}
       </div>
     </div>

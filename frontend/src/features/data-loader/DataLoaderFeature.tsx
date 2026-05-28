@@ -196,10 +196,7 @@ function DataLoaderFeature() {
   const currentWorkspace =
     workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId) || null;
 
-  const nodeCount =
-    workspaceGraph?.nodes?.length ??
-    currentWorkspace?.total_nodes ??
-    0;
+  const nodeCount = workspaceGraph?.nodes?.length ?? currentWorkspace?.total_nodes ?? 0;
 
   /**
    * Bridges the add-file dialog to workspace node creation. The AddFilePanel
@@ -315,7 +312,9 @@ function DataLoaderFeature() {
                   variant="ghost"
                   aria-label="Refresh file list"
                   title="Refresh file list"
-                  onClick={handleRefreshFiles}
+                  onClick={() => {
+                    void handleRefreshFiles();
+                  }}
                   disabled={refreshingFiles || loadingFiles}
                 >
                   <RefreshCcw className={`h-4 w-4 ${refreshingFiles ? 'animate-spin' : ''}`} />
@@ -332,7 +331,12 @@ function DataLoaderFeature() {
                   <HelpIcon targetKey="data-loader.upload.button" label="Upload files" />
                 </div>
                 <div className="flex items-center gap-1">
-                  <SampleDataPanel authHeaders={authHeaders} onImportComplete={refetchFiles} />
+                    <SampleDataPanel
+                      authHeaders={authHeaders}
+                      onImportComplete={() => {
+                        void refetchFiles();
+                      }}
+                    />
                   <HelpIcon
                     targetKey="data-loader.import-sample.button"
                     label="Import sample data"
@@ -354,7 +358,9 @@ function DataLoaderFeature() {
                   aria-label="Upload files"
                   className="hidden"
                   multiple
-                  onChange={handleFileInputChange}
+                  onChange={(e) => {
+                    void handleFileInputChange(e);
+                  }}
                 />
                 <div className="text-muted-foreground text-xs">
                   Stored under <span className="font-mono">{workspaceFolder}</span>
@@ -372,7 +378,9 @@ function DataLoaderFeature() {
                 onDragEnter={handleFileAreaDragOver}
                 onDragOver={handleFileAreaDragOver}
                 onDragLeave={handleFileAreaDragLeave}
-                onDrop={handleFileAreaDrop}
+                onDrop={(e) => {
+                  void handleFileAreaDrop(e);
+                }}
                 className={`flex min-h-0 flex-1 flex-col rounded-md transition-colors ${isFileDropActive ? 'border-primary bg-primary/5 ring-primary/20 border ring-2' : ''}`}
               >
                 {loadingFiles ? (
@@ -429,11 +437,17 @@ function DataLoaderFeature() {
                           onPreviewFile={setPreviewFile}
                           onAddFile={setAddFileName}
                           onSelectFile={setSelectedFile}
-                          onDownloadFile={handleDownloadFile}
-                          onDeleteFile={handleDeleteFile}
+                          onDownloadFile={(file) => {
+                            void handleDownloadFile(file);
+                          }}
+                          onDeleteFile={(file) => {
+                            void handleDeleteFile(file);
+                          }}
                           onWarnNoWorkspace={() => setWorkspaceAlertOpen(true)}
                           onCreateFolderInside={openCreateFolderDialog}
-                          onOpenCitation={openCitation}
+                          onOpenCitation={(directory, readmePath) => {
+                            void openCitation(directory, readmePath);
+                          }}
                           onMoveFile={handleMoveFile}
                         />
                       </div>
@@ -465,10 +479,10 @@ function DataLoaderFeature() {
       <DataLoaderDialogs
         noWorkspaceAlert={{
           open: workspaceAlertOpen,
-                    /**
-         * Dismisses the no-workspace alert owned by DataLoaderDialogs.
-         * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
-         */
+          /**
+           * Dismisses the no-workspace alert owned by DataLoaderDialogs.
+           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           */
           onClose: () => setWorkspaceAlertOpen(false),
         }}
         workspaceNameAlert={{
@@ -483,10 +497,10 @@ function DataLoaderFeature() {
           target: workspaceToDelete,
           deleting: deletingWorkspace,
           onCancel: closeDeleteWorkspaceDialog,
-                    /**
-                     * Confirms the pending workspace delete from the presentation dialog.
-                     * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
-                     */
+          /**
+           * Confirms the pending workspace delete from the presentation dialog.
+           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           */
           onConfirm: () => void handleConfirmDeleteWorkspace(),
         }}
         ldacaImport={{
@@ -522,24 +536,24 @@ function DataLoaderFeature() {
             void reloadFeaturedRecords(trimmed);
             notify('success', 'LDaCA token saved.');
           },
-                    /**
-                     * Deletes the stored Oni token and refreshes featured collections anonymously.
-                     * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
-                     */
+          /**
+           * Deletes the stored Oni token and refreshes featured collections anonymously.
+           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           */
           onTokenDelete: () => {
             setLdacaOniApiToken(null);
             void reloadFeaturedRecords(null);
             notify('success', 'LDaCA token deleted.');
           },
-                    /**
-                     * Routes dialog search submission through the feature's guarded search handler.
-                     * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
-                     */
+          /**
+           * Routes dialog search submission through the feature's guarded search handler.
+           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           */
           onSearch: () => void handleLdacaSearch(),
-                    /**
-                     * Routes row-level imports through the feature's import task handler.
-                     * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
-                     */
+          /**
+           * Routes row-level imports through the feature's import task handler.
+           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           */
           onImport: (recordId) => void handleLdacaImport(recordId),
         }}
         createFolder={{

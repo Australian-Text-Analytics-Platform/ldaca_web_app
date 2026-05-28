@@ -1,10 +1,28 @@
 import { useMemo, useState } from 'react';
-import type { Column as TableColumn, SortingState, ColumnFiltersState, PaginationState as TanstackPaginationState } from '@tanstack/react-table';
-import { type ColumnDef, type ColumnPinningState, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import type {
+  Column as TableColumn,
+  SortingState,
+  ColumnFiltersState,
+  PaginationState as TanstackPaginationState,
+} from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  type ColumnPinningState,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { DatetimeFormatPanel } from '@/components/panels/DatetimeFormatPanel';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RowDetailPanel } from '@/features/analysis/common/components/RowDetailPanel';
@@ -74,7 +92,12 @@ export function WorkspaceTable({
 }: WorkspaceTableProps) {
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
-  const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
+  const {
+    detailPayload,
+    detailOpen,
+    setDetailOpen,
+    openDetail: openRowDetail,
+  } = useRowDetailDialog();
 
   const sanitizedData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
@@ -144,24 +167,29 @@ export function WorkspaceTable({
   // Filter helpers
   const activeFilter = columnFilters.length > 0 ? columnFilters[0] : null;
   const activeFilterColumn = activeFilter ? String(activeFilter.id) : null;
-  const activeFilterParts = activeFilter?.value as { value: string; op: FilterOperator } | undefined;
+  const activeFilterParts = activeFilter?.value as
+    | { value: string; op: FilterOperator }
+    | undefined;
 
-    /**
+  /**
    * Applies a server-side column filter and resets pagination.
-     * Called by: WorkspaceTable internal event, effect, or helper flow.
-     * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
-     */
+   * Called by: WorkspaceTable internal event, effect, or helper flow.
+   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   */
   const applyFilter = (col: string, value: string, op: FilterOperator) => {
-    if (!value.trim()) { clearFilter(col); return; }
+    if (!value.trim()) {
+      clearFilter(col);
+      return;
+    }
     onColumnFiltersChange?.([{ id: col, value: { value: value.trim(), op } }]);
     onPageChange?.(1);
   };
 
-    /**
+  /**
    * Clears server-side filters and returns to the first page.
-     * Called by: WorkspaceTable internal event, effect, or helper flow.
-     * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
-     */
+   * Called by: WorkspaceTable internal event, effect, or helper flow.
+   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   */
   const clearFilter = (_col: string) => {
     onColumnFiltersChange?.([]);
     onPageChange?.(1);
@@ -209,33 +237,34 @@ export function WorkspaceTable({
     const isFiltered = activeFilterColumn === column;
     const isStringLike = ['string', 'categorical', 'unknown'].includes(currentType);
 
-        /**
+    /**
      * Toggles wide-column expansion without storing false entries.
-         * Called by: WorkspaceTable internal event, effect, or helper flow.
-         * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
-         */
-    const onToggleExpand = () => setExpandedColumns((prev) => {
-      if (prev[column]) {
-        const { [column]: _, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [column]: true };
-    });
+     * Called by: WorkspaceTable internal event, effect, or helper flow.
+     * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+     */
+    const onToggleExpand = () =>
+      setExpandedColumns((prev) => {
+        if (prev[column]) {
+          const { [column]: _, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [column]: true };
+      });
 
     return {
       id: column,
-            /**
+      /**
        * Reads row values by dynamic workspace column name for TanStack Table.
-             * Called by: WorkspaceTable object consumers.
-             * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
-             */
+       * Called by: WorkspaceTable object consumers.
+       * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+       */
       accessorFn: (row) => row?.[column],
-          /**
+      /**
        * Renders the interactive workspace column header controls.
-           * Called by: WorkspaceTable object consumers.
-           * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
-           * Flow: pass column state, filter state, and mutation handlers into the lifted header component.
-           */
+       * Called by: WorkspaceTable object consumers.
+       * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+       * Flow: pass column state, filter state, and mutation handlers into the lifted header component.
+       */
       header: ({ column: colInst }) => (
         <WorkspaceColumnHeader
           column={column}
@@ -266,21 +295,34 @@ export function WorkspaceTable({
           onRequestDelete={() => requestDeleteColumn(column)}
         />
       ),
-            /**
+      /**
        * Renders a compact display value while preserving full text in the title.
-             * Called by: WorkspaceTable object consumers.
-             * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
-             */
+       * Called by: WorkspaceTable object consumers.
+       * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+       */
       cell: ({ getValue }) => {
         const cellValue = getValue();
         const displayValue = cellValue == null ? '' : String(cellValue);
-        return <span className="block truncate" title={displayValue}>{displayValue}</span>;
+        return (
+          <span className="block truncate" title={displayValue}>
+            {displayValue}
+          </span>
+        );
       },
       meta: {
         headerClassName: 'whitespace-nowrap border-r border-border/70 px-2 py-2 text-left',
-        headerMaxWidth: isWideColumn ? (isCollapsedColumn ? COLLAPSED_COLUMN_MAX_WIDTH : EXPANDED_COLUMN_MAX_WIDTH) : undefined,
-        cellClassName: 'whitespace-nowrap border-r border-border/60 px-2 py-1.5 text-sm text-foreground',
-        cellMaxWidth: isWideColumn ? (isCollapsedColumn ? COLLAPSED_COLUMN_MAX_WIDTH : EXPANDED_COLUMN_MAX_WIDTH) : undefined,
+        headerMaxWidth: isWideColumn
+          ? isCollapsedColumn
+            ? COLLAPSED_COLUMN_MAX_WIDTH
+            : EXPANDED_COLUMN_MAX_WIDTH
+          : undefined,
+        cellClassName:
+          'whitespace-nowrap border-r border-border/60 px-2 py-1.5 text-sm text-foreground',
+        cellMaxWidth: isWideColumn
+          ? isCollapsedColumn
+            ? COLLAPSED_COLUMN_MAX_WIDTH
+            : EXPANDED_COLUMN_MAX_WIDTH
+          : undefined,
       },
     } satisfies ColumnDef<DataRow, unknown>;
   });
@@ -290,24 +332,28 @@ export function WorkspaceTable({
   const pageSize = pagination?.page_size ?? 20;
   const totalRows = rowCount ?? pagination?.total_rows ?? 0;
 
-    /**
+  /**
    * Bridges TanStack pagination updates to server pagination callbacks.
-     * Called by: WorkspaceTable internal event, effect, or helper flow.
-     * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
-     */
-  const handlePaginationChange = (updater: TanstackPaginationState | ((prev: TanstackPaginationState) => TanstackPaginationState)) => {
+   * Called by: WorkspaceTable internal event, effect, or helper flow.
+   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   */
+  const handlePaginationChange = (
+    updater: TanstackPaginationState | ((prev: TanstackPaginationState) => TanstackPaginationState),
+  ) => {
     const current = { pageIndex, pageSize };
     const next = typeof updater === 'function' ? updater(current) : updater;
     if (next.pageSize !== pageSize) onPageSizeChange?.(next.pageSize);
     if (next.pageIndex !== pageIndex) onPageChange?.(next.pageIndex + 1);
   };
 
-    /**
+  /**
    * Bridges TanStack sorting updates to server sorting callbacks.
-     * Called by: WorkspaceTable internal event, effect, or helper flow.
-     * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
-     */
-  const handleSortingChangeInternal = (updater: SortingState | ((prev: SortingState) => SortingState)) => {
+   * Called by: WorkspaceTable internal event, effect, or helper flow.
+   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   */
+  const handleSortingChangeInternal = (
+    updater: SortingState | ((prev: SortingState) => SortingState),
+  ) => {
     const next = typeof updater === 'function' ? updater(sorting) : updater;
     onSortingChange?.(next);
     onPageChange?.(1);
@@ -339,7 +385,10 @@ export function WorkspaceTable({
    * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
    * Flow: read the column pin state, set sticky offsets, then add edge shadows for pinned sides.
    */
-  const getPinnedStyles = (col: TableColumn<DataRow, unknown>, variant: 'header' | 'cell'): React.CSSProperties | undefined => {
+  const getPinnedStyles = (
+    col: TableColumn<DataRow, unknown>,
+    variant: 'header' | 'cell',
+  ): React.CSSProperties | undefined => {
     const pinState = col.getIsPinned();
     if (!pinState) return undefined;
     const style: React.CSSProperties = {
@@ -349,10 +398,16 @@ export function WorkspaceTable({
     if (variant === 'header') style.top = 0;
     if (pinState === 'left') {
       style.left = `${col.getStart('left')}px`;
-      style.boxShadow = variant === 'header' ? '2px 0 0 -1px rgba(15, 23, 42, 0.12)' : '2px 0 0 -1px rgba(15, 23, 42, 0.08)';
+      style.boxShadow =
+        variant === 'header'
+          ? '2px 0 0 -1px rgba(15, 23, 42, 0.12)'
+          : '2px 0 0 -1px rgba(15, 23, 42, 0.08)';
     } else if (pinState === 'right') {
       style.right = `${col.getStart('right')}px`;
-      style.boxShadow = variant === 'header' ? '-2px 0 0 -1px rgba(15, 23, 42, 0.12)' : '-2px 0 0 -1px rgba(15, 23, 42, 0.08)';
+      style.boxShadow =
+        variant === 'header'
+          ? '-2px 0 0 -1px rgba(15, 23, 42, 0.12)'
+          : '-2px 0 0 -1px rgba(15, 23, 42, 0.08)';
     }
     return style;
   };
@@ -384,15 +439,32 @@ export function WorkspaceTable({
                     return (
                       <TableHead
                         key={header.id}
-                        className={cn(meta?.headerClassName, 'h-8 px-1 py-1 last:border-r-0', header.column.getIsPinned() ? 'bg-muted shadow-sm' : 'bg-muted')}
+                        className={cn(
+                          meta?.headerClassName,
+                          'h-8 px-1 py-1 last:border-r-0',
+                          header.column.getIsPinned() ? 'bg-muted shadow-sm' : 'bg-muted',
+                        )}
                         style={{
                           ...(meta?.headerMinWidth ? { minWidth: `${meta.headerMinWidth}px` } : {}),
-                          ...(meta?.headerMaxWidth !== undefined ? { maxWidth: `${meta.headerMaxWidth}px`, width: `${meta.headerMaxWidth}px`, overflow: 'hidden' } : {}),
-                          ...(meta?.headerMinWidth || meta?.headerMaxWidth !== undefined ? { transition: 'max-width 200ms ease, width 200ms ease, min-width 200ms ease' } : {}),
+                          ...(meta?.headerMaxWidth !== undefined
+                            ? {
+                                maxWidth: `${meta.headerMaxWidth}px`,
+                                width: `${meta.headerMaxWidth}px`,
+                                overflow: 'hidden',
+                              }
+                            : {}),
+                          ...(meta?.headerMinWidth || meta?.headerMaxWidth !== undefined
+                            ? {
+                                transition:
+                                  'max-width 200ms ease, width 200ms ease, min-width 200ms ease',
+                              }
+                            : {}),
                           ...getPinnedStyles(header.column, 'header'),
                         }}
                       >
-                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     );
                   })}
@@ -405,7 +477,11 @@ export function WorkspaceTable({
                   key={row.id}
                   className="cursor-pointer transition-colors duration-150 hover:bg-muted/40 [&>td]:px-1 [&>td]:py-1"
                   onClick={() => {
-                    const detailTextColumn = documentColumn && Object.prototype.hasOwnProperty.call(row.original, documentColumn) ? documentColumn : undefined;
+                    const detailTextColumn =
+                      documentColumn &&
+                      Object.prototype.hasOwnProperty.call(row.original, documentColumn)
+                        ? documentColumn
+                        : undefined;
                     openRowDetail({ record: { ...row.original }, textColumn: detailTextColumn });
                   }}
                 >
@@ -414,11 +490,26 @@ export function WorkspaceTable({
                     return (
                       <TableCell
                         key={cell.id}
-                        className={cn(meta?.cellClassName, 'last:border-r-0', cell.column.getIsPinned() ? 'bg-white' : undefined)}
+                        className={cn(
+                          meta?.cellClassName,
+                          'last:border-r-0',
+                          cell.column.getIsPinned() ? 'bg-white' : undefined,
+                        )}
                         style={{
                           ...(meta?.cellMinWidth ? { minWidth: `${meta.cellMinWidth}px` } : {}),
-                          ...(meta?.cellMaxWidth !== undefined ? { maxWidth: `${meta.cellMaxWidth}px`, width: `${meta.cellMaxWidth}px`, overflow: 'hidden' } : {}),
-                          ...(meta?.cellMinWidth || meta?.cellMaxWidth !== undefined ? { transition: 'max-width 200ms ease, width 200ms ease, min-width 200ms ease' } : {}),
+                          ...(meta?.cellMaxWidth !== undefined
+                            ? {
+                                maxWidth: `${meta.cellMaxWidth}px`,
+                                width: `${meta.cellMaxWidth}px`,
+                                overflow: 'hidden',
+                              }
+                            : {}),
+                          ...(meta?.cellMinWidth || meta?.cellMaxWidth !== undefined
+                            ? {
+                                transition:
+                                  'max-width 200ms ease, width 200ms ease, min-width 200ms ease',
+                              }
+                            : {}),
                           ...getPinnedStyles(cell.column, 'cell'),
                         }}
                       >
@@ -430,7 +521,10 @@ export function WorkspaceTable({
               ))}
               {tableRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={visibleColumnCount} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={visibleColumnCount}
+                    className="px-4 py-6 text-center text-sm text-muted-foreground"
+                  >
                     No rows to display
                   </TableCell>
                 </TableRow>
@@ -446,10 +540,13 @@ export function WorkspaceTable({
         onClose={closeDatetimeModal}
         onConfirm={handleDatetimeFormatConfirm}
         columnName={datetimeModal.column}
-        sampleValues={sanitizedData.slice(0, 25).map((row) => {
-          const v = row[datetimeModal.column];
-          return v == null ? '' : String(v);
-        }).filter(Boolean)}
+        sampleValues={sanitizedData
+          .slice(0, 25)
+          .map((row) => {
+            const v = row[datetimeModal.column];
+            return v == null ? '' : String(v);
+          })
+          .filter(Boolean)}
       />
 
       <ConfirmDialog
@@ -460,7 +557,9 @@ export function WorkspaceTable({
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"
-        onConfirm={confirmDeleteColumn}
+        onConfirm={() => {
+          void confirmDeleteColumn();
+        }}
       />
 
       <RowDetailPanel open={detailOpen} onOpenChange={setDetailOpen} payload={detailPayload} />

@@ -31,7 +31,12 @@ export interface ReplaceSubTabProps {
     operations: boolean;
   };
   onAlert: (message: string) => void;
-  replaceTextPreview: (nodeId: string, request: ReplaceRequest, page?: number, pageSize?: number) => Promise<FilterPreviewResponse>;
+  replaceTextPreview: (
+    nodeId: string,
+    request: ReplaceRequest,
+    page?: number,
+    pageSize?: number,
+  ) => Promise<FilterPreviewResponse>;
   replaceText: (nodeId: string, request: ReplaceRequest) => Promise<ReplaceApplyResponse>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
@@ -57,7 +62,9 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const effectiveNodes = (() => {
     if (selectedNodes.length > 0) return takeMostRecent(selectedNodes, 1);
     if (!selectedNodeId) return [];
-    const fallback = workspaceNodes.find((node, index) => getNodeId(node, index) === selectedNodeId);
+    const fallback = workspaceNodes.find(
+      (node, index) => getNodeId(node, index) === selectedNodeId,
+    );
     return fallback ? [fallback] : [];
   })();
 
@@ -71,9 +78,10 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const firstStringColumn = stringColumns[0] ?? '';
 
   const [selectedColumnDraft, setSelectedColumn] = useState('');
-  const selectedColumn = activeNodeId && stringColumns.includes(selectedColumnDraft)
-    ? selectedColumnDraft
-    : firstStringColumn;
+  const selectedColumn =
+    activeNodeId && stringColumns.includes(selectedColumnDraft)
+      ? selectedColumnDraft
+      : firstStringColumn;
   const [mode, setMode] = useState<'replace' | 'extract'>('replace');
   const [n, setN] = useState<number | null>(null);
   const count = n !== null ? 'first' : 'all';
@@ -121,8 +129,11 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     enabled: hasSelection,
   });
 
-  const controlsDisabled = !hasSelection || isLoading.nodeData || isLoading.operations || applyLoading;
-  const canApply = Boolean(activeNodeId && selectedColumn && pattern.length > 0 && !applyLoading && !previewError);
+  const controlsDisabled =
+    !hasSelection || isLoading.nodeData || isLoading.operations || applyLoading;
+  const canApply = Boolean(
+    activeNodeId && selectedColumn && pattern.length > 0 && !applyLoading && !previewError,
+  );
   const resolvedOutputColumnName = previewColumnName;
 
   const applyDisabledReason: string | undefined = (() => {
@@ -138,8 +149,8 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
    * Applies the replace/extract operation to the selected node and refreshes
    * schema so output-column changes are visible to downstream tools.
    * Called by: useReplaceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-  * Steps: guard required inputs, build the replace request, call the mutation, refresh schema,
-  * and clear apply loading.
+   * Steps: guard required inputs, build the replace request, call the mutation, refresh schema,
+   * and clear apply loading.
    */
   const handleApply = async () => {
     if (!activeNodeId || !selectedColumn || pattern.length === 0) return;

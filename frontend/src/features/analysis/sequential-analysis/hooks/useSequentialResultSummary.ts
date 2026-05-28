@@ -3,7 +3,9 @@ import { useMemo } from 'react';
 import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
 
 type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
-type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequestInput['custom_interval_unit']>;
+type SequentialCustomIntervalUnit = NonNullable<
+  SequentialAnalysisRequestInput['custom_interval_unit']
+>;
 
 const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
   'minutes',
@@ -70,56 +72,63 @@ interface Fallbacks {
 export const useSequentialResultSummary = (
   results: ResultLike | null | undefined,
   fallbacks: Fallbacks,
-): SequentialResultSummary => useMemo(() => {
-  const params = (results?.analysis_params ?? {}) as Record<string, unknown>;
+): SequentialResultSummary =>
+  useMemo(() => {
+    const params = (results?.analysis_params ?? {}) as Record<string, unknown>;
 
-  const timeColumn = (params.time_column as string | undefined) ?? fallbacks.timeColumn;
-  const groupBy = (params.group_by_columns as string[] | undefined) ?? fallbacks.groupBy;
-  const columnType =
-    (params.column_type as 'datetime' | 'numeric' | undefined) ?? fallbacks.columnType;
+    const timeColumn = (params.time_column as string | undefined) ?? fallbacks.timeColumn;
+    const groupBy = (params.group_by_columns as string[] | undefined) ?? fallbacks.groupBy;
+    const columnType =
+      (params.column_type as 'datetime' | 'numeric' | undefined) ?? fallbacks.columnType;
 
-  const numericOrigin = columnType === 'numeric'
-    ? (params.numeric_origin as number | null | undefined) ?? fallbacks.numericOrigin
-    : null;
-  const numericInterval = columnType === 'numeric'
-    ? (params.numeric_interval as number | null | undefined) ?? fallbacks.numericInterval
-    : null;
+    const numericOrigin =
+      columnType === 'numeric'
+        ? ((params.numeric_origin as number | null | undefined) ?? fallbacks.numericOrigin)
+        : null;
+    const numericInterval =
+      columnType === 'numeric'
+        ? ((params.numeric_interval as number | null | undefined) ?? fallbacks.numericInterval)
+        : null;
 
-  const rawFrequency =
-    (params.frequency as SequentialFrequency | undefined) ?? fallbacks.frequency;
-  const customIntervalValue =
-    (params.custom_interval_value as number | null | undefined) ?? fallbacks.customIntervalValue;
-  const rawCustomIntervalUnit = params.custom_interval_unit ?? fallbacks.customIntervalUnit;
-  const customIntervalUnit: SequentialCustomIntervalUnit | null =
-    isCustomIntervalUnit(rawCustomIntervalUnit) ? rawCustomIntervalUnit : null;
+    const rawFrequency =
+      (params.frequency as SequentialFrequency | undefined) ?? fallbacks.frequency;
+    const customIntervalValue =
+      (params.custom_interval_value as number | null | undefined) ?? fallbacks.customIntervalValue;
+    const rawCustomIntervalUnit = params.custom_interval_unit ?? fallbacks.customIntervalUnit;
+    const customIntervalUnit: SequentialCustomIntervalUnit | null = isCustomIntervalUnit(
+      rawCustomIntervalUnit,
+    )
+      ? rawCustomIntervalUnit
+      : null;
 
-  const frequencyDisplay = columnType === 'numeric'
-    ? 'Numeric bins'
-    : rawFrequency === 'custom'
-      ? customIntervalValue && customIntervalUnit
-        ? `Every ${customIntervalValue} ${customIntervalUnit}`
-        : 'Custom interval'
-      : rawFrequency;
+    const frequencyDisplay =
+      columnType === 'numeric'
+        ? 'Numeric bins'
+        : rawFrequency === 'custom'
+          ? customIntervalValue && customIntervalUnit
+            ? `Every ${customIntervalValue} ${customIntervalUnit}`
+            : 'Custom interval'
+          : rawFrequency;
 
-  return {
-    timeColumn,
-    groupBy,
-    columnType,
-    numericOrigin,
-    numericInterval,
-    rawFrequency,
-    customIntervalValue,
-    customIntervalUnit,
-    frequencyDisplay,
-  };
-}, [
-  results?.analysis_params,
-  fallbacks.timeColumn,
-  fallbacks.groupBy,
-  fallbacks.columnType,
-  fallbacks.numericOrigin,
-  fallbacks.numericInterval,
-  fallbacks.frequency,
-  fallbacks.customIntervalValue,
-  fallbacks.customIntervalUnit,
-]);
+    return {
+      timeColumn,
+      groupBy,
+      columnType,
+      numericOrigin,
+      numericInterval,
+      rawFrequency,
+      customIntervalValue,
+      customIntervalUnit,
+      frequencyDisplay,
+    };
+  }, [
+    results?.analysis_params,
+    fallbacks.timeColumn,
+    fallbacks.groupBy,
+    fallbacks.columnType,
+    fallbacks.numericOrigin,
+    fallbacks.numericInterval,
+    fallbacks.frequency,
+    fallbacks.customIntervalValue,
+    fallbacks.customIntervalUnit,
+  ]);

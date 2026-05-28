@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  MANIFEST_FILE_NAME,
-  findResultPayload,
-  readBundle,
-  writeBundle,
-} from '../bundle';
+import { MANIFEST_FILE_NAME, findResultPayload, readBundle, writeBundle } from '../bundle';
 import type { SnapshotManifest } from '../types';
 
 /**
@@ -22,9 +17,7 @@ function bytes(text: string): Uint8Array {
  * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  * Flow: defaults define payload/source/capability blocks, then each test overrides the field under assertion.
  */
-function demoManifest(
-  overrides: Partial<SnapshotManifest> = {},
-): SnapshotManifest {
+function demoManifest(overrides: Partial<SnapshotManifest> = {}): SnapshotManifest {
   return {
     schema_version: 1,
     mode: 'demo',
@@ -88,9 +81,9 @@ describe('writeBundle + readBundle — round trip', () => {
     expect(Array.from(read.bundle.payloadBytes.get('tables/result.parquet')!)).toEqual(
       Array.from(resultBytes),
     );
-    expect(
-      Array.from(read.bundle.payloadBytes.get('tables/dispersion-bins.json')!),
-    ).toEqual(Array.from(binsBytes));
+    expect(Array.from(read.bundle.payloadBytes.get('tables/dispersion-bins.json')!)).toEqual(
+      Array.from(binsBytes),
+    );
   });
 
   it('writeBundle throws when a declared payload has no bytes provided', async () => {

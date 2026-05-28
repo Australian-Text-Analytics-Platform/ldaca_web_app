@@ -24,9 +24,7 @@ vi.mock('@/hooks/useNodeColumnInfos', () => ({
 
 describe('useAnalysisLockCore', () => {
   it('exposes recomputeAutoColumns function', () => {
-    const { result } = renderHook(() =>
-      useAnalysisLockCore({ allowedDataTypes: ['string'] })
-    );
+    const { result } = renderHook(() => useAnalysisLockCore({ allowedDataTypes: ['string'] }));
 
     expect(typeof result.current.recomputeAutoColumns).toBe('function');
   });

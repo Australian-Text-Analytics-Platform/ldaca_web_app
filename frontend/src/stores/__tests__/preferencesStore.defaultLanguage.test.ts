@@ -64,9 +64,7 @@ describe('preferencesStore default language fields', () => {
     setDefaultTokenizerModel(' lindera:jieba ');
     expect(usePreferencesStore.getState().defaultTokenizerModel).toBe('lindera:jieba');
     setDefaultTokenizerModel(' native:plain_words_en ');
-    expect(usePreferencesStore.getState().defaultTokenizerModel).toBe(
-      'native:plain_words_en',
-    );
+    expect(usePreferencesStore.getState().defaultTokenizerModel).toBe('native:plain_words_en');
   });
 
   it('setDefaultTokenizerModel clears on empty input', () => {

@@ -20,9 +20,7 @@ import { isTauri } from '@/lib/isTauri';
 /** Called by: useBackendHealth in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const normalizeToHealthUrl = (backendUrl: string) => {
   const trimmed = backendUrl.replace(/\/$/, '');
-  return trimmed.endsWith('/api')
-    ? trimmed.replace(/\/api$/, '/health')
-    : `${trimmed}/health`;
+  return trimmed.endsWith('/api') ? trimmed.replace(/\/api$/, '/health') : `${trimmed}/health`;
 };
 
 /** Resolves the health URL from Tauri injection, Tauri command, or web API-base rules. */
@@ -61,12 +59,16 @@ export const useBackendHealth = () => {
   useEffect(() => {
     let cancelled = false;
     resolveHealthUrl()
-      .then((url) => { if (!cancelled) setHealthUrl(url); })
+      .then((url) => {
+        if (!cancelled) setHealthUrl(url);
+      })
       .catch((err) => {
         console.error('Failed to resolve backend health URL', err);
         if (!cancelled) setHealthUrl('/health');
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -80,16 +82,16 @@ export const useBackendHealth = () => {
     /** Called by: useBackendHealth in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
     const scheduleNext = () => {
       if (cancelled) return;
-      const nextDelay = attempt <= 6
-        ? 500
-        : Math.min(5000, 1000 * 2 ** Math.min(5, attempt - 6));
-      timeoutId = window.setTimeout(poll, nextDelay);
+      const nextDelay = attempt <= 6 ? 500 : Math.min(5000, 1000 * 2 ** Math.min(5, attempt - 6));
+      timeoutId = window.setTimeout(() => {
+        void poll();
+      }, nextDelay);
     };
 
     /** Performs one health check and schedules another unless the backend is ready. */
     /**
-      * Called by: the polling effect because backend startup can lag behind the frontend shell in desktop and dev modes.
-      * Flow: fetch the health URL without cache, accept healthy/operational statuses, otherwise store the failure and schedule the next retry.
+     * Called by: the polling effect because backend startup can lag behind the frontend shell in desktop and dev modes.
+     * Flow: fetch the health URL without cache, accept healthy/operational statuses, otherwise store the failure and schedule the next retry.
      */
     const poll = async () => {
       attempt += 1;
@@ -97,9 +99,14 @@ export const useBackendHealth = () => {
         const resp = await fetch(healthUrl, { cache: 'no-store' });
         if (resp.ok) {
           const body = await resp.json();
-          const healthy = Boolean(body && (body.status === 'healthy' || body.status === 'operational'));
+          const healthy = Boolean(
+            body && (body.status === 'healthy' || body.status === 'operational'),
+          );
           if (healthy) {
-            if (!cancelled) { setReady(true); setError(null); }
+            if (!cancelled) {
+              setReady(true);
+              setError(null);
+            }
             return;
           }
         }
@@ -112,7 +119,7 @@ export const useBackendHealth = () => {
       }
     };
 
-    poll();
+    void poll();
 
     return () => {
       cancelled = true;

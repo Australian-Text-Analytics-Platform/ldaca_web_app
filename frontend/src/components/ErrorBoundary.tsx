@@ -1,4 +1,5 @@
 import { Component, type ReactNode, type ComponentType } from 'react';
+import * as Sentry from '@sentry/react';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -29,9 +30,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true, error };
   }
 
-  /** Called by: React error recovery to expose stack details for developers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: React error recovery to expose stack details for developers and send to Sentry for production monitoring. */
   override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error Boundary caught an error:', error, errorInfo);
+    Sentry.captureException(error, {
+      contexts: { react: errorInfo as unknown as Record<string, unknown> },
+    });
   }
 
   /** Lets fallback UIs retry the child tree without forcing a full page reload. */
@@ -56,47 +60,42 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
  * Used by: ErrorBoundary when no feature-specific fallback component is passed because the caller needs one documented boundary for the lookup, event, or state handoff step.
  * Flow: show the error message, offer retry and reload actions, then reveal stack details only in development builds.
  */
-function DefaultErrorFallback({ 
-  error, 
-  resetError 
-}: { error?: Error; resetError: () => void }) {
+function DefaultErrorFallback({ error, resetError }: { error?: Error; resetError: () => void }) {
   return (
-  <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-red-50 border border-red-200 rounded-lg">
-    <div className="text-red-600 text-xl font-semibold mb-4">
-      Something went wrong
+    <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-red-50 border border-red-200 rounded-lg">
+      <div className="text-red-600 text-xl font-semibold mb-4">Something went wrong</div>
+
+      <div className="text-red-700 text-sm mb-6 max-w-md text-center">
+        {error?.message || 'An unexpected error occurred. Please try again.'}
+      </div>
+
+      <div className="space-x-4">
+        <button
+          onClick={resetError}
+          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+        >
+          Try Again
+        </button>
+
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+        >
+          Reload Page
+        </button>
+      </div>
+
+      {import.meta.env.DEV && error?.stack && (
+        <details className="mt-6 w-full max-w-2xl">
+          <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+            Show Error Details
+          </summary>
+          <pre className="mt-2 p-4 bg-gray-100 rounded text-xs text-gray-800 overflow-auto">
+            {error.stack}
+          </pre>
+        </details>
+      )}
     </div>
-    
-    <div className="text-red-700 text-sm mb-6 max-w-md text-center">
-      {error?.message || 'An unexpected error occurred. Please try again.'}
-    </div>
-    
-    <div className="space-x-4">
-      <button
-        onClick={resetError}
-        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-      >
-        Try Again
-      </button>
-      
-      <button
-        onClick={() => window.location.reload()}
-        className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-      >
-        Reload Page
-      </button>
-    </div>
-    
-    {import.meta.env.DEV && error?.stack && (
-      <details className="mt-6 w-full max-w-2xl">
-        <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
-          Show Error Details
-        </summary>
-        <pre className="mt-2 p-4 bg-gray-100 rounded text-xs text-gray-800 overflow-auto">
-          {error.stack}
-        </pre>
-      </details>
-    )}
-  </div>
   );
 }
 
@@ -106,28 +105,29 @@ function DefaultErrorFallback({
  * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
  * Flow: show a workspace-specific error message and retry button, then delegate recovery to resetError.
  */
-export function WorkspaceErrorFallback({ 
-  error, 
-  resetError 
-}: { error?: Error; resetError: () => void }) {
+export function WorkspaceErrorFallback({
+  error,
+  resetError,
+}: {
+  error?: Error;
+  resetError: () => void;
+}) {
   return (
-  <div className="flex flex-col items-center justify-center h-full p-8 bg-yellow-50 border border-yellow-200 rounded-lg">
-    <div className="text-yellow-800 text-lg font-semibold mb-4">
-      Workspace Error
+    <div className="flex flex-col items-center justify-center h-full p-8 bg-yellow-50 border border-yellow-200 rounded-lg">
+      <div className="text-yellow-800 text-lg font-semibold mb-4">Workspace Error</div>
+
+      <div className="text-yellow-700 text-sm mb-6 max-w-md text-center">
+        {error?.message || 'Unable to load workspace data. This might be a temporary issue.'}
+      </div>
+
+      <div className="space-x-4">
+        <button
+          onClick={resetError}
+          className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
     </div>
-    
-    <div className="text-yellow-700 text-sm mb-6 max-w-md text-center">
-      {error?.message || 'Unable to load workspace data. This might be a temporary issue.'}
-    </div>
-    
-    <div className="space-x-4">
-      <button
-        onClick={resetError}
-        className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
-      >
-        Retry
-      </button>
-    </div>
-  </div>
   );
 }

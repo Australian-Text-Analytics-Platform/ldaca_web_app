@@ -23,11 +23,7 @@ import {
  * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
  * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
  */
-function dailyRow(
-  iso: string,
-  count: number,
-  groups: Record<string, string> = {},
-): CapturedRow {
+function dailyRow(iso: string, count: number, groups: Record<string, string> = {}): CapturedRow {
   const start = new Date(iso);
   // period_end on the captured side approximates "last timestamp in
   // this bucket"; for daily buckets that's end-of-day, but the
@@ -142,10 +138,10 @@ describe('rebucket — datetime coarsening', () => {
   it('daily → quarterly buckets on Jan/Apr/Jul/Oct boundaries', () => {
     const rows = [
       dailyRow('2026-01-15T00:00:00Z', 10), // Q1
-      dailyRow('2026-03-31T00:00:00Z', 5),  // Q1
-      dailyRow('2026-04-01T00:00:00Z', 3),  // Q2
-      dailyRow('2026-09-30T00:00:00Z', 8),  // Q3
-      dailyRow('2026-10-01T00:00:00Z', 4),  // Q4
+      dailyRow('2026-03-31T00:00:00Z', 5), // Q1
+      dailyRow('2026-04-01T00:00:00Z', 3), // Q2
+      dailyRow('2026-09-30T00:00:00Z', 8), // Q3
+      dailyRow('2026-10-01T00:00:00Z', 4), // Q4
     ];
     const result = rebucket(rows, { ...baseConfig, viewFrequency: 'quarterly' });
     expect(result.chartData.length).toBe(4);
@@ -276,7 +272,11 @@ describe('rebucket — numeric coarsening', () => {
   /**
    * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
    */
-  function numericRow(value: number, count: number, groups: Record<string, string> = {}): CapturedRow {
+  function numericRow(
+    value: number,
+    count: number,
+    groups: Record<string, string> = {},
+  ): CapturedRow {
     return {
       time_period_formatted: String(value),
       time_period: value,
@@ -301,9 +301,11 @@ describe('rebucket — numeric coarsening', () => {
 
   it('coarsens by integer multiple — bin=2 from a bin=1 capture', () => {
     const rows = [
-      numericRow(0, 5), numericRow(1, 3), // bin 0..2 → 8
-      numericRow(2, 7), numericRow(3, 1), // bin 2..4 → 8
-      numericRow(4, 4),                    // bin 4..6 → 4
+      numericRow(0, 5),
+      numericRow(1, 3), // bin 0..2 → 8
+      numericRow(2, 7),
+      numericRow(3, 1), // bin 2..4 → 8
+      numericRow(4, 4), // bin 4..6 → 4
     ];
     const result = rebucket(rows, {
       ...baseConfig,
@@ -319,8 +321,11 @@ describe('rebucket — numeric coarsening', () => {
   it('honours capture origin when coarsening', () => {
     // Capture: origin=10, interval=1; view: interval=5 from origin 10.
     const rows = [
-      numericRow(10, 1), numericRow(11, 2), numericRow(12, 3), // bin 10..15 → 6
-      numericRow(15, 4), numericRow(19, 5),                     // bin 15..20 → 9
+      numericRow(10, 1),
+      numericRow(11, 2),
+      numericRow(12, 3), // bin 10..15 → 6
+      numericRow(15, 4),
+      numericRow(19, 5), // bin 15..20 → 9
     ];
     const result = rebucket(rows, {
       ...baseConfig,

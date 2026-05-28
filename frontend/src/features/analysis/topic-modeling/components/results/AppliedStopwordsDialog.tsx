@@ -56,9 +56,7 @@ export function AppliedStopwordsDialog({
 }: AppliedStopwordsDialogProps) {
   const nonEmptyGroups = byLanguage.filter((group) => group.words.length > 0);
   const isMultiLanguage = nonEmptyGroups.length > 1;
-  const languageSummary = nonEmptyGroups
-    .map((group) => languageLabel(group.language))
-    .join(' + ');
+  const languageSummary = nonEmptyGroups.map((group) => languageLabel(group.language)).join(' + ');
 
   return (
     <Dialog
@@ -72,9 +70,9 @@ export function AppliedStopwordsDialog({
           <DialogTitle>Stopwords being filtered</DialogTitle>
           <DialogDescription>
             {totalCount} {languageSummary || 'English'} stopword
-            {totalCount === 1 ? '' : 's'} {totalCount === 1 ? 'is' : 'are'}{' '}
-            hidden from each topic&apos;s representative words while the
-            filter is on. The source list comes from the backend bundle
+            {totalCount === 1 ? '' : 's'} {totalCount === 1 ? 'is' : 'are'} hidden from each
+            topic&apos;s representative words while the filter is on. The source list comes from the
+            backend bundle
             {isMultiLanguage ? ' (one per corpus language)' : ''}.
           </DialogDescription>
         </DialogHeader>

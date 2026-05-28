@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TokenFrequencySingleTokenSection } from '../TokenFrequencySingleTokenSection';
 import { TokenFrequencyUnifiedTokenSection } from '../TokenFrequencyUnifiedTokenSection';
-import type { NodeResultView, TokenFrequencyStatisticsEntry } from '@/features/analysis/token-frequency/tokenFrequencyAdapters';
+import type {
+  NodeResultView,
+  TokenFrequencyStatisticsEntry,
+} from '@/features/analysis/token-frequency/tokenFrequencyAdapters';
 
 vi.mock('@/components/help/HelpIcon', () => ({
   /** Used by: HelpIcon mock module factory so layout assertions can ignore tutorial wiring because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
@@ -17,7 +20,13 @@ vi.mock('@/components/help/InfoIcon', () => ({
 
 vi.mock('@visx/wordcloud', () => ({
   /** Used by: Wordcloud mock module factory to render deterministic cloud words without d3 layout because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
-  Wordcloud: ({ children, words }: { children: (cloudWords: Array<Record<string, unknown>>) => React.ReactNode; words: Array<Record<string, unknown>> }) => (
+  Wordcloud: ({
+    children,
+    words,
+  }: {
+    children: (cloudWords: Array<Record<string, unknown>>) => React.ReactNode;
+    words: Array<Record<string, unknown>>;
+  }) => (
     <g data-testid="mock-wordcloud">
       {children(
         words.map((word, index) => ({
@@ -27,7 +36,7 @@ vi.mock('@visx/wordcloud', () => ({
           rotate: 0,
           size: 18,
           font: 'sans-serif',
-        }))
+        })),
       )}
     </g>
   ),
@@ -35,7 +44,9 @@ vi.mock('@visx/wordcloud', () => ({
 
 vi.mock('@visx/text', () => ({
   /** Used by: Text mock module factory to replace VisX text with a plain SVG element because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
-  Text: ({ children, ...props }: React.SVGProps<SVGTextElement>) => <text {...props}>{children}</text>,
+  Text: ({ children, ...props }: React.SVGProps<SVGTextElement>) => (
+    <text {...props}>{children}</text>
+  ),
 }));
 
 /**
@@ -70,7 +81,9 @@ const baseSingleSectionProps = {
  * Used by: unified token-frequency layout tests to build comparative statistics fixtures because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
  * Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
  */
-const buildStatistic = (overrides: Partial<TokenFrequencyStatisticsEntry> = {}): TokenFrequencyStatisticsEntry => ({
+const buildStatistic = (
+  overrides: Partial<TokenFrequencyStatisticsEntry> = {},
+): TokenFrequencyStatisticsEntry => ({
   token: overrides.token ?? 'alpha',
   freq_reference: overrides.freq_reference ?? 18,
   percent_reference: overrides.percent_reference ?? 0.6,
@@ -131,7 +144,7 @@ describe('Token frequency result layouts', () => {
             rows: displayRows,
           }),
         ]}
-      />
+      />,
     );
 
     expect(screen.getAllByText('token-1').length).toBeGreaterThan(0);
@@ -154,7 +167,7 @@ describe('Token frequency result layouts', () => {
         nodeDisplayResults={[nodeA, nodeB]}
         lastCompareNodeIds={['node-a', 'node-b']}
         statistics={statistics}
-      />
+      />,
     );
 
     expect(screen.getByText('Juxtorpus')).toBeInTheDocument();

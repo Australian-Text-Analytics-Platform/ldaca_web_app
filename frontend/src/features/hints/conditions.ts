@@ -30,17 +30,14 @@ export function useHintConditions(): {
   );
 
   const noActiveWorkspace = !currentWorkspaceId;
-  const workspaceHasNoNodes =
-    !!currentWorkspaceId && (workspaceGraph?.nodes?.length ?? 0) === 0;
-  const workspaceHasNodes =
-    !!currentWorkspaceId && (workspaceGraph?.nodes?.length ?? 0) > 0;
+  const workspaceHasNoNodes = !!currentWorkspaceId && (workspaceGraph?.nodes?.length ?? 0) === 0;
+  const workspaceHasNodes = !!currentWorkspaceId && (workspaceGraph?.nodes?.length ?? 0) > 0;
 
   // "File uploaded without an active workspace": user uploaded something but
   // hasn't created/loaded a workspace yet. This is a separate hint id from
   // `no-active-workspace` so that previously dismissing the generic
   // workspace-card nudge doesn't suppress the upload follow-up.
-  const fileUploadedNoWorkspace =
-    !!lastUploadedFilePath && !currentWorkspaceId;
+  const fileUploadedNoWorkspace = !!lastUploadedFilePath && !currentWorkspaceId;
 
   // "File uploaded but not added": there is a remembered last-uploaded file
   // and that path/basename is not represented as a node id or name in the
@@ -68,10 +65,8 @@ export function useHintConditions(): {
   // Suppress all hints while a modal/dialog is open to avoid stacking UI.
   const enabled = !hasAnyModalOpen;
   const isFilterView = currentView === 'filter';
-  const filterNoNodeSelected =
-    isFilterView && workspaceHasNodes && !selectedNodeId;
-  const filterAwaitingColumnSelection =
-    isFilterView && !!selectedNodeId;
+  const filterNoNodeSelected = isFilterView && workspaceHasNodes && !selectedNodeId;
+  const filterAwaitingColumnSelection = isFilterView && !!selectedNodeId;
 
   return {
     conditions: {

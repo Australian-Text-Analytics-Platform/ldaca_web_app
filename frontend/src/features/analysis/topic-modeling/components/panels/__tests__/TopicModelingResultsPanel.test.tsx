@@ -102,10 +102,12 @@ describe('TopicModelingResultsPanel', () => {
     render(
       <TooltipProvider>
         <TopicModelingResultsPanel {...baseProps} />
-      </TooltipProvider>
+      </TooltipProvider>,
     );
 
-    expect(screen.getByRole('slider', { name: 'Exact Topic No. after modelling' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('slider', { name: 'Exact Topic No. after modelling' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.queryByText('Range 2-12 from the raw fit')).not.toBeInTheDocument();
@@ -115,7 +117,7 @@ describe('TopicModelingResultsPanel', () => {
     render(
       <TooltipProvider>
         <TopicModelingResultsPanel {...baseProps} />
-      </TooltipProvider>
+      </TooltipProvider>,
     );
 
     const input = screen.getByRole('slider', { name: 'Exact Topic No. after modelling' });
@@ -133,7 +135,7 @@ describe('TopicModelingResultsPanel', () => {
           {...baseProps}
           onUpdateExactTopicCount={onUpdateExactTopicCount}
         />
-      </TooltipProvider>
+      </TooltipProvider>,
     );
 
     const input = screen.getByRole('slider', { name: 'Exact Topic No. after modelling' });
@@ -154,7 +156,7 @@ describe('TopicModelingResultsPanel', () => {
           stopwordFilterSet={new Set(zhWords)}
           stopwordFilterByLanguage={[{ language: 'zh', words: zhWords }]}
         />
-      </TooltipProvider>
+      </TooltipProvider>,
     );
 
     const viewButton = screen.getByRole('button', {
@@ -184,12 +186,10 @@ describe('TopicModelingResultsPanel', () => {
             { language: 'zh', words: ['的', '了'] },
           ]}
         />
-      </TooltipProvider>
+      </TooltipProvider>,
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /view the 4 stopwords being filtered/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /view the 4 stopwords being filtered/i }));
 
     // Each group surfaces a heading with its label + count.
     expect(screen.getByText(/^English \(2\)$/)).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe('TopicModelingResultsPanel', () => {
           stopwordFilterSet={new Set()}
           stopwordFilterByLanguage={[]}
         />
-      </TooltipProvider>
+      </TooltipProvider>,
     );
 
     expect(

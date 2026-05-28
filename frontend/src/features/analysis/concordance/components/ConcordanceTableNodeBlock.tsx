@@ -1,4 +1,3 @@
-
 import {
   Table,
   TableBody,
@@ -99,7 +98,10 @@ export type ConcordanceTableNodeBlockProps = {
   nodeDetaching: Record<string, boolean>;
   nodeMaterializing: Record<string, boolean>;
   materializedPaths: Record<string, string>;
-  materializeSummaries: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }>;
+  materializeSummaries: Record<
+    string,
+    { recordCount: number; uniqueDocuments: number; totalDocuments: number }
+  >;
 
   // Handlers
   handleSort: (columnKey: string, paginationKey: string, requestNodeId: string) => void;
@@ -165,10 +167,14 @@ export function ConcordanceTableNodeBlock({
     const combinedHasPrev = Boolean(nodeData.pagination?.has_prev);
     const combinedHasNext = Boolean(nodeData.pagination?.has_next);
     const metaCols = nodeData.metadata.metadata_columns;
-    const concCols = (nodeData.metadata.concordance_columns?.length
-      ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
-      : CORE_COLS) as string[];
-    const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
+    const concCols = (
+      nodeData.metadata.concordance_columns?.length
+        ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
+        : CORE_COLS
+    ) as string[];
+    const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) =>
+      metaCols.includes(columnName),
+    );
     const rawDisplayColumns = showMetadata
       ? [...concCols.filter((c) => columns.includes(c)), ...visibleMetaCols]
       : concCols.filter((c) => columns.includes(c));
@@ -178,8 +184,8 @@ export function ConcordanceTableNodeBlock({
       .map((n) => n.id)
       .filter((id): id is string => Boolean(id));
     const isAnyCombinedMaterializing = combinedNodeIds.some((id) => Boolean(nodeMaterializing[id]));
-    const allCombinedMaterialized = combinedNodeIds.length > 0
-      && combinedNodeIds.every((id) => Boolean(materializedPaths[id]));
+    const allCombinedMaterialized =
+      combinedNodeIds.length > 0 && combinedNodeIds.every((id) => Boolean(materializedPaths[id]));
 
     return (
       <div key="__COMBINED__" className="mb-6">
@@ -193,25 +199,33 @@ export function ConcordanceTableNodeBlock({
                   if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
                   for (const nid of combinedNodeIds) {
                     if (materializedPaths[nid]) continue;
-                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                    const col =
+                      effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
                     if (!col) continue;
                     void handleMaterialize(nid, col);
                   }
                 }}
                 disabled={
-                  readOnly
-                  || isAnyCombinedMaterializing
-                  || allCombinedMaterialized
-                  || !searchWord.trim()
-                  || combinedNodeIds.length === 0
+                  readOnly ||
+                  isAnyCombinedMaterializing ||
+                  allCombinedMaterialized ||
+                  !searchWord.trim() ||
+                  combinedNodeIds.length === 0
                 }
                 size="sm"
                 variant="outline"
                 className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                title={readOnly ? undefined : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'}
+                title={
+                  readOnly
+                    ? undefined
+                    : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
+                }
               >
                 {isAnyCombinedMaterializing ? (
-                  <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    Processing...
+                  </>
                 ) : allCombinedMaterialized ? (
                   <>Processed</>
                 ) : (
@@ -223,18 +237,29 @@ export function ConcordanceTableNodeBlock({
               <Button
                 onClick={() => {
                   if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                  const nodes = combinedNodeIds.map((nid) => {
-                    const col = effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
-                    const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
-                    const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
-                    return { nodeId: nid, column: col, nodeLabel: sourceLabel };
-                  }).filter((n) => n.column);
+                  const nodes = combinedNodeIds
+                    .map((nid) => {
+                      const col =
+                        effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                      const sourceNode = panelSelectedNodes.find(
+                        (node, idx) => getNodeIdentifier(node, idx) === nid,
+                      );
+                      const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
+                      return { nodeId: nid, column: col, nodeLabel: sourceLabel };
+                    })
+                    .filter((n) => n.column);
                   openDetachDialog(nodes);
                 }}
-                disabled={readOnly || combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
+                disabled={
+                  readOnly || combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0
+                }
                 size="sm"
                 className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                title={readOnly ? undefined : 'Create new data blocks with concordance results for both sources joined to their original tables'}
+                title={
+                  readOnly
+                    ? undefined
+                    : 'Create new data blocks with concordance results for both sources joined to their original tables'
+                }
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Both to Workspace
@@ -260,8 +285,12 @@ export function ConcordanceTableNodeBlock({
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell className="h-24 text-center text-muted-foreground" colSpan={displayColumns.length || 1}>
-                      No matching rows on this page for &quot;{searchWord}&quot;. Source rows without matches are omitted.
+                    <TableCell
+                      className="h-24 text-center text-muted-foreground"
+                      colSpan={displayColumns.length || 1}
+                    >
+                      No matching rows on this page for &quot;{searchWord}&quot;. Source rows
+                      without matches are omitted.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -271,7 +300,9 @@ export function ConcordanceTableNodeBlock({
                     let color = normalized ? sourceColorMap[normalized] : undefined;
                     if (!color && rawSrc && normalized) {
                       // Fallback: loose match (substring) when exact lookup fails.
-                      const entry = Object.entries(sourceColorMap).find(([k]) => k.includes(normalized));
+                      const entry = Object.entries(sourceColorMap).find(([k]) =>
+                        k.includes(normalized),
+                      );
                       color = entry ? entry[1] : undefined;
                     }
                     if (!color) {
@@ -296,19 +327,25 @@ export function ConcordanceTableNodeBlock({
                               const candidates = [
                                 n.id,
                                 n.name,
-                                (n as Record<string, unknown>).data
-                                  && typeof (n as Record<string, unknown>).data === 'object'
-                                  ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.name
+                                (n as Record<string, unknown>).data &&
+                                typeof (n as Record<string, unknown>).data === 'object'
+                                  ? ((n as Record<string, unknown>).data as Record<string, unknown>)
+                                      ?.name
                                   : undefined,
                                 n.label,
-                                (n as Record<string, unknown>).data
-                                  && typeof (n as Record<string, unknown>).data === 'object'
-                                  ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.label
+                                (n as Record<string, unknown>).data &&
+                                typeof (n as Record<string, unknown>).data === 'object'
+                                  ? ((n as Record<string, unknown>).data as Record<string, unknown>)
+                                      ?.label
                                   : undefined,
-                              ].filter(Boolean).map((v) => String(v).toLowerCase());
+                              ]
+                                .filter(Boolean)
+                                .map((v) => String(v).toLowerCase());
                               return candidates.includes(rawSrc.toString().toLowerCase());
                             });
-                            const sel = nodeObj && effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
+                            const sel =
+                              nodeObj &&
+                              effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
                             if (nodeObj && sel?.column) {
                               handleRowClick(row, String(nodeObj.id ?? ''), sel.column);
                             }
@@ -328,16 +365,30 @@ export function ConcordanceTableNodeBlock({
             </Table>
           </AnalysisTableScrollArea>
           {(() => {
-            const summary = nodeData.materialized
-              ? (Object.keys(materializeSummaries).length > 0
-                ? <GroupedResultsPageSizeSummary
-                    groups={[]}
-                    totalInstances={Object.values(materializeSummaries).reduce((sum, s) => sum + s.recordCount, 0)}
-                    totalDocuments={Object.values(materializeSummaries).reduce((sum, s) => sum + s.uniqueDocuments, 0)}
-                    totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
-                  />
-                : null)
-              : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={batchProcessedCount(nodeData.pagination)} />;
+            const summary = nodeData.materialized ? (
+              Object.keys(materializeSummaries).length > 0 ? (
+                <GroupedResultsPageSizeSummary
+                  groups={[]}
+                  totalInstances={Object.values(materializeSummaries).reduce(
+                    (sum, s) => sum + s.recordCount,
+                    0,
+                  )}
+                  totalDocuments={Object.values(materializeSummaries).reduce(
+                    (sum, s) => sum + s.uniqueDocuments,
+                    0,
+                  )}
+                  totalProcessed={Object.values(materializeSummaries).reduce(
+                    (sum, s) => sum + s.totalDocuments,
+                    0,
+                  )}
+                />
+              ) : null
+            ) : (
+              <GroupedResultsPageSizeSummary
+                groups={nodeData.data}
+                totalProcessed={batchProcessedCount(nodeData.pagination)}
+              />
+            );
             return summary ? (
               <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
                 {summary}
@@ -363,12 +414,19 @@ export function ConcordanceTableNodeBlock({
   const rows = flattenConcordanceGroups(groupedRows);
   const allCols = nodeData.columns;
   const metaCols = nodeData.metadata.metadata_columns;
-  const concCols = (nodeData.metadata.concordance_columns?.length
-    ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
-    : CORE_COLS) as string[];
-  const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
+  const concCols = (
+    nodeData.metadata.concordance_columns?.length
+      ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
+      : CORE_COLS
+  ) as string[];
+  const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) =>
+    metaCols.includes(columnName),
+  );
   const rawDisplayColumns = showMetadata
-    ? [...concCols.filter((c) => allCols.includes(c)), ...visibleMetaCols.filter((c) => allCols.includes(c))]
+    ? [
+        ...concCols.filter((c) => allCols.includes(c)),
+        ...visibleMetaCols.filter((c) => allCols.includes(c)),
+      ]
     : concCols.filter((c) => allCols.includes(c));
   const displayColumns = dedupeColumns(rawDisplayColumns);
   const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
@@ -394,14 +452,16 @@ export function ConcordanceTableNodeBlock({
             className="inline-block h-3 w-3 shrink-0 rounded-full"
             style={{ backgroundColor: context.nodeColor }}
           />
-          <h3 className="text-sm font-medium text-foreground">
-            {context.displayName || nodeKey}
-          </h3>
+          <h3 className="text-sm font-medium text-foreground">{context.displayName || nodeKey}</h3>
         </div>
       )}
       <div
         className="rounded-lg border border-border bg-card"
-        style={showNodeIndicator ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor } : undefined}
+        style={
+          showNodeIndicator
+            ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor }
+            : undefined
+        }
       >
         <AnalysisTableScrollArea maxHeightClass="max-h-100">
           <Table className="min-w-180" disableContainer>
@@ -433,8 +493,12 @@ export function ConcordanceTableNodeBlock({
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell className="h-24 text-center text-muted-foreground" colSpan={tableColumns.length || 1}>
-                    No matching rows on this page for &quot;{searchWord}&quot;. Source rows without matches are omitted.
+                  <TableCell
+                    className="h-24 text-center text-muted-foreground"
+                    colSpan={tableColumns.length || 1}
+                  >
+                    No matching rows on this page for &quot;{searchWord}&quot;. Source rows without
+                    matches are omitted.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -448,7 +512,9 @@ export function ConcordanceTableNodeBlock({
                   >
                     {tableColumns.map((colKey: string, cellIndex) => (
                       <TableCell key={cellIndex} className={alignmentClassForColumn(colKey)}>
-                        {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
+                        {row[colKey] !== null && row[colKey] !== undefined
+                          ? String(row[colKey])
+                          : ''}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -468,14 +534,20 @@ export function ConcordanceTableNodeBlock({
         // pagination, matching the combined branch's fallback. Snapshot
         // captures use page_size: 'all' so the per-page count is the
         // total, making the fallback exact rather than approximate.
-        const summary = nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
-          ? <GroupedResultsPageSizeSummary
+        const summary =
+          nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId] ? (
+            <GroupedResultsPageSizeSummary
               groups={[]}
               totalInstances={materializeSummaries[detachNodeId].recordCount}
               totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
               totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
             />
-          : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={batchProcessedCount(nodeData.pagination)} />;
+          ) : (
+            <GroupedResultsPageSizeSummary
+              groups={nodeData.data}
+              totalProcessed={batchProcessedCount(nodeData.pagination)}
+            />
+          );
         return summary ? (
           <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
             {summary}
@@ -499,21 +571,28 @@ export function ConcordanceTableNodeBlock({
               }
             }}
             disabled={
-              readOnly
-              || nodeIsLoading
-              || isMaterializing
-              || hasMaterializedPath
-              || !searchWord.trim()
-              || !canDetach
-              || !detachNodeId
+              readOnly ||
+              nodeIsLoading ||
+              isMaterializing ||
+              hasMaterializedPath ||
+              !searchWord.trim() ||
+              !canDetach ||
+              !detachNodeId
             }
             size="sm"
             variant="outline"
             className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title={readOnly ? undefined : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'}
+            title={
+              readOnly
+                ? undefined
+                : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
+            }
           >
             {isMaterializing ? (
-              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
+              <>
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                Processing...
+              </>
             ) : hasMaterializedPath ? (
               <>Processed</>
             ) : (
@@ -530,15 +609,32 @@ export function ConcordanceTableNodeBlock({
                 openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
               }
             }}
-            disabled={readOnly || nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
+            disabled={
+              readOnly ||
+              nodeIsLoading ||
+              isDetaching ||
+              !searchWord.trim() ||
+              !canDetach ||
+              !detachNodeId
+            }
             size="sm"
             className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title={readOnly ? undefined : 'Create a new data block with concordance results joined to the original table'}
+            title={
+              readOnly
+                ? undefined
+                : 'Create a new data block with concordance results joined to the original table'
+            }
           >
             {isDetaching ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding to Workspace...</>
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding to Workspace...
+              </>
             ) : (
-              <><Plus className="mr-2 h-4 w-4" />Add to Workspace</>
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Workspace
+              </>
             )}
           </Button>
         </DisabledReasonTooltip>

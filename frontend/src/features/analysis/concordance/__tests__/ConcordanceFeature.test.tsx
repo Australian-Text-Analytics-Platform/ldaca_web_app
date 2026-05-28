@@ -21,7 +21,8 @@ let latestTaskFlowParams: { state?: Record<string, unknown> } | null = null;
 let mockPendingConcordance: Record<string, unknown> | null = null;
 let mockHydrationState = { status: 'idle' as const, lastHydratedAt: 1 };
 let mockInitialResult: Record<string, unknown> | null = null;
-let mockSetSafeResult: React.Dispatch<React.SetStateAction<Record<string, unknown> | null>> | null = null;
+let mockSetSafeResult: React.Dispatch<React.SetStateAction<Record<string, unknown> | null>> | null =
+  null;
 
 vi.mock('sonner', () => ({
   toast: {
@@ -75,18 +76,8 @@ vi.mock('@/components/ui/tabs', () => {
     TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     /** Converts tab triggers into plain buttons that still fire value changes. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-    TabsTrigger: ({
-      children,
-      value,
-    }: {
-      children: React.ReactNode;
-      value: string;
-    }) => (
-      <button
-        type="button"
-        role="tab"
-        onClick={() => currentOnValueChange?.(value)}
-      >
+    TabsTrigger: ({ children, value }: { children: React.ReactNode; value: string }) => (
+      <button type="button" role="tab" onClick={() => currentOnValueChange?.(value)}>
         {children}
       </button>
     ),
@@ -133,7 +124,9 @@ vi.mock('@/components/ui/confirm-dialog', () => ({
       <div>
         <div>{title}</div>
         <div>{description}</div>
-        <button type="button" onClick={() => onOpenChange(false)}>{cancelText}</button>
+        <button type="button" onClick={() => onOpenChange(false)}>
+          {cancelText}
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -251,14 +244,14 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
   useConcordanceTaskFlow: (params: { state?: Record<string, unknown> }) => {
     latestTaskFlowParams = params;
     return {
-    handleSearch: handleSearchMock,
-    updateStoredResult: vi.fn(),
-    handleSort: vi.fn(),
-    handlePageChange: vi.fn(),
-    persistResultPreferences: vi.fn(),
-    handleDetach: vi.fn(),
-    handleMaterialize: vi.fn(),
-  };
+      handleSearch: handleSearchMock,
+      updateStoredResult: vi.fn(),
+      handleSort: vi.fn(),
+      handlePageChange: vi.fn(),
+      persistResultPreferences: vi.fn(),
+      handleDetach: vi.fn(),
+      handleMaterialize: vi.fn(),
+    };
   },
 }));
 
@@ -298,7 +291,7 @@ vi.mock('../../common', async () => {
     /** Supplies analysis lifecycle state and mockable clear behavior for feature tests. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     useAnalysisFeature: () => ({
-      resolveTaskId: vi.fn(async () => 'task-1'),
+      resolveTaskId: vi.fn(() => 'task-1'),
       setLocalTaskId: vi.fn(),
       isRunning: false,
       setIsRunning: vi.fn(),
@@ -319,7 +312,9 @@ vi.mock('../../common', async () => {
     /** Emulates the shared safe-result hook while exposing the setter to tests. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     useSafeResult: () => {
-      const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(mockInitialResult);
+      const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(
+        mockInitialResult,
+      );
       const ref = ReactModule.useRef<Record<string, unknown> | null>(result);
       ReactModule.useEffect(() => {
         ref.current = result;
@@ -328,20 +323,22 @@ vi.mock('../../common', async () => {
       return [result, ref, vi.fn(), setResult];
     },
     EXTENDED_PALETTE: ['#000000'],
-    executeAnalysisRunOrUpdate: vi.fn(async ({
-      hasLockedParameterChanges,
-      clearResults,
-      runFreshAnalysis,
-    }: {
-      hasLockedParameterChanges: boolean;
-      clearResults: () => Promise<void>;
-      runFreshAnalysis: () => Promise<void>;
-    }) => {
-      if (hasLockedParameterChanges) {
-        await clearResults();
-      }
-      await runFreshAnalysis();
-    }),
+    executeAnalysisRunOrUpdate: vi.fn(
+      async ({
+        hasLockedParameterChanges,
+        clearResults,
+        runFreshAnalysis,
+      }: {
+        hasLockedParameterChanges: boolean;
+        clearResults: () => Promise<void>;
+        runFreshAnalysis: () => Promise<void>;
+      }) => {
+        if (hasLockedParameterChanges) {
+          await clearResults();
+        }
+        await runFreshAnalysis();
+      },
+    ),
     getAnalysisActionState: vi.fn(({ allowRunWhenLocked }: { allowRunWhenLocked?: boolean }) => ({
       runDisabled: false,
       clearDisabled: false,
@@ -361,6 +358,7 @@ describe('ConcordanceFeature', () => {
     mockHydrationState = { status: 'idle', lastHydratedAt: 1 };
     mockInitialResult = null;
     mockSetSafeResult = null;
+    // eslint-disable-next-line @typescript-eslint/require-await -- mock must match async interface
     clearResultsMock.mockImplementation(async () => {
       mockSetSafeResult?.(null);
     });
@@ -391,7 +389,14 @@ describe('ConcordanceFeature', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]!);
 
     return waitFor(() => {
-      expect(handleSearchMock).toHaveBeenCalledWith(true, undefined, undefined, undefined, undefined, true);
+      expect(handleSearchMock).toHaveBeenCalledWith(
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
     }).finally(unmount);
   });
 
@@ -427,7 +432,9 @@ describe('ConcordanceFeature', () => {
     const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue('keyword');
+      expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue(
+        'keyword',
+      );
     });
 
     unmount();
@@ -479,7 +486,9 @@ describe('ConcordanceFeature', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue('replacement');
+      expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue(
+        'replacement',
+      );
     });
 
     unmount();
@@ -504,11 +513,23 @@ describe('ConcordanceFeature', () => {
               },
             ],
           ],
-          columns: ['text', 'speaker', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          columns: [
+            'text',
+            'speaker',
+            'CONC_LEFT_CONTEXT',
+            'CONC_MATCHED_TEXT',
+            'CONC_RIGHT_CONTEXT',
+          ],
           metadata: {
             metadata_columns: ['text', 'speaker'],
             concordance_columns: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
-            all_columns: ['text', 'speaker', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+            all_columns: [
+              'text',
+              'speaker',
+              'CONC_LEFT_CONTEXT',
+              'CONC_MATCHED_TEXT',
+              'CONC_RIGHT_CONTEXT',
+            ],
           },
           pagination: {
             page: 1,
@@ -532,7 +553,9 @@ describe('ConcordanceFeature', () => {
       expect(screen.getByText('CONC_dispersion')).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('checkbox', { name: /bar length proportional to text length/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: /bar length proportional to text length/i }),
+    ).toBeInTheDocument();
 
     expect(screen.queryByText('CONC_LEFT_CONTEXT')).not.toBeInTheDocument();
     expect(screen.queryByText('CONC_MATCHED_TEXT')).not.toBeInTheDocument();
@@ -542,7 +565,9 @@ describe('ConcordanceFeature', () => {
   });
 
   it('keeps the dispersion column at 85% of the table width when metadata is shown', async () => {
-    const clientWidthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockReturnValue(800);
     mockInitialResult = {
       state: 'successful',
       message: 'ok',
@@ -561,11 +586,23 @@ describe('ConcordanceFeature', () => {
               },
             ],
           ],
-          columns: ['document', 'speaker', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          columns: [
+            'document',
+            'speaker',
+            'CONC_LEFT_CONTEXT',
+            'CONC_MATCHED_TEXT',
+            'CONC_RIGHT_CONTEXT',
+          ],
           metadata: {
             metadata_columns: ['document', 'speaker'],
             concordance_columns: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
-            all_columns: ['document', 'speaker', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+            all_columns: [
+              'document',
+              'speaker',
+              'CONC_LEFT_CONTEXT',
+              'CONC_MATCHED_TEXT',
+              'CONC_RIGHT_CONTEXT',
+            ],
           },
           pagination: {
             page: 1,
@@ -606,8 +643,12 @@ describe('ConcordanceFeature', () => {
     // can extend beyond the viewport, exposing the ScrollArea's horizontal
     // scrollbar — the user keeps a long dispersion bar and still discovers
     // any metadata that wouldn't otherwise fit.
-    expect(screen.getByRole('columnheader', { name: 'CONC_dispersion' })).toHaveStyle({ width: '680px' });
-    expect(screen.getByRole('columnheader', { name: 'speaker' })).toHaveStyle({ minWidth: '200px' });
+    expect(screen.getByRole('columnheader', { name: 'CONC_dispersion' })).toHaveStyle({
+      width: '680px',
+    });
+    expect(screen.getByRole('columnheader', { name: 'speaker' })).toHaveStyle({
+      minWidth: '200px',
+    });
 
     unmount();
     clientWidthSpy.mockRestore();
@@ -632,11 +673,23 @@ describe('ConcordanceFeature', () => {
               },
             ],
           ],
-          columns: ['speaker', 'text', 'CONC_left_context', 'CONC_matched_text', 'CONC_right_context'],
+          columns: [
+            'speaker',
+            'text',
+            'CONC_left_context',
+            'CONC_matched_text',
+            'CONC_right_context',
+          ],
           metadata: {
             metadata_columns: ['speaker', 'text'],
             concordance_columns: ['CONC_left_context', 'CONC_matched_text', 'CONC_right_context'],
-            all_columns: ['speaker', 'text', 'CONC_left_context', 'CONC_matched_text', 'CONC_right_context'],
+            all_columns: [
+              'speaker',
+              'text',
+              'CONC_left_context',
+              'CONC_matched_text',
+              'CONC_right_context',
+            ],
           },
           pagination: {
             page: 1,
@@ -664,7 +717,7 @@ describe('ConcordanceFeature', () => {
     expect(screen.queryByRole('columnheader', { name: /^text$/i })).not.toBeInTheDocument();
   });
 
-  it('shows the current page concordance occurrence count in the pagination label', async () => {
+  it('shows the current page concordance occurrence count in the pagination label', () => {
     mockInitialResult = {
       state: 'successful',
       message: 'ok',
@@ -716,7 +769,9 @@ describe('ConcordanceFeature', () => {
     // total_source_rows from the mock pagination (1) is now preferred over
     // page_size (20) for the "processed N documents" label — page_size is
     // a configuration knob, not an actual processed count.
-    expect(screen.getByText('(Found 2 instances in 1 document after processing 1 document).')).toBeInTheDocument();
+    expect(
+      screen.getByText('(Found 2 instances in 1 document after processing 1 document).'),
+    ).toBeInTheDocument();
   });
 
   it('hides the proportional-width control until Dispersion View is enabled', () => {
@@ -748,7 +803,9 @@ describe('ConcordanceFeature', () => {
 
     const { unmount } = renderWithClient(<ConcordanceFeature />);
 
-    expect(screen.queryByRole('checkbox', { name: /bar length proportional to text length/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: /bar length proportional to text length/i }),
+    ).not.toBeInTheDocument();
 
     unmount();
   });

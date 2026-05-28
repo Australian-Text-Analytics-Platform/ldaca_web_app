@@ -60,8 +60,16 @@ export function isCoarserOrEqual(
 }
 
 const DEFAULT_PALETTE = [
-  '#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#14b8a6', '#f97316', '#ec4899', '#0ea5e9', '#22c55e',
+  '#2563eb',
+  '#16a34a',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#14b8a6',
+  '#f97316',
+  '#ec4899',
+  '#0ea5e9',
+  '#22c55e',
 ];
 
 // Provides deterministic series colours that match the live sequential chart palette style.
@@ -78,7 +86,7 @@ const paletteColor = (index: number) =>
  * unrecognisable inputs. */
 /**
  * Called by: sequentialRebucket analysis helper module as a local helper in this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
-   * Flow: accept Date instances, detect epoch microseconds versus milliseconds, parse nonempty strings, then return null for unrecognized values.
+ * Flow: accept Date instances, detect epoch microseconds versus milliseconds, parse nonempty strings, then return null for unrecognized values.
  */
 function parseCapturedTimestamp(value: unknown): Date | null {
   if (value == null) return null;
@@ -104,7 +112,7 @@ function parseCapturedTimestamp(value: unknown): Date | null {
 /** Round ``d`` down to the start of its bucket at ``freq``. Pure UTC. */
 /**
  * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
-   * Flow: extract UTC date parts, round to the requested second/minute/hour/day/week/month/quarter/year boundary, then return the bucket start.
+ * Flow: extract UTC date parts, round to the requested second/minute/hour/day/week/month/quarter/year boundary, then return the bucket start.
  */
 function bucketStart(d: Date, freq: SnapshotFinestFrequency): Date {
   const y = d.getUTCFullYear();
@@ -151,7 +159,7 @@ const pad2 = (n: number): string => (n < 10 ? `0${n}` : String(n));
  * week 00. Matches polars' ``%W`` behaviour. */
 /**
  * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
-   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+ * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
  */
 function isoWeekNumberMondayStart(d: Date): number {
   const y = d.getUTCFullYear();
@@ -173,7 +181,7 @@ function isoWeekNumberMondayStart(d: Date): number {
  * labels stay consistent across modes. */
 /**
  * Used by: sequentialRebucket.test.ts because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
-   * Flow: read UTC bucket parts, format each supported frequency with backend-compatible labels, then return the period string.
+ * Flow: read UTC bucket parts, format each supported frequency with backend-compatible labels, then return the period string.
  */
 export function formatBucket(d: Date, freq: SnapshotFinestFrequency): string {
   const y = d.getUTCFullYear();
@@ -195,7 +203,7 @@ export function formatBucket(d: Date, freq: SnapshotFinestFrequency): string {
     case 'monthly':
       return `${y}-${pad2(m)}`;
     case 'quarterly': {
-      const q = Math.floor((d.getUTCMonth()) / 3) + 1;
+      const q = Math.floor(d.getUTCMonth() / 3) + 1;
       return `${y}-Q${q}`;
     }
     case 'yearly':
@@ -286,7 +294,7 @@ interface BucketAccumulator {
  * numeric: floor(time_period / interval) * interval. */
 /**
  * Called by: sequentialRebucket analysis helper module during this analysis workflow because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
-   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+ * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
  */
 function viewBucket(
   row: CapturedRow,
@@ -326,10 +334,7 @@ function viewBucket(
  * Used by: sequentialRebucket.test.ts, SequentialAnalysisFeature.tsx because snapshot Trends needs client-side re-aggregation that preserves backend bucket semantics without rerunning the analysis.
  * Flow: parse captured buckets, regroup rows under the requested view, aggregate series counts, then return chart-ready data and config.
  */
-export function rebucket(
-  capturedRows: CapturedRow[],
-  config: RebucketViewConfig,
-): RebucketResult {
+export function rebucket(capturedRows: CapturedRow[], config: RebucketViewConfig): RebucketResult {
   const buckets = new Map<string, BucketAccumulator>();
   const seriesKeys = new Set<string>();
 
@@ -337,9 +342,7 @@ export function rebucket(
     const bucket = viewBucket(row, config);
     if (!bucket) continue;
     const rawCount = row.sequential_count;
-    const count = typeof rawCount === 'number'
-      ? rawCount
-      : Number(rawCount ?? 0);
+    const count = typeof rawCount === 'number' ? rawCount : Number(rawCount ?? 0);
     if (!Number.isFinite(count)) continue;
 
     let acc = buckets.get(bucket.key);

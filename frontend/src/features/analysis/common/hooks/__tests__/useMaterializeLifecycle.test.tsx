@@ -19,8 +19,10 @@ import { useMaterializeLifecycle } from '../useMaterializeLifecycle';
 // parameter shape without `as any` casts.
 type MatBoolSpy = ReturnType<typeof vi.fn> & Dispatch<SetStateAction<Record<string, boolean>>>;
 type MatTaskIdsSpy = ReturnType<typeof vi.fn> & Dispatch<SetStateAction<Record<string, string>>>;
-type SuccessSpy = ReturnType<typeof vi.fn> & ((nodeId: string, taskId: string) => void | Promise<void>);
-type FailureSpy = ReturnType<typeof vi.fn> & ((nodeId: string, state: 'failed' | 'cancelled') => void);
+type SuccessSpy = ReturnType<typeof vi.fn> &
+  ((nodeId: string, taskId: string) => void | Promise<void>);
+type FailureSpy = ReturnType<typeof vi.fn> &
+  ((nodeId: string, state: 'failed' | 'cancelled') => void);
 /** Called by: materialize lifecycle tests when asserting node loading cleanup because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
 const mkMatBool = () => vi.fn() as unknown as MatBoolSpy;
 /** Called by: materialize lifecycle tests when asserting task-id cleanup because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */

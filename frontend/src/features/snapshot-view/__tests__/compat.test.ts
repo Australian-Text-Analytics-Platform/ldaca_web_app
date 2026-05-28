@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  TOOL_COMPATIBILITY,
-  isCompatibleSnapshot,
-  parseMajorMinor,
-} from '../compat';
+import { TOOL_COMPATIBILITY, isCompatibleSnapshot, parseMajorMinor } from '../compat';
 import type { SnapshotToolKey } from '../types';
 
 describe('parseMajorMinor', () => {

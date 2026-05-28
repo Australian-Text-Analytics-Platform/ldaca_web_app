@@ -11,10 +11,10 @@ interface PlaceholderTabFillArgs {
  * Used by: local callers in preprocessing/placeholderTabFill module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
 const scheduleCaretRestore = (input: HTMLInputElement, value: string) => {
-    /**
-     * Repositions the caret only if focus remains in the accepted input.
-     * Called by: scheduleCaretRestore internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
+  /**
+   * Repositions the caret only if focus remains in the accepted input.
+   * Called by: scheduleCaretRestore internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
   const restore = () => {
     if (document.activeElement !== input) {
       return;

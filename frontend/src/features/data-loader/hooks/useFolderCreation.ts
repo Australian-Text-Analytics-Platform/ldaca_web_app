@@ -18,11 +18,7 @@ interface UseFolderCreationParams {
  * Flow: tracks the selected parent, resets stale draft/error state when opened,
  * then submits the trimmed folder name and refreshes the browser on success.
  */
-export function useFolderCreation({
-  authHeaders,
-  refetchFiles,
-  notify,
-}: UseFolderCreationParams) {
+export function useFolderCreation({ authHeaders, refetchFiles, notify }: UseFolderCreationParams) {
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [createFolderParentPath, setCreateFolderParentPath] = useState('');
   const [createFolderParentLabel, setCreateFolderParentLabel] = useState('root');

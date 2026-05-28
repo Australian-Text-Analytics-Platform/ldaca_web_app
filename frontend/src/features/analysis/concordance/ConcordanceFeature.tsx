@@ -37,9 +37,7 @@ import {
   executeAnalysisRunOrUpdate,
 } from '../common';
 import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
-import {
-  pruneTasksById,
-} from '@/hooks/analysisTaskUtils';
+import { pruneTasksById } from '@/hooks/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
 import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -83,13 +81,10 @@ import {
   CONCORDANCE_FREQ_COLUMNS,
 } from '../generatedColumns';
 
-
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];
 const ALL_CONC_COLS_SET = new Set<string>([...CORE_COLS, ...FREQ_COLS]);
 type ConcordanceGroupedRow = Record<string, unknown>[];
-
-
 
 /** Orchestrates the full concordance analysis UI, task lifecycle, snapshots, and detach flows. */
 /**
@@ -102,12 +97,8 @@ function ConcordanceFeature() {
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
-  const {
-    detachConcordance,
-    detachConcordanceDispersion,
-    materializeConcordance,
-    selectNodes,
-  } = useWorkspaceActions();
+  const { detachConcordance, detachConcordanceDispersion, materializeConcordance, selectNodes } =
+    useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'concordance';
   const { getColumnInfos } = useNodeColumnInfos({
@@ -176,32 +167,26 @@ function ConcordanceFeature() {
   const [hiddenMatchedTexts, setHiddenMatchedTexts] = useState<Set<string>>(new Set());
   const [binCount, setBinCount] = useState<DispersionDisplayBinCount>(DISPERSION_DEFAULT_BIN_COUNT);
   const [combinedSourceMode, setCombinedSourceMode] = useState<'aggregate' | 'split'>('aggregate');
-  const [dispersionChartType, setDispersionChartType] =
-    useState<MultiSeriesChartType>('line');
-  const [selectedBinIndices, setSelectedBinIndices] = useState<
-    Record<string, Set<number>>
-  >({});
+  const [dispersionChartType, setDispersionChartType] = useState<MultiSeriesChartType>('line');
+  const [selectedBinIndices, setSelectedBinIndices] = useState<Record<string, Set<number>>>({});
   const lastSelectedBinRef = useRef<Record<string, number | null>>({});
-  const handleBinSelect = useCallback(
-    (blockKey: string, index: number, shiftHeld: boolean) => {
-      setSelectedBinIndices((prev) => {
-        const prevSet = prev[blockKey] ?? new Set<number>();
-        const next = new Set(prevSet);
-        const lastIdx = lastSelectedBinRef.current[blockKey];
-        if (shiftHeld && typeof lastIdx === 'number') {
-          const [from, to] = lastIdx < index ? [lastIdx, index] : [index, lastIdx];
-          for (let i = from; i <= to; i++) next.add(i);
-        } else if (next.has(index)) {
-          next.delete(index);
-        } else {
-          next.add(index);
-        }
-        return { ...prev, [blockKey]: next };
-      });
-      lastSelectedBinRef.current[blockKey] = index;
-    },
-    [],
-  );
+  const handleBinSelect = useCallback((blockKey: string, index: number, shiftHeld: boolean) => {
+    setSelectedBinIndices((prev) => {
+      const prevSet = prev[blockKey] ?? new Set<number>();
+      const next = new Set(prevSet);
+      const lastIdx = lastSelectedBinRef.current[blockKey];
+      if (shiftHeld && typeof lastIdx === 'number') {
+        const [from, to] = lastIdx < index ? [lastIdx, index] : [index, lastIdx];
+        for (let i = from; i <= to; i++) next.add(i);
+      } else if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return { ...prev, [blockKey]: next };
+    });
+    lastSelectedBinRef.current[blockKey] = index;
+  }, []);
   const handleClearBinSelection = useCallback((blockKey: string) => {
     setSelectedBinIndices((prev) => {
       if (!prev[blockKey]) return prev;
@@ -216,20 +201,20 @@ function ConcordanceFeature() {
   // Bin indices identify ranges (e.g. index 7 = 70–80 % in a 10-bin chart but
   // 7–8 % in a 100-bin chart). Selections are not portable across bin counts,
   // so clear every block's selection whenever the bin count changes.
-  const handleBinCountChange = useCallback(
-    (value: DispersionDisplayBinCount) => {
-      setBinCount(value);
-      setSelectedBinIndices((prev) => (Object.keys(prev).length === 0 ? prev : {}));
-      lastSelectedBinRef.current = {};
-    },
-    [],
-  );
-  const [liveMaterializedBins, setMaterializedBins] = useState<Record<string, ConcordanceDispersionBinRow[]>>({});
+  const handleBinCountChange = useCallback((value: DispersionDisplayBinCount) => {
+    setBinCount(value);
+    setSelectedBinIndices((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+    lastSelectedBinRef.current = {};
+  }, []);
+  const [liveMaterializedBins, setMaterializedBins] = useState<
+    Record<string, ConcordanceDispersionBinRow[]>
+  >({});
   // Declared early so the position-fetch effect / lookups can reference it.
   // The setter is also used further below by the materialise-task watcher.
   const [liveMaterializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
-  const [liveResults, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
+  const [liveResults, concordanceResultsRef, _setResultSafely, setResults] =
+    useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
 
   // Snapshot view mode for this tool. ``live`` in every code path
@@ -309,11 +294,15 @@ function ConcordanceFeature() {
   // graph + sidebar are showing. ``promoteTempColors`` is fired
   // below in ``handleRunOrUpdate`` to commit the pending temps to
   // assigned when the user actually runs the analysis.
-  const { nodeColors: liveNodeColors, handleColorChange, defaultPalette, promoteTempColors } =
-    useNodeColorManagement({
-      activeNodeIds,
-      tabKey: 'concordance',
-    });
+  const {
+    nodeColors: liveNodeColors,
+    handleColorChange,
+    defaultPalette,
+    promoteTempColors,
+  } = useNodeColorManagement({
+    activeNodeIds,
+    tabKey: 'concordance',
+  });
   // In snapshot mode the live colour store has no entries for the
   // captured node IDs. Shadow with the frozen ``manifest.node_colors``
   // so swatches, legends, and chart series read the captured colour.
@@ -332,18 +321,21 @@ function ConcordanceFeature() {
     if (concordanceTaskId) concordanceTaskIdFallbackRef.current = concordanceTaskId;
   }, [concordanceTaskId]);
 
-  const resolveNodeIdForKey = useCallback((nodeKey: string): string | null => {
-    if (nodeKey === '__COMBINED__') return null;
-    const direct = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
-      const d = n.data as Record<string, unknown> | undefined;
-      const dataName = d && typeof d === 'object' ? (d.name as string | undefined) : undefined;
-      return n.id === nodeKey || n.name === nodeKey || dataName === nodeKey;
-    });
-    if (direct?.id) return direct.id;
-    const mapped = labelToNodeId?.[nodeKey];
-    if (mapped) return mapped;
-    return null;
-  }, [panelSelectedNodes, labelToNodeId]);
+  const resolveNodeIdForKey = useCallback(
+    (nodeKey: string): string | null => {
+      if (nodeKey === '__COMBINED__') return null;
+      const direct = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
+        const d = n.data as Record<string, unknown> | undefined;
+        const dataName = d && typeof d === 'object' ? (d.name as string | undefined) : undefined;
+        return n.id === nodeKey || n.name === nodeKey || dataName === nodeKey;
+      });
+      if (direct?.id) return direct.id;
+      const mapped = labelToNodeId?.[nodeKey];
+      if (mapped) return mapped;
+      return null;
+    },
+    [panelSelectedNodes, labelToNodeId],
+  );
 
   /** Resolves a displayed result block key to the source node ids needed for materialized bins. */
   /**
@@ -407,7 +399,13 @@ function ConcordanceFeature() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showDispersion, proportionalDispersionBars, concordanceTaskId, materializedPaths, panelSelectedNodes]);
+  }, [
+    showDispersion,
+    proportionalDispersionBars,
+    concordanceTaskId,
+    materializedPaths,
+    panelSelectedNodes,
+  ]);
 
   /** Reports whether every source node behind a result block has a cached materialized path. */
   /**
@@ -421,11 +419,9 @@ function ConcordanceFeature() {
   /** Combines per-node server bins into the tagged row shape expected by dispersion charts. */
   /**
    * Called by: ConcordanceFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     * Flow: resolve source node ids for the display key, require all materialized paths and bins, tag each bin with its node label, then return chart-ready rows.
+   * Flow: resolve source node ids for the display key, require all materialized paths and bins, tag each bin with its node label, then return chart-ready rows.
    */
-  const getMaterializedBinsForKey = (
-    nodeKey: string,
-  ): TaggedBinRow[] | undefined => {
+  const getMaterializedBinsForKey = (nodeKey: string): TaggedBinRow[] | undefined => {
     const ids = relevantNodeIdsForKey(nodeKey);
     if (ids.length === 0) return undefined;
     if (!ids.every((id) => id in materializedPaths)) return undefined;
@@ -462,21 +458,30 @@ function ConcordanceFeature() {
     }
     return [...seen].sort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showDispersion, colourMatches, lowercaseMatches, results?.data, materializedBins, materializedPaths, panelSelectedNodes]);
+  }, [
+    showDispersion,
+    colourMatches,
+    lowercaseMatches,
+    results?.data,
+    materializedBins,
+    materializedPaths,
+    panelSelectedNodes,
+  ]);
 
   const matchedTextColorMap = useMemo(
     (): Record<string, string> =>
-      Object.fromEntries(allMatchedTexts.map((t, i) => [t, EXTENDED_PALETTE[i % EXTENDED_PALETTE.length]!])),
+      Object.fromEntries(
+        allMatchedTexts.map((t, i) => [t, EXTENDED_PALETTE[i % EXTENDED_PALETTE.length]!]),
+      ),
     [allMatchedTexts],
   );
 
-  const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
+  const [viewMode, setViewMode] = useState<'separated' | 'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
   // Separate snapshot-mode viewMode so toggling Separated/Combined
   // while viewing a snapshot doesn't pollute live state on Exit.
   // Initialised below from the captured ``settings.combined`` flag.
-  const [snapshotViewMode, setSnapshotViewMode] =
-    useState<'separated'|'combined'>('separated');
+  const [snapshotViewMode, setSnapshotViewMode] = useState<'separated' | 'combined'>('separated');
 
   useEffect(() => {
     const element = resultsViewportRef.current;
@@ -538,20 +543,13 @@ function ConcordanceFeature() {
   const sourceColorMap = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     panelSelectedNodes.forEach((node, idx) => {
-      const candidateIds = [
-        node.id,
-        node.node_id,
-      ].map((val) => (typeof val === 'string' ? val : null)).filter(Boolean) as string[];
+      const candidateIds = [node.id, node.node_id]
+        .map((val) => (typeof val === 'string' ? val : null))
+        .filter(Boolean) as string[];
       const primaryId = candidateIds[0] ?? `node-${idx}`;
       const assigned = (nodeColors[primaryId] || defaultPalette[idx % defaultPalette.length])!;
       const variants = new Set<string>();
-      [
-        primaryId,
-        node.name,
-        node.name,
-        node.label,
-        node.label,
-      ].forEach((value) => {
+      [primaryId, node.name, node.name, node.label, node.label].forEach((value) => {
         if (typeof value === 'string' && value.trim()) {
           variants.add(value);
         }
@@ -597,7 +595,7 @@ function ConcordanceFeature() {
   // leaving it sticky lets stale 'tokens' survive onto an ineligible
   // block, where Run then errors at the backend.
   useEffect(() => {
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       if (!tokensModeAvailable) {
         setSearchMode('regex');
         setSearchModeUserSet(false);
@@ -614,21 +612,25 @@ function ConcordanceFeature() {
 
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<PaginationState>({});
-  
+
   // Individual node loading states for pagination/sorting (separate from main search)
   const [nodeLoading, setNodeLoading] = useState<Record<string, boolean>>({});
-  
+
   // Individual node detaching states
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
 
   // Individual node materializing states and tracked task ids
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
-  const [materializeSummaries, setMaterializeSummaries] = useState<Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }>>({});
-  
+  const [materializeSummaries, setMaterializeSummaries] = useState<
+    Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }>
+  >({});
+
   // Detach dialog state
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
-  const [pendingDetachNodes, setPendingDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
+  const [pendingDetachNodes, setPendingDetachNodes] = useState<
+    { nodeId: string; column: string; nodeLabel: string }[]
+  >([]);
   const [detachNodeOptions, setDetachDialogNodeOptions] = useState<DetachDialogNodeOption[]>([]);
   const {
     selectedDetachColumns,
@@ -643,12 +645,21 @@ function ConcordanceFeature() {
   // (default checked) and CONC_* columns are hidden (always computed by
   // the worker, not user-selectable).
   const [dispersionDetachDialogOpen, setDispersionDetachDialogOpen] = useState(false);
-  const [pendingDispersionDetachNodes, setPendingDispersionDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
-  const [dispersionDetachOptions, setDispersionDetachOptions] = useState<DetachDialogNodeOption[]>([]);
-  const [pendingDispersionBinSelection, setPendingDispersionBinSelection] = useState<number[] | null>(null);
+  const [pendingDispersionDetachNodes, setPendingDispersionDetachNodes] = useState<
+    { nodeId: string; column: string; nodeLabel: string }[]
+  >([]);
+  const [dispersionDetachOptions, setDispersionDetachOptions] = useState<DetachDialogNodeOption[]>(
+    [],
+  );
+  const [pendingDispersionBinSelection, setPendingDispersionBinSelection] = useState<
+    number[] | null
+  >(null);
   const [pendingDispersionBinCount, setPendingDispersionBinCount] = useState<number>(0);
-  const [pendingDispersionMatchedTexts, setPendingDispersionMatchedTexts] = useState<string[] | null>(null);
-  const [pendingDispersionCaseInsensitive, setPendingDispersionCaseInsensitive] = useState<boolean>(false);
+  const [pendingDispersionMatchedTexts, setPendingDispersionMatchedTexts] = useState<
+    string[] | null
+  >(null);
+  const [pendingDispersionCaseInsensitive, setPendingDispersionCaseInsensitive] =
+    useState<boolean>(false);
   const {
     selectedDetachColumns: selectedDispersionColumns,
     setSelectedDetachColumns: setSelectedDispersionColumns,
@@ -656,17 +667,22 @@ function ConcordanceFeature() {
     selectAllDetachColumns: selectAllDispersionColumns,
     deselectAllDetachColumns: deselectAllDispersionColumns,
   } = useDetachColumnsState(dispersionDetachOptions);
-  
+
   // Global page size setting
   const [globalPageSize, setGlobalPageSize] = useState(20);
-  
+
   // Detail view state
-  const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
+  const {
+    detailPayload,
+    detailOpen,
+    setDetailOpen,
+    openDetail: openRowDetail,
+  } = useRowDetailDialog();
   const [concordanceDetailExtra, setConcordanceDetailExtra] = useState<{
     concordanceHits: Array<Record<string, unknown>>;
     caseSensitive: boolean;
   } | null>(null);
-  
+
   const {
     resolveTaskId,
     setLocalTaskId: setLocalConcordanceTaskId,
@@ -728,7 +744,8 @@ function ConcordanceFeature() {
       if (!req || typeof req !== 'object') return;
       const reqObj = req as Record<string, unknown>;
       const nodeIds: string[] = Array.isArray(reqObj.node_ids) ? reqObj.node_ids.slice(0, 2) : [];
-      const node_columns: Record<string, string> = (reqObj.node_columns as Record<string, string>) || {};
+      const node_columns: Record<string, string> =
+        (reqObj.node_columns as Record<string, string>) || {};
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
       setSearchWord(String(reqObj.search_word || ''));
@@ -736,9 +753,12 @@ function ConcordanceFeature() {
       setNumRightTokens(Number(reqObj.num_right_tokens ?? 10));
       const hydratedRegex = !!reqObj.regex;
       setRegex(hydratedRegex);
-      setWholeWord(hydratedRegex ? false : typeof reqObj.whole_word === 'boolean' ? reqObj.whole_word : true);
+      setWholeWord(
+        hydratedRegex ? false : typeof reqObj.whole_word === 'boolean' ? reqObj.whole_word : true,
+      );
       setCaseSensitive(!!reqObj.case_sensitive);
-      const hydratedMode: 'separated' | 'combined' = reqObj.combined && reqObj.combinable !== false ? 'combined' : 'separated';
+      const hydratedMode: 'separated' | 'combined' =
+        reqObj.combined && reqObj.combinable !== false ? 'combined' : 'separated';
       setViewMode(hydratedMode);
       // Replace (not merge) on hydration so the saved task's materialised
       // state is the source of truth. Otherwise stale entries from a
@@ -749,12 +769,17 @@ function ConcordanceFeature() {
       // the consumer + bin-fetch effects re-populate cleanly for whatever
       // the hydrated task contains.
       const paths = reqObj.materialized_paths as Record<string, string> | undefined;
-      const nextPaths = (paths && typeof paths === 'object') ? { ...paths } : {};
+      const nextPaths = paths && typeof paths === 'object' ? { ...paths } : {};
       setMaterializedPaths(nextPaths);
       setMaterializedBins({});
       resetProcessedEvents();
-      const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
-      const nextSummaries: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
+      const summaries = reqObj.materialize_summaries as
+        | Record<string, Record<string, unknown>>
+        | undefined;
+      const nextSummaries: Record<
+        string,
+        { recordCount: number; uniqueDocuments: number; totalDocuments: number }
+      > = {};
       if (summaries && typeof summaries === 'object') {
         for (const [nid, s] of Object.entries(summaries)) {
           nextSummaries[nid] = {
@@ -774,7 +799,9 @@ function ConcordanceFeature() {
           queryClient,
           maxNodes: 2,
         });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     },
     /** Clears result-specific state while preserving local controls when requested by handoff flows. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -820,7 +847,7 @@ function ConcordanceFeature() {
   const [latestCaptureTaskId, setLatestCaptureTaskId] = useState('');
   useEffect(() => {
     if (!liveCaptureTaskId) return;
-    Promise.resolve().then(() => setLatestCaptureTaskId(liveCaptureTaskId));
+    void Promise.resolve().then(() => setLatestCaptureTaskId(liveCaptureTaskId));
   }, [liveCaptureTaskId]);
   const captureTaskId = liveCaptureTaskId || latestCaptureTaskId;
 
@@ -924,9 +951,7 @@ function ConcordanceFeature() {
     // the per-node ``materialized`` flags don't exist there at all,
     // which would incorrectly disable Save even after Process Both
     // successfully materialised both nodes.
-    const unmaterialised = selectedIds.filter(
-      (id) => !materializedPaths[id],
-    );
+    const unmaterialised = selectedIds.filter((id) => !materializedPaths[id]);
     if (unmaterialised.length > 0) {
       return `Click Process All to materialise ${unmaterialised.length === 1 ? 'the result' : 'all selected data blocks'} before saving — keeps the snapshot compact and enables re-binning of the dispersion chart.`;
     }
@@ -941,7 +966,7 @@ function ConcordanceFeature() {
   // that are no longer in the available set (e.g. after a re-run that drops
   // a column from the source data).
   useEffect(() => {
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       setSelectedMetadataColumns((prev) => {
         const filtered = prev.filter((column) => availableMetadataColumns.includes(column));
         if (filtered.length === prev.length) return prev;
@@ -1074,21 +1099,30 @@ function ConcordanceFeature() {
     prefsSyncedRef.current = true;
 
     const analysisParams = results?.analysis_params ?? {};
-    const preferenceSource = results?.preferences ?? (analysisParams as Record<string, unknown>)?.preferences as Record<string, unknown> | undefined ?? {};
+    const preferenceSource =
+      results?.preferences ??
+      ((analysisParams as Record<string, unknown>)?.preferences as
+        | Record<string, unknown>
+        | undefined) ??
+      {};
 
     // Fall back to the first node's resolved pagination.page_size (which reflects
     // server-side estimation) when the analysis params don't carry it.
-    const firstNodeEntry = results?.data
-      ? Object.values(results.data)[0]
-      : undefined;
+    const firstNodeEntry = results?.data ? Object.values(results.data)[0] : undefined;
     const firstNodePageSize = firstNodeEntry?.pagination?.page_size;
 
-    const nextPageSize = preferenceSource?.page_size ?? analysisParams?.page_size ?? firstNodePageSize;
-    if (typeof nextPageSize === 'number' && Number.isFinite(nextPageSize) && nextPageSize > 0 && nextPageSize !== globalPageSize) {
+    const nextPageSize =
+      preferenceSource?.page_size ?? analysisParams?.page_size ?? firstNodePageSize;
+    if (
+      typeof nextPageSize === 'number' &&
+      Number.isFinite(nextPageSize) &&
+      nextPageSize > 0 &&
+      nextPageSize !== globalPageSize
+    ) {
       // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
       const id = requestAnimationFrame(() => {
         setGlobalPageSize(nextPageSize);
-        setNodePagination(prev => {
+        setNodePagination((prev) => {
           const updated = { ...prev };
           Object.keys(updated).forEach((nodeId) => {
             updated[nodeId] = {
@@ -1101,7 +1135,6 @@ function ConcordanceFeature() {
       });
       return () => cancelAnimationFrame(id);
     }
-
   }, [results, globalPageSize, setNodePagination, inSnapshotMode]);
 
   // Materialize lifecycle: terminal-state task watcher, task-id ref reset,
@@ -1175,11 +1208,7 @@ function ConcordanceFeature() {
     }
   }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns]);
 
-
   // Color assignment now handled by stack allocator - no auto-fill effect needed
-
-
-
 
   /**
    * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
@@ -1279,14 +1308,7 @@ function ConcordanceFeature() {
       /** Starts the feature-specific concordance search after shared update checks pass. */
       // Called by: handleRunOrUpdate through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
       runFreshAnalysis: () =>
-        handleSearch(
-          true,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          hasLockedParameterChanges,
-        ),
+        handleSearch(true, undefined, undefined, undefined, undefined, hasLockedParameterChanges),
     });
   };
 
@@ -1300,15 +1322,14 @@ function ConcordanceFeature() {
     resultsRef,
   });
 
-
   /** Opens row details with concordance-specific hit context and metadata filtering. */
   /**
    * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-     * Flow: verify workspace context, choose grouped hits or the clicked row, cache concordance detail metadata, then open row details without analysis-only columns.
+   * Flow: verify workspace context, choose grouped hits or the clicked row, cache concordance detail metadata, then open row details without analysis-only columns.
    */
   const handleRowClick = (
     row: Record<string, unknown>,
-    nodeId: string,
+    _nodeId: string,
     column: string,
     groupedHits?: ConcordanceGroupedRow,
   ) => {
@@ -1318,11 +1339,12 @@ function ConcordanceFeature() {
     const primaryRecord = concordanceHits[0] ?? row;
     const record = { ...primaryRecord };
     const rawFullText = record[column];
-    const fullText = rawFullText === null || rawFullText === undefined ? undefined : String(rawFullText);
+    const fullText =
+      rawFullText === null || rawFullText === undefined ? undefined : String(rawFullText);
 
     setConcordanceDetailExtra({
       concordanceHits,
-      caseSensitive: (typeof row.case_sensitive === 'boolean' ? row.case_sensitive : caseSensitive),
+      caseSensitive: typeof row.case_sensitive === 'boolean' ? row.case_sensitive : caseSensitive,
     });
 
     openRowDetail({
@@ -1356,18 +1378,26 @@ function ConcordanceFeature() {
           label: 'L1 Word',
           value: String(record[CONCORDANCE_COLUMN_KEYS.leftToken] ?? ''),
         },
-        ...(record[CONCORDANCE_COLUMN_KEYS.leftTokenFreq] != null ? [{
-          label: 'L1 Freq',
-          value: String(record[CONCORDANCE_COLUMN_KEYS.leftTokenFreq]),
-        }] : []),
+        ...(record[CONCORDANCE_COLUMN_KEYS.leftTokenFreq] != null
+          ? [
+              {
+                label: 'L1 Freq',
+                value: String(record[CONCORDANCE_COLUMN_KEYS.leftTokenFreq]),
+              },
+            ]
+          : []),
         {
           label: 'R1 Word',
           value: String(record[CONCORDANCE_COLUMN_KEYS.rightToken] ?? ''),
         },
-        ...(record[CONCORDANCE_COLUMN_KEYS.rightTokenFreq] != null ? [{
-          label: 'R1 Freq',
-          value: String(record[CONCORDANCE_COLUMN_KEYS.rightTokenFreq]),
-        }] : []),
+        ...(record[CONCORDANCE_COLUMN_KEYS.rightTokenFreq] != null
+          ? [
+              {
+                label: 'R1 Freq',
+                value: String(record[CONCORDANCE_COLUMN_KEYS.rightTokenFreq]),
+              },
+            ]
+          : []),
       ],
       /** Highlights every concordance hit in the source text shown by the row-detail panel. */
       // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -1378,7 +1408,7 @@ function ConcordanceFeature() {
             start: hit[CONCORDANCE_COLUMN_KEYS.startIdx],
             end: hit[CONCORDANCE_COLUMN_KEYS.endIdx],
           })),
-          (typeof matchedTextValue === 'string' && matchedTextValue.length > 0)
+          typeof matchedTextValue === 'string' && matchedTextValue.length > 0
             ? matchedTextValue
             : searchWord,
           detailCaseSensitive,
@@ -1389,19 +1419,23 @@ function ConcordanceFeature() {
   // --- Detach dialog helpers ---
   /**
    * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
-  const openDetachDialog = async (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => {
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
+  const openDetachDialog = async (
+    nodes: { nodeId: string; column: string; nodeLabel: string }[],
+  ) => {
     setPendingDetachNodes(nodes);
 
     try {
       const responses = await Promise.all(
-        nodes.map((node) => concordanceDetachOptions({
-          headers: getAuthHeaders(),
-          path: { node_id: node.nodeId },
-          query: { column: node.column },
-          throwOnError: true,
-        }).then(({ data }) => data))
+        nodes.map((node) =>
+          concordanceDetachOptions({
+            headers: getAuthHeaders(),
+            path: { node_id: node.nodeId },
+            query: { column: node.column },
+            throwOnError: true,
+          }).then(({ data }) => data),
+        ),
       );
       const options = responses.flatMap((response) => response.data?.nodes ?? []);
       const initial: Record<string, string[]> = {};
@@ -1413,7 +1447,9 @@ function ConcordanceFeature() {
       setDetachDialogOpen(true);
     } catch (error) {
       console.error('Failed to load concordance detach options:', error);
-      toast.error(`Failed to load concordance detach options: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(
+        `Failed to load concordance detach options: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       setPendingDetachNodes([]);
       setSelectedDetachColumns({});
     }
@@ -1426,7 +1462,13 @@ function ConcordanceFeature() {
   const handleDetachConfirm = async () => {
     for (const n of pendingDetachNodes) {
       const cols = selectedDetachColumns[n.nodeId] || [];
-      await handleDetach(n.nodeId, n.column, n.nodeLabel, cols, materializedPaths[n.nodeId] ?? null);
+      await handleDetach(
+        n.nodeId,
+        n.column,
+        n.nodeLabel,
+        cols,
+        materializedPaths[n.nodeId] ?? null,
+      );
     }
     setDetachDialogOpen(false);
     setPendingDetachNodes([]);
@@ -1437,8 +1479,8 @@ function ConcordanceFeature() {
   // --- Dispersion detach dialog helpers ---
   /**
    * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
+   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   */
   const openDispersionDetachDialog = async (
     nodes: { nodeId: string; column: string; nodeLabel: string }[],
     selectedBins: ReadonlySet<number> | null,
@@ -1476,19 +1518,19 @@ function ConcordanceFeature() {
       // as the per-document joined string, so it would be misleading to
       // present it as an opt-in pick (and the dispersion endpoint can't
       // source-select a generated column).
-      const dispersionHiddenColumns = new Set<string>([
-        CONCORDANCE_COLUMN_KEYS.extraction,
-      ]);
-      const options = responses.flatMap((response) => response.data?.nodes ?? []).map((node) => {
-        const disabled = new Set(node.disabled_columns || []);
-        return {
-          ...node,
-          available_columns: node.available_columns.filter(
-            (c) => !disabled.has(c) && !dispersionHiddenColumns.has(c),
-          ),
-          disabled_columns: [],
-        };
-      });
+      const dispersionHiddenColumns = new Set<string>([CONCORDANCE_COLUMN_KEYS.extraction]);
+      const options = responses
+        .flatMap((response) => response.data?.nodes ?? [])
+        .map((node) => {
+          const disabled = new Set(node.disabled_columns || []);
+          return {
+            ...node,
+            available_columns: node.available_columns.filter(
+              (c) => !disabled.has(c) && !dispersionHiddenColumns.has(c),
+            ),
+            disabled_columns: [],
+          };
+        });
       const initial: Record<string, string[]> = {};
       options.forEach((node) => {
         initial[node.node_id] = [];
@@ -1511,12 +1553,10 @@ function ConcordanceFeature() {
   /** Dispatches aggregated dispersion detach requests using the dialog's column and bin choices. */
   /**
    * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-     * Flow: convert pending bin selections to a set, dispatch each pending dispersion detach with chosen columns and match filters, then reset dialog state.
+   * Flow: convert pending bin selections to a set, dispatch each pending dispersion detach with chosen columns and match filters, then reset dialog state.
    */
   const handleDispersionDetachConfirm = async () => {
-    const binsSet = pendingDispersionBinSelection
-      ? new Set(pendingDispersionBinSelection)
-      : null;
+    const binsSet = pendingDispersionBinSelection ? new Set(pendingDispersionBinSelection) : null;
     for (const n of pendingDispersionDetachNodes) {
       const cols = selectedDispersionColumns[n.nodeId] || [];
       await handleDispersionDetach(n.nodeId, n.column, {
@@ -1539,12 +1579,11 @@ function ConcordanceFeature() {
     setPendingDispersionCaseInsensitive(false);
   };
 
-  const anyDispersionNodeDetaching = pendingDispersionDetachNodes.some(
-    (n) => Boolean(nodeDetaching[n.nodeId]),
+  const anyDispersionNodeDetaching = pendingDispersionDetachNodes.some((n) =>
+    Boolean(nodeDetaching[n.nodeId]),
   );
 
-  const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));
-
+  const anyNodeDetaching = pendingDetachNodes.some((n) => Boolean(nodeDetaching[n.nodeId]));
 
   // Snapshot-mode client-side pagination + sort, matching the backend
   // materialised-path semantics:
@@ -1572,12 +1611,8 @@ function ConcordanceFeature() {
       const groups = entry.data ?? [];
       const isCombined = id === '__COMBINED__';
       const np = isCombined ? undefined : nodePagination[id];
-      const pageSize = isCombined
-        ? globalPageSize
-        : (np?.pageSize ?? globalPageSize);
-      const currentPage = isCombined
-        ? combinedPage
-        : (np?.currentPage ?? 1);
+      const pageSize = isCombined ? globalPageSize : (np?.pageSize ?? globalPageSize);
+      const currentPage = isCombined ? combinedPage : (np?.currentPage ?? 1);
       const sortBy = isCombined ? '' : (np?.sortBy ?? '');
       const descending = isCombined ? false : (np?.descending ?? false);
 
@@ -1734,9 +1769,7 @@ function ConcordanceFeature() {
   // Combined tab appears only when ``results.combinable`` is true,
   // which we set above based on whether the captured payload carries
   // the ``__COMBINED__`` entry.
-  const effViewMode: 'separated' | 'combined' = inSnapshotMode
-    ? snapshotViewMode
-    : viewMode;
+  const effViewMode: 'separated' | 'combined' = inSnapshotMode ? snapshotViewMode : viewMode;
 
   // Sync snapshotViewMode with the captured ``settings.combined``
   // flag whenever a new snapshot loads (or when the snapshot's
@@ -1745,7 +1778,7 @@ function ConcordanceFeature() {
   useEffect(() => {
     if (inSnapshotMode && loadedSnapshot) {
       const cap = loadedSnapshot.payload.settings?.combined ?? false;
-      Promise.resolve().then(() => setSnapshotViewMode(cap ? 'combined' : 'separated'));
+      void Promise.resolve().then(() => setSnapshotViewMode(cap ? 'combined' : 'separated'));
     }
   }, [inSnapshotMode, loadedSnapshot]);
 
@@ -1891,7 +1924,9 @@ function ConcordanceFeature() {
           handlePageChange={effHandlePageChange}
           handleRowClick={handleRowClick}
           handleMaterialize={handleMaterialize}
-          openDetachDialog={openDetachDialog}
+          openDetachDialog={(nodes) => {
+            void openDetachDialog(nodes);
+          }}
           onDispersionDetach={openDispersionDetachDialog}
           readOnly={inSnapshotMode}
         />
@@ -1966,6 +2001,6 @@ function ConcordanceFeature() {
       />
     </div>
   );
-};
+}
 
 export default ConcordanceFeature;

@@ -120,8 +120,9 @@ export function ActiveWorkspaceCard({
                 </Badge>
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} | Size{' '}
-                {formatBytes(Number(currentWorkspace.workspace_size_Byte || 0))} | Created{' '}
+                Updated{' '}
+                {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} |
+                Size {formatBytes(Number(currentWorkspace.workspace_size_Byte || 0))} | Created{' '}
                 {formatTimestamp(currentWorkspace.created_at)}
               </div>
             </div>
@@ -129,7 +130,10 @@ export function ActiveWorkspaceCard({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label htmlFor="rename-workspace">Rename workspace</Label>
-                <HelpIcon targetKey="data-loader.rename-workspace.input" label="Rename workspace input" />
+                <HelpIcon
+                  targetKey="data-loader.rename-workspace.input"
+                  label="Rename workspace input"
+                />
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
@@ -163,7 +167,11 @@ export function ActiveWorkspaceCard({
                 />
                 <Button
                   onClick={() => void onUpdateDescription(descriptionValue.trim())}
-                  disabled={!hasWorkspaceSelected || busy || normalizedDescriptionValue === normalizedCurrentDescription}
+                  disabled={
+                    !hasWorkspaceSelected ||
+                    busy ||
+                    normalizedDescriptionValue === normalizedCurrentDescription
+                  }
                 >
                   Update description
                 </Button>
@@ -171,7 +179,11 @@ export function ActiveWorkspaceCard({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => void onSave()} disabled={!hasWorkspaceSelected}>
+              <Button
+                variant="outline"
+                onClick={() => void onSave()}
+                disabled={!hasWorkspaceSelected}
+              >
                 <RefreshCcw className="mr-2 h-4 w-4" /> Save
               </Button>
               <div className="flex items-center gap-1">
@@ -208,7 +220,9 @@ export function ActiveWorkspaceCard({
               placeholder="Optional description"
             />
             <div className="flex items-center gap-2">
-              <DisabledReasonTooltip reason={!newWorkspaceName.trim() ? 'Enter a workspace name first' : undefined}>
+              <DisabledReasonTooltip
+                reason={!newWorkspaceName.trim() ? 'Enter a workspace name first' : undefined}
+              >
                 <Button onClick={() => void handleCreate()} disabled={!newWorkspaceName.trim()}>
                   <Plus className="mr-2 h-4 w-4" /> Create workspace
                 </Button>

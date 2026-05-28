@@ -26,13 +26,7 @@ export interface WorkspaceGraphFeatureProps {
  * Rendered by: workspace/WorkspaceGraphFeature module JSX because graph controls need a compact overview toggle.
  * Flow: receive the overview state, choose the button title/icon opacity, and invoke the supplied toggle handler from React Flow controls.
  */
-const OverviewToggle = ({
-  active,
-  onToggle,
-}: {
-  active: boolean;
-  onToggle: () => void;
-}) => (
+const OverviewToggle = ({ active, onToggle }: { active: boolean; onToggle: () => void }) => (
   <button
     type="button"
     className="react-flow__controls-button"
@@ -48,13 +42,7 @@ const OverviewToggle = ({
  * Rendered by: workspace/WorkspaceGraphFeature module JSX because multi-select graph sessions need a one-click clear action.
  * Flow: receive disabled state and clear callback, render a React Flow control button, and block the clear action when no selection can be cleared.
  */
-const DeselectButton = ({
-  disabled,
-  onClear,
-}: {
-  disabled: boolean;
-  onClear: () => void;
-}) => (
+const DeselectButton = ({ disabled, onClear }: { disabled: boolean; onClear: () => void }) => (
   <button
     type="button"
     className="react-flow__controls-button"
@@ -170,14 +158,21 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls position="top-right">
-          <OverviewToggle active={showOverview} onToggle={() => setShowOverview((value) => !value)} />
+          <OverviewToggle
+            active={showOverview}
+            onToggle={() => setShowOverview((value) => !value)}
+          />
           <DeselectButton
             disabled={!graph.canClearSelection}
             onClear={() => graph.clearSelection?.()}
           />
         </Controls>
         {showOverview && (
-          <MiniMap position="bottom-right" nodeColor="#e2e8f0" maskColor="rgba(255, 255, 255, 0.8)" />
+          <MiniMap
+            position="bottom-right"
+            nodeColor="#e2e8f0"
+            maskColor="rgba(255, 255, 255, 0.8)"
+          />
         )}
       </ReactFlow>
     </div>

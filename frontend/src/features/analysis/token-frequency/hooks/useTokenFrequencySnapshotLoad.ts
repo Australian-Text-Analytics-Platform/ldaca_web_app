@@ -17,10 +17,7 @@ import {
   useSnapshotViewStore,
   type LoadedSnapshot,
 } from '@/features/snapshot-view';
-import type {
-  TokenFrequencyRequestInput,
-  TokenFrequencyResponse,
-} from '@/api/generated/types.gen';
+import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
 
 type TokenFrequencyRequest = TokenFrequencyRequestInput;
 

@@ -39,8 +39,7 @@ export const getAnalysisActionState = ({
     isBusy ||
     ((isLocked || hasActiveTask) && !allowRunWhenLocked);
 
-  const clearDisabled =
-    !hasWorkspace || (!hasResults && !isLocked && !hasActiveTask);
+  const clearDisabled = !hasWorkspace || (!hasResults && !isLocked && !hasActiveTask);
 
   const runLabel: 'Run' | 'Update' = allowRunWhenLocked ? 'Update' : 'Run';
 

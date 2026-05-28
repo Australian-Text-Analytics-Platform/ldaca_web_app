@@ -6,13 +6,14 @@ import { saveBlob } from '@/lib/download';
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 const toSafeExportFilename = (label: string, suffix: string, extension: string) => {
-  const base = (label || 'token-frequency')
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || 'token-frequency';
+  const base =
+    (label || 'token-frequency')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'token-frequency';
   return `${base}-${suffix}.${extension}`;
 };
 
@@ -41,23 +42,27 @@ const toRawStandaloneFilename = (label: string, suffix: string, extension: strin
 /** Sanitizes a corpus label for use as a compact zip archive segment. */
 /**
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
-   * Flow: trim the label, keep the basename, replace forbidden filename characters and control codes, then truncate to a nonempty archive segment.
+ * Flow: trim the label, keep the basename, replace forbidden filename characters and control codes, then truncate to a nonempty archive segment.
  */
 const toArchiveNameSegment = (label: string, maxLength = 20) => {
   const raw = (label || 'analysis').toString().trim() || 'analysis';
   const tail = raw.split('/').pop()?.trim() || raw;
-  const safe = tail
-    .split('')
-    .map((char) => {
-      if (char.charCodeAt(0) < 32) {
-        return '_';
-      }
-      return /[<>:"\\|?*]/.test(char) ? '_' : char;
-    })
-    .join('')
-    .replace(/\s+/g, ' ')
-    .trim() || 'analysis';
-  const truncated = safe.slice(0, maxLength).replace(/[_\-. ]+$/g, '').trim();
+  const safe =
+    tail
+      .split('')
+      .map((char) => {
+        if (char.charCodeAt(0) < 32) {
+          return '_';
+        }
+        return /[<>:"\\|?*]/.test(char) ? '_' : char;
+      })
+      .join('')
+      .replace(/\s+/g, ' ')
+      .trim() || 'analysis';
+  const truncated = safe
+    .slice(0, maxLength)
+    .replace(/[_\-. ]+$/g, '')
+    .trim();
   return truncated || 'analysis';
 };
 
@@ -66,9 +71,7 @@ const toArchiveNameSegment = (label: string, maxLength = 20) => {
  * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 export const buildTokenFrequencyZipFilename = (labels: string[], date: Date = new Date()) => {
-  const segments = labels
-    .map((label) => toArchiveNameSegment(label))
-    .filter(Boolean);
+  const segments = labels.map((label) => toArchiveNameSegment(label)).filter(Boolean);
   const base = segments.length > 0 ? segments.join('_') : 'analysis';
   return `${buildTimestampFragment(date)}_${base}.zip`;
 };
@@ -101,7 +104,7 @@ const DEFAULT_TOKEN_COLUMNS = ['token', 'frequency'] as const;
 /** Infers stable export columns from result rows while preserving the default token shape. */
 /**
  * Called by: tokenFrequencyExport analysis helper module as a local helper in this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
-   * Flow: collect first-seen row keys across all rows, fall back to token/frequency defaults when empty, then flag the default token shape.
+ * Flow: collect first-seen row keys across all rows, fall back to token/frequency defaults when empty, then flag the default token shape.
  */
 const deriveExportColumns = (rows: Array<Record<string, unknown>>) => {
   const seen = new Set<string>();
@@ -168,7 +171,7 @@ const toCellString = (value: unknown) => {
 const getRowValues = (
   row: Record<string, unknown>,
   columns: string[],
-  isDefaultTokenFrequencyShape: boolean
+  isDefaultTokenFrequencyShape: boolean,
 ) => {
   if (isDefaultTokenFrequencyShape) {
     return [toCellString(row?.token), toCellString(row?.frequency)];
@@ -187,7 +190,8 @@ const escapeCsvValue = (value: string) => `"${value.replace(/"/g, '""')}"`;
 /**
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
-const escapeMarkdownValue = (value: string) => value.replace(/[\r\n]+/g, '<br />').replace(/\|/g, '\\|');
+const escapeMarkdownValue = (value: string) =>
+  value.replace(/[\r\n]+/g, '<br />').replace(/\|/g, '\\|');
 
 /** Serializes frequency rows into CSV for spreadsheet-friendly downloads. */
 /**
@@ -200,13 +204,15 @@ const serializeRowsAsCsv = (rows: Array<Record<string, unknown>>) => {
   return [
     headers.csv,
     ...rows.map((row) => getRowValues(row, columns, isDefaultTokenFrequencyShape)),
-  ].map((line) => line.map((value) => escapeCsvValue(toCellString(value))).join(',')).join('\r\n');
+  ]
+    .map((line) => line.map((value) => escapeCsvValue(toCellString(value))).join(','))
+    .join('\r\n');
 };
 
 /** Serializes frequency rows into a Markdown table for document-friendly downloads. */
 /**
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
-   * Flow: derive columns and headers, write the Markdown header and separator rows, escape each cell, then join table lines.
+ * Flow: derive columns and headers, write the Markdown header and separator rows, escape each cell, then join table lines.
  */
 const serializeRowsAsMarkdown = (rows: Array<Record<string, unknown>>) => {
   const { columns, isDefaultTokenFrequencyShape } = deriveExportColumns(rows);
@@ -219,7 +225,7 @@ const serializeRowsAsMarkdown = (rows: Array<Record<string, unknown>>) => {
 
   for (const row of rows) {
     const values = getRowValues(row, columns, isDefaultTokenFrequencyShape).map((value) =>
-      escapeMarkdownValue(toCellString(value))
+      escapeMarkdownValue(toCellString(value)),
     );
     lines.push(`| ${values.join(' | ')} |`);
   }
@@ -236,68 +242,69 @@ const renderWordCloudBitmap = (
   svgString: string,
   width: number,
   height: number,
-  options: { format: Exclude<WordCloudFormat, 'svg'>; scale?: number }
-) => new Promise<Blob>((resolve, reject) => {
-  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const image = new Image();
+  options: { format: Exclude<WordCloudFormat, 'svg'>; scale?: number },
+) =>
+  new Promise<Blob>((resolve, reject) => {
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
 
-  image.onload = () => {
-    try {
-      const canvas = document.createElement('canvas');
-      const exportScale = options.scale ?? 3;
-      const scale = Number.isFinite(exportScale) && exportScale > 1 ? exportScale : 1;
-      canvas.width = Math.max(1, Math.round(width * scale));
-      canvas.height = Math.max(1, Math.round(height * scale));
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const exportScale = options.scale ?? 3;
+        const scale = Number.isFinite(exportScale) && exportScale > 1 ? exportScale : 1;
+        canvas.width = Math.max(1, Math.round(width * scale));
+        canvas.height = Math.max(1, Math.round(height * scale));
 
-      const context = canvas.getContext('2d');
-      if (!context) {
-        reject(new Error('Canvas 2D context is not available for export'));
-        return;
+        const context = canvas.getContext('2d');
+        if (!context) {
+          reject(new Error('Canvas 2D context is not available for export'));
+          return;
+        }
+
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        if (scale > 1) {
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = 'high';
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(
+          (output) => {
+            if (!output) {
+              reject(new Error(`Failed to create ${options.format} export blob`));
+              return;
+            }
+            resolve(output);
+          },
+          options.format === 'jpeg' ? 'image/jpeg' : 'image/png',
+          options.format === 'jpeg' ? 0.92 : undefined,
+        );
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('Failed to render word cloud export'));
+      } finally {
+        URL.revokeObjectURL(url);
       }
+    };
 
-      context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      if (scale > 1) {
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = 'high';
-      }
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-      canvas.toBlob(
-        (output) => {
-          if (!output) {
-            reject(new Error(`Failed to create ${options.format} export blob`));
-            return;
-          }
-          resolve(output);
-        },
-        options.format === 'jpeg' ? 'image/jpeg' : 'image/png',
-        options.format === 'jpeg' ? 0.92 : undefined,
-      );
-    } catch (error) {
-      reject(error instanceof Error ? error : new Error('Failed to render word cloud export'));
-    } finally {
+    image.onerror = () => {
       URL.revokeObjectURL(url);
-    }
-  };
+      reject(new Error('Failed to load serialized SVG for export'));
+    };
 
-  image.onerror = () => {
-    URL.revokeObjectURL(url);
-    reject(new Error('Failed to load serialized SVG for export'));
-  };
-
-  image.src = url;
-});
+    image.src = url;
+  });
 
 /** Builds a word-cloud export file in the requested image format. */
 /**
  * Used by: TokenFrequencyFeature.tsx because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
-   * Flow: serialize the SVG and dimensions, return raw SVG when requested, otherwise render a bitmap blob and build the export filename.
+ * Flow: serialize the SVG and dimensions, return raw SVG when requested, otherwise render a bitmap blob and build the export filename.
  */
 export const buildWordCloudExportFile = async (
   svg: SVGSVGElement,
-  options: { displayName: string; fallbackKey: string; format: WordCloudFormat; scale?: number }
+  options: { displayName: string; fallbackKey: string; format: WordCloudFormat; scale?: number },
 ): Promise<ExportedDownloadFile> => {
   const { svgString, width, height } = serializeSvg(svg);
   const label = options.displayName || options.fallbackKey;
@@ -327,7 +334,7 @@ export const buildWordCloudExportFile = async (
 export const buildFrequencyExportFile = (
   label: string,
   rows: Array<Record<string, unknown>>,
-  format: FrequencyFormat
+  format: FrequencyFormat,
 ): ExportedDownloadFile => {
   if (format === 'markdown') {
     return {
@@ -346,7 +353,10 @@ export const buildFrequencyExportFile = (
 /**
  * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
-export const buildStopWordsExportFile = (stopWordsText: string, label: string): ExportedDownloadFile => {
+export const buildStopWordsExportFile = (
+  stopWordsText: string,
+  label: string,
+): ExportedDownloadFile => {
   const words = stopWordsText
     .split(',')
     .map((w) => w.trim())
@@ -362,7 +372,10 @@ export const buildStopWordsExportFile = (stopWordsText: string, label: string): 
 /**
  * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
-export const downloadExportBundleAsZip = async (zipFilename: string, files: ExportedDownloadFile[]) => {
+export const downloadExportBundleAsZip = async (
+  zipFilename: string,
+  files: ExportedDownloadFile[],
+) => {
   if (files.length === 0) return;
   if (files.length === 1) {
     downloadExportedFile(files[0]!);
@@ -384,7 +397,7 @@ export type FrequencyFormat = 'csv' | 'markdown';
 /** Serializes the live word-cloud SVG with concrete dimensions for export rendering. */
 /**
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
-   * Flow: read explicit/client/viewBox dimensions, clone the SVG with xmlns and dimensions, then serialize it with XMLSerializer.
+ * Flow: read explicit/client/viewBox dimensions, clone the SVG with xmlns and dimensions, then serialize it with XMLSerializer.
  */
 const serializeSvg = (svg: SVGSVGElement): { svgString: string; width: number; height: number } => {
   let width = Number(svg.getAttribute('width')) || svg.clientWidth || 400;
@@ -410,27 +423,34 @@ const serializeSvg = (svg: SVGSVGElement): { svgString: string; width: number; h
 /** Downloads a word cloud as SVG directly or as a rendered bitmap file. */
 /**
  * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
-   * Flow: no-op outside browsers, download serialized SVG directly for SVG format, otherwise render a bitmap export and trigger the file download.
+ * Flow: no-op outside browsers, download serialized SVG directly for SVG format, otherwise render a bitmap export and trigger the file download.
  */
 export const downloadWordCloudAs = (
   svg: SVGSVGElement,
-  options: { displayName: string; fallbackKey: string; format: WordCloudFormat; scale?: number }
+  options: { displayName: string; fallbackKey: string; format: WordCloudFormat; scale?: number },
 ) => {
   if (typeof window === 'undefined') return;
   if (options.format === 'svg') {
     const { svgString } = serializeSvg(svg);
     const label = options.displayName || options.fallbackKey;
-    downloadExportedFile({
-      filename: toSafeExportFilename(label, 'wordcloud', 'svg'),
-      blob: new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }),
-    }, toRawStandaloneFilename(label, 'wordcloud', 'svg'));
+    downloadExportedFile(
+      {
+        filename: toSafeExportFilename(label, 'wordcloud', 'svg'),
+        blob: new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }),
+      },
+      toRawStandaloneFilename(label, 'wordcloud', 'svg'),
+    );
     return;
   }
 
   void buildWordCloudExportFile(svg, options).then((file) => {
     downloadExportedFile(
       file,
-      toRawStandaloneFilename(options.displayName || options.fallbackKey, 'wordcloud', options.format)
+      toRawStandaloneFilename(
+        options.displayName || options.fallbackKey,
+        'wordcloud',
+        options.format,
+      ),
     );
   });
 };
@@ -442,12 +462,12 @@ export const downloadWordCloudAs = (
 export const downloadFrequencyRowsAs = (
   label: string,
   rows: Array<Record<string, unknown>>,
-  format: FrequencyFormat
+  format: FrequencyFormat,
 ) => {
   if (typeof window === 'undefined') return;
   downloadExportedFile(
     buildFrequencyExportFile(label, rows, format),
-    toRawStandaloneFilename(label, 'frequencies', format === 'markdown' ? 'md' : 'csv')
+    toRawStandaloneFilename(label, 'frequencies', format === 'markdown' ? 'md' : 'csv'),
   );
 };
 
@@ -459,6 +479,6 @@ export const downloadStopWordsAsTxt = (stopWordsText: string, label: string) => 
   if (typeof window === 'undefined') return;
   downloadExportedFile(
     buildStopWordsExportFile(stopWordsText, label),
-    toRawStandaloneFilename(label, 'stopwords', 'txt')
+    toRawStandaloneFilename(label, 'stopwords', 'txt'),
   );
 };

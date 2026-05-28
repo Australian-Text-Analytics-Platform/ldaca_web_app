@@ -4,7 +4,7 @@
  * `react-refresh/only-export-components` rule).
  */
 
-export type PaginationRangeItem = number | "dots";
+export type PaginationRangeItem = number | 'dots';
 
 /**
  * Builds compact page ranges for pagination components. Analysis tables and
@@ -18,7 +18,7 @@ export const buildPaginationRange = (
   totalPages: number | undefined,
   hasNext: boolean = false,
 ): PaginationRangeItem[] => {
-  if (typeof totalPages === "number" && totalPages > 0) {
+  if (typeof totalPages === 'number' && totalPages > 0) {
     const total = Math.max(totalPages, 1);
     const output: PaginationRangeItem[] = [];
     let previous: number | null = null;
@@ -35,7 +35,7 @@ export const buildPaginationRange = (
         if (gap === 2) {
           output.push(previous + 1);
         } else if (gap > 2) {
-          output.push("dots");
+          output.push('dots');
         }
       }
 
@@ -54,14 +54,14 @@ export const buildPaginationRange = (
     for (let p = 1; p <= current; p++) output.push(p);
   } else {
     output.push(1);
-    output.push("dots");
+    output.push('dots');
     output.push(current - 1);
     output.push(current);
   }
 
   if (hasNext) {
     output.push(current + 1);
-    output.push("dots");
+    output.push('dots');
   }
 
   return output;

@@ -84,10 +84,17 @@ describe('DataFolderDialog', () => {
     });
 
     expect(setCurrentWorkspace).toHaveBeenCalledWith(null);
-    expect(updateConfig).toHaveBeenCalledWith({ body: { data_root: '/tmp/updated' }, throwOnError: true });
+    expect(updateConfig).toHaveBeenCalledWith({
+      body: { data_root: '/tmp/updated' },
+      throwOnError: true,
+    });
 
-    expect(setCurrentWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(updateConfig.mock.invocationCallOrder[0]!);
-    expect(updateConfig.mock.invocationCallOrder[0]!).toBeLessThan(refreshAuth.mock.invocationCallOrder[0]!);
+    expect(setCurrentWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(
+      updateConfig.mock.invocationCallOrder[0]!,
+    );
+    expect(updateConfig.mock.invocationCallOrder[0]!).toBeLessThan(
+      refreshAuth.mock.invocationCallOrder[0]!,
+    );
 
     await waitFor(() => {
       expect(refetchQueriesSpy).toHaveBeenCalledWith({

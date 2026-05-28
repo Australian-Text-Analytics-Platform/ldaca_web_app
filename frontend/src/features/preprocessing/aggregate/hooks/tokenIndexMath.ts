@@ -23,7 +23,11 @@ export const clampIndex = (value: number, max: number): number => {
  * `[0, items.length]`. `undefined` for `targetIndex` appends.
  * Used by: useAggregateSubTab hook, tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
-export const insertItemAt = <T>(items: readonly T[], targetIndex: number | undefined, item: T): T[] => {
+export const insertItemAt = <T>(
+  items: readonly T[],
+  targetIndex: number | undefined,
+  item: T,
+): T[] => {
   const next = [...items];
   const idx = clampIndex(targetIndex ?? next.length, next.length);
   next.splice(idx, 0, item);

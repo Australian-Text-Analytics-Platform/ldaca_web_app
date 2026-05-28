@@ -32,11 +32,7 @@ describe('computeDagreLayout', () => {
   });
 
   it('never leaks the synthetic super-source into the returned positions', () => {
-    const positions = computeDagreLayout(
-      [{ id: 'only' }],
-      [],
-      { rankdir: 'LR' },
-    );
+    const positions = computeDagreLayout([{ id: 'only' }], [], { rankdir: 'LR' });
     expect(positions.size).toBe(1);
     expect(positions.has('only')).toBe(true);
     for (const key of positions.keys()) {

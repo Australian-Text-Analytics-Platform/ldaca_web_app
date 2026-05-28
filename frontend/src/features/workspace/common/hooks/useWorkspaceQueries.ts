@@ -1,6 +1,11 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getCurrentWorkspace, getNodeData, getWorkspaceGraph, listWorkspaces } from '@/api/generated/sdk.gen';
+import {
+  getCurrentWorkspace,
+  getNodeData,
+  getWorkspaceGraph,
+  listWorkspaces,
+} from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
 import type { WorkspaceNodeInfo as GraphNode, NodeDataResponse } from '@/api';
 import { type PaginationState } from './types';
@@ -21,7 +26,7 @@ const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
   },
   columns: [],
   dtypes: {},
-      /** Loads workspace summaries for selectors and launch screens. */
+  /** Loads workspace summaries for selectors and launch screens. */
   sorting: { sort_by: null, descending: false },
   filtering: { column: null, value: null, op: 'contains' },
 }) as NodeDataResponse;
@@ -51,11 +56,11 @@ export const useWorkspaceQueries = ({
 }: WorkspaceQueriesParams) => {
   const workspacesQuery = useQuery({
     queryKey: queryKeys.workspaces,
-        /**
+    /**
      * Loads workspace summaries for selectors and launch screens.
-         * Called by: useQuery option object inside useWorkspaceQueries.
-         * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
-         */
+     * Called by: useQuery option object inside useWorkspaceQueries.
+     * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+     */
     queryFn: async () => {
       const { data } = await listWorkspaces({ headers: authHeaders, throwOnError: true });
       return data;
@@ -66,11 +71,11 @@ export const useWorkspaceQueries = ({
 
   const currentWorkspaceQuery = useQuery({
     queryKey: queryKeys.currentWorkspace,
-        /**
+    /**
      * Restores the backend-selected workspace during authenticated startup.
-         * Called by: useQuery option object inside useWorkspaceQueries.
-         * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
-         */
+     * Called by: useQuery option object inside useWorkspaceQueries.
+     * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+     */
     queryFn: async () => {
       const { data } = await getCurrentWorkspace({ headers: authHeaders, throwOnError: true });
       return data.id ?? null;
@@ -83,11 +88,11 @@ export const useWorkspaceQueries = ({
     queryKey: currentWorkspaceId
       ? queryKeys.workspaceGraph(currentWorkspaceId)
       : ['workspaces', 'graph'],
-        /**
+    /**
      * Fetches graph topology for the active workspace view.
-         * Called by: useQuery option object inside useWorkspaceQueries.
-         * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
-         */
+     * Called by: useQuery option object inside useWorkspaceQueries.
+     * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+     */
     queryFn: async () => {
       const { data } = await getWorkspaceGraph({ headers: authHeaders, throwOnError: true });
       return data;
@@ -108,15 +113,16 @@ export const useWorkspaceQueries = ({
       getPaginationForNode(selectedNodeId).filterColumn,
       getPaginationForNode(selectedNodeId).filterValue,
     ),
-      /**
+    /**
      * Fetches the selected node page using server-side table controls.
-       * Called by: useQuery option object inside useWorkspaceQueries.
-       * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
-       * Flow: verify the active workspace/node, derive pagination controls, then call the generated node-data endpoint.
-       */
+     * Called by: useQuery option object inside useWorkspaceQueries.
+     * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+     * Flow: verify the active workspace/node, derive pagination controls, then call the generated node-data endpoint.
+     */
     queryFn: () => {
       if (!currentWorkspaceId || !selectedNodeId) throw new Error('Missing workspace or node ID');
-      const { currentPage, pageSize, sortBy, descending, filterColumn, filterValue, filterOp } = getPaginationForNode(selectedNodeId);
+      const { currentPage, pageSize, sortBy, descending, filterColumn, filterValue, filterOp } =
+        getPaginationForNode(selectedNodeId);
       return getNodeData({
         headers: authHeaders,
         path: { node_id: selectedNodeId },
@@ -145,8 +151,8 @@ export const useWorkspaceQueries = ({
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
 
   const selectedNodes = selectedNodeIds
-        .map((id: string) => nodes.find((node) => node.id === id))
-        .filter((n): n is GraphNode => Boolean(n));
+    .map((id: string) => nodes.find((node) => node.id === id))
+    .filter((n): n is GraphNode => Boolean(n));
 
   const nodeData: NodeDataResponse = nodeDataQuery.data ?? EMPTY_NODE_DATA;
 

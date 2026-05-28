@@ -1,4 +1,3 @@
-
 import { useFilePreview } from '../../hooks/useFilePreview';
 import { FilePreviewContent } from './FilePreviewContent';
 import { CardFooter } from '../ui/card';
@@ -94,7 +93,16 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
       open={open}
       onClose={onClose}
       onSheetChange={handleSheetChange}
-      data={{ previewData, columns, loading, error, fileType, sheetNames, selectedSheet, setSelectedSheet }}
+      data={{
+        previewData,
+        columns,
+        loading,
+        error,
+        fileType,
+        sheetNames,
+        selectedSheet,
+        setSelectedSheet,
+      }}
       dialogMaxWidth="min(80vw, 1000px)"
       title={filename ? `Preview: ${filename}` : 'File preview'}
       description="Inspect file content before adding to workspace."

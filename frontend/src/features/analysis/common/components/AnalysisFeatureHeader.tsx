@@ -22,8 +22,8 @@ export interface AnalysisFeatureHeaderProps {
   helpLabel: string;
   helpTooltip?: string;
   /** Snapshot save handler. The host feature wires its own capture
-  * logic in via this prop — see ``SnapshotActions.onSave``. Optional
-  * because tools wire snapshot capture individually. */
+   * logic in via this prop — see ``SnapshotActions.onSave``. Optional
+   * because tools wire snapshot capture individually. */
   onSaveSnapshot?: (filename: string, description: string) => Promise<void>;
   /** When set, the Save button renders disabled with this string as
    * a hover tooltip — same UX as the Run-disabled pattern elsewhere
@@ -72,10 +72,7 @@ export function AnalysisFeatureHeader({
           <InfoIcon targetKey={infoKey} label={infoLabel} tooltip={infoTooltip} />
           <HelpIcon targetKey={helpKey} label={helpLabel} tooltip={helpTooltip} />
         </CardTitle>
-        <div
-          className="flex items-center gap-2"
-          data-testid="analysis-feature-header-actions"
-        >
+        <div className="flex items-center gap-2" data-testid="analysis-feature-header-actions">
           <SnapshotActions
             tool={tool}
             onSave={onSaveSnapshot}
@@ -87,4 +84,4 @@ export function AnalysisFeatureHeader({
       </div>
     </CardHeader>
   );
-};
+}

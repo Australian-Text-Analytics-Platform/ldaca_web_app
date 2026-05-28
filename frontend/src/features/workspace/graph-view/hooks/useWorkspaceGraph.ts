@@ -41,7 +41,10 @@ export interface WorkspaceGraphViewModel {
   handleEdgesChange: ReturnType<typeof useEdgesState<Edge>>[2];
   handlePaneClick: () => void;
   handleConnect: (connection: Connection) => void;
-  handleConnectStart: (event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: string | null }) => void;
+  handleConnectStart: (
+    event: MouseEvent | TouchEvent,
+    params: { nodeId: string | null; handleId: string | null; handleType: string | null },
+  ) => void;
   handleConnectEnd: (event: MouseEvent | TouchEvent) => void;
   handleInit: (instance: ReactFlowInstance) => void;
   clearSelection: (() => void) | undefined;
@@ -83,9 +86,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (!nodeId || !deleteNode) {
         return;
       }
-      deleteNode(nodeId);
+      void deleteNode(nodeId);
     },
-    [deleteNode]
+    [deleteNode],
   );
 
   /** Renames a graph node through workspace actions. */
@@ -94,9 +97,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (!nodeId || !newName?.trim() || !renameNode) {
         return;
       }
-      renameNode(nodeId, newName.trim());
+      void renameNode(nodeId, newName.trim());
     },
-    [renameNode]
+    [renameNode],
   );
 
   /** Clones a graph node through workspace actions. */
@@ -105,9 +108,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (!nodeId || !copyNode) {
         return;
       }
-      copyNode(nodeId);
+      void copyNode(nodeId);
     },
-    [copyNode]
+    [copyNode],
   );
 
   /** Applies an undo operation to a graph node. */
@@ -118,7 +121,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       }
       void undoNode(nodeId);
     },
-    [undoNode]
+    [undoNode],
   );
 
   /** Applies a redo operation to a graph node. */
@@ -129,9 +132,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       }
       void redoNode(nodeId);
     },
-    [redoNode]
+    [redoNode],
   );
-
 
   // Per-node visual state (active / focus / unselected + X/Y colour pair)
   // is computed here once per render so CustomNode is purely presentational
@@ -168,8 +170,11 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
 
     const positions = computeDagreLayout(
       workspaceGraph.nodes.map((n: GraphNode) => ({ id: n.id })),
-      (workspaceGraph.edges || []).map((edge: GraphEdge) => ({ source: edge.source, target: edge.target })),
-      { rankdir: 'LR', ranksep: 140, nodesep: 100 }
+      (workspaceGraph.edges || []).map((edge: GraphEdge) => ({
+        source: edge.source,
+        target: edge.target,
+      })),
+      { rankdir: 'LR', ranksep: 140, nodesep: 100 },
     );
 
     return workspaceGraph.nodes.map((node: GraphNode, index: number) => {
@@ -179,26 +184,28 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
 
       const columnSchema =
         node.schema && typeof node.schema === 'object'
-          ? Object.entries(node.schema as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, value]) => {
-              acc[key] = String(value);
-              return acc;
-            }, {})
+          ? Object.entries(node.schema as Record<string, unknown>).reduce<Record<string, string>>(
+              (acc, [key, value]) => {
+                acc[key] = String(value);
+                return acc;
+              },
+              {},
+            )
           : {};
 
-      const documentColumn = typeof node.document === 'string' && node.document.trim().length > 0
-        ? node.document
-        : null;
+      const documentColumn =
+        typeof node.document === 'string' && node.document.trim().length > 0 ? node.document : null;
 
-        const rawShape = Array.isArray((node as { shape?: unknown }).shape)
-          ? ((node as { shape?: unknown[] }).shape as unknown[])
-          : null;
-        const parsedShape: [number | null, number | null] =
-          rawShape && rawShape.length >= 2
-            ? [
-                typeof rawShape[0] === 'number' ? rawShape[0] : null,
-                typeof rawShape[1] === 'number' ? rawShape[1] : null,
-              ]
-            : [null, null];
+      const rawShape = Array.isArray((node as { shape?: unknown }).shape)
+        ? ((node as { shape?: unknown[] }).shape as unknown[])
+        : null;
+      const parsedShape: [number | null, number | null] =
+        rawShape && rawShape.length >= 2
+          ? [
+              typeof rawShape[0] === 'number' ? rawShape[0] : null,
+              typeof rawShape[1] === 'number' ? rawShape[1] : null,
+            ]
+          : [null, null];
 
       const position = positions.get(node.id) || { x: index * 320, y: 50 };
 
@@ -241,7 +248,18 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         connectable: false,
       } as Node;
     });
-  }, [workspaceGraph, selectedNodeIds, currentView, assignedColors, freshIds, handleDelete, handleRename, handleCopy, handleUndo, handleRedo]);
+  }, [
+    workspaceGraph,
+    selectedNodeIds,
+    currentView,
+    assignedColors,
+    freshIds,
+    handleDelete,
+    handleRename,
+    handleCopy,
+    handleUndo,
+    handleRedo,
+  ]);
 
   const initialEdges = useMemo(() => {
     if (!workspaceGraph?.edges) {
@@ -333,7 +351,18 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         cancelAnimationFrame(updateRafRef.current);
       }
     };
-  }, [currentEdgeIds, currentNodeIds, currentNodesSignature, initialEdges, initialNodes, newEdgeIds, newNodeIds, newNodesSignature, setEdges, setNodes]);
+  }, [
+    currentEdgeIds,
+    currentNodeIds,
+    currentNodesSignature,
+    initialEdges,
+    initialNodes,
+    newEdgeIds,
+    newNodeIds,
+    newNodesSignature,
+    setEdges,
+    setNodes,
+  ]);
 
   useEffect(() => {
     setNodes((existing) =>
@@ -345,7 +374,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           isMultiSelected:
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
         },
-      }))
+      })),
     );
   }, [selectedNodeIds, setNodes]);
 
@@ -356,7 +385,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           ...node,
           selected: false,
           data: { ...node.data, isMultiSelected: false },
-        }))
+        })),
       );
     }
   }, [selectedNodeIds, setNodes]);
@@ -372,7 +401,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       });
       onNodesChange(normalized);
     },
-    [onNodesChange, selectedNodeIds]
+    [onNodesChange, selectedNodeIds],
   );
 
   /** Restores visual selection when pane clicks would otherwise clear React Flow state. */
@@ -381,7 +410,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       existing.map((node: Node) => ({
         ...node,
         selected: selectedNodeIds?.includes?.(node.id) ?? false,
-      }))
+      })),
     );
   }, [selectedNodeIds, setNodes]);
 
@@ -398,31 +427,28 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         markInteracted([node.id]);
       }
     },
-    [toggleNodeSelection, markInteracted]
+    [toggleNodeSelection, markInteracted],
   );
 
   /** No-op connection handler because graph edges are backend-derived. */
-  const handleConnect = useCallback(
-    (_connection: Connection) => {},
-    []
-  );
+  const handleConnect = useCallback((_connection: Connection) => {}, []);
 
   /** No-op connection-start handler retained for React Flow prop parity. */
   const handleConnectStart = useCallback(
-    (_event: MouseEvent | TouchEvent, _params: { nodeId: string | null; handleId: string | null; handleType: string | null }) => {},
-    []
+    (
+      _event: MouseEvent | TouchEvent,
+      _params: { nodeId: string | null; handleId: string | null; handleType: string | null },
+    ) => {},
+    [],
   );
 
   /** No-op connection-end handler retained for React Flow prop parity. */
-  const handleConnectEnd = useCallback(
-    (_event: MouseEvent | TouchEvent) => {},
-    []
-  );
+  const handleConnectEnd = useCallback((_event: MouseEvent | TouchEvent) => {}, []);
 
   /** Fits the graph into view after React Flow initializes. */
   const handleInit = useCallback((instance: ReactFlowInstance) => {
     try {
-      instance.fitView({ padding: 0.2, includeHiddenNodes: false });
+      void instance.fitView({ padding: 0.2, includeHiddenNodes: false });
     } catch {
       // React Flow can reject fitView during teardown; layout remains usable.
     }

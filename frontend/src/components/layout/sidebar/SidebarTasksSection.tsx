@@ -83,13 +83,11 @@ function SidebarTasksSection({
   onReconnect,
 }: SidebarTasksSectionProps) {
   const sortedTasks = Array.isArray(tasks)
-    ? tasks
-        .slice()
-        .sort((a, b) => {
-          const priorityDelta = taskPriority(a) - taskPriority(b);
-          if (priorityDelta !== 0) return priorityDelta;
-          return taskTimestamp(b) - taskTimestamp(a);
-        })
+    ? tasks.slice().sort((a, b) => {
+        const priorityDelta = taskPriority(a) - taskPriority(b);
+        if (priorityDelta !== 0) return priorityDelta;
+        return taskTimestamp(b) - taskTimestamp(a);
+      })
     : [];
 
   const [expandedTaskIds, setExpandedTaskIds] = React.useState<Set<string>>(() => new Set());
@@ -158,7 +156,7 @@ function SidebarTasksSection({
                   'rounded-md border bg-background text-left transition-colors',
                   PROBLEMATIC_STATES.has(String(task.state ?? '').toLowerCase())
                     ? 'border-red-200 bg-red-50/50 dark:border-red-950 dark:bg-red-950/20'
-                    : 'border-border/40'
+                    : 'border-border/40',
                 )}
               >
                 <div
@@ -188,7 +186,10 @@ function SidebarTasksSection({
                     />
                   )}
                   <ChevronDown
-                    className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-180')}
+                    className={cn(
+                      'h-3 w-3 shrink-0 text-muted-foreground transition-transform',
+                      expanded && 'rotate-180',
+                    )}
                   />
                 </div>
 
@@ -222,8 +223,6 @@ function SidebarTasksSection({
                     </dl>
                   </div>
                 )}
-
-
               </div>
             );
           })
@@ -235,6 +234,6 @@ function SidebarTasksSection({
       </div>
     </div>
   );
-};
+}
 
 export default SidebarTasksSection;

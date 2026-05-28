@@ -24,7 +24,9 @@ describe('ConcordanceDispersionCell', () => {
   });
 
   it('supports proportional bar widths', () => {
-    const { unmount } = render(<ConcordanceDispersionCell hits={hits} textLength={16} barWidthPercent={50} />);
+    const { unmount } = render(
+      <ConcordanceDispersionCell hits={hits} textLength={16} barWidthPercent={50} />,
+    );
 
     expect(screen.getByTestId('concordance-dispersion-bar')).toHaveStyle({ width: '50%' });
 

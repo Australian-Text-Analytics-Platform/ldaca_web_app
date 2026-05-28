@@ -1,10 +1,5 @@
-import type {
-  ConcordanceDispersionBinRow,
-} from '@/api/generated/types.gen';
-import {
-  CONCORDANCE_COLUMN_KEYS,
-  CONCORDANCE_CORE_COLUMNS,
-} from '../generatedColumns';
+import type { ConcordanceDispersionBinRow } from '@/api/generated/types.gen';
+import { CONCORDANCE_COLUMN_KEYS, CONCORDANCE_CORE_COLUMNS } from '../generatedColumns';
 
 type ConcordanceHitRow = Record<string, unknown>;
 type ConcordanceGroupedRow = ConcordanceHitRow[];
@@ -136,10 +131,7 @@ export const DISPERSION_AGGREGATE_KEY = '__dispersion_total__';
 /**
  * Called by: concordanceViewModels analysis helper module during this analysis workflow because callers need the same normalization and view-model rules before rendering or testing analysis results.
  */
-const fillEmptyBins = (
-  bins: DispersionBinDatum[],
-  totalsByKey: Record<string, number>,
-): void => {
+const fillEmptyBins = (bins: DispersionBinDatum[], totalsByKey: Record<string, number>): void => {
   const keys = Object.keys(totalsByKey);
   for (const bin of bins) {
     for (const key of keys) {
@@ -190,9 +182,8 @@ export function buildDispersionBins(
       const source = rowSource || String(hit.__source_node ?? '');
       if (source) sourceSet.add(source);
       const baseKey = aggregateAll ? DISPERSION_AGGREGATE_KEY : text;
-      const seriesKey = splitBySource && source
-        ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${source}`
-        : baseKey;
+      const seriesKey =
+        splitBySource && source ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${source}` : baseKey;
       const bin = bins[binIdx]!;
       bin[seriesKey] = (bin[seriesKey] ?? 0) + 1;
       totalsByKey[seriesKey] = (totalsByKey[seriesKey] ?? 0) + 1;
@@ -267,9 +258,8 @@ export function buildDispersionBinsFromBinned(
     if (source) sourceSet.add(source);
     const displayIdx = Math.min(targetCount - 1, Math.floor(sourceBinIdx / step));
     const baseKey = aggregateAll ? DISPERSION_AGGREGATE_KEY : text;
-    const seriesKey = splitBySource && source
-      ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${source}`
-      : baseKey;
+    const seriesKey =
+      splitBySource && source ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${source}` : baseKey;
     const bin = bins[displayIdx]!;
     bin[seriesKey] = (bin[seriesKey] ?? 0) + count;
     totalsByKey[seriesKey] = (totalsByKey[seriesKey] ?? 0) + count;

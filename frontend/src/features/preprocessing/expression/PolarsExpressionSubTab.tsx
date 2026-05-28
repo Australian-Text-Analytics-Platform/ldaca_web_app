@@ -1,4 +1,3 @@
-
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
 import { CodeEditor } from '@/features/preprocessing/expression/CodeEditor';
@@ -44,8 +43,7 @@ function CodeHint({ context }: { context: string }) {
       'One or more expressions per box (comma-separated).\nAlias syntax: pl.col("price").mul(0.9).alias("discounted")\nAssignment syntax: discounted = pl.col("price").mul(0.9)',
     select:
       'Column references or expressions. Comma-separate multiple in one box.\nExample: pl.col("id"), pl.col("name")\nAssignment: full_name = pl.col("first") + pl.col("last")',
-    sort:
-      'Sort key expression(s). Set descending per item.\nExample: pl.col("date")',
+    sort: 'Sort key expression(s). Set descending per item.\nExample: pl.col("date")',
     group_by_agg:
       'Grouping key and aggregation expressions.\nExample key: pl.col("category")\nAssignment: total = pl.col("sales").sum()',
   };
@@ -101,7 +99,8 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     if (isApplying || isLoading.operations) return undefined;
     if (!hasNode) return 'Select a data block first';
     if (!serializedRequest) return 'Build and preview an expression first';
-    if (preview.error) return 'Fix the expression error shown in Preview before adding to workspace';
+    if (preview.error)
+      return 'Fix the expression error shown in Preview before adding to workspace';
     return undefined;
   })();
 
@@ -169,7 +168,9 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
               <CodeEditor
                 value={filterCode}
                 onChange={setFilterCode}
-                onBlur={evalExpressions}
+                onBlur={() => {
+                  void evalExpressions();
+                }}
                 disabled={!hasNode}
                 placeholder='pl.col("column_name") > 0'
                 minHeight="5rem"
@@ -185,9 +186,13 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
                     className="flex-1"
                     value={item.code}
                     onChange={(val) => {
-                      setWithColumns((prev) => prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)));
+                      setWithColumns((prev) =>
+                        prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)),
+                      );
                     }}
-                    onBlur={evalExpressions}
+                    onBlur={() => {
+                  void evalExpressions();
+                }}
                     disabled={!hasNode}
                     placeholder='b = pl.col("a").cast(pl.Utf8)'
                   />
@@ -222,9 +227,13 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
                     className="flex-1"
                     value={item.code}
                     onChange={(val) => {
-                      setSelectExpressions((prev) => prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)));
+                      setSelectExpressions((prev) =>
+                        prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)),
+                      );
                     }}
-                    onBlur={evalExpressions}
+                    onBlur={() => {
+                  void evalExpressions();
+                }}
                     disabled={!hasNode}
                     placeholder='pl.col("a"), pl.col("b")'
                   />
@@ -233,7 +242,9 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
                     size="icon"
                     className="mt-1 shrink-0"
                     disabled={selectExpressions.length <= 1}
-                    onClick={() => setSelectExpressions((prev) => prev.filter((it) => it.id !== item.id))}
+                    onClick={() =>
+                      setSelectExpressions((prev) => prev.filter((it) => it.id !== item.id))
+                    }
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -259,20 +270,31 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
                     className="flex-1"
                     value={item.code}
                     onChange={(val) => {
-                      setSortItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)));
+                      setSortItems((prev) =>
+                        prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)),
+                      );
                     }}
-                    onBlur={evalExpressions}
+                    onBlur={() => {
+                  void evalExpressions();
+                }}
                     disabled={!hasNode}
                     placeholder='pl.col("date")'
                   />
                   <div className="flex flex-col items-center gap-1 pt-2">
-                    <Label htmlFor={`sort-desc-${item.id}`} className="text-xs text-muted-foreground">Desc</Label>
+                    <Label
+                      htmlFor={`sort-desc-${item.id}`}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Desc
+                    </Label>
                     <Checkbox
                       id={`sort-desc-${item.id}`}
                       checked={item.descending}
                       onCheckedChange={(checked) => {
                         setSortItems((prev) =>
-                          prev.map((it) => (it.id === item.id ? { ...it, descending: Boolean(checked) } : it)),
+                          prev.map((it) =>
+                            it.id === item.id ? { ...it, descending: Boolean(checked) } : it,
+                          ),
                         );
                       }}
                       disabled={!hasNode}
@@ -308,7 +330,9 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
                 <CodeEditor
                   value={groupByState.keyCode}
                   onChange={(val) => setGroupByState({ ...groupByState, keyCode: val })}
-                  onBlur={evalExpressions}
+                  onBlur={() => {
+                  void evalExpressions();
+                }}
                   disabled={!hasNode}
                   placeholder='pl.col("category")'
                 />
@@ -328,7 +352,9 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
                           ),
                         }));
                       }}
-                      onBlur={evalExpressions}
+                      onBlur={() => {
+                  void evalExpressions();
+                }}
                       disabled={!hasNode}
                       placeholder='total = pl.col("value").sum()'
                     />
@@ -368,12 +394,9 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
           {/* Eval button + error */}
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={evalExpressions}
-              disabled={!canEval}
-            >
+            <Button variant="outline" size="sm" onClick={() => {
+              void evalExpressions();
+            }} disabled={!canEval}>
               <Play className="mr-1.5 h-3.5 w-3.5" />
               Preview
             </Button>
@@ -393,21 +416,27 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
         <CardFooter className="flex items-center gap-3 border-t pt-4">
           <div className="flex flex-1 items-center gap-2">
-            <Label htmlFor="polars-new-node-name" className="shrink-0">New data block name</Label>
+            <Label htmlFor="polars-new-node-name" className="shrink-0">
+              New data block name
+            </Label>
             <Input
               id="polars-new-node-name"
               className="min-w-0 flex-1"
               placeholder={newNodeNamePlaceholder}
               value={newNodeName}
               onChange={(e) => setNewNodeName(e.target.value)}
-              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: newNodeName, setValue: setNewNodeName })}
+              onKeyDown={(event) =>
+                acceptPlaceholderOnTab({ event, value: newNodeName, setValue: setNewNodeName })
+              }
               disabled={!canApply}
             />
           </div>
           <DisabledReasonTooltip reason={applyDisabledReason}>
             <Button
               size="sm"
-              onClick={applyExpression}
+              onClick={() => {
+                void applyExpression();
+              }}
               disabled={!canApply || isLoading.operations}
               className="shrink-0"
             >

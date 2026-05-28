@@ -40,8 +40,8 @@ const ChartImageDownloadDialogContent = ({
   extraOptions = [],
 }: Omit<Props, 'open'>) => {
   const [selectedFormat, setSelectedFormat] = useState<ChartImageFormat>('png');
-  const [extraStates, setExtraStates] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(extraOptions.map((opt) => [opt.id, opt.defaultChecked ?? false])),
+  const [extraStates, setExtraStates] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(extraOptions.map((opt) => [opt.id, opt.defaultChecked ?? false])),
   );
 
   /** Called by: ChartImageDownloadDialogContent Download action because the caller needs one documented boundary for the lookup, event, or state handoff step. */
@@ -109,7 +109,13 @@ const ChartImageDownloadDialogContent = ({
  * Alert-dialog wrapper used by chart result actions before exporting PNG/SVG/JPEG images.
  * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
-export const ChartImageDownloadDialog = ({ open, onOpenChange, title, onConfirm, extraOptions }: Props) => (
+export const ChartImageDownloadDialog = ({
+  open,
+  onOpenChange,
+  title,
+  onConfirm,
+  extraOptions,
+}: Props) => (
   <AlertDialog open={open} onOpenChange={onOpenChange}>
     {open ? (
       <ChartImageDownloadDialogContent

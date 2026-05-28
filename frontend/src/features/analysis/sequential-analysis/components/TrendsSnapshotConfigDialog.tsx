@@ -42,9 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  SNAPSHOT_FINEST_FREQUENCIES,
-} from '../trendsSnapshotConfig';
+import { SNAPSHOT_FINEST_FREQUENCIES } from '../trendsSnapshotConfig';
 import { getColumnUniqueValues } from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
@@ -122,7 +120,7 @@ interface Props {
   availableGroupByColumns: string[];
   /** Workspace + node identifiers — used by the dialog to fetch real
    * unique-value counts for ticked group-by columns via
-  * ``getColumnUniqueValues``. The result feeds the estimator's
+   * ``getColumnUniqueValues``. The result feeds the estimator's
    * cardinality product so the row count is accurate within a
    * factor of the time-bucket estimate. Without these the estimator
    * falls back to a flat assumption of 10 distinct values per column. */
@@ -145,7 +143,9 @@ interface Props {
 export function TrendsSnapshotConfigDialog({ open, ...contentProps }: Props) {
   return (
     <Dialog open={open} onOpenChange={contentProps.onOpenChange}>
-      {open ? <TrendsSnapshotConfigDialogContent key={contentProps.defaultName} {...contentProps} /> : null}
+      {open ? (
+        <TrendsSnapshotConfigDialogContent key={contentProps.defaultName} {...contentProps} />
+      ) : null}
     </Dialog>
   );
 }
@@ -203,7 +203,7 @@ function TrendsSnapshotConfigDialogContent({
   // Pure-JS estimator: corpus time-span × buckets-per-year × cardinality
   // product. Cardinalities default to 10 for any ticked column not yet
   // resolved by ``cardinalityByColumn``.
-    /**
+  /**
    * Used by: TrendsSnapshotConfigDialogContent cap warnings to estimate the captured snapshot row count because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
@@ -240,7 +240,10 @@ function TrendsSnapshotConfigDialogContent({
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isEstimating, setIsEstimating] = useState(false);
-  const [actualRowsResult, setActualRowsResult] = useState<{ signature: string; rows: number } | null>(null);
+  const [actualRowsResult, setActualRowsResult] = useState<{
+    signature: string;
+    rows: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const configSignature = `${config.finestFrequency}|${config.groupByColumns.join('\0')}|${config.numericInterval}|${config.numericOrigin ?? ''}`;
   const actualRows = actualRowsResult?.signature === configSignature ? actualRowsResult.rows : null;
@@ -267,7 +270,7 @@ function TrendsSnapshotConfigDialogContent({
     setError(null);
     try {
       const actual = await dryRunRowCount(config);
-        setActualRowsResult({ signature: configSignature, rows: actual });
+      setActualRowsResult({ signature: configSignature, rows: actual });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -325,224 +328,234 @@ function TrendsSnapshotConfigDialogContent({
     }
   };
 
-    return (
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Save Trends snapshot</DialogTitle>
-          <DialogDescription>
-            Pick the finest granularity to capture. The snapshot viewer can re-aggregate to
-            coarser frequencies and fewer group dimensions client-side — but it can't go finer
-            than what you save here.
-          </DialogDescription>
-        </DialogHeader>
+  return (
+    <DialogContent className="max-w-lg">
+      <DialogHeader>
+        <DialogTitle>Save Trends snapshot</DialogTitle>
+        <DialogDescription>
+          Pick the finest granularity to capture. The snapshot viewer can re-aggregate to coarser
+          frequencies and fewer group dimensions client-side — but it can't go finer than what you
+          save here.
+        </DialogDescription>
+      </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          {/* Finest bin */}
-          {columnType === 'datetime' ? (
+      <div className="space-y-4 py-2">
+        {/* Finest bin */}
+        {columnType === 'datetime' ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="snap-finest-freq">Finest time bin</Label>
+            <Select
+              value={config.finestFrequency}
+              onValueChange={(v) => handleFinestFrequency(v as SnapshotFinestFrequency)}
+            >
+              <SelectTrigger id="snap-finest-freq" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SNAPSHOT_FINEST_FREQUENCIES.map((freq) => (
+                  <SelectItem key={freq} value={freq}>
+                    {FREQUENCY_LABELS[freq]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Viewers can coarsen but not refine. Smaller bins = larger capture.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="snap-finest-freq">Finest time bin</Label>
-              <Select
-                value={config.finestFrequency}
-                onValueChange={(v) => handleFinestFrequency(v as SnapshotFinestFrequency)}
-              >
-                <SelectTrigger id="snap-finest-freq" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SNAPSHOT_FINEST_FREQUENCIES.map((freq) => (
-                    <SelectItem key={freq} value={freq}>
-                      {FREQUENCY_LABELS[freq]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Viewers can coarsen but not refine. Smaller bins = larger capture.
-              </p>
+              <Label htmlFor="snap-num-interval">Finest numeric bin</Label>
+              <Input
+                id="snap-num-interval"
+                type="number"
+                min="0"
+                step="any"
+                value={String(config.numericInterval)}
+                onChange={(e) => handleNumericInterval(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Default 1.</p>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="snap-num-origin">Origin (optional)</Label>
+              <Input
+                id="snap-num-origin"
+                type="number"
+                step="any"
+                value={config.numericOrigin == null ? '' : String(config.numericOrigin)}
+                onChange={(e) => handleNumericOrigin(e.target.value)}
+                placeholder="Auto-detect"
+              />
+              <p className="text-xs text-muted-foreground">Blank = data min.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Group-by columns */}
+        <div className="space-y-1.5">
+          <Label>Group-by columns ({config.groupByColumns.length}/3)</Label>
+          {availableGroupByColumns.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No metadata columns available on the active data block.
+            </p>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="snap-num-interval">Finest numeric bin</Label>
-                <Input
-                  id="snap-num-interval"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={String(config.numericInterval)}
-                  onChange={(e) => handleNumericInterval(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">Default 1.</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="snap-num-origin">Origin (optional)</Label>
-                <Input
-                  id="snap-num-origin"
-                  type="number"
-                  step="any"
-                  value={config.numericOrigin == null ? '' : String(config.numericOrigin)}
-                  onChange={(e) => handleNumericOrigin(e.target.value)}
-                  placeholder="Auto-detect"
-                />
-                <p className="text-xs text-muted-foreground">Blank = data min.</p>
-              </div>
+            <div className="max-h-32 overflow-y-auto rounded-md border border-input p-2">
+              {availableGroupByColumns.map((col) => {
+                const checked = config.groupByColumns.includes(col);
+                const disabled = !checked && config.groupByColumns.length >= 3;
+                // Only ticked columns are queried — when unticked,
+                // ``cardinalityByColumn`` won't have an entry, and we
+                // suppress the chip rather than show "10" (the
+                // estimator's default).
+                const cardinality = checked ? cardinalityByColumn[col] : null;
+                return (
+                  <label
+                    key={col}
+                    className={`flex items-center gap-2 px-1 py-1 text-sm ${
+                      disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      disabled={disabled}
+                      onCheckedChange={() => toggleGroupColumn(col)}
+                    />
+                    <span className="flex-1">{col}</span>
+                    {checked &&
+                      (cardinality == null ? (
+                        <span className="text-xs text-muted-foreground">…</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{cardinality} unique</span>
+                      ))}
+                  </label>
+                );
+              })}
             </div>
           )}
+          <p className="text-xs text-muted-foreground">
+            Pick up to 3. Viewers can hide groups but not add new ones.
+          </p>
+        </div>
 
-          {/* Group-by columns */}
-          <div className="space-y-1.5">
-            <Label>Group-by columns ({config.groupByColumns.length}/3)</Label>
-            {availableGroupByColumns.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No metadata columns available on the active data block.
-              </p>
-            ) : (
-              <div className="max-h-32 overflow-y-auto rounded-md border border-input p-2">
-                {availableGroupByColumns.map((col) => {
-                  const checked = config.groupByColumns.includes(col);
-                  const disabled = !checked && config.groupByColumns.length >= 3;
-                  // Only ticked columns are queried — when unticked,
-                  // ``cardinalityByColumn`` won't have an entry, and we
-                  // suppress the chip rather than show "10" (the
-                  // estimator's default).
-                  const cardinality = checked ? cardinalityByColumn[col] : null;
-                  return (
-                    <label
-                      key={col}
-                      className={`flex items-center gap-2 px-1 py-1 text-sm ${
-                        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                      }`}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        disabled={disabled}
-                        onCheckedChange={() => toggleGroupColumn(col)}
-                      />
-                      <span className="flex-1">{col}</span>
-                      {checked && (
-                        cardinality == null
-                          ? <span className="text-xs text-muted-foreground">…</span>
-                          : <span className="text-xs text-muted-foreground">{cardinality} unique</span>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Pick up to 3. Viewers can hide groups but not add new ones.
-            </p>
+        {/* Row estimate + cap */}
+        <div className="space-y-1.5 rounded-md border border-input p-3">
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="font-medium">Estimated rows</span>
+            <span
+              className={
+                isOverCap
+                  ? 'font-mono text-destructive'
+                  : isOverSoft
+                    ? 'font-mono text-amber-600 dark:text-amber-400'
+                    : 'font-mono'
+              }
+            >
+              ~{effectiveRowCount.toLocaleString()}
+              {actualRows != null && (
+                <span className="ml-1 text-xs text-muted-foreground">(actual)</span>
+              )}
+            </span>
           </div>
-
-          {/* Row estimate + cap */}
-          <div className="space-y-1.5 rounded-md border border-input p-3">
-            <div className="flex items-center justify-between gap-2 text-sm">
-              <span className="font-medium">Estimated rows</span>
-              <span className={isOverCap ? 'font-mono text-destructive' : isOverSoft ? 'font-mono text-amber-600 dark:text-amber-400' : 'font-mono'}>
-                ~{effectiveRowCount.toLocaleString()}
-                {actualRows != null && (
-                  <span className="ml-1 text-xs text-muted-foreground">(actual)</span>
-                )}
+          <div className="text-xs text-muted-foreground">
+            Cap {SNAPSHOT_ROW_HARD_CAP.toLocaleString()} · warn over{' '}
+            {SNAPSHOT_ROW_SOFT_WARN.toLocaleString()}.
+            {cardinalitiesLoading && (
+              <span className="ml-1 italic">Loading column cardinalities…</span>
+            )}
+          </div>
+          {isOverCap && (
+            <div className="flex items-start gap-1.5 text-xs text-destructive">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>Over the hard cap. Try a coarser bin or fewer group columns.</span>
+            </div>
+          )}
+          {!isOverCap && isOverSoft && (
+            <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Large capture — viewer aggregation will still be snappy, but the bundle is bigger.
               </span>
             </div>
-            <div className="text-xs text-muted-foreground">
-              Cap {SNAPSHOT_ROW_HARD_CAP.toLocaleString()} · warn over {SNAPSHOT_ROW_SOFT_WARN.toLocaleString()}.
-              {cardinalitiesLoading && (
-                <span className="ml-1 italic">Loading column cardinalities…</span>
+          )}
+          {canDryRun && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isEstimating}
+              onClick={() => {
+                void handleDryRun();
+              }}
+              className="mt-1"
+            >
+              {isEstimating ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Computing…
+                </>
+              ) : (
+                'Verify actual row count'
               )}
-            </div>
-            {isOverCap && (
-              <div className="flex items-start gap-1.5 text-xs text-destructive">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>
-                  Over the hard cap. Try a coarser bin or fewer group columns.
-                </span>
-              </div>
-            )}
-            {!isOverCap && isOverSoft && (
-              <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>
-                  Large capture — viewer aggregation will still be snappy, but the bundle is bigger.
-                </span>
-              </div>
-            )}
-            {canDryRun && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isEstimating}
-                onClick={handleDryRun}
-                className="mt-1"
-              >
-                {isEstimating ? (
-                  <>
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    Computing…
-                  </>
-                ) : (
-                  'Verify actual row count'
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* Filename + description */}
-          <div className="space-y-1.5">
-            <Label htmlFor="snap-name">Filename</Label>
-            <Input
-              id="snap-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={defaultName}
-            />
-            <p className="text-xs text-muted-foreground">
-              On disk: {tool}-{sanitiseName(name) || '<name>'}.ldaca-snapshot
-            </p>
-            {nameValidation.error && (
-              <p className="text-xs text-destructive">{nameValidation.error}</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="snap-desc">Description (optional)</Label>
-            <textarea
-              id="snap-desc"
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
-              placeholder="What this snapshot demonstrates."
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            </Button>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={!nameValidation.ok || isOverCap || isSaving}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <FolderPlus className="mr-2 h-4 w-4" />
-                Save
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+        {/* Filename + description */}
+        <div className="space-y-1.5">
+          <Label htmlFor="snap-name">Filename</Label>
+          <Input
+            id="snap-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={defaultName}
+          />
+          <p className="text-xs text-muted-foreground">
+            On disk: {tool}-{sanitiseName(name) || '<name>'}.ldaca-snapshot
+          </p>
+          {nameValidation.error && (
+            <p className="text-xs text-destructive">{nameValidation.error}</p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="snap-desc">Description (optional)</Label>
+          <textarea
+            id="snap-desc"
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder="What this snapshot demonstrates."
+          />
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+          Cancel
+        </Button>
+        <Button
+          onClick={() => {
+            void handleSave();
+          }}
+          disabled={!nameValidation.ok || isOverCap || isSaving}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving…
+            </>
+          ) : (
+            <>
+              <FolderPlus className="mr-2 h-4 w-4" />
+              Save
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }

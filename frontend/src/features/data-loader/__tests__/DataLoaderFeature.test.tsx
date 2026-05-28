@@ -96,10 +96,10 @@ vi.mock('@/hooks/useAuth', () => ({
   // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   useAuth: () => ({
     dataFolder: '/tmp/user_data',
-        /**
-         * Returns empty headers so SDK calls avoid depending on auth setup.
-         * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
-         */
+    /**
+     * Returns empty headers so SDK calls avoid depending on auth setup.
+     * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+     */
     getAuthHeaders: () => ({}),
   }),
 }));
@@ -152,7 +152,9 @@ vi.mock('@/api/generated/sdk.gen', () => ({
   moveFile: mockMoveFile,
   importSampleData: vi.fn(),
   listLdacaFeaturedCollections: mockListLdacaFeaturedCollections,
-  searchLdacaCollections: vi.fn(async () => ({ data: { state: 'successful', data: [], message: 'Searched' } })),
+  searchLdacaCollections: vi.fn(() => ({
+    data: { state: 'successful', data: [], message: 'Searched' },
+  })),
   importLdacaDataset: vi.fn(),
   uploadWorkspaceZip: vi.fn(),
 }));
@@ -180,26 +182,26 @@ vi.mock('@/components/panels', () => ({
   // Loader wiring and file/workspace controls.
   // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   AddFilePanel: () => null,
-    /**
-     * Keeps preview rendering inert while preserving the feature prop contract.
-     * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
-     */
+  /**
+   * Keeps preview rendering inert while preserving the feature prop contract.
+   * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+   */
   FilePreviewPanel: () => null,
 }));
 
 vi.mock('@/components/help/HelpIcon', () => ({
-    /**
-     * Replaces help chrome so tests focus on Data Loader behavior.
-     * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
-     */
+  /**
+   * Replaces help chrome so tests focus on Data Loader behavior.
+   * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+   */
   default: () => null,
 }));
 
 vi.mock('@/components/help/InfoIcon', () => ({
-    /**
-     * Replaces info chrome so tests focus on Data Loader behavior.
-     * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
-     */
+  /**
+   * Replaces info chrome so tests focus on Data Loader behavior.
+   * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
+   */
   default: () => null,
 }));
 
@@ -233,8 +235,14 @@ describe('DataLoaderFeature citation UI', () => {
     vi.clearAllMocks();
     mockHandleUploadFile.mockResolvedValue(true);
     mockRawFile.mockResolvedValue({ data: '# ADO Citation\n\nReference text.', error: undefined });
-    mockCreateFolder.mockResolvedValue({ data: { message: 'Folder created', path: 'new-folder' }, error: undefined });
-    mockMoveFile.mockResolvedValue({ data: { message: 'File moved', path: 'sample_data/Other/docs.csv' }, error: undefined });
+    mockCreateFolder.mockResolvedValue({
+      data: { message: 'Folder created', path: 'new-folder' },
+      error: undefined,
+    });
+    mockMoveFile.mockResolvedValue({
+      data: { message: 'File moved', path: 'sample_data/Other/docs.csv' },
+      error: undefined,
+    });
     mockListLdacaFeaturedCollections.mockResolvedValue({
       data: { state: 'successful', data: [], message: 'Loaded' },
       error: undefined,
@@ -465,7 +473,7 @@ describe('DataLoaderFeature citation UI', () => {
     expect(titleLink).toHaveAttribute('target', '_blank');
   });
 
-  it('shows only active workspace controls when a workspace is loaded and allows quick unload from the manager', async () => {
+  it('shows only active workspace controls when a workspace is loaded and allows quick unload from the manager', () => {
     renderWithProviders(<DataLoaderFeature />);
 
     const activeWorkspaceCard = getVisibleMatch(screen.getAllByTestId('active-workspace-card'));

@@ -1,4 +1,3 @@
-
 import { Calculator, Loader2, X } from 'lucide-react';
 
 import NodeSelectionPanel from '@/features/analysis/common/components/NodeSelectionPanel';
@@ -50,14 +49,8 @@ const getAggregateSelectionKey = (props: AggregateSubTabProps): string => {
  */
 function AggregateSubTabContent(props: AggregateSubTabProps) {
   const { isLoading } = props;
-  const {
-    nodeSelection,
-    expression,
-    basicBuilder,
-    preview,
-    apply,
-    dropZoneRef,
-  } = useAggregateSubTab(props);
+  const { nodeSelection, expression, basicBuilder, preview, apply, dropZoneRef } =
+    useAggregateSubTab(props);
 
   return (
     <div className="space-y-4">
@@ -106,135 +99,166 @@ function AggregateSubTabContent(props: AggregateSubTabProps) {
           <Separator />
 
           <div className="space-y-4">
-              <div className="space-y-2">
-                <span className="text-sm font-medium text-foreground">Available columns</span>
-                {basicBuilder.availableColumns.length > 0 ? (
-                  <div className={cn('flex flex-wrap gap-2', basicBuilder.disabled && 'pointer-events-none opacity-60')}>
-                    {basicBuilder.availableColumns.map((col) => (
-                      <button
-                        key={col.name}
-                        type="button"
-                        draggable={!basicBuilder.disabled}
-                        onDragStart={(event) => basicBuilder.handlers.columnDragStart(event, col.name, col.dataType)}
-                        onDragEnd={basicBuilder.handlers.paletteDragEnd}
-                        onClick={() => basicBuilder.addColumnToken(col.name, col.dataType)}
-                        className={cn(
-                          'select-none rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
-                          basicBuilder.disabled
-                            ? 'cursor-not-allowed opacity-60'
-                            : 'cursor-grab active:cursor-grabbing',
-                        )}
-                      >
-                        {col.name}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      draggable={!basicBuilder.disabled}
-                      onDragStart={basicBuilder.handlers.customDragStart}
-                      onDragEnd={basicBuilder.handlers.paletteDragEnd}
-                      onClick={() => basicBuilder.addCustomToken()}
-                      className={cn(
-                        'select-none rounded-full border border-border bg-background px-3 py-1 text-sm text-foreground shadow-sm transition',
-                        basicBuilder.disabled ? 'cursor-not-allowed opacity-60' : 'cursor-grab active:cursor-grabbing',
-                      )}
-                    >
-                      Custom Text
-                    </button>
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-dashed border-muted-foreground/50 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                    Column names will appear here once schema metadata loads.
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">Builder</span>
-                  <HelpIcon targetKey="preprocessing.aggregate.builder" label="Expression builder" />
-                </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Available columns</span>
+              {basicBuilder.availableColumns.length > 0 ? (
                 <div
-                  ref={dropZoneRef}
-                  onDragEnter={basicBuilder.handlers.builderDragOver}
-                  onDragOver={basicBuilder.handlers.builderDragOver}
-                  onDragLeave={basicBuilder.handlers.builderDragLeave}
-                  onDrop={basicBuilder.handlers.builderDrop}
                   className={cn(
-                    'min-h-23 rounded-md border border-dashed border-muted-foreground/50 bg-muted/30 p-4 transition',
-                    basicBuilder.dragActive && 'border-primary bg-primary/5',
+                    'flex flex-wrap gap-2',
                     basicBuilder.disabled && 'pointer-events-none opacity-60',
                   )}
                 >
-                  {basicBuilder.tokens.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Drag columns or custom text here to build an expression. Tokens snap into place as you drop them.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-3">
-                      {basicBuilder.tokens.map((token) => {
-                        const isCustom = token.kind === 'custom';
-                        const isEditing = basicBuilder.editingTokenId === token.id;
-                        const showBefore =
-                          basicBuilder.dropIndicator?.tokenId === token.id &&
-                          basicBuilder.dropIndicator.position === 'before';
-                        const showAfter =
-                          basicBuilder.dropIndicator?.tokenId === token.id &&
-                          basicBuilder.dropIndicator.position === 'after';
-                        return (
-                          <div key={token.id} className="flex items-center gap-1">
-                            {showBefore && <span className="h-8 w-0.5 rounded bg-primary" aria-hidden="true" />}
+                  {basicBuilder.availableColumns.map((col) => (
+                    <button
+                      key={col.name}
+                      type="button"
+                      draggable={!basicBuilder.disabled}
+                      onDragStart={(event) =>
+                        basicBuilder.handlers.columnDragStart(event, col.name, col.dataType)
+                      }
+                      onDragEnd={basicBuilder.handlers.paletteDragEnd}
+                      onClick={() => basicBuilder.addColumnToken(col.name, col.dataType)}
+                      className={cn(
+                        'select-none rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
+                        basicBuilder.disabled
+                          ? 'cursor-not-allowed opacity-60'
+                          : 'cursor-grab active:cursor-grabbing',
+                      )}
+                    >
+                      {col.name}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    draggable={!basicBuilder.disabled}
+                    onDragStart={basicBuilder.handlers.customDragStart}
+                    onDragEnd={basicBuilder.handlers.paletteDragEnd}
+                    onClick={() => basicBuilder.addCustomToken()}
+                    className={cn(
+                      'select-none rounded-full border border-border bg-background px-3 py-1 text-sm text-foreground shadow-sm transition',
+                      basicBuilder.disabled
+                        ? 'cursor-not-allowed opacity-60'
+                        : 'cursor-grab active:cursor-grabbing',
+                    )}
+                  >
+                    Custom Text
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed border-muted-foreground/50 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                  Column names will appear here once schema metadata loads.
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">Builder</span>
+                <HelpIcon targetKey="preprocessing.aggregate.builder" label="Expression builder" />
+              </div>
+              <div
+                ref={dropZoneRef}
+                onDragEnter={basicBuilder.handlers.builderDragOver}
+                onDragOver={basicBuilder.handlers.builderDragOver}
+                onDragLeave={basicBuilder.handlers.builderDragLeave}
+                onDrop={basicBuilder.handlers.builderDrop}
+                className={cn(
+                  'min-h-23 rounded-md border border-dashed border-muted-foreground/50 bg-muted/30 p-4 transition',
+                  basicBuilder.dragActive && 'border-primary bg-primary/5',
+                  basicBuilder.disabled && 'pointer-events-none opacity-60',
+                )}
+              >
+                {basicBuilder.tokens.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Drag columns or custom text here to build an expression. Tokens snap into place
+                    as you drop them.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {basicBuilder.tokens.map((token) => {
+                      const isCustom = token.kind === 'custom';
+                      const isEditing = basicBuilder.editingTokenId === token.id;
+                      const showBefore =
+                        basicBuilder.dropIndicator?.tokenId === token.id &&
+                        basicBuilder.dropIndicator.position === 'before';
+                      const showAfter =
+                        basicBuilder.dropIndicator?.tokenId === token.id &&
+                        basicBuilder.dropIndicator.position === 'after';
+                      return (
+                        <div key={token.id} className="flex items-center gap-1">
+                          {showBefore && (
+                            <span className="h-8 w-0.5 rounded bg-primary" aria-hidden="true" />
+                          )}
+                          <div
+                            className={cn('group', basicBuilder.disabled && 'opacity-70')}
+                            draggable={!basicBuilder.disabled && !isEditing}
+                            onDragStart={(event) =>
+                              basicBuilder.handlers.existingTokenDragStart(event, token.id)
+                            }
+                            onDragEnd={basicBuilder.handlers.existingTokenDragEnd}
+                            onDragOver={(event) =>
+                              basicBuilder.handlers.tokenDragOver(token.id, event)
+                            }
+                          >
                             <div
-                              className={cn('group', basicBuilder.disabled && 'opacity-70')}
-                              draggable={!basicBuilder.disabled && !isEditing}
-                              onDragStart={(event) => basicBuilder.handlers.existingTokenDragStart(event, token.id)}
-                              onDragEnd={basicBuilder.handlers.existingTokenDragEnd}
-                              onDragOver={(event) => basicBuilder.handlers.tokenDragOver(token.id, event)}
+                              className={cn(
+                                'flex min-h-8.5 items-center gap-1 rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
+                                !basicBuilder.disabled &&
+                                  !isEditing &&
+                                  'cursor-grab active:cursor-grabbing',
+                              )}
                             >
-                              <div
-                                className={cn(
-                                  'flex min-h-8.5 items-center gap-1 rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
-                                  !basicBuilder.disabled && !isEditing && 'cursor-grab active:cursor-grabbing',
-                                )}
-                              >
-                                {isCustom ? (
-                                  isEditing ? (
-                                    <Input
-                                      value={basicBuilder.customDraft}
-                                      onChange={basicBuilder.handlers.customDraftChange}
-                                      onBlur={() => basicBuilder.finishCustomEdit(true)}
-                                      onKeyDown={basicBuilder.handlers.customInputKeyDown}
-                                      spellCheck={false}
-                                      autoCorrect="off"
-                                      autoCapitalize="none"
-                                      autoComplete="off"
-                                      autoFocus
-                                      className="h-7 w-32 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground shadow-none focus-visible:ring-0"
-                                    />
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => basicBuilder.startEditingCustom(token.id)}
-                                      className="text-sm font-medium tracking-tight text-background transition hover:text-background/80"
-                                    >
-                                      {token.value || '""'}
-                                    </button>
-                                  )
+                              {isCustom ? (
+                                isEditing ? (
+                                  <Input
+                                    value={basicBuilder.customDraft}
+                                    onChange={basicBuilder.handlers.customDraftChange}
+                                    onBlur={() => basicBuilder.finishCustomEdit(true)}
+                                    onKeyDown={basicBuilder.handlers.customInputKeyDown}
+                                    spellCheck={false}
+                                    autoCorrect="off"
+                                    autoCapitalize="none"
+                                    autoComplete="off"
+                                    autoFocus
+                                    className="h-7 w-32 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground shadow-none focus-visible:ring-0"
+                                  />
                                 ) : (
-                                  <OperationPopover
-                                    nodeId={nodeSelection.effectiveNodes[0]?.id ?? nodeSelection.effectiveNodes[0]?.node_id ?? ''}
-                                    column={token.column}
-                                    onSelect={(op) => basicBuilder.addOperation(token.id, op)}
-                                    disabled={basicBuilder.disabled}
+                                  <button
+                                    type="button"
+                                    onClick={() => basicBuilder.startEditingCustom(token.id)}
+                                    className="text-sm font-medium tracking-tight text-background transition hover:text-background/80"
                                   >
-                                    <button type="button" className="font-medium hover:text-background/80 transition">
-                                      {token.column}
-                                    </button>
-                                  </OperationPopover>
-                                )}
-                                {!isCustom && token.operations.map((op, idx) => (
-                                  <span key={`${op}-${idx}`} className="flex items-center gap-0.5 border-l border-background/30 pl-1">
-                                    <span className="font-mono text-xs text-background/70">.{op}()</span>
+                                    {token.value || '""'}
+                                  </button>
+                                )
+                              ) : (
+                                <OperationPopover
+                                  nodeId={
+                                    nodeSelection.effectiveNodes[0]?.id ??
+                                    nodeSelection.effectiveNodes[0]?.node_id ??
+                                    ''
+                                  }
+                                  column={token.column}
+                                  onSelect={(op) => basicBuilder.addOperation(token.id, op)}
+                                  disabled={basicBuilder.disabled}
+                                >
+                                  <button
+                                    type="button"
+                                    className="font-medium hover:text-background/80 transition"
+                                  >
+                                    {token.column}
+                                  </button>
+                                </OperationPopover>
+                              )}
+                              {!isCustom &&
+                                token.operations.map((op, idx) => (
+                                  <span
+                                    key={`${op}-${idx}`}
+                                    className="flex items-center gap-0.5 border-l border-background/30 pl-1"
+                                  >
+                                    <span className="font-mono text-xs text-background/70">
+                                      .{op}()
+                                    </span>
                                     <button
                                       type="button"
                                       onClick={() => basicBuilder.removeOperation(token.id, idx)}
@@ -246,55 +270,60 @@ function AggregateSubTabContent(props: AggregateSubTabProps) {
                                     </button>
                                   </span>
                                 ))}
-                                <button
-                                  type="button"
-                                  onClick={() => basicBuilder.removeToken(token.id)}
-                                  className="ml-1 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-background/30 text-background/60 transition hover:border-background/60 hover:text-background focus-visible:outline-hidden group-hover:border-background/60 group-hover:text-background"
-                                  aria-label="Remove token"
-                                  disabled={basicBuilder.disabled}
-                                  onMouseDown={(event) => event.stopPropagation()}
-                                >
-                                  <X className="size-2.5" />
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => basicBuilder.removeToken(token.id)}
+                                className="ml-1 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-background/30 text-background/60 transition hover:border-background/60 hover:text-background focus-visible:outline-hidden group-hover:border-background/60 group-hover:text-background"
+                                aria-label="Remove token"
+                                disabled={basicBuilder.disabled}
+                                onMouseDown={(event) => event.stopPropagation()}
+                              >
+                                <X className="size-2.5" />
+                              </button>
                             </div>
-                            {showAfter && <span className="h-8 w-0.5 rounded bg-primary" aria-hidden="true" />}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                          {showAfter && (
+                            <span className="h-8 w-0.5 rounded bg-primary" aria-hidden="true" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <span className="text-sm font-medium text-foreground">Expression preview</span>
-                <div className="rounded-md border border-muted-foreground/50 bg-muted/30 px-3 py-2 font-mono text-sm text-muted-foreground break-all">
-                  {basicBuilder.expressionPreview.length > 0 ? basicBuilder.expressionPreview : '—'}
-                </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Expression preview</span>
+              <div className="rounded-md border border-muted-foreground/50 bg-muted/30 px-3 py-2 font-mono text-sm text-muted-foreground break-all">
+                {basicBuilder.expressionPreview.length > 0 ? basicBuilder.expressionPreview : '—'}
               </div>
+            </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={basicBuilder.clearBuilder}
-                  disabled={
-                    basicBuilder.disabled ||
-                    (basicBuilder.tokens.length === 0 && expression.expression.trim().length === 0)
-                  }
-                >
-                  Clear Builder
-                </Button>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={basicBuilder.clearBuilder}
+                disabled={
+                  basicBuilder.disabled ||
+                  (basicBuilder.tokens.length === 0 && expression.expression.trim().length === 0)
+                }
+              >
+                Clear Builder
+              </Button>
+            </div>
           </div>
         </CardContent>
 
         <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
           <div className="flex flex-1 items-center gap-2">
             <span className="shrink-0 text-sm font-medium text-foreground">New column name</span>
-            <HelpIcon targetKey="preprocessing.aggregate.column-name" label="Computed column name" />
+            <HelpIcon
+              targetKey="preprocessing.aggregate.column-name"
+              label="Computed column name"
+            />
             <Input
               value={expression.columnName}
               onChange={expression.onChange.columnName}
@@ -309,7 +338,15 @@ function AggregateSubTabContent(props: AggregateSubTabProps) {
             />
           </div>
           <DisabledReasonTooltip reason={apply.disabledReason}>
-            <Button type="button" size="sm" onClick={apply.handleApply} disabled={!apply.canApply} className="shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                void apply.handleApply();
+              }}
+              disabled={!apply.canApply}
+              className="shrink-0"
+            >
               {apply.loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -347,4 +384,4 @@ function AggregateSubTabContent(props: AggregateSubTabProps) {
       />
     </div>
   );
-};
+}

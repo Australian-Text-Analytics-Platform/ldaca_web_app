@@ -95,9 +95,8 @@ function AddFilePanelBody({
         </SelectContent>
       </Select>
       <p className="mt-1 text-xs text-muted-foreground">
-        Sets the default for this and future corpora. Analysis tools without a
-        language-specific implementation (e.g. quotation extractor) will disable
-        themselves on non-English corpora.
+        Sets the default for this and future corpora. Analysis tools without a language-specific
+        implementation (e.g. quotation extractor) will disable themselves on non-English corpora.
       </p>
     </div>
   );
@@ -108,7 +107,9 @@ function AddFilePanelBody({
         <Button variant="outline" onClick={onClose} type="button">
           Cancel
         </Button>
-        <Button size="sm" onClick={handleConfirm} disabled={submitting}>
+        <Button size="sm" onClick={() => {
+          void handleConfirm();
+        }} disabled={submitting}>
           {submitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -130,7 +131,16 @@ function AddFilePanelBody({
       filename={filename}
       open
       onClose={onClose}
-      data={{ previewData, columns, loading, error, fileType, sheetNames, selectedSheet, setSelectedSheet }}
+      data={{
+        previewData,
+        columns,
+        loading,
+        error,
+        fileType,
+        sheetNames,
+        selectedSheet,
+        setSelectedSheet,
+      }}
       title={`Add File: ${filename}`}
       description="Files are added as data blocks automatically. Choose an optional sheet, inspect the preview, and confirm before adding it to the workspace."
       headerSlot={languageSelector}

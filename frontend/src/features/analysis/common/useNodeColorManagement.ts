@@ -53,15 +53,11 @@ export function useNodeColorManagement(
   const assignedColors = useNodeColorsStore((state) => state.colors);
   const ensureColors = useNodeColorsStore((state) => state.ensureColors);
   const setColor = useNodeColorsStore((state) => state.setColor);
-  const tabTemps = useNodeColorsStore((state) =>
-    tabKey ? (state.temps[tabKey] ?? null) : null,
-  );
+  const tabTemps = useNodeColorsStore((state) => (tabKey ? (state.temps[tabKey] ?? null) : null));
   const ensureTempColors = useNodeColorsStore((state) => state.ensureTempColors);
   const setTempColor = useNodeColorsStore((state) => state.setTempColor);
   const clearTempColors = useNodeColorsStore((state) => state.clearTempColors);
-  const promoteTempColorsAction = useNodeColorsStore(
-    (state) => state.promoteTempColors,
-  );
+  const promoteTempColorsAction = useNodeColorsStore((state) => state.promoteTempColors);
 
   // Stable key so we don't re-fire the ensure/clear effects on every
   // render when the caller hands us a freshly-built array of the same

@@ -84,7 +84,10 @@ const writeCache = (payload: PartialRemoteRegistry): void => {
  */
 const fetchRegistry = async (baseUrl: string): Promise<PartialRemoteRegistry | null> => {
   try {
-    const url = new URL('registry.json', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString();
+    const url = new URL(
+      'registry.json',
+      baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
+    ).toString();
     const resp = await fetch(url, { cache: 'no-cache' });
     if (!resp.ok) return null;
     const json = (await resp.json()) as unknown;

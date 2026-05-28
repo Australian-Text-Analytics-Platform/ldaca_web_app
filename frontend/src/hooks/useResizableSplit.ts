@@ -241,18 +241,21 @@ export function useResizableSplit({
   );
 
   /** Starts a drag interaction and captures the pointer for reliable splitter movement. */
-  const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    draggingRef.current = true;
-    setIsDragging(true);
-    liveValueRef.current = value;
-    onDragStartRef.current?.();
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // ignore pointer capture errors
-    }
-  }, [value]);
+  const onPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      draggingRef.current = true;
+      setIsDragging(true);
+      liveValueRef.current = value;
+      onDragStartRef.current?.();
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // ignore pointer capture errors
+      }
+    },
+    [value],
+  );
 
   /** Streams drag updates either through DOM-imperative callbacks or hook state. */
   const onPointerMove = useCallback(
@@ -303,8 +306,10 @@ export function useResizableSplit({
       // anchor='end', it grows the value (the end pane gets bigger as the
       // splitter moves away from it… err, no — as the splitter moves
       // toward the START edge, the END pane grows). Sign flip via anchor.
-      const isStartward = orientation === 'horizontal' ? event.key === 'ArrowUp' : event.key === 'ArrowLeft';
-      const isEndward = orientation === 'horizontal' ? event.key === 'ArrowDown' : event.key === 'ArrowRight';
+      const isStartward =
+        orientation === 'horizontal' ? event.key === 'ArrowUp' : event.key === 'ArrowLeft';
+      const isEndward =
+        orientation === 'horizontal' ? event.key === 'ArrowDown' : event.key === 'ArrowRight';
       const startwardDelta = anchor === 'end' ? +step : -step;
       const endwardDelta = anchor === 'end' ? -step : +step;
       if (isStartward) {
@@ -336,8 +341,8 @@ export function useResizableSplit({
   // ARIA value reporting: clamp to a 0..100 integer scale so screen readers
   // get a sensible % regardless of mode.
   const reportedNow = mode === 'percent' ? value * 100 : value;
-  const reportedMin = mode === 'percent' ? min * 100 : (Number.isFinite(min) ? min : 0);
-  const reportedMax = mode === 'percent' ? max * 100 : (Number.isFinite(max) ? max : 100);
+  const reportedMin = mode === 'percent' ? min * 100 : Number.isFinite(min) ? min : 0;
+  const reportedMax = mode === 'percent' ? max * 100 : Number.isFinite(max) ? max : 100;
 
   const splitterProps: ResizableSplitHandle['splitterProps'] = {
     role: 'separator',

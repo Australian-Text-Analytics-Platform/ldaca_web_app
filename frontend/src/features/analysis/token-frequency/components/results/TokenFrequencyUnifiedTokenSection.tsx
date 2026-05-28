@@ -1,5 +1,9 @@
 import { memo } from 'react';
-import type { NodeResultView, NormalizedNodeResult, TokenFrequencyStatisticsEntry } from '../../tokenFrequencyAdapters';
+import type {
+  NodeResultView,
+  NormalizedNodeResult,
+  TokenFrequencyStatisticsEntry,
+} from '../../tokenFrequencyAdapters';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,15 +94,18 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   // across renders, regardless of whether the comparative panel is showing.
   const measuredCardWidth = useElementWidth(unifiedCloudContainerRef);
 
-  const hasMultipleNodes = normalizedNodeResults.length >= 2 || nodeDisplayResults.length >= 2 || lastCompareNodeIds.length >= 2;
+  const hasMultipleNodes =
+    normalizedNodeResults.length >= 2 ||
+    nodeDisplayResults.length >= 2 ||
+    lastCompareNodeIds.length >= 2;
 
   if (!hasMultipleNodes) {
     return null;
   }
 
   const isComparative = normalizedNodeResults.length === 2 && lastCompareNodeIds.length === 2;
-  const nodeAResult = (nodeDisplayResults[0] ?? normalizedNodeResults[0]) ?? null;
-  const nodeBResult = (nodeDisplayResults[1] ?? normalizedNodeResults[1]) ?? null;
+  const nodeAResult = nodeDisplayResults[0] ?? normalizedNodeResults[0] ?? null;
+  const nodeBResult = nodeDisplayResults[1] ?? normalizedNodeResults[1] ?? null;
   const nodeAId = nodeAResult?.nodeId ?? lastCompareNodeIds[0] ?? '';
   const nodeBId = nodeBResult?.nodeId ?? lastCompareNodeIds[1] ?? '';
   const nodeAName = nodeAResult?.displayName ?? computeDisplayName(nodeAId, nodeAId);
@@ -121,14 +128,13 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
       ...s,
       total: s.o1 + s.o2,
       juxRank:
-        (s.o1 + s.o2) > 0 && Number.isFinite(s.logratio)
-          ? Math.log10(s.o1 + s.o2) * s.logratio
-          : 0,
+        s.o1 + s.o2 > 0 && Number.isFinite(s.logratio) ? Math.log10(s.o1 + s.o2) * s.logratio : 0,
     }))
     .filter((s) => s.token.length > 0 && s.total > 10);
 
   const sortedByRank = cloudStats.toSorted((a, b) => a.juxRank - b.juxRank);
-  const limitForCloudBase = typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : defaultTokenLimit;
+  const limitForCloudBase =
+    typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : defaultTokenLimit;
   const cloudLimit = Math.max(0, limitForCloudBase * 2);
   const half = Math.floor(cloudLimit / 2);
   const low = sortedByRank.slice(0, Math.min(half, sortedByRank.length));
@@ -164,10 +170,11 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
     };
   };
   /** Used by: blend to convert RGB channels back into a hex swatch for SVG text fill because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-  const rgbToHex = (r: number, g: number, b: number) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  const rgbToHex = (r: number, g: number, b: number) =>
+    `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
   const colorA = hexToRgb(nodeAColor);
   const colorB = hexToRgb(nodeBColor);
-    /**
+  /**
    * Used by: unified word-cloud Text fill to blend between study and reference colors because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
@@ -185,11 +192,11 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
     return {
       text: s.token,
       value: s.total,
-      proportion: denom > 0 ? (s.p1 / denom) : 0.5,
+      proportion: denom > 0 ? s.p1 / denom : 0.5,
     };
   });
   const proportionByToken = new Map<string, number>(
-    words.map((word) => [word.text, Number(word.proportion) || 0.5])
+    words.map((word) => [word.text, Number(word.proportion) || 0.5]),
   );
 
   // Measure the card body so the SVG fills the actual available width
@@ -252,15 +259,36 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
         </CardHeader>
 
         <CardContent>
-          <div ref={unifiedCloudContainerRef} className="rounded-lg border p-3" style={{ minHeight: effectiveCloudHeight }}>
+          <div
+            ref={unifiedCloudContainerRef}
+            className="rounded-lg border p-3"
+            style={{ minHeight: effectiveCloudHeight }}
+          >
             {isComparative && selectedCloudStats.length > 0 ? (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1"><span className="inline-block h-3.5 w-3.5 rounded" style={{ backgroundColor: nodeAColor }} />{nodeAName}</div>
-                  <div className="flex items-center gap-1"><span className="inline-block h-3.5 w-3.5 rounded" style={{ backgroundColor: nodeBColor }} />{nodeBName}</div>
+                  <div className="flex items-center gap-1">
+                    <span
+                      className="inline-block h-3.5 w-3.5 rounded"
+                      style={{ backgroundColor: nodeAColor }}
+                    />
+                    {nodeAName}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span
+                      className="inline-block h-3.5 w-3.5 rounded"
+                      style={{ backgroundColor: nodeBColor }}
+                    />
+                    {nodeBName}
+                  </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span>Gradient</span>
-                    <div className="h-2.5 w-28 rounded" style={{ background: `linear-gradient(to right, ${nodeAColor}, ${nodeBColor})` }} />
+                    <div
+                      className="h-2.5 w-28 rounded"
+                      style={{
+                        background: `linear-gradient(to right, ${nodeAColor}, ${nodeBColor})`,
+                      }}
+                    />
                     <span>A → B</span>
                   </div>
                 </div>
@@ -317,13 +345,16 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Unified cloud appears when two data block results and comparative statistics are available.</p>
+              <p className="text-sm text-muted-foreground">
+                Unified cloud appears when two data block results and comparative statistics are
+                available.
+              </p>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {(Array.isArray(statistics) && statistics.length > 0) && (
+      {Array.isArray(statistics) && statistics.length > 0 && (
         <div className={view === 'list' ? undefined : 'hidden'}>
           {(() => {
             // lastCompareNodeIds is ordered [reference, study]; the
@@ -362,6 +393,4 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
  * is enough to skip the re-render entirely when only ``stopWords``
  * (which this component doesn't take) changed.
  */
-export const TokenFrequencyUnifiedTokenSection = memo(
-  TokenFrequencyUnifiedTokenSectionInner,
-);
+export const TokenFrequencyUnifiedTokenSection = memo(TokenFrequencyUnifiedTokenSectionInner);

@@ -7,8 +7,8 @@ export interface LanguageOption {
   code: string;
   label: string;
   /**
-  * Marker for languages the quotation extractor supports. Drives the
-  * disabled-with-tooltip indicator in tool menus.
+   * Marker for languages the quotation extractor supports. Drives the
+   * disabled-with-tooltip indicator in tool menus.
    */
   quotationSupported: boolean;
 }

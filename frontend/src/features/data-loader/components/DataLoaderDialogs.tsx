@@ -31,7 +31,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { OniSearchRequest, OniSearchResult as LdacaSearchResult } from '@/api/generated/types.gen';
+import type {
+  OniSearchRequest,
+  OniSearchResult as LdacaSearchResult,
+} from '@/api/generated/types.gen';
 import type { FileTreeDirectory } from '@/features/data-loader/types';
 
 type LdacaSearchMethod = Extract<NonNullable<OniSearchRequest['method']>, 'keyword' | 'identifier'>;
@@ -740,6 +743,6 @@ export function DataLoaderDialogs({
       </AlertDialog>
     </>
   );
-};
+}
 
 export default DataLoaderDialogs;

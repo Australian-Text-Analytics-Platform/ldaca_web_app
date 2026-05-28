@@ -95,13 +95,13 @@ export const AnalysisPagination = ({
       <div className="flex flex-wrap items-center gap-2">
         {onPageSizeChange && (
           <>
-            <Label htmlFor="analysis-rows-per-page" className="whitespace-nowrap text-sm text-muted-foreground">
+            <Label
+              htmlFor="analysis-rows-per-page"
+              className="whitespace-nowrap text-sm text-muted-foreground"
+            >
               {pageSizeLabel}
             </Label>
-            <Select
-              value={String(pageSize)}
-              onValueChange={(val) => onPageSizeChange(Number(val))}
-            >
+            <Select value={String(pageSize)} onValueChange={(val) => onPageSizeChange(Number(val))}>
               <SelectTrigger className="h-9 w-20" id="analysis-rows-per-page">
                 <SelectValue />
               </SelectTrigger>
@@ -141,10 +141,7 @@ export const AnalysisPagination = ({
           {paginationRange.map((item, index) => (
             <PaginationItem key={`${item}-${index}`}>
               {item === 'dots' ? (
-                <PaginationJump
-                  totalPages={totalPages}
-                  onPageChange={onPageChange}
-                />
+                <PaginationJump totalPages={totalPages} onPageChange={onPageChange} />
               ) : (
                 <PaginationLink
                   href="#"
@@ -183,11 +180,7 @@ export const AnalysisPagination = ({
       </Pagination>
 
       {/* Right: Extra controls (e.g. Add to Workspace) */}
-      {children ? (
-        <div className="flex items-center gap-2">
-          {children}
-        </div>
-      ) : null}
+      {children ? <div className="flex items-center gap-2">{children}</div> : null}
     </div>
   );
 };

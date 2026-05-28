@@ -1,63 +1,60 @@
-import * as React from "react"
+import * as React from 'react';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
   MoreHorizontal,
   MoreHorizontalIcon,
-} from "lucide-react"
+} from 'lucide-react';
 
-import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { cn } from '@/lib/utils';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 /**
  * Pagination navigation landmark used by table and analysis pagination controls.
  * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
-function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
+function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
   return (
     <nav
       role="navigation"
       aria-label="pagination"
       data-slot="pagination"
-      className={cn("mx-auto flex w-full justify-center", className)}
+      className={cn('mx-auto flex w-full justify-center', className)}
       {...props}
     />
-  )
+  );
 }
 
 /** Used by: Pagination consumers to wrap page links, jump controls, and ellipses because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-function PaginationContent({
-  className,
-  ...props
-}: React.ComponentProps<"ul">) {
+function PaginationContent({ className, ...props }: React.ComponentProps<'ul'>) {
   return (
     <ul
       data-slot="pagination-content"
-      className={cn("flex flex-row items-center gap-1", className)}
+      className={cn('flex flex-row items-center gap-1', className)}
       {...props}
     />
-  )
+  );
 }
 
 /** Used by: Pagination consumers for each page link or ellipsis item because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-function PaginationItem({ ...props }: React.ComponentProps<"li">) {
-  return <li data-slot="pagination-item" {...props} />
+function PaginationItem({ ...props }: React.ComponentProps<'li'>) {
+  return <li data-slot="pagination-item" {...props} />;
 }
 
 type PaginationLinkProps = {
-  isActive?: boolean
-} & Pick<React.ComponentProps<typeof Button>, "size"> &
-  Omit<React.ComponentProps<"a">, "size">
+  isActive?: boolean;
+} & Pick<React.ComponentProps<typeof Button>, 'size'> &
+  Omit<React.ComponentProps<'a'>, 'size'>;
 
 interface PaginationJumpProps {
   /** Known total pages. Omit for source-row pagination with unknown totals. */
-  totalPages?: number
-  onPageChange: (page: number) => void
+  totalPages?: number;
+  onPageChange: (page: number) => void;
   /** Override the trigger button's classes (e.g. `size-8` for tighter footers). */
-  triggerClassName?: string
+  triggerClassName?: string;
   /** Whether to render a "Page:" label inside the popover. Defaults to true. */
-  showPageLabel?: boolean
+  showPageLabel?: boolean;
 }
 
 /**
@@ -73,71 +70,73 @@ export function PaginationJump({
   triggerClassName,
   showPageLabel = true,
 }: PaginationJumpProps) {
-  const [open, setOpen] = React.useState(false)
-  const [value, setValue] = React.useState("")
-  const [error, setError] = React.useState<string | null>(null)
-  const containerRef = React.useRef<HTMLDivElement | null>(null)
-  const inputRef = React.useRef<HTMLInputElement | null>(null)
-  const inputId = React.useId()
-  const errorId = `${inputId}-error`
+  const [open, setOpen] = React.useState(false);
+  const [value, setValue] = React.useState('');
+  const [error, setError] = React.useState<string | null>(null);
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const inputId = React.useId();
+  const errorId = `${inputId}-error`;
 
   React.useEffect(() => {
-    if (!open) return
+    if (!open) return;
 
     /**
      * Closes the page-size selector when consumers click outside the control.
      * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
      */
     const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current || containerRef.current.contains(event.target as Node)) return
-      setOpen(false)
-    }
+      if (!containerRef.current || containerRef.current.contains(event.target as Node)) return;
+      setOpen(false);
+    };
     /** Called by: the PaginationJump document keydown listener because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
-    }
+      if (event.key === 'Escape') setOpen(false);
+    };
 
-    document.addEventListener("mousedown", handlePointerDown)
-    document.addEventListener("keydown", handleEscape)
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown)
-      document.removeEventListener("keydown", handleEscape)
-    }
-  }, [open])
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
 
   React.useEffect(() => {
-    if (!open) return
+    if (!open) return;
     // rAF defer avoids the react-hooks/set-state-in-effect lint while still
     // resetting the form and focusing the input the moment the popover opens.
     const id = requestAnimationFrame(() => {
-      setValue("")
-      setError(null)
-      inputRef.current?.focus()
-    })
-    return () => cancelAnimationFrame(id)
-  }, [open])
+      setValue('');
+      setError(null);
+      inputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open]);
 
   /**
    * Called by: the PaginationJump form onSubmit prop because the interaction needs a single handler that validates state, runs the action, and updates feedback.
-    * Flow: trim and validate numeric input, report range errors, emit the parsed page to onPageChange, then close the popover.
+   * Flow: trim and validate numeric input, report range errors, emit the parsed page to onPageChange, then close the popover.
    */
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const trimmed = value.trim()
+    event.preventDefault();
+    const trimmed = value.trim();
     if (!/^\d+$/.test(trimmed)) {
-      setError(totalPages ? `Enter a number between 1 and ${totalPages}` : "Enter a page number")
-      return
+      setError(totalPages ? `Enter a number between 1 and ${totalPages}` : 'Enter a page number');
+      return;
     }
 
-    const target = Number.parseInt(trimmed, 10)
+    const target = Number.parseInt(trimmed, 10);
     if (Number.isNaN(target) || target < 1 || (totalPages && target > totalPages)) {
-      setError(totalPages ? `Enter a value between 1 and ${totalPages}` : "Enter a valid page number")
-      return
+      setError(
+        totalPages ? `Enter a value between 1 and ${totalPages}` : 'Enter a valid page number',
+      );
+      return;
     }
 
-    onPageChange(target)
-    setOpen(false)
-  }
+    onPageChange(target);
+    setOpen(false);
+  };
 
   return (
     <div ref={containerRef} className="relative">
@@ -148,7 +147,7 @@ export function PaginationJump({
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((prev) => !prev)}
-        className={cn("size-9 text-muted-foreground hover:text-foreground", triggerClassName)}
+        className={cn('size-9 text-muted-foreground hover:text-foreground', triggerClassName)}
       >
         <MoreHorizontal className="h-4 w-4" />
         <span className="sr-only">Jump to page</span>
@@ -166,17 +165,17 @@ export function PaginationJump({
               ref={inputRef}
               value={value}
               onChange={(event) => {
-                setValue(event.target.value)
-                if (error) setError(null)
+                setValue(event.target.value);
+                if (error) setError(null);
               }}
               type="text"
               inputMode="numeric"
-              placeholder={totalPages ? `${totalPages}` : "…"}
-              aria-invalid={error ? "true" : undefined}
+              placeholder={totalPages ? `${totalPages}` : '…'}
+              aria-invalid={error ? 'true' : undefined}
               aria-describedby={error ? errorId : undefined}
               className={cn(
-                "h-8 w-16 text-sm",
-                error && "border-destructive focus-visible:ring-destructive",
+                'h-8 w-16 text-sm',
+                error && 'border-destructive focus-visible:ring-destructive',
               )}
             />
             <Button type="submit" size="sm">
@@ -191,91 +190,77 @@ export function PaginationJump({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 /** Used by: pagination footers for numeric pages and previous/next controls because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-function PaginationLink({
-  className,
-  isActive,
-  size = "icon",
-  ...props
-}: PaginationLinkProps) {
+function PaginationLink({ className, isActive, size = 'icon', ...props }: PaginationLinkProps) {
   return (
     <a
-      aria-current={isActive ? "page" : undefined}
+      aria-current={isActive ? 'page' : undefined}
       data-slot="pagination-link"
       data-active={isActive}
       className={cn(
         buttonVariants({
-          variant: isActive ? "outline" : "ghost",
+          variant: isActive ? 'outline' : 'ghost',
           size,
         }),
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 /**
  * Previous-page link wrapper used by paginated tables and analysis results.
  * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
-function PaginationPrevious({
-  className,
-  ...props
-}: React.ComponentProps<typeof PaginationLink>) {
+function PaginationPrevious({ className, ...props }: React.ComponentProps<typeof PaginationLink>) {
   return (
     <PaginationLink
       aria-label="Go to previous page"
       size="default"
-      className={cn("gap-1 px-2.5 sm:pl-2.5", className)}
+      className={cn('gap-1 px-2.5 sm:pl-2.5', className)}
       {...props}
     >
       <ChevronLeftIcon />
       <span className="hidden sm:block">Previous</span>
     </PaginationLink>
-  )
+  );
 }
 
 /**
  * Next-page link wrapper used by paginated tables and analysis results.
  * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
-function PaginationNext({
-  className,
-  ...props
-}: React.ComponentProps<typeof PaginationLink>) {
+function PaginationNext({ className, ...props }: React.ComponentProps<typeof PaginationLink>) {
   return (
     <PaginationLink
       aria-label="Go to next page"
       size="default"
-      className={cn("gap-1 px-2.5 sm:pr-2.5", className)}
+      className={cn('gap-1 px-2.5 sm:pr-2.5', className)}
       {...props}
     >
       <span className="hidden sm:block">Next</span>
       <ChevronRightIcon />
     </PaginationLink>
-  )
+  );
 }
 
 /** Used by: pagination footers when compact ranges hide intermediate pages because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-function PaginationEllipsis({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
+function PaginationEllipsis({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
       aria-hidden
       data-slot="pagination-ellipsis"
-      className={cn("flex size-9 items-center justify-center", className)}
+      className={cn('flex size-9 items-center justify-center', className)}
       {...props}
     >
       <MoreHorizontalIcon className="size-4" />
       <span className="sr-only">More pages</span>
     </span>
-  )
+  );
 }
 
 export {
@@ -288,4 +273,4 @@ export {
   PaginationEllipsis,
   // buildPaginationRange and PaginationJump are exported inline above as
   // top-level `export const` so consumers can import them directly.
-}
+};

@@ -129,7 +129,7 @@ describe('ExportFeature', () => {
       ok: true,
       // Provides export bytes to the component's download branch.
       // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-      blob: async () => new Blob(['parquet-bytes']),
+      blob: () => new Blob(['parquet-bytes']),
     });
 
     Object.defineProperty(URL, 'createObjectURL', {

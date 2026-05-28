@@ -3,7 +3,12 @@
  * 6-color base palette used by stack allocator and fallback assignments.
  */
 export const DEFAULT_PALETTE: string[] = [
-  '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#0d9488', '#db2777',
+  '#2563eb',
+  '#dc2626',
+  '#16a34a',
+  '#9333ea',
+  '#0d9488',
+  '#db2777',
 ];
 
 /**
@@ -24,8 +29,18 @@ export const UNASSIGNED_NODE_COLOR = '#6b7280';
  * the user, including UNASSIGNED_NODE_COLOR as a deliberate choice.
  */
 export const EXTENDED_PALETTE: string[] = [
-  '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#d97706', '#0d9488',
-  '#db2777', '#4f46e5', '#65a30d', '#0891b2', '#92400e', UNASSIGNED_NODE_COLOR,
+  '#2563eb',
+  '#dc2626',
+  '#16a34a',
+  '#9333ea',
+  '#d97706',
+  '#0d9488',
+  '#db2777',
+  '#4f46e5',
+  '#65a30d',
+  '#0891b2',
+  '#92400e',
+  UNASSIGNED_NODE_COLOR,
 ];
 
 /**

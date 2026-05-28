@@ -44,7 +44,10 @@ describe('tokenFrequencyUtils', () => {
 
   it('buildSelectionNameById merges selected + panel nodes with panel precedence', () => {
     const selected = [{ id: 'a', name: 'Alpha' }];
-    const panel = [{ id: 'a', name: 'Panel A' }, { id: 'b', name: 'Beta' }];
+    const panel = [
+      { id: 'a', name: 'Panel A' },
+      { id: 'b', name: 'Beta' },
+    ];
 
     expect(buildSelectionNameById(selected, panel)).toEqual({
       a: 'Panel A',
@@ -53,7 +56,10 @@ describe('tokenFrequencyUtils', () => {
   });
 
   it('buildSelectionNameKey produces a stable key from merged names', () => {
-    const selected = [{ id: 'b', name: 'Beta' }, { id: 'a', name: 'Alpha' }];
+    const selected = [
+      { id: 'b', name: 'Beta' },
+      { id: 'a', name: 'Alpha' },
+    ];
     const panel = [{ id: 'a', name: 'Panel A' }];
 
     expect(buildSelectionNameKey(selected, panel)).toBe('a:Panel A|b:Beta');

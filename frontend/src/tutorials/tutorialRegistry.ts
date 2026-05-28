@@ -5,11 +5,7 @@
  * literal-union continue to compile.
  */
 
-import {
-  TUTORIAL_INDEX_TARGET,
-  type BundledTutorialKey,
-  type DocTarget,
-} from './bundledRegistry';
+import { TUTORIAL_INDEX_TARGET, type BundledTutorialKey, type DocTarget } from './bundledRegistry';
 import { getDocTarget } from './getDocTarget';
 
 export type TutorialTarget = DocTarget;

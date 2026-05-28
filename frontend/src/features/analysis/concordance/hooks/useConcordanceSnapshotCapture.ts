@@ -7,7 +7,11 @@
  */
 import { useCallback } from 'react';
 import JSZip from 'jszip';
-import { concordanceTaskDispersionBins, concordanceTaskResultPost, uploadSnapshot } from '@/api/generated/sdk.gen';
+import {
+  concordanceTaskDispersionBins,
+  concordanceTaskResultPost,
+  uploadSnapshot,
+} from '@/api/generated/sdk.gen';
 import type {
   ConcordanceAnalysisRequest,
   ConcordanceAnalysisResponse,
@@ -75,7 +79,7 @@ function perBlockRowCounts(
 /** Builds the manifest preview shown before a concordance snapshot is loaded. */
 /**
  * Called by: useConcordanceSnapshotCapture hook as a local helper in this analysis workflow because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
-   * Flow: read the request search term, count hits across result nodes, detect materialized output, capture display columns, then return preview metadata.
+ * Flow: read the request search term, count hits across result nodes, detect materialized output, capture display columns, then return preview metadata.
  */
 function buildConcordancePreview(
   resp: ConcordanceAnalysisResponse,
@@ -106,9 +110,7 @@ function buildConcordancePreview(
  * Used by: ConcordanceFeature.tsx, compat.ts, useConcordanceSnapshotLoad.ts, and related files because snapshot capture needs this unit to summarize live analysis state before packaging a reusable snapshot.
  * Flow: inspect the current result, build preview metadata, serialize the snapshot payload, then hand the bundle data to snapshot actions.
  */
-export function useConcordanceSnapshotCapture(
-  input: UseConcordanceSnapshotCaptureInput,
-) {
+export function useConcordanceSnapshotCapture(input: UseConcordanceSnapshotCaptureInput) {
   const {
     workspaceId,
     workspaceName,
@@ -186,11 +188,12 @@ export function useConcordanceSnapshotCapture(
         }).then(({ data }) => data),
         wasCombined
           ? concordanceTaskResultPost({
-                body: { page_size: 'all', update_only: false, combined: true },
-                headers,
-                path: { task_id: taskId },
-                throwOnError: true,
-              }).then(({ data }) => data)
+              body: { page_size: 'all', update_only: false, combined: true },
+              headers,
+              path: { task_id: taskId },
+              throwOnError: true,
+            })
+              .then(({ data }) => data)
               .catch((err: unknown) => {
                 // Combined fetch is best-effort — if it fails, the
                 // snapshot still ships per-node entries.
@@ -200,11 +203,11 @@ export function useConcordanceSnapshotCapture(
           : Promise.resolve(null),
         ...validNodeIds.map((id) =>
           concordanceTaskDispersionBins({
-              headers,
-              path: { task_id: taskId },
-              query: { node_id: id },
-              throwOnError: true,
-            })
+            headers,
+            path: { task_id: taskId },
+            query: { node_id: id },
+            throwOnError: true,
+          })
             .then(({ data }) => data)
             .then(
               (bins) => ({ id, bins }) as { id: string; bins: ConcordanceDispersionBinsResponse },
@@ -234,9 +237,7 @@ export function useConcordanceSnapshotCapture(
       // too so the hook stays self-contained — a captured bundle's
       // result payload must be the flat materialised shape, otherwise
       // the load-side viewer can't render it.
-      const unmaterialised = validNodeIds.filter(
-        (id) => !perNodeResult.data?.[id]?.materialized,
-      );
+      const unmaterialised = validNodeIds.filter((id) => !perNodeResult.data?.[id]?.materialized);
       if (unmaterialised.length > 0) {
         throw captureError(
           'not-materialised',
@@ -278,9 +279,7 @@ export function useConcordanceSnapshotCapture(
         tool: 'concordance',
         tool_version: getCurrentAppVersion() || 'v0.0.0-dev',
         captured_at: new Date().toISOString(),
-        title: filename
-          .replace(/^concordance-/, '')
-          .replace(/\.ldaca-snapshot$/, ''),
+        title: filename.replace(/^concordance-/, '').replace(/\.ldaca-snapshot$/, ''),
         source: {
           workspace_id: workspaceId,
           workspace_name: workspaceName,
@@ -300,9 +299,7 @@ export function useConcordanceSnapshotCapture(
         payloads: [
           { kind: 'result', path: RESULT_PAYLOAD_PATH },
           { kind: 'dispersion-bins', path: DISPERSION_BINS_PAYLOAD_PATH },
-          ...(request
-            ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const)
-            : []),
+          ...(request ? ([{ kind: 'settings', path: SETTINGS_PAYLOAD_PATH }] as const) : []),
         ],
         node_colors: nodeColorsForSnapshot,
       };
@@ -337,14 +334,6 @@ export function useConcordanceSnapshotCapture(
         throwOnError: true,
       });
     },
-    [
-      workspaceId,
-      workspaceName,
-      taskId,
-      request,
-      selectedNodes,
-      getNodeRowCount,
-      getAuthHeaders,
-    ],
+    [workspaceId, workspaceName, taskId, request, selectedNodes, getNodeRowCount, getAuthHeaders],
   );
 }

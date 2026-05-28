@@ -96,7 +96,9 @@ describe('tokenizer model inventory', () => {
   });
 
   it('orders predefined tokenizer models with language-compatible models first', () => {
-    expect(orderedTokenizerModelsForLanguage(TOKENIZER_MODELS, 'ja').map((option) => option.model)).toEqual([
+    expect(
+      orderedTokenizerModelsForLanguage(TOKENIZER_MODELS, 'ja').map((option) => option.model),
+    ).toEqual([
       'lindera:ja-ipadic',
       'lindera:ja-ipadic-neologd',
       'lindera:ja-unidic',

@@ -11,9 +11,7 @@ export function extractAndSetTaskId(
 ): string | null {
   const responseRecord = response as Record<string, unknown> | null | undefined;
   const metadata = responseRecord?.metadata as Record<string, unknown> | null | undefined;
-  const taskId =
-    metadata?.task_id ??
-    responseRecord?.task_id;
+  const taskId = metadata?.task_id ?? responseRecord?.task_id;
   if (typeof taskId === 'string' && taskId.trim().length > 0) {
     setLocalTaskId(taskId);
     return taskId;

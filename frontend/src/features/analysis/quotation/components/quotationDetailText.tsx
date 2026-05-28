@@ -57,9 +57,21 @@ export const renderQuotationDetailText = (
       addSpan(s?.start, s?.end, s?.type as string | undefined),
     );
   } else {
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
-    addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
+    addSpan(
+      row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx],
+      row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx],
+      'speaker',
+    );
+    addSpan(
+      row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx],
+      row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx],
+      'quote',
+    );
+    addSpan(
+      row?.[QUOTATION_COLUMN_KEYS.verbStartIdx],
+      row?.[QUOTATION_COLUMN_KEYS.verbEndIdx],
+      'verb',
+    );
   }
 
   if (!spans.length) return text;
@@ -76,9 +88,7 @@ export const renderQuotationDetailText = (
     const s = points[i]!;
     const e = points[i + 1]!;
     if (e <= s) continue;
-    const covering = spans
-      .filter((sp) => sp.start < e && sp.end > s)
-      .flatMap((sp) => sp.types);
+    const covering = spans.filter((sp) => sp.start < e && sp.end > s).flatMap((sp) => sp.types);
     segs.push({ start: s, end: e, types: Array.from(new Set(covering)) });
   }
 

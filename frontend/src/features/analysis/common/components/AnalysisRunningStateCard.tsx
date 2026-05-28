@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
@@ -18,7 +18,7 @@ const toMs = (v: number) => (v < 1e12 ? v * 1000 : v);
  * Tracks elapsed task runtime for running-state cards without requiring every
  * feature to own an interval timer.
  * Used by: AnalysisRunningStateCard because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-   * Flow: initialize elapsed seconds from started_at, tick every second while a valid start exists, then clear the interval when the card unmounts or task changes.
+ * Flow: initialize elapsed seconds from started_at, tick every second while a valid start exists, then clear the interval when the card unmounts or task changes.
  */
 function useElapsedSeconds(startedAt: string | number | null | undefined): number {
   const [elapsed, setElapsed] = useState<number>(() => {
@@ -75,7 +75,9 @@ export function AnalysisRunningStateCard({
           <div className="flex items-baseline gap-3">
             <p className="font-medium">{title}</p>
             {elapsed > 0 && (
-              <span className="text-xs text-amber-800/70">Running for {formatElapsed(elapsed)}</span>
+              <span className="text-xs text-amber-800/70">
+                Running for {formatElapsed(elapsed)}
+              </span>
             )}
           </div>
           <p className="text-amber-800/90">{message}</p>

@@ -6,8 +6,11 @@
  * Used by: src/components/panels/DatetimeFormatPanel.tsx, src/utils/__tests__/datetimeFormatInfer.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
-export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boolean } = {}): string | null {
-  const nonEmpty = samples.filter(s => typeof s === 'string' && s.trim()).slice(0, 50);
+export function inferDatetimeFormat(
+  samples: string[],
+  opts: { requireTime?: boolean } = {},
+): string | null {
+  const nonEmpty = samples.filter((s) => typeof s === 'string' && s.trim()).slice(0, 50);
   if (!nonEmpty.length) return null;
 
   // Choose the sample with the most content (likely has time / tz info)
@@ -30,7 +33,8 @@ export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boo
 
   /** Tells later replacements whether the candidate already exposes a month token. */
   /** Called by: inferDatetimeFormat in this utility module because the utility needs local normalization steps before returning a shared result. */
-  const hasMonthToken = () => format.includes('%m') || format.includes('%b') || format.includes('%B');
+  const hasMonthToken = () =>
+    format.includes('%m') || format.includes('%b') || format.includes('%B');
   /** Escapes regex-significant date separators before dynamic replacement rules consume them. */
   /** Called by: inferDatetimeFormat in this utility module because the utility needs local normalization steps before returning a shared result. */
   const escapeSep = (s: string) => (s === '.' ? '\\.' : s);

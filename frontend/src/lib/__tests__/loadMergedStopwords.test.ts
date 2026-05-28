@@ -9,7 +9,9 @@ describe('loadMergedStopwords', () => {
   });
 
   it('deduplicates normalised language codes before resolving stopwords', async () => {
-    const result = await loadMergedStopwords({ languages: ['en', 'EN ', ' en-AU', null, undefined, 'en'] });
+    const result = await loadMergedStopwords({
+      languages: ['en', 'EN ', ' en-AU', null, undefined, 'en'],
+    });
 
     expect(result.byLanguage).toHaveLength(1);
     expect(result.byLanguage[0]?.language).toBe('en');

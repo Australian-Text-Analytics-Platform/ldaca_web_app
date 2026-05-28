@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Play, Square, Trash2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisFeatureHeader } from '@/features/analysis/common/components/AnalysisFeatureHeader';
-import NodeSelectionPanel, { type NodeSelectionColumnAddonArgs } from '@/features/analysis/common/components/NodeSelectionPanel';
+import NodeSelectionPanel, {
+  type NodeSelectionColumnAddonArgs,
+} from '@/features/analysis/common/components/NodeSelectionPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { SNAPSHOT_DISABLED_REASON, snapshotDisabledReason } from '@/features/snapshot-view';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/analysis/common/components/AnalysisLockedNotice';
@@ -43,9 +45,9 @@ export type ConcordanceParameterPanelProps = {
   caseSensitive: boolean;
   setCaseSensitive: Dispatch<SetStateAction<boolean>>;
   /**
-    * Selected concordance engine. ``tokens`` mode walks the tokenization column
-    * prepared by the selected tokenizer model; only meaningful when
-    * ``tokensModeAvailable`` is true.
+   * Selected concordance engine. ``tokens`` mode walks the tokenization column
+   * prepared by the selected tokenizer model; only meaningful when
+   * ``tokensModeAvailable`` is true.
    */
   searchMode: 'regex' | 'tokens';
   setSearchMode: (next: 'regex' | 'tokens') => void;
@@ -81,7 +83,7 @@ export type ConcordanceParameterPanelProps = {
    * hidden, and the Save/Open snapshot buttons in the header stay
    * available (the host gates Save with ``saveSnapshotDisabledReason``
    * which it sets to a fixed string in snapshot mode). Used by the
-  * snapshot view to reuse the live ParameterPanel chrome verbatim. */
+   * snapshot view to reuse the live ParameterPanel chrome verbatim. */
   readOnly?: boolean;
   renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
 };
@@ -136,7 +138,8 @@ export function ConcordanceParameterPanel({
     if (isSearching) return undefined;
     if (actionState.runDisabledReason) return actionState.runDisabledReason;
     if (!searchWord.trim()) return 'Enter a search word first';
-    if (effectiveNodeColumnSelections.some((sel) => !sel.column)) return 'Select a column for each data block';
+    if (effectiveNodeColumnSelections.some((sel) => !sel.column))
+      return 'Select a column for each data block';
     return undefined;
   })();
 
@@ -186,8 +189,13 @@ export function ConcordanceParameterPanel({
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <label className="block text-sm font-medium text-foreground">Search word or phrase</label>
-                <HelpIcon targetKey="analysis.concordance.search-term" label="Concordance search term" />
+                <label className="block text-sm font-medium text-foreground">
+                  Search word or phrase
+                </label>
+                <HelpIcon
+                  targetKey="analysis.concordance.search-term"
+                  label="Concordance search term"
+                />
               </div>
               <DisabledReasonTooltip
                 reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
@@ -209,7 +217,9 @@ export function ConcordanceParameterPanel({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">Left context (tokens)</label>
+                <label className="block text-sm font-medium text-foreground">
+                  Left context (tokens)
+                </label>
                 <DisabledReasonTooltip
                   reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
                   className="w-full"
@@ -226,7 +236,9 @@ export function ConcordanceParameterPanel({
                 </DisabledReasonTooltip>
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">Right context (tokens)</label>
+                <label className="block text-sm font-medium text-foreground">
+                  Right context (tokens)
+                </label>
                 <DisabledReasonTooltip
                   reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
                   className="w-full"
@@ -376,16 +388,22 @@ export function ConcordanceParameterPanel({
                   void handleRunOrUpdate();
                 }}
                 disabled={
-                  actionState.runDisabled
-                  || !searchWord.trim()
-                  || effectiveNodeColumnSelections.some((sel) => !sel.column)
+                  actionState.runDisabled ||
+                  !searchWord.trim() ||
+                  effectiveNodeColumnSelections.some((sel) => !sel.column)
                 }
                 className="w-full md:w-auto"
               >
                 {isSearching ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running...
+                  </>
                 ) : (
-                  <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    {actionState.runLabel}
+                  </>
                 )}
               </Button>
             </DisabledReasonTooltip>
@@ -398,14 +416,20 @@ export function ConcordanceParameterPanel({
                 variant="outline"
                 disabled={isStopping}
               >
-                {isStopping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
+                {isStopping ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="mr-2 h-4 w-4" />
+                )}
                 Stop
               </Button>
             ) : null}
 
             <div className="flex items-center gap-2">
               <Button
-                onClick={handleClearResults}
+                onClick={() => {
+                  void handleClearResults();
+                }}
                 variant="destructive"
                 disabled={actionState.clearDisabled}
               >
@@ -439,4 +463,4 @@ export function ConcordanceParameterPanel({
       </CardFooter>
     </Card>
   );
-};
+}

@@ -60,12 +60,12 @@ export interface FormatNumberOptions {
  * Formats backend metrics for shared analysis UI elements that need consistent
  * fallbacks, scaling, and locale-aware decimal handling.
  * Used by: shared analysis summary cards, tables, and chart labels because backend metrics need fallback text, optional scaling, and locale-aware precision.
-   * Flow: coerce the input with toFiniteNumber, apply fallback text for non-numeric values, scale and format with Intl.NumberFormat, then append any suffix.
+ * Flow: coerce the input with toFiniteNumber, apply fallback text for non-numeric values, scale and format with Intl.NumberFormat, then append any suffix.
  */
 export const formatNumber = (
   value: unknown,
   decimals = 2,
-  options: FormatNumberOptions = {}
+  options: FormatNumberOptions = {},
 ): string => {
   const numeric = toFiniteNumber(value);
   if (numeric === null) {
@@ -113,11 +113,11 @@ export interface AnalysisNodeRequestShape {
  * Extracts the node/column selection shape shared by multi-node analysis task
  * requests so hydration and lock restoration can reuse one parser.
  * Used by: token-frequency hydration and lock restoration because backend requests store node_ids and node_columns that must become ordered selections.
-   * Flow: slice valid node_ids to the requested limit, read the node_columns map, then return node ids, column lookup, and ordered selections.
+ * Flow: slice valid node_ids to the requested limit, read the node_columns map, then return node ids, column lookup, and ordered selections.
  */
 export const parseAnalysisNodeRequest = (
   requestData: AnalysisNodeRequestShape | null | undefined,
-  maxNodes = 2
+  maxNodes = 2,
 ): ParsedAnalysisNodeRequest => {
   const nodeIds: string[] = Array.isArray(requestData?.node_ids)
     ? requestData.node_ids
@@ -164,7 +164,12 @@ export const restoreAnalysisLockFromRequest = async ({
   const parsed = parseAnalysisNodeRequest(requestData, maxNodes);
 
   if (workspaceId && parsed.nodeIds.length) {
-    const snapshots = await createNodeSnapshots(workspaceId, parsed.nodeIds, getAuthHeaders, queryClient);
+    const snapshots = await createNodeSnapshots(
+      workspaceId,
+      parsed.nodeIds,
+      getAuthHeaders,
+      queryClient,
+    );
     const normalizedSnapshots = applySelectedColumnsToSnapshots(snapshots, parsed.nodeColumns);
     lockWithSnapshots(normalizedSnapshots);
   }

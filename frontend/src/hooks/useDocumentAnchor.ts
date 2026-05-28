@@ -24,7 +24,8 @@ export const useDocumentAnchor = ({ activeAnchor, loading, error }: UseDocumentA
     }
     missingAnchorRef.current = null;
     anchorElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    const highlightTarget = anchorElement.closest('p, li, section, h2, h3, h4, h5') ?? anchorElement;
+    const highlightTarget =
+      anchorElement.closest('p, li, section, h2, h3, h4, h5') ?? anchorElement;
     highlightTarget.classList.add('tutorial-highlight');
     const timeoutId = window.setTimeout(() => {
       highlightTarget.classList.remove('tutorial-highlight');

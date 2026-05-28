@@ -2,7 +2,11 @@ import React, { type ReactNode } from 'react';
 import { AlertTriangle, Lock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import type { NodeColumnSelection, NodeColumnSource, WorkspaceNodeLike } from '../nodeSelectionTypes';
+import type {
+  NodeColumnSelection,
+  NodeColumnSource,
+  WorkspaceNodeLike,
+} from '../nodeSelectionTypes';
 import { getNodeIdentifier } from '../nodeSelectionTypes';
 import { NodeColumnSelector, NodeSelectionList } from '.';
 import type { NodeSelectionRenderArgs } from '.';
@@ -26,7 +30,7 @@ interface NodeSelectionPanelProps {
   selectedNodes: WorkspaceNodeLike[];
   nodeColumnSelections: NodeColumnSelection[];
   onColumnChange: (nodeId: string, column: string) => void;
-  nodeColors: Record<string,string>;
+  nodeColors: Record<string, string>;
   onColorChange: (nodeId: string, color: string) => void;
   getNodeColumns?: (node: WorkspaceNodeLike) => NodeColumnSource;
   defaultPalette: string[];
@@ -39,7 +43,7 @@ interface NodeSelectionPanelProps {
   renderNodeMeta?: (node: WorkspaceNodeLike) => React.ReactNode;
   showShape?: boolean; // display shape if present on node metadata
   disabled?: boolean; // disables interactions but keeps UI fully visible
-  locked?: boolean;   // shows a small lock icon in the header when true
+  locked?: boolean; // shows a small lock icon in the header when true
   originalCount?: number; // total selection count prior to slicing for display
   /**
    * Restrict selectable columns by normalized data type (e.g., ['string'], ['datetime']).
@@ -90,7 +94,8 @@ function NodeSelectionPanel({
   renderColumnControlAddon,
 }: NodeSelectionPanelProps) {
   /** Called by: renderColumnSelector while labeling each node's column control because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-  const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
+  const getColumnLabel = (node: WorkspaceNodeLike, idx: number) =>
+    columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:';
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
   const selectedNodeIds = selectedNodes.map((node, idx) => getNodeIdentifier(node, idx));
 
@@ -111,7 +116,7 @@ function NodeSelectionPanel({
     fallbackToAllColumns,
   });
 
-    /**
+  /**
    * Called by: renderMetaContent when shape display is enabled because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: read the optional row/column shape tuple, format finite dimensions with locale separators, then return placeholders for unknown values.
    */
@@ -138,7 +143,7 @@ function NodeSelectionPanel({
     return null;
   };
 
-    /**
+  /**
    * Called by: NodeSelectionList for each selected node body because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
    * Flow: derive display state, bind user actions, then render the analysis UI.
    */
@@ -148,7 +153,8 @@ function NodeSelectionPanel({
     const options = columnOptions[nodeId];
     const columns = options?.columns ?? [];
     const selection = columnSelectionsByNode.get(nodeId);
-    const selectValue = selection?.column && selection.column.length > 0 ? selection.column : CLEAR_SELECTION_VALUE;
+    const selectValue =
+      selection?.column && selection.column.length > 0 ? selection.column : CLEAR_SELECTION_VALUE;
     const addon = renderColumnControlAddon?.({
       ...args,
       column: selection?.column ?? '',
@@ -197,7 +203,7 @@ function NodeSelectionPanel({
         <div className="flex items-center justify-between px-3 pt-1.5">
           <div className="flex items-center gap-2">
             <label className="block text-sm font-medium text-muted-foreground">
-              Selected Data Blocks ({(originalCount ?? selectedNodes.length)}/{maxCompare})
+              Selected Data Blocks ({originalCount ?? selectedNodes.length}/{maxCompare})
             </label>
             {headerAddon}
           </div>
@@ -208,9 +214,7 @@ function NodeSelectionPanel({
                   <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
               </TooltipTrigger>
-              {lockedMessage && (
-                <TooltipContent side="top">{lockedMessage}</TooltipContent>
-              )}
+              {lockedMessage && <TooltipContent side="top">{lockedMessage}</TooltipContent>}
             </Tooltip>
           )}
         </div>
@@ -229,9 +233,9 @@ function NodeSelectionPanel({
       )}
       {selectedNodes.length === 0 ? (
         <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
-          { (originalCount && originalCount > 0)
+          {originalCount && originalCount > 0
             ? `Over-selected (${originalCount}) but none usable. Reduce to max ${maxCompare}.`
-            : `No data blocks selected. Single click on data blocks in the workspace view to select them (max ${maxCompare} for comparison).` }
+            : `No data blocks selected. Single click on data blocks in the workspace view to select them (max ${maxCompare} for comparison).`}
         </div>
       ) : (
         <NodeSelectionList
@@ -250,13 +254,18 @@ function NodeSelectionPanel({
       {(originalCount ?? selectedNodes.length) > maxCompare && (
         <div className="mt-1 flex items-center gap-1 text-sm text-amber-600">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          Maximum {maxCompare} data block{maxCompare === 1 ? '' : 's'} allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the most recent {maxCompare} {maxCompare === 1 ? 'is' : 'are'} used.
+          Maximum {maxCompare} data block{maxCompare === 1 ? '' : 's'} allowed here. Currently{' '}
+          {originalCount ?? selectedNodes.length} selected in workspace; only the most recent{' '}
+          {maxCompare} {maxCompare === 1 ? 'is' : 'are'} used.
         </div>
       )}
     </div>
   );
-};
+}
 
-export type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+export type {
+  NodeColumnSelection,
+  WorkspaceNodeLike,
+} from '@/features/analysis/common/nodeSelectionTypes';
 
 export default NodeSelectionPanel;

@@ -21,8 +21,12 @@ const normalizeTimestamp = (value: unknown): number => {
 /** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const getTaskTimestamp = (task?: TaskItem | null) => {
   const anyTask = task as (TaskItem & { __event_timestamp?: unknown }) | undefined | null;
-  return normalizeTimestamp(anyTask?.__event_timestamp) ||
-    normalizeTimestamp(task?.updated_at ?? task?.finished_at ?? task?.started_at ?? task?.created_at ?? 0);
+  return (
+    normalizeTimestamp(anyTask?.__event_timestamp) ||
+    normalizeTimestamp(
+      task?.updated_at ?? task?.finished_at ?? task?.started_at ?? task?.created_at ?? 0,
+    )
+  );
 };
 
 /** Breaks timestamp ties using task-stream event order when events arrive in the same millisecond. */
