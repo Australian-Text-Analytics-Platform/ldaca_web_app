@@ -558,17 +558,6 @@ const reference = {
 
 export const BUNDLED_REGISTRY: RegistryShape = { tutorial, info, reference };
 
-/** Files that ship inside `frontend/public/`. The remote-URL resolver in
- *  `DocumentView` falls back to the local-relative path for these even when
- *  `VITE_DOCS_BASE_URL` is set, so first-paint remains zero-network. */
-export const BUNDLED_FILES: ReadonlySet<string> = new Set(
-  [
-    ...Object.values(tutorial),
-    ...Object.values(info),
-    ...Object.values(reference),
-  ].map((t) => t.file),
-);
-
 export type BundledTutorialKey = keyof typeof tutorial;
 export type BundledInfoKey = keyof typeof info;
 export type BundledReferenceKey = keyof typeof reference;
@@ -590,3 +579,23 @@ export const REFERENCE_INDEX_TARGET: DocTarget = {
   anchor: 'help-references-index',
   label: 'References index',
 };
+
+/** Files that ship inside `frontend/public/`. The remote-URL resolver in
+ *  `DocumentView` falls back to the local-relative path for these even when
+ *  `VITE_DOCS_BASE_URL` is set, so first-paint remains zero-network. */
+export const BUNDLED_FILES: ReadonlySet<string> = new Set(
+  [
+    ...Object.values(tutorial),
+    ...Object.values(info),
+    ...Object.values(reference),
+    // The index entry points are standalone *_INDEX_TARGET constants (not
+    // members of the keyed objects above), yet they ship in public/ too.
+    // Without them the main Tutorial button and the info/reference index
+    // links resolve against VITE_DOCS_BASE_URL — a remote fetch a Tauri
+    // build's CSP blocks, surfacing as "load fail". Bundle them so they
+    // load locally in the desktop app exactly like the web host.
+    TUTORIAL_INDEX_TARGET,
+    INFO_INDEX_TARGET,
+    REFERENCE_INDEX_TARGET,
+  ].map((t) => t.file),
+);
