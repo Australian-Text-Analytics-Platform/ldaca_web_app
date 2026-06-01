@@ -7,13 +7,7 @@ import rehypeRaw from 'rehype-raw';
 import logo from '../logo.png';
 import { toast } from 'sonner';
 import 'katex/dist/katex.min.css';
-import { BUNDLED_FILES } from '@/tutorials/bundledRegistry';
 import { getBackendRoot } from '@/api/env';
-
-/** Detect the packaged desktop (Tauri) webview, whose CSP blocks the remote
- *  docs host — so docs must be read from the bundled backend over localhost. */
-const isTauri = (): boolean =>
-  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export type DocumentTarget = {
   file: string;
@@ -49,60 +43,20 @@ const isExternalLink = (href?: string | null): boolean => {
   return /^(https?:)?\/\//i.test(href) || href.startsWith('mailto:') || href.startsWith('tel:');
 };
 
-const resolveLocalDocUrl = (requestedFile: string): string => {
-  if (typeof window === 'undefined') {
-    return requestedFile;
-  }
-
-  const baseHref = document.querySelector('base')?.href;
-  if (baseHref) {
-    try {
-      return new URL(requestedFile, baseHref).toString();
-    } catch {
-      // fall back to location-based resolution
-    }
-  }
-
-  try {
-    const base = window.location.href.split('#')[0];
-    return new URL(requestedFile, base).toString();
-  } catch {
-    return requestedFile;
-  }
-};
-
 /**
  * Resolve a requested doc file to a fetchable URL.
  *
- * - Files in `BUNDLED_FILES` always resolve locally (`public/<file>`), so
- *   offline / bundled-fallback paths keep working without a network hop.
- * - When `VITE_DOCS_BASE_URL` is set and the file is NOT bundled, it's
- *   resolved against the remote base URL.
- * - When `VITE_DOCS_BASE_URL` is unset, every file resolves locally —
- *   matches the pre-migration behavior.
+ * Always routes through the bundled backend's `/docs` endpoint, which serves
+ * the locally synced copy (mirrored from the version-pinned docs site) and
+ * falls back to the docs bundled inside the app. Going through the backend on
+ * every deployment — desktop, local web/uvx, and hosted (Binder/Nectar) —
+ * keeps doc behaviour identical everywhere: fresh when online, cache-served
+ * when offline, bundled as the floor. `getBackendRoot()` resolves to the
+ * localhost backend in the desktop app and the same-origin / reverse-proxy
+ * base on the web.
  */
-const resolveDocUrl = (requestedFile: string): string => {
-  // Desktop (Tauri): the webview CSP blocks the remote docs host, so route every
-  // doc through the bundled backend over localhost. The backend serves the
-  // locally synced copy and falls back to the bundled docs — giving the desktop
-  // app the same freshness as the version-pinned site, without an app rebuild.
-  if (isTauri()) {
-    return `${getBackendRoot()}/docs/${requestedFile.replace(/^\/+/, '')}`;
-  }
-  if (BUNDLED_FILES.has(requestedFile)) {
-    return resolveLocalDocUrl(requestedFile);
-  }
-  const remoteBase = import.meta.env.VITE_DOCS_BASE_URL?.trim();
-  if (remoteBase) {
-    try {
-      const baseWithSlash = remoteBase.endsWith('/') ? remoteBase : `${remoteBase}/`;
-      return new URL(requestedFile, baseWithSlash).toString();
-    } catch {
-      // fall through to local
-    }
-  }
-  return resolveLocalDocUrl(requestedFile);
-};
+const resolveDocUrl = (requestedFile: string): string =>
+  `${getBackendRoot()}/docs/${requestedFile.replace(/^\/+/, '')}`;
 
 const DocumentView: React.FC<{
   docType: DocumentType;
@@ -194,14 +148,13 @@ const DocumentView: React.FC<{
     img: ({ node: _node, className, alt, src, ...props }) => {
       const mergedClassName = ['max-w-full h-auto', className].filter(Boolean).join(' ');
       const resolvedAlt = typeof alt === 'string' ? alt : '';
-      // Under Tauri the markdown body is fetched from the backend, but a
-      // relative <img src> would resolve against the tauri:// app origin (the
-      // read-only bundle). Rewrite local image refs to the same backend /docs
-      // path so mirrored images stay as fresh as the markdown. (The Tauri CSP
-      // img-src allows localhost; external/data/blob srcs are left untouched.)
+      // Markdown bodies come from the backend /docs route, but a relative
+      // <img src> would resolve against the page origin (the tauri:// app shell,
+      // or the SPA base on the web). Rewrite local image refs to the same /docs
+      // path so images come from the synced cache / bundled fallback alongside
+      // the markdown. External/data/blob srcs are left untouched.
       let resolvedSrc = src;
       if (
-        isTauri() &&
         typeof src === 'string' &&
         src &&
         !isExternalLink(src) &&
