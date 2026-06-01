@@ -3,6 +3,52 @@
 User-facing changes to the LDaCA Wordflow (previously "LDaCA Text Analytics Web Application") since v0.2.5.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.6] — 2026-06-01
+
+A docs-delivery and Trends-reliability release: in-app documentation now refreshes
+itself from the published docs site and works offline from a local cache — the same
+way on every platform — case-insensitive Trends grouping now folds every group
+column, plus a handful of desktop UI fixes. No new analysis tools.
+
+**Workspace compatibility:** no serialization-layer change since v0.5.5
+(`polars-text` and `docworkspace` pins are unchanged), `workspace_format` is
+unchanged — workspaces saved by prior 0.5.x versions open unchanged. Risk: safe.
+
+### Added
+
+- **In-app docs refresh themselves and work offline — identically everywhere.**
+  The Tutorial, References, and Information pages are now served by the backend,
+  which quietly mirrors the version-matched docs site to a local cache on
+  startup. You get the latest docs when online, the cached copy when offline,
+  and the copy bundled in the build as a floor — the same behaviour in the
+  desktop app, the `uvx` local runner, and the web/Binder deployments. Previously
+  the desktop app could only show the documentation frozen into its build.
+
+### Changed
+
+- **Case-insensitive Trends grouping now folds every group field.** With
+  "case-insensitive" on, low-cardinality group columns (party, stance, outlet, …)
+  stored as Categorical/Enum — not just plain text — now fold together, so a
+  multi-group key like "party · stance" no longer leaves values that differ only
+  in case (e.g. "lnp · Yes" vs "lnp · yes") in separate buckets. The live tool
+  and the snapshot viewer now bucket identically.
+
+### Fixed
+
+- **Trends "Add to workspace" is enabled whenever your selection is a subset.**
+  The button now activates whenever the chosen points differ from the full set —
+  including when every period is selected but a group/value filter narrows the
+  result — instead of staying greyed out.
+- **Desktop: long names wrap in confirmation dialogs.** A long node or file name
+  in a confirmation dialog now wraps inside the dialog instead of overflowing its
+  edge (a WebKit/Tauri layout fix).
+- **Desktop: dropping a file on empty space no longer navigates away.** Dragging
+  a file onto a blank area of the desktop window previously replaced the app with
+  the raw file; the window now ignores stray drops.
+- **Desktop: the Tutorial button loads correctly.** The bundled documentation
+  index targets now ship with the desktop build, fixing the bottom-left Tutorial
+  button that previously failed to load in the Tauri app.
+
 ## [0.5.5] — 2026-05-27
 
 A focused release: an update-available reminder across every platform, a desktop
