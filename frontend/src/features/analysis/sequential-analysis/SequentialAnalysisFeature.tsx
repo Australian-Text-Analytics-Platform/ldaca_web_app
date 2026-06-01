@@ -1037,10 +1037,6 @@ const SequentialAnalysisFeature = () => {
   const filteredOutGroupKeys = new Set(groupKeys.filter((key) => !passesMinGroupSize(key)));
   const invisibleGroupKeys = new Set([...hiddenKeys, ...filteredOutGroupKeys]);
 
-  const canDetach = selectedPeriodIndices.size > 0
-    && selectedPeriodIndices.size < chartData.length
-    && filteredGroupKeys.length > 0;
-
   const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
     currentWorkspaceId,
     resolveTaskId,
@@ -1089,6 +1085,16 @@ const SequentialAnalysisFeature = () => {
   const shownDocumentCount = sumSequentialDocs(shownRows);
   const chosenPointCount = selectedPeriodIndices.size > 0 ? chosenRows.length : 0;
   const chosenDocumentCount = selectedPeriodIndices.size > 0 ? sumSequentialDocs(chosenRows) : 0;
+
+  // Enable "Add to workspace" whenever the CHOSEN datapoints differ from the
+  // Total (and something is chosen). Selecting every period is valid too: when
+  // min-group-size hides small groups (or the time filter drops out-of-range
+  // records), the chosen subset genuinely differs from the source block, so
+  // detaching it is meaningful. Previously this was disabled whenever all
+  // periods were selected, even when the shown data differed from the total.
+  const chosenMatchesTotal =
+    chosenPointCount === totalPointCount && chosenDocumentCount === totalDocumentCount;
+  const canDetach = chosenPointCount > 0 && !chosenMatchesTotal;
 
   const resultsSummary = summaryTimeColumn
     ? (summaryColumnType === 'numeric'

@@ -24,6 +24,29 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// In the packaged desktop (Tauri) build only, stop the WebView from
+// navigating away to display a file dropped onto blank space — which
+// otherwise turns the whole window into a plain text reader. Everything the
+// app uses on purpose is left untouched: in-app drag-drop (file uploads,
+// graph block moves, preprocessing column drags), text selection + copy,
+// Cmd +/- zoom, and browser find all keep working. The dev browser is
+// unaffected because of the Tauri guard.
+if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+  // Stop the WebView from opening a file dropped outside a drop zone. We
+  // only cancel the default for *external file* drags ('Files' in types),
+  // so internal HTML5 drag-drop (graph blocks, preprocessing columns) is
+  // never affected. Real drop zones still receive the event and read the
+  // files normally — preventDefault here only kills the navigate-away
+  // fallback that fires when nothing else handled the drop.
+  const blockExternalFileDrop = (event: DragEvent) => {
+    if (Array.from(event.dataTransfer?.types ?? []).includes('Files')) {
+      event.preventDefault();
+    }
+  };
+  window.addEventListener('dragover', blockExternalFileDrop);
+  window.addEventListener('drop', blockExternalFileDrop);
+}
+
 // Resolve Google Client ID in priority order:
 //   1. window.__GOOGLE_CLIENT_ID__ (injected by backend at runtime)
 //   2. VITE_GOOGLE_CLIENT_ID (build-time env)

@@ -68,7 +68,10 @@ export function useSequentialAnalysisDetach({
 
   const handleDetach = async () => {
     if (!currentWorkspaceId) return;
-    if (selectedPeriodIndices.size === 0 || selectedPeriodIndices.size >= chartData.length) {
+    // Need at least one selected period. Selecting *all* periods is allowed —
+    // the "is this a meaningful subset" decision lives in the caller's
+    // `canDetach` (Chosen != Total), e.g. when min-group-size hides groups.
+    if (selectedPeriodIndices.size === 0) {
       return;
     }
 
