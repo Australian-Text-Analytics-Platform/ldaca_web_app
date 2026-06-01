@@ -97,9 +97,11 @@
     "package:backend-runtime": "cd .. && uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14",
     "stage:backend-runtime": "node scripts/stage-backend-runtime.mjs",
     "prepare:backend-runtime": "npm run package:backend-runtime && npm run stage:backend-runtime",
+    "sync:bundled-docs": "node scripts/sync-bundled-docs.mjs",
+    "deploy:backend": "node ../scripts/deploy-frontend-to-backend.mjs",
     "desktop:dev": "npm run prepare:backend-runtime && tauri dev",
-    "desktop:build:mac": "npm run prepare:backend-runtime && tauri build --bundles app,dmg",
-    "desktop:build:windows": "npm run prepare:backend-runtime && tauri build"
+    "desktop:build:mac": "npm run sync:bundled-docs && npm run build && npm run deploy:backend && npm run prepare:backend-runtime && tauri build --bundles app,dmg",
+    "desktop:build:windows": "npm run sync:bundled-docs && npm run build && npm run deploy:backend && npm run prepare:backend-runtime && tauri build"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
