@@ -6,8 +6,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 import { Loader2, Play, Square, Trash2 } from 'lucide-react';
-import { SnapshotActions } from '@/features/snapshot-view/components/SnapshotActions';
-import type { SnapshotToolKey } from '@/features/snapshot-view';
 
 type HelpConfig = {
   targetKey: string;
@@ -21,33 +19,6 @@ type AnalysisCardLayoutProps = {
   help?: HelpConfig;
   tone?: 'default' | 'error';
   headerActions?: React.ReactNode;
-  /** Snapshot-feature wiring. When ``tool`` is set, the layout renders
-   * the shared <SnapshotActions> Save/Load buttons next to
-   * ``headerActions`` (or in their place when no other header actions
-   * exist). Same prop surface as <AnalysisFeatureHeader>; pulled here
-   * so quotation / token-freq / sequential / topic-modelling can adopt
-   * snapshots without restructuring their existing card layout. */
-  snapshot?: {
-    tool: SnapshotToolKey;
-    onSave?: (filename: string, description: string) => Promise<void>;
-    saveDisabledReason?: string | null;
-    onOpen?: (filename: string) => Promise<void>;
-    /** Display labels of the currently-selected data blocks. Forwarded
-     * to <SnapshotActions> so the Save dialog pre-populates the
-     * filename with something more useful than ``demo-{date}``. */
-    nodeLabels?: string[];
-    /** Optional override for the Save dialog. See SnapshotActions for
-     * the renderer contract. Trends uses this to inject its richer
-     * configuration dialog. */
-    saveDialog?: (props: {
-      open: boolean;
-      onOpenChange: (open: boolean) => void;
-      tool: SnapshotToolKey;
-      existingFilenames: string[];
-      defaultName: string;
-      onSave: (filename: string, description: string) => Promise<void>;
-    }) => React.ReactNode;
-  };
   actions?: {
     onRun: () => void | Promise<void>;
     onStop?: () => void | Promise<void>;
@@ -73,7 +44,7 @@ type AnalysisCardLayoutProps = {
 
 /**
  * Provides the shared card chrome for analysis feature panels, including help
- * affordances, snapshot actions, and consistent run/stop/clear controls.
+ * affordances and consistent run/stop/clear controls.
  * Used by: token-frequency, quotation, sequential, topic-modeling, and AI panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
@@ -83,7 +54,6 @@ export function AnalysisCardLayout({
   help,
   tone = 'default',
   headerActions,
-  snapshot,
   actions,
   children,
   footer,
@@ -107,24 +77,9 @@ export function AnalysisCardLayout({
               <HelpIcon targetKey={help.targetKey} label={help.label} tooltip={help.tooltip} />
             ) : null}
           </CardTitle>
-          {headerActions || snapshot ? (
+          {headerActions ? (
             <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
               {headerActions}
-              {snapshot ? (
-                <div
-                  className="flex items-center gap-2"
-                  data-testid="analysis-card-snapshot-actions"
-                >
-                  <SnapshotActions
-                    tool={snapshot.tool}
-                    onSave={snapshot.onSave}
-                    disabledReason={snapshot.saveDisabledReason}
-                    onOpenSnapshot={snapshot.onOpen}
-                    nodeLabels={snapshot.nodeLabels}
-                    saveDialog={snapshot.saveDialog}
-                  />
-                </div>
-              ) : null}
             </div>
           ) : null}
         </div>

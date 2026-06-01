@@ -14,7 +14,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({ currentWorkspaceId: 'workspace-1' }),
 }));
 
-vi.mock('@/hooks/useNodeColumnInfos', () => ({
+vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   /** Called by: useAnalysisLockCore under test to provide column metadata because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useNodeColumnInfos: () => ({
     /** Called by: useAutoNodeColumns inside useAnalysisLockCore because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */

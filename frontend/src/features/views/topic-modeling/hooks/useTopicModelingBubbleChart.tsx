@@ -70,7 +70,7 @@ const resolvePanelColor = (
 
 /** Builds topic bubble chart SVG elements and shared rendering helpers for the results panel. */
 /**
- * Used by: checklistSearch.ts, TopicModelingFeature.tsx, useTopicModelingSnapshotLoad.ts because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Used by: checklistSearch.ts and TopicModelingFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export function useTopicModelingBubbleChart({

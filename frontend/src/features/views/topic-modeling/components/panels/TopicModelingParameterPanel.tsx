@@ -17,7 +17,6 @@ import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useA
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import type { NodeLike } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
-import type { SnapshotToolKey } from '@/features/snapshot-view';
 
 export type CorpusSample = {
   percent: string;
@@ -65,10 +64,7 @@ type Props = {
    * unlocked (no server-side cap).
    */
   representativeWordsCountServerMax?: number | null;
-  /** Override for the tooltip on the locked "Words per topic" input.
-   * Live mode tells the user how to lift the cap ("Clear Results to
-   * fit with a higher count"); snapshot mode passes its own copy
-   * because Clear Results doesn't apply there. */
+  /** Override for the tooltip on the locked "Words per topic" input. */
   representativeWordsCountLockedReason?: string;
   onRepresentativeWordsCountChange: (value: number) => void;
   isRunning: boolean;
@@ -88,20 +84,8 @@ type Props = {
    * (the live UI uses them to stage the next Update). */
   inputsDisabled?: boolean;
   /** Displayed when the panel is locked. Defaults to the standard
-   * "locked while results loaded" message; snapshot mode passes a
-   * tailored "viewing saved snapshot" string. */
+   * "locked while results loaded" message. */
   lockedMessage?: string;
-  /** Snapshot Save/Load slot. Forwarded straight to the underlying
-   * AnalysisCardLayout, which renders <SnapshotActions> alongside any
-   * other header actions. Mirrors the per-tool wiring used by the
-   * other parameter cards. */
-  snapshot?: {
-    tool: SnapshotToolKey;
-    onSave?: (filename: string, description: string) => Promise<void>;
-    saveDisabledReason?: string | null;
-    onOpen?: (filename: string) => Promise<void>;
-    nodeLabels?: string[];
-  };
 };
 /**
  * Rendered by: TopicModelingFeature to show the topic-modeling parameter form and shared actions because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
@@ -145,7 +129,6 @@ export function TopicModelingParameterPanel({
   resultState,
   inputsDisabled = false,
   lockedMessage = ANALYSIS_LOCKED_MESSAGE,
-  snapshot,
 }: Props) {
   const [topicSizeDraft, setTopicSizeDraft] = useState<NumericInputDraft>(() => ({
     source: topicSizeValue,
@@ -207,7 +190,6 @@ export function TopicModelingParameterPanel({
         label: 'About Topic Modeling',
         tooltip: 'Learn what topic modeling is and how it can help you.',
       }}
-      snapshot={snapshot}
       actions={{
         onRun,
         onStop,

@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/generated/types.gen';
 import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
@@ -49,6 +48,7 @@ import { batchProcessedCount, flattenConcordanceGroups } from '../concordanceVie
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];
 const ALL_CONC_COLS_SET = new Set<string>([...CORE_COLS, ...FREQ_COLS]);
+const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
 
 /** Used by: ConcordanceTableNodeBlock display-column assembly to remove repeated concordance/metadata keys because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const dedupeColumns = (cols: string[]): string[] => {
@@ -115,9 +115,7 @@ export type ConcordanceTableNodeBlockProps = {
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
   openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
-  /** Snapshot-view flag — disables Process All / Add to Workspace
-   * buttons (both per-node and combined-view variants). Pagination,
-   * sort, and row-click row-detail still work. */
+  /** Read-only flag that disables Process All and Add to Workspace buttons while pagination, sort, and row details remain active. */
   readOnly?: boolean;
 };
 
@@ -193,7 +191,7 @@ export function ConcordanceTableNodeBlock({
           <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
           <div className="ml-auto flex items-center space-x-2">
             <span className="text-xs text-gray-500">Rows colored by source data block</span>
-            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+            <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
               <Button
                 onClick={() => {
                   if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
@@ -233,7 +231,7 @@ export function ConcordanceTableNodeBlock({
                 )}
               </Button>
             </DisabledReasonTooltip>
-            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+            <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
               <Button
                 onClick={() => {
                   if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
@@ -526,14 +524,9 @@ export function ConcordanceTableNodeBlock({
       </div>
 
       {(() => {
-        // Prefer the per-node materialised summary when it's available
-        // (live mode, after Process All has fired its event). When it's
-        // not — snapshot mode never persists materialize_summaries, and
-        // there's a transient window in live mode before the SSE event
-        // arrives — fall back to counting from ``nodeData.data`` +
-        // pagination, matching the combined branch's fallback. Snapshot
-        // captures use page_size: 'all' so the per-page count is the
-        // total, making the fallback exact rather than approximate.
+        // Prefer the per-node materialised summary when it's available.
+        // Before the SSE materialization event arrives, fall back to counting
+        // from ``nodeData.data`` + pagination, matching the combined branch.
         const summary =
           nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId] ? (
             <GroupedResultsPageSizeSummary
@@ -563,7 +556,7 @@ export function ConcordanceTableNodeBlock({
         onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
         loading={nodeIsLoading}
       >
-        <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+        <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
           <Button
             onClick={() => {
               if (detachNodeId) {
@@ -600,7 +593,7 @@ export function ConcordanceTableNodeBlock({
             )}
           </Button>
         </DisabledReasonTooltip>
-        <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+        <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
           <Button
             onClick={() => {
               if (detachNodeId) {

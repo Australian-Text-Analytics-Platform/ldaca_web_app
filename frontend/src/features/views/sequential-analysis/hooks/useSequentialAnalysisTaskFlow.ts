@@ -142,7 +142,7 @@ type Params = {
 
 /** Builds the submit, clear, chart-type, and chart-shaping logic for sequential analysis. */
 /**
- * Used by: SequentialChart.tsx, sequentialRebucket.ts, SequentialAnalysisFeature.tsx, and related files because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Used by: SequentialChart.tsx, SequentialAnalysisFeature.tsx, and related files because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
  * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
  */
 export function useSequentialAnalysisTaskFlow({

@@ -22,9 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { DemoSnapshotsTab } from './DemoSnapshotsTab';
 
 const TOOL_LABELS: Record<string, string> = {
   concordance: 'Concordance',
@@ -83,7 +81,7 @@ interface ReadmeViewerProps {
 /**
  * Displays collection README markdown so users can inspect sample citations.
  * Rendered by: data-loader/SampleDataPanel module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
- * Flow: load README markdown for a snapshot, show loading/error states, and render fetched text
+ * Flow: load README markdown for a collection, show loading/error states, and render fetched text
  * only after the request resolves.
  */
 function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
@@ -150,9 +148,8 @@ interface Props {
  * Opens the sample-content import workflow from Data Loader. It manages local
  * dataset selection and delegates successful imports back to the parent file
  * browser refresh callback.
- * Rendered by: DemoSnapshotsTab component, DataLoaderFeature module, SnapshotDescriptionDialog component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
- * Flow: request available sample categories, render snapshot tabs and description dialog, then
- * delegate imports so the Data Loader can refresh files afterward.
+ * Rendered by: DataLoaderFeature module because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Flow: request available sample categories, render the dataset dialog, then delegate imports so the Data Loader can refresh files afterward.
  */
 export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
   const [open, setOpen] = useState(false);
@@ -237,19 +234,10 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Import sample content</DialogTitle>
-            <DialogDescription>
-              Datasets are raw corpora; demo snapshots are pre-built analyses you can open in any
-              tool.
-            </DialogDescription>
+            <DialogDescription>Import bundled or downloadable sample corpora.</DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="datasets" className="py-2">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="datasets">Datasets</TabsTrigger>
-              <TabsTrigger value="snapshots">Demo snapshots</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="datasets" className="space-y-3">
+          <div className="space-y-3 py-2">
               {isLoading && (
                 <div className="space-y-2">
                   <Skeleton className="h-12 w-full" />
@@ -315,26 +303,15 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
                 </p>
               )}
 
-              <div className="flex justify-end">
-                <Button onClick={() => {
+            <div className="flex justify-end">
+              <Button onClick={() => {
                   void handleImport();
                 }} disabled={importing || (!isError && !anyChecked)}>
-                  <FolderPlus className="mr-2 h-4 w-4" />
-                  {importing ? 'Importing…' : 'Import selected'}
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="snapshots">
-              <DemoSnapshotsTab
-                authHeaders={authHeaders}
-                onImportComplete={() => {
-                  /* keep dialog open; the toast confirms */
-                }}
-                enabled={open}
-              />
-            </TabsContent>
-          </Tabs>
+                <FolderPlus className="mr-2 h-4 w-4" />
+                {importing ? 'Importing…' : 'Import selected'}
+              </Button>
+            </div>
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={importing}>

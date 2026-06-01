@@ -2,7 +2,7 @@
  * 1024-based byte formatter used by Data Loader file/workspace sizes.
  * `lib/utils.ts` exports a 1000-based variant; do not merge — they target
  * different displays.
- * Used by: utils module, LoadSnapshotDialog tests, LoadSnapshotDialog component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by: Data Loader components and tests because those callers need a shared helper boundary for consistent file-size display formatting.
  * Steps: reject missing values, choose the largest 1024 unit, and format precision by display size.
  */
 export const formatBytes = (bytes?: number | null): string => {

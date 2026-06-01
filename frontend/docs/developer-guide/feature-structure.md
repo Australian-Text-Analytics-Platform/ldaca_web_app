@@ -5,7 +5,7 @@ The frontend uses feature-first folders. Shared UI primitives live under
 
 ## Directory Layout (Top Level)
 
-```
+```text
 src/
 ├── api/              Generated SDK + barrel
 ├── components/       App shell + layout + shared UI (shadcn primitives)
@@ -14,7 +14,6 @@ src/
 │   ├── auth/         Authentication and startup gating
 │   ├── feedback/     Feedback survey modal
 │   ├── hints/        In-app hint/tutorial system
-│   ├── snapshot-view/  Demo snapshot save/load
 │   ├── views/        All sidebar-tab features (see below)
 │   └── workspace/    Right-side workspace surface (graph, data view, tasks)
 ├── hooks/            Globally shared hooks (non-feature-specific)
@@ -29,7 +28,7 @@ src/
 
 Every non-trivial feature module uses subdirectories for internal structure:
 
-```
+```text
 features/<feature>/
 ├── index.ts          Public barrel export
 ├── components/       Feature-specific components
@@ -61,17 +60,17 @@ Auth gating (login screen, blocking screen, refresh banner) is owned by
 `src/features/views/` holds every tab rendered in the left sidebar. Each
 subdirectory maps to one `ViewType`:
 
-| ViewType | Directory | Purpose |
-|---|---|---|
-| `data-loader` | `views/data-loader/` | File/workspace management, file tree, upload, LDaCA import |
-| `filter` | `views/preprocessing/` | DataFrame preprocessing tabs (filter, slice, join, concat, find, aggregate, expression) |
-| `token-frequency` | `views/token-frequency/` | Word frequency + word clouds |
-| `concordance` | `views/concordance/` | Keyword-in-context search with dispersion |
-| `analysis` | `views/sequential-analysis/` | Time-series trends |
-| `topic-modeling` | `views/topic-modeling/` | BERTopic topic modeling + bubble chart |
-| `quotation` | `views/quotation/` | Quotation extraction |
-| `ai-annotator` | `views/ai-annotator/` | LLM-powered text annotation |
-| `export` | `views/export/` | Data block export/download |
+| ViewType          | Directory                    | Purpose                                                                                 |
+| ----------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
+| `data-loader`     | `views/data-loader/`         | File/workspace management, file tree, upload, LDaCA import                              |
+| `filter`          | `views/preprocessing/`       | DataFrame preprocessing tabs (filter, slice, join, concat, find, aggregate, expression) |
+| `token-frequency` | `views/token-frequency/`     | Word frequency + word clouds                                                            |
+| `concordance`     | `views/concordance/`         | Keyword-in-context search with dispersion                                               |
+| `analysis`        | `views/sequential-analysis/` | Time-series trends                                                                      |
+| `topic-modeling`  | `views/topic-modeling/`      | BERTopic topic modeling + bubble chart                                                  |
+| `quotation`       | `views/quotation/`           | Quotation extraction                                                                    |
+| `ai-annotator`    | `views/ai-annotator/`        | LLM-powered text annotation                                                             |
+| `export`          | `views/export/`              | Data block export/download                                                              |
 
 Shared code used by multiple views lives in `views/common/`:
 

@@ -26,7 +26,7 @@ vi.mock('@/api/generated/sdk.gen', () => ({
 vi.mock('../useAnalysisHydration', () => ({
   /** Called by: useAnalysisFeature under test while keeping hydration inert because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useAnalysisHydration: () => ({
-    hydrateFromServer: vi.fn(() => undefined),
+    hydrateFromServer: vi.fn(() => Promise.resolve()),
     hydrationState: { status: 'idle' as const },
   }),
 }));

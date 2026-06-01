@@ -6,7 +6,6 @@ import { TokensColumnMismatchNotice } from '@/features/views/common/components/T
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
-import type { SnapshotToolKey } from '@/features/snapshot-view';
 import type {
   WorkspaceNodeLike,
   NodeColumnSource,
@@ -45,17 +44,10 @@ type TokenFrequencyParameterPanelProps = {
   computeDisplayName: (nodeId: string) => string;
   renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
   lockedMessage?: string;
-  snapshot?: {
-    tool: SnapshotToolKey;
-    onSave?: (filename: string, description: string) => Promise<void>;
-    saveDisabledReason?: string | null;
-    onOpen?: (filename: string) => Promise<void>;
-    nodeLabels?: string[];
-  };
 };
 
 /**
- * Rendered by: TokenFrequencyFeature to show setup controls, selection locking, and snapshot actions because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: TokenFrequencyFeature to show setup controls and selection locking because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export const TokenFrequencyParameterPanel = ({
@@ -84,7 +76,6 @@ export const TokenFrequencyParameterPanel = ({
   computeDisplayName,
   renderTokenizerModelSelector,
   lockedMessage = ANALYSIS_LOCKED_MESSAGE,
-  snapshot,
 }: TokenFrequencyParameterPanelProps) => {
   const hasMultipleNodes = panelSelectedNodes.length >= 2;
   const nodeOptions = panelSelectedNodes
@@ -113,7 +104,6 @@ export const TokenFrequencyParameterPanel = ({
         tooltip:
           'Choose up to two data blocks and the text columns to analyze. After the run, use the results panel to adjust stop words and displayed token limits.',
       }}
-      snapshot={snapshot}
       actions={{
         onRun: onAnalyze,
         onStop,

@@ -9,7 +9,7 @@ type TaskStatusReturn = {
 };
 
 const useAnalysisTaskStatusMock = vi.hoisted(() => vi.fn<() => TaskStatusReturn>());
-vi.mock('@/hooks/useAnalysisTaskStatus', () => ({
+vi.mock('@/features/views/common/useAnalysisTaskStatus', () => ({
   useAnalysisTaskStatus: useAnalysisTaskStatusMock,
 }));
 

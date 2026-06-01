@@ -70,7 +70,7 @@ auth probes during startup.
 ## Preferences
 
 `preferencesStore` holds local preferences such as hidden views, favorites,
-quotation engine, default language/tokenizer, and demo snapshot visibility.
+quotation engine, and default language/tokenizer.
 `usePreferences` initializes the store from `/api/preferences` and debounces
 backend sync. View visibility is mirrored into `uiStore`.
 

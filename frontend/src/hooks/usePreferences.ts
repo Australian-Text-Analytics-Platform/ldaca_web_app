@@ -18,7 +18,6 @@ interface PersistedSnapshot {
   defaultLanguage: string | null;
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
-  demoSnapshotsEnabled: boolean;
 }
 
 /**
@@ -37,7 +36,6 @@ const snapshotPersisted = (
   defaultLanguage: state.defaultLanguage,
   defaultTokenizerModel: state.defaultTokenizerModel,
   ldacaOniApiToken: state.ldacaOniApiToken,
-  demoSnapshotsEnabled: state.demoSnapshotsEnabled,
 });
 
 /** Compares the persisted preference subset so cosmetic store changes do not sync to the backend. */
@@ -51,7 +49,6 @@ const snapshotsEqual = (a: PersistedSnapshot, b: PersistedSnapshot) => {
   if (a.defaultLanguage !== b.defaultLanguage) return false;
   if (a.defaultTokenizerModel !== b.defaultTokenizerModel) return false;
   if (a.ldacaOniApiToken !== b.ldacaOniApiToken) return false;
-  if (a.demoSnapshotsEnabled !== b.demoSnapshotsEnabled) return false;
   if (a.hiddenViews.length !== b.hiddenViews.length) return false;
   if (a.favoriteWorkspaces.length !== b.favoriteWorkspaces.length) return false;
   for (let i = 0; i < a.hiddenViews.length; i++) {

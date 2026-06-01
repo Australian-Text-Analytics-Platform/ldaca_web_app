@@ -62,10 +62,7 @@ export interface SequentialAnalysisResultsPanelProps {
   onDetachNodeNameChange: (value: string) => void;
   onDetach: () => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
-  /** Snapshot view: forwarded straight to <SequentialChart> to gate
-   * the detach-to-workspace control. Everything else on the results
-   * panel (chart type, x-axis, min group size, download) is purely
-   * client-side and stays active. */
+  /** Read-only flag forwarded to <SequentialChart> to gate the detach-to-workspace control. */
   readOnly?: boolean;
 }
 

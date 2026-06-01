@@ -14,7 +14,6 @@ function resetStore() {
     defaultLanguage: null,
     defaultTokenizerModel: null,
     ldacaOniApiToken: null,
-    demoSnapshotsEnabled: false,
     hydrated: false,
     syncing: false,
   });

@@ -8,7 +8,6 @@ import NodeSelectionPanel, {
   type NodeSelectionColumnAddonArgs,
 } from '@/features/views/common/components/NodeSelectionPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { SNAPSHOT_DISABLED_REASON, snapshotDisabledReason } from '@/features/snapshot-view';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
 import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
 import type { AnalysisActionState, NodeColumnSelection } from '../../common';
@@ -66,30 +65,13 @@ export type ConcordanceParameterPanelProps = {
   setGlobalPageSize: Dispatch<SetStateAction<number>>;
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
   persistResultPreferences: (partial: { pageSize?: number }) => Promise<unknown>;
-  /** Forwarded to <AnalysisFeatureHeader> — wires the Save snapshot
-   * button in the header's right slot. */
-  onSaveSnapshot?: (filename: string, description: string) => Promise<void>;
-  /** Forwarded to <AnalysisFeatureHeader>. When set, the Save button
-   * is rendered disabled with this string as a hover tooltip. */
-  saveSnapshotDisabledReason?: string | null;
-  /** Forwarded to <AnalysisFeatureHeader> — wires the Open click in
-   * the load dialog to the host's load pipeline. */
-  onOpenSnapshot?: (filename: string) => Promise<void>;
-  /** Forwarded to <AnalysisFeatureHeader>. Data-block labels used to
-   * pre-populate the Save dialog's filename input. */
-  snapshotNodeLabels?: string[];
-  /** When true, the panel renders the captured search params for
-   * display only — every input is disabled, Run + Clear footer is
-   * hidden, and the Save/Open snapshot buttons in the header stay
-   * available (the host gates Save with ``saveSnapshotDisabledReason``
-   * which it sets to a fixed string in snapshot mode). Used by the
-   * snapshot view to reuse the live ParameterPanel chrome verbatim. */
+  /** When true, the panel renders its controls for display only. */
   readOnly?: boolean;
   renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
 };
 
 /**
- * Rendered by: ConcordanceFeature to own concordance parameters and header snapshot controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: ConcordanceFeature to own concordance parameters because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export function ConcordanceParameterPanel({
@@ -127,10 +109,6 @@ export function ConcordanceParameterPanel({
   setGlobalPageSize,
   setNodePagination,
   persistResultPreferences,
-  onSaveSnapshot,
-  saveSnapshotDisabledReason,
-  onOpenSnapshot,
-  snapshotNodeLabels,
   readOnly = false,
   renderTokenizerModelSelector,
 }: ConcordanceParameterPanelProps) {
@@ -142,11 +120,12 @@ export function ConcordanceParameterPanel({
       return 'Select a column for each data block';
     return undefined;
   })();
+  const readOnlyReason = readOnly ? 'This panel is read-only.' : undefined;
+  const readOnlyOrReason = (reason?: string | false) => readOnlyReason ?? (reason || undefined);
 
   return (
     <Card>
       <AnalysisFeatureHeader
-        tool="concordance"
         title="Concordance Search"
         infoKey="concordance.overview"
         infoLabel="About Concordance Search"
@@ -154,10 +133,6 @@ export function ConcordanceParameterPanel({
         helpKey="analysis.concordance.parameters"
         helpLabel="Concordance parameters"
         helpTooltip="Select data blocks, choose the search term, and set context options before running."
-        onSaveSnapshot={onSaveSnapshot}
-        saveSnapshotDisabledReason={saveSnapshotDisabledReason}
-        onOpenSnapshot={onOpenSnapshot}
-        snapshotNodeLabels={snapshotNodeLabels}
       />
       <CardContent className="space-y-4 pt-0">
         <NodeSelectionPanel
@@ -176,7 +151,7 @@ export function ConcordanceParameterPanel({
           getNodeColumns={getColumnInfos}
           allowedDataTypes={['string']}
           originalCount={displayNodeCount}
-          lockedMessage={readOnly ? SNAPSHOT_DISABLED_REASON : ANALYSIS_LOCKED_MESSAGE}
+          lockedMessage={readOnly ? 'This panel is read-only.' : ANALYSIS_LOCKED_MESSAGE}
           renderColumnControlAddon={renderTokenizerModelSelector}
         />
 
@@ -198,7 +173,7 @@ export function ConcordanceParameterPanel({
                 />
               </div>
               <DisabledReasonTooltip
-                reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
+                reason={readOnlyReason}
                 className="w-full"
               >
                 <input
@@ -221,7 +196,7 @@ export function ConcordanceParameterPanel({
                   Left context (tokens)
                 </label>
                 <DisabledReasonTooltip
-                  reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
+                  reason={readOnlyReason}
                   className="w-full"
                 >
                   <input
@@ -240,7 +215,7 @@ export function ConcordanceParameterPanel({
                   Right context (tokens)
                 </label>
                 <DisabledReasonTooltip
-                  reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
+                  reason={readOnlyReason}
                   className="w-full"
                 >
                   <input
@@ -269,7 +244,7 @@ export function ConcordanceParameterPanel({
                 aria-label="Concordance search mode"
                 className="inline-flex overflow-hidden rounded-md border border-input"
               >
-                <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+                <DisabledReasonTooltip reason={readOnlyReason}>
                   <button
                     type="button"
                     role="radio"
@@ -286,8 +261,7 @@ export function ConcordanceParameterPanel({
                   </button>
                 </DisabledReasonTooltip>
                 <DisabledReasonTooltip
-                  reason={snapshotDisabledReason(
-                    readOnly,
+                  reason={readOnlyOrReason(
                     tokensModeAvailable
                       ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
                       : 'Tokens mode needs a tokenizer model for each selected column.',
@@ -319,8 +293,7 @@ export function ConcordanceParameterPanel({
 
             <div className="flex items-center gap-2">
               <DisabledReasonTooltip
-                reason={snapshotDisabledReason(
-                  readOnly,
+                reason={readOnlyOrReason(
                   searchMode === 'tokens' &&
                     'Whole-word applies to text-mode searches only — tokens-mode matches exact tokens by design.',
                 )}
@@ -339,8 +312,7 @@ export function ConcordanceParameterPanel({
             </div>
             <div className="flex items-center gap-2">
               <DisabledReasonTooltip
-                reason={snapshotDisabledReason(
-                  readOnly,
+                reason={readOnlyOrReason(
                   searchMode === 'tokens' &&
                     'Regex applies to text-mode only — switch to text-mode to use it.',
                 )}
@@ -364,7 +336,7 @@ export function ConcordanceParameterPanel({
               </DisabledReasonTooltip>
               <HelpIcon targetKey="analysis.concordance.regex-toggle" label="Regex mode toggle" />
             </div>
-            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+            <DisabledReasonTooltip reason={readOnlyReason}>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -451,10 +423,8 @@ export function ConcordanceParameterPanel({
               });
               return updated;
             });
-            // Snapshot mode: pagination is client-side over the
-            // captured rows, so we don't push the new size to the
-            // server. ``persistResultPreferences`` would 404 against
-            // a workspace the snapshot's task no longer lives in.
+            // Read-only results should not persist page-size changes back to
+            // the stored task preferences.
             if (!readOnly) {
               void persistResultPreferences({ pageSize: newSize });
             }

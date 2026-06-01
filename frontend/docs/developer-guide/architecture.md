@@ -28,7 +28,7 @@ and auth bootstrap before mounting the workspace shell.
 - `src/stores/`: Zustand stores for auth, UI, selection, preferences, tasks,
   and node colors.
 - `src/features/`: feature-first UI modules — `auth`, `feedback`, `hints`,
-  `snapshot-view`, `workspace`, and `views` (sidebar-tab features).
+  `workspace`, and `views` (sidebar-tab features).
 - `src/features/views/`: all left-sidebar view tabs (data-loader,
   preprocessing, token-frequency, concordance, sequential-analysis,
   topic-modeling, quotation, ai-annotator, export) plus `views/common/` for

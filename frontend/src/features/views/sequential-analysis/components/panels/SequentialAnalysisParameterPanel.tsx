@@ -44,8 +44,7 @@ const FREQUENCY_LABELS: Record<SequentialFrequency, string> = {
   custom: 'Customised',
 };
 
-/** Default live-mode dropdown — hourly..yearly + custom. Snapshot
- * mode passes a filtered list via the ``frequencyOptions`` prop. */
+/** Default dropdown — hourly..yearly + custom. */
 const DEFAULT_FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
   { value: 'hourly', label: FREQUENCY_LABELS.hourly },
   { value: 'daily', label: FREQUENCY_LABELS.daily },
@@ -76,9 +75,7 @@ export interface SequentialAnalysisParameterPanelProps {
   isLocked: boolean;
   displayNodeCount: number;
   onColumnChange: (nodeId: string, column: string) => void;
-  /** Displayed when the panel is locked. Defaults to the standard
-   * "locked while results loaded" message; snapshot mode passes a
-   * tailored "viewing saved snapshot" string. */
+  /** Displayed when the panel is locked. Defaults to the standard "locked while results loaded" message. */
   lockedMessage?: string;
 
   // Configuration shared
@@ -91,11 +88,7 @@ export interface SequentialAnalysisParameterPanelProps {
   // Datetime branch
   frequency: SequentialFrequency;
   onFrequencyChange: (value: SequentialFrequency) => void;
-  /** Optional override for the frequency dropdown options. Snapshot
-   * mode passes a filtered list (coarser-or-equal to the captured
-   * finest frequency) so the viewer can't ask for a refinement
-   * the captured data can't support. Defaults to the live preset
-   * list (hourly..yearly + custom). */
+  /** Optional override for the frequency dropdown options. Defaults to the preset list (hourly..yearly + custom). */
   frequencyOptions?: Array<{ value: SequentialFrequency; label: string }>;
   customIntervalValueInput: string;
   onCustomIntervalValueChange: (value: string) => void;

@@ -18,7 +18,7 @@ export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValu
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.columnUniqueValues(workspaceId, nodeId, columnName),
-    // Used by: UniqueValueCount query to fetch metadata that informs snapshot-size decisions because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+    // Used by: UniqueValueCount query to fetch metadata that informs group-by decisions because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
     queryFn: async () => {
       const { data: response } = await getColumnUniqueValues({
         headers: getAuthHeaders(),
@@ -36,8 +36,7 @@ export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValu
 
   // Pill is a nice-to-have hint, not load-bearing. Render nothing on
   // error so we don't flag the user with a red "Error" badge — most
-  // failure modes (snapshot view where the captured node isn't live-
-  // queryable, transient backend hiccup) are recoverable on their own
+  // failure modes such as transient backend hiccups are recoverable on their own
   // and don't warrant a prominent error UI on a parameter dropdown.
   if (error || !data) {
     return null;

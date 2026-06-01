@@ -110,11 +110,7 @@ export type ConcordanceResultsPanelProps = {
       matchCaseInsensitive?: boolean;
     },
   ) => Promise<void> | void;
-  /** Snapshot-view flag: when true, the node blocks render the
-   * captured rows + bins but every mutation surface (Process All,
-   * Add to Workspace, Dispersion Detach) is disabled. Pagination,
-   * sort, dispersion re-binning, and exports still work because
-   * they operate on the in-memory captured data. */
+  /** Read-only flag that disables mutation surfaces while preserving pagination, sorting, chart interaction, and exports. */
   readOnly?: boolean;
 };
 

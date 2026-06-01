@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/generated/types.gen';
 import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
@@ -39,6 +38,7 @@ import type { MultiSeriesChartType } from '../../common/components/MultiSeriesCh
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
 const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
+const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
 
 /** Used by: ConcordanceDispersionNodeBlock display-column assembly to prevent duplicate dispersion/metadata cells because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const dedupeColumns = (cols: string[]): string[] => {
@@ -167,11 +167,7 @@ export type ConcordanceDispersionNodeBlockProps = {
   ) => void;
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
-  /** Snapshot-view flag — disables Process All / Process Both /
-   * Dispersion Detach (Add to Workspace) buttons. The chart itself
-   * (bin selection, colour matches, re-binning) keeps working
-   * because those operate entirely on the captured 100-bucket bins
-   * via ``buildDispersionBinsFromBinned``. */
+  /** Read-only flag that disables Process All / Process Both / Dispersion Detach buttons while leaving chart exploration controls active. */
   readOnly?: boolean;
 };
 
@@ -284,7 +280,7 @@ export function ConcordanceDispersionNodeBlock({
           <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
           <div className="ml-auto flex items-center space-x-2">
             <span className="text-xs text-gray-500">Rows colored by source data block</span>
-            <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+            <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
               <Button
                 onClick={() => {
                   if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
@@ -346,7 +342,7 @@ export function ConcordanceDispersionNodeBlock({
                 combinedScopeMismatch ||
                 allLegendHidden;
               const combinedDetachTitle = readOnly
-                ? SNAPSHOT_DISABLED_REASON
+                ? READ_ONLY_DISABLED_REASON
                 : combinedScopeMismatch
                   ? 'Materialise the corpus first (Process Both) to safely apply this bin selection across all source documents.'
                   : allLegendHidden
@@ -766,9 +762,8 @@ export function ConcordanceDispersionNodeBlock({
       {(() => {
         // Mirror the table block's fallback: prefer the per-node
         // materialised summary when available, otherwise count from
-        // ``nodeData.data`` + pagination. Snapshot bundles don't carry
-        // materialize_summaries, so this fallback is what makes the
-        // separated dispersion view display the count line at all.
+        // ``nodeData.data`` + pagination so separated dispersion view
+        // count lines still render before materialization completes.
         const summary =
           nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId] ? (
             <GroupedResultsPageSizeSummary
@@ -798,7 +793,7 @@ export function ConcordanceDispersionNodeBlock({
         onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
         loading={nodeIsLoading}
       >
-        <DisabledReasonTooltip reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}>
+        <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
           <Button
             onClick={() => {
               if (detachNodeId) {
@@ -858,7 +853,7 @@ export function ConcordanceDispersionNodeBlock({
             nodeScopeMismatch ||
             allLegendHidden;
           const nodeDetachTitle = readOnly
-            ? SNAPSHOT_DISABLED_REASON
+            ? READ_ONLY_DISABLED_REASON
             : nodeScopeMismatch
               ? 'Materialise the corpus first (Process All) to safely apply this bin selection across all documents.'
               : allLegendHidden

@@ -7,7 +7,7 @@
  *     `syncToBackend` directly.
  *   - The init hook subscribes to changes after `hydrated` flips true,
  *     coalesces bursts via a 800 ms debounce, and pushes the latest
- *     snapshot using auth headers from the React-side `useAuth`.
+ *     persisted preference subset using auth headers from the React-side `useAuth`.
  *
  * Doing the sync at the hook level means the call always has fresh auth
  * headers; doing it via subscribe (instead of inline in each setter)
@@ -39,11 +39,6 @@ interface PreferencesState {
   defaultLanguage: string | null;
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
-  /** Master switch for the demo-snapshot feature. When false, every
-   * tool's Save/Load button is unmounted via the shared
-   * ``<AnalysisFeatureHeader>``. Default false; persisted to backend
-   * preferences. */
-  demoSnapshotsEnabled: boolean;
   /** True once the first backend fetch completes */
   hydrated: boolean;
   /** True while a backend sync is in-flight */
@@ -67,7 +62,6 @@ interface PreferencesActions {
   setDefaultLanguage: (language: string | null) => void;
   setDefaultTokenizerModel: (model: string | null) => void;
   setLdacaOniApiToken: (token: string | null) => void;
-  setDemoSnapshotsEnabled: (enabled: boolean) => void;
   /** Fetch preferences from backend and hydrate the store */
   loadFromBackend: (headers?: Record<string, string>) => Promise<void>;
   /** Push current state to backend */
@@ -88,7 +82,6 @@ type ResolvedUserPreferences = Omit<
   UserPreferences,
   | 'default_language'
   | 'default_tokenizer_model'
-  | 'demo_snapshots_enabled'
   | 'favorite_workspaces'
   | 'hidden_views'
   | 'ldaca_oni_api_token'
@@ -100,7 +93,6 @@ type ResolvedUserPreferences = Omit<
   default_language: string | null;
   default_tokenizer_model: string | null;
   ldaca_oni_api_token: string | null;
-  demo_snapshots_enabled: boolean;
 };
 
 /** Converts frontend auth header casing to the generated preferences client contract. */
@@ -115,7 +107,7 @@ const getAuthorizationHeaders = (
 /** Applies backend defaults so the store always works with concrete preference fields. */
 /**
  * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
- * Flow: fill missing backend arrays, quotation fields, language/tokenizer choices, token, and demo flag with concrete frontend defaults.
+ * Flow: fill missing backend arrays, quotation fields, language/tokenizer choices, and token with concrete frontend defaults.
  */
 const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences => ({
   hidden_views: data.hidden_views ?? [],
@@ -127,7 +119,6 @@ const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences =>
   default_language: data.default_language ?? null,
   default_tokenizer_model: data.default_tokenizer_model ?? null,
   ldaca_oni_api_token: data.ldaca_oni_api_token ?? null,
-  demo_snapshots_enabled: data.demo_snapshots_enabled ?? false,
 });
 
 /** Hydrates persisted preference fields into the immer draft after a successful backend load. */
@@ -143,7 +134,6 @@ function applyServerState(state: PreferencesState, data: ResolvedUserPreferences
   state.defaultLanguage = data.default_language;
   state.defaultTokenizerModel = data.default_tokenizer_model;
   state.ldacaOniApiToken = data.ldaca_oni_api_token;
-  state.demoSnapshotsEnabled = data.demo_snapshots_enabled;
   state.hydrated = true;
 }
 
@@ -158,7 +148,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
         defaultLanguage: null,
         defaultTokenizerModel: null,
         ldacaOniApiToken: null,
-        demoSnapshotsEnabled: false,
         hydrated: false,
         syncing: false,
         lastSyncError: null,
@@ -249,14 +238,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
-        /** Enables or disables demo snapshot controls across analysis feature headers. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-        setDemoSnapshotsEnabled: (enabled) => {
-          set((state) => {
-            state.demoSnapshotsEnabled = !!enabled;
-          });
-        },
-
         /** Loads preferences from the backend once auth is available, falling back to local state. */
         /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         loadFromBackend: async (headers) => {
@@ -305,7 +286,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
               ? { default_tokenizer_model: state.defaultTokenizerModel }
               : {}),
             ldaca_oni_api_token: state.ldacaOniApiToken,
-            demo_snapshots_enabled: state.demoSnapshotsEnabled,
           };
           try {
             await updatePreferences({
@@ -336,7 +316,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
           defaultLanguage: state.defaultLanguage,
           defaultTokenizerModel: state.defaultTokenizerModel,
           ldacaOniApiToken: state.ldacaOniApiToken,
-          demoSnapshotsEnabled: state.demoSnapshotsEnabled,
         }),
       },
     ),

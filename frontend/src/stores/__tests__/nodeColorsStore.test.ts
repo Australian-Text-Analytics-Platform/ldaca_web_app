@@ -160,7 +160,7 @@ describe('useNodeColorsStore — hydrateColors', () => {
   it('resets assignmentOrder to the keys of the hydrated payload', () => {
     useNodeColorsStore.getState().setColor('stale', '#000000');
     useNodeColorsStore.getState().hydrateColors({ a: '#2563eb', b: '#dc2626' });
-    expect(useNodeColorsStore.getState().assignmentOrder.sort()).toEqual(['a', 'b']);
+    expect(useNodeColorsStore.getState().assignmentOrder.toSorted()).toEqual(['a', 'b']);
   });
 
   it('does not touch the per-tab temp layer', () => {

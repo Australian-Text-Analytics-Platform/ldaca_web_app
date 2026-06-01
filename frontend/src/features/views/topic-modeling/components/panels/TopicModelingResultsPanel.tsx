@@ -1,7 +1,6 @@
 import React, { useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { SNAPSHOT_DISABLED_REASON } from '@/features/snapshot-view';
 import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
@@ -28,6 +27,8 @@ type TopicModelingResult = {
   metadata?: Record<string, unknown> | null;
   message?: string | null;
 } | null;
+
+const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
 
 type ExactTopicCountSliderProps = {
   currentExactTopicCount?: number | null;
@@ -238,12 +239,7 @@ type Props = {
     language: string;
     words: ReadonlyArray<string>;
   }>;
-  /** Snapshot view: disables the Add-to-Workspace (detach) button and
-   * the Exact Topic No. re-aggregation slider — both make backend
-   * calls that create new state or refit topics, which don't make
-   * sense for a frozen captured result. The bubble chart, zoom,
-   * legend/topic selection, search, and stopword filter all stay
-   * active (purely client-side display logic). */
+  /** Read-only flag that disables Add to Workspace and exact-topic re-aggregation while leaving chart exploration controls active. */
   readOnly?: boolean;
 };
 
@@ -415,7 +411,7 @@ export function TopicModelingResultsPanel({
                     <div className="hidden lg:block" />
                   )}
                   <DisabledReasonTooltip
-                    reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
+                    reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}
                     className="w-full shrink-0 lg:w-auto"
                   >
                     <Button

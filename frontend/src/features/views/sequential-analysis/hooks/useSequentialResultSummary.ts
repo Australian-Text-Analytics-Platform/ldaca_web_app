@@ -13,7 +13,7 @@ const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
   'days',
   'weeks',
 ];
-// Narrows unknown snapshot request values to the custom interval units supported by the UI.
+// Narrows unknown request values to the custom interval units supported by the UI.
 /**
  * Called by: useSequentialResultSummary hook during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  */

@@ -268,7 +268,7 @@ export interface UseAnalysisLockMachineConfig extends AnalysisLockConfig {
 }
 
 /**
- * Extends the local lock core with workspace-aware snapshot capture so features
+ * Extends the local lock core with workspace-aware node metadata capture so features
  * can restore selected columns from cached node metadata or backend task payloads.
  * Used by: useAnalysisLock and analysis feature screens with direct lock-machine needs.
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.

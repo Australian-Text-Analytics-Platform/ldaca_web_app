@@ -3,7 +3,6 @@ import { Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { SNAPSHOT_DISABLED_REASON, snapshotDisabledReason } from '@/features/snapshot-view';
 import type { ChartConfig } from '@/components/ui/chart';
 import {
   MultiSeriesChart,
@@ -26,6 +25,12 @@ export type SequentialXAxisType = 'category' | 'number';
 const TIMESTAMP_HEURISTIC_THRESHOLD = 1e11;
 
 const NUMERIC_X_KEY = '__x_numeric__';
+const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
+
+const readOnlyDisabledReason = (readOnly: boolean, fallback?: string | false) => {
+  if (readOnly) return READ_ONLY_DISABLED_REASON;
+  return fallback || undefined;
+};
 
 // Used by: SequentialChart numeric-axis data mapping to convert row periods into Recharts x-coordinates because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
 const toNumericX = (row: SequentialAnalysisDatum): number => {
@@ -67,12 +72,7 @@ interface SequentialChartProps {
   onDetachNodeNameChange: (value: string) => void;
   onDetach: () => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
-  /** Snapshot view: disables the "Add to Workspace" detach button and
-   * the new-node-name input (both create a backend node from the
-   * captured selection, which doesn't make sense for a frozen
-   * snapshot). Legend toggling and period selection stay enabled —
-   * those are purely visual and help users explore the captured
-   * data. */
+  /** Read-only flag that disables Add to Workspace and the new-node-name input while leaving chart exploration controls active. */
   readOnly?: boolean;
 }
 
@@ -156,7 +156,7 @@ export function SequentialChart({
             <DisabledReasonTooltip
               reason={
                 readOnly
-                  ? SNAPSHOT_DISABLED_REASON
+                  ? READ_ONLY_DISABLED_REASON
                   : 'No groups meet the current minimum group size — adjust the filter to enable selecting periods.'
               }
             >
@@ -288,7 +288,7 @@ export function SequentialChart({
               New data block name
             </label>
             <DisabledReasonTooltip
-              reason={readOnly ? SNAPSHOT_DISABLED_REASON : undefined}
+              reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}
               className="min-w-0 flex-1"
             >
               <Input
@@ -313,7 +313,7 @@ export function SequentialChart({
             reason={
               isDetaching
                 ? undefined
-                : snapshotDisabledReason(
+                : readOnlyDisabledReason(
                     readOnly,
                     !canDetach &&
                       'Click periods on the chart (shift-click to extend) to pick a subset to add as a new data block.',

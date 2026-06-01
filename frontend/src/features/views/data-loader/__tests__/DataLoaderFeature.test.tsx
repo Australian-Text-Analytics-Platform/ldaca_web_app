@@ -159,7 +159,7 @@ vi.mock('@/api/generated/sdk.gen', () => ({
   uploadWorkspaceZip: vi.fn(),
 }));
 
-vi.mock('@/hooks/useFiles', () => ({
+vi.mock('@/features/views/data-loader/hooks/useFiles', () => ({
   // Supplies a stable file tree with README citation coverage for the Data
   // Loader browser tests.
   // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.

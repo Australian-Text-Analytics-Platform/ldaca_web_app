@@ -15,7 +15,7 @@ state machine. It handles:
 - terminal result fetch,
 - clear/reset behavior,
 - cancelling the current backend task from the owning tab,
-- request snapshots.
+- request hydration.
 
 `features/analysis/common/tasks/useAnalysisTaskFlow.ts` connects an analysis
 tab to the task stream. It refreshes results only when the relevant task reaches
@@ -84,8 +84,8 @@ chart interactions.
 ## Sequential Analysis
 
 Sequential analysis runs trend grouping over one node. It supports datetime,
-integer, and float time columns, frequency/custom intervals, chart export,
-selected-period detach, and snapshot capture at configurable granularity.
+integer, and float time columns, frequency/custom intervals, chart export, and
+selected-period detach.
 
 ## AI Annotation
 

@@ -22,6 +22,5 @@ export const preferencesResponse = (overrides: Partial<UserPreferences> = {}): U
   default_language: null,
   default_tokenizer_model: null,
   ldaca_oni_api_token: null,
-  demo_snapshots_enabled: false,
   ...overrides,
 });
