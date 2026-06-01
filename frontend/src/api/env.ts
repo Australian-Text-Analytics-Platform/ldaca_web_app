@@ -79,3 +79,13 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
   // 6. Default: same origin /api
   return `${origin}/api`;
 }
+
+/**
+ * Absolute backend origin without the trailing `/api`, e.g.
+ * `http://127.0.0.1:8001` in the desktop app, or `` / the reverse-proxy base on
+ * the web. Use for backend resources served outside the `/api` namespace — e.g.
+ * `${getBackendRoot()}/docs/<file>` for the docs-serving route.
+ */
+export function getBackendRoot(options: ApiEnvOptions = {}): string {
+  return getApiBase(options).replace(/\/api$/, '');
+}
