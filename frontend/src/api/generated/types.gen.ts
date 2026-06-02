@@ -136,10 +136,6 @@ export type AiAnnotationDetachRequest = {
      */
     examples?: Array<AiAnnotationExample>;
     /**
-     * Language
-     */
-    language?: string | null;
-    /**
      * Model
      */
     model: string;
@@ -439,10 +435,6 @@ export type AiAnnotationRequest = {
      */
     examples?: Array<AiAnnotationExample>;
     /**
-     * Language
-     */
-    language?: string | null;
-    /**
      * Model
      */
     model: string;
@@ -668,6 +660,53 @@ export type AnalysisSorting = {
      * Sort By
      */
     sort_by?: string | null;
+};
+
+/**
+ * AnalysisTab
+ *
+ * A single thin analysis tab.
+ *
+ * Carries only identity and a pointer to the analysis result it shows. All
+ * parameters/node selection live on the referenced ``AnalysisTask.request``.
+ *
+ * Used by:
+ * - `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab
+ * store round-trips this exact shape.
+ */
+export type AnalysisTab = {
+    /**
+     * Tab Id
+     */
+    tab_id: string;
+    /**
+     * Task Id
+     */
+    task_id?: string | null;
+    /**
+     * Title
+     */
+    title?: string;
+};
+
+/**
+ * AnalysisTabGroup
+ *
+ * Ordered tab group for one analysis type.
+ *
+ * Tab order is the array order of ``tabs``; ``active_tab_id`` selects the
+ * visible tab. Used by `WorkspaceTabsState` to namespace tabs per analysis
+ * type (concordance, token_frequencies, ...).
+ */
+export type AnalysisTabGroup = {
+    /**
+     * Active Tab Id
+     */
+    active_tab_id?: string | null;
+    /**
+     * Tabs
+     */
+    tabs?: Array<AnalysisTab>;
 };
 
 /**
@@ -1115,10 +1154,6 @@ export type ConcordanceAnalysisRequest = {
      */
     descending?: boolean;
     /**
-     * Language
-     */
-    language?: string | null;
-    /**
      * Node Columns
      */
     node_columns: {
@@ -1152,6 +1187,10 @@ export type ConcordanceAnalysisRequest = {
      * Sort By
      */
     sort_by?: string | null;
+    /**
+     * Tab Id
+     */
+    tab_id?: string | null;
     /**
      * Whole Word
      */
@@ -1462,10 +1501,6 @@ export type ConcordanceMaterializeRequest = {
      */
     column: string;
     /**
-     * Language
-     */
-    language?: string | null;
-    /**
      * Num Left Tokens
      */
     num_left_tokens?: number;
@@ -1581,10 +1616,6 @@ export type ConcordanceRequest = {
      * Combined
      */
     combined?: boolean;
-    /**
-     * Language
-     */
-    language?: string | null;
     /**
      * Materialized Paths
      */
@@ -3012,10 +3043,6 @@ export type QuotationDetachRequest = {
     column: string;
     engine?: QuotationEngineConfigInput | null;
     /**
-     * Language
-     */
-    language?: string | null;
-    /**
      * Materialized Path
      */
     materialized_path?: string | null;
@@ -3087,10 +3114,6 @@ export type QuotationMaterializeRequest = {
      */
     column: string;
     engine?: QuotationEngineConfigInput | null;
-    /**
-     * Language
-     */
-    language?: string | null;
     /**
      * Parent Task Id
      */
@@ -3231,10 +3254,6 @@ export type QuotationRequestInput = {
      */
     descending?: boolean;
     engine?: QuotationEngineConfigInput | null;
-    /**
-     * Language
-     */
-    language?: string | null;
     /**
      * Page
      */
@@ -4798,10 +4817,6 @@ export type TopicModelingEmbeddingCacheSizeResponse = {
  */
 export type TopicModelingRequestInput = {
     /**
-     * Language
-     */
-    language?: string | null;
-    /**
      * Min Topic Size
      */
     min_topic_size?: number | null;
@@ -5055,10 +5070,6 @@ export type User = {
  */
 export type UserPreferences = {
     /**
-     * Default Language
-     */
-    default_language?: string | null;
-    /**
      * Default Tokenizer Model
      */
     default_tokenizer_model?: string | null;
@@ -5091,10 +5102,6 @@ export type UserPreferences = {
  * responses in the shape expected by frontend clients and tests.
  */
 export type UserPreferencesUpdate = {
-    /**
-     * Default Language
-     */
-    default_language?: string | null;
     /**
      * Default Tokenizer Model
      */
@@ -5503,6 +5510,26 @@ export type WorkspaceSummary = {
      * Workspace Size Byte
      */
     workspace_size_Byte?: number;
+};
+
+/**
+ * WorkspaceTabsState
+ *
+ * Full per-workspace analysis-tab state.
+ *
+ * API schema round-tripped by the GET/PUT ``/{workspace_id}/tabs`` routes and
+ * the frontend tab store. ``groups`` is keyed by analysis type.
+ *
+ * Used by:
+ * - backend API routes, generated frontend client, and backend tests.
+ */
+export type WorkspaceTabsState = {
+    /**
+     * Groups
+     */
+    groups?: {
+        [key: string]: AnalysisTabGroup;
+    };
 };
 
 /**
@@ -10442,6 +10469,78 @@ export type UploadWorkspaceZipResponses = {
 };
 
 export type UploadWorkspaceZipResponse = UploadWorkspaceZipResponses[keyof UploadWorkspaceZipResponses];
+
+export type GetWorkspaceTabsData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/tabs';
+};
+
+export type GetWorkspaceTabsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetWorkspaceTabsError = GetWorkspaceTabsErrors[keyof GetWorkspaceTabsErrors];
+
+export type GetWorkspaceTabsResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceTabsState;
+};
+
+export type GetWorkspaceTabsResponse = GetWorkspaceTabsResponses[keyof GetWorkspaceTabsResponses];
+
+export type PutWorkspaceTabsData = {
+    body: WorkspaceTabsState;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/tabs';
+};
+
+export type PutWorkspaceTabsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutWorkspaceTabsError = PutWorkspaceTabsErrors[keyof PutWorkspaceTabsErrors];
+
+export type PutWorkspaceTabsResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceTabsState;
+};
+
+export type PutWorkspaceTabsResponse = PutWorkspaceTabsResponses[keyof PutWorkspaceTabsResponses];
 
 export type GetWorkspaceUiStateData = {
     body?: never;

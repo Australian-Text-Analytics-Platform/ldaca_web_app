@@ -9,6 +9,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import { InsetCard } from '@/components/layout/InsetCard';
 import { RefreshStatusBanner } from '@/features/auth/components/RefreshStatusBanner';
 import { useUIStore } from '@/stores';
+import type { ViewType } from '@/stores';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -19,6 +20,21 @@ import { ViewRouter } from '@/components/layout/ViewRouter';
 const FeedbackPanel = lazy(() => import('@/features/feedback/components/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 const HintsController = lazy(() => import('@/features/hints/HintsController'));
+
+/**
+ * Views that render their own tabbed card (AnalysisTabbedPanel via
+ * AnalysisTabsHost) instead of sitting inside the shared main card. For these,
+ * the main InsetCard frame is made transparent so the tab strip can protrude
+ * above the view's own card with no double-card nesting. Every analysis view
+ * that has migrated to the shared tab shell must be listed here.
+ */
+const TABBED_MAIN_VIEWS = new Set<ViewType>([
+  'concordance',
+  'token-frequency',
+  'analysis',
+  'topic-modeling',
+  'quotation',
+]);
 
 export function WorkspaceShell() {
   const { feedbackOpen, closeModal } = useUIStore(
@@ -31,6 +47,8 @@ export function WorkspaceShell() {
   usePreferencesInit();
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const syncVisibleViews = useUIStore((s) => s.syncVisibleViewsFromPreferences);
+  const currentView = useUIStore((s) => s.currentView);
+  const isTabbedMain = TABBED_MAIN_VIEWS.has(currentView);
   useEffect(() => {
     if (prefsHydrated) syncVisibleViews();
   }, [prefsHydrated, syncVisibleViews]);
@@ -107,7 +125,13 @@ export function WorkspaceShell() {
                         width: isRightCollapsed ? '100%' : `${(1 - asidePanelRatio) * 100}%`,
                         minWidth: 280,
                       }}
-                      innerClassName="overflow-y-auto scrollbar-none p-4"
+                      innerClassName={
+                        isTabbedMain
+                          ? // Tabbed views own their card; strip the shared frame
+                            // (border/bg/shadow/padding) so tabs protrude above it.
+                            'overflow-hidden border-0 bg-transparent p-0 shadow-none'
+                          : 'overflow-y-auto scrollbar-none p-4'
+                      }
                     >
                       <div className="mx-0 flex min-h-0 w-full max-w-none flex-1">
                         <ViewRouter />

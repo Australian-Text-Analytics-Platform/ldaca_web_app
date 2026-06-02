@@ -1,0 +1,86 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  closeTabInState,
+  createTabInState,
+  getActiveTabId,
+  getTabs,
+  renameTabInState,
+  setActiveTabInState,
+  setTabTaskInState,
+} from '../tabStateOps';
+
+const TYPE = 'concordance_analysis';
+const OTHER = 'token_frequency_analysis';
+
+describe('tabStateOps', () => {
+  it('creates a tab, focuses it, and returns its id', () => {
+    const { state, tabId } = createTabInState(null, TYPE, 'Analysis 1', 'a');
+    expect(tabId).toBe('a');
+    expect(getTabs(state, TYPE)).toHaveLength(1);
+    expect(getTabs(state, TYPE)[0]).toMatchObject({ tab_id: 'a', task_id: null, title: 'Analysis 1' });
+    expect(getActiveTabId(state, TYPE)).toBe('a');
+  });
+
+  it('keeps other analysis-type groups intact when mutating one group', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, OTHER, 'B', 'b').state;
+    state = createTabInState(state, TYPE, 'A2', 'a2').state;
+    expect(getTabs(state, TYPE).map((t) => t.tab_id)).toEqual(['a', 'a2']);
+    expect(getTabs(state, OTHER).map((t) => t.tab_id)).toEqual(['b']);
+  });
+
+  it('reselects the previous tab when the active tab is closed', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, TYPE, 'B', 'b').state;
+    state = createTabInState(state, TYPE, 'C', 'c').state; // active = c
+    state = closeTabInState(state, TYPE, 'c');
+    expect(getActiveTabId(state, TYPE)).toBe('b');
+    expect(getTabs(state, TYPE).map((t) => t.tab_id)).toEqual(['a', 'b']);
+  });
+
+  it('clears the active id when the last tab is closed', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = closeTabInState(state, TYPE, 'a');
+    expect(getTabs(state, TYPE)).toHaveLength(0);
+    expect(getActiveTabId(state, TYPE)).toBeNull();
+  });
+
+  it('does not change the active id when closing a non-active tab', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, TYPE, 'B', 'b').state; // active = b
+    state = closeTabInState(state, TYPE, 'a');
+    expect(getActiveTabId(state, TYPE)).toBe('b');
+  });
+
+  it('renames a tab title', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = renameTabInState(state, TYPE, 'a', 'Renamed');
+    expect(getTabs(state, TYPE)[0]!.title).toBe('Renamed');
+  });
+
+  it('sets the active tab and ignores unknown ids', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, TYPE, 'B', 'b').state;
+    state = setActiveTabInState(state, TYPE, 'a');
+    expect(getActiveTabId(state, TYPE)).toBe('a');
+    state = setActiveTabInState(state, TYPE, 'missing');
+    expect(getActiveTabId(state, TYPE)).toBe('a');
+  });
+
+  it('sets and clears a tab task id', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = setTabTaskInState(state, TYPE, 'a', 'task-123');
+    expect(getTabs(state, TYPE)[0]!.task_id).toBe('task-123');
+    state = setTabTaskInState(state, TYPE, 'a', null);
+    expect(getTabs(state, TYPE)[0]!.task_id).toBeNull();
+  });
+
+  it('falls back to the first tab when active_tab_id is dangling', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, TYPE, 'B', 'b').state;
+    // Simulate a stale active pointer.
+    state = { groups: { [TYPE]: { tabs: getTabs(state, TYPE), active_tab_id: 'gone' } } };
+    expect(getActiveTabId(state, TYPE)).toBe('a');
+  });
+});

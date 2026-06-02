@@ -42,6 +42,9 @@ interface AnalysisActions {
   setAppliedStopSet: React.Dispatch<React.SetStateAction<Set<string>>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
   lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
+  // Reports the run's assigned task id back to the owning tab. No-op when not
+  // tab-mounted.
+  onTaskIdAssigned?: (taskId: string | null) => void;
 }
 
 interface LockActions {
@@ -95,6 +98,7 @@ export const useTokenFrequencyTaskFlow = ({
     setAppliedStopSet,
     setStopWords,
     lastFetchedRef,
+    onTaskIdAssigned,
   },
   lock: { getAuthHeaders, lockWithSnapshots, queryClient },
   navigation: {
@@ -178,7 +182,8 @@ export const useTokenFrequencyTaskFlow = ({
       });
       setResultsSafely(response);
 
-      extractAndSetTaskId(response, setLocalTaskId);
+      const assignedTaskId = extractAndSetTaskId(response, setLocalTaskId);
+      onTaskIdAssigned?.(assignedTaskId);
 
       setLastCompareNodeIds(request.node_ids);
 

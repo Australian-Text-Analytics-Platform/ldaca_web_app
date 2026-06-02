@@ -77,7 +77,7 @@ const getStopwordList = (iso6393Code: string): string[] => {
 
 /** Resolves and deduplicates stopwords synchronously for callers/tests that already have languages. */
 /**
- * Used by: src/features/views/common/hooks/useDefaultStopwords.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Used by: src/features/views/token-frequency/hooks/useTokenFrequencyPreferences.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 export function resolveMergedStopwords(

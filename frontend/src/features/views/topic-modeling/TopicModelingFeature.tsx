@@ -30,9 +30,6 @@ import {
   getAnalysisActionState,
   executeAnalysisRunOrUpdate,
 } from '../common';
-import { useDefaultStopwords } from '../common/hooks/useDefaultStopwords';
-import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
-import { usePreferencesStore } from '@/stores/preferencesStore';
 import {
   TopicModelingParameterPanel,
   type CorpusSample,
@@ -47,10 +44,20 @@ const DEFAULT_TOPIC_SIZE_VALUE = 20;
 
 /** Renders the topic-modeling workflow for live BERTopic runs and result exploration. */
 /**
- * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: TopicModelingTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ *
+ * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
+ * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
+ * task id assignment/clear back to the tab record.
  */
-function TopicModelingFeature() {
+export interface TopicModelingFeatureProps {
+  tabId?: string;
+  tabTaskId?: string | null;
+  onTabTaskChange?: (taskId: string | null) => void;
+}
+
+function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModelingFeatureProps = {}) {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
@@ -71,6 +78,9 @@ function TopicModelingFeature() {
     analysisType: 'topic_modeling',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
+    // Tab-scoped locking: bind the lock to this tab's persisted task. Null for a
+    // fresh tab that has not run yet (unlocked).
+    taskId: tabTaskId ?? null,
     allowedDataTypes: ['string'],
     maxNodes: 2,
     docTypeOnly: true,
@@ -94,7 +104,6 @@ function TopicModelingFeature() {
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
   const setTasks = useAnalysisStore((state) => state.setTasks);
-  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const [error, setError] = useState<string | null>(null);
   const [liveResult, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
 
@@ -121,14 +130,6 @@ function TopicModelingFeature() {
   }>({ x: 0, y: 0, topic: null });
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
   const [topicSearchQuery, setTopicSearchQuery] = useState('');
-  // Post-fit stopword filtering for non-English topic labels. CJK function
-  // words (的/是/了 etc.) dominate every label because we deliberately
-  // don't pass a CountVectorizer stopword list to the backend — that
-  // would be opinionated and irreversible. The filter is purely
-  // client-side: it drops matching words from each topic's display
-  // representation and hides topics whose representative words all match.
-  // Backend output is unchanged, so toggling off restores the raw labels.
-  const [stopwordFilterEnabled, setStopwordFilterEnabled] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(800);
@@ -155,6 +156,9 @@ function TopicModelingFeature() {
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
+    // Tab-driven deterministic hydration: the tab's persisted task id wins task
+    // resolution over transient local state.
+    hydrationTaskId: tabTaskId ?? null,
     resultRef,
     // Loads the latest topic-modeling result for polling and task resumption.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -238,9 +242,15 @@ function TopicModelingFeature() {
     },
     // Clears topic-specific result and error state after the shared lifecycle deletes results.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    onCleared: () => {
+    onCleared: (_, options) => {
       setResultSafely(null);
       setError(null);
+      if (options?.preserveLocalState) {
+        return;
+      }
+      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
+      // a task the user explicitly cleared.
+      onTabTaskChange?.(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
     // Removes completed topic tasks from the global task list after clear/delete operations.
@@ -563,28 +573,12 @@ function TopicModelingFeature() {
   const hasAnySampling = sampleFractionsForRequest.some((f) => f !== null);
 
   const rawTopics: TopicModelingTopic[] = result?.data?.topics || [];
-  const topicLanguages = [effectiveNodeLanguage({ defaultLanguage })];
-  const {
-    stopwords: stopwordSet,
-    byLanguage: stopwordByLanguage,
-    available: stopwordFilterAvailable,
-  } = useDefaultStopwords(topicLanguages, { strict: true });
-  // Aggregate label for the toggle copy ("Hide EN + ZH stopwords").
-  // Only includes languages that actually returned a non-empty list,
-  // so a ZH-only resolved set won't claim "EN" in the toggle label.
-  const stopwordFilterLanguageLabel = stopwordByLanguage
-    .filter((group) => group.words.length > 0)
-    .map((group) => group.language.toUpperCase())
-    .join(' + ');
   // Rebuild each topic's label from its representative_words sliced to the
   // current "Words per topic" display cap, so changing that input updates
   // the bottom list without a rerun. Falls back to the server-built label
-  // when representative_words is missing. When the stopword filter is on
-  // and we have a bundled list for the resolved language, drop matching
-  // words before slicing and hide topics that end up empty.
+  // when representative_words is missing.
   const topics: TopicModelingTopic[] = useMemo(() => {
     const cap = Math.max(1, Math.floor(representativeWordsCount));
-    const filterActive = stopwordFilterEnabled && stopwordFilterAvailable;
     const filtered: TopicModelingTopic[] = [];
     for (const topic of rawTopics) {
       const words = Array.isArray(topic.representative_words) ? topic.representative_words : null;
@@ -592,29 +586,12 @@ function TopicModelingFeature() {
         filtered.push(topic);
         continue;
       }
-      const kept = filterActive
-        ? words.filter((w) => typeof w === 'string' && !stopwordSet.has(w.trim()))
-        : words;
-      if (filterActive && kept.length === 0) {
-        // Topic was entirely stopwords — hide it per the agreed UX.
-        continue;
-      }
-      const sliced = kept.slice(0, cap).join(', ');
-      filtered.push(
-        sliced
-          ? { ...topic, representative_words: kept, label: sliced }
-          : { ...topic, representative_words: kept },
-      );
+      const sliced = words.slice(0, cap).join(', ');
+      filtered.push(sliced ? { ...topic, label: sliced } : { ...topic });
     }
     return filtered;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    result,
-    representativeWordsCount,
-    stopwordFilterEnabled,
-    stopwordFilterAvailable,
-    stopwordSet,
-  ]);
+  }, [result, representativeWordsCount]);
 
   // Task-flow hook is intentionally placed after ``topics`` so it can
   // receive the already-filtered display list as ``displayedTopics`` —
@@ -656,6 +633,11 @@ function TopicModelingFeature() {
       lastFetchedRef,
       resolveTopicModelingTaskId: resolveTaskId,
       setLocalTaskId,
+      // Persist the run's assigned task id onto the active tab so reload
+      // rehydrates the same task.
+      onTaskIdAssigned: (taskId) => {
+        if (tabId) onTabTaskChange?.(taskId);
+      },
     },
     lock: {
       getAuthHeaders,
@@ -891,12 +873,6 @@ function TopicModelingFeature() {
           selectAllDetachColumns={selectAllDetachColumns}
           deselectAllDetachColumns={deselectAllDetachColumns}
           handleDetachConfirm={handleDetachConfirm}
-          stopwordFilterAvailable={stopwordFilterAvailable}
-          stopwordFilterEnabled={stopwordFilterEnabled}
-          onStopwordFilterToggle={setStopwordFilterEnabled}
-          stopwordFilterLanguage={stopwordFilterLanguageLabel || undefined}
-          stopwordFilterSet={stopwordSet}
-          stopwordFilterByLanguage={stopwordByLanguage}
           readOnly={false}
         />
       )}

@@ -50,6 +50,9 @@ interface TopicModelingActions {
   lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
   resolveTopicModelingTaskId: () => Promise<string | null>;
   setLocalTaskId: (id: string | null) => void;
+  // Reports the run's assigned task id back to the owning tab. No-op when not
+  // tab-mounted.
+  onTaskIdAssigned?: (taskId: string | null) => void;
 }
 
 interface TopicModelingLock {
@@ -114,6 +117,7 @@ export function useTopicModelingTaskFlow({
     lastFetchedRef,
     resolveTopicModelingTaskId,
     setLocalTaskId,
+    onTaskIdAssigned,
   },
   lock: { getAuthHeaders, lockWithSnapshots, queryClient },
 }: Params) {
@@ -187,7 +191,8 @@ export function useTopicModelingTaskFlow({
         headers: getAuthHeaders(),
         throwOnError: true,
       });
-      extractAndSetTaskId(res, setLocalTaskId);
+      const assignedTaskId = extractAndSetTaskId(res, setLocalTaskId);
+      onTaskIdAssigned?.(assignedTaskId);
       setResultSafely(res);
 
       if (res.state === 'failed') {

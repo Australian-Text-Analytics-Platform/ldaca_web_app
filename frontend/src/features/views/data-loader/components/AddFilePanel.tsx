@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import { useFilePreview } from '../hooks/useFilePreview';
-import { SUPPORTED_LANGUAGES } from '@/lib/languages';
-import { usePreferencesStore } from '@/stores/preferencesStore';
 import { FilePreviewContent } from './FilePreviewContent';
 import { CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog } from '@/components/ui/dialog';
 
 interface AddFilePanelProps {
@@ -42,9 +39,9 @@ export function AddFilePanel({ filename, open, onClose, onConfirm }: AddFilePane
 }
 
 /**
- * File-add dialog body. Shows preview rows, optional Excel sheet selection,
- * and corpus language defaults before delegating the actual add operation
- * back to the data-loader feature via FilePreviewContent.
+ * File-add dialog body. Shows preview rows and optional Excel sheet selection
+ * before delegating the actual add operation back to the data-loader feature
+ * via FilePreviewContent.
  */
 function AddFilePanelBody({
   filename,
@@ -62,9 +59,6 @@ function AddFilePanelBody({
     setSelectedSheet,
   } = useFilePreview(filename, true);
 
-  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
-  const setDefaultLanguage = usePreferencesStore((state) => state.setDefaultLanguage);
-  const selectedLanguage = defaultLanguage ?? 'en';
   const [submitting, setSubmitting] = useState(false);
 
   const handleConfirm = async () => {
@@ -76,30 +70,6 @@ function AddFilePanelBody({
       setSubmitting(false);
     }
   };
-
-  const languageSelector = (
-    <div>
-      <label htmlFor="add-file-language" className="mb-2 block text-sm font-medium text-foreground">
-        Language
-      </label>
-      <Select value={selectedLanguage} onValueChange={setDefaultLanguage}>
-        <SelectTrigger id="add-file-language" aria-label="Corpus language">
-          <SelectValue placeholder="English" />
-        </SelectTrigger>
-        <SelectContent>
-          {SUPPORTED_LANGUAGES.map((option) => (
-            <SelectItem key={option.code} value={option.code}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Sets the default for this and future corpora. Analysis tools without a language-specific
-        implementation (e.g. quotation extractor) will disable themselves on non-English corpora.
-      </p>
-    </div>
-  );
 
   const footer = (
     <CardFooter className="border-t px-6 py-4">
@@ -143,7 +113,6 @@ function AddFilePanelBody({
       }}
       title={`Add File: ${filename}`}
       description="Files are added as data blocks automatically. Choose an optional sheet, inspect the preview, and confirm before adding it to the workspace."
-      headerSlot={languageSelector}
       footer={footer}
     />
   );

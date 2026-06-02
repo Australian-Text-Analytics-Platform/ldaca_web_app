@@ -88,6 +88,9 @@ interface QuotationActions {
   updateResultState: (nodeId: string, column: string, result: QuotationAnalysisResponse) => void;
   applyContextLengthPreferenceFromResult: (payload: QuotationAnalysisResponse) => void;
   setLocalTaskId: (id: string | null) => void;
+  // Reports the run's assigned task id back to the owning tab. No-op when not
+  // tab-mounted.
+  onTaskIdAssigned?: (taskId: string | null) => void;
 }
 
 interface QuotationLock {
@@ -148,6 +151,7 @@ export function useQuotationTaskFlow({
     updateResultState,
     applyContextLengthPreferenceFromResult,
     setLocalTaskId,
+    onTaskIdAssigned,
   },
   lock: {
     getAuthHeaders,
@@ -299,7 +303,8 @@ export function useQuotationTaskFlow({
 
     try {
       const result = await quotationSearch(nodeId, requestPayload);
-      extractAndSetTaskId(result, setLocalTaskId);
+      const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
+      onTaskIdAssigned?.(assignedTaskId);
       applyContextLengthPreferenceFromResult(result);
       updateResultState(nodeId, column, result);
       return {

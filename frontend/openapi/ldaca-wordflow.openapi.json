@@ -154,17 +154,6 @@
             "title": "Examples",
             "type": "array"
           },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
           "model": {
             "title": "Model",
             "type": "string"
@@ -585,17 +574,6 @@
             "title": "Examples",
             "type": "array"
           },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
           "model": {
             "title": "Model",
             "type": "string"
@@ -906,6 +884,61 @@
           "descending"
         ],
         "title": "AnalysisSorting",
+        "type": "object"
+      },
+      "AnalysisTab": {
+        "description": "A single thin analysis tab.\n\nCarries only identity and a pointer to the analysis result it shows. All\nparameters/node selection live on the referenced ``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
+        "properties": {
+          "tab_id": {
+            "title": "Tab Id",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "title": {
+            "default": "Untitled",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tab_id"
+        ],
+        "title": "AnalysisTab",
+        "type": "object"
+      },
+      "AnalysisTabGroup": {
+        "description": "Ordered tab group for one analysis type.\n\nTab order is the array order of ``tabs``; ``active_tab_id`` selects the\nvisible tab. Used by `WorkspaceTabsState` to namespace tabs per analysis\ntype (concordance, token_frequencies, ...).",
+        "properties": {
+          "active_tab_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Tab Id"
+          },
+          "tabs": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisTab"
+            },
+            "title": "Tabs",
+            "type": "array"
+          }
+        },
+        "title": "AnalysisTabGroup",
         "type": "object"
       },
       "AnalysisTaskActionResponse": {
@@ -1541,17 +1574,6 @@
             "title": "Descending",
             "type": "boolean"
           },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
           "node_columns": {
             "additionalProperties": {
               "type": "string"
@@ -1604,6 +1626,17 @@
               }
             ],
             "title": "Sort By"
+          },
+          "tab_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tab Id"
           },
           "whole_word": {
             "default": false,
@@ -2066,17 +2099,6 @@
             "title": "Column",
             "type": "string"
           },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
           "num_left_tokens": {
             "default": 10,
             "title": "Num Left Tokens",
@@ -2232,17 +2254,6 @@
             "default": false,
             "title": "Combined",
             "type": "boolean"
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
           },
           "materialized_paths": {
             "anyOf": [
@@ -3980,17 +3991,6 @@
               }
             ]
           },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
           "materialized_path": {
             "anyOf": [
               {
@@ -4090,17 +4090,6 @@
                 "type": "null"
               }
             ]
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
           },
           "parent_task_id": {
             "title": "Parent Task Id",
@@ -4249,17 +4238,6 @@
                 "type": "null"
               }
             ]
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
           },
           "page": {
             "default": 1,
@@ -6546,17 +6524,6 @@
           "topic_size_value": 25
         },
         "properties": {
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
           "min_topic_size": {
             "anyOf": [
               {
@@ -6962,17 +6929,6 @@
         "additionalProperties": false,
         "description": "Preference schema persisted by preference routes for user preferences.\n\nUsed by:\n- backend API routes, backend request/response models, backend tests, core workspace and\n  worker services because they need a stable JSON contract shared by route handlers,\n  generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
-          "default_language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Default Language"
-          },
           "default_tokenizer_model": {
             "anyOf": [
               {
@@ -7020,17 +6976,6 @@
         "additionalProperties": false,
         "description": "Partial update payload \u2014 only provided fields are merged.\n\nUsed by:\n- backend API routes, backend request/response models, backend tests, core workspace and\n  worker services because they need a stable JSON contract shared by route handlers,\n  generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
-          "default_language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Default Language"
-          },
           "default_tokenizer_model": {
             "anyOf": [
               {
@@ -7604,6 +7549,20 @@
           "name"
         ],
         "title": "WorkspaceSummary",
+        "type": "object"
+      },
+      "WorkspaceTabsState": {
+        "description": "Full per-workspace analysis-tab state.\n\nAPI schema round-tripped by the GET/PUT ``/{workspace_id}/tabs`` routes and\nthe frontend tab store. ``groups`` is keyed by analysis type.\n\nUsed by:\n- backend API routes, generated frontend client, and backend tests.",
+        "properties": {
+          "groups": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AnalysisTabGroup"
+            },
+            "title": "Groups",
+            "type": "object"
+          }
+        },
+        "title": "WorkspaceTabsState",
         "type": "object"
       },
       "WorkspaceTaskStartResponse": {
@@ -16610,6 +16569,134 @@
         "tags": [
           "workspace_management",
           "lifecycle"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/tabs": {
+      "get": {
+        "description": "Return the persisted analysis-tab state for a workspace.\n\nUsed by the frontend tab store on view entry to restore tabs (and their\ntask ids) after a reload. Returns the empty default when no sidecar exists.",
+        "operationId": "get_workspace_tabs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceTabsState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Workspace Tabs",
+        "tags": [
+          "workspace_management",
+          "workspace_tabs"
+        ]
+      },
+      "put": {
+        "description": "Replace the persisted analysis-tab state for a workspace.\n\nUsed by the frontend tab store whenever tabs are created, closed, renamed,\nreordered, activated, or wired to a new task id. Full-replacement semantics\nmirror the ``ui_state.json`` sidecar.",
+        "operationId": "put_workspace_tabs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceTabsState"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceTabsState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Workspace Tabs",
+        "tags": [
+          "workspace_management",
+          "workspace_tabs"
         ]
       }
     },

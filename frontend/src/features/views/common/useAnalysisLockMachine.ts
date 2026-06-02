@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { useAutoNodeColumns } from '@/features/workspace/common/hooks/useAutoNodeColumns';
@@ -31,6 +32,7 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
   const { allowedDataTypes, maxNodes = 2, docTypeOnly = false, storageScope } = config;
 
   const { selectedNodes } = useWorkspaceSelection();
+  const { selectNodes } = useWorkspaceActions();
   const { currentWorkspaceId } = useWorkspaceData();
 
   const { getColumnInfos } = useNodeColumnInfos({
@@ -75,8 +77,19 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     return map;
   })();
 
-  /** Called by: clear flows, toggleLock, and invalid snapshot restoration because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
+  /**
+   * Called by: clear flows, toggleLock, and invalid snapshot restoration because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
+   * Conflict handling: when a panel transitions from locked to unlocked it hands
+   * the previously-locked node ids back to the workspace graph selection so the
+   * user keeps working from where the locked task left off instead of snapping
+   * back to a stale graph selection.
+   * Flow: push snapshot ids to the graph (if any), then clear the lock + snapshot.
+   */
   const unlockSelection = () => {
+    const lockedIds = lockedNodesSnapshot.map((snap) => snap.id);
+    if (lockedIds.length > 0) {
+      selectNodes(lockedIds);
+    }
     setIsLocked(false);
     setLockedNodesSnapshot([]);
   };

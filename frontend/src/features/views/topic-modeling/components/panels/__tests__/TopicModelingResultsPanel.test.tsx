@@ -92,9 +92,6 @@ const baseProps = {
   selectAllDetachColumns: vi.fn(),
   deselectAllDetachColumns: vi.fn(),
   handleDetachConfirm: vi.fn(),
-  stopwordFilterAvailable: false,
-  stopwordFilterEnabled: false,
-  onStopwordFilterToggle: vi.fn(),
 };
 
 describe('TopicModelingResultsPanel', () => {
@@ -143,78 +140,5 @@ describe('TopicModelingResultsPanel', () => {
     fireEvent.mouseUp(input);
 
     expect(onUpdateExactTopicCount).toHaveBeenCalledWith(12);
-  });
-
-  it('renders a "view list" button next to the stopword toggle when a non-empty filter set is provided', () => {
-    const zhWords = ['的', '了', '是'];
-    render(
-      <TooltipProvider>
-        <TopicModelingResultsPanel
-          {...baseProps}
-          stopwordFilterAvailable={true}
-          stopwordFilterLanguage="ZH"
-          stopwordFilterSet={new Set(zhWords)}
-          stopwordFilterByLanguage={[{ language: 'zh', words: zhWords }]}
-        />
-      </TooltipProvider>,
-    );
-
-    const viewButton = screen.getByRole('button', {
-      name: /view the 3 stopwords being filtered/i,
-    });
-    expect(viewButton).toBeInTheDocument();
-
-    fireEvent.click(viewButton);
-
-    // Dialog opens with the count + words visible.
-    expect(screen.getByRole('heading', { name: /stopwords being filtered/i })).toBeInTheDocument();
-    expect(screen.getByText('的')).toBeInTheDocument();
-    expect(screen.getByText('了')).toBeInTheDocument();
-    expect(screen.getByText('是')).toBeInTheDocument();
-  });
-
-  it('renders per-language group headings when multiple languages are filtered', () => {
-    render(
-      <TooltipProvider>
-        <TopicModelingResultsPanel
-          {...baseProps}
-          stopwordFilterAvailable={true}
-          stopwordFilterLanguage="EN + ZH"
-          stopwordFilterSet={new Set(['the', 'and', '的', '了'])}
-          stopwordFilterByLanguage={[
-            { language: 'en', words: ['the', 'and'] },
-            { language: 'zh', words: ['的', '了'] },
-          ]}
-        />
-      </TooltipProvider>,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /view the 4 stopwords being filtered/i }));
-
-    // Each group surfaces a heading with its label + count.
-    expect(screen.getByText(/^English \(2\)$/)).toBeInTheDocument();
-    expect(screen.getByText(/^Chinese \(2\)$/)).toBeInTheDocument();
-    // And every word from both groups is rendered.
-    for (const word of ['the', 'and', '的', '了']) {
-      expect(screen.getByText(word)).toBeInTheDocument();
-    }
-  });
-
-  it('omits the "view list" button when no stopwords are active', () => {
-    render(
-      <TooltipProvider>
-        <TopicModelingResultsPanel
-          {...baseProps}
-          stopwordFilterAvailable={true}
-          stopwordFilterLanguage="zh"
-          stopwordFilterSet={new Set()}
-          stopwordFilterByLanguage={[]}
-        />
-      </TooltipProvider>,
-    );
-
-    expect(
-      screen.queryByRole('button', { name: /view the.+stopwords being filtered/i }),
-    ).not.toBeInTheDocument();
   });
 });

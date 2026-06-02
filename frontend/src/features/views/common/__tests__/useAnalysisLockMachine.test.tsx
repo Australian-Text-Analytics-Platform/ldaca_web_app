@@ -14,6 +14,11 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({ currentWorkspaceId: 'workspace-1' }),
 }));
 
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
+  /** Called by: useAnalysisLockCore under test so unlockSelection can hand locked node ids back to the graph; stubbed because the test needs a deterministic mock before exercising the behavior under assertion. */
+  useWorkspaceActions: () => ({ selectNodes: vi.fn() }),
+}));
+
 vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   /** Called by: useAnalysisLockCore under test to provide column metadata because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useNodeColumnInfos: () => ({

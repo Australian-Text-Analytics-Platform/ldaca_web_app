@@ -35,8 +35,6 @@ interface PreferencesState {
   favoriteWorkspaces: string[];
   quotationEngine: QuotationEngineConfig;
   quotationLastRemoteUrl: string;
-  /** ``null`` lets the backend fall back to its per-request language resolver. */
-  defaultLanguage: string | null;
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
   /** True once the first backend fetch completes */
@@ -58,8 +56,6 @@ interface PreferencesActions {
    * single call keeps the two in sync.
    */
   updateQuotationRemoteUrl: (url: string) => void;
-  /** Persist a language code (e.g. ``"zh"``) or ``null`` to unset. */
-  setDefaultLanguage: (language: string | null) => void;
   setDefaultTokenizerModel: (model: string | null) => void;
   setLdacaOniApiToken: (token: string | null) => void;
   /** Fetch preferences from backend and hydrate the store */
@@ -80,7 +76,6 @@ type ResolvedQuotationPreferences = Omit<
 
 type ResolvedUserPreferences = Omit<
   UserPreferences,
-  | 'default_language'
   | 'default_tokenizer_model'
   | 'favorite_workspaces'
   | 'hidden_views'
@@ -90,7 +85,6 @@ type ResolvedUserPreferences = Omit<
   hidden_views: string[];
   favorite_workspaces: string[];
   quotation: ResolvedQuotationPreferences;
-  default_language: string | null;
   default_tokenizer_model: string | null;
   ldaca_oni_api_token: string | null;
 };
@@ -116,7 +110,6 @@ const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences =>
     engine: (data.quotation?.engine ?? { type: 'local' }) as QuotationEngineConfig,
     last_remote_url: data.quotation?.last_remote_url ?? '',
   },
-  default_language: data.default_language ?? null,
   default_tokenizer_model: data.default_tokenizer_model ?? null,
   ldaca_oni_api_token: data.ldaca_oni_api_token ?? null,
 });
@@ -131,7 +124,6 @@ function applyServerState(state: PreferencesState, data: ResolvedUserPreferences
   state.favoriteWorkspaces = data.favorite_workspaces;
   state.quotationEngine = data.quotation.engine;
   state.quotationLastRemoteUrl = data.quotation.last_remote_url;
-  state.defaultLanguage = data.default_language;
   state.defaultTokenizerModel = data.default_tokenizer_model;
   state.ldacaOniApiToken = data.ldaca_oni_api_token;
   state.hydrated = true;
@@ -145,7 +137,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
         favoriteWorkspaces: [],
         quotationEngine: { type: 'local' } as QuotationEngineConfig,
         quotationLastRemoteUrl: '',
-        defaultLanguage: null,
         defaultTokenizerModel: null,
         ldacaOniApiToken: null,
         hydrated: false,
@@ -203,18 +194,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
             if (state.quotationEngine.type === 'remote') {
               state.quotationEngine = { type: 'remote', url: trimmed };
             }
-          });
-        },
-
-        /** Stores the user's default language for language-aware analysis controls. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-        setDefaultLanguage: (language) => {
-          // Normalise to a trimmed lowercase code so backend resolution
-          // doesn't see stray case / whitespace from form inputs.
-          const value =
-            typeof language === 'string' && language.trim() ? language.trim().toLowerCase() : null;
-          set((state) => {
-            state.defaultLanguage = value;
           });
         },
 
@@ -277,11 +256,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
               engine: state.quotationEngine,
               last_remote_url: state.quotationLastRemoteUrl,
             },
-            // Backend's partial-update contract treats ``null`` as
-            // "no change". To avoid losing a previously-set value when
-            // the user hasn't touched the language UI this session, only
-            // include the field when the user explicitly has one.
-            ...(state.defaultLanguage !== null ? { default_language: state.defaultLanguage } : {}),
             ...(state.defaultTokenizerModel !== null
               ? { default_tokenizer_model: state.defaultTokenizerModel }
               : {}),
@@ -313,7 +287,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
           favoriteWorkspaces: state.favoriteWorkspaces,
           quotationEngine: state.quotationEngine,
           quotationLastRemoteUrl: state.quotationLastRemoteUrl,
-          defaultLanguage: state.defaultLanguage,
           defaultTokenizerModel: state.defaultTokenizerModel,
           ldacaOniApiToken: state.ldacaOniApiToken,
         }),

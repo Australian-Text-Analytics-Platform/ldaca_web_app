@@ -35,8 +35,13 @@ interface ConcordanceState {
   caseSensitive: boolean;
   /** Selected concordance engine. */
   searchMode: 'regex' | 'tokens';
-  /** Optional language hint for the backend gate / resolver. */
-  language?: string;
+  /**
+   * Active analysis tab id (when this feature is rendered inside a tab).
+   * Stamped onto the run request as ``tab_id`` so the backend keys the task's
+   * current-task slot per tab, letting a re-run supersede the prior task for
+   * this tab while leaving sibling tabs untouched. Undefined in non-tabbed use.
+   */
+  tabId?: string | null;
 }
 
 interface ConcordanceActions {
@@ -50,6 +55,12 @@ interface ConcordanceActions {
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
   setNodeMaterializing?: Dispatch<SetStateAction<Record<string, boolean>>>;
   setMaterializeTaskIds?: Dispatch<SetStateAction<Record<string, string>>>;
+  /**
+   * Notifies the owner (analysis tab wrapper) of the task id assigned by a run
+   * (or null when none). The wrapper persists it onto the tab record so the tab
+   * rehydrates the same task after reload. Optional for non-tabbed callers.
+   */
+  onTaskIdAssigned?: (taskId: string | null) => void;
 }
 
 interface ConcordanceLock {
@@ -98,8 +109,8 @@ export function useConcordanceTaskFlow({
     regex,
     wholeWord,
     searchMode,
-    language,
     caseSensitive,
+    tabId,
   },
   actions: {
     setNodePagination,
@@ -112,6 +123,7 @@ export function useConcordanceTaskFlow({
     setNodeDetaching,
     setNodeMaterializing,
     setMaterializeTaskIds,
+    onTaskIdAssigned,
   },
   lock: {
     getAuthHeaders,
@@ -249,8 +261,8 @@ export function useConcordanceTaskFlow({
         case_sensitive: caseSensitive,
         search_mode: searchMode,
       };
-      if (language) {
-        request.language = language;
+      if (tabId) {
+        request.tab_id = tabId;
       }
       if (isCombinedQuery) {
         request.combined = true;
@@ -266,7 +278,8 @@ export function useConcordanceTaskFlow({
         throwOnError: true,
       });
       setResults(response);
-      extractAndSetTaskId(response, setLocalTaskId);
+      const assignedTaskId = extractAndSetTaskId(response, setLocalTaskId);
+      onTaskIdAssigned?.(assignedTaskId);
 
       try {
         await restoreAnalysisLockFromRequest({
@@ -583,9 +596,6 @@ export function useConcordanceTaskFlow({
         // the regex flow over raw text and silently drops tokens-mode hits.
         search_mode: searchMode,
       };
-      if (language) {
-        request.language = language;
-      }
       const resp = await materializeConcordance(nodeId, request);
       const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
       if (taskId && setMaterializeTaskIds) {

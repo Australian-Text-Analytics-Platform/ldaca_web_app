@@ -127,6 +127,9 @@ interface SequentialAnalysisActions {
   lockCurrentSchema: (schema?: Record<string, string>) => void;
   resolveTaskId: () => Promise<string | null>;
   clearResults: () => Promise<void>;
+  // Reports the run's assigned task id back to the owning tab. No-op when not
+  // tab-mounted.
+  onTaskIdAssigned?: (taskId: string | null) => void;
 }
 
 interface SequentialAnalysisLock {
@@ -174,6 +177,7 @@ export function useSequentialAnalysisTaskFlow({
     lockCurrentSchema,
     resolveTaskId,
     clearResults,
+    onTaskIdAssigned,
   },
   lock: { getAuthHeaders, queryClient },
 }: Params) {
@@ -257,7 +261,8 @@ export function useSequentialAnalysisTaskFlow({
         path: { node_id: nodeIdForAnalysis },
         throwOnError: true,
       });
-      extractAndSetTaskId(result, setLocalTaskId);
+      const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
+      onTaskIdAssigned?.(assignedTaskId);
       const enrichedResult = {
         ...result,
         analysis_params: {

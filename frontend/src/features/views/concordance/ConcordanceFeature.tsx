@@ -37,8 +37,6 @@ import {
 import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
-import { effectiveNodeLanguage } from '@/lib/effectiveNodeLanguage';
-import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
 import { useConcordanceMaterializedEvents } from './hooks/useConcordanceMaterializedEvents';
 import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
@@ -78,8 +76,24 @@ type ConcordanceGroupedRow = Record<string, unknown>[];
 /**
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ *
+ * Tab props (optional): when rendered inside an analysis tab by
+ * ConcordanceTabbedFeature, ``tabId`` identifies the active tab, ``tabTaskId``
+ * seeds deterministic hydration of that tab's task, and ``onTabTaskChange``
+ * lets the feature report task id assignment/clear back to the tab record. All
+ * are absent in the legacy non-tabbed mounting, where behaviour is unchanged.
  */
-function ConcordanceFeature() {
+export interface ConcordanceFeatureProps {
+  tabId?: string;
+  tabTaskId?: string | null;
+  onTabTaskChange?: (taskId: string | null) => void;
+}
+
+function ConcordanceFeature({
+  tabId,
+  tabTaskId,
+  onTabTaskChange,
+}: ConcordanceFeatureProps = {}) {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
   const { selectedNodes } = useWorkspaceSelection();
@@ -121,6 +135,11 @@ function ConcordanceFeature() {
     analysisType: 'concordance_analysis',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
+    // Tab-scoped locking: bind the lock to this tab's persisted task so it stays
+    // independent of sibling tabs (which share the same workspace +
+    // analysisType). tabTaskId is null for a fresh tab that has not run yet
+    // (unlocked).
+    taskId: tabTaskId ?? null,
     allowedDataTypes: ['string'],
     maxNodes: 2,
     docTypeOnly: true,
@@ -484,7 +503,6 @@ function ConcordanceFeature() {
   // Tokens mode is available when every selected node that has a column also
   // has a tokenizer model selected — either chosen in this session or
   // previously persisted to the backend (read back via node.tokenizer_models).
-  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const effectiveTokenizerModelsByNode = useMemo(() => {
     // Seed with models persisted to the backend from previous sessions,
     // then apply any live overrides the user has made in this session.
@@ -525,10 +543,6 @@ function ConcordanceFeature() {
       setSearchMode('tokens');
     });
   }, [tokensModeAvailable, searchModeUserSet]);
-
-  const concordanceLanguage = useMemo(() => {
-    return effectiveNodeLanguage({ defaultLanguage });
-  }, [defaultLanguage]);
 
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<PaginationState>({});
@@ -621,6 +635,10 @@ function ConcordanceFeature() {
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
+    // Tab-driven deterministic hydration: when mounted inside an analysis tab,
+    // the tab's persisted task id must win task resolution over transient local
+    // state. Undefined in non-tabbed use, which the resolver skips.
+    hydrationTaskId: tabTaskId ?? null,
     resultRef: concordanceResultsRef,
     /** Fetches a completed concordance task result for polling and hydration. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -733,6 +751,10 @@ function ConcordanceFeature() {
       if (options?.preserveLocalState) {
         return;
       }
+      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
+      // a task the user explicitly cleared. Preserve-local-state clears (handoff
+      // flows) intentionally keep the tab→task link.
+      onTabTaskChange?.(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
     /** Keeps the global task list free of concordance task duplicates after lifecycle updates. */
@@ -791,7 +813,7 @@ function ConcordanceFeature() {
       wholeWord,
       caseSensitive,
       searchMode,
-      language: concordanceLanguage,
+      tabId,
     },
     actions: {
       setNodePagination,
@@ -804,6 +826,11 @@ function ConcordanceFeature() {
       setNodeDetaching,
       setNodeMaterializing,
       setMaterializeTaskIds,
+      // Persist the run's assigned task id onto the active tab so reload
+      // rehydrates the same task. No-op when not tab-mounted.
+      onTaskIdAssigned: (taskId) => {
+        if (tabId) onTabTaskChange?.(taskId);
+      },
     },
     lock: {
       getAuthHeaders,
@@ -1583,4 +1610,5 @@ function ConcordanceFeature() {
   );
 }
 
+export { ConcordanceFeature };
 export default ConcordanceFeature;

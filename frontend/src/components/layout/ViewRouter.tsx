@@ -10,22 +10,30 @@ const DataPreprocessingFeature = lazy(
   () => import('@/features/views/preprocessing/DataPreprocessingFeature'),
 );
 /** Lazy concordance chunk consumed by `VIEW_COMPONENTS` when concordance is selected. */
-const ConcordanceFeature = lazy(() => import('@/features/views/concordance/ConcordanceFeature'));
-/** Lazy quotation chunk consumed by `VIEW_COMPONENTS` when quotation analysis is selected. */
-const QuotationFeature = lazy(() => import('@/features/views/quotation/QuotationFeature'));
-/** Lazy topic-modeling chunk consumed by `VIEW_COMPONENTS` when topic modeling is selected. */
-const TopicModelingFeature = lazy(
-  () => import('@/features/views/topic-modeling/TopicModelingFeature'),
+/** Points at the tabbed wrapper (ConcordanceTabbedFeature) so the concordance
+ *  view renders the Chrome-style analysis tab strip as its outermost element. */
+const ConcordanceFeature = lazy(
+  () => import('@/features/views/concordance/ConcordanceTabbedFeature'),
 );
-/** Lazy sequential-analysis chunk consumed by `VIEW_COMPONENTS` when trends analysis is selected. */
+/** Points at the tabbed wrapper (QuotationTabbedFeature) so the quotation
+ *  view renders the Chrome-style analysis tab strip as its outermost element. */
+const QuotationFeature = lazy(() => import('@/features/views/quotation/QuotationTabbedFeature'));
+/** Points at the tabbed wrapper (TopicModelingTabbedFeature) so the topic-modeling
+ *  view renders the Chrome-style analysis tab strip as its outermost element. */
+const TopicModelingFeature = lazy(
+  () => import('@/features/views/topic-modeling/TopicModelingTabbedFeature'),
+);
+/** Points at the tabbed wrapper (SequentialAnalysisTabbedFeature) so the trends
+ *  view renders the Chrome-style analysis tab strip as its outermost element. */
 const SequentialAnalysisFeature = lazy(
-  () => import('@/features/views/sequential-analysis/SequentialAnalysisFeature'),
+  () => import('@/features/views/sequential-analysis/SequentialAnalysisTabbedFeature'),
 );
 /** Lazy export chunk consumed by `VIEW_COMPONENTS` when export tools are selected. */
 const ExportFeature = lazy(() => import('@/features/views/export/ExportFeature'));
-/** Lazy token-frequency chunk consumed by `VIEW_COMPONENTS` when frequency analysis is selected. */
+/** Points at the tabbed wrapper (TokenFrequencyTabbedFeature) so the token-frequency
+ *  view renders the Chrome-style analysis tab strip as its outermost element. */
 const TokenFrequencyFeature = lazy(
-  () => import('@/features/views/token-frequency/TokenFrequencyFeature'),
+  () => import('@/features/views/token-frequency/TokenFrequencyTabbedFeature'),
 );
 /** Lazy AI annotator chunk consumed by `VIEW_COMPONENTS` when the optional annotator view is visible. */
 const AiAnnotatorFeature = lazy(

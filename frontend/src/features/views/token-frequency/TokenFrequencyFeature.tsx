@@ -71,10 +71,24 @@ const UNIFIED_WORDCLOUD_HEIGHT = 340;
 
 /** Coordinates token-frequency selection, execution, and export wiring for the analysis tab. */
 /**
- * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: TokenFrequencyTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ *
+ * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
+ * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
+ * task id assignment/clear back to the tab record.
  */
-const TokenFrequencyFeature = () => {
+export interface TokenFrequencyFeatureProps {
+  tabId?: string;
+  tabTaskId?: string | null;
+  onTabTaskChange?: (taskId: string | null) => void;
+}
+
+const TokenFrequencyFeature = ({
+  tabId,
+  tabTaskId,
+  onTabTaskChange,
+}: TokenFrequencyFeatureProps = {}) => {
   const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
     Record<string, string>
   >({});
@@ -98,6 +112,9 @@ const TokenFrequencyFeature = () => {
     analysisType: 'token_frequencies',
     workspaceId: currentWorkspace?.id ?? null,
     getAuthHeaders,
+    // Tab-scoped locking: bind the lock to this tab's persisted task so it stays
+    // independent of sibling tabs. Null for a fresh tab that has not run yet.
+    taskId: tabTaskId ?? null,
     allowedDataTypes: ['string'],
     docTypeOnly: true,
     maxNodes: 2,
@@ -190,6 +207,9 @@ const TokenFrequencyFeature = () => {
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
+    // Tab-driven deterministic hydration: the tab's persisted task id wins task
+    // resolution over transient local state.
+    hydrationTaskId: tabTaskId ?? null,
     resultRef,
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -267,8 +287,14 @@ const TokenFrequencyFeature = () => {
     },
     /** Clears local result and selection state when the feature reset action runs. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    onCleared: () => {
+    onCleared: (_, options) => {
       setResultSafely(null);
+      if (options?.preserveLocalState) {
+        return;
+      }
+      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
+      // a task the user explicitly cleared.
+      onTabTaskChange?.(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
       setLastCompareNodeIds([]);
       setStudyNodeId(null);
@@ -405,6 +431,11 @@ const TokenFrequencyFeature = () => {
       setAppliedStopSet,
       setStopWords,
       lastFetchedRef,
+      // Persist the run's assigned task id onto the active tab so reload
+      // rehydrates the same task.
+      onTaskIdAssigned: (taskId) => {
+        if (tabId) onTabTaskChange?.(taskId);
+      },
     },
     lock: {
       getAuthHeaders,

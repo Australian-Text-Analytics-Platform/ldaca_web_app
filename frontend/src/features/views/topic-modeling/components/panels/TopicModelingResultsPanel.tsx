@@ -4,7 +4,6 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
-import { AppliedStopwordsDialog } from '../results/AppliedStopwordsDialog';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
@@ -217,28 +216,6 @@ type Props = {
   selectAllDetachColumns: () => void;
   deselectAllDetachColumns: () => void;
   handleDetachConfirm: () => Promise<void> | void;
-  /** Post-fit stopword filter wiring. ``available`` is false when the run's
-   * resolved language doesn't have a bundled stopword list — the toggle
-   * is hidden in that case rather than greyed out, since there's no
-   * meaningful action available. */
-  stopwordFilterAvailable: boolean;
-  stopwordFilterEnabled: boolean;
-  onStopwordFilterToggle: (enabled: boolean) => void;
-  /** Aggregated label for the toggle copy — e.g. ``"ZH"`` for a single
-   *  language, ``"EN + ZH"`` for two. ``undefined`` collapses the
-   *  language suffix entirely so it reads "Hide stopwords". */
-  stopwordFilterLanguage?: string;
-  /** Flat set the filter actually applies. Surfaced so the "view list"
-   *  link can show a count without re-deriving from groups. Empty /
-   *  undefined hides the link without disabling the toggle. */
-  stopwordFilterSet?: Set<string>;
-  /** Per-language groups (matching the order requested by
-   *  ``useDefaultStopwords``). The popup renders one chip block per
-   *  group with the language label as a header. */
-  stopwordFilterByLanguage?: ReadonlyArray<{
-    language: string;
-    words: ReadonlyArray<string>;
-  }>;
   /** Read-only flag that disables Add to Workspace and exact-topic re-aggregation while leaving chart exploration controls active. */
   readOnly?: boolean;
 };
@@ -286,17 +263,9 @@ export function TopicModelingResultsPanel({
   toggleDetachColumn,
   selectAllDetachColumns,
   deselectAllDetachColumns,
-  stopwordFilterAvailable,
-  stopwordFilterEnabled,
-  onStopwordFilterToggle,
-  stopwordFilterLanguage,
-  stopwordFilterSet,
-  stopwordFilterByLanguage,
   handleDetachConfirm,
   readOnly = false,
 }: Props) {
-  const [isAppliedStopwordsDialogOpen, setIsAppliedStopwordsDialogOpen] = useState(false);
-  const appliedStopwordsCount = stopwordFilterSet?.size ?? 0;
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
   const runningMessage =
     runningTask?.message || topicWaitingBanner?.message || result?.message || 'Task running';
@@ -367,37 +336,10 @@ export function TopicModelingResultsPanel({
               topicSizeMode={topicSizeMode}
               topicSizeValue={topicSizeValue}
               randomSeed={randomSeed}
-              stopwordsByLanguage={stopwordFilterByLanguage}
-              stopwordsFilterEnabled={stopwordFilterEnabled}
               controlRowSlot={
                 <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-x-6">
                   <div className="flex shrink-0 items-center gap-3">
                     <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
-                    {stopwordFilterAvailable ? (
-                      <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                        <label className="inline-flex cursor-pointer select-none items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={stopwordFilterEnabled}
-                            onChange={(e) => onStopwordFilterToggle(e.target.checked)}
-                            className="h-3.5 w-3.5 rounded border-input"
-                          />
-                          Hide{' '}
-                          {stopwordFilterLanguage ? `${stopwordFilterLanguage.toUpperCase()} ` : ''}
-                          stopwords
-                        </label>
-                        {appliedStopwordsCount > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => setIsAppliedStopwordsDialogOpen(true)}
-                            className="cursor-pointer text-xs underline-offset-2 hover:underline"
-                            aria-label={`View the ${appliedStopwordsCount} stopwords being filtered`}
-                          >
-                            (view list)
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </div>
                   {showExactTopicCountControl && exactTopicCountRange && !readOnly ? (
                     <ExactTopicCountSlider
@@ -459,15 +401,6 @@ export function TopicModelingResultsPanel({
         deselectAllDetachColumns={deselectAllDetachColumns}
         handleDetachConfirm={handleDetachConfirm}
       />
-
-      {appliedStopwordsCount > 0 ? (
-        <AppliedStopwordsDialog
-          open={isAppliedStopwordsDialogOpen}
-          onClose={() => setIsAppliedStopwordsDialogOpen(false)}
-          totalCount={appliedStopwordsCount}
-          byLanguage={stopwordFilterByLanguage ?? []}
-        />
-      ) : null}
     </>
   );
 }

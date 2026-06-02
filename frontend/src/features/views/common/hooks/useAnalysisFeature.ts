@@ -74,6 +74,16 @@ export interface UseAnalysisFeatureConfig<TResult = unknown> {
   getClearTaskIdSources?: () => Array<string | null | undefined>;
   /** Custom check for whether the result indicates a running state (default: result.state === 'running') */
   isResultRunning?: (result: TResult | null) => boolean;
+
+  /**
+   * Task id supplied by an external owner (e.g. the active analysis tab) that
+   * must win task resolution deterministically. Prepended as the first task-id
+   * candidate so it survives the workspace-change ``localTaskId`` reset race —
+   * the tab record, not transient local state, drives which task hydrates.
+   * Callers without tabs pass undefined/null, which ``resolveAnalysisTaskId``
+   * skips, preserving existing behaviour.
+   */
+  hydrationTaskId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +221,7 @@ export function useAnalysisFeature<TResult = unknown>(
 
     return resolveAnalysisTaskId({
       candidateIds: [
+        cfg.hydrationTaskId ?? null,
         localTaskIdRef.current,
         metadataTaskId,
         cachedLock?.currentTaskId ?? null,

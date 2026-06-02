@@ -44,22 +44,9 @@ type Props = {
   topicSizeValue?: number;
   randomSeed?: number;
   /** Rendered between the bubble chart and the topic list. Hosts the
-   * post-fit control row (topic count, stopword toggle, re-aggregate
+   * post-fit control row (topic count, re-aggregate
    * slider, Add to Workspace). */
   controlRowSlot?: React.ReactNode;
-  /** Per-language stopword groups currently being applied by the
-   *  post-fit filter. Surfaced here so the chart-download dialog can
-   *  offer an extra ``Include stopwords (.txt)`` checkbox that drops
-   *  the active list into the zip alongside the image (and CSV, when
-   *  also selected). Undefined / empty hides the option. */
-  stopwordsByLanguage?: ReadonlyArray<{
-    language: string;
-    words: ReadonlyArray<string>;
-  }>;
-  /** ``true`` when the filter toggle is on. The download option is
-   *  hidden when the filter is off so users don't accidentally bundle
-   *  a list that didn't actually shape the displayed topics. */
-  stopwordsFilterEnabled?: boolean;
 };
 
 const OVERLAY_BTN =
@@ -115,27 +102,6 @@ const TM_CSV_OPTION = {
   defaultChecked: true,
 } as const;
 
-const TM_STOPWORDS_OPTION = {
-  id: 'includeStopwords',
-  label: 'Include applied stopwords (TXT)',
-  defaultChecked: true,
-} as const;
-
-/** Used by: handleDownloadChart to build a plain-text file containing the active stopword groups, because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
- *  one ``# Language`` heading per group followed by one word per line.
- *  Mirrors the format users already see in the read-only dialog and is
- *  trivial to diff / inspect after the fact. */
-const buildStopwordsTxt = (
-  groups: ReadonlyArray<{ language: string; words: ReadonlyArray<string> }>,
-): string => {
-  const blocks: string[] = [];
-  for (const group of groups) {
-    if (!group.words.length) continue;
-    blocks.push(`# ${group.language.toUpperCase()}\n${group.words.join('\n')}`);
-  }
-  return `${blocks.join('\n\n')}\n`;
-};
-
 /**
  * Rendered by: TopicModelingResultsPanel to show the topic bubble chart and export controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
@@ -161,22 +127,10 @@ export function TopicModelingBubbleChartSection({
   topicSizeValue,
   randomSeed,
   controlRowSlot,
-  stopwordsByLanguage,
-  stopwordsFilterEnabled,
 }: Props) {
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
 
-  // Only surface the stopwords-in-archive checkbox when the filter is
-  // actually shaping the displayed topics — otherwise the included
-  // file would represent a list the user disabled.
-  const activeStopwordGroups = (stopwordsByLanguage ?? []).filter(
-    (group) => group.words.length > 0,
-  );
-  const stopwordsDownloadEligible =
-    Boolean(stopwordsFilterEnabled) && activeStopwordGroups.length > 0;
-  const downloadExtraOptions = stopwordsDownloadEligible
-    ? [TM_CSV_OPTION, TM_STOPWORDS_OPTION]
-    : [TM_CSV_OPTION];
+  const downloadExtraOptions = [TM_CSV_OPTION];
 
   // Called by: TopicModelingBubbleChartSection download menu because chart exports may include SVG/bitmap, topic CSV, and active stopword lists. Flow: verify the chart SVG, build header and extra files, then download the chart bundle or show toast errors.
   const handleDownloadChart = async (format: ChartImageFormat, extras: Record<string, boolean>) => {
@@ -206,12 +160,11 @@ export function TopicModelingBubbleChartSection({
     ];
 
     const includeCSV = extras['includeCSV'] ?? false;
-    const includeStopwords = stopwordsDownloadEligible && (extras['includeStopwords'] ?? false);
 
     try {
       // Anything beyond the image alone forces the zip path so the
       // user gets one archive instead of N concurrent saveBlobs.
-      const wantsZip = includeCSV || includeStopwords;
+      const wantsZip = includeCSV;
 
       if (wantsZip) {
         const { blob: imageBlob, filename: imageFilename } = await buildChartBlob(svg, {
@@ -232,16 +185,6 @@ export function TopicModelingBubbleChartSection({
           zip.file(
             `${safeBaseName}_tm_topics.csv`,
             new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }),
-          );
-        }
-
-        if (includeStopwords) {
-          // ``activeStopwordGroups`` is captured above and known
-          // non-empty whenever ``stopwordsDownloadEligible`` is true.
-          const txtContent = buildStopwordsTxt(activeStopwordGroups);
-          zip.file(
-            `${safeBaseName}_tm_stopwords.txt`,
-            new Blob([txtContent], { type: 'text/plain;charset=utf-8;' }),
           );
         }
 

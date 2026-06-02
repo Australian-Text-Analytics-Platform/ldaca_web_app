@@ -23,7 +23,6 @@ import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { effectiveNodeLanguage, isEnglish } from '@/lib/effectiveNodeLanguage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -200,10 +199,20 @@ function buildQuotationResultState(
 
 /** Renders the quotation extraction workflow, including live runs and result materialisation. */
 /**
- * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: QuotationTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ *
+ * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
+ * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
+ * task id assignment/clear back to the tab record.
  */
-function QuotationFeature() {
+export interface QuotationFeatureProps {
+  tabId?: string;
+  tabTaskId?: string | null;
+  onTabTaskChange?: (taskId: string | null) => void;
+}
+
+function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatureProps = {}) {
   const {
     selectedNodes,
     handlePageChange: baseHandlePageChange,
@@ -232,6 +241,9 @@ function QuotationFeature() {
     analysisType: 'quotation_analysis',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
+    // Tab-scoped locking: bind the lock to this tab's persisted task. Null for a
+    // fresh tab that has not run yet (unlocked).
+    taskId: tabTaskId ?? null,
     allowedDataTypes: ['string'],
     maxNodes: 1,
     docTypeOnly: true,
@@ -245,7 +257,6 @@ function QuotationFeature() {
   const lastRemoteUrl = usePreferencesStore((state) => state.quotationLastRemoteUrl);
   const setEngineConfigStore = usePreferencesStore((state) => state.setQuotationEngine);
   const updateRemoteUrl = usePreferencesStore((state) => state.updateQuotationRemoteUrl);
-  const defaultLanguage = usePreferencesStore((state) => state.defaultLanguage);
   const [engineError, setEngineError] = useState<string | null>(null);
   const engineDialogOpen = useUIStore((state) => state.modals.quotationEngine);
   const setEngineDialogOpen = useUIStore((state) => state.setModalOpen);
@@ -301,19 +312,6 @@ function QuotationFeature() {
     tabKey: 'quotation',
   });
   const nodeColors: Record<string, string> = liveNodeColors;
-
-  // Quotation rules are English-only. Mirror the
-  // backend gate at the UI so the Run button surfaces a clear "why is
-  // this disabled" tooltip rather than letting the user submit a request
-  // that's going to come back as HTTP 400. Resolves language from the
-  // per-user default preference, then "en".
-  const nodeLanguage = effectiveNodeLanguage({
-    defaultLanguage,
-  });
-  const quotationLanguageUnsupported = !isEnglish(nodeLanguage);
-  const quotationLanguageDisabledReason = quotationLanguageUnsupported
-    ? `Quotation extractor is English-only (this node resolves to ${nodeLanguage}). The vendored rules don't generalise to other languages.`
-    : null;
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
@@ -393,6 +391,9 @@ function QuotationFeature() {
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
+    // Tab-driven deterministic hydration: the tab's persisted task id wins task
+    // resolution over transient local state.
+    hydrationTaskId: tabTaskId ?? null,
     resultRef: quotationResultRef,
     // Loads the latest quotation result for polling and task resumption.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -498,12 +499,18 @@ function QuotationFeature() {
     },
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    onCleared: () => {
+    onCleared: (_, options) => {
       setIsClearing(false);
       setHasLoaded(false);
       setResultsByNode({});
       setNodeState({});
       setMaterializeSummary(null);
+      if (options?.preserveLocalState) {
+        return;
+      }
+      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
+      // a task the user explicitly cleared.
+      onTabTaskChange?.(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
   });
@@ -595,8 +602,7 @@ function QuotationFeature() {
     Boolean(currentWorkspaceId) &&
     displayedNodes.length > 0 &&
     !hasIncompleteSelections &&
-    engineReady &&
-    !quotationLanguageUnsupported;
+    engineReady;
 
   // Per-node pagination and sorting state
   const [liveNodeState, setNodeState] = useState<Record<string, NodePaginationState>>({});
@@ -753,6 +759,11 @@ function QuotationFeature() {
       updateResultState,
       applyContextLengthPreferenceFromResult,
       setLocalTaskId,
+      // Persist the run's assigned task id onto the active tab so reload
+      // rehydrates the same task.
+      onTaskIdAssigned: (taskId) => {
+        if (tabId) onTabTaskChange?.(taskId);
+      },
     },
     lock: {
       getAuthHeaders,
@@ -1102,7 +1113,6 @@ function QuotationFeature() {
               if (actionState.runDisabledReason) return actionState.runDisabledReason;
               if (hasIncompleteSelections) return 'Select a column for each data block';
               if (!engineReady) return 'Configure the remote engine before running';
-              if (quotationLanguageDisabledReason) return quotationLanguageDisabledReason;
               return undefined;
             })(),
             clearDisabled: actionState.clearDisabled || isClearing,

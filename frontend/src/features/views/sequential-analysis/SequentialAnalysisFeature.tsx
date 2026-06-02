@@ -112,10 +112,24 @@ const parseNonNegativeIntegerInput = (value: string): number | null => {
 
 /** Renders the sequential-analysis workflow for live trends and result exploration. */
 /**
- * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: SequentialAnalysisTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ *
+ * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
+ * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
+ * task id assignment/clear back to the tab record.
  */
-const SequentialAnalysisFeature = () => {
+interface SequentialAnalysisFeatureProps {
+  tabId?: string;
+  tabTaskId?: string | null;
+  onTabTaskChange?: (taskId: string | null) => void;
+}
+
+const SequentialAnalysisFeature = ({
+  tabId,
+  tabTaskId,
+  onTabTaskChange,
+}: SequentialAnalysisFeatureProps = {}) => {
   const queryClient = useQueryClient();
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId } = useWorkspaceData();
@@ -138,6 +152,9 @@ const SequentialAnalysisFeature = () => {
     analysisType: 'sequential_analysis',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
+    // Tab-scoped locking: bind the lock to this tab's persisted task. Null for a
+    // fresh tab that has not run yet (unlocked).
+    taskId: tabTaskId ?? null,
     allowedDataTypes: ['datetime'],
     maxNodes: 1,
     docTypeOnly: false,
@@ -225,6 +242,9 @@ const SequentialAnalysisFeature = () => {
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
+    // Tab-driven deterministic hydration: the tab's persisted task id wins task
+    // resolution over transient local state.
+    hydrationTaskId: tabTaskId ?? null,
     resultRef,
     // Loads the latest sequential-analysis result for polling and task resumption.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -440,6 +460,9 @@ const SequentialAnalysisFeature = () => {
       if (options?.preserveLocalState) {
         return;
       }
+      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
+      // a task the user explicitly cleared.
+      onTabTaskChange?.(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
       setLockedSchema(null);
       setChartType('line');
@@ -713,6 +736,11 @@ const SequentialAnalysisFeature = () => {
       lockCurrentSchema,
       resolveTaskId,
       clearResults,
+      // Persist the run's assigned task id onto the active tab so reload
+      // rehydrates the same task.
+      onTaskIdAssigned: (taskId) => {
+        if (tabId) onTabTaskChange?.(taskId);
+      },
     },
     lock: { getAuthHeaders, queryClient },
   });

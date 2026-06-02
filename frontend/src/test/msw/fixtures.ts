@@ -19,7 +19,6 @@ export const preferencesResponse = (overrides: Partial<UserPreferences> = {}): U
     engine: { type: 'local' },
     last_remote_url: '',
   },
-  default_language: null,
   default_tokenizer_model: null,
   ldaca_oni_api_token: null,
   ...overrides,
