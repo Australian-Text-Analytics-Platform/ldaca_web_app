@@ -46,6 +46,7 @@ import {
   TokenFrequencyDownloadDialog,
   type DownloadDialogMode,
 } from './components/TokenFrequencyDownloadDialog';
+import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
 import {
@@ -92,9 +93,9 @@ const TokenFrequencyFeature = ({
   const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
     Record<string, string>
   >({});
-  const [liveTokenizerLanguagesByNode, setLiveTokenizerLanguagesByNode] = useState<
-    Record<string, string | null>
-  >({});
+  // Controls the "Fill Default" stop-words dialog where the user confirms which
+  // language's defaults to load (guessed on the fly, not stored per column).
+  const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspaceData();
@@ -343,19 +344,15 @@ const TokenFrequencyFeature = ({
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
-  // All distinct tokenizer languages selected in this session, in selection order.
-  // Fill Default uses the detected language from the tokenizer selector.
-  const defaultStopWordsLanguages = useMemo(() => {
-    const seen = new Set<string>();
-    const ordered: string[] = [];
-    for (const selection of effectiveNodeColumnSelections) {
-      const lang = liveTokenizerLanguagesByNode[selection.nodeId];
-      if (!lang || seen.has(lang)) continue;
-      seen.add(lang);
-      ordered.push(lang);
-    }
-    return ordered;
-  }, [effectiveNodeColumnSelections, liveTokenizerLanguagesByNode]);
+  // Primary node/column the "Fill Default" dialog samples to guess a language.
+  // Language is not stored per column (a column may mix languages), so the guess
+  // is derived on demand from the first selected text column and the user
+  // confirms or overrides it in the dialog.
+  const fillDefaultSelection = effectiveNodeColumnSelections.find((selection) => selection.column);
+  const fillDefaultTarget = {
+    nodeId: fillDefaultSelection?.nodeId ?? null,
+    column: fillDefaultSelection?.column ?? null,
+  };
 
   const {
     stopWords,
@@ -381,7 +378,6 @@ const TokenFrequencyFeature = ({
     setResults,
     getAuthHeaders,
     resolveTokenFrequencyTaskId: resolveTaskId,
-    defaultStopWordsLanguages,
     backendTokenLimit,
     backendStopWordsKey,
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,
@@ -709,7 +705,6 @@ const TokenFrequencyFeature = ({
       const { [nodeId]: _removed, ...rest } = prev;
       return rest;
     });
-    setLiveTokenizerLanguagesByNode((prev) => ({ ...prev, [nodeId]: language }));
     void persistTokenizerPreference(nodeId, column, model, language);
   };
 
@@ -782,7 +777,7 @@ const TokenFrequencyFeature = ({
         onStopWordsApply={handleApplyStopWords}
         isLoadingStopWords={isLoadingStopWords}
         onFillDefaultStopWords={() => {
-          void handleFillDefaultStopWords();
+          setFillDialogOpen(true);
         }}
         onSortStopWords={sortStopWords}
         tokenLimitInput={tokenLimitInput}
@@ -816,6 +811,20 @@ const TokenFrequencyFeature = ({
         mode={downloadDialogMode}
         onConfirm={(options) => {
           void handleDownloadConfirm(options);
+        }}
+      />
+
+      <FillDefaultStopWordsDialog
+        key={fillDialogOpen ? 'fill-dialog-open' : 'fill-dialog-closed'}
+        open={fillDialogOpen}
+        onOpenChange={setFillDialogOpen}
+        workspaceId={currentWorkspaceId}
+        nodeId={fillDefaultTarget.nodeId}
+        column={fillDefaultTarget.column}
+        getAuthHeaders={getAuthHeaders}
+        isLoading={isLoadingStopWords}
+        onFill={(language) => {
+          void handleFillDefaultStopWords(language);
         }}
       />
     </div>

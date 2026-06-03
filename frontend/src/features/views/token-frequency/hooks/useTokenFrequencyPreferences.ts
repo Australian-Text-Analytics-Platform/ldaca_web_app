@@ -18,13 +18,6 @@ type UseTokenFrequencyPreferencesParams = {
   setResults: React.Dispatch<React.SetStateAction<TokenFrequencyResponse | null>>;
   getAuthHeaders: () => Record<string, string>;
   resolveTokenFrequencyTaskId: () => Promise<string | null>;
-  /**
-   * Resolved language codes for the currently-selected corpora, one per
-   * unique language. "Apply Stop Words" loads all matching local stopword
-   * lists and merges them so a multi-language comparison (e.g. EN + ZH)
-   * fills both lists at once.
-   */
-  defaultStopWordsLanguages?: ReadonlyArray<string | null | undefined>;
   backendTokenLimit: number | null;
   backendStopWordsKey: string;
   maxTokenLimitInput: number;
@@ -43,7 +36,6 @@ export const useTokenFrequencyPreferences = ({
   setResults,
   getAuthHeaders,
   resolveTokenFrequencyTaskId,
-  defaultStopWordsLanguages,
   backendTokenLimit,
   backendStopWordsKey,
   maxTokenLimitInput,
@@ -378,24 +370,23 @@ export const useTokenFrequencyPreferences = ({
     }
   };
 
-  /** Loads default stop words for the selected tokenizer languages into the editable text area. */
+  /** Loads default stop words for a single chosen language into the editable text area. */
   /**
-   * Called by: useTokenFrequencyPreferences through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-   * Flow: require resolved languages, load and merge default stop words by language, render grouped text, then apply the stop set.
+   * Called by: TokenFrequencyFeature via FillDefaultStopWordsDialog's onFill,
+   * because language is picked per scenario in the dialog rather than derived
+   * from a stored per-column property.
+   * Flow: load the chosen language's default stop words, render them, then apply
+   * the stop set.
    */
-  const handleFillDefaultStopWords = async () => {
+  const handleFillDefaultStopWords = async (language: string) => {
+    if (!language) {
+      console.error('Default stop words require a language selection');
+      return;
+    }
     setIsLoadingStopWords(true);
     try {
-      const hasLanguages =
-        Array.isArray(defaultStopWordsLanguages) && defaultStopWordsLanguages.length > 0;
-
-      if (!hasLanguages) {
-        console.error('Default stop words require at least one resolved language');
-        return;
-      }
-
       const { byLanguage, merged } = await loadMergedStopwords({
-        languages: defaultStopWordsLanguages!,
+        languages: [language],
       });
       if (merged.length === 0) {
         console.error('Default stop words returned an empty list');

@@ -9,18 +9,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { getNodeData, getTokenizerModels } from '@/api/generated/sdk.gen';
+import { getTokenizerModels } from '@/api/generated/sdk.gen';
 import { queryKeys } from '@/lib/queryKeys';
-import { detectLanguageIso6391 } from '@/lib/languageDetection';
 import { partitionTokenizerModelsForLanguage } from '@/lib/languages';
 import { cn } from '@/lib/utils';
-import { collectDocumentColumnText } from './tokenizerModelSelectorUtils';
+import { useDetectedColumnLanguage } from '../hooks/useDetectedColumnLanguage';
 
 const TOKENIZER_MODELS_LOADING_VALUE = '__ldaca__tokenizer_models_loading__';
 const TOKENIZER_MODELS_ERROR_VALUE = '__ldaca__tokenizer_models_error__';
 const TOKENIZER_MODELS_EMPTY_VALUE = '__ldaca__tokenizer_models_empty__';
 const TOKENIZER_MODEL_CLEAR_VALUE = '__ldaca__select_tokenizer_model__';
-const LANGUAGE_SAMPLE_PAGE_SIZE = 100;
 
 export interface TokenizerModelSelectorProps {
   workspaceId: string | null;
@@ -52,49 +50,14 @@ function TokenizerModelSelector({
   className,
 }: TokenizerModelSelectorProps) {
   const canFetchSample = Boolean(workspaceId && nodeId && column);
-  const sampleQuery = useQuery({
-    queryKey: workspaceId
-      ? [
-          ...queryKeys.nodeData(workspaceId, nodeId, 1, LANGUAGE_SAMPLE_PAGE_SIZE),
-          'language-sample',
-          column,
-        ]
-      : ['tokenizer-language-sample', nodeId, column],
-    enabled: canFetchSample,
-    staleTime: 60_000,
-    /** Called by: TanStack Query to fetch sample text for language detection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    queryFn: async () => {
-      const { data } = await getNodeData({
-        path: { node_id: nodeId },
-        query: { page: 1, page_size: LANGUAGE_SAMPLE_PAGE_SIZE },
-        headers: getAuthHeaders(),
-        throwOnError: true,
-      });
-      return data;
-    },
-  });
-
-  const sampleText = collectDocumentColumnText(
-    sampleQuery.data?.data as Array<Record<string, unknown>> | undefined,
+  const { detectedLanguage } = useDetectedColumnLanguage({
+    workspaceId,
+    nodeId,
     column,
-  );
-
-  const detectionQuery = useQuery({
-    queryKey: [
-      'tokenizer-language-detection',
-      workspaceId,
-      nodeId,
-      column,
-      sampleText.slice(0, 512),
-    ],
-    enabled: sampleText.length > 0,
-    staleTime: 5 * 60_000,
-    retry: false,
-    /** Called by: TanStack Query after sample text is available because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    queryFn: () => detectLanguageIso6391(sampleText),
+    getAuthHeaders,
+    enabled: canFetchSample,
   });
 
-  const detectedLanguage = detectionQuery.data ?? null;
   const modelQuery = useQuery({
     queryKey: queryKeys.tokenizerModels,
     enabled: false,

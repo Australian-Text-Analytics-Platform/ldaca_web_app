@@ -4,27 +4,17 @@ import {
   useState,
   type Dispatch,
   type SetStateAction,
-  type MutableRefObject,
 } from 'react';
-import type { ConcordanceAnalysisResponse } from '@/api/generated/types.gen';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { HydrationState } from '../../common/useAnalysisHydration';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
-/** Detects whether incoming token-frequency handoffs would replace visible results. */
-/**
- * Called by: useConcordancePendingHandoff hook during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- */
-const hasSuccessfulConcordanceResults = (result: ConcordanceAnalysisResponse | null): boolean =>
-  Boolean(result && result.state === 'successful');
-
 type Params = {
   pendingConcordance: PendingConcordance | null;
   clearPendingConcordance: () => void;
   hydrationState: HydrationState;
-  results: ConcordanceAnalysisResponse | null;
   selectedNodes: WorkspaceNodeLike[];
   setSearchWord: Dispatch<SetStateAction<string>>;
   setNodeColumnSelections: (
@@ -36,11 +26,6 @@ type Params = {
 };
 
 export type UseConcordancePendingHandoffResult = {
-  queuedPendingConcordance: PendingConcordance | null;
-  setQueuedPendingConcordance: Dispatch<SetStateAction<PendingConcordance | null>>;
-  handoffConfirmOpen: boolean;
-  setHandoffConfirmOpen: Dispatch<SetStateAction<boolean>>;
-  handoffConfirmingRef: MutableRefObject<boolean>;
   shouldAutoSearch: boolean;
   setShouldAutoSearch: Dispatch<SetStateAction<boolean>>;
 };
@@ -51,14 +36,17 @@ export type UseConcordancePendingHandoffResult = {
  *
  *   1. Queue: copy `pendingConcordance` from the analysis store into local
  *      state (deferred via rAF) so hydration has a chance to finish first.
- *   2. Apply: once hydration settles, either prompt for confirmation (when
- *      results already exist) or fill the search box / sync the selection /
+ *   2. Apply: once hydration settles, fill the search box / sync the selection /
  *      sync per-node colours and column selections, optionally arming the
  *      auto-search flag.
  *
- * The actual auto-search dispatch + confirm/cancel handlers stay in the
- * parent — they need access to `handleSearch` and `clearResults`, which the
- * parent already has wired up.
+ * Token clicks always open a brand-new concordance tab (see
+ * useTokenFrequencyTaskFlow.handleTokenClick), so the consuming feature instance
+ * is always a fresh tab with no results — the seed is applied unconditionally
+ * and never has to prompt about replacing existing output.
+ *
+ * The actual auto-search dispatch stays in the parent — it needs access to
+ * `handleSearch`, which the parent already has wired up.
  */
 /**
  * Used by: ConcordanceFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
@@ -68,7 +56,6 @@ export function useConcordancePendingHandoff({
   pendingConcordance,
   clearPendingConcordance,
   hydrationState,
-  results,
   selectedNodes,
   setSearchWord,
   setNodeColumnSelections,
@@ -77,10 +64,8 @@ export function useConcordancePendingHandoff({
 }: Params): UseConcordancePendingHandoffResult {
   const [queuedPendingConcordance, setQueuedPendingConcordance] =
     useState<PendingConcordance | null>(pendingConcordance);
-  const [handoffConfirmOpen, setHandoffConfirmOpen] = useState(false);
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
   const lastPendingConcordanceRef = useRef<number | null>(null);
-  const handoffConfirmingRef = useRef(false);
 
   useEffect(() => {
     if (!pendingConcordance) return;
@@ -97,10 +82,6 @@ export function useConcordancePendingHandoff({
 
   useEffect(() => {
     if (!queuedPendingConcordance) {
-      if (handoffConfirmOpen) {
-        const id = requestAnimationFrame(() => setHandoffConfirmOpen(false));
-        return () => cancelAnimationFrame(id);
-      }
       return;
     }
 
@@ -108,14 +89,6 @@ export function useConcordancePendingHandoff({
       hydrationState.status === 'error' ||
       (hydrationState.status === 'idle' && typeof hydrationState.lastHydratedAt === 'number');
     if (!hydrationSettled) {
-      return;
-    }
-
-    if (hasSuccessfulConcordanceResults(results)) {
-      if (!handoffConfirmOpen) {
-        const id = requestAnimationFrame(() => setHandoffConfirmOpen(true));
-        return () => cancelAnimationFrame(id);
-      }
       return;
     }
 
@@ -175,7 +148,6 @@ export function useConcordancePendingHandoff({
 
     const resetId = requestAnimationFrame(() => {
       setQueuedPendingConcordance(null);
-      setHandoffConfirmOpen(false);
     });
 
     return () => {
@@ -189,8 +161,6 @@ export function useConcordancePendingHandoff({
     queuedPendingConcordance,
     hydrationState.status,
     hydrationState.lastHydratedAt,
-    results,
-    handoffConfirmOpen,
     selectedNodes,
     setNodeColumnSelections,
     selectNodes,
@@ -199,11 +169,6 @@ export function useConcordancePendingHandoff({
   ]);
 
   return {
-    queuedPendingConcordance,
-    setQueuedPendingConcordance,
-    handoffConfirmOpen,
-    setHandoffConfirmOpen,
-    handoffConfirmingRef,
     shouldAutoSearch,
     setShouldAutoSearch,
   };

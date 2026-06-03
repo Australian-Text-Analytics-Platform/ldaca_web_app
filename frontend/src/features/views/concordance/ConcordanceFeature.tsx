@@ -47,7 +47,6 @@ import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { highlightMatchInText } from '../common/components/highlightText';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
 import { ConcordanceDispersionDetachDialog } from './components/ConcordanceDispersionDetachDialog';
 import type { DetachDialogNodeOption } from '../common/components/DetachColumnsDialog';
@@ -991,18 +990,12 @@ function ConcordanceFeature({
   }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
 
   const {
-    queuedPendingConcordance,
-    setQueuedPendingConcordance,
-    handoffConfirmOpen,
-    setHandoffConfirmOpen,
-    handoffConfirmingRef,
     shouldAutoSearch,
     setShouldAutoSearch,
   } = useConcordancePendingHandoff({
     pendingConcordance,
     clearPendingConcordance,
     hydrationState,
-    results,
     selectedNodes,
     setSearchWord,
     setNodeColumnSelections,
@@ -1071,33 +1064,6 @@ function ConcordanceFeature({
   const handleClearResults = async () => {
     if (!currentWorkspaceId) return;
     await clearResults();
-  };
-
-  /** Confirms a token-frequency handoff by clearing stale concordance output first. */
-  /**
-   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleConfirmPendingConcordance = async () => {
-    if (!queuedPendingConcordance) {
-      setHandoffConfirmOpen(false);
-      return;
-    }
-    handoffConfirmingRef.current = true;
-    try {
-      await clearResults({ preserveLocalState: true });
-      setHandoffConfirmOpen(false);
-    } finally {
-      handoffConfirmingRef.current = false;
-    }
-  };
-
-  /** Cancels a queued token-frequency handoff without touching current concordance results. */
-  /**
-   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleCancelPendingConcordance = () => {
-    setQueuedPendingConcordance(null);
-    setHandoffConfirmOpen(false);
   };
 
   /** Runs or updates concordance while promoting temporary node colours into workspace state. */
@@ -1589,22 +1555,6 @@ function ConcordanceFeature({
         selectAllDetachColumns={selectAllDetachColumns}
         deselectAllDetachColumns={deselectAllDetachColumns}
         handleDetachConfirm={handleDetachConfirm}
-      />
-      <ConfirmDialog
-        open={handoffConfirmOpen}
-        onOpenChange={(open) => {
-          setHandoffConfirmOpen(open);
-          if (!open && queuedPendingConcordance && !handoffConfirmingRef.current) {
-            handleCancelPendingConcordance();
-          }
-        }}
-        title="Replace concordance results?"
-        description="This will clear the current concordance results and fill the clicked token into the search box."
-        confirmText="Clear and fill token"
-        cancelText="Keep current results"
-        onConfirm={() => {
-          void handleConfirmPendingConcordance();
-        }}
       />
     </div>
   );

@@ -440,7 +440,7 @@ describe('ConcordanceFeature', () => {
     unmount();
   });
 
-  it('asks for confirmation before replacing existing concordance results from a token handoff', async () => {
+  it('fills the concordance search box directly from a token handoff even when results already exist', async () => {
     mockPendingConcordance = {
       searchWord: 'replacement',
       selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
@@ -476,20 +476,15 @@ describe('ConcordanceFeature', () => {
     const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     await waitFor(() => {
-      expect(screen.getByText('Replace concordance results?')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Clear and fill token' }));
-
-    await waitFor(() => {
-      expect(clearResultsMock).toHaveBeenCalledWith({ preserveLocalState: true });
-    });
-
-    await waitFor(() => {
       expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue(
         'replacement',
       );
     });
+
+    // Token clicks always open a fresh tab, so the handoff applies unconditionally:
+    // no overwrite prompt is shown and results are never force-cleared.
+    expect(screen.queryByText('Replace concordance results?')).not.toBeInTheDocument();
+    expect(clearResultsMock).not.toHaveBeenCalledWith({ preserveLocalState: true });
 
     unmount();
   });

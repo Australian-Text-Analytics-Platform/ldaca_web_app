@@ -13,6 +13,7 @@ import {
   extractAndSetTaskId,
   type WorkspaceNodeLike,
 } from '../../common';
+import { useWorkspaceTabs } from '../../common/tabs/useWorkspaceTabs';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
@@ -109,6 +110,17 @@ export const useTokenFrequencyTaskFlow = ({
     getColorForNode,
   },
 }: UseTokenFrequencyTaskFlowParams) => {
+  // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
+  // concordance tab for every token click. Sharing the workspace-tabs query
+  // cache means the tab is created + activated before the concordance view
+  // mounts, so the clicked token always lands in a fresh tab instead of
+  // overwriting an existing concordance search.
+  const { createTab: createConcordanceTab } = useWorkspaceTabs(
+    currentWorkspaceId,
+    'concordance_analysis',
+    getAuthHeaders,
+  );
+
   /** Builds and submits a token-frequency request from the current selection state. */
   /**
    * Called by: useTokenFrequencyTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
@@ -289,6 +301,12 @@ export const useTokenFrequencyTaskFlow = ({
         timestamp: Date.now(),
       });
 
+      // Always hand the clicked token to a fresh concordance tab. Creating +
+      // activating the tab here (before the view switch) guarantees the new
+      // tab's ConcordanceFeature is the instance that consumes the pending
+      // payload, so no existing concordance search is ever overwritten.
+      createConcordanceTab(trimmedToken || undefined);
+
       setCurrentView('concordance');
     },
     [
@@ -303,6 +321,7 @@ export const useTokenFrequencyTaskFlow = ({
       getColorForNode,
       selectNodes,
       setPendingConcordance,
+      createConcordanceTab,
       setCurrentView,
     ],
   );

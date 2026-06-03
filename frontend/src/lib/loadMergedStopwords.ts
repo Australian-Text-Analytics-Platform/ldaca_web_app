@@ -126,3 +126,44 @@ export async function loadMergedStopwords(args: {
 }): Promise<MergedStopwordsResult> {
   return resolveMergedStopwords(args.languages);
 }
+
+/** A stopword language offered in the "Fill Default" picker. */
+export interface SupportedStopwordLanguage {
+  /** ISO 639-1 code passed back into loadMergedStopwords. */
+  iso6391: string;
+  /** Human-readable language name for the dropdown label. */
+  name: string;
+}
+
+// Index iso-639-3 records by both their 639-3 and 639-1 codes so a stopword
+// export key (always a 639-3 code, see resolveStopwordLanguageCode) resolves to
+// a displayable name and the 639-1 code the loader expects.
+const iso639EntryByCode = new Map<string, { name: string; iso6391: string | null }>();
+for (const language of iso6393) {
+  const record = { name: language.name, iso6391: language.iso6391 ?? null };
+  if (language.iso6393) iso639EntryByCode.set(language.iso6393, record);
+  if (language.iso6391) iso639EntryByCode.set(language.iso6391, record);
+}
+
+/**
+ * Lists every language the bundled stopword package can supply, as
+ * {iso6391, name} sorted by name. Used by: FillDefaultStopWordsDialog to
+ * populate its language dropdown so users pick a stoplist case-by-case instead
+ * of relying on a stored per-column language.
+ * Flow: scan the stopword exports, keep array values with words, resolve each
+ * 639-3 key to a 639-1 code + display name, dedupe by 639-1, then sort by name.
+ */
+export function listSupportedStopwordLanguages(): SupportedStopwordLanguage[] {
+  const result: SupportedStopwordLanguage[] = [];
+  const seen = new Set<string>();
+  for (const [code, value] of Object.entries(stopwordExports)) {
+    if (!Array.isArray(value) || value.length === 0) continue;
+    const entry = iso639EntryByCode.get(code);
+    const iso6391 = entry?.iso6391;
+    if (!iso6391 || seen.has(iso6391)) continue;
+    seen.add(iso6391);
+    result.push({ iso6391, name: entry.name });
+  }
+  result.sort((a, b) => a.name.localeCompare(b.name));
+  return result;
+}

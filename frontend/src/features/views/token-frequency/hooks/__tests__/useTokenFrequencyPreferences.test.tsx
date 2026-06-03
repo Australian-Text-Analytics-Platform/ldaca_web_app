@@ -34,52 +34,33 @@ describe('useTokenFrequencyPreferences', () => {
     updateTokenFrequenciesTaskResultMock.mockReset();
   });
 
-  it('fills default stop words for a single resolved language', async () => {
-    const { result } = renderHook(() =>
-      useTokenFrequencyPreferences({
-        ...baseArgs,
-        defaultStopWordsLanguages: ['zh'],
-      }),
-    );
+  it('fills default stop words for the chosen language', async () => {
+    const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
     await act(async () => {
-      await result.current.handleFillDefaultStopWords();
+      await result.current.handleFillDefaultStopWords('zh');
     });
 
     await waitFor(() => expect(result.current.stopWords).toContain('的'));
   });
 
-  it('does not fill default stop words when no languages are resolved', async () => {
-    const { result } = renderHook(() =>
-      useTokenFrequencyPreferences({
-        ...baseArgs,
-        defaultStopWordsLanguages: [],
-      }),
-    );
+  it('does not fill default stop words when no language is chosen', async () => {
+    const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
     await act(async () => {
-      await result.current.handleFillDefaultStopWords();
+      await result.current.handleFillDefaultStopWords('');
     });
 
     expect(result.current.stopWords).toBe('');
   });
 
-  it('merges per-language groups when multiple languages are requested', async () => {
-    const { result } = renderHook(() =>
-      useTokenFrequencyPreferences({
-        ...baseArgs,
-        defaultStopWordsLanguages: ['en', 'zh'],
-      }),
-    );
+  it('fills English default stop words for the chosen language', async () => {
+    const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
     await act(async () => {
-      await result.current.handleFillDefaultStopWords();
+      await result.current.handleFillDefaultStopWords('en');
     });
 
-    // The hook builds groups separated by ``\n\n`` for visual clarity,
-    // then ``applyStopSetFromText`` normalises into the canonical flat
-    // ``, ``-joined form. Both EN and ZH entries survive the round-trip.
     await waitFor(() => expect(result.current.stopWords).toContain('about'));
-    expect(result.current.stopWords).toContain('的');
   });
 });
