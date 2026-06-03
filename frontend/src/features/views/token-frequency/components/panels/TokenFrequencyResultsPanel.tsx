@@ -270,7 +270,7 @@ export const TokenFrequencyResultsPanel = ({
                   onClick={onFillDefaultStopWords}
                   disabled={isLoadingStopWords}
                 >
-                  Fill Default
+                  Add Default
                 </Button>
                 <Button
                   type="button"
@@ -284,7 +284,7 @@ export const TokenFrequencyResultsPanel = ({
                 <HelpIcon
                   targetKey="analysis.token-frequency.stop-words"
                   label="About default stop words"
-                  tooltip="Fill Default opens a dialog where you pick the language (a guess is pre-selected from the column's text) whose default stop words to load. You can edit the list before or after applying it. Click to open the tutorial."
+                  tooltip="Add Default opens a dialog where you pick a language (a guess is pre-selected from the column's text) whose default stop words are appended to your current list. Add bags from several languages and edit the list before or after applying. Click to open the tutorial."
                   className="h-5 w-5 text-muted-foreground"
                 />
               </div>

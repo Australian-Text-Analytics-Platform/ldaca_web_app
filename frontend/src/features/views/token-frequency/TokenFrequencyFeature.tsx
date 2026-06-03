@@ -93,8 +93,8 @@ const TokenFrequencyFeature = ({
   const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
     Record<string, string>
   >({});
-  // Controls the "Fill Default" stop-words dialog where the user confirms which
-  // language's defaults to load (guessed on the fly, not stored per column).
+  // Controls the "Add Default" stop-words dialog where the user confirms which
+  // language's defaults to append (guessed on the fly, not stored per column).
   const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
@@ -344,7 +344,7 @@ const TokenFrequencyFeature = ({
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
-  // Primary node/column the "Fill Default" dialog samples to guess a language.
+  // Primary node/column the "Add Default" dialog samples to guess a language.
   // Language is not stored per column (a column may mix languages), so the guess
   // is derived on demand from the first selected text column and the user
   // confirms or overrides it in the dialog.
@@ -370,7 +370,7 @@ const TokenFrequencyFeature = ({
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
     applyTokenLimit,
-    handleFillDefaultStopWords,
+    handleAddDefaultStopWords,
     resetPreferenceUiState,
   } = useTokenFrequencyPreferences({
     currentWorkspaceId,
@@ -824,7 +824,7 @@ const TokenFrequencyFeature = ({
         getAuthHeaders={getAuthHeaders}
         isLoading={isLoadingStopWords}
         onFill={(language) => {
-          void handleFillDefaultStopWords(language);
+          void handleAddDefaultStopWords(language);
         }}
       />
     </div>

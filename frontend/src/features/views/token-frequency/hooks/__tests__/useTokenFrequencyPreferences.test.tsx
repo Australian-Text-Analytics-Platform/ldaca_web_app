@@ -34,33 +34,39 @@ describe('useTokenFrequencyPreferences', () => {
     updateTokenFrequenciesTaskResultMock.mockReset();
   });
 
-  it('fills default stop words for the chosen language', async () => {
+  it('adds default stop words for the chosen language', async () => {
     const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
     await act(async () => {
-      await result.current.handleFillDefaultStopWords('zh');
+      await result.current.handleAddDefaultStopWords('zh');
     });
 
     await waitFor(() => expect(result.current.stopWords).toContain('的'));
   });
 
-  it('does not fill default stop words when no language is chosen', async () => {
+  it('does not add default stop words when no language is chosen', async () => {
     const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
     await act(async () => {
-      await result.current.handleFillDefaultStopWords('');
+      await result.current.handleAddDefaultStopWords('');
     });
 
     expect(result.current.stopWords).toBe('');
   });
 
-  it('fills English default stop words for the chosen language', async () => {
+  it('appends a second language without dropping the first', async () => {
     const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
     await act(async () => {
-      await result.current.handleFillDefaultStopWords('en');
+      await result.current.handleAddDefaultStopWords('en');
+    });
+    await waitFor(() => expect(result.current.stopWords).toContain('about'));
+
+    await act(async () => {
+      await result.current.handleAddDefaultStopWords('zh');
     });
 
-    await waitFor(() => expect(result.current.stopWords).toContain('about'));
+    await waitFor(() => expect(result.current.stopWords).toContain('的'));
+    expect(result.current.stopWords).toContain('about');
   });
 });

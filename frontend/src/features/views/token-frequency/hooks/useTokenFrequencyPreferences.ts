@@ -370,36 +370,35 @@ export const useTokenFrequencyPreferences = ({
     }
   };
 
-  /** Loads default stop words for a single chosen language into the editable text area. */
+  /** Adds a chosen language's default stop words to the existing editable list. */
   /**
    * Called by: TokenFrequencyFeature via FillDefaultStopWordsDialog's onFill,
    * because language is picked per scenario in the dialog rather than derived
    * from a stored per-column property.
-   * Flow: load the chosen language's default stop words, render them, then apply
-   * the stop set.
+   * Flow: load the chosen language's default stop words, append them to whatever
+   * is already in the editor, then apply the combined set. Appending (instead of
+   * replacing) lets users stack stop-word bags from multiple languages; the
+   * dedupe in applyStopSetFromText keeps overlaps from piling up.
    */
-  const handleFillDefaultStopWords = async (language: string) => {
+  const handleAddDefaultStopWords = async (language: string) => {
     if (!language) {
       console.error('Default stop words require a language selection');
       return;
     }
     setIsLoadingStopWords(true);
     try {
-      const { byLanguage, merged } = await loadMergedStopwords({
+      const { merged } = await loadMergedStopwords({
         languages: [language],
       });
       if (merged.length === 0) {
         console.error('Default stop words returned an empty list');
         return;
       }
-      const grouped = byLanguage
-        .filter((group) => group.words.length > 0)
-        .map((group) => group.words.join(', '))
-        .join('\n\n');
-      const display = grouped || merged.join(', ');
+      const combined = [stopWords, merged.join(', ')]
+        .filter((part) => part.trim().length > 0)
+        .join(', ');
 
-      setStopWords(display);
-      applyStopSetFromText(display);
+      applyStopSetFromText(combined);
     } catch (error) {
       console.error('Error getting default stop words:', error);
     } finally {
@@ -431,7 +430,7 @@ export const useTokenFrequencyPreferences = ({
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
     applyTokenLimit,
-    handleFillDefaultStopWords,
+    handleAddDefaultStopWords,
     persistTokenPreferences,
     resetPreferenceUiState,
   };

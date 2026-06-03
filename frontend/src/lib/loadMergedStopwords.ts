@@ -127,7 +127,7 @@ export async function loadMergedStopwords(args: {
   return resolveMergedStopwords(args.languages);
 }
 
-/** A stopword language offered in the "Fill Default" picker. */
+/** A stopword language offered in the "Add Default" picker. */
 export interface SupportedStopwordLanguage {
   /** ISO 639-1 code passed back into loadMergedStopwords. */
   iso6391: string;

@@ -33,13 +33,14 @@ export interface FillDefaultStopWordsDialogProps {
 }
 
 /**
- * Prompts the user to confirm which language's default stop words to load.
- * Used by: TokenFrequencyFeature when the "Fill Default" button is clicked,
+ * Prompts the user to confirm which language's default stop words to add.
+ * Used by: TokenFrequencyFeature when the "Add Default" button is clicked,
  * because language is not an intrinsic column property (a column may mix
  * languages) and must be chosen per scenario rather than stored.
  * Flow: when open, guess the language from the selected column's sampled text
- * and pre-select it; let the user override via the dropdown; on Fill, hand the
- * chosen ISO 639-1 code back to the feature and close.
+ * and pre-select it; let the user override via the dropdown; on Add, hand the
+ * chosen ISO 639-1 code back to the feature (which appends that language's bag
+ * to the existing stop-word list) and close.
  */
 function FillDefaultStopWordsDialog({
   open,
@@ -84,10 +85,11 @@ function FillDefaultStopWordsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Fill default stop words</DialogTitle>
+          <DialogTitle>Add default stop words</DialogTitle>
           <DialogDescription>
-            Choose the language whose default stop words you want to load. The guess below is based
-            on the selected column's text and can be changed.
+            Choose the language whose default stop words you want to add. They are appended to your
+            current list, so you can stack bags from several languages. The guess below is based on
+            the selected column's text and can be changed.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
@@ -114,7 +116,7 @@ function FillDefaultStopWordsDialog({
             Cancel
           </Button>
           <Button type="button" onClick={handleFill} disabled={isLoading || !selected}>
-            {isLoading ? 'Filling…' : 'Fill'}
+            {isLoading ? 'Adding…' : 'Add'}
           </Button>
         </DialogFooter>
       </DialogContent>
