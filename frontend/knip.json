@@ -1,0 +1,27 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "entry": [
+        "src/index.tsx",
+        "vite.config.ts",
+        "eslint.config.js",
+        "openapi.config.ts"
+    ],
+    "project": [
+        "src/**/*.{ts,tsx}"
+    ],
+    "ignore": [
+        "src/api/generated/**",
+        "src/components/ui/**"
+    ],
+    "ignoreDependencies": [
+        "postcss",
+        "@babel/preset-typescript",
+        "@babel/core",
+        "tw-animate-css",
+        "tailwindcss",
+        "@tailwindcss/typography"
+    ],
+    "ignoreBinaries": [
+        "uv"
+    ]
+}

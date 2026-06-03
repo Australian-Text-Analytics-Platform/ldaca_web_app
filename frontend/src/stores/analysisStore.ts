@@ -23,7 +23,7 @@ const PENDING_TASK_STATES: ReadonlySet<string> = new Set<string>([
 /** States representing in-flight execution. */
 const RUNNING_TASK_STATES: ReadonlySet<string> = new Set<string>(['running']);
 /** States the task can never leave (i.e. polling can stop). */
-export const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>([
+const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>([
   'successful',
   'failed',
   'cancelled',

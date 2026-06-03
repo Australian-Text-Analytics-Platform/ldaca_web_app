@@ -10,11 +10,6 @@ export const CONCORDANCE_CORE_COLUMNS = [
 
 export const CONCORDANCE_FREQ_COLUMNS = ['CONC_l1_freq', 'CONC_r1_freq'] as const;
 
-export const CONCORDANCE_MATERIALIZED_COLUMNS = [
-  ...CONCORDANCE_CORE_COLUMNS,
-  ...CONCORDANCE_FREQ_COLUMNS,
-] as const;
-
 export const CONCORDANCE_DISPERSION_COLUMN = 'CONC_dispersion' as const;
 
 export const CONCORDANCE_COLUMN_KEYS = {
@@ -55,8 +50,3 @@ export const QUOTATION_COLUMN_KEYS = {
 } as const;
 
 export const QUOTATION_DOCUMENT_COLUMN = QUOTATION_COLUMN_KEYS.document;
-
-export const TOPIC_COLUMN_KEYS = {
-  topic: 'TOPIC_topic',
-  topicMeaning: 'TOPIC_topic_meaning',
-} as const;

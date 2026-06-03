@@ -14,7 +14,7 @@ import { hasNonEmptyValue } from '../../utils/typeUtils';
  * Steps: drop incomplete rows, normalize range/date/list values, and preserve boolean/regex
  * flags for backend request payloads.
  */
-export const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
+const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
   return conditions.map<FilterCondition>((condition) => {
     let value: ConditionValue;
     if (condition.operator === 'is_null') {

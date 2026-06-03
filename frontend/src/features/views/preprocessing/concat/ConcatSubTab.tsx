@@ -197,5 +197,3 @@ export function ConcatSubTab(props: ConcatSubTabProps) {
     </div>
   );
 }
-
-export default ConcatSubTab;

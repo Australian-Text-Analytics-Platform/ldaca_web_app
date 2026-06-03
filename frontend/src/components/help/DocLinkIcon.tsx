@@ -114,5 +114,3 @@ export function DocLinkIcon({ kind, targetKey, label, tooltip, className }: DocL
     </Tooltip>
   );
 }
-
-export default DocLinkIcon;

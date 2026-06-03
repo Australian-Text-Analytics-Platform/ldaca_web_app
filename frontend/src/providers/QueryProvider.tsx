@@ -5,13 +5,10 @@ import React from 'react';
 /**
  * App-wide TanStack Query client.
  *
- * Exported separately so non-React callers (e.g. WebSocket task-stream
- * handlers) can invalidate or write to the cache directly. The eslint
- * override below is intentional — every other consumer imports from
- * `providers/QueryProvider`, so the client is effectively a singleton.
+ * Module-private singleton owned by QueryProvider; the provider injects it via
+ * QueryClientProvider so the whole component tree shares one cache.
  */
-// eslint-disable-next-line react-refresh/only-export-components -- queryClient is imported by non-component modules
-export const queryClient = new QueryClient({
+const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 min — after this, next read refetches.

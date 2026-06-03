@@ -20,7 +20,7 @@ import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { getPreferences, updatePreferences } from '@/api/generated/sdk.gen';
 import type {
-  LdacaWordflowModelsQuotationEngineConfig,
+  LdacaWordflowModelsQuotationQuotationEngineConfig,
   QuotationPreferencesOutput,
   UserPreferences,
   UserPreferencesUpdate,
@@ -28,7 +28,7 @@ import type {
 import type { ViewType } from '@/stores/uiStore';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = ['ai-annotator'];
-type QuotationEngineConfig = LdacaWordflowModelsQuotationEngineConfig;
+type QuotationEngineConfig = LdacaWordflowModelsQuotationQuotationEngineConfig;
 
 interface PreferencesState {
   hiddenViews: string[];

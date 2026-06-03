@@ -27,7 +27,7 @@ export const clampDisplayTokenLimit = (value: number | null | undefined): ClampR
 /**
  * Coerces loose metric values from analysis responses into finite numbers for
  * summary cards and chart labels without leaking NaN into the UI.
- * Used by: formatNumber and token-frequency preference parsing because analysis metrics and inputs arrive as numbers, strings, or booleans and need finite numeric values.
+ * Used by: token-frequency preference parsing because analysis metrics and inputs arrive as numbers, strings, or booleans and need finite numeric values.
  */
 export const toFiniteNumber = (value: unknown): number | null => {
   if (typeof value === 'number') {
@@ -45,47 +45,6 @@ export const toFiniteNumber = (value: unknown): number | null => {
     return value ? 1 : 0;
   }
   return null;
-};
-
-export interface FormatNumberOptions {
-  suffix?: string;
-  multiplier?: number;
-  fallback?: string;
-  locale?: string;
-  minimumFractionDigits?: number;
-  maximumFractionDigits?: number;
-}
-
-/**
- * Formats backend metrics for shared analysis UI elements that need consistent
- * fallbacks, scaling, and locale-aware decimal handling.
- * Used by: shared analysis summary cards, tables, and chart labels because backend metrics need fallback text, optional scaling, and locale-aware precision.
- * Flow: coerce the input with toFiniteNumber, apply fallback text for non-numeric values, scale and format with Intl.NumberFormat, then append any suffix.
- */
-export const formatNumber = (
-  value: unknown,
-  decimals = 2,
-  options: FormatNumberOptions = {},
-): string => {
-  const numeric = toFiniteNumber(value);
-  if (numeric === null) {
-    return options.fallback ?? '—';
-  }
-
-  const multiplier = typeof options.multiplier === 'number' ? options.multiplier : 1;
-  const scaled = numeric * multiplier;
-  const minimumFractionDigits =
-    typeof options.minimumFractionDigits === 'number' ? options.minimumFractionDigits : decimals;
-  const maximumFractionDigits =
-    typeof options.maximumFractionDigits === 'number' ? options.maximumFractionDigits : decimals;
-
-  const formatter = new Intl.NumberFormat(options.locale, {
-    minimumFractionDigits,
-    maximumFractionDigits,
-  });
-
-  const formatted = formatter.format(scaled);
-  return options.suffix ? `${formatted}${options.suffix}` : formatted;
 };
 
 /**

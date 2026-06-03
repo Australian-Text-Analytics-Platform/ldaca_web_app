@@ -110,5 +110,3 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
     />
   );
 }
-
-export default FilePreviewPanel;

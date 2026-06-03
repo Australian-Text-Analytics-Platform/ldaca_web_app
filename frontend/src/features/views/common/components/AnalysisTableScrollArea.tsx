@@ -30,5 +30,3 @@ export const AnalysisTableScrollArea = ({
     <div className={contentClassName}>{children}</div>
   </ScrollArea>
 );
-
-export default AnalysisTableScrollArea;

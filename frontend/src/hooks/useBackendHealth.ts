@@ -129,5 +129,3 @@ export const useBackendHealth = () => {
 
   return { ready, error };
 };
-
-export default useBackendHealth;

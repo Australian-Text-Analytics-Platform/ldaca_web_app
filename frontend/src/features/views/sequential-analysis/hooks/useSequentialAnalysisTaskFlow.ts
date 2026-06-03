@@ -14,7 +14,7 @@ export type SequentialAnalysisDatum = Record<string, unknown>;
 
 export type ChartTypeOption = 'line' | 'bar' | 'area';
 
-export const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
+const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
 
 // Narrows stored or server-provided chart type values to the supported UI options.
 /**
@@ -23,7 +23,7 @@ export const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
 export const isChartTypeOption = (value: unknown): value is ChartTypeOption =>
   typeof value === 'string' && CHART_TYPE_OPTIONS.includes(value as ChartTypeOption);
 
-export const SEQUENTIAL_ANALYSIS_PALETTE = [
+const SEQUENTIAL_ANALYSIS_PALETTE = [
   '#2563eb',
   '#16a34a',
   '#f59e0b',

@@ -26,7 +26,7 @@ export type NodeResultView = NormalizedNodeResult & {
 /**
  * Used by: tokenFrequencyAdapters analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
  */
-export const extractRows = (entry: unknown): TokenFrequencyRow[] => {
+const extractRows = (entry: unknown): TokenFrequencyRow[] => {
   if (Array.isArray(entry)) {
     return entry as TokenFrequencyRow[];
   }
@@ -45,7 +45,7 @@ export const extractRows = (entry: unknown): TokenFrequencyRow[] => {
 /**
  * Used by: tokenFrequencyAdapters analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
  */
-export const extractMetadata = (entry: unknown): Record<string, unknown> => {
+const extractMetadata = (entry: unknown): Record<string, unknown> => {
   if (
     entry &&
     typeof entry === 'object' &&
@@ -62,7 +62,7 @@ export const extractMetadata = (entry: unknown): Record<string, unknown> => {
 /**
  * Used by: tokenFrequencyAdapters analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
  */
-export const maxBy = <T>(items: T[], selector: (item: T) => number, fallback: number): number => {
+const maxBy = <T>(items: T[], selector: (item: T) => number, fallback: number): number => {
   let max = fallback;
   for (const item of items) {
     const value = selector(item);

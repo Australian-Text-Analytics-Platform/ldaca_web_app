@@ -82,7 +82,7 @@ export const formatTimeInputValue = (date: Date | null | undefined): string => {
  * Used by: local callers in preprocessing/dateTimeHelpers module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  * Flow: split HH:MM:SS parts, parse each segment, and replace invalid numbers with zero before recombination.
  */
-export const parseTimeSegments = (value: string): [number, number, number] => {
+const parseTimeSegments = (value: string): [number, number, number] => {
   const [hours = '0', minutes = '0', seconds = '0'] = value.split(':');
   const parsedHours = Number(hours);
   const parsedMinutes = Number(minutes);

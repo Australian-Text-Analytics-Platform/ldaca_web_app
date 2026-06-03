@@ -71,5 +71,3 @@ export function HighlightRing({ target, tick, className }: HighlightRingProps) {
     />
   );
 }
-
-export default HighlightRing;

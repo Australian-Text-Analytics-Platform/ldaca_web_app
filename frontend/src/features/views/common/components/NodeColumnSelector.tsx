@@ -94,5 +94,3 @@ export function NodeColumnSelector({
     </div>
   );
 }
-
-export default NodeColumnSelector;

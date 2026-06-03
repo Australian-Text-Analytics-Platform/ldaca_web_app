@@ -23,7 +23,7 @@ interface IsoDateInputProps extends React.InputHTMLAttributes<HTMLInputElement> 
  * ISO text input used by datetime filter controls. It normalizes typed values
  * before committing them to the owning condition row.
  */
-export const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>(
+const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>(
   (props, externalRef) => {
     const {
       committedValue,

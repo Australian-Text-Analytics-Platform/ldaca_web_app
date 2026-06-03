@@ -184,5 +184,3 @@ export const AnalysisPagination = ({
     </div>
   );
 };
-
-export default AnalysisPagination;

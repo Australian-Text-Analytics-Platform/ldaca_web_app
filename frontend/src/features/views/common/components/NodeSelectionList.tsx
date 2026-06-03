@@ -132,5 +132,3 @@ export function NodeSelectionList({
     </div>
   );
 }
-
-export default NodeSelectionList;

@@ -96,9 +96,9 @@ export interface BuildNodeColumnOptionsArgs {
 /**
  * Builds the per-node column option map used by multi-node analysis parameter
  * panels and their detached-column dialogs.
- * Used by: useNodeColumnOptions and tests because multi-node panels need per-node selectable columns with data-type filtering and fallback diagnostics.
+ * Used by: useNodeColumnOptions because multi-node panels need per-node selectable columns with data-type filtering and fallback diagnostics.
  */
-export const buildNodeColumnOptionsMap = ({
+const buildNodeColumnOptionsMap = ({
   nodes = [],
   getNodeColumns,
   allowedDataTypes,

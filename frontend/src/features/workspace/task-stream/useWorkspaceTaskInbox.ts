@@ -373,5 +373,3 @@ export const useWorkspaceTaskInbox = (
       }
     : clientState;
 };
-
-export default useWorkspaceTaskInbox;

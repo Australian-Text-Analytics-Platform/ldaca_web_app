@@ -3224,7 +3224,7 @@ export type QuotationPreferencesInput = {
  * responses in the shape expected by frontend clients and tests.
  */
 export type QuotationPreferencesOutput = {
-    engine?: LdacaWordflowModelsQuotationEngineConfig;
+    engine?: LdacaWordflowModelsQuotationQuotationEngineConfig;
     /**
      * Last Remote Url
      */
@@ -4123,6 +4123,64 @@ export type TaskClearActionResponse = {
 };
 
 /**
+ * TaskEntry
+ *
+ * Dict shape of a serialized task from ``WorkerTaskManager._serialize_task``.
+ *
+ * Keys match ``core/worker_task_manager.py:_serialize_task``.
+ */
+export type TaskEntry = {
+    /**
+     * Created At
+     */
+    created_at?: string;
+    /**
+     * Finished At
+     */
+    finished_at?: string | null;
+    /**
+     * Name
+     */
+    name?: string;
+    /**
+     * Parent Task Id
+     */
+    parent_task_id?: string | null;
+    /**
+     * Progress
+     */
+    progress?: number;
+    /**
+     * Progress Message
+     */
+    progress_message?: string | null;
+    /**
+     * Started At
+     */
+    started_at?: string | null;
+    /**
+     * State
+     */
+    state?: string;
+    /**
+     * Task Id
+     */
+    task_id?: string;
+    /**
+     * Task Type
+     */
+    task_type?: string;
+    /**
+     * User Id
+     */
+    user_id?: string;
+    /**
+     * Workspace Id
+     */
+    workspace_id?: string;
+};
+
+/**
  * TaskListResponse
  *
  * Response schema returned by API routes and consumed by generated clients for task list response.
@@ -4138,9 +4196,7 @@ export type TaskListResponse = {
     /**
      * Data
      */
-    data: Array<{
-        [key: string]: unknown;
-    }>;
+    data: Array<TaskEntry>;
     /**
      * Message
      */
@@ -5639,7 +5695,7 @@ export type LdacaWordflowAnalysisImplementationsQuotationQuotationEngineConfig =
  * Flow: validate incoming API fields, apply defaults or validators, and serialize route
  * responses in the shape expected by frontend clients and tests.
  */
-export type LdacaWordflowModelsQuotationEngineConfig = {
+export type LdacaWordflowModelsQuotationQuotationEngineConfig = {
     type?: QuotationEngineType;
     /**
      * Url

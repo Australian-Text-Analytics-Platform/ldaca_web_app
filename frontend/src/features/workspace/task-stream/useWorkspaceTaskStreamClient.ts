@@ -261,5 +261,3 @@ export const useWorkspaceTaskStreamClient = (
 
   return { ...state, reconnect };
 };
-
-export default useWorkspaceTaskStreamClient;

@@ -9,12 +9,6 @@
 export { useUIStore } from './uiStore';
 export type { ViewType, ModalKind, ModalTarget } from './uiStore';
 
-export { useSelectionStore } from './selectionStore';
-
-export { usePreferencesStore } from './preferencesStore';
-
-export { useAnalysisStore } from './analysisStore';
 export type { TaskItem, PendingConcordance } from './analysisStore';
 
-export { useAuthStore, REFRESH_FAILURE_THRESHOLD } from './authStore';
 export type { AuthPhase, FetchReason } from './authStore';

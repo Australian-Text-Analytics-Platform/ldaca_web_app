@@ -204,5 +204,3 @@ export function FilterSubTab(props: FilterSubTabProps) {
     </div>
   );
 }
-
-export default FilterSubTab;

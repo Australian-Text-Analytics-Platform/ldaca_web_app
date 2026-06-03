@@ -347,5 +347,3 @@ export function FileTree({
 
   return <>{nodes.map((node) => renderNode(node))}</>;
 }
-
-export default FileTree;

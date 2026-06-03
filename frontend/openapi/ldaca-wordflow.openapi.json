@@ -4205,7 +4205,7 @@
         "description": "Preference schema persisted by preference routes for quotation preferences.\n\nUsed by:\n- backend request/response models, backend tests because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
           "engine": {
-            "$ref": "#/components/schemas/ldaca_wordflow__models__QuotationEngineConfig"
+            "$ref": "#/components/schemas/ldaca_wordflow__models__quotation__QuotationEngineConfig"
           },
           "last_remote_url": {
             "default": "",
@@ -5459,13 +5459,95 @@
         "title": "TaskClearActionResponse",
         "type": "object"
       },
+      "TaskEntry": {
+        "description": "Dict shape of a serialized task from ``WorkerTaskManager._serialize_task``.\n\nKeys match ``core/worker_task_manager.py:_serialize_task``.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Task Id"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "number"
+          },
+          "progress_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Message"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "task_type": {
+            "title": "Task Type",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "title": "TaskEntry",
+        "type": "object"
+      },
       "TaskListResponse": {
         "description": "Response schema returned by API routes and consumed by generated clients for task list response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
           "data": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/TaskEntry"
             },
             "title": "Data",
             "type": "array"
@@ -7667,7 +7749,7 @@
         "title": "QuotationEngineConfig",
         "type": "object"
       },
-      "ldaca_wordflow__models__QuotationEngineConfig": {
+      "ldaca_wordflow__models__quotation__QuotationEngineConfig": {
         "additionalProperties": false,
         "description": "API schema used by routes and generated clients for quotation engine config.\n\nUsed by:\n- analysis task helpers, backend API routes, backend request/response models, backend\n  tests, core workspace and worker services because they need a stable JSON contract\n  shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {

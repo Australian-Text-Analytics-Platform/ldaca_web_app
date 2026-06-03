@@ -107,5 +107,3 @@ export function NodeColorPicker({
     </DropdownMenu>
   );
 }
-
-export default NodeColorPicker;

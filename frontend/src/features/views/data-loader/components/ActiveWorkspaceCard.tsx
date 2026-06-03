@@ -235,5 +235,3 @@ export function ActiveWorkspaceCard({
     </Card>
   );
 }
-
-export default ActiveWorkspaceCard;

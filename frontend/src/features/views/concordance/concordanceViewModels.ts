@@ -203,7 +203,7 @@ export type TaggedBinRow = ConcordanceDispersionBinRow & {
 };
 
 /** The fixed source-bin resolution returned by the `/bins` endpoint. */
-export const DISPERSION_SERVER_BIN_COUNT = 100;
+const DISPERSION_SERVER_BIN_COUNT = 100;
 
 /** Display bin counts the user can pick. Each value divides 100 evenly so we
  *  can re-aggregate the 100 server bins without remainders.

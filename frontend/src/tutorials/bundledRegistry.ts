@@ -568,17 +568,3 @@ export const TUTORIAL_INDEX_TARGET: DocTarget = {
   anchor: 'help-tutorial-index',
   label: 'Tutorial index',
 };
-
-/** Fallback target for opening the information index from generic help affordances. */
-export const INFO_INDEX_TARGET: DocTarget = {
-  file: 'information/index.md',
-  anchor: 'help-information-index',
-  label: 'Information index',
-};
-
-/** Fallback target for opening the reference index from generic help affordances. */
-export const REFERENCE_INDEX_TARGET: DocTarget = {
-  file: 'references/index.md',
-  anchor: 'help-references-index',
-  label: 'References index',
-};

@@ -95,5 +95,3 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     </AnalysisTabbedPanel>
   );
 }
-
-export default AnalysisTabsHost;

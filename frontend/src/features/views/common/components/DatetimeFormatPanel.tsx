@@ -141,5 +141,3 @@ function DatetimeFormatPanelContent({
     </DialogContent>
   );
 }
-
-export default DatetimeFormatPanel;

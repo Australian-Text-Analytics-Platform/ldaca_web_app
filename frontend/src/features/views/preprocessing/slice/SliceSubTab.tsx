@@ -280,5 +280,3 @@ function SliceSubTabContent(props: SliceSubTabProps) {
     </div>
   );
 }
-
-export default SliceSubTab;

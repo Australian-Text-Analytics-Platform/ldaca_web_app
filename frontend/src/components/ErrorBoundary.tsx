@@ -99,35 +99,3 @@ function DefaultErrorFallback({ error, resetError }: { error?: Error; resetError
   );
 }
 
-/**
- * Workspace-specific fallback used by workspace views to keep data-loading
- * failures visually distinct from full-app crashes.
- * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
- * Flow: show a workspace-specific error message and retry button, then delegate recovery to resetError.
- */
-export function WorkspaceErrorFallback({
-  error,
-  resetError,
-}: {
-  error?: Error;
-  resetError: () => void;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full p-8 bg-yellow-50 border border-yellow-200 rounded-lg">
-      <div className="text-yellow-800 text-lg font-semibold mb-4">Workspace Error</div>
-
-      <div className="text-yellow-700 text-sm mb-6 max-w-md text-center">
-        {error?.message || 'Unable to load workspace data. This might be a temporary issue.'}
-      </div>
-
-      <div className="space-x-4">
-        <button
-          onClick={resetError}
-          className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  );
-}

@@ -40,7 +40,7 @@ export interface TokenizerModelSelectorProps {
  * Used by: concordance and token-frequency parameter panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
-export function TokenizerModelSelector({
+function TokenizerModelSelector({
   workspaceId,
   nodeId,
   column,

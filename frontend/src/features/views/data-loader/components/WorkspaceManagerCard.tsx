@@ -259,5 +259,3 @@ export function WorkspaceManagerCard({
     </Card>
   );
 }
-
-export default WorkspaceManagerCard;

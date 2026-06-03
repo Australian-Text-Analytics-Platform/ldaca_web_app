@@ -29,7 +29,7 @@ import {
 } from './tabStateOps';
 
 /** Query key for the whole-workspace tab state (shared across analysis types). */
-export function workspaceTabsQueryKey(workspaceId: string): Array<string> {
+function workspaceTabsQueryKey(workspaceId: string): Array<string> {
   return ['workspace-tabs', workspaceId];
 }
 

@@ -181,5 +181,3 @@ export function AnalysisTabbedPanel({
     </div>
   );
 }
-
-export default AnalysisTabbedPanel;

@@ -188,5 +188,3 @@ export function RowDetailPanel({
     </Dialog>
   );
 }
-
-export default RowDetailPanel;

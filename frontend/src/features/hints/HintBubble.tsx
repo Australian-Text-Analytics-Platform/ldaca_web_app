@@ -230,5 +230,3 @@ export function HintBubble({
     </div>
   );
 }
-
-export default HintBubble;

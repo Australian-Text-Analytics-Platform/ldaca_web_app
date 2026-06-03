@@ -24,7 +24,7 @@ export const EMPTY_TABS_STATE: WorkspaceTabsState = { groups: {} };
  * also survives reload/serialization. Uses the platform UUID when available and
  * degrades to a timestamp+random fallback for non-secure/test contexts.
  */
-export function newTabId(): string {
+function newTabId(): string {
   const cryptoObj = globalThis.crypto as Crypto | undefined;
   if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
     return cryptoObj.randomUUID();
@@ -37,7 +37,7 @@ export function newTabId(): string {
  * Called by: useWorkspaceTabs selectors and the reducers below because all
  * tab operations scope to a single analysis-type namespace.
  */
-export function getGroup(
+function getGroup(
   state: WorkspaceTabsState | null | undefined,
   analysisType: string,
 ): AnalysisTabGroup {

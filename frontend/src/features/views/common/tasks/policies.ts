@@ -1,8 +1,6 @@
 import { getTaskTypeCandidates } from '@/features/views/common/analysisTaskUtils';
 import { isTerminalTaskState } from '@/stores/analysisStore';
 
-export { isTerminalTaskState };
-
 export interface ShouldRefreshOnCompletionInput {
   isTabActive: boolean;
   taskState: string | null | undefined;
@@ -36,11 +34,3 @@ export const shouldRefreshOnCompletion = ({
   const expectedTypes = new Set(getTaskTypeCandidates(taskType));
   return expectedTypes.has(completedTaskType);
 };
-
-/**
- * Identifies task-center clear actions that should remove cached task metadata
- * without also resetting the analysis feature's visible parameter state.
- * Used by: task-center action handlers because clear-task-center-item removes task metadata without resetting visible analysis parameters.
- */
-export const isTaskCenterClearOnlyAction = (action: string | null | undefined): boolean =>
-  action === 'clear-task-center-item';

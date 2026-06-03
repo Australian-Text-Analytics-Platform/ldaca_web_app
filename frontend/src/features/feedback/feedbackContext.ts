@@ -12,7 +12,7 @@ export const SURVEY_BASE_URL = 'https://sydney.au1.qualtrics.com/jfe/form/SV_0Hr
  * Called by: captureFeedbackContext when FeedbackPanel opens the survey because the caller needs one documented boundary for the lookup, event, or state handoff step.
  * Flow: prefer the build deployment id, classify Tauri by platform, then label local or hosted web origins from the hostname.
  */
-export const resolveDeployment = (): string => {
+const resolveDeployment = (): string => {
   const fromBuild = DEPLOYMENT_ID.trim() || undefined;
   if (fromBuild) return fromBuild;
   if (isTauri()) {

@@ -117,5 +117,3 @@ function AddFilePanelBody({
     />
   );
 }
-
-export default AddFilePanel;

@@ -1,4 +1,3 @@
-import type { ConcordanceAnalysisRequest } from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
 export interface TokenFrequencyAnalysisParams {
@@ -87,61 +86,3 @@ export function resolveTokenFrequencyNodeContext({
   return { nodeIds, selections };
 }
 
-export interface ConcordanceSeedParams {
-  selectedNodes: Array<{ id: string }>;
-  nodeColumnSelections: NodeColumnSelection[];
-  maxNodes?: number;
-  numLeftTokens?: number;
-  numRightTokens?: number;
-  combined?: boolean;
-}
-
-/** Builds a concordance request seed from a clicked token and the current frequency context. */
-/**
- * Used by: tokenFrequencyHelpers analysis helper module exports or same-file callers because callers need the same normalization and view-model rules before rendering or testing analysis results.
- * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
- */
-export function createConcordanceSeedRequest(
-  token: string,
-  {
-    selectedNodes,
-    nodeColumnSelections,
-    maxNodes = 2,
-    numLeftTokens = 10,
-    numRightTokens = 10,
-    combined = false,
-  }: ConcordanceSeedParams,
-): ConcordanceAnalysisRequest | null {
-  const trimmedToken = token?.toString().trim();
-  if (!trimmedToken) {
-    return null;
-  }
-
-  if (!Array.isArray(selectedNodes) || selectedNodes.length === 0) {
-    return null;
-  }
-
-  const nodeColumns: Record<string, string> = {};
-  selectedNodes.slice(0, maxNodes).forEach((node) => {
-    const selection = nodeColumnSelections.find((sel) => sel.nodeId === node.id);
-    if (selection?.column) {
-      nodeColumns[node.id] = selection.column;
-    }
-  });
-
-  const nodeIds = Object.keys(nodeColumns);
-  if (nodeIds.length === 0) {
-    return null;
-  }
-
-  return {
-    node_ids: nodeIds,
-    node_columns: nodeColumns,
-    search_word: trimmedToken,
-    num_left_tokens: numLeftTokens,
-    num_right_tokens: numRightTokens,
-    regex: false,
-    case_sensitive: false,
-    combined,
-  };
-}

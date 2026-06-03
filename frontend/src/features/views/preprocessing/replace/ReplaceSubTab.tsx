@@ -250,5 +250,3 @@ export function ReplaceSubTab(props: ReplaceSubTabProps) {
     </div>
   );
 }
-
-export default ReplaceSubTab;

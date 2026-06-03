@@ -744,5 +744,3 @@ export function DataLoaderDialogs({
     </>
   );
 }
-
-export default DataLoaderDialogs;

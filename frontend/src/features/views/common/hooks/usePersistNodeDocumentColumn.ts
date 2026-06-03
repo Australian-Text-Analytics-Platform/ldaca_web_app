@@ -11,7 +11,7 @@ import { queryKeys } from '@/lib/queryKeys';
  * Called by: node document-column and tokenization preference persistence hooks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  * Flow: write node-info and workspace-graph query data with the new node info, then invalidate both caches so selectors and graph panels refetch if needed.
  */
-export function updateWorkspaceNodeInfoCache(
+function updateWorkspaceNodeInfoCache(
   queryClient: QueryClient,
   workspaceId: string,
   nodeInfo: WorkspaceNodeInfo,

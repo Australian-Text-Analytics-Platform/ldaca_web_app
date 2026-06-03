@@ -40,7 +40,7 @@ const sanitizeMap = (map: Record<string, unknown>): Record<string, string> =>
  * Why: importers need one shared normalization boundary to keep behavior consistent.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
-export const columnPersistence = {
+const columnPersistence = {
   /** Restores all persisted column choices for `useAutoNodeColumns` at workspace/view startup. */
   /**
    * Called by: columnPersistence in this utility module because the utility needs local normalization steps before returning a shared result.

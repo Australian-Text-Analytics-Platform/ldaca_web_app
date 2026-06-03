@@ -242,5 +242,3 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
     </div>
   );
 }
-
-export default ConditionBuilder;

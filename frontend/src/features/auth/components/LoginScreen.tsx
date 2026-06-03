@@ -47,5 +47,3 @@ export function LoginScreen({ isLoading, error, authMethods = [] }: LoginScreenP
     </div>
   );
 }
-
-export default LoginScreen;
