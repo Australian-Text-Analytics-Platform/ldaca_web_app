@@ -73,6 +73,8 @@ export type ConcordanceResultsPanelProps = {
   // Per-block pagination + state
   nodePagination: PaginationState;
   globalPageSize: number;
+  /** Changes the single shared page size used by every result table footer. */
+  onPageSizeChange: (pageSize: number) => void;
   combinedPage: number;
   setCombinedPage: Dispatch<SetStateAction<number>>;
   nodeLoading: Record<string, boolean>;
@@ -164,6 +166,7 @@ export function ConcordanceResultsPanel({
   defaultPalette,
   nodePagination,
   globalPageSize,
+  onPageSizeChange,
   combinedPage,
   setCombinedPage,
   nodeLoading,
@@ -381,6 +384,7 @@ export function ConcordanceResultsPanel({
                     defaultPalette,
                     nodePagination,
                     globalPageSize,
+                    onPageSizeChange,
                     combinedPage,
                     combinedLoading,
                     nodeLoading,

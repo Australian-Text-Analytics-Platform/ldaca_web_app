@@ -56,7 +56,14 @@ vi.mock('@/features/views/common/components/AnalysisTaskBanner', () => ({
 }));
 
 vi.mock('@/components/ui/tabs', () => {
-  let currentOnValueChange: ((value: string) => void) | undefined;
+  // Each Tabs root publishes its own onValueChange through context so that
+  // multiple independent Tabs in the same tree (e.g. the search-mode picker and
+  // the Table/Dispersion view switcher) each fire the correct handler. A shared
+  // module-level handler would let whichever Tabs renders last hijack every
+  // trigger click.
+  const TabsValueChangeContext = React.createContext<((value: string) => void) | undefined>(
+    undefined,
+  );
   return {
     /** Captures tab value changes while keeping Radix markup out of this unit test. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
@@ -67,20 +74,24 @@ vi.mock('@/components/ui/tabs', () => {
       children: React.ReactNode;
       onValueChange?: (value: string) => void;
       value?: string;
-    }) => {
-      currentOnValueChange = onValueChange;
-      return <div>{children}</div>;
-    },
+    }) => (
+      <TabsValueChangeContext.Provider value={onValueChange}>
+        <div>{children}</div>
+      </TabsValueChangeContext.Provider>
+    ),
     /** Simplifies tab-list structure without changing child rendering. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    /** Converts tab triggers into plain buttons that still fire value changes. */
+    /** Converts tab triggers into plain buttons that still fire their own Tabs' value change. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-    TabsTrigger: ({ children, value }: { children: React.ReactNode; value: string }) => (
-      <button type="button" role="tab" onClick={() => currentOnValueChange?.(value)}>
-        {children}
-      </button>
-    ),
+    TabsTrigger: ({ children, value }: { children: React.ReactNode; value: string }) => {
+      const onValueChange = React.useContext(TabsValueChangeContext);
+      return (
+        <button type="button" role="tab" onClick={() => onValueChange?.(value)}>
+          {children}
+        </button>
+      );
+    },
   };
 });
 

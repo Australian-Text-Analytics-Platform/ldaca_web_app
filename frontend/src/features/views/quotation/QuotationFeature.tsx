@@ -97,7 +97,7 @@ import type { DetachDialogNodeOption } from '../common/components/DetachColumnsD
 import { MetadataColumnSelector } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
-import { PageSizeSelect } from '../common/components/PageSizeSelect';
+import { PAGE_SIZE_OPTIONS_DEFAULT } from '../common/constants';
 import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
@@ -1125,15 +1125,6 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
               targetKey: 'analysis.quotation.clear-results',
               label: 'Clear results',
             },
-            extraContent: (
-              <PageSizeSelect
-                value={
-                  nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']
-                    ?.pageSize ?? DEFAULT_PAGE_SIZE
-                }
-                onChange={effHandlePageSizeChange}
-              />
-            ),
           }}
         >
           <NodeSelectionPanel
@@ -1373,6 +1364,9 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
                       }
                       totalPages={resultState?.pagination?.total_source_pages}
                       onPageChange={(newPage) => effHandlePageChange(newPage)}
+                      onPageSizeChange={effHandlePageSizeChange}
+                      pageSizeLabel="Documents per batch"
+                      pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
                       pageSizeSummary={
                         materializedPaths[nodeId] ? (
                           materializeSummary ? (

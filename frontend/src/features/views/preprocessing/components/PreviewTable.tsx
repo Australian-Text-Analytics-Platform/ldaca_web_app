@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/card';
 import { RowDetailPanel } from '../../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../../common/components/useRowDetailDialog';
-import { useServerTable } from '@/features/workspace/data-view/hooks/useServerTable';
+import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { formatPreviewValue } from '../utils/typeUtils';
 import { type PreviewRow, type PreviewPagination, PREVIEW_PAGE_SIZE_OPTIONS } from '../types';
 

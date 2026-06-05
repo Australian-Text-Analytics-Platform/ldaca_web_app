@@ -13,6 +13,7 @@ import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/gene
 import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { AnalysisPagination } from '@/features/views/common/components/AnalysisPagination';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
+import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { getNodeIdentifier } from '../../common';
 import type { NodeColumnSelection } from '../../common';
@@ -92,6 +93,8 @@ export type ConcordanceTableNodeBlockProps = {
   // Pagination + per-node state
   nodePagination: PaginationState;
   globalPageSize: number;
+  /** Changes the single shared page size for all result tables (footer selector). */
+  onPageSizeChange: (pageSize: number) => void;
   combinedPage: number;
   combinedLoading: boolean;
   nodeLoading: Record<string, boolean>;
@@ -138,6 +141,7 @@ export function ConcordanceTableNodeBlock({
   defaultPalette,
   nodePagination,
   globalPageSize,
+  onPageSizeChange,
   combinedPage,
   combinedLoading,
   nodeLoading,
@@ -400,6 +404,9 @@ export function ConcordanceTableNodeBlock({
             hasPrev={combinedHasPrev}
             totalPages={nodeData.pagination?.total_source_pages}
             onPageChange={(newPage) => setCombinedPage(newPage)}
+            onPageSizeChange={readOnly ? undefined : onPageSizeChange}
+            pageSizeLabel="Documents per batch"
+            pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
             loading={combinedLoading}
           />
         </div>
@@ -437,8 +444,26 @@ export function ConcordanceTableNodeBlock({
 
   const detachingKey = detachNodeId ?? '';
   const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
-  const isMaterializing = detachingKey ? Boolean(nodeMaterializing[detachingKey]) : false;
-  const hasMaterializedPath = detachingKey ? Boolean(materializedPaths[detachingKey]) : false;
+
+  // Two side-by-side data blocks share one synced page size, so processing only
+  // one would leave the tables on mismatched units (instances/page vs
+  // documents/page). The Process button therefore materialises every selected
+  // block together; with a single block it processes just that node.
+  // Used by: the per-node AnalysisPagination footer below.
+  const processTogetherNodeIds = takeMostRecent(selectedNodes, 2)
+    .map((n) => n.id)
+    .filter((id): id is string => Boolean(id));
+  const isMultiBlock = processTogetherNodeIds.length > 1;
+  const processTargetIds = isMultiBlock
+    ? processTogetherNodeIds
+    : detachNodeId
+      ? [detachNodeId]
+      : [];
+  const isAnyProcessTargetMaterializing = processTargetIds.some((id) =>
+    Boolean(nodeMaterializing[id]),
+  );
+  const allProcessTargetsMaterialized =
+    processTargetIds.length > 0 && processTargetIds.every((id) => Boolean(materializedPaths[id]));
 
   const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
 
@@ -549,28 +574,37 @@ export function ConcordanceTableNodeBlock({
       })()}
       <AnalysisPagination
         page={currentPage}
-        pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
+        pageSize={globalPageSize}
         hasNext={hasNext}
         hasPrev={hasPrev}
         totalPages={nodeData.pagination?.total_source_pages}
         onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
+        onPageSizeChange={readOnly ? undefined : onPageSizeChange}
+        pageSizeLabel="Documents per batch"
+        pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
       >
         <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
           <Button
             onClick={() => {
-              if (detachNodeId) {
-                void handleMaterialize(detachNodeId, column);
+              if (!searchWord.trim()) return;
+              for (const nid of processTargetIds) {
+                if (materializedPaths[nid]) continue;
+                const col = isMultiBlock
+                  ? effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || ''
+                  : column;
+                if (!col) continue;
+                void handleMaterialize(nid, col);
               }
             }}
             disabled={
               readOnly ||
               nodeIsLoading ||
-              isMaterializing ||
-              hasMaterializedPath ||
+              isAnyProcessTargetMaterializing ||
+              allProcessTargetsMaterialized ||
               !searchWord.trim() ||
               !canDetach ||
-              !detachNodeId
+              processTargetIds.length === 0
             }
             size="sm"
             variant="outline"
@@ -578,16 +612,20 @@ export function ConcordanceTableNodeBlock({
             title={
               readOnly
                 ? undefined
-                : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
+                : isMultiBlock
+                  ? 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
+                  : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
             }
           >
-            {isMaterializing ? (
+            {isAnyProcessTargetMaterializing ? (
               <>
                 <Loader2 className="mr-2 h-3 w-3 animate-spin" />
                 Processing...
               </>
-            ) : hasMaterializedPath ? (
+            ) : allProcessTargetsMaterialized ? (
               <>Processed</>
+            ) : isMultiBlock ? (
+              <>Process Both Blocks</>
             ) : (
               <>Process All</>
             )}

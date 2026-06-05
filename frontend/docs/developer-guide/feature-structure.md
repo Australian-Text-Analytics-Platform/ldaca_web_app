@@ -103,7 +103,7 @@ preview/apply hooks, then delegate actual workspace mutations to
 - `common/utils/` holds workspace-wide utilities (`selectionUtils`).
 - `graph-view/` maps backend graph data into React Flow nodes and edges.
 - `data-view/` renders the selected node's paginated table and column actions.
-- `data-view/hooks/` holds data-table hooks (`useServerTable`).
+- `data-view/hooks/` holds workspace data-table hooks (`useColumnMutations`, `useWorkspaceDataTable`). The shared server-pagination hook (`useServerTable`) and footer (`ServerPaginationFooter`) live in `features/views/common/`.
 - `data-view/utils/` holds column-type and persistence utilities (`columnTypes`,
   `columnPersistence`).
 - `task-stream/` owns the SSE client and task event integration.

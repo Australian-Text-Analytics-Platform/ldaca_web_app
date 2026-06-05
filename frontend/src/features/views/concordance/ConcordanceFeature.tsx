@@ -842,6 +842,25 @@ function ConcordanceFeature({
     },
   });
 
+  // Single source of truth for page size across every concordance result table.
+  // Used by: each per-node / combined AnalysisPagination footer because changing
+  // the size on any table must keep all tables in sync and persist once.
+  // Flow: update globalPageSize, mirror it onto every node's internal pagination
+  // (resetting to page 1), then persist unless the panel is read-only.
+  const handleGlobalPageSizeChange = (newSize: number) => {
+    setGlobalPageSize(newSize);
+    setNodePagination((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((nid) => {
+        updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
+      });
+      return updated;
+    });
+    if (!isLocked) {
+      void persistResultPreferences({ pageSize: newSize });
+    }
+  };
+
   const hasLockedParameterChanges = hasLockedParameterDiff({
     isLocked,
     serverRequest: (serverRequest as Record<string, unknown> | null) ?? null,
@@ -1422,10 +1441,6 @@ function ConcordanceFeature({
         handleStopTask={stopTask}
         isStopping={isStopping}
         handleClearResults={handleClearResults}
-        globalPageSize={globalPageSize}
-        setGlobalPageSize={setGlobalPageSize}
-        setNodePagination={setNodePagination}
-        persistResultPreferences={persistResultPreferences}
       />
 
       {concordanceWaitingBanner && (
@@ -1486,6 +1501,7 @@ function ConcordanceFeature({
           defaultPalette={defaultPalette}
           nodePagination={nodePagination}
           globalPageSize={globalPageSize}
+          onPageSizeChange={handleGlobalPageSizeChange}
           combinedPage={combinedPage}
           setCombinedPage={setCombinedPage}
           nodeLoading={nodeLoading}

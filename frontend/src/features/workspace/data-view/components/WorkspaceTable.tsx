@@ -27,7 +27,7 @@ import { DatetimeFormatPanel } from '@/features/views/common/components/Datetime
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RowDetailPanel } from '@/features/views/common/components/RowDetailPanel';
 import { useRowDetailDialog } from '@/features/views/common/components/useRowDetailDialog';
-import { ServerTablePagination } from './ServerTablePagination';
+import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { WorkspaceColumnHeader } from './WorkspaceColumnHeader';
 import type { DataRow, FilterOperator, PaginationInfo } from '../types';
 import { DATA_TYPES, getTypeDisplayName, normalizeTypeName } from '../services/schemaMutations';
@@ -532,7 +532,7 @@ export function WorkspaceTable({
             </TableBody>
           </Table>
         </ScrollArea>
-        <ServerTablePagination table={tableInstance} />
+        <ServerPaginationFooter table={tableInstance} compact />
       </div>
 
       <DatetimeFormatPanel

@@ -8,13 +8,12 @@ import NodeSelectionPanel, {
   type NodeSelectionColumnAddonArgs,
 } from '@/features/views/common/components/NodeSelectionPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
 import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
 import type { AnalysisActionState, NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
-import { PageSizeSelect } from '../../common/components/PageSizeSelect';
-import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 
 type GetColumnInfo = (node: WorkspaceNodeLike | null | undefined, idx?: number) => ColumnInfo[];
 
@@ -59,12 +58,6 @@ export type ConcordanceParameterPanelProps = {
   handleStopTask?: () => Promise<void>;
   isStopping?: boolean;
   handleClearResults: () => Promise<void>;
-
-  // Page size
-  globalPageSize: number;
-  setGlobalPageSize: Dispatch<SetStateAction<number>>;
-  setNodePagination: Dispatch<SetStateAction<PaginationState>>;
-  persistResultPreferences: (partial: { pageSize?: number }) => Promise<unknown>;
   /** When true, the panel renders its controls for display only. */
   readOnly?: boolean;
   renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
@@ -105,10 +98,6 @@ export function ConcordanceParameterPanel({
   handleStopTask,
   isStopping,
   handleClearResults,
-  globalPageSize,
-  setGlobalPageSize,
-  setNodePagination,
-  persistResultPreferences,
   readOnly = false,
   renderTokenizerModelSelector,
 }: ConcordanceParameterPanelProps) {
@@ -234,120 +223,101 @@ export function ConcordanceParameterPanel({
 
           <div className="flex flex-wrap items-center gap-4 text-sm">
             {/* Search mode picker. ``tokens`` is auto-selected when every selected
-              source column has a tokenizer model; the regex / whole-word / case
-              checkboxes don't apply in tokens mode so they're disabled with a
-              tooltip explaining why. */}
+              source column has a tokenizer model. The regex / whole-word / case
+              checkboxes only apply to text mode, so they're hidden entirely when
+              tokens mode is active. */}
             <div className="flex items-center gap-1">
               <span className="text-sm font-medium text-foreground">Search mode:</span>
-              <div
-                role="radiogroup"
-                aria-label="Concordance search mode"
-                className="inline-flex overflow-hidden rounded-md border border-input"
+              <Tabs
+                value={searchMode}
+                onValueChange={(next) => {
+                  if (next === 'tokens' && !tokensModeAvailable) return;
+                  setSearchMode(next as 'regex' | 'tokens');
+                }}
               >
-                <DisabledReasonTooltip reason={readOnlyReason}>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={searchMode === 'regex'}
-                    onClick={() => setSearchMode('regex')}
-                    disabled={readOnly}
-                    className={`px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                      searchMode === 'regex'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-background text-foreground hover:bg-muted'
-                    }`}
+                <TabsList className="h-8">
+                  <DisabledReasonTooltip reason={readOnlyReason}>
+                    <TabsTrigger value="regex" disabled={readOnly} className="text-xs">
+                      Text
+                    </TabsTrigger>
+                  </DisabledReasonTooltip>
+                  <DisabledReasonTooltip
+                    reason={readOnlyOrReason(
+                      tokensModeAvailable
+                        ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
+                        : 'Tokens mode needs a tokenizer model for each selected column.',
+                    )}
                   >
-                    Text
-                  </button>
-                </DisabledReasonTooltip>
-                <DisabledReasonTooltip
-                  reason={readOnlyOrReason(
-                    tokensModeAvailable
-                      ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                      : 'Tokens mode needs a tokenizer model for each selected column.',
-                  )}
-                >
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={searchMode === 'tokens'}
-                    onClick={() => {
-                      if (tokensModeAvailable) setSearchMode('tokens');
-                    }}
-                    disabled={!tokensModeAvailable || readOnly}
-                    className={`border-l border-input px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                      searchMode === 'tokens'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-background text-foreground hover:bg-muted'
-                    }`}
-                  >
-                    Tokens
-                  </button>
-                </DisabledReasonTooltip>
-              </div>
+                    <TabsTrigger
+                      value="tokens"
+                      disabled={!tokensModeAvailable || readOnly}
+                      className="text-xs"
+                    >
+                      Tokens
+                    </TabsTrigger>
+                  </DisabledReasonTooltip>
+                </TabsList>
+              </Tabs>
               <HelpIcon
                 targetKey="analysis.concordance.search-mode"
                 label="Search mode (text vs tokens)"
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <DisabledReasonTooltip
-                reason={readOnlyOrReason(
-                  searchMode === 'tokens' &&
-                    'Whole-word applies to text-mode searches only — tokens-mode matches exact tokens by design.',
-                )}
-              >
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={wholeWord}
-                    onChange={(e) => setWholeWord(e.target.checked)}
-                    disabled={regex || searchMode === 'tokens' || readOnly}
-                    className="h-4 w-4"
+            {searchMode === 'regex' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <DisabledReasonTooltip reason={readOnlyReason}>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={wholeWord}
+                        onChange={(e) => setWholeWord(e.target.checked)}
+                        disabled={regex || readOnly}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-foreground">Whole word</span>
+                    </label>
+                  </DisabledReasonTooltip>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DisabledReasonTooltip reason={readOnlyReason}>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={regex}
+                        disabled={readOnly}
+                        onChange={(e) => {
+                          const nextRegex = e.target.checked;
+                          setRegex(nextRegex);
+                          if (nextRegex) {
+                            setWholeWord(false);
+                          }
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-foreground">Use regular expression</span>
+                    </label>
+                  </DisabledReasonTooltip>
+                  <HelpIcon
+                    targetKey="analysis.concordance.regex-toggle"
+                    label="Regex mode toggle"
                   />
-                  <span className="text-sm text-foreground">Whole word</span>
-                </label>
-              </DisabledReasonTooltip>
-            </div>
-            <div className="flex items-center gap-2">
-              <DisabledReasonTooltip
-                reason={readOnlyOrReason(
-                  searchMode === 'tokens' &&
-                    'Regex applies to text-mode only — switch to text-mode to use it.',
-                )}
-              >
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={regex}
-                    disabled={searchMode === 'tokens' || readOnly}
-                    onChange={(e) => {
-                      const nextRegex = e.target.checked;
-                      setRegex(nextRegex);
-                      if (nextRegex) {
-                        setWholeWord(false);
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-foreground">Use regular expression</span>
-                </label>
-              </DisabledReasonTooltip>
-              <HelpIcon targetKey="analysis.concordance.regex-toggle" label="Regex mode toggle" />
-            </div>
-            <DisabledReasonTooltip reason={readOnlyReason}>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={caseSensitive}
-                  onChange={(e) => setCaseSensitive(e.target.checked)}
-                  disabled={readOnly}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm text-foreground">Case sensitive</span>
-              </label>
-            </DisabledReasonTooltip>
+                </div>
+                <DisabledReasonTooltip reason={readOnlyReason}>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={caseSensitive}
+                      onChange={(e) => setCaseSensitive(e.target.checked)}
+                      disabled={readOnly}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm text-foreground">Case sensitive</span>
+                  </label>
+                </DisabledReasonTooltip>
+              </>
+            )}
           </div>
         </div>
       </CardContent>
@@ -412,24 +382,6 @@ export function ConcordanceParameterPanel({
             </div>
           </>
         )}
-        <PageSizeSelect
-          value={globalPageSize}
-          onChange={(newSize) => {
-            setGlobalPageSize(newSize);
-            setNodePagination((prev) => {
-              const updated = { ...prev };
-              Object.keys(updated).forEach((nid) => {
-                updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
-              });
-              return updated;
-            });
-            // Read-only results should not persist page-size changes back to
-            // the stored task preferences.
-            if (!readOnly) {
-              void persistResultPreferences({ pageSize: newSize });
-            }
-          }}
-        />
       </CardFooter>
     </Card>
   );
