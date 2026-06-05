@@ -4,7 +4,6 @@ import { Download, Info } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -38,8 +37,6 @@ export interface SequentialAnalysisResultsPanelProps {
   resultsSummary: string;
   summary: ResultsSummary;
   counts: PointCounts;
-  minGroupSizeInput: string;
-  onMinGroupSizeChange: (value: string) => void;
   chartType: ChartTypeOption;
   onChartTypeChange: (value: ChartTypeOption) => void;
   xAxisType: SequentialXAxisType;
@@ -77,8 +74,6 @@ export function SequentialAnalysisResultsPanel({
   resultsSummary,
   summary,
   counts,
-  minGroupSizeInput,
-  onMinGroupSizeChange,
   chartType,
   onChartTypeChange,
   xAxisType,
@@ -116,16 +111,6 @@ export function SequentialAnalysisResultsPanel({
           </CardTitle>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Min Group Size</span>
-          <Input
-            type="number"
-            min="0"
-            step="1"
-            value={minGroupSizeInput}
-            onChange={(event) => onMinGroupSizeChange(event.target.value)}
-            className="w-24 text-sm"
-            aria-label="Min Group Size"
-          />
           <span className="text-sm text-muted-foreground">Chart Type</span>
           <Select
             value={chartType}

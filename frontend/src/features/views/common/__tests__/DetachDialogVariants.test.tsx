@@ -104,17 +104,19 @@ function renderDialog(testCase: DetachDialogCase, overrides: Partial<DetachDialo
 }
 
 describe.each(dialogCases)('$name', (testCase) => {
-  it('hides mandatory columns and leaves optional metadata unchecked', () => {
+  it('shows mandatory columns as checked and disabled, optional metadata unchecked', () => {
     renderDialog(testCase);
 
     for (const column of testCase.disabledColumns) {
-      expect(
-        screen.queryByRole('checkbox', { name: new RegExp(escapeRegExp(column), 'i') }),
-      ).toBeNull();
+      const checkbox = screen.getByRole('checkbox', {
+        name: new RegExp(`^${escapeRegExp(column)}$`, 'i'),
+      });
+      expect(checkbox).toBeChecked();
+      expect(checkbox).toBeDisabled();
     }
     for (const column of testCase.optionalColumns) {
       expect(
-        screen.getByRole('checkbox', { name: new RegExp(escapeRegExp(column), 'i') }),
+        screen.getByRole('checkbox', { name: new RegExp(`^${escapeRegExp(column)}$`, 'i') }),
       ).not.toBeChecked();
     }
     expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeInTheDocument();

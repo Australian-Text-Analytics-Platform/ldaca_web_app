@@ -99,17 +99,6 @@ const parsePositiveIntegerInput = (value: string): number | null => {
   return parsed;
 };
 
-// Parses context/minimum-size inputs that may legitimately be zero.
-/**
- * Called by: SequentialAnalysisFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
- */
-const parseNonNegativeIntegerInput = (value: string): number | null => {
-  const parsed = parseNumericInput(value);
-  if (parsed === null) return null;
-  if (!Number.isInteger(parsed) || parsed < 0) return null;
-  return parsed;
-};
-
 /** Renders the sequential-analysis workflow for live trends and result exploration. */
 /**
  * Rendered by: SequentialAnalysisTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
@@ -192,7 +181,6 @@ const SequentialAnalysisFeature = ({
   const [customIntervalValueInput, setCustomIntervalValueInput] = useState<string>('1');
   const [customIntervalUnit, setCustomIntervalUnit] =
     useState<SequentialCustomIntervalUnit>('minutes');
-  const [minGroupSizeInput, setMinGroupSizeInput] = useState('10');
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [selectedPeriodIndices, setSelectedPeriodIndices] = useState<Set<number>>(new Set());
@@ -824,7 +812,6 @@ const SequentialAnalysisFeature = ({
     customIntervalValue,
     customIntervalUnit: customIntervalUnitValue,
   });
-  const minGroupSize = parseNonNegativeIntegerInput(minGroupSizeInput) ?? 0;
 
   const rawResultRows = Array.isArray(results?.data)
     ? (results.data as Array<Record<string, unknown>>)
@@ -847,33 +834,15 @@ const SequentialAnalysisFeature = ({
   const getGroupKey = (row: Record<string, unknown>) =>
     effectiveGroupBy.map((column) => foldGroupValue(row[column])).join(' - ');
 
-  const groupSizeByKey = (() => {
-    if (!effectiveGroupBy.length) return {} as Record<string, number>;
-
-    const sizes: Record<string, number> = {};
-    rawResultRows.forEach((row) => {
-      const groupKey = getGroupKey(row);
-      const count = row.sequential_count;
-      const numericCount = typeof count === 'number' ? count : Number(count ?? 0);
-      sizes[groupKey] = (sizes[groupKey] ?? 0) + numericCount;
-    });
-    return sizes;
-  })();
-
-  // Applies the minimum group-size threshold to chart series keys.
-  /**
-   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   */
-  const passesMinGroupSize = (key: string) =>
-    !effectiveGroupBy.length || (groupSizeByKey[key] ?? 0) >= minGroupSize;
-  const filteredGroupKeys = groupKeys.filter((key) => passesMinGroupSize(key));
-  const filteredOutGroupKeys = new Set(groupKeys.filter((key) => !passesMinGroupSize(key)));
-  const invisibleGroupKeys = new Set([...hiddenKeys, ...filteredOutGroupKeys]);
+  // Only the user-toggled legend entries hide a series. There is no
+  // automatic minimum-size filtering: the user sees every group their
+  // analysis produced.
+  const invisibleGroupKeys = hiddenKeys;
 
   const canDetach =
     selectedPeriodIndices.size > 0 &&
     selectedPeriodIndices.size < chartData.length &&
-    filteredGroupKeys.length > 0;
+    groupKeys.length > 0;
 
   const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
     currentWorkspaceId,
@@ -969,7 +938,7 @@ const SequentialAnalysisFeature = ({
       { label: 'Chosen', value: `${chosenPointCount}/${chosenDocumentCount}` },
       { label: 'Groups', value: summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None' },
     ];
-    const legend: ChartExportLegendItem[] = filteredGroupKeys.map((key, idx) => ({
+    const legend: ChartExportLegendItem[] = groupKeys.map((key, idx) => ({
       label: (chartConfig[key]?.label as string | undefined) ?? key,
       color: chartConfig[key]?.color ?? getPaletteColor(idx) ?? '#888888',
       type: chartType === 'line' ? 'line' : chartType === 'bar' ? 'bar' : 'area',
@@ -1106,8 +1075,6 @@ const SequentialAnalysisFeature = ({
             chosen: chosenPointCount,
             chosenDocuments: chosenDocumentCount,
           }}
-          minGroupSizeInput={minGroupSizeInput}
-          onMinGroupSizeChange={setMinGroupSizeInput}
           chartType={chartType}
           onChartTypeChange={(value) => {
             void effHandleChartTypeChange(value);
@@ -1117,7 +1084,7 @@ const SequentialAnalysisFeature = ({
           onDownloadClick={() => setDownloadDialogOpen(true)}
           chartData={chartData}
           chartConfig={chartConfig}
-          groupKeys={filteredGroupKeys}
+          groupKeys={groupKeys}
           groupPointCounts={groupPointCounts}
           hiddenKeys={hiddenKeys}
           selectedPeriodIndices={selectedPeriodIndices}

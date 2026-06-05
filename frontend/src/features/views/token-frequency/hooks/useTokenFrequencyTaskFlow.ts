@@ -297,7 +297,10 @@ export const useTokenFrequencyTaskFlow = ({
         nodeColumnSelections: effectiveSelections.map((selection) => ({ ...selection })),
         selectedNodes: nodeDetails,
         nodeColors: pendingNodeColors,
-        autoRun: false,
+        // Auto-run the concordance search on arrival: clicking a token is an
+        // explicit "search for this word" intent, so the fresh tab dispatches
+        // the request itself instead of leaving the user to press Run.
+        autoRun: true,
         timestamp: Date.now(),
       });
 

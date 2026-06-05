@@ -48,7 +48,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
 }));
 
 describe('WorkspaceControls', () => {
-  it('replaces Save with a Delete (n) batch button and disables it below the threshold', () => {
+  it('replaces Save with a Delete (n) batch button that is always enabled', () => {
     selectionState.selectedNodeIds = ['a', 'b'];
     render(
       <TooltipProvider>
@@ -59,11 +59,11 @@ describe('WorkspaceControls', () => {
     // Save is gone — the batch slot is repurposed for delete.
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
     const deleteButton = screen.getByRole('button', { name: /delete \(2\)/i });
-    // Below the 3-node minimum: disabled to keep batch deletion deliberate.
-    expect(deleteButton).toBeDisabled();
+    // Always clickable: the confirmation dialog is the real gate, no hidden threshold.
+    expect(deleteButton).toBeEnabled();
   });
 
-  it('enables the Delete button once 3+ nodes are selected', () => {
+  it('keeps the Delete button enabled with 3+ nodes selected', () => {
     selectionState.selectedNodeIds = ['a', 'b', 'c'];
     render(
       <TooltipProvider>

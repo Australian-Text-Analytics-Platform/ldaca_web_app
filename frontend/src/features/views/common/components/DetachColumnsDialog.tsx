@@ -110,23 +110,19 @@ export function DetachColumnsDialog({
 
         <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
           {detachNodeOptions.map((node) => {
-            // Mandatory columns are hidden from the dialog across every tool:
-            // the backend always includes them in the detach output, so
-            // surfacing them as greyed-out "(required)" checkboxes is just
-            // visual noise. The dispersion-detach dialog already drops them
-            // upstream; this branch handles the per-hit detach dialog the
-            // same way.
+            // Mandatory columns are shown as checked, disabled checkboxes: the
+            // backend always includes them in the detach output, so surfacing
+            // them (rather than hiding them) makes it clear to the user which
+            // columns are guaranteed to appear alongside the optional ones.
             const disabledSet = new Set(node.disabled_columns || []);
-            const optionalColumns = node.available_columns.filter(
-              (column) => !disabledSet.has(column),
-            );
-            if (optionalColumns.length === 0) return null;
             return (
               <div key={node.node_id} className="rounded-md border p-3">
                 <div className="mb-2 text-sm font-semibold text-foreground">{node.node_name}</div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {optionalColumns.map((column) => {
-                    const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
+                  {node.available_columns.map((column) => {
+                    const isDisabled = disabledSet.has(column);
+                    const checked =
+                      isDisabled || (selectedDetachColumns[node.node_id] || []).includes(column);
                     const isAnalysisColumn = column === node.text_column;
                     return (
                       <label
@@ -138,7 +134,7 @@ export function DetachColumnsDialog({
                           onCheckedChange={(value: boolean | 'indeterminate') =>
                             toggleDetachColumn(node.node_id, column, value === true)
                           }
-                          disabled={isDetaching}
+                          disabled={isDetaching || isDisabled}
                         />
                         <span className={isAnalysisColumn ? 'font-semibold' : undefined}>
                           {column}

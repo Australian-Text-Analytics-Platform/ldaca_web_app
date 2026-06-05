@@ -16,8 +16,8 @@ import { Button } from '@/components/ui/button';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import HelpIcon from '@/components/help/HelpIcon';
 
-/** Minimum selection size that makes the graph batch-delete affordance intentional. */
-const MIN_BATCH_DELETE_COUNT = 3;
+/** Minimum selection size for the graph delete affordance to be actionable. */
+const MIN_BATCH_DELETE_COUNT = 1;
 
 /**
  * Workspace graph toolbar used above the graph pane. It centralizes workspace
@@ -42,22 +42,17 @@ export function WorkspaceControls() {
   const selectedCount = selectedNodeIds?.length ?? 0;
   const canBatchDelete = selectedCount >= MIN_BATCH_DELETE_COUNT;
 
-  /** Builds the confirmation list for selected graph nodes, placing cascade roots last. */
+  /** Builds the confirmation list for the selected graph nodes, sorted by name. */
   const selectedForDelete = (() => {
     if (!workspaceGraph || !selectedNodeIds || selectedNodeIds.length === 0) return [];
     const idSet = new Set(selectedNodeIds);
-    const incomingTargets = new Set(workspaceGraph.edges.map((edge) => edge.target));
-    const items = workspaceGraph.nodes
+    return workspaceGraph.nodes
       .filter((node) => idSet.has(node.id))
       .map((node) => ({
         id: node.id,
         name: typeof node.name === 'string' && node.name.trim() ? node.name : node.id,
-        isRoot: !incomingTargets.has(node.id),
-      }));
-    return items.sort((a, b) => {
-      if (a.isRoot !== b.isRoot) return a.isRoot ? 1 : -1;
-      return a.name.localeCompare(b.name);
-    });
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   })();
 
   /** Called by: the WorkspaceControls batch-delete confirmation action because the caller needs one documented boundary for the lookup, event, or state handoff step. */
@@ -65,9 +60,9 @@ export function WorkspaceControls() {
     if (!canBatchDelete || isDeleting) return;
     setIsDeleting(true);
     try {
-      // Settled, not all: if the backend cascades on parent removal, a
-      // later child deletion may 404 — that's still the outcome the
-      // user asked for, so don't abort the rest of the batch.
+      // Each node carries its own independent lazy plan, so deletions
+      // don't cascade. Settle rather than all-or-nothing so one failure
+      // doesn't abort the rest of the batch.
       await Promise.allSettled(selectedForDelete.map((item) => deleteNode(item.id)));
       clearSelection?.();
       setDeleteConfirmOpen(false);
@@ -161,12 +156,13 @@ export function WorkspaceControls() {
             Rename
           </button>
 
-          {/* Batch delete — only enabled with 3+ selected so this stays
-              a deliberate, batch-only action. Per-node delete is still
-              available from each node's context menu in the graph.
-              Same size + shape in both states so the layout stays
-              stable; only colours swap — destructive (red) when
-              actionable, the existing muted/bordered look when not. */}
+          {/* Delete — always enabled so there are no surprises about why
+              it's greyed out. The confirmation dialog gates the actual
+              removal, and the disabled state only kicks in mid-delete.
+              Per-node delete is still available from each node's context
+              menu in the graph. Same size + shape in both states so the
+              layout stays stable; only colours swap — destructive (red)
+              when actionable, the existing muted/bordered look when not. */}
           <button
             className={`text-xs px-2 py-1 border rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               canBatchDelete && !isDeleting
@@ -174,12 +170,8 @@ export function WorkspaceControls() {
                 : 'text-gray-600 hover:text-gray-800'
             }`}
             onClick={() => setDeleteConfirmOpen(true)}
-            disabled={!canBatchDelete || isDeleting}
-            title={
-              canBatchDelete
-                ? 'Delete the selected data blocks'
-                : `Select ${MIN_BATCH_DELETE_COUNT} or more data blocks to batch-delete`
-            }
+            disabled={isDeleting}
+            title="Delete the selected data blocks"
           >
             Delete ({selectedCount})
           </button>
@@ -194,26 +186,23 @@ export function WorkspaceControls() {
               {selectedForDelete.length === 1 ? '' : 's'}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. The following data blocks will be removed (root blocks — those
-              with no parent — are bolded; deleting a root cascades to any downstream blocks too):
+              This cannot be undone. The following data blocks will be removed:
             </AlertDialogDescription>
           </AlertDialogHeader>
           <ul className="max-h-60 overflow-y-auto rounded border bg-muted/40 p-2 text-sm">
             {selectedForDelete.map((item) => (
-              <li key={item.id} className={item.isRoot ? 'font-semibold' : undefined}>
-                {item.name}
-              </li>
+              <li key={item.id}>{item.name}</li>
             ))}
           </ul>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <Button asChild variant="destructive" disabled={isDeleting}>
+            <Button asChild variant="destructive" disabled={isDeleting || !canBatchDelete}>
               <AlertDialogAction
                 onClick={(event) => {
                   event.preventDefault();
                   void handleBatchDelete();
                 }}
-                disabled={isDeleting}
+                disabled={isDeleting || !canBatchDelete}
               >
                 {isDeleting ? 'Deleting…' : `Delete ${selectedForDelete.length}`}
               </AlertDialogAction>
