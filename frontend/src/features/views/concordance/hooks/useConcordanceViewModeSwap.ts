@@ -11,14 +11,19 @@ import type {
   ConcordanceAnalysisResponse,
   ConcordanceResultQuery,
 } from '@/api/generated/types.gen';
+import { buildCombinedSlice } from '../concordanceViewModels';
 
 type Params = {
   viewMode: 'separated' | 'combined';
   setViewMode: Dispatch<SetStateAction<'separated' | 'combined'>>;
   results: ConcordanceAnalysisResponse | null;
+  setResults: Dispatch<SetStateAction<ConcordanceAnalysisResponse | null>>;
   combinedPage: number;
   globalPageSize: number;
-  updateStoredResult: (query: Partial<ConcordanceResultQuery>) => Promise<unknown>;
+  updateStoredResult: (
+    query: Partial<ConcordanceResultQuery>,
+    options?: { mergeNodeData?: boolean },
+  ) => Promise<ConcordanceAnalysisResponse | null>;
   resultsRef: RefObject<HTMLDivElement | null>;
 };
 
@@ -41,7 +46,13 @@ export type UseConcordanceViewModeSwapResult = {
  *      is in Combined view (e.g. after a re-run that produced a single
  *      block), drop back to Separated.
  *   2. Refetch on combined-page change: when the page changes while in
- *      Combined view, re-issue the result query.
+ *      Combined view, re-fetch both nodes and rebuild the combined block.
+ *
+ * The Combined view is synthesized entirely on the client: there is no backend
+ * "combined" mode anymore. Entering Combined (or paging within it) fetches
+ * BOTH nodes at the same page via scoped per-node result queries, then folds
+ * them into a single `__COMBINED__` block via `buildCombinedSlice`. Next/prev
+ * in Combined view is therefore equivalent to next/prev on both nodes at once.
  *
  * The scroll-preservation logic anchors to `resultsRef` (the results card),
  * grabs `getBoundingClientRect().top` before the swap, and restores it after
@@ -55,6 +66,7 @@ export function useConcordanceViewModeSwap({
   viewMode,
   setViewMode,
   results,
+  setResults,
   combinedPage,
   globalPageSize,
   updateStoredResult,
@@ -62,6 +74,61 @@ export function useConcordanceViewModeSwap({
 }: Params): UseConcordanceViewModeSwapResult {
   const [combinedLoading, setCombinedLoading] = useState(false);
   const lastCombinedQueryRef = useRef<string | null>(null);
+
+  /**
+   * Fetches both source nodes at `page` and rebuilds the `__COMBINED__` block.
+   *
+   * Called by: the combined-page effect and `handleViewModeChange` because
+   * entering Combined view or paging within it must re-page both nodes and
+   * re-synthesize the interleaved view client-side.
+   *
+   * Flow: derive the two node ids from the current result data (insertion order
+   * = backend node order = left/right), issue two scoped per-node queries with
+   * `mergeNodeData` so each node slice refreshes independently (preserving Bug
+   * #2's per-table isolation), then interleave the returned slices into a fresh
+   * `__COMBINED__` entry.
+   */
+  const refetchCombined = useCallback(
+    async (page: number) => {
+      const nodeKeys = results?.data
+        ? Object.keys(results.data).filter((key) => key !== '__COMBINED__')
+        : [];
+      if (nodeKeys.length < 2) {
+        return;
+      }
+      const [leftId, rightId] = nodeKeys;
+
+      setCombinedLoading(true);
+      try {
+        const [leftResp, rightResp] = await Promise.all([
+          updateStoredResult(
+            { node_id: leftId, page, page_size: globalPageSize },
+            { mergeNodeData: true },
+          ),
+          updateStoredResult(
+            { node_id: rightId, page, page_size: globalPageSize },
+            { mergeNodeData: true },
+          ),
+        ]);
+
+        const leftSlice = leftResp?.data?.[leftId!];
+        const rightSlice = rightResp?.data?.[rightId!];
+        if (!leftSlice || !rightSlice) {
+          return;
+        }
+
+        const combined = buildCombinedSlice(leftSlice, rightSlice, page, globalPageSize);
+        setResults((prev) =>
+          prev?.data
+            ? ({ ...prev, data: { ...prev.data, __COMBINED__: combined } } as ConcordanceAnalysisResponse)
+            : prev,
+        );
+      } finally {
+        setCombinedLoading(false);
+      }
+    },
+    [results, globalPageSize, updateStoredResult, setResults],
+  );
 
   useEffect(() => {
     if (viewMode === 'combined' && results && results.combinable === false) {
@@ -84,8 +151,8 @@ export function useConcordanceViewModeSwap({
       return;
     }
     lastCombinedQueryRef.current = key;
-    void updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize });
-  }, [viewMode, results, combinedPage, globalPageSize, updateStoredResult]);
+    void refetchCombined(combinedPage);
+  }, [viewMode, results, combinedPage, globalPageSize, refetchCombined]);
 
   const handleViewModeChange = useCallback(
     (nextMode: 'separated' | 'combined') => {
@@ -96,6 +163,14 @@ export function useConcordanceViewModeSwap({
       setViewMode(nextMode);
 
       if (nextMode === 'combined' && results?.combinable) {
+        // Pre-stamp the dedupe key so the combined-page effect doesn't also
+        // fire a redundant fetch for the same (task, page, pageSize) tuple.
+        const taskId =
+          results?.metadata?.task_id ??
+          (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
+          '';
+        lastCombinedQueryRef.current = `${taskId}|${combinedPage}|${globalPageSize}`;
+
         const prevAnchor = resultsRef.current;
         if (prevAnchor) {
           const rect = prevAnchor.getBoundingClientRect();
@@ -109,13 +184,7 @@ export function useConcordanceViewModeSwap({
             0;
           const prevScrollY = window.scrollY;
 
-          setCombinedLoading(true);
-          void updateStoredResult({
-            combined: true,
-            page: combinedPage,
-            page_size: globalPageSize,
-          }).finally(() => {
-            setCombinedLoading(false);
+          void refetchCombined(combinedPage).finally(() => {
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
                 const newAnchor = resultsRef.current;
@@ -142,7 +211,9 @@ export function useConcordanceViewModeSwap({
         const prevTop = prevAnchor?.getBoundingClientRect().top ?? 0;
         const prevScrollY = window.scrollY;
 
-        void updateStoredResult({ combined: false, page: 1, page_size: globalPageSize }).finally(() => {
+        // Full-replace refetch: re-pages every node to page 1 (no scoped
+        // node_id), restoring the independent per-node separated layout.
+        void updateStoredResult({ page: 1, page_size: globalPageSize }).finally(() => {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               const newAnchor = resultsRef.current;
@@ -161,7 +232,16 @@ export function useConcordanceViewModeSwap({
         });
       }
     },
-    [viewMode, setViewMode, results, resultsRef, updateStoredResult, combinedPage, globalPageSize],
+    [
+      viewMode,
+      setViewMode,
+      results,
+      resultsRef,
+      updateStoredResult,
+      refetchCombined,
+      combinedPage,
+      globalPageSize,
+    ],
   );
 
   return { combinedLoading, handleViewModeChange };

@@ -1564,11 +1564,6 @@
             "title": "Case Sensitive",
             "type": "boolean"
           },
-          "combined": {
-            "default": false,
-            "title": "Combined",
-            "type": "boolean"
-          },
           "descending": {
             "default": true,
             "title": "Descending",
@@ -2250,11 +2245,6 @@
             "title": "Case Sensitive",
             "type": "boolean"
           },
-          "combined": {
-            "default": false,
-            "title": "Combined",
-            "type": "boolean"
-          },
           "materialized_paths": {
             "anyOf": [
               {
@@ -2334,17 +2324,6 @@
       "ConcordanceResultQuery": {
         "description": "Query overrides for reading persisted concordance results.\n\nUsed by:\n- `concordance_task_result` because they need this unit's \"Query overrides for reading persisted concordance results\" behavior.\n- `concordance_task_result_post` because they need this unit's \"Query overrides for reading persisted concordance results\" behavior.\n\nWhy:\n- Allows pagination and sorting updates without recomputing concordance.\n\n    Flow:\n    - FastAPI/Pydantic parses optional GET query parameters or POST body overrides.\n    - Result endpoints merge provided values into the stored concordance request.\n    - Downstream response builders receive normalized pagination, sorting, and visibility flags.",
         "properties": {
-          "combined": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Combined"
-          },
           "descending": {
             "anyOf": [
               {
@@ -10660,22 +10639,6 @@
                 }
               ],
               "title": "Node Id"
-            }
-          },
-          {
-            "in": "query",
-            "name": "combined",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Combined"
             }
           },
           {

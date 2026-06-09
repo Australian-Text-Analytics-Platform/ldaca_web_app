@@ -52,16 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
-import { ArrowUpDown, Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   getNodeIdentifier,
@@ -78,7 +69,6 @@ import {
   type WorkspaceNodeLike,
 } from '../common';
 
-import { AnalysisPagination } from '@/features/views/common/components/AnalysisPagination';
 import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../common/generatedColumns';
@@ -89,10 +79,8 @@ import {
 } from './quotationTextClip';
 import { normalizeRemoteUrl } from './quotationRemoteUrl';
 import { QuotationDetachDialog } from './components/QuotationDetachDialog';
-import {
-  QuotationHighlightedCell,
-  type QuotationHoverState,
-} from './components/QuotationHighlightedCell';
+import { type QuotationHoverState } from './components/QuotationHighlightedCell';
+import { QuotationNodeBlock } from './components/QuotationNodeBlock';
 import type { DetachDialogNodeOption } from '../common/components/DetachColumnsDialog';
 import { MetadataColumnSelector } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
@@ -125,7 +113,6 @@ interface QuotationResultState {
   column: string;
 }
 
-const DEFAULT_PAGE_SIZE = 50;
 type QuotationEngineConfig = QuotationEngineConfigInput;
 type QuotationHitRow = Record<string, unknown>;
 type QuotationGroupedRow = QuotationHitRow[];
@@ -1244,130 +1231,34 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
                 })();
 
                 return (
-                  <section key={nodeId} className="space-y-4">
-                    <div className="border-b border-border/60 pb-4">
-                      <p className="text-sm text-muted-foreground">
-                        Text column:{' '}
-                        {textCol || 'Select a text column to view highlighted quotations.'}
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-border bg-card">
-                      <AnalysisTableScrollArea
-                        maxHeightClass="max-h-[70vh]"
-                        contentClassName="min-w-max h-full"
-                      >
-                        <Table className="min-w-full text-sm" disableContainer>
-                          <TableHeader className="bg-muted sticky top-0 z-10">
-                            <TableRow className="border-b border-border/60">
-                              {cols.map((c: string) => {
-                                // Every column is sortable through the backend materialised path.
-                                const sortable = true;
-                                const active = resultState?.sorting?.sort_by === c;
-                                return (
-                                  <TableHead
-                                    key={c}
-                                    className={`h-10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/90 select-none whitespace-nowrap ${sortable ? 'cursor-pointer' : 'cursor-default opacity-75'}`}
-                                    onClick={sortable ? () => effHandleSort(nodeId, c) : undefined}
-                                  >
-                                    <div className="flex items-center gap-1.5">
-                                      <span>{c}</span>
-                                      {sortable && (
-                                        <ArrowUpDown
-                                          className={`h-3 w-3 ${active ? 'text-foreground' : 'opacity-60'}`}
-                                        />
-                                      )}
-                                    </div>
-                                  </TableHead>
-                                );
-                              })}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {rowsWithQuotes.length === 0 ? (
-                              <TableRow>
-                                <TableCell
-                                  className="h-24 text-center text-muted-foreground"
-                                  colSpan={cols.length || 1}
-                                >
-                                  No quotations found on this page. Source rows without quotations
-                                  are omitted.
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              rowsWithQuotes.map((row, rowIdx: number) => (
-                                <TableRow
-                                  key={rowIdx}
-                                  className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer"
-                                  onClick={() => {
-                                    const record = { ...row };
-                                    const rawFullText = record[textCol];
-                                    const fullText =
-                                      rawFullText == null ? undefined : String(rawFullText);
-                                    const quotationGeneratedCols =
-                                      Object.values(QUOTATION_COLUMN_KEYS);
-                                    openRowDetail({
-                                      record,
-                                      textColumn: textCol,
-                                      fullText,
-                                      excludeMetadataColumns: [
-                                        ...quotationGeneratedCols,
-                                        '__spans',
-                                      ],
-                                    });
-                                  }}
-                                >
-                                  {cols.map((c: string, cellIdx: number) => {
-                                    const val =
-                                      c === QUOTATION_DOCUMENT_COLUMN ? row?.[textCol] : row?.[c];
-                                    const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
-                                    const shouldHighlight =
-                                      Boolean(textCol) && c === QUOTATION_DOCUMENT_COLUMN;
-                                    const content = shouldHighlight ? (
-                                      <QuotationHighlightedCell
-                                        text={typeof val === 'string' ? val : String(val ?? '')}
-                                        row={row}
-                                        cellKey={cellKey}
-                                        contextLength={contextLength}
-                                        hoverState={hoverState}
-                                        onHoverChange={setHoverState}
-                                      />
-                                    ) : val !== undefined && val !== null ? (
-                                      String(val)
-                                    ) : (
-                                      ''
-                                    );
-                                    return (
-                                      <TableCell
-                                        key={cellIdx}
-                                        className="px-4 py-3 align-top text-sm leading-relaxed"
-                                      >
-                                        {content}
-                                      </TableCell>
-                                    );
-                                  })}
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </AnalysisTableScrollArea>
-                    </div>
-
-                    <AnalysisPagination
-                      page={resultState?.pagination?.page ?? 1}
-                      pageSize={resultState?.pagination?.page_size ?? DEFAULT_PAGE_SIZE}
-                      hasNext={resultState?.pagination?.has_next ?? false}
-                      hasPrev={
-                        resultState?.pagination?.has_prev ??
-                        (resultState?.pagination?.page ?? 1) > 1
-                      }
-                      totalPages={resultState?.pagination?.total_source_pages}
-                      onPageChange={(newPage) => effHandlePageChange(newPage)}
-                      onPageSizeChange={effHandlePageSizeChange}
-                      pageSizeLabel="Documents per batch"
-                      pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
-                      pageSizeSummary={
+                  <QuotationNodeBlock
+                    key={nodeId}
+                    nodeId={nodeId}
+                    textCol={textCol}
+                    cols={cols}
+                    rows={rowsWithQuotes}
+                    pagination={resultState?.pagination}
+                    sortBy={resultState?.sorting?.sort_by}
+                    contextLength={contextLength}
+                    hoverState={hoverState}
+                    onHoverChange={setHoverState}
+                    onSort={effHandleSort}
+                    onPageChange={effHandlePageChange}
+                    onPageSizeChange={effHandlePageSizeChange}
+                    onRowClick={(row) => {
+                      const record = { ...row };
+                      const rawFullText = record[textCol];
+                      const fullText = rawFullText == null ? undefined : String(rawFullText);
+                      const quotationGeneratedCols = Object.values(QUOTATION_COLUMN_KEYS);
+                      openRowDetail({
+                        record,
+                        textColumn: textCol,
+                        fullText,
+                        excludeMetadataColumns: [...quotationGeneratedCols, '__spans'],
+                      });
+                    }}
+                    pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
+                    pageSizeSummary={
                         materializedPaths[nodeId] ? (
                           materializeSummary ? (
                             <GroupedResultsPageSizeSummary
@@ -1449,8 +1340,7 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
                           )}
                         </Button>
                       </DisabledReasonTooltip>
-                    </AnalysisPagination>
-                  </section>
+                  </QuotationNodeBlock>
                 );
               })}
             </CardContent>

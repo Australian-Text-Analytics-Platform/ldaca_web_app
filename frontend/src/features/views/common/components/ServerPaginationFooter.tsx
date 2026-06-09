@@ -24,8 +24,20 @@ import { Label } from '@/components/ui/label';
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 export interface ServerPaginationFooterProps<TData> {
-  /** TanStack instance whose pagination state drives the controls. */
+  /**
+   * TanStack instance used ONLY for actions (setPageIndex / setPageSize). Its
+   * reference is referentially stable across renders, so display state is taken
+   * from the props below instead — otherwise React Compiler memoizes this
+   * component on the unchanged `table` reference and the page indicator freezes
+   * even as pagination advances.
+   */
   table: Table<TData>;
+  /** Zero-based current page index (real changing value from the consumer). */
+  pageIndex: number;
+  /** Current page size (real changing value from the consumer). */
+  pageSize: number;
+  /** Total row count used to derive the page count (documents, for analysis tables). */
+  rowCount: number;
   /** Options shown in the page-size dropdown. */
   pageSizeOptions?: number[];
   /**
@@ -48,26 +60,36 @@ export interface ServerPaginationFooterProps<TData> {
 }
 
 /**
- * Unified pagination footer for every server-backed TanStack table. It reads
- * page/pageSize/pageCount directly off the table instance, so navigation and
- * page-size changes flow through the same `onPaginationChange` bridge that
- * triggers backend refetches.
+ * Unified pagination footer for every server-backed TanStack table.
  *
- * For analysis tables (concordance, quotation) the table's `rowCount` is the
- * number of SOURCE documents, not the displayed hit rows — so `getPageCount()`
- * reflects "documents per batch" pagination even though each page renders a
- * different number of hit rows.
+ * DISPLAY state (current page, total pages, prev/next enablement) is derived
+ * from the `pageIndex`/`pageSize`/`rowCount` props, which are the consumer's
+ * REAL controlled values. This is deliberate: TanStack's `useReactTable`
+ * returns a referentially stable instance, so under React Compiler a footer
+ * that read `table.getState()` would be memoized on the unchanged `table`
+ * reference and the page indicator would freeze on page 1 even as navigation
+ * fired backend refetches. The stable `table` is kept only to dispatch ACTIONS
+ * (`setPageIndex` / `setPageSize`), which flow through the same
+ * `onPaginationChange` bridge that triggers refetches.
+ *
+ * For analysis tables (concordance, quotation) `rowCount` is the number of
+ * SOURCE documents, not displayed hit rows — so the page count reflects
+ * "documents per batch" pagination even though each page renders a different
+ * number of hit rows.
  *
  * Rendered by: WorkspaceTable (compact), ConcordanceTableNodeBlock,
- * QuotationFeature, AiAnnotatorFeature, ConcordanceDispersionNodeBlock because
- * every on-demand paginated table needs one consistent footer that mutates
- * query state instead of slicing rows locally.
- * Flow: derive page bounds from TanStack state, render the page-size selector,
- * page links and optional summary/loading/trailing actions, then emit changes
- * back through the table instance.
+ * QuotationNodeBlock, AiAnnotatorFeature, ConcordanceDispersionNodeBlock,
+ * PreviewTable because every on-demand paginated table needs one consistent
+ * footer that mutates query state instead of slicing rows locally.
+ * Flow: derive page bounds from the props, render the page-size selector, page
+ * links and optional summary/loading/trailing actions, then emit changes back
+ * through the table instance.
  */
 export function ServerPaginationFooter<TData>({
   table,
+  pageIndex,
+  pageSize,
+  rowCount,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   showPageSize = true,
   pageSizeLabel = 'Rows per page',
@@ -77,10 +99,11 @@ export function ServerPaginationFooter<TData>({
   compact = false,
   className,
 }: ServerPaginationFooterProps<TData>) {
-  const { pageIndex, pageSize } = table.getState().pagination;
-  const pageCount = table.getPageCount();
+  // Derived from real props (not `table.getState()`) so the component re-renders
+  // when the consumer's controlled pagination advances.
+  const pageCount = pageSize > 0 ? Math.ceil(rowCount / pageSize) : 0;
 
-  if (compact && pageCount <= 0 && table.getRowCount() <= 0) return null;
+  if (compact && pageCount <= 0) return null;
 
   const currentPage = pageIndex + 1; // 0-indexed → 1-indexed for display
   const safeTotalPages = Math.max(pageCount, 1);
@@ -89,8 +112,8 @@ export function ServerPaginationFooter<TData>({
   );
   const paginationRange = buildPaginationRange(currentPage, safeTotalPages);
 
-  const canPrev = table.getCanPreviousPage();
-  const canNext = table.getCanNextPage();
+  const canPrev = pageIndex > 0;
+  const canNext = pageIndex < pageCount - 1;
 
   /** Converts a display page number back into TanStack's zero-based page index. */
   const goToPage = (page: number) => {
@@ -131,7 +154,7 @@ export function ServerPaginationFooter<TData>({
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
-                  if (canPrev) table.previousPage();
+                  if (canPrev) table.setPageIndex(pageIndex - 1);
                 }}
                 className={cn(!canPrev && 'pointer-events-none opacity-50')}
                 aria-disabled={!canPrev}
@@ -167,7 +190,7 @@ export function ServerPaginationFooter<TData>({
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
-                  if (canNext) table.nextPage();
+                  if (canNext) table.setPageIndex(pageIndex + 1);
                 }}
                 className={cn(!canNext && 'pointer-events-none opacity-50')}
                 aria-disabled={!canNext}
@@ -229,7 +252,7 @@ export function ServerPaginationFooter<TData>({
               href="#"
               onClick={(event) => {
                 event.preventDefault();
-                if (canPrev) table.previousPage();
+                if (canPrev) table.setPageIndex(pageIndex - 1);
               }}
               className={cn(!canPrev && 'pointer-events-none opacity-50')}
               aria-disabled={!canPrev}
@@ -262,7 +285,7 @@ export function ServerPaginationFooter<TData>({
               href="#"
               onClick={(event) => {
                 event.preventDefault();
-                if (canNext) table.nextPage();
+                if (canNext) table.setPageIndex(pageIndex + 1);
               }}
               className={cn(!canNext && 'pointer-events-none opacity-50')}
               aria-disabled={!canNext}

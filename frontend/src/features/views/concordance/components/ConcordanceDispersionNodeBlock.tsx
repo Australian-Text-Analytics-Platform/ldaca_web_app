@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/generated/types.gen';
+import type { ColumnDef } from '@tanstack/react-table';
 import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
-import { AnalysisPagination } from '@/features/views/common/components/AnalysisPagination';
+import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
+import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
@@ -40,6 +42,13 @@ type ConcordanceGroupedRow = Record<string, unknown>[];
 
 const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
 const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
+
+// Stable empty references so the footer-only TanStack table never rebuilds its
+// row model: the dispersion bins body renders manually; this table instance
+// exists purely to drive ServerPaginationFooter's page math from rowCount
+// (which walks SOURCE documents, not displayed bin rows).
+const EMPTY_DISPERSION_ROWS: Record<string, unknown>[] = [];
+const EMPTY_DISPERSION_COLUMNS: ColumnDef<Record<string, unknown>, unknown>[] = [];
 
 /** Used by: ConcordanceDispersionNodeBlock display-column assembly to prevent duplicate dispersion/metadata cells because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const dedupeColumns = (cols: string[]): string[] => {
@@ -252,14 +261,37 @@ export function ConcordanceDispersionNodeBlock({
     [],
   );
 
+  // Footer-only TanStack instance shared by both branches (only one mounts per
+  // keyed instance). Called unconditionally to respect the rules of hooks; the
+  // bins body still renders manually below. rowCount = total source documents.
+  const isCombinedView = nodeKey === '__COMBINED__';
+  const activePage = isCombinedView
+    ? combinedPage
+    : (nodePagination[paginationKey]?.currentPage ?? 1);
+  const paginationTable = useServerTable<Record<string, unknown>>({
+    data: EMPTY_DISPERSION_ROWS,
+    columns: EMPTY_DISPERSION_COLUMNS,
+    rowCount: nodeData.pagination?.total_source_rows ?? 0,
+    pageIndex: activePage - 1,
+    pageSize: globalPageSize,
+    onPaginationChange: (next) => {
+      if (next.pageSize !== globalPageSize) {
+        if (!readOnly) onPageSizeChange(next.pageSize);
+        return;
+      }
+      const newPage = next.pageIndex + 1;
+      if (newPage === activePage) return;
+      if (isCombinedView) setCombinedPage(newPage);
+      else handlePageChange(newPage, paginationKey, requestNodeId);
+    },
+  });
+
   if (nodeKey === '__COMBINED__') {
     const groupedRows = nodeData.data;
     const rows = buildDispersionRows(groupedRows);
     const longestTextLength = proportionalDispersionBars
       ? rows.reduce((max, row) => Math.max(max, getDispersionTextLength(row, column)), 0)
       : 0;
-    const combinedHasPrev = Boolean(nodeData.pagination?.has_prev);
-    const combinedHasNext = Boolean(nodeData.pagination?.has_next);
     const metaCols = nodeData.metadata.metadata_columns;
     const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) =>
       metaCols.includes(columnName),
@@ -561,17 +593,15 @@ export function ConcordanceDispersionNodeBlock({
               </div>
             ) : null;
           })()}
-          <AnalysisPagination
-            page={combinedPage}
+          <ServerPaginationFooter
+            table={paginationTable}
+            pageIndex={activePage - 1}
             pageSize={globalPageSize}
-            hasNext={combinedHasNext}
-            hasPrev={combinedHasPrev}
-            totalPages={nodeData.pagination?.total_source_pages}
-            onPageChange={(newPage) => setCombinedPage(newPage)}
-            onPageSizeChange={readOnly ? undefined : onPageSizeChange}
+            rowCount={nodeData.pagination?.total_source_rows ?? 0}
             pageSizeLabel="Documents per batch"
             pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
             loading={combinedLoading}
+            showPageSize={!readOnly}
           />
           {colourMatches && allMatchedTexts.length > 0 && (
             <ConcordanceDispersionLegend
@@ -652,11 +682,7 @@ export function ConcordanceDispersionNodeBlock({
   const dispersionColumnStyle = getDispersionColumnStyle(showMetadata, resultsViewportWidth);
   const metadataColumnStyle = getMetadataColumnStyle(showMetadata);
 
-  const currentNodePagination = nodePagination[paginationKey];
-  const currentPage = currentNodePagination?.currentPage ?? 1;
   const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
-  const hasPrev = Boolean(nodeData.pagination?.has_prev) || currentPage > 1;
-  const hasNext = Boolean(nodeData.pagination?.has_next);
 
   const detachingKey = detachNodeId ?? '';
   const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
@@ -665,7 +691,7 @@ export function ConcordanceDispersionNodeBlock({
   // one would leave the tables on mismatched units (instances/page vs
   // documents/page). The Process button therefore materialises every selected
   // block together; with a single block it processes just that node.
-  // Used by: the per-node AnalysisPagination footer below.
+  // Used by: the per-node ServerPaginationFooter below.
   const processTogetherNodeIds = takeMostRecent(selectedNodes, 2)
     .map((n) => n.id)
     .filter((id): id is string => Boolean(id));
@@ -809,17 +835,15 @@ export function ConcordanceDispersionNodeBlock({
           </div>
         ) : null;
       })()}
-      <AnalysisPagination
-        page={currentPage}
+      <ServerPaginationFooter
+        table={paginationTable}
+        pageIndex={activePage - 1}
         pageSize={globalPageSize}
-        hasNext={hasNext}
-        hasPrev={hasPrev}
-        totalPages={nodeData.pagination?.total_source_pages}
-        onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-        onPageSizeChange={readOnly ? undefined : onPageSizeChange}
+        rowCount={nodeData.pagination?.total_source_rows ?? 0}
         pageSizeLabel="Documents per batch"
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
+        showPageSize={!readOnly}
       >
         <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
           <Button
@@ -939,7 +963,7 @@ export function ConcordanceDispersionNodeBlock({
             </DisabledReasonTooltip>
           );
         })()}
-      </AnalysisPagination>
+      </ServerPaginationFooter>
       {colourMatches && allMatchedTexts.length > 0 && (
         <ConcordanceDispersionLegend
           matchedTexts={allMatchedTexts}

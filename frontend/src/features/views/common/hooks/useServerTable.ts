@@ -91,8 +91,10 @@ export function useServerTable<TData>({
     onColumnFiltersChange?.(next);
   };
 
+  const { state: tableOptionsState, ...restTableOptions } = tableOptions ?? {};
+
   // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable returns non-memoizable functions; React Compiler can skip this
-  const table = useReactTable({
+  const table = useReactTable<TData>({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
@@ -105,16 +107,14 @@ export function useServerTable<TData>({
       sorting,
       columnFilters,
       columnPinning,
-      ...tableOptions?.state,
+      ...tableOptionsState,
     },
     onPaginationChange: handlePaginationChange,
     onSortingChange: handleSortingChange,
     onColumnFiltersChange: handleColumnFiltersChange,
     onColumnPinningChange: setColumnPinning,
-    ...tableOptions,
-    // Ensure state isn't overwritten by tableOptions spread.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any);
+    ...restTableOptions,
+  });
 
   return table;
 }

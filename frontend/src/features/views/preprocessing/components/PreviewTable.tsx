@@ -277,8 +277,8 @@ export function PreviewTable({
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage() || loading}
+              onClick={() => table.setPageIndex(currentPage - 2)}
+              disabled={currentPage <= 1 || loading}
               variant="outline"
               size="sm"
             >
@@ -287,8 +287,8 @@ export function PreviewTable({
             <span className="text-sm text-muted-foreground">Page {currentPage}</span>
             <Button
               type="button"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage() || loading}
+              onClick={() => table.setPageIndex(currentPage)}
+              disabled={currentPage >= displayTotalPages || loading}
               variant="outline"
               size="sm"
             >

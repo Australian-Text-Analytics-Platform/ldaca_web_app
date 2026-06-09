@@ -43,7 +43,9 @@ import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AnalysisPagination } from '@/features/views/common/components/AnalysisPagination';
+import type { ColumnDef } from '@tanstack/react-table';
+import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
+import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import {
   Table,
   TableBody,
@@ -144,6 +146,13 @@ const parseExamples = (raw: string) => {
 
 /** Keeps result paging consistent across the annotation and review tables in this feature. */
 const DEFAULT_PAGE_SIZE = 5;
+
+// Stable empty references for the footer-only TanStack tables: the annotate and
+// review tables render their bespoke (editable / multi-header) bodies manually;
+// these instances exist solely to drive ServerPaginationFooter page math from
+// rowCount (the backend's source-row totals).
+const EMPTY_ANNOTATOR_ROWS: Record<string, unknown>[] = [];
+const EMPTY_ANNOTATOR_COLUMNS: ColumnDef<Record<string, unknown>, unknown>[] = [];
 
 /** Converts arbitrary backend cell values into editable/displayable text for annotation review cells. */
 /**
@@ -692,9 +701,6 @@ function AiAnnotatorFeature() {
   const pagination = resultNode?.pagination;
   const page = pagination?.page ?? 1;
   const pageSize = pagination?.page_size ?? DEFAULT_PAGE_SIZE;
-  const hasNext = Boolean(pagination?.has_next);
-  const hasPrev = Boolean(pagination?.has_prev);
-  const totalPages = pagination?.total_source_pages;
   const annotationColumn = annotationColumns[0] ?? `${selectedColumn || 'text'}_annotation`;
 
   // Builds a stable edit map key for one review table cell and annotator provider.
@@ -1091,6 +1097,55 @@ function AiAnnotatorFeature() {
   useEffect(() => {
     void Promise.resolve().then(() => setReviewEdits({}));
   }, [resultNodeId, page, pageSize]);
+
+  // Footer-only TanStack instance for the annotate results table (the bespoke
+  // body renders manually). rowCount mirrors the backend's source-row total so
+  // the shared footer derives the same page count as the old props-based footer.
+  const annotatePaginationTable = useServerTable<Record<string, unknown>>({
+    data: EMPTY_ANNOTATOR_ROWS,
+    columns: EMPTY_ANNOTATOR_COLUMNS,
+    rowCount: pagination?.total_source_rows ?? 0,
+    pageIndex: page - 1,
+    pageSize,
+    onPaginationChange: (next) => {
+      if (next.pageSize !== pageSize) {
+        void loadResultPage(1, next.pageSize);
+        return;
+      }
+      const newPage = next.pageIndex + 1;
+      if (newPage !== page) void loadResultPage(newPage, pageSize);
+    },
+  });
+
+  // Footer-only TanStack instance for the review table (editable multi-header
+  // body renders manually). Page/size mirror reviewData's pagination.
+  const reviewPagination = reviewData?.pagination;
+  const reviewPageNum = reviewPagination?.page ?? 1;
+  const reviewPageSizeNum = reviewPagination?.page_size ?? DEFAULT_PAGE_SIZE;
+  const reviewPaginationTable = useServerTable<Record<string, unknown>>({
+    data: EMPTY_ANNOTATOR_ROWS,
+    columns: EMPTY_ANNOTATOR_COLUMNS,
+    rowCount: reviewPagination?.total_source_rows ?? 0,
+    pageIndex: reviewPageNum - 1,
+    pageSize: reviewPageSizeNum,
+    onPaginationChange: (next) => {
+      if (!reviewNodeId) return;
+      const sizeChanged = next.pageSize !== reviewPageSizeNum;
+      const targetPage = sizeChanged ? 1 : next.pageIndex + 1;
+      const targetPageSize = sizeChanged ? next.pageSize : reviewPageSizeNum;
+      if (!sizeChanged && targetPage === reviewPageNum) return;
+      void Promise.all([
+        loadReviewPage(
+          reviewNodeId,
+          reviewTextColumn,
+          reviewAnnotationColumn,
+          targetPage,
+          targetPageSize,
+        ),
+        refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
+      ]);
+    },
+  });
 
   return (
     <div className="space-y-4">
@@ -1623,18 +1678,11 @@ function AiAnnotatorFeature() {
               </ScrollArea>
             </div>
 
-            <AnalysisPagination
-              page={page}
+            <ServerPaginationFooter
+              table={annotatePaginationTable}
+              pageIndex={page - 1}
               pageSize={pageSize}
-              hasNext={hasNext}
-              hasPrev={hasPrev}
-              totalPages={totalPages}
-              onPageChange={(nextPage) => {
-                void loadResultPage(nextPage, pageSize);
-              }}
-              onPageSizeChange={(nextPageSize) => {
-                void loadResultPage(1, nextPageSize);
-              }}
+              rowCount={pagination?.total_source_rows ?? 0}
               pageSizeOptions={[5, 10, 20, 50, 100]}
               loading={isPaging}
             />
@@ -1649,9 +1697,6 @@ function AiAnnotatorFeature() {
             const rvPagination = reviewData.pagination;
             const rvPage = rvPagination?.page ?? 1;
             const rvPageSize = rvPagination?.page_size ?? DEFAULT_PAGE_SIZE;
-            const rvHasNext = Boolean(rvPagination?.has_next);
-            const rvHasPrev = Boolean(rvPagination?.has_prev);
-            const rvTotalPages = rvPagination?.total_source_pages;
 
             const rvAnnotationCol = reviewAnnotationColumn;
             const rvDiscoveredProviders = Array.from(
@@ -1833,36 +1878,11 @@ function AiAnnotatorFeature() {
                     </ScrollArea>
                   </div>
 
-                  <AnalysisPagination
-                    page={rvPage}
-                    pageSize={rvPageSize}
-                    hasNext={rvHasNext}
-                    hasPrev={rvHasPrev}
-                    totalPages={rvTotalPages}
-                    onPageChange={(nextPage) => {
-                      void Promise.all([
-                        loadReviewPage(
-                          reviewNodeId,
-                          reviewTextColumn,
-                          reviewAnnotationColumn,
-                          nextPage,
-                          rvPageSize,
-                        ),
-                        refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
-                      ]);
-                    }}
-                    onPageSizeChange={(nextPageSize) => {
-                      void Promise.all([
-                        loadReviewPage(
-                          reviewNodeId,
-                          reviewTextColumn,
-                          reviewAnnotationColumn,
-                          1,
-                          nextPageSize,
-                        ),
-                        refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
-                      ]);
-                    }}
+                  <ServerPaginationFooter
+                    table={reviewPaginationTable}
+                    pageIndex={reviewPageNum - 1}
+                    pageSize={reviewPageSizeNum}
+                    rowCount={reviewPagination?.total_source_rows ?? 0}
                     pageSizeOptions={[5, 10, 20, 50, 100]}
                     loading={isReviewPaging}
                   />

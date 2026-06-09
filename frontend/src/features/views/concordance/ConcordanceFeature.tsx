@@ -694,9 +694,10 @@ function ConcordanceFeature({
         hydratedRegex ? false : typeof reqObj.whole_word === 'boolean' ? reqObj.whole_word : true,
       );
       setCaseSensitive(!!reqObj.case_sensitive);
-      const hydratedMode: 'separated' | 'combined' =
-        reqObj.combined && reqObj.combinable !== false ? 'combined' : 'separated';
-      setViewMode(hydratedMode);
+      // Combined view is a client-only synthesis and is never persisted, so
+      // hydrated tasks always restore to separated; the user can re-enter
+      // combined via the toggle (which re-pages both nodes on demand).
+      setViewMode('separated');
       // Replace (not merge) on hydration so the saved task's materialised
       // state is the source of truth. Otherwise stale entries from a
       // previous task could survive a re-run that produced an empty
@@ -843,7 +844,7 @@ function ConcordanceFeature({
   });
 
   // Single source of truth for page size across every concordance result table.
-  // Used by: each per-node / combined AnalysisPagination footer because changing
+  // Used by: each per-node / combined ServerPaginationFooter because changing
   // the size on any table must keep all tables in sync and persist once.
   // Flow: update globalPageSize, mirror it onto every node's internal pagination
   // (resetting to page 1), then persist unless the panel is read-only.
@@ -1109,6 +1110,7 @@ function ConcordanceFeature({
     viewMode,
     setViewMode,
     results,
+    setResults,
     combinedPage,
     globalPageSize,
     updateStoredResult,

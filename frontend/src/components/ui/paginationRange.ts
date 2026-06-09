@@ -10,7 +10,7 @@ export type PaginationRangeItem = number | 'dots';
  * Builds compact page ranges for pagination components. Analysis tables and
  * server-row paginators use it to share first/last/current-window behavior
  * while still supporting unknown totals via `hasNext`.
- * Called by: AnalysisPagination and ServerTablePagination before rendering page controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+ * Called by: ServerPaginationFooter before rendering page controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
  * Flow: emit first/last/current-window pages with dots for known totals, or emit a current-window plus trailing dots when unknown totals still have next pages.
  */
 export const buildPaginationRange = (

@@ -1146,10 +1146,6 @@ export type ConcordanceAnalysisRequest = {
      */
     case_sensitive?: boolean;
     /**
-     * Combined
-     */
-    combined?: boolean;
-    /**
      * Descending
      */
     descending?: boolean;
@@ -1613,10 +1609,6 @@ export type ConcordanceRequest = {
      */
     case_sensitive?: boolean;
     /**
-     * Combined
-     */
-    combined?: boolean;
-    /**
      * Materialized Paths
      */
     materialized_paths?: {
@@ -1677,10 +1669,6 @@ export type ConcordanceRequest = {
  * - Downstream response builders receive normalized pagination, sorting, and visibility flags.
  */
 export type ConcordanceResultQuery = {
-    /**
-     * Combined
-     */
-    combined?: boolean | null;
     /**
      * Descending
      */
@@ -7297,10 +7285,6 @@ export type ConcordanceTaskResultData = {
          * Node Id
          */
         node_id?: string | null;
-        /**
-         * Combined
-         */
-        combined?: boolean | null;
         /**
          * Page
          */

@@ -49,7 +49,7 @@ interface ConcordanceActions {
   setViewMode: (mode: 'separated' | 'combined') => void;
   setCombinedPage: (page: number) => void;
   setIsSearching: (value: boolean) => void;
-  setResults: (results: ConcordanceAnalysisResponse | null) => void;
+  setResults: Dispatch<SetStateAction<ConcordanceAnalysisResponse | null>>;
   setLocalTaskId: (id: string | null) => void;
   setNodeLoading: Dispatch<SetStateAction<Record<string, boolean>>>;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
@@ -149,9 +149,16 @@ export function useConcordanceTaskFlow({
   /** Refetches the stored concordance task result after preference or page changes. */
   /**
    * Called by: useConcordanceTaskFlow during this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   *
+   * When ``mergeNodeData`` is set, the response is treated as a partial,
+   * single-node update (separated view per-node page/sort): only the returned
+   * node slices overwrite their entries in the existing results, so the sibling
+   * table keeps its independently-paged data. Otherwise the whole result object
+   * is replaced (fresh search, global page-size change, combined view).
    */
   const updateStoredResult = async (
     body: ConcordanceResultQuery,
+    options?: { mergeNodeData?: boolean },
   ): Promise<ConcordanceAnalysisResponse | null> => {
     if (!currentWorkspaceId) return null;
 
@@ -165,7 +172,18 @@ export function useConcordanceTaskFlow({
       throwOnError: true,
     });
     if (response) {
-      setResults(response);
+      if (options?.mergeNodeData) {
+        setResults((prev) =>
+          prev?.data
+            ? ({
+                ...response,
+                data: { ...prev.data, ...response.data },
+              } as ConcordanceAnalysisResponse)
+            : response,
+        );
+      } else {
+        setResults(response);
+      }
     }
     return response;
   };
@@ -229,7 +247,6 @@ export function useConcordanceTaskFlow({
     setNodePagination(updatedPagination);
 
     const shouldForceSeparated = resetPage && !allowWhenLocked && !forceMode;
-    const effectiveMode = shouldForceSeparated ? 'separated' : forceMode || viewMode;
     if (shouldForceSeparated && viewMode !== 'separated') {
       setViewMode('separated');
     }
@@ -249,7 +266,6 @@ export function useConcordanceTaskFlow({
     setIsSearching(true);
     try {
       const authHeaders = getAuthHeaders();
-      const isCombinedQuery = effectiveMode === 'combined';
       const request: ConcordanceAnalysisRequest = {
         node_ids: requestNodeIds,
         node_columns: nodeColumns,
@@ -263,9 +279,6 @@ export function useConcordanceTaskFlow({
       };
       if (tabId) {
         request.tab_id = tabId;
-      }
-      if (isCombinedQuery) {
-        request.combined = true;
       }
       const requestedSortBy = overrideSortBy ?? firstNodePagination.sortBy;
       if (requestedSortBy) {
@@ -348,7 +361,7 @@ export function useConcordanceTaskFlow({
           page: 1,
           page_size: pageSize,
         };
-        await updateStoredResult(overrides);
+        await updateStoredResult(overrides, { mergeNodeData: true });
       } finally {
         setNodeLoading((prev) => ({ ...prev, [nodeKey]: false }));
       }
@@ -388,7 +401,7 @@ export function useConcordanceTaskFlow({
           sort_by: currentNodePagination.sortBy || undefined,
           descending: currentNodePagination.descending,
         };
-        await updateStoredResult(overrides);
+        await updateStoredResult(overrides, { mergeNodeData: true });
       } finally {
         setNodeLoading((prev) => ({ ...prev, [nodeKey]: false }));
       }
@@ -411,14 +424,13 @@ export function useConcordanceTaskFlow({
     if (Object.keys(preferenceUpdates).length === 0) return;
 
     try {
-      const fetchParams: Record<string, unknown> = { combined: viewMode === 'combined' };
-      if (viewMode === 'combined') {
-        fetchParams.page = combinedPage;
-        fetchParams.page_size = partial.pageSize ?? globalPageSize;
-      } else {
-        fetchParams.page = 1;
-        fetchParams.page_size = partial.pageSize ?? globalPageSize;
-      }
+      // Combined view is synthesized client-side, so this only persists the
+      // per-node page-size preference. In combined mode the swap hook's
+      // page/page-size effect rebuilds the __COMBINED__ block afterwards.
+      const fetchParams: Record<string, unknown> = {
+        page: viewMode === 'combined' ? combinedPage : 1,
+        page_size: partial.pageSize ?? globalPageSize,
+      };
 
       const mergedBody = {
         ...preferenceUpdates,

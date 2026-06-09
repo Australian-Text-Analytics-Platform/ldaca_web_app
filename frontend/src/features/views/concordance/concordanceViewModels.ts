@@ -1,4 +1,7 @@
-import type { ConcordanceDispersionBinRow } from '@/api/generated/types.gen';
+import type {
+  ConcordanceDispersionBinRow,
+  ConcordanceNodeResult,
+} from '@/api/generated/types.gen';
 import { CONCORDANCE_COLUMN_KEYS, CONCORDANCE_CORE_COLUMNS } from '../common/generatedColumns';
 
 type ConcordanceHitRow = Record<string, unknown>;
@@ -31,6 +34,106 @@ const getNumericIndex = (value: unknown): number | null => {
  */
 export function flattenConcordanceGroups(groups: ConcordanceGroupedRow[]): ConcordanceHitRow[] {
   return groups.flatMap((group) => group);
+}
+
+/**
+ * Synthesizes the client-side "combined" concordance view from two per-node
+ * result slices. Replaces the former backend ``collect_interleaved_combined``
+ * helper: the backend now only ever returns per-node slices, and the Combined
+ * layout is composed entirely on the frontend.
+ *
+ * Used by: useConcordanceViewModeSwap because entering Combined view (or paging
+ * within it) fetches both nodes at the same page and folds them into a single
+ * ``__COMBINED__`` block.
+ *
+ * Flow:
+ * - Interleave the two slices' grouped rows left/right (alternating, with the
+ *   longer side's leftover rows appended in order). Rows already carry
+ *   ``__source_node`` so the table can colour each hit by origin.
+ * - Union the column lists (dedupe, left order first) and recompute the
+ *   concordance/metadata column split from the core-column set.
+ * - Pagination spans the larger of the two nodes: ``total_source_*`` use max(),
+ *   ``has_next``/``has_prev`` derive from the shared page, and ``result_count``
+ *   is the interleaved row count.
+ */
+export function buildCombinedSlice(
+  leftSlice: ConcordanceNodeResult,
+  rightSlice: ConcordanceNodeResult,
+  page: number,
+  pageSize: number,
+): ConcordanceNodeResult {
+  const leftRows = leftSlice.data ?? [];
+  const rightRows = rightSlice.data ?? [];
+
+  const interleaved: ConcordanceNodeResult['data'] = [];
+  let li = 0;
+  let ri = 0;
+  let useLeft = true;
+  while (li < leftRows.length || ri < rightRows.length) {
+    if (useLeft) {
+      if (li < leftRows.length) {
+        interleaved.push(leftRows[li]!);
+        li += 1;
+      } else if (ri < rightRows.length) {
+        interleaved.push(rightRows[ri]!);
+        ri += 1;
+        useLeft = !useLeft;
+        continue;
+      } else {
+        break;
+      }
+    } else {
+      if (ri < rightRows.length) {
+        interleaved.push(rightRows[ri]!);
+        ri += 1;
+      } else if (li < leftRows.length) {
+        interleaved.push(leftRows[li]!);
+        li += 1;
+        useLeft = !useLeft;
+        continue;
+      } else {
+        break;
+      }
+    }
+    useLeft = !useLeft;
+  }
+
+  const leftColumns = leftSlice.columns ?? [];
+  const rightColumns = rightSlice.columns ?? [];
+  let columns: string[] = leftColumns.length > 0 ? leftColumns : rightColumns;
+  if (leftColumns.length > 0 && rightColumns.length > 0) {
+    columns = Array.from(new Set([...leftColumns, ...rightColumns]));
+  }
+
+  const leftPag = leftSlice.pagination;
+  const rightPag = rightSlice.pagination;
+  const totalSourceRows = Math.max(leftPag.total_source_rows, rightPag.total_source_rows);
+  const totalSourcePages = Math.max(leftPag.total_source_pages, rightPag.total_source_pages);
+  const resolvedPageSize = leftPag.page_size || rightPag.page_size || pageSize;
+  const effectiveSortBy = leftSlice.sorting.sort_by || rightSlice.sorting.sort_by || null;
+
+  return {
+    data: interleaved,
+    columns,
+    metadata: {
+      concordance_columns: columns.filter((c) => CORE_COLUMN_SET.has(c)),
+      metadata_columns: columns.filter((c) => !CORE_COLUMN_SET.has(c)),
+      all_columns: columns,
+    },
+    pagination: {
+      page,
+      page_size: resolvedPageSize,
+      total_source_rows: totalSourceRows,
+      total_source_pages: totalSourcePages,
+      result_count: interleaved.length,
+      has_next: page < totalSourcePages,
+      has_prev: page > 1,
+    },
+    sorting: {
+      sort_by: effectiveSortBy,
+      descending: leftSlice.sorting.descending,
+    },
+  };
 }
 
 /** Converts hit groups into one dispersion row per source document for chart consumers. */

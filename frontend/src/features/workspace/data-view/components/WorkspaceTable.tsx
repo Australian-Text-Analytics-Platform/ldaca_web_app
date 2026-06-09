@@ -532,7 +532,13 @@ export function WorkspaceTable({
             </TableBody>
           </Table>
         </ScrollArea>
-        <ServerPaginationFooter table={tableInstance} compact />
+        <ServerPaginationFooter
+          table={tableInstance}
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          rowCount={totalRows}
+          compact
+        />
       </div>
 
       <DatetimeFormatPanel
