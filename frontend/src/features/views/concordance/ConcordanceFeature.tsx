@@ -1233,18 +1233,9 @@ function ConcordanceFeature({
         ),
       );
       const options = responses.flatMap((response) => response.data?.nodes ?? []);
-      // Default selection mirrors what the user is already looking at: the
-      // concordance-specific generated columns, plus exactly the metadata
-      // columns ticked in the "Show metadata" dropdown. The source text
-      // column and any unticked metadata start unselected — the user opts in
-      // to those. Everything remains freely toggleable in the dialog.
-      const concordanceColumns = new Set<string>(Object.values(CONCORDANCE_COLUMN_KEYS));
-      const selectedMetadata = new Set(selectedMetadataColumns);
       const initial: Record<string, string[]> = {};
       options.forEach((node) => {
-        initial[node.node_id] = node.available_columns.filter(
-          (column) => concordanceColumns.has(column) || selectedMetadata.has(column),
-        );
+        initial[node.node_id] = [];
       });
       setSelectedDetachColumns(initial);
       setDetachDialogNodeOptions(options);

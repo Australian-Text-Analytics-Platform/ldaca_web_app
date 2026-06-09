@@ -847,12 +847,9 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
         throwOnError: true,
       });
       const nodes = response.data?.nodes ?? [];
-      // Default-select every column (analysis-generated ones included): the
-      // user opts OUT of what they don't want. The backend drops unticked
-      // columns and skips computing the ones it can.
       const initialSelections: Record<string, string[]> = {};
       nodes.forEach((node) => {
-        initialSelections[node.node_id] = [...node.available_columns];
+        initialSelections[node.node_id] = [];
       });
       setPendingDetachNodeId(nodeId);
       setDetachNodeOptions(nodes);
