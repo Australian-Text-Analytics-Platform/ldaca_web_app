@@ -32,40 +32,23 @@ export function TopicModelingDetachDialog({
   deselectAllDetachColumns,
   handleDetachConfirm,
 }: Props) {
-  // Topic modelling's only mandatory output column is the topic number,
-  // which is meaningless without metadata to join against. Block the
-  // detach until the user picks at least one optional column per
-  // displayed node so the resulting workspace block actually carries
-  // analyzable context. Other tools (concordance, quotation) have
-  // meaningful mandatory columns of their own and don't need this gate.
-  const confirmDisabledReason = (() => {
-    if (detachNodeOptions.length === 0) return undefined;
-    const allHaveSelection = detachNodeOptions.every((node) => {
-      const disabled = new Set(node.disabled_columns || []);
-      const optionalColumns = node.available_columns.filter((column) => !disabled.has(column));
-      if (optionalColumns.length === 0) return true;
-      const selected = new Set(selectedDetachColumns[node.node_id] || []);
-      return optionalColumns.some((column) => selected.has(column));
-    });
-    return allHaveSelection
-      ? undefined
-      : 'Select at least one column from each data block to add to workspace.';
-  })();
-
+  // The topic column and every source column are user-choosable here, all
+  // selected by default. The shared dialog already blocks an all-empty
+  // selection (a zero-column node), so no extra gating is needed — the user
+  // owns the choice of which columns, including the topic number, to keep.
   return (
     <DetachColumnsDialog
       open={open}
       onOpenChange={onOpenChange}
       isDetaching={isDetaching}
       title="Detach Topic Results"
-      description="Select optional source columns to include with the detached topic results. Required output columns stay checked automatically."
+      description="Select the columns to include with the detached topic results. The topic column is selected by default; untick it if you don't need it."
       detachNodeOptions={detachNodeOptions}
       selectedDetachColumns={selectedDetachColumns}
       toggleDetachColumn={toggleDetachColumn}
       selectAllDetachColumns={selectAllDetachColumns}
       deselectAllDetachColumns={deselectAllDetachColumns}
       handleDetachConfirm={handleDetachConfirm}
-      confirmDisabledReason={confirmDisabledReason}
     />
   );
 }

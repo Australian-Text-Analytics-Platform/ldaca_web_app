@@ -71,7 +71,7 @@ describe('useDetachColumnsState', () => {
   });
 
   describe('selectAllDetachColumns', () => {
-    it('selects every available, non-disabled column for each node', () => {
+    it('selects every available column for each node', () => {
       const options = buildNodeOptions([
         {
           node_id: 'n1',
@@ -87,7 +87,7 @@ describe('useDetachColumnsState', () => {
       });
 
       expect(result.current.selectedDetachColumns).toEqual({
-        n1: ['col_a', 'col_c'],
+        n1: ['col_a', 'col_b', 'col_c'],
         n2: ['col_x', 'col_y'],
       });
     });

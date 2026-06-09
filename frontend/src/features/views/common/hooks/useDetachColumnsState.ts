@@ -8,7 +8,7 @@ export interface UseDetachColumnsStateResult {
   setSelectedDetachColumns: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
   /** Toggle one column on one node. Set-based so duplicates can't sneak in. */
   toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
-  /** Select every available, non-disabled column across all nodes. */
+  /** Select every available column across all nodes. */
   selectAllDetachColumns: () => void;
   /** Empty selection for every node. */
   deselectAllDetachColumns: () => void;
@@ -44,8 +44,7 @@ export const useDetachColumnsState = (
     setSelectedDetachColumns((prev) => {
       const next = { ...prev };
       for (const node of detachNodeOptions) {
-        const disabled = new Set(node.disabled_columns ?? []);
-        next[node.node_id] = node.available_columns.filter((column) => !disabled.has(column));
+        next[node.node_id] = [...node.available_columns];
       }
       return next;
     });

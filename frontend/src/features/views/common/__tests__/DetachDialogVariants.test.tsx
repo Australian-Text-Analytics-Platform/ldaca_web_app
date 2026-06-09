@@ -93,7 +93,8 @@ function renderDialog(testCase: DetachDialogCase, overrides: Partial<DetachDialo
           disabled_columns: testCase.disabledColumns,
         },
       ]}
-      selectedDetachColumns={{ 'node-1': [] }}
+      // Real callers seed the selection with every column (default-selected).
+      selectedDetachColumns={{ 'node-1': [...testCase.availableColumns] }}
       toggleDetachColumn={vi.fn()}
       selectAllDetachColumns={vi.fn()}
       deselectAllDetachColumns={vi.fn()}
@@ -104,29 +105,36 @@ function renderDialog(testCase: DetachDialogCase, overrides: Partial<DetachDialo
 }
 
 describe.each(dialogCases)('$name', (testCase) => {
-  it('shows mandatory columns as checked and disabled, optional metadata unchecked', () => {
+  it('renders every column as a toggleable checkbox, all selected by default', () => {
     renderDialog(testCase);
 
-    for (const column of testCase.disabledColumns) {
+    // Generated/analysis columns are no longer "mandatory" — they render as
+    // ordinary, enabled checkboxes that start checked alongside the metadata.
+    for (const column of [...testCase.disabledColumns, ...testCase.optionalColumns]) {
       const checkbox = screen.getByRole('checkbox', {
         name: new RegExp(`^${escapeRegExp(column)}$`, 'i'),
       });
       expect(checkbox).toBeChecked();
-      expect(checkbox).toBeDisabled();
+      expect(checkbox).toBeEnabled();
     }
-    for (const column of testCase.optionalColumns) {
-      expect(
-        screen.getByRole('checkbox', { name: new RegExp(`^${escapeRegExp(column)}$`, 'i') }),
-      ).not.toBeChecked();
-    }
-    expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeEnabled();
+  });
+
+  it('disables Add to Workspace when no column is selected', () => {
+    renderDialog(testCase, { selectedDetachColumns: { 'node-1': [] } });
+
+    expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeDisabled();
   });
 
   it('renders a select all button and triggers the callback', async () => {
     const user = userEvent.setup();
     const selectAllDetachColumns = vi.fn();
 
-    renderDialog(testCase, { selectAllDetachColumns });
+    // Seed a partial selection so "Select all" has something left to select.
+    renderDialog(testCase, {
+      selectedDetachColumns: { 'node-1': [testCase.selectedColumn] },
+      selectAllDetachColumns,
+    });
 
     await user.click(screen.getByRole('button', { name: /^select all$/i }));
     expect(selectAllDetachColumns).toHaveBeenCalledTimes(1);

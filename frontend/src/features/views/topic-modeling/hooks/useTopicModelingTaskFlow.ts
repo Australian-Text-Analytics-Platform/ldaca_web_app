@@ -232,9 +232,11 @@ export function useTopicModelingTaskFlow({
       });
       const nodes = resp?.data?.nodes ?? [];
       setDetachNodeOptions(nodes);
+      // Default-select every column (the topic column included): the user
+      // opts OUT of what they don't want rather than opting in.
       const initialSelections: Record<string, string[]> = {};
       nodes.forEach((node) => {
-        initialSelections[node.node_id] = [];
+        initialSelections[node.node_id] = [...node.available_columns];
       });
       setSelectedDetachColumns(initialSelections);
       setDetachDialogOpen(true);

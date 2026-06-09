@@ -67,17 +67,28 @@ export function DetachColumnsDialog({
   confirmDisabledReason,
 }: DetachColumnsDialogProps) {
   const canSelectAll = detachNodeOptions.some((node) => {
-    const disabled = new Set(node.disabled_columns || []);
     const selected = new Set(selectedDetachColumns[node.node_id] || []);
-    return node.available_columns.some((column) => !disabled.has(column) && !selected.has(column));
+    return node.available_columns.some((column) => !selected.has(column));
   });
   const canDeselectAll = detachNodeOptions.some((node) => {
-    const disabled = new Set(node.disabled_columns || []);
     const selected = new Set(selectedDetachColumns[node.node_id] || []);
-    return node.available_columns.some((column) => !disabled.has(column) && selected.has(column));
+    return node.available_columns.some((column) => selected.has(column));
   });
 
-  const isDetachDisabled = isDetaching || Boolean(confirmDisabledReason);
+  // A detached node needs at least one column to exist. If any displayed node
+  // has columns available but none ticked, block the confirm with a clear
+  // reason rather than letting the user create a zero-column block. A caller
+  // can still supply its own stricter reason via `confirmDisabledReason`.
+  const emptySelectionReason = detachNodeOptions.some((node) => {
+    const hasColumns = node.available_columns.length > 0;
+    const selectedCount = (selectedDetachColumns[node.node_id] || []).length;
+    return hasColumns && selectedCount === 0;
+  })
+    ? 'Select at least one column from each data block to add to workspace.'
+    : undefined;
+  const effectiveConfirmDisabledReason = confirmDisabledReason ?? emptySelectionReason;
+
+  const isDetachDisabled = isDetaching || Boolean(effectiveConfirmDisabledReason);
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -110,19 +121,18 @@ export function DetachColumnsDialog({
 
         <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
           {detachNodeOptions.map((node) => {
-            // Mandatory columns are shown as checked, disabled checkboxes: the
-            // backend always includes them in the detach output, so surfacing
-            // them (rather than hiding them) makes it clear to the user which
-            // columns are guaranteed to appear alongside the optional ones.
-            const disabledSet = new Set(node.disabled_columns || []);
+            // Every column — including the analysis-generated ones — is an
+            // opt-in choice the user controls. They all start selected (the
+            // caller seeds the selection with the full column list), but the
+            // user can untick any of them; deselected columns are dropped
+            // from the detached output and, where possible, skipped on the
+            // backend so they aren't even computed.
             return (
               <div key={node.node_id} className="rounded-md border p-3">
                 <div className="mb-2 text-sm font-semibold text-foreground">{node.node_name}</div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {node.available_columns.map((column) => {
-                    const isDisabled = disabledSet.has(column);
-                    const checked =
-                      isDisabled || (selectedDetachColumns[node.node_id] || []).includes(column);
+                    const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
                     const isAnalysisColumn = column === node.text_column;
                     return (
                       <label
@@ -134,7 +144,7 @@ export function DetachColumnsDialog({
                           onCheckedChange={(value: boolean | 'indeterminate') =>
                             toggleDetachColumn(node.node_id, column, value === true)
                           }
-                          disabled={isDetaching || isDisabled}
+                          disabled={isDetaching}
                         />
                         <span className={isAnalysisColumn ? 'font-semibold' : undefined}>
                           {column}
@@ -150,7 +160,7 @@ export function DetachColumnsDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDetaching}>Cancel</AlertDialogCancel>
-          <DisabledReasonTooltip reason={confirmDisabledReason}>
+          <DisabledReasonTooltip reason={effectiveConfirmDisabledReason}>
             <Button asChild size="sm" disabled={isDetachDisabled}>
               <AlertDialogAction
                 onClick={(event) => {
