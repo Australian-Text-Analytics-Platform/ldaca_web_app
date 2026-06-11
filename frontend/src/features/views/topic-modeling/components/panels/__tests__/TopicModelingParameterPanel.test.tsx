@@ -43,9 +43,7 @@ const baseProps = {
   corpusSamples: [],
   nodeDocCounts: [],
   onCorpusSampleChange: vi.fn(),
-  topicSizeMode: 'exact' as const,
-  onTopicSizeModeChange: vi.fn(),
-  topicSizeValue: 25,
+  topicSizeValue: 10,
   topicSizeUserSet: false,
   topicSizeWarning: null as 'orange' | 'red' | null,
   onTopicSizeValueChange: vi.fn(),
@@ -74,7 +72,7 @@ describe('TopicModelingParameterPanel', () => {
   it('keeps the raw topic size value input while editing', () => {
     render(<TopicModelingParameterPanel {...baseProps} topicSizeValue={25} />);
 
-    const input = screen.getByLabelText('Topic size value') as HTMLInputElement;
+    const input = screen.getByLabelText('Minimum topic size') as HTMLInputElement;
 
     fireEvent.change(input, { target: { value: '' } });
     expect(input.value).toBe('');
@@ -135,15 +133,15 @@ describe('TopicModelingParameterPanel', () => {
     expect(screen.getByText(/sampled corpus may be too small/i)).toBeInTheDocument();
   });
 
-  it('shows a target-mode slowdown tooltip icon when Target Topic Number is selected', () => {
-    render(<TopicModelingParameterPanel {...baseProps} topicSizeMode="exact" />);
+  it('renders a Minimum topic size control with an explanatory help icon', () => {
+    render(<TopicModelingParameterPanel {...baseProps} topicSizeValue={10} />);
 
-    const tooltipIcon = screen.getByLabelText(/Target Topic Number/i);
-    const input = screen.getByLabelText('Topic size value');
+    const tooltipIcon = screen.getByLabelText(/Minimum topic size is the smallest/i);
+    const input = screen.getByLabelText('Minimum topic size');
     expect(tooltipIcon).toHaveAttribute(
       'title',
-      expect.stringMatching(/may run slower than Min Topic Size/i),
+      expect.stringMatching(/smallest number of documents that can form a topic/i),
     );
-    expect(tooltipIcon.compareDocumentPosition(input)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(input).toBeInTheDocument();
   });
 });

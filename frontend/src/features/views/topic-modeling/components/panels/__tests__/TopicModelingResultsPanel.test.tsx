@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -44,7 +44,7 @@ const baseProps = {
         },
       ],
       corpus_sizes: [4],
-      meta: { raw_total_topics: 12 },
+      meta: {},
     },
   },
   error: null,
@@ -77,13 +77,8 @@ const baseProps = {
   onTopicSearchQueryChange: vi.fn(),
   activeDomain: null,
   nodeNames: ['Corpus A'],
-  topicSizeMode: 'exact',
-  topicSizeValue: 5,
-  currentExactTopicCount: 5,
+  topicSizeValue: 10,
   randomSeed: 42,
-  exactTopicCountRange: { min: 2, max: 12 },
-  isUpdatingExactTopicCount: false,
-  onUpdateExactTopicCount: vi.fn(),
   detachDialogOpen: false,
   setDetachDialogOpen: vi.fn(),
   detachNodeOptions: [],
@@ -95,50 +90,16 @@ const baseProps = {
 };
 
 describe('TopicModelingResultsPanel', () => {
-  it('shows the post-run exact topic count control for successful exact results', () => {
+  it('renders successful results without the removed exact-topic-count slider', () => {
     render(
       <TooltipProvider>
         <TopicModelingResultsPanel {...baseProps} />
       </TooltipProvider>,
     );
 
-    expect(
-      screen.getByRole('slider', { name: 'Exact Topic No. after modelling' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.queryByText('Range 2-12 from the raw fit')).not.toBeInTheDocument();
-  });
-
-  it('shows the live exact topic count in a tooltip while sliding', () => {
-    render(
-      <TooltipProvider>
-        <TopicModelingResultsPanel {...baseProps} />
-      </TooltipProvider>,
-    );
-
-    const input = screen.getByRole('slider', { name: 'Exact Topic No. after modelling' });
-    fireEvent.mouseDown(input);
-    fireEvent.change(input, { target: { value: '9' } });
-
-    expect(screen.getByText('9')).toBeInTheDocument();
-  });
-
-  it('clamps and submits the updated exact topic count on slider release', () => {
-    const onUpdateExactTopicCount = vi.fn();
-    render(
-      <TooltipProvider>
-        <TopicModelingResultsPanel
-          {...baseProps}
-          onUpdateExactTopicCount={onUpdateExactTopicCount}
-        />
-      </TooltipProvider>,
-    );
-
-    const input = screen.getByRole('slider', { name: 'Exact Topic No. after modelling' });
-    fireEvent.change(input, { target: { value: '20' } });
-    fireEvent.mouseUp(input);
-
-    expect(onUpdateExactTopicCount).toHaveBeenCalledWith(12);
+    // The post-fit re-aggregation slider was removed along with target/exact
+    // topic-count modes; only the native min-cluster-size control remains.
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+    expect(screen.getByText('Topics (1)')).toBeInTheDocument();
   });
 });

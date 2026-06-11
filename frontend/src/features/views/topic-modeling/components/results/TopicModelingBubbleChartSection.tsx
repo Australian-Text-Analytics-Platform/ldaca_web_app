@@ -40,7 +40,6 @@ type Props = {
   onTopicSearchQueryChange: (query: string) => void;
   activeDomain: ZoomDomain | null;
   nodeNames?: string[];
-  topicSizeMode?: string;
   topicSizeValue?: number;
   randomSeed?: number;
   /** Rendered between the bubble chart and the topic list. Hosts the
@@ -123,7 +122,6 @@ export function TopicModelingBubbleChartSection({
   onTopicSearchQueryChange,
   activeDomain,
   nodeNames,
-  topicSizeMode,
   topicSizeValue,
   randomSeed,
   controlRowSlot,
@@ -146,15 +144,12 @@ export function TopicModelingBubbleChartSection({
 
     // Join all node names with '_' so the filename reflects both data blocks
     const nodeName = (nodeNames ?? []).filter(Boolean).join('_') || 'data';
-    const topicSizeLabel =
-      topicSizeMode === 'min'
-        ? 'Min Topic Size'
-        : topicSizeMode === 'exact'
-          ? 'Exact Topics'
-          : 'Target Topics';
     const header: ChartExportHeaderItem[] = [
       { label: 'Data Block', value: nodeNames?.join(', ') ?? 'data' },
-      { label: topicSizeLabel, value: topicSizeValue != null ? String(topicSizeValue) : '—' },
+      {
+        label: 'Minimum topic size',
+        value: topicSizeValue != null ? String(topicSizeValue) : '—',
+      },
       { label: 'Random Seed', value: randomSeed != null ? String(randomSeed) : '—' },
       { label: 'Topics', value: String(topics.length) },
     ];

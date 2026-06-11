@@ -3,13 +3,6 @@ import { CircleHelp } from 'lucide-react';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import HelpIcon from '@/components/help/HelpIcon';
 import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
@@ -46,8 +39,6 @@ type Props = {
   corpusSamples: CorpusSample[];
   nodeDocCounts: number[];
   onCorpusSampleChange: (idx: number, update: Partial<CorpusSample>) => void;
-  topicSizeMode: 'min' | 'exact';
-  onTopicSizeModeChange: (mode: 'min' | 'exact') => void;
   topicSizeValue: number;
   topicSizeUserSet: boolean;
   topicSizeWarning: 'orange' | 'red' | null;
@@ -96,8 +87,6 @@ export function TopicModelingParameterPanel({
   corpusSamples,
   nodeDocCounts,
   onCorpusSampleChange,
-  topicSizeMode,
-  onTopicSizeModeChange,
   topicSizeValue,
   topicSizeUserSet,
   topicSizeWarning,
@@ -324,38 +313,24 @@ export function TopicModelingParameterPanel({
             <HelpIcon targetKey="analysis.topic-modeling.options" />
           </div>
 
-          {/* Row 1: mode dropdown + value input */}
+          {/* Row 1: minimum topic size (HDBSCAN min cluster size) */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <Select
-                value={topicSizeMode}
-                onValueChange={(v) => onTopicSizeModeChange(v as 'min' | 'exact')}
+            <Label
+              htmlFor="topic-size-value"
+              className="flex min-w-0 flex-1 items-center gap-1.5 whitespace-nowrap pl-3 text-sm"
+            >
+              Minimum topic size
+              <span
+                aria-label="Minimum topic size is the smallest number of documents that can form a topic; smaller values yield more, finer-grained topics"
+                title="Minimum topic size is the smallest number of documents that can form a topic. Smaller values yield more, finer-grained topics; the total number of topics is determined automatically."
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
               >
-                <SelectTrigger className="h-8 flex-1 text-sm font-medium">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="exact" className="text-sm font-medium">
-                    Target Topic Number
-                  </SelectItem>
-                  <SelectItem value="min" className="text-sm font-medium">
-                    Min Topic Size
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {topicSizeMode === 'exact' ? (
-                <span
-                  aria-label="Target Topic Number fits the model then merges topics to the chosen count"
-                  title="Target Topic Number fits the model first and then merges topics to your chosen count, so it may run slower than Min Topic Size."
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground"
-                >
-                  <CircleHelp className="h-4 w-4" />
-                </span>
-              ) : null}
-            </div>
+                <CircleHelp className="h-4 w-4" />
+              </span>
+            </Label>
             <Input
               id="topic-size-value"
-              aria-label="Topic size value"
+              aria-label="Minimum topic size"
               type="number"
               min={2}
               step={1}

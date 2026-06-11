@@ -6567,6 +6567,7 @@
       "TopicModelingRequest-Input": {
         "description": "Request schema used by API routes and generated clients for topic modeling request.\n\nUsed by:\n- analysis task helpers, backend API routes, backend request/response models, backend\n  tests because they need a stable JSON contract shared by route handlers, generated\n  clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "example": {
+          "min_topic_size": 10,
           "node_columns": {
             "node1": "text",
             "node2": "content"
@@ -6580,9 +6581,7 @@
           "sample_fractions": [
             0.2,
             0.5
-          ],
-          "topic_size_mode": "target",
-          "topic_size_value": 25
+          ]
         },
         "properties": {
           "min_topic_size": {
@@ -6655,35 +6654,6 @@
               }
             ],
             "title": "Sample Fractions"
-          },
-          "topic_size_mode": {
-            "anyOf": [
-              {
-                "enum": [
-                  "target",
-                  "min",
-                  "exact"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": "target",
-            "title": "Topic Size Mode"
-          },
-          "topic_size_value": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": 25,
-            "title": "Topic Size Value"
           }
         },
         "required": [
@@ -6698,8 +6668,8 @@
         "description": "Request model for topic-modeling analysis.\n\nUsed by:\n- topic-modeling run/update endpoints because they need a backend boundary that\n  validates inputs before delegating to workspace or worker state.\nWhy:\n- Validates node selection and clustering configuration inputs.\n\nFlow: normalize inputs, delegate to the owning backend state or service boundary, and\n    return serialized values or existing domain errors to callers.",
         "properties": {
           "min_topic_size": {
-            "default": 5,
-            "description": "Kept for backwards compatibility. Ignored when topic_size_mode is 'target' or 'exact' \u2014 computed from topic_size_value in those modes.",
+            "default": 10,
+            "description": "HDBSCAN minimum cluster size: the smallest group of chunks that counts as a topic. The number of topics is whatever HDBSCAN yields for this value (the only native topic-count control).",
             "title": "Min Topic Size",
             "type": "integer"
           },
@@ -6759,37 +6729,6 @@
             ],
             "description": "One sampling fraction (0 < f \u2264 1) per corpus in node_ids order. None for a corpus means no sampling. Sampling uses random_seed.",
             "title": "Sample Fractions"
-          },
-          "topic_size_mode": {
-            "anyOf": [
-              {
-                "enum": [
-                  "target",
-                  "min",
-                  "exact"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": "target",
-            "description": "'target': min_topic_size = max(2, n_eff // (topic_size_value * 10)). 'min': topic_size_value used directly as min_topic_size. 'exact': min_topic_size = max(5, int(target_min_topic_size * 0.75)) where target_min_topic_size = max(2, n_eff // (topic_size_value * 10)), then reduce_topics(nr_topics=topic_size_value) post-fit.",
-            "title": "Topic Size Mode"
-          },
-          "topic_size_value": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": 25,
-            "description": "Numeric parameter interpreted according to topic_size_mode.",
-            "title": "Topic Size Value"
           }
         },
         "required": [
@@ -6842,20 +6781,6 @@
           "message"
         ],
         "title": "TopicModelingResponse",
-        "type": "object"
-      },
-      "TopicModelingResultUpdateRequest": {
-        "description": "Request schema used by API routes and generated clients for topic modeling result update request.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "topic_size_value": {
-            "title": "Topic Size Value",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "topic_size_value"
-        ],
-        "title": "TopicModelingResultUpdateRequest",
         "type": "object"
       },
       "TopicModelingTopic": {
@@ -16421,74 +16346,6 @@
           }
         },
         "summary": "Topic Modeling Task Result",
-        "tags": [
-          "workspace_management",
-          "topic-modeling"
-        ]
-      },
-      "post": {
-        "description": "Re-aggregate a completed exact topic-modeling task without refitting.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI POST /topic-modeling/tasks/{task_id}/result route because they need this unit's \"Re-aggregate a completed exact topic-modeling task without refitting\" behavior.",
-        "operationId": "update_topic_modeling_task_result",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "task_id",
-            "required": true,
-            "schema": {
-              "title": "Task Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TopicModelingResultUpdateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TopicModelingResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Update Topic Modeling Task Result",
         "tags": [
           "workspace_management",
           "topic-modeling"

@@ -4886,14 +4886,6 @@ export type TopicModelingRequestInput = {
      * Sample Fractions
      */
     sample_fractions?: Array<number | null> | null;
-    /**
-     * Topic Size Mode
-     */
-    topic_size_mode?: 'target' | 'min' | 'exact' | null;
-    /**
-     * Topic Size Value
-     */
-    topic_size_value?: number | null;
 };
 
 /**
@@ -4914,7 +4906,7 @@ export type TopicModelingRequestOutput = {
     /**
      * Min Topic Size
      *
-     * Kept for backwards compatibility. Ignored when topic_size_mode is 'target' or 'exact' — computed from topic_size_value in those modes.
+     * HDBSCAN minimum cluster size: the smallest group of chunks that counts as a topic. The number of topics is whatever HDBSCAN yields for this value (the only native topic-count control).
      */
     min_topic_size?: number;
     /**
@@ -4949,18 +4941,6 @@ export type TopicModelingRequestOutput = {
      * One sampling fraction (0 < f ≤ 1) per corpus in node_ids order. None for a corpus means no sampling. Sampling uses random_seed.
      */
     sample_fractions?: Array<number | null> | null;
-    /**
-     * Topic Size Mode
-     *
-     * 'target': min_topic_size = max(2, n_eff // (topic_size_value * 10)). 'min': topic_size_value used directly as min_topic_size. 'exact': min_topic_size = max(5, int(target_min_topic_size * 0.75)) where target_min_topic_size = max(2, n_eff // (topic_size_value * 10)), then reduce_topics(nr_topics=topic_size_value) post-fit.
-     */
-    topic_size_mode?: 'target' | 'min' | 'exact' | null;
-    /**
-     * Topic Size Value
-     *
-     * Numeric parameter interpreted according to topic_size_mode.
-     */
-    topic_size_value?: number | null;
     [key: string]: unknown;
 };
 
@@ -4987,25 +4967,6 @@ export type TopicModelingResponse = {
      * State
      */
     state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * TopicModelingResultUpdateRequest
- *
- * Request schema used by API routes and generated clients for topic modeling result update request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingResultUpdateRequest = {
-    /**
-     * Topic Size Value
-     */
-    topic_size_value: number;
 };
 
 /**
@@ -10406,42 +10367,6 @@ export type TopicModelingTaskResultResponses = {
 };
 
 export type TopicModelingTaskResultResponse = TopicModelingTaskResultResponses[keyof TopicModelingTaskResultResponses];
-
-export type UpdateTopicModelingTaskResultData = {
-    body: TopicModelingResultUpdateRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/topic-modeling/tasks/{task_id}/result';
-};
-
-export type UpdateTopicModelingTaskResultErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type UpdateTopicModelingTaskResultError = UpdateTopicModelingTaskResultErrors[keyof UpdateTopicModelingTaskResultErrors];
-
-export type UpdateTopicModelingTaskResultResponses = {
-    /**
-     * Successful Response
-     */
-    200: TopicModelingResponse;
-};
-
-export type UpdateTopicModelingTaskResultResponse = UpdateTopicModelingTaskResultResponses[keyof UpdateTopicModelingTaskResultResponses];
 
 export type UnloadWorkspaceData = {
     body?: never;

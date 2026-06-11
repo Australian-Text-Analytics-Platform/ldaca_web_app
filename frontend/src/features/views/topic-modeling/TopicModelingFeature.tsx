@@ -7,7 +7,6 @@ import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils
 import {
   topicModelingTaskRequest,
   topicModelingTaskResult,
-  updateTopicModelingTaskResult,
 } from '@/api/generated/sdk.gen';
 import type {
   TopicModelingResponse,
@@ -40,7 +39,7 @@ import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 
-const DEFAULT_TOPIC_SIZE_VALUE = 20;
+const DEFAULT_TOPIC_SIZE_VALUE = 10;
 
 /** Renders the topic-modeling workflow for live BERTopic runs and result exploration. */
 /**
@@ -98,8 +97,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     min_topic_size?: number;
     random_seed?: number;
     representative_words_count?: number;
-    topic_size_mode?: string;
-    topic_size_value?: number;
   } | null;
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
@@ -114,10 +111,11 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
   // through Clear Results if the user explicitly touched them, so the user
   // doesn't lose tuned sampling when re-running on the same corpora.
   const [corpusSamplesUserSet, setCorpusSamplesUserSet] = useState(false);
-  const [topicSizeMode, setTopicSizeMode] = useState<'min' | 'exact'>('exact');
+  // "Minimum topic size" = HDBSCAN min_cluster_size: the smallest group of
+  // chunks that counts as a topic. The topic count is whatever emerges (the
+  // only native topic-count control; there is no post-fit merge to a target).
   const [topicSizeValue, setTopicSizeValue] = useState(DEFAULT_TOPIC_SIZE_VALUE);
   const [topicSizeUserSet, setTopicSizeUserSet] = useState(false);
-  const [referenceTopicNo, setReferenceTopicNo] = useState(DEFAULT_TOPIC_SIZE_VALUE);
   const [randomSeed, setRandomSeed] = useState(42);
   const [randomSeedUserSet, setRandomSeedUserSet] = useState(false);
   const [representativeWordsCount, setRepresentativeWordsCount] = useState(15);
@@ -135,7 +133,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
   const [chartWidth, setChartWidth] = useState<number>(800);
   const chartResizeFrameRef = useRef<number | null>(null);
   const [isClearing, setIsClearing] = useState(false);
-  const [isUpdatingExactTopicCount, setIsUpdatingExactTopicCount] = useState(false);
 
   const {
     resolveTaskId,
@@ -219,11 +216,8 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
       setRandomSeedUserSet(true);
       setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
       setRepresentativeWordsCountUserSet(true);
-      const persistedMode = req.topic_size_mode as 'min' | 'exact' | undefined;
-      setTopicSizeMode(persistedMode === 'min' ? 'min' : 'exact');
-      const hydratedTopicSizeValue = Number(req.topic_size_value ?? DEFAULT_TOPIC_SIZE_VALUE);
+      const hydratedTopicSizeValue = Number(req.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE);
       setTopicSizeValue(hydratedTopicSizeValue);
-      setReferenceTopicNo(hydratedTopicSizeValue);
       setTopicSizeUserSet(true);
       if (nodeIds.length && currentWorkspaceId) {
         try {
@@ -301,37 +295,20 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     if (!corpusSamplesUserSet) {
       setCorpusSamples(computeDefaultCorpusSamples());
     }
-    setTopicSizeMode('exact');
     setTopicSizeValue(DEFAULT_TOPIC_SIZE_VALUE);
     setTopicSizeUserSet(false);
-    setReferenceTopicNo(DEFAULT_TOPIC_SIZE_VALUE);
     setRandomSeedUserSet(false);
     setRepresentativeWordsCountUserSet(false);
     setIsClearing(false);
   };
 
-  // Switches between min-topic-size and exact-topic target modes for the next run.
-  /**
-   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleTopicSizeModeChange = (mode: 'min' | 'exact') => {
-    setTopicSizeMode(mode);
-    setTopicSizeUserSet(false);
-    if (mode !== 'min') {
-      setTopicSizeValue(referenceTopicNo);
-    }
-  };
-
-  // Records the next-run topic size value and keeps the exact-topic reference in sync.
+  // Records the next-run minimum topic size (HDBSCAN min_cluster_size).
   /**
    * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleTopicSizeValueChange = (value: number) => {
     setTopicSizeValue(value);
     setTopicSizeUserSet(true);
-    if (topicSizeMode !== 'min') {
-      setReferenceTopicNo(value);
-    }
   };
 
   // Toggles topics selected for detach/export workflows.
@@ -453,11 +430,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     serverRequest: typedServerRequest,
     currentParams: {
       random_seed: Number(randomSeed),
-      topic_size_mode: topicSizeMode,
-      // Target Topic Number (exact) and Min Topic Size both trip the rerun:
-      // the post-fit slider is decoupled and writes to its own state, so
-      // changes to this parameter always represent a "next-rerun" intent.
-      topic_size_value: Number(topicSizeValue),
+      min_topic_size: Number(topicSizeValue),
       // representative_words_count is a frontend display cap (bounded by
       // the originally-fitted value); changes within range don't require
       // a rerun and so are excluded here.
@@ -467,8 +440,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getServerParams: (request) => ({
       random_seed: Number(request.random_seed),
-      topic_size_mode: request.topic_size_mode ?? 'exact',
-      topic_size_value: Number(request.topic_size_value ?? DEFAULT_TOPIC_SIZE_VALUE),
+      min_topic_size: Number(request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
       sample_fractions: normalizeSampleFractions(
         (request as unknown as { sample_fractions?: unknown }).sample_fractions,
         panelNodeIds.length,
@@ -540,23 +512,15 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
 
   const combinedEffective = effectiveDocCounts.reduce((a, b) => a + b, 0);
 
-  // Docs-per-estimated-topic: for target/exact this is combinedEffective/value;
-  // for min mode the value itself is the minimum cluster size (= docs per topic floor).
+  // "Minimum topic size" is the HDBSCAN min_cluster_size, i.e. the floor on
+  // documents (chunks) per topic. A very small floor produces noisy/unstable
+  // micro-topics, so warn as it drops below readable thresholds.
   const topicSizeWarning: 'orange' | 'red' | null = useMemo(() => {
     if (combinedEffective <= 0 || topicSizeValue <= 0) return null;
-    const docsPerTopic =
-      topicSizeMode === 'min' ? topicSizeValue : combinedEffective / topicSizeValue;
-    if (docsPerTopic < 3) return 'red';
-    if (docsPerTopic < 10) return 'orange';
+    if (topicSizeValue < 3) return 'red';
+    if (topicSizeValue < 10) return 'orange';
     return null;
-  }, [topicSizeMode, topicSizeValue, combinedEffective]);
-
-  // Auto-recalculate min topic size when in 'min' mode and not overridden by user
-  useEffect(() => {
-    if (topicSizeMode !== 'min' || topicSizeUserSet || combinedEffective <= 0) return;
-    const autoMin = Math.max(2, Math.floor(combinedEffective / (10 * referenceTopicNo)));
-    void Promise.resolve().then(() => setTopicSizeValue(autoMin));
-  }, [topicSizeMode, topicSizeUserSet, combinedEffective, referenceTopicNo]);
+  }, [topicSizeValue, combinedEffective]);
 
   const showSamplingWarning =
     combinedEffective > 0 && combinedEffective < 5 * (topicSizeValue ?? DEFAULT_TOPIC_SIZE_VALUE);
@@ -621,8 +585,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
       representativeWordsCount,
       selectedTopicIds,
       sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
-      topicSizeMode,
-      topicSizeValue,
+      minTopicSize: topicSizeValue,
       displayedTopics: topics,
     },
     actions: {
@@ -647,20 +610,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
   });
 
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
-  const exactRawTopicCount = (() => {
-    const rawValue = result?.data?.meta?.raw_total_topics;
-    if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
-      return null;
-    }
-    return Math.max(0, Math.trunc(rawValue));
-  })();
-  const currentExactTopicCount = (() => {
-    const metaValue = result?.data?.meta?.topic_size_value;
-    if (typeof metaValue === 'number' && Number.isFinite(metaValue)) {
-      return Math.max(0, Math.trunc(metaValue));
-    }
-    return null;
-  })();
   const chartPadding = 40;
   const chartHeight = Math.min(520, Math.max(320, Math.round(chartWidth * 0.55)));
 
@@ -726,46 +675,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     });
   };
 
-  // Re-aggregates a completed exact-topic result without changing the next-run parameter input.
-  /**
-   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
-   */
-  const handleUpdateExactTopicCount = async (value: number) => {
-    if (topicSizeMode !== 'exact') return;
-    const taskId = await resolveTaskId();
-    if (!taskId) {
-      setError('No completed topic modeling task available to update.');
-      return;
-    }
-
-    setIsUpdatingExactTopicCount(true);
-    setError(null);
-    try {
-      const { data: updated } = await updateTopicModelingTaskResult({
-        body: { topic_size_value: value },
-        headers: getAuthHeaders(),
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      // The slider is decoupled from the "Target Topic Number" parameter
-      // input: it represents the post-fit display target only, so we just
-      // swap in the new result and clear transient selection state. The
-      // parameter panel input (`topicSizeValue`) is left alone so the user
-      // can still see / edit the next-rerun target independently.
-      setResultSafely(updated);
-      setSelectedTopicIds(new Set());
-      setHoveredTopicId(null);
-      setTopicSearchQuery('');
-    } catch (updateError: unknown) {
-      setError(
-        updateError instanceof Error ? updateError.message : 'Failed to update exact topic count',
-      );
-    } finally {
-      setIsUpdatingExactTopicCount(false);
-    }
-  };
-
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
 
   return (
@@ -790,8 +699,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
             return next;
           });
         }}
-        topicSizeMode={topicSizeMode}
-        onTopicSizeModeChange={handleTopicSizeModeChange}
         topicSizeValue={topicSizeValue}
         topicSizeUserSet={topicSizeUserSet}
         topicSizeWarning={topicSizeWarning}
@@ -854,17 +761,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
               .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
               .filter(Boolean) as string[]
           }
-          topicSizeMode={topicSizeMode}
-          topicSizeValue={topicSizeValue}
-          currentExactTopicCount={currentExactTopicCount}
           randomSeed={randomSeed}
-          exactTopicCountRange={
-            topicSizeMode === 'exact' && exactRawTopicCount && exactRawTopicCount >= 2
-              ? { min: 2, max: exactRawTopicCount }
-              : null
-          }
-          isUpdatingExactTopicCount={isUpdatingExactTopicCount}
-          onUpdateExactTopicCount={handleUpdateExactTopicCount}
           detachDialogOpen={detachDialogOpen}
           setDetachDialogOpen={setDetachDialogOpen}
           detachNodeOptions={detachNodeOptions}

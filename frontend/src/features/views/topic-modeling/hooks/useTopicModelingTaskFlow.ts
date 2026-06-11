@@ -19,7 +19,7 @@ import { buildSamplingAutoNodeName } from '@/features/views/preprocessing/utils/
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
-const DEFAULT_TOPIC_SIZE_VALUE = 20;
+const DEFAULT_TOPIC_SIZE_VALUE = 10;
 type TopicModelingRequest = TopicModelingRequestInput;
 
 interface TopicModelingState {
@@ -31,8 +31,7 @@ interface TopicModelingState {
   representativeWordsCount: number;
   selectedTopicIds: Set<number>;
   sampleFractions?: (number | null)[] | null;
-  topicSizeMode?: 'min' | 'exact';
-  topicSizeValue?: number;
+  minTopicSize?: number;
   /**
    * Currently-displayed topic list — already filtered by the post-fit
    * stopword toggle and carrying ``representative_words`` in display order.
@@ -105,8 +104,7 @@ export function useTopicModelingTaskFlow({
     representativeWordsCount,
     selectedTopicIds,
     sampleFractions,
-    topicSizeMode,
-    topicSizeValue,
+    minTopicSize,
     displayedTopics,
   },
   actions: {
@@ -166,8 +164,7 @@ export function useTopicModelingTaskFlow({
         node_columns: nodeColumns,
         random_seed: randomSeed,
         representative_words_count: representativeWordsCount,
-        topic_size_mode: topicSizeMode ?? 'exact',
-        topic_size_value: topicSizeValue ?? DEFAULT_TOPIC_SIZE_VALUE,
+        min_topic_size: minTopicSize ?? DEFAULT_TOPIC_SIZE_VALUE,
         ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
       };
 
