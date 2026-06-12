@@ -1846,6 +1846,10 @@ export type DetachNodeOption = {
      */
     available_columns: Array<string>;
     /**
+     * Default Selected Columns
+     */
+    default_selected_columns?: Array<string> | null;
+    /**
      * Disabled Columns
      */
     disabled_columns?: Array<string>;

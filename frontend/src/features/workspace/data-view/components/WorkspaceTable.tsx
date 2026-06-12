@@ -29,6 +29,7 @@ import { RowDetailPanel } from '@/features/views/common/components/RowDetailPane
 import { useRowDetailDialog } from '@/features/views/common/components/useRowDetailDialog';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { WorkspaceColumnHeader } from './WorkspaceColumnHeader';
+import { TopicDistributionBar } from './TopicDistributionBar';
 import type { DataRow, FilterOperator, PaginationInfo } from '../types';
 import { DATA_TYPES, getTypeDisplayName, normalizeTypeName } from '../services/schemaMutations';
 import { useColumnMutations } from '../hooks/useColumnMutations';
@@ -302,6 +303,11 @@ export function WorkspaceTable({
        */
       cell: ({ getValue }) => {
         const cellValue = getValue();
+        // Topic-distribution columns render as a stacked proportion bar rather
+        // than stringified struct text.
+        if (currentType === 'tmdist') {
+          return <TopicDistributionBar value={cellValue} />;
+        }
         const displayValue = cellValue == null ? '' : String(cellValue);
         return (
           <span className="block truncate" title={displayValue}>

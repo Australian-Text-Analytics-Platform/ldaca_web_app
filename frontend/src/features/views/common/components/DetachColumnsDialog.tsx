@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,9 @@ export type DetachDialogNodeOption = {
   node_name: string;
   available_columns: string[];
   disabled_columns?: string[];
+  /** Columns to tick by default when the dialog opens. When absent the caller
+   * falls back to its per-tool default (e.g. select-all). */
+  default_selected_columns?: string[] | null;
   /** Column the analysis ran on. Bolded in the column list so it
    * stands out from sibling metadata columns. */
   text_column?: string | null;
@@ -37,6 +40,10 @@ type DetachColumnsDialogProps = {
   selectAllDetachColumns: () => void;
   deselectAllDetachColumns: () => void;
   handleDetachConfirm: () => Promise<void> | void;
+  /** Optional extra UI rendered between the column list and the footer (e.g.
+   * topic-modeling's distribution filter builder). Kept generic so the shared
+   * dialog stays tool-agnostic. */
+  extraContent?: ReactNode;
   /** When set, the confirm button is disabled and the string is shown
    * as a hover tooltip explaining why. Callers opt in per analysis
    * tool — e.g. topic modelling needs a metadata column selected
@@ -64,6 +71,7 @@ export function DetachColumnsDialog({
   selectAllDetachColumns,
   deselectAllDetachColumns,
   handleDetachConfirm,
+  extraContent,
   confirmDisabledReason,
 }: DetachColumnsDialogProps) {
   const canSelectAll = detachNodeOptions.some((node) => {
@@ -157,6 +165,8 @@ export function DetachColumnsDialog({
             );
           })}
         </div>
+
+        {extraContent}
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDetaching}>Cancel</AlertDialogCancel>

@@ -424,7 +424,9 @@ export const useFilterSubTabSections = (
 
     conditions.forEach((condition) => {
       if (
-        (condition.dataType === 'categorical' || condition.dataType === 'list_string') &&
+        (condition.dataType === 'categorical' ||
+          condition.dataType === 'list[string]' ||
+          condition.dataType === 'tmdist') &&
         condition.column
       ) {
         const key = getCategoricalKey(condition.column);
@@ -539,11 +541,20 @@ export const useFilterSubTabSections = (
             updated.dataType = columnInfo.dataType;
             const nextOperator = getDefaultOperatorForType(columnInfo.dataType);
             updated.operator = nextOperator;
-            updated.value = nextOperator === 'in' ? [] : '';
+            if (columnInfo.dataType === 'tmdist') {
+              // Topic-distribution filter: default to "topic 0 ≥ 5%".
+              updated.value = { topic_id: 0, threshold: 0.05 };
+            } else {
+              updated.value = nextOperator === 'in' ? [] : '';
+            }
             updated.regex = false;
             updated.caseSensitive = false;
 
-            if (columnInfo.dataType === 'categorical' || columnInfo.dataType === 'list_string') {
+            if (
+              columnInfo.dataType === 'categorical' ||
+              columnInfo.dataType === 'list[string]' ||
+              columnInfo.dataType === 'tmdist'
+            ) {
               nextCategoricalColumnToLoad = columnInfo.name;
             }
 
@@ -569,7 +580,7 @@ export const useFilterSubTabSections = (
           if (value === 'in') {
             updated.value = Array.isArray(updated.value) ? updated.value : [];
             if (
-              (updated.dataType === 'categorical' || updated.dataType === 'list_string') &&
+              (updated.dataType === 'categorical' || updated.dataType === 'list[string]') &&
               updated.column
             ) {
               nextCategoricalColumnToLoad = updated.column;
@@ -615,7 +626,11 @@ export const useFilterSubTabSections = (
           : targetCondition?.dataType;
       void ensureCategoricalOptions(
         nextCategoricalColumnToLoad,
-        targetType === 'categorical' || targetType === 'list_string' ? targetType : 'categorical',
+        targetType === 'categorical' ||
+          targetType === 'list[string]' ||
+          targetType === 'tmdist'
+          ? targetType
+          : 'categorical',
       );
     }
   };
@@ -674,7 +689,11 @@ export const useFilterSubTabSections = (
    * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const shouldHideOperatorSelect = (condition: FilterConditionWithId) =>
-    condition.dataType === 'categorical' || condition.dataType === 'list_string';
+    condition.dataType === 'categorical' ||
+    condition.dataType === 'list[string]' ||
+    // tmdist renders its own topic + operator + value controls together so the
+    // topic dropdown can sit before the operator.
+    condition.dataType === 'tmdist';
 
   /**
    * Supplies type-aware operator options to the shared ConditionBuilder.
@@ -808,7 +827,87 @@ export const useFilterSubTabSections = (
 
     const dataType = condition.dataType || 'string';
 
-    if (dataType === 'categorical' || dataType === 'list_string') {
+    if (dataType === 'tmdist') {
+      // Topic-distribution column: render [topic dropdown] [operator] [value %].
+      // The generic operator select is hidden for tmdist (see
+      // shouldHideOperatorSelect) so the topic dropdown can sit first. Topic
+      // options come from the column's distinct topic ids (loaded like
+      // categorical options); threshold is stored as a 0..1 fraction.
+      const current =
+        condition.value && typeof condition.value === 'object' && 'topic_id' in condition.value
+          ? (condition.value as { topic_id: number; threshold: number })
+          : { topic_id: 0, threshold: 0.05 };
+      const patch = (next: Partial<{ topic_id: number; threshold: number }>) =>
+        handleConditionChange(condition.id, 'value', { ...current, ...next });
+
+      const key = condition.column ? getCategoricalKey(condition.column) : null;
+      const optionState = key ? categoricalOptions[key] : undefined;
+      const topicIds = (optionState?.options ?? [])
+        .map((opt) => Number(opt.value))
+        .filter((n) => Number.isFinite(n))
+        .sort((a, b) => a - b);
+      const operatorOptions = getOperatorsForType('tmdist');
+
+      return (
+        <div className="flex flex-1 flex-wrap items-center gap-1.5">
+          <Select
+            value={String(current.topic_id)}
+            onValueChange={(v) => patch({ topic_id: Number(v) })}
+            disabled={disabled || topicIds.length === 0}
+          >
+            <SelectTrigger className="w-32" aria-label="Topic">
+              <SelectValue placeholder={optionState?.loading ? 'Loading…' : 'Topic'} />
+            </SelectTrigger>
+            <SelectContent>
+              {topicIds.map((tid) => (
+                <SelectItem key={tid} value={String(tid)}>
+                  Topic {tid}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={condition.operator}
+            onValueChange={(v) =>
+              handleConditionChange(
+                condition.id,
+                'operator',
+                v as FilterConditionWithId['operator'],
+              )
+            }
+            disabled={disabled}
+          >
+            <SelectTrigger className="w-20" aria-label="Comparison operator">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {operatorOptions.map((op) => (
+                <SelectItem key={op.value} value={op.value}>
+                  {op.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            aria-label="Proportion percentage"
+            value={Math.round((current.threshold ?? 0) * 100)}
+            onChange={(e) => {
+              const pct = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+              patch({ threshold: pct / 100 });
+            }}
+            className="w-20 rounded-md border border-input px-2 py-1 text-right text-sm text-foreground"
+            disabled={disabled}
+          />
+          <span className="text-sm text-muted-foreground">%</span>
+        </div>
+      );
+    }
+
+    if (dataType === 'categorical' || dataType === 'list[string]') {
       const column = condition.column;
       const key = column ? getCategoricalKey(column) : null;
       const optionState = key ? categoricalOptions[key] : undefined;

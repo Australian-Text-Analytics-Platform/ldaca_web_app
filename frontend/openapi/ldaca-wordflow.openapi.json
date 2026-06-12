@@ -2531,6 +2531,20 @@
             "title": "Available Columns",
             "type": "array"
           },
+          "default_selected_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Selected Columns"
+          },
           "disabled_columns": {
             "items": {
               "type": "string"

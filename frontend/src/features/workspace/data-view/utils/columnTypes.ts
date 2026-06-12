@@ -18,10 +18,19 @@ export interface ColumnInfo {
  * Ordered list of `(matcher → canonical type)` rules. First match wins, so
  * keep the most specific patterns on top.
  *
- * Canonical types: `annotation`, `list_string`, `string`, `datetime`,
+ * Canonical types: `tmdist`, `annotation`, `list[string]`, `string`, `datetime`,
  * `boolean`, `integer`, `float`, `categorical`, `struct`, `unknown`.
  */
 const TYPE_RULES: Array<[(s: string) => boolean, string]> = [
+  [
+    (s) =>
+      s === 'tmdist' ||
+      (s.includes('list') &&
+        s.includes('struct') &&
+        s.includes('topic_id') &&
+        s.includes('proportion')),
+    'tmdist',
+  ],
   [
     (s) =>
       s === 'annotation' ||
@@ -33,11 +42,12 @@ const TYPE_RULES: Array<[(s: string) => boolean, string]> = [
   ],
   [
     (s) =>
+      s === 'list[string]' ||
       s === 'list_string' ||
       s.includes('list(string') ||
       s.includes('list[utf8') ||
       s.includes('list[str'),
-    'list_string',
+    'list[string]',
   ],
   [(s) => s.includes('utf8') || s.includes('string') || s.includes('str'), 'string'],
   [(s) => s.includes('datetime') || s.includes('timestamp'), 'datetime'],

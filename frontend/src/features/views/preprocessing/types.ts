@@ -9,7 +9,9 @@ import type {
 
 export type FilterOperator =
   | 'eq'
+  | 'gt'
   | 'gte'
+  | 'lt'
   | 'lte'
   | 'contains'
   | 'startswith'
@@ -38,12 +40,16 @@ export type FilterRequest = Omit<
  * the API accepts.
  */
 export type ConditionRange = { start: string | Date | null; end: string | Date | null };
+/** Value shape for a TMDist (topic-distribution) filter condition: keep rows
+ * where one topic's proportion (0..1) compares against the threshold. */
+export type TmdistConditionValue = { topic_id: number; threshold: number };
 export type ConditionValue =
   | string
   | number
   | boolean
   | Date
   | ConditionRange
+  | TmdistConditionValue
   | null
   | Array<string | number | boolean | Date | null>;
 

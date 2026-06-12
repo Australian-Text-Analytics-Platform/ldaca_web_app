@@ -20,8 +20,16 @@ export const getOperatorsForType = (dataType: string) => {
       ];
     case 'categorical':
       return [{ value: 'in', label: 'is one of' }];
-    case 'list_string':
+    case 'list[string]':
       return [{ value: 'in', label: 'contains any of' }];
+    case 'tmdist':
+      // Topic-distribution: compare one topic's proportion against a threshold.
+      return [
+        { value: 'gte', label: '≥' },
+        { value: 'gt', label: '>' },
+        { value: 'lte', label: '≤' },
+        { value: 'lt', label: '<' },
+      ];
     case 'integer':
     case 'float':
       return [

@@ -4,8 +4,8 @@ import { normalizeTypeName as normalizeSharedType } from '@/features/workspace/d
 
 describe('preprocessing type utils', () => {
   it('normalizes list string dtype to list_string', () => {
-    expect(normalizePreprocessingType('List(String)')).toBe('list_string');
-    expect(normalizePreprocessingType('list_string')).toBe('list_string');
+    expect(normalizePreprocessingType('List(String)')).toBe('list[string]');
+    expect(normalizePreprocessingType('list_string')).toBe('list[string]');
   });
 
   it('maps non-string list/array dtypes to unknown', () => {
@@ -14,13 +14,13 @@ describe('preprocessing type utils', () => {
   });
 
   it('offers checklist operator set for list_string', () => {
-    expect(getOperatorsForType('list_string')).toEqual([{ value: 'in', label: 'contains any of' }]);
+    expect(getOperatorsForType('list[string]')).toEqual([{ value: 'in', label: 'contains any of' }]);
   });
 });
 
 describe('shared column type utils', () => {
   it('normalizes list string dtype to list_string', () => {
-    expect(normalizeSharedType('List(String)')).toBe('list_string');
+    expect(normalizeSharedType('List(String)')).toBe('list[string]');
   });
 
   it('maps non-string list/array dtypes to unknown', () => {

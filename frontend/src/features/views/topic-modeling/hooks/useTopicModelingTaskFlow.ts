@@ -229,11 +229,15 @@ export function useTopicModelingTaskFlow({
       });
       const nodes = resp?.data?.nodes ?? [];
       setDetachNodeOptions(nodes);
-      // Default-select every column (the topic column included): the user
-      // opts OUT of what they don't want rather than opting in.
+      // Default-select only the generated topic columns (TOPIC_top1,
+      // TOPIC_distribution) when the backend marks them; source columns start
+      // unticked, matching concordance/quotation. Falls back to select-all when
+      // no defaults are advertised.
       const initialSelections: Record<string, string[]> = {};
       nodes.forEach((node) => {
-        initialSelections[node.node_id] = [...node.available_columns];
+        initialSelections[node.node_id] = node.default_selected_columns
+          ? [...node.default_selected_columns]
+          : [...node.available_columns];
       });
       setSelectedDetachColumns(initialSelections);
       setDetachDialogOpen(true);

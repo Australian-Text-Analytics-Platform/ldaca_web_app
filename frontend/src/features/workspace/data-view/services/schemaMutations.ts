@@ -12,7 +12,7 @@ export const DATA_TYPES = [
   { value: 'float', label: 'float' },
   { value: 'boolean', label: 'boolean' },
   { value: 'datetime', label: 'datetime' },
-  { value: 'list_string', label: 'list_string' },
+  { value: 'list[string]', label: 'list[string]' },
 ] as const;
 
 /**
