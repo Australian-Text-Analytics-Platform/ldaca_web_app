@@ -1,0 +1,818 @@
+{
+  "src/components/__tests__/DocumentView.test.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/dialogs/DataFolderDialog.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/components/layout/WorkspaceShell.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/layout/sidebar/SidebarNodesSection.tsx": {
+    "@typescript-eslint/unbound-method": {
+      "count": 1
+    }
+  },
+  "src/components/layout/sidebar/SidebarTasksSection.tsx": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 2
+    }
+  },
+  "src/components/layout/sidebar/types.ts": {
+    "@typescript-eslint/no-redundant-type-constituents": {
+      "count": 5
+    }
+  },
+  "src/components/ui/Pagination.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/components/ui/alert-dialog.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 6
+    }
+  },
+  "src/components/ui/chart.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/components/ui/checkbox.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/components/ui/dialog.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 4
+    }
+  },
+  "src/components/ui/dropdown-menu.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 8
+    }
+  },
+  "src/components/ui/select.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 7
+    }
+  },
+  "src/components/ui/separator.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/components/ui/sidebar.tsx": {
+    "@typescript-eslint/no-confusing-void-expression": {
+      "count": 2
+    }
+  },
+  "src/components/ui/tag.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/components/ui/tooltip.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/config/env.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "src/features/feedback/feedbackContext.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    }
+  },
+  "src/features/hints/__tests__/hintRegistry.test.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/hints/conditions.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    }
+  },
+  "src/features/views/ai-annotator/AiAnnotatorFeature.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 8
+    },
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 3
+    }
+  },
+  "src/features/views/common/components/GroupedResultsPageSizeSummary.tsx": {
+    "@typescript-eslint/no-unnecessary-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/features/views/common/components/MetadataColumnSelector.tsx": {
+    "@typescript-eslint/no-unnecessary-boolean-literal-compare": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/features/views/common/components/MultiSeriesChart.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 3
+    }
+  },
+  "src/features/views/common/components/RowDetailPanel.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/common/components/tokenizerModelSelectorUtils.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    }
+  },
+  "src/features/views/common/hooks/useAnalysisFeature.ts": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 2
+    },
+    "@typescript-eslint/no-redundant-type-constituents": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 4
+    }
+  },
+  "src/features/views/common/hooks/useDetectedColumnLanguage.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/common/hooks/useServerTable.ts": {
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    }
+  },
+  "src/features/views/common/nodeInputs/useTabNodeInputs.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/common/nodeSelectionTypes.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/features/views/common/tasks/types.ts": {
+    "@typescript-eslint/no-redundant-type-constituents": {
+      "count": 1
+    }
+  },
+  "src/features/views/common/useAnalysisHydration.ts": {
+    "@typescript-eslint/use-unknown-in-catch-callback-variable": {
+      "count": 2
+    }
+  },
+  "src/features/views/common/useAnalysisTaskStatus.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/features/views/common/useNodeColorManagement.ts": {
+    "@typescript-eslint/unbound-method": {
+      "count": 6
+    }
+  },
+  "src/features/views/common/useNodeColumnOptions.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/common/useSafeResult.ts": {
+    "@typescript-eslint/no-unnecessary-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/features/views/concordance/ConcordanceFeature.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 5
+    },
+    "@typescript-eslint/no-confusing-void-expression": {
+      "count": 1
+    },
+    "@typescript-eslint/no-meaningless-void-operator": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 5
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "src/features/views/concordance/components/ConcordanceDispersionCell.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 3
+    }
+  },
+  "src/features/views/concordance/components/ConcordanceDispersionNodeBlock.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 5
+    },
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 5
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/concordance/components/ConcordanceDispersionSummary.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/concordance/components/ConcordanceResultsPanel.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/concordance/components/ConcordanceTableNodeBlock.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 5
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/concordance/concordanceViewModels.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 2
+    }
+  },
+  "src/features/views/concordance/hooks/useConcordanceMaterializedEvents.ts": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/features/views/concordance/hooks/useConcordanceMetadataColumns.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/concordance/hooks/useConcordancePendingHandoff.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/concordance/hooks/useConcordanceTaskFlow.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/features/views/concordance/hooks/useConcordanceViewModeSwap.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 2
+    }
+  },
+  "src/features/views/data-loader/DataLoaderFeature.tsx": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 2
+    }
+  },
+  "src/features/views/data-loader/components/ActiveWorkspaceCard.tsx": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/data-loader/components/DataLoaderDialogs.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/features/views/data-loader/components/FilePreviewContent.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    }
+  },
+  "src/features/views/data-loader/components/WorkspaceManagerCard.tsx": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/export/ExportFeature.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 3
+    }
+  },
+  "src/features/views/preprocessing/DataPreprocessingFeature.tsx": {
+    "@typescript-eslint/no-useless-default-assignment": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/__tests__/DataPreprocessingFeature.test.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/aggregate/components/OperationPopover.tsx": {
+    "@typescript-eslint/use-unknown-in-catch-callback-variable": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/components/PreviewTable.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/concat/hooks/useConcatSubTab.ts": {
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 2
+    }
+  },
+  "src/features/views/preprocessing/expression/PolarsExpressionSubTab.tsx": {
+    "@typescript-eslint/no-confusing-void-expression": {
+      "count": 7
+    },
+    "@typescript-eslint/no-meaningless-void-operator": {
+      "count": 7
+    }
+  },
+  "src/features/views/preprocessing/filter/hooks/useFilterSubTabSections.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 5
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 5
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/filter/utils/serializers.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 3
+    }
+  },
+  "src/features/views/preprocessing/hooks/__tests__/useNodePreviewWithRawFallback.test.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/hooks/useNodePreviewWithRawFallback.ts": {
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/hooks/usePreprocessingPreview.ts": {
+    "@typescript-eslint/use-unknown-in-catch-callback-variable": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/join/hooks/useJoinSubTab.ts": {
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/slice/hooks/useSliceSubTab.ts": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/features/views/preprocessing/types.ts": {
+    "@typescript-eslint/no-redundant-type-constituents": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/utils/__tests__/placeholderTabFill.test.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/utils/dateTimeUtils.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/utils/nodeMetadata.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/preprocessing/utils/typeUtils.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    }
+  },
+  "src/features/views/quotation/QuotationFeature.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 9
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 3
+    }
+  },
+  "src/features/views/quotation/components/QuotationNodeBlock.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    }
+  },
+  "src/features/views/quotation/components/quotationDetailText.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 3
+    }
+  },
+  "src/features/views/quotation/hooks/__tests__/useQuotationTaskFlow.test.tsx": {
+    "@typescript-eslint/no-confusing-void-expression": {
+      "count": 2
+    }
+  },
+  "src/features/views/quotation/hooks/useQuotationTaskFlow.ts": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 5
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 18
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/sequential-analysis/components/SequentialChart.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/sequential-analysis/hooks/useSequentialAnalysisDetach.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/sequential-analysis/hooks/useSequentialAnalysisTaskFlow.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 7
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/sequential-analysis/hooks/useSequentialResultSummary.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/token-frequency/TokenFrequencyFeature.tsx": {
+    "@typescript-eslint/no-confusing-void-expression": {
+      "count": 1
+    },
+    "@typescript-eslint/no-meaningless-void-operator": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/token-frequency/components/results/TokenFrequencySingleTokenSection.tsx": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 5
+    }
+  },
+  "src/features/views/token-frequency/components/results/TokenFrequencyStatisticsTable.tsx": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 5
+    }
+  },
+  "src/features/views/token-frequency/components/results/TokenFrequencyUnifiedTokenSection.tsx": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 7
+    }
+  },
+  "src/features/views/token-frequency/hooks/useTokenFrequencyPreferences.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/views/token-frequency/hooks/useTokenFrequencyTaskFlow.ts": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 2
+    }
+  },
+  "src/features/views/token-frequency/tokenFrequencyAdapters.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    }
+  },
+  "src/features/views/token-frequency/tokenFrequencyExport.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 3
+    }
+  },
+  "src/features/views/token-frequency/tokenFrequencyUtils.ts": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/views/topic-modeling/TopicModelingFeature.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 5
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "src/features/views/topic-modeling/components/panels/__tests__/TopicModelingParameterPanel.test.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/features/views/topic-modeling/hooks/useTopicModelingTaskFlow.ts": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/common/hooks/useSchemaManagement.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    },
+    "@typescript-eslint/no-meaningless-void-operator": {
+      "count": 2
+    }
+  },
+  "src/features/workspace/common/hooks/useWorkspaceQueries.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/common/hooks/useWorkspaceUiStateSync.ts": {
+    "@typescript-eslint/unbound-method": {
+      "count": 1
+    },
+    "@typescript-eslint/use-unknown-in-catch-callback-variable": {
+      "count": 2
+    }
+  },
+  "src/features/workspace/data-view/components/WorkspaceColumnHeader.tsx": {
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/data-view/components/WorkspaceTable.tsx": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 2
+    }
+  },
+  "src/features/workspace/data-view/hooks/useColumnMutations.ts": {
+    "@typescript-eslint/use-unknown-in-catch-callback-variable": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/data-view/hooks/useWorkspaceDataTable.ts": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/data-view/services/schemaMutations.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/data-view/utils/columnPersistence.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/data-view/utils/columnTypes.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/graph-view/components/CustomNode.tsx": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/graph-view/components/WorkspaceGraphFeature.tsx": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/graph-view/hooks/useWorkspaceGraph.ts": {
+    "@typescript-eslint/no-unnecessary-type-arguments": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 3
+    },
+    "@typescript-eslint/unbound-method": {
+      "count": 3
+    }
+  },
+  "src/features/workspace/graph-view/services/graphLayout.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 2
+    }
+  },
+  "src/features/workspace/task-stream/useWorkspaceTaskInbox.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 3
+    }
+  },
+  "src/hooks/use-mobile.ts": {
+    "@typescript-eslint/no-deprecated": {
+      "count": 2
+    }
+  },
+  "src/hooks/useBackendHealth.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 2
+    },
+    "@typescript-eslint/use-unknown-in-catch-callback-variable": {
+      "count": 1
+    }
+  },
+  "src/hooks/useResizableSplit.ts": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 2
+    }
+  },
+  "src/lib/apiError.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    }
+  },
+  "src/lib/chartExport.ts": {
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    }
+  },
+  "src/lib/download.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/lib/sentry.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 2
+    }
+  },
+  "src/stores/preferencesStore.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    }
+  }
+}

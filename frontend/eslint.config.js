@@ -10,7 +10,18 @@ export default tseslint.config([
 
   // ── Main: TypeScript + React ────────────────────────────────────
   {
-    extends: [js.configs.recommended, ...tseslint.configs.strict],
+    extends: [
+      js.configs.recommended,
+      // Type-aware strict harness. strictTypeChecked catches the bug classes
+      // that AI-generated code most often introduces: `any` propagation
+      // (no-unsafe-*), floating/misused promises, unsafe member access, and
+      // bad stringification (no-base-to-string). These are correctness rules,
+      // not cosmetics — we deliberately skip stylisticTypeChecked so the gate
+      // stays focused on bugs. projectService below provides the type info
+      // these rules require. Existing violations are grandfathered in
+      // eslint-suppressions.json; new code must satisfy every rule.
+      ...tseslint.configs.strictTypeChecked,
+    ],
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       globals: globals.browser,
@@ -67,6 +78,37 @@ export default tseslint.config([
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/require-await': 'error',
 
+      // ── strictTypeChecked tuning ──────────────────────────────────
+      // These type-aware rules are kept, but their high-noise members are
+      // configured for this codebase so the gate stays signal, not churn.
+
+      // Template literals legitimately interpolate numbers/booleans/nullish
+      // (ids, counts, flags). Allow those primitives; still flag objects,
+      // which is the real `[object Object]` bug class.
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        {
+          allowNumber: true,
+          allowBoolean: true,
+          allowNullish: true,
+          allowRegExp: true,
+          allowArray: true,
+        },
+      ],
+
+      // `<div onClick={() => doThing()}>` is idiomatic React; the void-return
+      // arrow shorthand is not confusing here.
+      '@typescript-eslint/no-confusing-void-expression': [
+        'error',
+        { ignoreArrowShorthand: true },
+      ],
+
+      // Off: with `noUncheckedIndexedAccess` + intentional defensive guards
+      // (checking values the types claim are always present, e.g. at API and
+      // worker boundaries), this rule fires overwhelmingly on safe code. The
+      // TS compiler already covers the genuinely-impossible cases.
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+
       // noUncheckedIndexedAccess (tsconfig) covers array/object indexing safety.
       // Non-null assertions are allowed at logically-guaranteed access sites.
       '@typescript-eslint/no-non-null-assertion': 'off',
@@ -87,8 +129,18 @@ export default tseslint.config([
     },
     rules: {
       ...testingLibrary.configs['flat/react'].rules,
+      // Tests legitimately lean on `any` (mock factories, partial fixtures,
+      // casting DOM nodes). The no-unsafe-* family cascades from that `any`,
+      // so relax the whole cluster here rather than forcing casts in every
+      // test. Production code keeps all of these as errors.
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/unbound-method': 'off',
       'no-console': 'off',
     },
   },

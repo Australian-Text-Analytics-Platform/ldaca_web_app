@@ -47,8 +47,8 @@ function computePosition(
           : ['bottom', 'top', 'right', 'left'];
 
   for (const side of order) {
-    let top = 0;
-    let left = 0;
+    let top: number;
+    let left: number;
     if (side === 'bottom') {
       top = rect.bottom + BUBBLE_GAP;
       left = rect.left + rect.width / 2 - bubbleRect.width / 2;

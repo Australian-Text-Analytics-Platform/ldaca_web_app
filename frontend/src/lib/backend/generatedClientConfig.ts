@@ -89,7 +89,7 @@ const createRequest = async (
  * Flow: read runtime configuration, normalize request or response details, then return the backend-facing value.
  */
 const parseErrorResponse = async (response: Response): Promise<ApiError> => {
-  let detail: unknown = null;
+  let detail: unknown;
   try {
     detail = await response.clone().json();
   } catch {
