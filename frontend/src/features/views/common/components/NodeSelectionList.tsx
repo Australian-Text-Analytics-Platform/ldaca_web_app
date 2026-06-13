@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
 import { getNodeDisplayName, getNodeIdentifier } from '../nodeSelectionTypes';
-import { NodeColorPicker } from './NodeColorPicker';
 
 export interface NodeSelectionRenderArgs {
   node: WorkspaceNodeLike;
@@ -16,11 +15,8 @@ export interface NodeSelectionRenderArgs {
 export interface NodeSelectionListProps {
   nodes?: WorkspaceNodeLike[];
   nodeIds?: string[];
-  nodeColors: Record<string, string>;
   palette: string[];
   maxCompare: number;
-  showColorPicker?: boolean;
-  onColorChange?: (nodeId: string, color: string) => void;
   /** When provided, each card shows an × button that removes that node from the inputs. */
   onRemoveNode?: (nodeId: string) => void;
   renderNodeMeta?: (args: NodeSelectionRenderArgs) => React.ReactNode;
@@ -34,18 +30,17 @@ export interface NodeSelectionListProps {
 
 /**
  * Displays the selected analysis data blocks as horizontally scrollable cards,
- * with optional colour controls and feature-provided per-node content slots.
+ * with feature-provided per-node content slots. Each card is assigned a stable
+ * palette colour by position so chart legends and metadata slots stay
+ * consistent; there is no per-node colour store or picker.
  * Used by: NodeInputsPanel and shared node-selection tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function NodeSelectionList({
   nodes = [],
   nodeIds,
-  nodeColors,
   palette,
   maxCompare,
-  showColorPicker = true,
-  onColorChange,
   onRemoveNode,
   renderNodeMeta,
   renderNodeBody,
@@ -87,9 +82,8 @@ export function NodeSelectionList({
       {nodes.map((node, index) => {
         const nodeId = derivedNodeIds[index];
         if (!nodeId) return null;
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/no-non-null-assertion -- empty color string should fall through to the palette; palette index is always in range with the '#000000' fallback
-        const color = (nodeColors[nodeId] ||
-          (palette.length ? palette[index % palette.length] : '#000000'))!;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- palette index is always in range with the '#000000' fallback
+        const color = (palette.length ? palette[index % palette.length] : '#000000')!;
         const title = getNodeTitle(node, nodeId, index);
         return (
           <Card
@@ -100,15 +94,6 @@ export function NodeSelectionList({
               cardClassName,
             )}
           >
-            {showColorPicker && onColorChange && (
-              <div className="pointer-events-auto absolute right-2 top-2">
-                <NodeColorPicker
-                  color={color}
-                  palette={palette}
-                  onChange={(next) => { onColorChange(nodeId, next); }}
-                />
-              </div>
-            )}
             {onRemoveNode && (
               <button
                 type="button"
@@ -116,19 +101,17 @@ export function NodeSelectionList({
                 title={`Remove ${title}`}
                 onClick={() => { onRemoveNode(nodeId); }}
                 className={cn(
-                  'pointer-events-auto absolute top-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-muted/80 text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground',
-                  showColorPicker && onColorChange ? 'right-9' : 'right-2',
+                  'pointer-events-auto absolute top-2 right-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-muted/80 text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground',
                 )}
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
             )}
             <CardHeader
-              className={cn('space-y-1 px-3 pb-1.5', showColorPicker ? 'pt-3' : 'pt-2.5')}
+              className={cn('space-y-1 px-3 pb-1.5 pt-2.5')}
             >
               <div
                 className="max-w-full wrap-break-word pr-2 text-sm font-semibold leading-snug text-foreground"
-                style={showColorPicker ? { color } : undefined}
                 title={title}
               >
                 {title}

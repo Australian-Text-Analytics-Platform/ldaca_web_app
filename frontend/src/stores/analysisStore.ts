@@ -65,7 +65,6 @@ export interface PendingConcordance {
   searchWord?: string;
   selectedNodes?: { id?: string; [key: string]: unknown }[];
   nodeColumnSelections?: NodeColumnSelection[];
-  nodeColors?: Record<string, string>;
   autoRun?: boolean;
   timestamp?: number;
 }

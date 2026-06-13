@@ -22,7 +22,6 @@ interface Params {
     options?: { replace?: boolean },
   ) => void;
   selectNodes: (ids: string[]) => void;
-  handleColorChange: (nodeId: string, color: string) => void;
 }
 
 export interface UseConcordancePendingHandoffResult {
@@ -37,7 +36,7 @@ export interface UseConcordancePendingHandoffResult {
  *   1. Queue: copy `pendingConcordance` from the analysis store into local
  *      state (deferred via rAF) so hydration has a chance to finish first.
  *   2. Apply: once hydration settles, fill the search box / sync the selection /
- *      sync per-node colours and column selections, optionally arming the
+ *      sync column selections, optionally arming the
  *      auto-search flag.
  *
  * Token clicks always open a brand-new concordance tab (see
@@ -60,7 +59,6 @@ export function useConcordancePendingHandoff({
   setSearchWord,
   setNodeColumnSelections,
   selectNodes,
-  handleColorChange,
 }: Params): UseConcordancePendingHandoffResult {
   const [queuedPendingConcordance, setQueuedPendingConcordance] =
     useState<PendingConcordance | null>(pendingConcordance);
@@ -125,12 +123,6 @@ export function useConcordancePendingHandoff({
       setNodeColumnSelections(queuedPendingConcordance.nodeColumnSelections, { replace: true });
     }
 
-    if (queuedPendingConcordance.nodeColors) {
-      Object.entries(queuedPendingConcordance.nodeColors).forEach(([nodeId, color]) => {
-        handleColorChange(nodeId, color);
-      });
-    }
-
     let timeoutId: number | null = null;
     const hasNodeTargets =
       selectedNodes.length > 0 ||
@@ -164,7 +156,6 @@ export function useConcordancePendingHandoff({
     selectedNodes,
     setNodeColumnSelections,
     selectNodes,
-    handleColorChange,
     setSearchWord,
   ]);
 

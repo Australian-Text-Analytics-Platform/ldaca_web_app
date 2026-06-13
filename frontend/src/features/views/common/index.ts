@@ -10,6 +10,5 @@ export * from './tasks/types';
 export * from './tasks/policies';
 export * from './useSafeResult';
 export * from './extractTaskId';
-export * from './palette';
-export * from './useNodeColorManagement';
+export * from './vizPalette';
 export * from './rerunAnalysis';

@@ -43,7 +43,6 @@ describe('useTokenFrequencyTaskFlow', () => {
           stopWords: 'and, the',
           results: null,
           lastCompareNodeIds: [],
-          nodeColors: {},
           lockedNodeNameMap: {},
           nodeIdToName: { 'node-1': 'Corpus' },
         },
@@ -64,7 +63,6 @@ describe('useTokenFrequencyTaskFlow', () => {
           setPendingConcordance: vi.fn(),
           setCurrentView: vi.fn(),
           applyStopSetFromText: vi.fn(),
-          getColorForNode: () => '#000000',
         },
       }),
     );

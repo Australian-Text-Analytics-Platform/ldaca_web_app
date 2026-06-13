@@ -154,12 +154,6 @@ function DataPreprocessingFeature() {
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={nodeInputs.setColumn}
-        nodeColors={{}}
-        onColorChange={() => {
-          /* Color changes are disabled here (showColorPicker is false). */
-        }}
-        defaultPalette={['#2563eb', '#16a34a', '#f59e0b', '#ef4444']}
-        showColorPicker={false}
         showColumnPicker={showInputColumnPicker}
         columnLabel={showInputColumnPicker ? preprocessingColumnLabel : undefined}
         title="Preprocessing Inputs"

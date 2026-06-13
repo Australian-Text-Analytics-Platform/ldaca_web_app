@@ -17,8 +17,6 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { nodeVisualInfo } from '@/lib/nodeVisualState';
-import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useUIStore } from '@/stores';
@@ -63,8 +61,8 @@ export interface WorkspaceGraphViewModel {
 
 /**
  * Builds the React Flow view model consumed by `WorkspaceGraphFeature`.
- * Used by: nodeColorsStore module, WorkspaceGraphFeature component, CustomNode component (rg call sites/imports) because the graph shell needs backend graph data converted to React Flow state.
- * Flow: workspace graph data is laid out, colored, and converted into React Flow nodes before handlers update selection and navigation.
+ * Used by: WorkspaceGraphFeature component, CustomNode component (rg call sites/imports) because the graph shell needs backend graph data converted to React Flow state.
+ * Flow: workspace graph data is laid out and converted into React Flow nodes (selected/unselected state + fresh-node markers) before handlers update selection and navigation.
  */
 export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const { workspaceGraph } = useWorkspaceData();
@@ -136,21 +134,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [redoNode],
   );
 
-  // Per-node visual state (active / focus / unselected + X/Y colour pair)
-  // is computed here once per render so CustomNode is purely presentational
-  // — it just renders what data carries. See the strategy doc for the
-  // active/focus split rules.
-  const assignedColors = useNodeColorsStore((state) => state.colors);
-  // Zustand store actions are stable closures and never rely on `this`, so
-  // selecting them directly is safe despite unbound-method.
-  // eslint-disable-next-line @typescript-eslint/unbound-method
-  const pruneStaleColors = useNodeColorsStore((state) => state.pruneStaleColors);
   const currentView = useUIStore((state) => state.currentView);
   // "Fresh" = nodes that appeared mid-session (detach / join / stack /
   // clone / etc. outputs) and haven't been interacted with yet. The
-  // graph paints them with a black outline overlay so the user can
-  // find them in a busy workspace. ``observeNodeIds`` is called from
-  // a useEffect below so the side-effect doesn't fire inside useMemo.
+  // graph marks them with a red "new" dot so the user can find them in
+  // a busy workspace. ``observeNodeIds`` is called from a useEffect
+  // below so the side-effect doesn't fire inside useMemo.
   const freshIds = useFreshNodesStore((state) => state.freshIds);
   // Zustand store actions are stable closures and never rely on `this`, so
   // selecting them directly is safe despite unbound-method.
@@ -180,12 +169,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   );
   useEffect(() => {
     observeNodeIds(currentGraphNodeIds);
-    // Drop colour entries for nodes that are no longer in the
-    // workspace (deleted via the graph or the API). Keeps the store
-    // — and the persisted sidecar, once that lands — free of stale
-    // colour metadata that would otherwise grow unbounded.
-    pruneStaleColors(currentGraphNodeIds);
-  }, [currentGraphNodeIds, observeNodeIds, pruneStaleColors]);
+  }, [currentGraphNodeIds, observeNodeIds]);
 
   const initialNodes = useMemo(() => {
     if (!workspaceGraph?.nodes) {
@@ -253,11 +237,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           },
           isMultiSelected:
             selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
-          visualInfo: nodeVisualInfo(node.id, {
-            selectedNodeIds,
-            currentView,
-            assignedColors,
-          }),
           isFresh: freshIds.has(node.id),
           onDelete: handleDelete,
           onRename: handleRename,
@@ -275,8 +254,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   }, [
     workspaceGraph,
     selectedNodeIds,
-    currentView,
-    assignedColors,
     freshIds,
     handleDelete,
     handleRename,
@@ -317,12 +294,10 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const newNodeIds = initialNodes.map((node: Node) => node.id).join(',');
   const newEdgeIds = initialEdges.map((edge: Edge) => `${edge.source}-${edge.target}`).join(',');
 
-  /** Pull the fields the signature tracks. Colour state lives at
-   * ``data.visualInfo`` — pre-fix it was excluded, so when a node's
-   * assigned colour or active/focus state changed, the signature was
-   * identical and ``setNodes`` was skipped, leaving CustomNode rendered
-   * with stale data. Encode ``state:X`` (state + the bold colour) so
-   * any visible-colour change drives a re-render. */
+  /** Pull the fields the signature tracks. Node freshness lives at
+   * ``data.isFresh`` so the "new" dot appears/clears correctly; the rest
+   * are visible metadata fields that should drive a re-render when they
+   * change. */
   interface NodeDataSignatureShape {
     node?: {
       data_type?: string;
@@ -331,7 +306,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       can_undo?: boolean;
       can_redo?: boolean;
     };
-    visualInfo?: { state?: string; pair?: { X?: string } };
     isFresh?: boolean;
   }
   /**
@@ -347,10 +321,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     const name = nd.node?.name ?? '';
     const canUndo = nd.node?.can_undo ? '1' : '0';
     const canRedo = nd.node?.can_redo ? '1' : '0';
-    const vis = nd.visualInfo;
-    const visToken = `${vis?.state ?? '-'}:${vis?.pair?.X ?? '-'}`;
     const freshToken = nd.isFresh ? '1' : '0';
-    return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}:${visToken}:${freshToken}`;
+    return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}:${freshToken}`;
   };
 
   const currentNodesSignature = nodes.map(nodeSignatureFor).join(',');

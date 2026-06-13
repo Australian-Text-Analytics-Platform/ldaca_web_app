@@ -21,8 +21,6 @@ import {
   normalizeUnknownStringArray,
   useLastRunRequest,
   useAnalysisFeature,
-  useNodeColorManagement,
-  getNodeIdentifier,
   useSafeResult,
   executeAnalysisRerun,
 } from '../common';
@@ -141,7 +139,6 @@ const SequentialAnalysisFeature = ({
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeId = nodeInputs.resolvedNodes[0]?.id ?? '';
   const selectedNode = nodeInputs.resolvedNodes[0]?.node ?? null;
-  const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
   const applyInputsFromSelections = (
     selections: { nodeId: string; column?: string | null }[],
   ) => {
@@ -157,22 +154,6 @@ const SequentialAnalysisFeature = ({
     getAuthHeaders,
     taskId: tabTaskId ?? null,
   });
-  // Lifted from the panel so promoteTempColors is accessible to the
-  // Run handler below. ``tabKey`` routes picker changes through the
-  // per-tab temp layer (see node-colour strategy doc).
-  const trendsActiveNodeIds = displayedNodes
-    .map((node, idx) => getNodeIdentifier(node, idx))
-    .filter((id): id is string => Boolean(id));
-  const {
-    nodeColors: liveTrendsNodeColors,
-    handleColorChange: trendsHandleColorChange,
-    defaultPalette: trendsDefaultPalette,
-    promoteTempColors: trendsPromoteTempColors,
-  } = useNodeColorManagement({
-    activeNodeIds: trendsActiveNodeIds,
-    tabKey: 'analysis',
-  });
-  const trendsNodeColors: Record<string, string> = liveTrendsNodeColors;
 
   const [timeColumn, setTimeColumn] = useState('');
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
@@ -734,9 +715,6 @@ const SequentialAnalysisFeature = ({
    * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleRunOrUpdate = async () => {
-    // Promote pending per-tab temp colours to assigned (Run is the
-    // commit trigger per the node-colour strategy doc).
-    trendsPromoteTempColors(trendsActiveNodeIds);
     await executeAnalysisRerun({
       hasUnrunChanges: hasParamsChanged,
       clearResults,
@@ -986,9 +964,6 @@ const SequentialAnalysisFeature = ({
           onGroupByColumnChange={handleGroupByColumnChange}
           caseSensitive={caseSensitive}
           onCaseSensitiveChange={setCaseSensitive}
-          nodeColors={trendsNodeColors}
-          defaultPalette={trendsDefaultPalette}
-          onColorChange={trendsHandleColorChange}
         />
       </AnalysisCardLayout>
 

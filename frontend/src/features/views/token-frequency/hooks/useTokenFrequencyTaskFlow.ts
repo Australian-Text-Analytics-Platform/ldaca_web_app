@@ -23,7 +23,6 @@ interface AnalysisState {
   stopWords: string;
   results: TokenFrequencyResponse | null;
   lastCompareNodeIds: string[];
-  nodeColors: Record<string, string>;
   lockedNodeNameMap: Record<string, string>;
   nodeIdToName: Record<string, string>;
 }
@@ -51,7 +50,6 @@ interface NavigationActions {
   setPendingConcordance: (payload: PendingConcordance) => void;
   setCurrentView: (view: ViewType) => void;
   applyStopSetFromText: (text: string) => void;
-  getColorForNode: (nodeId: string, index?: number) => string;
 }
 
 interface UseTokenFrequencyTaskFlowParams {
@@ -77,7 +75,6 @@ export const useTokenFrequencyTaskFlow = ({
     results,
     lockedNodeNameMap,
     nodeIdToName,
-    nodeColors,
     lastCompareNodeIds,
   },
   actions: {
@@ -97,7 +94,6 @@ export const useTokenFrequencyTaskFlow = ({
     setPendingConcordance,
     setCurrentView,
     applyStopSetFromText,
-    getColorForNode,
   },
 }: UseTokenFrequencyTaskFlowParams) => {
   // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
@@ -261,16 +257,10 @@ export const useTokenFrequencyTaskFlow = ({
         name: lockedNodeNameMap[id] || nodeIdToName[id] || id,
       }));
 
-      const pendingNodeColors: Record<string, string> = { ...nodeColors };
-      uniqueNodeIds.forEach((id, index) => {
-        pendingNodeColors[id] ??= getColorForNode(id, index);
-      });
-
       setPendingConcordance({
         searchWord: trimmedToken,
         nodeColumnSelections: effectiveSelections.map((selection) => ({ ...selection })),
         selectedNodes: nodeDetails,
-        nodeColors: pendingNodeColors,
         // Auto-run the concordance search on arrival: clicking a token is an
         // explicit "search for this word" intent, so the fresh tab dispatches
         // the request itself instead of leaving the user to press Run.
@@ -294,8 +284,6 @@ export const useTokenFrequencyTaskFlow = ({
       panelNodeIds,
       lockedNodeNameMap,
       nodeIdToName,
-      nodeColors,
-      getColorForNode,
       selectNodes,
       setPendingConcordance,
       createConcordanceTab,

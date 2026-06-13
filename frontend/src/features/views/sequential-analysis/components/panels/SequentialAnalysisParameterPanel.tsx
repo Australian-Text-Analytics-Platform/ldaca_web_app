@@ -97,13 +97,6 @@ export interface SequentialAnalysisParameterPanelProps {
   onGroupByColumnChange: (index: number, value: string) => void;
   caseSensitive: boolean;
   onCaseSensitiveChange: (value: boolean) => void;
-
-  // Node-colour management (lifted from the panel to the feature
-  // parent so the same hook instance can expose ``promoteTempColors``
-  // to the Run handler). See node-colour strategy doc.
-  nodeColors: Record<string, string>;
-  defaultPalette: string[];
-  onColorChange: (nodeId: string, color: string) => void;
 }
 
 /**
@@ -140,9 +133,6 @@ export function SequentialAnalysisParameterPanel({
   onGroupByColumnChange,
   caseSensitive,
   onCaseSensitiveChange,
-  nodeColors,
-  defaultPalette,
-  onColorChange,
 }: SequentialAnalysisParameterPanelProps) {
   return (
     <>
@@ -158,10 +148,6 @@ export function SequentialAnalysisParameterPanel({
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}
-        nodeColors={nodeColors}
-        onColorChange={onColorChange}
-        defaultPalette={defaultPalette}
-        showColorPicker
         columnLabel="Time/Numeric Column *"
       />
 

@@ -5575,23 +5575,6 @@ export type WorkspaceTaskStartResponse = {
 };
 
 /**
- * WorkspaceUiState
- *
- * API schema used by routes and generated clients for workspace ui state.
- *
- * Used by:
- * - backend API routes, backend tests because they need this unit's "API schema used by routes and generated clients for workspace ui state" behavior.
- */
-export type WorkspaceUiState = {
-    /**
-     * Node Colors
-     */
-    node_colors?: {
-        [key: string]: string;
-    };
-};
-
-/**
  * WorkspaceUploadResponse
  *
  * Response schema returned by API routes and consumed by generated clients for workspace upload response.
@@ -10333,78 +10316,6 @@ export type PutWorkspaceTabsResponses = {
 };
 
 export type PutWorkspaceTabsResponse = PutWorkspaceTabsResponses[keyof PutWorkspaceTabsResponses];
-
-export type GetWorkspaceUiStateData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/ui-state';
-};
-
-export type GetWorkspaceUiStateErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetWorkspaceUiStateError = GetWorkspaceUiStateErrors[keyof GetWorkspaceUiStateErrors];
-
-export type GetWorkspaceUiStateResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceUiState;
-};
-
-export type GetWorkspaceUiStateResponse = GetWorkspaceUiStateResponses[keyof GetWorkspaceUiStateResponses];
-
-export type PutWorkspaceUiStateData = {
-    body: WorkspaceUiState;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/ui-state';
-};
-
-export type PutWorkspaceUiStateErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type PutWorkspaceUiStateError = PutWorkspaceUiStateErrors[keyof PutWorkspaceUiStateErrors];
-
-export type PutWorkspaceUiStateResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceUiState;
-};
-
-export type PutWorkspaceUiStateResponse = PutWorkspaceUiStateResponses[keyof PutWorkspaceUiStateResponses];
 
 export type HealthCheckData = {
     body?: never;

@@ -11,6 +11,7 @@ import type { NodeAddRejection, ResolvedNodeInput } from '../nodeInputs/nodeInpu
 import type { ResolvedPreset } from '../nodeInputs/useTabNodeInputs';
 import { NodeColumnSelector } from './NodeColumnSelector';
 import { NodeSelectionList, type NodeSelectionRenderArgs } from './NodeSelectionList';
+import { VIZ_PALETTE } from '../vizPalette';
 
 const CLEAR_COLUMN_VALUE = '__ldaca__clear__';
 
@@ -43,10 +44,9 @@ export interface NodeInputsPanelProps {
   onClear: () => void;
   /** Change a node's chosen column. */
   onColumnChange: (nodeId: string, column: string) => void;
-  nodeColors: Record<string, string>;
-  onColorChange: (nodeId: string, color: string) => void;
-  defaultPalette: string[];
-  showColorPicker?: boolean;
+  /** Palette used to assign each node card a stable colour by position
+   * (for chart legends / metadata slots). Defaults to the shared viz palette. */
+  defaultPalette?: string[];
   showColumnPicker?: boolean;
   showAddControls?: boolean;
   showRemoveButtons?: boolean;
@@ -71,7 +71,7 @@ export interface NodeInputsPanelProps {
  *
  * Owns the Add control (graph selection + per-node dropdown, invalid candidates
  * greyed with a reason), per-node remove (\u00d7), and Clear all, on top of the
- * existing column/color pickers rendered via NodeSelectionList.
+ * existing column picker rendered via NodeSelectionList.
  *
  * Used by: every analysis *Feature and preprocessing subtab through their
  * ``useNodeInputs`` result, so each view shares one curate-your-inputs surface
@@ -93,10 +93,7 @@ export function NodeInputsPanel({
   onRemoveNode,
   onClear,
   onColumnChange,
-  nodeColors,
-  onColorChange,
-  defaultPalette,
-  showColorPicker = true,
+  defaultPalette = VIZ_PALETTE,
   showColumnPicker = true,
   showAddControls = true,
   showRemoveButtons = true,
@@ -389,11 +386,8 @@ export function NodeInputsPanel({
         <NodeSelectionList
           nodes={nodes}
           nodeIds={nodeIds}
-          nodeColors={nodeColors}
           palette={defaultPalette}
           maxCompare={maxNodes ?? nodes.length}
-          showColorPicker={showColorPicker}
-          onColorChange={showColorPicker && !disabled ? onColorChange : undefined}
           onRemoveNode={showRemoveButtons && !disabled ? onRemoveNode : undefined}
           renderNodeMeta={renderNodeMeta}
           renderNodeBody={showColumnPicker ? renderColumnBody : undefined}

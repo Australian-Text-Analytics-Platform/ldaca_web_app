@@ -13,9 +13,6 @@ import HelpIcon from '@/components/help/HelpIcon';
 interface TokenFrequencyParameterPanelProps {
   nodeInputs: UseTabNodeInputsResult;
   onColumnChange: (nodeId: string, column: string) => void;
-  nodeColors: Record<string, string>;
-  onColorChange: (nodeId: string, color: string) => void;
-  defaultPalette: string[];
   actionState: {
     runDisabled: boolean;
     clearDisabled: boolean;
@@ -45,9 +42,6 @@ interface TokenFrequencyParameterPanelProps {
 export const TokenFrequencyParameterPanel = ({
   nodeInputs,
   onColumnChange,
-  nodeColors,
-  onColorChange,
-  defaultPalette,
   actionState,
   isAnalyzing,
   onAnalyze,
@@ -172,10 +166,6 @@ export const TokenFrequencyParameterPanel = ({
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}
-        nodeColors={nodeColors}
-        onColorChange={onColorChange}
-        defaultPalette={defaultPalette}
-        showColorPicker
         renderColumnAddon={renderTokenizerModelSelector}
       />
       <TokensColumnMismatchNotice

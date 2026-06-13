@@ -7593,20 +7593,6 @@
         "title": "WorkspaceTaskStartResponse",
         "type": "object"
       },
-      "WorkspaceUiState": {
-        "description": "API schema used by routes and generated clients for workspace ui state.\n\nUsed by:\n- backend API routes, backend tests because they need this unit's \"API schema used by routes and generated clients for workspace ui state\" behavior.",
-        "properties": {
-          "node_colors": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "title": "Node Colors",
-            "type": "object"
-          }
-        },
-        "title": "WorkspaceUiState",
-        "type": "object"
-      },
       "WorkspaceUploadResponse": {
         "description": "Response schema returned by API routes and consumed by generated clients for workspace upload response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: resolve the user workspace directory, refresh cached path indexes, coordinate task\n    cleanup, and return stable workspace metadata to callers.",
         "properties": {
@@ -16248,7 +16234,7 @@
         ]
       },
       "put": {
-        "description": "Replace the persisted analysis-tab state for a workspace.\n\nUsed by the frontend tab store whenever tabs are created, closed, renamed,\nreordered, activated, or wired to a new task id. Full-replacement semantics\nmirror the ``ui_state.json`` sidecar.",
+        "description": "Replace the persisted analysis-tab state for a workspace.\n\nUsed by the frontend tab store whenever tabs are created, closed, renamed,\nreordered, activated, or wired to a new task id. Full-replacement semantics\nwrite the whole tabs.json sidecar on every change.",
         "operationId": "put_workspace_tabs",
         "parameters": [
           {
@@ -16313,134 +16299,6 @@
         "tags": [
           "workspace_management",
           "workspace_tabs"
-        ]
-      }
-    },
-    "/api/workspaces/{workspace_id}/ui-state": {
-      "get": {
-        "description": "Return get workspace ui state API requests for workspace UI-state routes.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /{workspace_id}/ui-state route because they need this unit's \"Return get workspace ui state API requests for workspace UI-state routes\" behavior.",
-        "operationId": "get_workspace_ui_state",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "workspace_id",
-            "required": true,
-            "schema": {
-              "title": "Workspace Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WorkspaceUiState"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Workspace Ui State",
-        "tags": [
-          "workspace_management",
-          "workspace_ui_state"
-        ]
-      },
-      "put": {
-        "description": "Update put workspace ui state API requests for workspace UI-state routes.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI PUT /{workspace_id}/ui-state route because they need this unit's \"Update put workspace ui state API requests for workspace UI-state routes\" behavior.",
-        "operationId": "put_workspace_ui_state",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "workspace_id",
-            "required": true,
-            "schema": {
-              "title": "Workspace Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WorkspaceUiState"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WorkspaceUiState"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Put Workspace Ui State",
-        "tags": [
-          "workspace_management",
-          "workspace_ui_state"
         ]
       }
     },

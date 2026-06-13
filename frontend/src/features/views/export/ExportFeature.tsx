@@ -21,7 +21,6 @@ import { saveBlob } from '@/lib/download';
 import { isTauri } from '@/lib/isTauri';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
-import { useNodeColorManagement } from '@/features/views/common';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -85,12 +84,6 @@ function ExportFeature() {
     // chain always resolves to a string id at runtime, so assert string.
     return n.id || ((n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? `node-${String(idx)}`) as string);
   });
-
-  // Subscribe to the global node-colour store. Reuses whatever colour was
-  // assigned to each node by Concordance / Topic Modelling / Frequency /
-  // etc., so Export's listing visually matches the rest of the analysis
-  // surface for the same node.
-  const { nodeColors } = useNodeColorManagement({ activeNodeIds: nodeIds });
 
   // Best-effort helpers for node display
   /**
@@ -294,9 +287,6 @@ function ExportFeature() {
                 const info = toDisplay(n);
                 const status = downloadingIds[info.id] ?? 'idle';
                 const isDownloading = status === 'downloading';
-                // Reuse the colour the analysis tabs have already assigned
-                // to this node. Same node ⇒ same colour everywhere.
-                const nameColor = nodeColors[info.id];
                 return (
                   <div
                     key={info.id}
@@ -305,7 +295,6 @@ function ExportFeature() {
                     <div className="space-y-1">
                       <p
                         className="text-sm font-semibold text-foreground"
-                        style={nameColor ? { color: nameColor } : undefined}
                       >
                         {info.name}
                       </p>

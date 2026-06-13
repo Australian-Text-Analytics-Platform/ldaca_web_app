@@ -56,7 +56,6 @@ import {
   getServerEngineConfig,
   useLastRunRequest,
   useAnalysisFeature,
-  useNodeColorManagement,
   executeAnalysisRerun,
   type NodePaginationState,
 } from '../common';
@@ -226,7 +225,6 @@ function QuotationFeature({
   const setNodeColumnSelection = nodeInputs.setColumn;
   const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
   const activeSelections = nodeColumnSelections;
-  const activeNodeIds = nodeInputs.resolvedNodes.map((node) => node.id).slice(0, 1);
   const applyInputsFromSelections = (
     selections: { nodeId: string; column?: string | null }[],
   ) => {
@@ -277,20 +275,6 @@ function QuotationFeature({
     setDetailOpen,
     openDetail: openRowDetail,
   } = useRowDetailDialog();
-
-  // ``tabKey`` routes colour changes through this tab's temp layer —
-  // see the node-colour strategy doc. ``promoteTempColors`` is called
-  // from ``handleRunOrUpdate`` below to commit the preview on Run.
-  const {
-    nodeColors: liveNodeColors,
-    handleColorChange,
-    defaultPalette,
-    promoteTempColors,
-  } = useNodeColorManagement({
-    activeNodeIds,
-    tabKey: 'quotation',
-  });
-  const nodeColors: Record<string, string> = liveNodeColors;
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
@@ -849,9 +833,6 @@ function QuotationFeature({
    * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleRunOrUpdate = async () => {
-    // Promote pending per-tab temp colours to assigned — Run is the
-    // commit trigger per the node-colour strategy doc.
-    promoteTempColors(activeNodeIds);
     await executeAnalysisRerun({
       hasUnrunChanges: hasParamsChanged,
       clearResults,
@@ -1092,10 +1073,6 @@ function QuotationFeature({
             onRemoveNode={nodeInputs.removeNode}
             onClear={nodeInputs.clear}
             onColumnChange={handleColumnChange}
-            nodeColors={nodeColors}
-            onColorChange={handleColorChange}
-            defaultPalette={defaultPalette}
-            showColorPicker
             className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
           />
         </AnalysisCardLayout>

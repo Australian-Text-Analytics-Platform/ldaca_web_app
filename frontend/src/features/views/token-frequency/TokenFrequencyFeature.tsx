@@ -49,7 +49,8 @@ import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
 import {
   useAnalysisFeature,
   useSafeResult,
-  useNodeColorManagement,
+  VIZ_PALETTE,
+  vizColorMapForNodes,
 } from '../common';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
@@ -159,20 +160,12 @@ const TokenFrequencyFeature = ({
     ];
   }, [effectiveStudyNodeId, panelNodeIds]);
 
-  // ``tabKey`` routes colour changes through this tab's temp layer;
-  // ``promoteTempColors`` is called from ``handleAnalyzeWithPromote``
-  // below so a Run commits the preview to the global assigned store.
+  // Per-source chart colours derived locally from a static palette by
+  // selection position. There is no node-colour store or picker anymore;
+  // colours are deterministic and used only for chart legends/series.
   const tokenActiveNodeIds = panelNodeIds.slice(0, 2);
-  const {
-    nodeColors: liveNodeColors,
-    handleColorChange,
-    defaultPalette,
-    promoteTempColors,
-  } = useNodeColorManagement({
-    activeNodeIds: tokenActiveNodeIds,
-    tabKey: 'token-frequency',
-  });
-  const nodeColors: Record<string, string> = liveNodeColors;
+  const defaultPalette = VIZ_PALETTE;
+  const nodeColors = vizColorMapForNodes(tokenActiveNodeIds);
 
   const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
   const unifiedCloudContainerRef = useRef<HTMLDivElement | null>(null);
@@ -391,7 +384,6 @@ const TokenFrequencyFeature = ({
       results,
       lockedNodeNameMap,
       nodeIdToName,
-      nodeColors,
       lastCompareNodeIds,
     },
     actions: {
@@ -417,7 +409,6 @@ const TokenFrequencyFeature = ({
       setPendingConcordance,
       setCurrentView,
       applyStopSetFromText,
-      getColorForNode,
     },
   });
 
@@ -703,17 +694,10 @@ const TokenFrequencyFeature = ({
       <TokenFrequencyParameterPanel
         nodeInputs={nodeInputs}
         onColumnChange={handleColumnChange}
-        nodeColors={nodeColors}
-        onColorChange={handleColorChange}
-        defaultPalette={defaultPalette}
         actionState={actionState}
         isAnalyzing={isRunning}
         isStopping={isStopping}
         onAnalyze={() => {
-          // Promote pending per-tab temp colours to assigned before
-          // the analysis runs; the strategy doc treats Run as the
-          // commit trigger.
-          promoteTempColors(tokenActiveNodeIds);
           void handleAnalyze();
         }}
         onStop={() => {

@@ -37,7 +37,6 @@ import {
   getNodeIdentifier,
   useAnalysisFeature,
   extractAndSetTaskId,
-  useNodeColorManagement,
 } from '../common';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
@@ -264,15 +263,6 @@ function AiAnnotatorFeature() {
   const displayedNodeIds = displayedNodes
     .map((node, idx) => getNodeIdentifier(node, idx))
     .filter((id): id is string => Boolean(id));
-
-  // ``tabKey`` routes colour changes through this tab's temp layer.
-  // ``promoteTempColors`` is called from ``handleRun`` below so a
-  // successful Run commits the preview to the global assigned store.
-  const { nodeColors, handleColorChange, defaultPalette, promoteTempColors } =
-    useNodeColorManagement({
-      activeNodeIds: displayedNodeIds,
-      tabKey: 'ai-annotator',
-    });
 
   const effectiveSelections = nodeInputs.nodeColumnSelections.filter((selection) =>
     displayedNodeIds.includes(selection.nodeId),
@@ -574,9 +564,6 @@ function AiAnnotatorFeature() {
       setStatusMessage('Select one data block and text column before running.');
       return;
     }
-    // Promote pending temp colours to assigned — see node-colour
-    // strategy doc.
-    promoteTempColors(displayedNodeIds);
 
     setIsRunning(true);
     try {
@@ -1239,10 +1226,6 @@ function AiAnnotatorFeature() {
                   onRemoveNode={nodeInputs.removeNode}
                   onClear={nodeInputs.clear}
                   onColumnChange={handleColumnChange}
-                  nodeColors={nodeColors}
-                  onColorChange={handleColorChange}
-                  defaultPalette={defaultPalette}
-                  showColorPicker
                   showColumnPicker={false}
                 />
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1474,10 +1457,6 @@ function AiAnnotatorFeature() {
                 onRemoveNode={nodeInputs.removeNode}
                 onClear={nodeInputs.clear}
                 onColumnChange={handleColumnChange}
-                nodeColors={nodeColors}
-                onColorChange={handleColorChange}
-                defaultPalette={defaultPalette}
-                showColorPicker
                 showColumnPicker={false}
               />
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

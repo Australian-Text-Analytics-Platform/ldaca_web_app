@@ -24,9 +24,8 @@ import type { MultiSeriesChartType } from '@/features/views/common/components/Mu
 import {
   useLastRunRequest,
   useAnalysisFeature,
-  useNodeColorManagement,
   useSafeResult,
-  EXTENDED_PALETTE,
+  VIZ_PALETTE,
   executeAnalysisRerun,
 } from '../common';
 import { useTabNodeInputs } from '../common/nodeInputs';
@@ -272,22 +271,22 @@ function ConcordanceFeature({
     return null;
   }, [liveResults]);
 
-  // Color management & view mode. ``tabKey`` routes the colour
-  // changes through the per-tab temp layer so the picker preview
-  // doesn't immediately rewrite the assigned colours other tabs +
-  // graph + sidebar are showing. ``promoteTempColors`` is fired
-  // below in ``handleRunOrUpdate`` to commit the pending temps to
-  // assigned when the user actually runs the analysis.
-  const {
-    nodeColors: liveNodeColors,
-    handleColorChange,
-    defaultPalette,
-    promoteTempColors,
-  } = useNodeColorManagement({
-    activeNodeIds,
-    tabKey: 'concordance',
-  });
-  const nodeColors: Record<string, string> = liveNodeColors;
+  // Per-source visualisation colours. Each selected node gets a stable
+  // colour by its position in the panel selection, used to tint the
+  // combined results table and metadata column groupings. This is a
+  // purely local, in-result viz mapping — there is no node-colour store,
+  // persistence, or user picker anymore.
+  const defaultPalette = VIZ_PALETTE;
+  const nodeColors = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    panelSelectedNodes.forEach((node, idx) => {
+      const colour = VIZ_PALETTE[idx % VIZ_PALETTE.length] ?? '';
+      for (const candidate of [node.id, node.node_id]) {
+        if (typeof candidate === 'string' && candidate) map[candidate] = colour;
+      }
+    });
+    return map;
+  }, [panelSelectedNodes]);
 
   const concordanceTaskId = useMemo(() => {
     const md = (liveResults)?.metadata as
@@ -454,7 +453,7 @@ function ConcordanceFeature({
     (): Record<string, string> =>
       Object.fromEntries(
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- i % length is always a valid index of the non-empty palette
-        allMatchedTexts.map((t, i) => [t, EXTENDED_PALETTE[i % EXTENDED_PALETTE.length]!]),
+        allMatchedTexts.map((t, i) => [t, VIZ_PALETTE[i % VIZ_PALETTE.length]!]),
       ),
     [allMatchedTexts],
   );
@@ -1038,7 +1037,6 @@ function ConcordanceFeature({
     setSearchWord,
     setNodeColumnSelections: (sels) => { applyInputsFromSelections(sels); },
     selectNodes,
-    handleColorChange,
   });
 
   // No auto-column recompute: a node's default column is chosen at add-time by
@@ -1099,16 +1097,11 @@ function ConcordanceFeature({
     await clearResults();
   };
 
-  /** Runs or updates concordance while promoting temporary node colours into workspace state. */
+  /** Runs or updates concordance after shared update checks pass. */
   /**
    * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleRunOrUpdate = async () => {
-    // Commit the per-tab temp colours to the global assigned store so
-    // graph + sidebar reflect the colours the user just chose to run
-    // with. See the node-colour strategy doc — Run is the promotion
-    // trigger.
-    promoteTempColors(activeNodeIds);
     await executeAnalysisRerun({
       hasUnrunChanges: hasChanges,
       clearResults: handleClearResults,
@@ -1411,9 +1404,6 @@ function ConcordanceFeature({
       <ConcordanceParameterPanel
         nodeInputs={nodeInputs}
         handleColumnChange={handleColumnChange}
-        nodeColors={nodeColors}
-        handleColorChange={handleColorChange}
-        defaultPalette={defaultPalette}
         searchWord={effSearchWord}
         setSearchWord={setSearchWord}
         numLeftTokens={effNumLeftTokens}

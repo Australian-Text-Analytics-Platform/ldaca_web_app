@@ -1,11 +1,7 @@
 import React from 'react';
 import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { nodeVisualInfo, type NodeVisualState } from '@/lib/nodeVisualState';
-import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
-import { useUIStore } from '@/stores';
-import type { ColorPair } from '@/lib/color';
 import type { SidebarWorkspaceNode } from './types';
 
 interface SidebarNodesSectionProps {
@@ -16,34 +12,22 @@ interface SidebarNodesSectionProps {
 }
 
 /**
- * Sidebar selection glyph used by `SidebarNodesSection`. It maps node visual
- * state to the global node color pair so selection/focus colors match the graph
- * while fresh-node outlines help users find newly created blocks.
- * Why: sidebar node rows should use the same colour semantics as the graph while marking fresh nodes visibly.
- * Flow: derive fill from visual state, apply fresh-node outline when needed, then render the checkmark only for selected/focus states.
+ * Sidebar selection glyph used by `SidebarNodesSection`. Shows a filled
+ * check circle when the node is selected and an empty circle otherwise.
+ * Why: the sidebar mirrors the graph's selected/unselected state without any
+ * per-node colour.
+ * Flow: fill the circle for selected rows, then render the checkmark only when selected.
  */
-function NodeCheckIcon({
-  state,
-  pair,
-  isFresh,
-}: {
-  state: NodeVisualState;
-  pair: ColorPair;
-  isFresh: boolean;
-}) {
-  const isUnselected = state === 'unselected';
-  const fill = state === 'active' ? pair.X : state === 'focus' ? pair.Y : 'transparent';
+function NodeCheckIcon({ checked }: { checked: boolean }) {
   return (
     <span
-      className="pointer-events-none flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2"
-      style={{
-        borderColor: pair.X,
-        backgroundColor: fill,
-        ...(isFresh ? { outline: '3px solid #000', outlineOffset: '2px' } : {}),
-      }}
+      className={cn(
+        'pointer-events-none flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
+        checked ? 'border-primary bg-primary' : 'border-muted-foreground/40 bg-transparent',
+      )}
       aria-hidden="true"
     >
-      {!isUnselected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+      {checked && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
     </span>
   );
 }
@@ -78,7 +62,7 @@ const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
  * in a stable order and bridges sidebar clicks back to workspace selection and
  * fresh-node acknowledgement stores.
  * Rendered by: Sidebar's Data Blocks section because graph selection and fresh-node acknowledgement must stay aligned.
- * Flow: read colour/current-view/fresh state, order selected nodes first, then render counts, clear action, and toggleable node rows.
+ * Flow: read fresh state, order selected nodes first, then render counts, clear action, and toggleable node rows.
  */
 function SidebarNodesSection({
   nodes,
@@ -89,19 +73,11 @@ function SidebarNodesSection({
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
 
-  // Derived here so the list mirrors graph node color semantics for the active analysis view.
-  const assignedColors = useNodeColorsStore((state) => state.colors);
-  const currentView = useUIStore((state) => state.currentView);
   const freshIds = useFreshNodesStore((state) => state.freshIds);
   const markInteracted = useFreshNodesStore((state) =>
     // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
     state.markInteracted,
   );
-  const selectionContext = {
-    selectedNodeIds: selectedNodeIds ?? [],
-    currentView,
-    assignedColors,
-  };
 
   /** Called by: SidebarNodesSection row click and keyboard activation handlers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const handleToggle = (nodeId: string) => {
@@ -154,7 +130,6 @@ function SidebarNodesSection({
             const shape = formatShapeLabel(node);
             const checked = selectedNodeIds?.includes(node.id) ?? false;
             const tooltip = `${displayName}\nShape: ${shape}`;
-            const { state, pair } = nodeVisualInfo(node.id, selectionContext);
             const isFresh = freshIds.has(node.id);
 
             return (
@@ -180,10 +155,17 @@ function SidebarNodesSection({
                     : 'hover:border-border/60 hover:bg-accent/60',
                 )}
               >
-                <NodeCheckIcon state={state} pair={pair} isFresh={isFresh} />
+                <NodeCheckIcon checked={checked} />
                 <span className="flex-1 min-w-0 truncate text-sm font-medium text-foreground">
                   {displayName}
                 </span>
+                {isFresh && (
+                  <span
+                    className="pointer-events-none ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-red-500"
+                    title="New data block"
+                    aria-label="New data block"
+                  />
+                )}
               </div>
             );
           })

@@ -20,21 +20,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { type WorkspaceNode } from '@/features/workspace/data-view/types';
 import { cn } from '@/lib/utils';
-import { DEFAULT_GREY_PAIR } from '@/lib/color';
-import type { NodeVisualInfo } from '@/lib/nodeVisualState';
 
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
   isMultiSelected?: boolean;
-  /** Pre-computed node visual state (active / focus / unselected +
-   * X/Y colour pair) from ``useWorkspaceGraph``. See the strategy doc:
-   * ``frontend/docs/developer-guide/node-colour-strategy.md``. */
-  visualInfo?: NodeVisualInfo;
   /** True for nodes that appeared mid-session (detach / join / stack /
    * clone outputs etc.) and haven't been interacted with yet. Triggers
-   * the "find me" black outline overlay in the graph + sidebar.
-   * Cleared by ``markInteracted`` in useFreshNodesStore on first
-   * click / selection. */
+   * the red "new" dot in the graph + sidebar. Cleared by ``markInteracted``
+   * in useFreshNodesStore on first click / selection. */
   isFresh?: boolean;
   onDelete: (nodeId: string) => void;
   onRename?: (nodeId: string, newName: string) => void;
@@ -57,8 +50,6 @@ const TOOLBAR_HIDE_DELAY_MS = 350;
 function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
   const {
     node,
-    isMultiSelected = false,
-    visualInfo,
     isFresh = false,
     onDelete,
     onRename,
@@ -67,13 +58,9 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     onRedo,
     onAddToSelection,
   } = data;
-  // Fall back to the unselected-grey treatment if no visual info was
-  // attached (defensive — useWorkspaceGraph always provides one now,
-  // but CustomNode tests render without it).
-  const nodeVisualState = visualInfo?.state ?? 'unselected';
-  const nodeColorPair = visualInfo?.pair ?? DEFAULT_GREY_PAIR;
-  const isActive = nodeVisualState === 'active';
-  const isFocus = nodeVisualState === 'focus';
+  // Selection is the only visual state now (no per-node colours): a node
+  // is either selected (React Flow ``selected``) or not.
+  const isSelected = selected;
   const [showMenu, setShowMenu] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
@@ -262,30 +249,12 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     }
   };
 
-  // Visual treatment driven by the node-colour strategy (see strategy
-  // doc). Active = Y fill + X stroke. Focus = Y fill, no stroke ring.
-  // Unselected (but with an assigned colour) = Y stroke, default fill.
-  // Unselected + grey default = the existing flat card look.
-  // ``selected`` from React Flow (single-click highlight) is treated as
-  // Focus visually when the node isn't already in the analysis window.
-  const isHighlighted = isActive || isFocus || selected;
-  const nodeClasses =
-    'w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out shadow-md';
-  // Stroke and ring follow Active > Focus/selected > Unselected.
-  const nodeBorderColor = isActive
-    ? nodeColorPair.X
-    : isFocus || selected
-      ? 'transparent'
-      : nodeColorPair.Y;
-  const nodeBoxShadow = isActive
-    ? `0 0 0 3px ${nodeColorPair.Y}, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`
-    : undefined;
-  // For unselected nodes that carry an assigned colour, tint the
-  // displayed name with X so the node's identity is recognisable at
-  // rest. Default-grey unselected nodes keep the standard foreground
-  // so never-analysed blocks stay visually quiet.
-  const hasAssignedColour = visualInfo ? visualInfo.pair.X !== DEFAULT_GREY_PAIR.X : false;
-  const nameColour = !isHighlighted && hasAssignedColour ? nodeColorPair.X : undefined;
+  // Visual treatment: selected nodes get a primary border + ring; all
+  // others use the flat default card look. No per-node colours anymore.
+  const nodeClasses = cn(
+    'w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out shadow-md',
+    isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border',
+  );
 
   /**
    * Formats row/column counts for the node shape label.
@@ -446,11 +415,23 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     </AlertDialog>
   );
 
+  // Red "new" dot for nodes that appeared mid-session and haven't been
+  // interacted with yet (``isFresh``). Cleared on first click/selection
+  // via markInteracted. Absolute-positioned in the node's top-right.
+  const newDot = isFresh ? (
+    <span
+      className="pointer-events-none absolute -right-1 -top-1 z-20 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white"
+      title="New data block"
+      aria-label="New data block"
+    />
+  ) : null;
+
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
-    const compactClasses =
-      'flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out shadow-md';
-    const compactBg = isHighlighted ? nodeColorPair.Y : undefined;
+    const compactClasses = cn(
+      'flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out shadow-md',
+      isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border',
+    );
     return (
       <div
         className={compactClasses}
@@ -460,29 +441,18 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
           minWidth: '180px',
           maxWidth: '300px',
           position: 'relative',
-          borderColor: nodeBorderColor,
-          backgroundColor: compactBg,
-          boxShadow: nodeBoxShadow,
-          // ``isFresh`` overlay: black outline around newly-created
-          // nodes that the user hasn't acknowledged yet. Renders
-          // outside the border-box, doesn't shift layout.
-          ...(isFresh ? { outline: '3px solid #000', outlineOffset: '2px' } : {}),
+          // ``isFresh`` red "new" dot rendered below marks newly-created
+          // nodes the user hasn't acknowledged yet.
         }}
       >
+        {newDot}
         {nodeToolbar}
-        {isHighlighted && (
-          <div
-            className="w-3 h-3 rounded-full mr-2.5 mt-2 shrink-0"
-            style={{ backgroundColor: nodeColorPair.X }}
-          />
-        )}
         <div
           className="pr-16 font-bold text-3xl leading-snug whitespace-normal"
           style={{
             wordBreak: 'break-word',
             overflowWrap: 'anywhere',
             hyphens: 'auto',
-            ...(nameColour ? { color: nameColour } : {}),
           }}
           title={nodeName}
         >
@@ -512,36 +482,17 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         minWidth: '256px',
         minHeight: '120px',
         position: 'relative',
-        borderColor: nodeBorderColor,
-        boxShadow: nodeBoxShadow,
-        // ``isFresh`` overlay: black outline around newly-created
-        // nodes that the user hasn't acknowledged yet. Renders
-        // outside the border-box, doesn't shift layout.
-        ...(isFresh ? { outline: '3px solid #000', outlineOffset: '2px' } : {}),
       }}
     >
-      {/* Node Header — top fill uses the Y (lighter) variant when the
-          node has any selection state so the top-strip mirrors the
-          assigned hue per the strategy doc's zoom-in fill pattern.
-          Falls back to the standard muted strip when unselected. */}
+      {newDot}
+      {/* Node Header — primary-tinted strip when selected, muted otherwise. */}
       <div
         className={cn(
           'flex items-start justify-between p-2 rounded-t-lg border-b-2 min-h-fit relative',
-          !isHighlighted && 'bg-muted border-border',
+          isSelected ? 'bg-primary/10 border-primary/40' : 'bg-muted border-border',
         )}
-        style={{
-          backgroundColor: isHighlighted ? nodeColorPair.Y : undefined,
-          borderColor: isHighlighted ? nodeColorPair.X : undefined,
-        }}
       >
         <div className="flex items-center flex-1 mr-2">
-          {isHighlighted && (
-            <div
-              className="w-2 h-2 rounded-full mr-2 shrink-0"
-              style={{ backgroundColor: nodeColorPair.X }}
-              title={isMultiSelected ? 'Selected for joining' : 'Selected'}
-            ></div>
-          )}
           {isRenaming ? (
             <form onSubmit={handleRenameSubmit} className="flex-1 relative z-50">
               <input
@@ -568,7 +519,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
                 wordBreak: 'break-all',
                 overflowWrap: 'anywhere',
                 hyphens: 'auto',
-                ...(nameColour ? { color: nameColour } : {}),
               }}
               title={nodeName}
             >

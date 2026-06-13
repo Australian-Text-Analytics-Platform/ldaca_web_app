@@ -324,14 +324,6 @@ vi.mock('../../common', async () => {
       hydrationState: mockHydrationState,
       clearResults: clearResultsMock,
     }),
-    /** Provides node-colour controls without depending on global colour stores. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-    useNodeColorManagement: () => ({
-      nodeColors: {},
-      handleColorChange: vi.fn(),
-      defaultPalette: ['#000000'],
-      promoteTempColors: vi.fn(),
-    }),
     /** Emulates the shared safe-result hook while exposing the setter to tests. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     useSafeResult: () => {
@@ -345,7 +337,7 @@ vi.mock('../../common', async () => {
       }, [result, setResult]);
       return [result, ref, vi.fn(), setResult];
     },
-    EXTENDED_PALETTE: ['#000000'],
+    VIZ_PALETTE: ['#000000'],
     executeAnalysisRerun: vi.fn(
       async ({
         hasUnrunChanges,

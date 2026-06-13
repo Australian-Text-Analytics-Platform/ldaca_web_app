@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
+import { VIZ_PALETTE } from '@/features/views/common';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 
 export interface CorpusSample {
@@ -21,9 +22,6 @@ interface NumericInputDraft {
 interface Props {
   nodeInputs: UseTabNodeInputsResult;
   onColumnChange: (nodeId: string, column: string) => void;
-  nodeColors: Record<string, string>;
-  onNodeColorChange: (nodeId: string, color: string) => void;
-  defaultPalette: string[];
   actionState: {
     runDisabled: boolean;
     clearDisabled: boolean;
@@ -68,9 +66,6 @@ interface Props {
 export function TopicModelingParameterPanel({
   nodeInputs,
   onColumnChange,
-  nodeColors,
-  onNodeColorChange,
-  defaultPalette,
   actionState,
   corpusSamples,
   nodeDocCounts,
@@ -186,9 +181,6 @@ export function TopicModelingParameterPanel({
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}
-        nodeColors={nodeColors}
-        onColorChange={onNodeColorChange}
-        defaultPalette={defaultPalette}
       />
 
       <div className="mt-4 grid grid-cols-2 gap-6">
@@ -204,7 +196,7 @@ export function TopicModelingParameterPanel({
             const sample = corpusSamples[idx] ?? { percent: '100', enabled: false };
             const nodeId = node?.id ?? '';
             const color = nodeId
-              ? (nodeColors[nodeId] ?? defaultPalette[idx] ?? '#6b7280')
+              ? (VIZ_PALETTE[idx % VIZ_PALETTE.length] ?? '#6b7280')
               : '#9ca3af';
             const nDocs = nodeDocCounts[idx] ?? 0;
 

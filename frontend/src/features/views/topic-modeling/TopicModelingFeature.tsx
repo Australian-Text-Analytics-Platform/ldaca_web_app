@@ -19,8 +19,8 @@ import {
   useLastRunRequest,
   useAnalysisFeature,
   useSafeResult,
-  useNodeColorManagement,
-  DEFAULT_PALETTE,
+  VIZ_PALETTE,
+  vizColorMapForNodes,
   executeAnalysisRerun,
 } from '../common';
 import { useTabNodeInputs } from '../common/nodeInputs';
@@ -365,21 +365,13 @@ function TopicModelingFeature({
     };
   }, []);
 
-  const defaultPalette = DEFAULT_PALETTE;
+  const defaultPalette = VIZ_PALETTE;
 
-  // ``tabKey`` routes colour changes through the per-tab temp layer
-  // (commit on Run via ``promoteTempColors`` below).
+  // Per-source bubble-chart colours derived locally from a static palette by
+  // selection position. No node-colour store or picker; colours are
+  // deterministic and used only for the bubble chart's per-source grouping.
   const topicActiveNodeIds = panelNodeIds.slice(0, 2);
-  const {
-    nodeColors: liveNodeColors,
-    handleColorChange,
-    defaultPalette: _dp,
-    promoteTempColors,
-  } = useNodeColorManagement({
-    activeNodeIds: topicActiveNodeIds,
-    tabKey: 'topic-modeling',
-  });
-  const nodeColors: Record<string, string> = liveNodeColors;
+  const nodeColors = vizColorMapForNodes(topicActiveNodeIds);
 
   const effectiveNodeColumnSelections = nodeColumnSelections;
 
@@ -634,9 +626,6 @@ function TopicModelingFeature({
    * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleRunOrUpdate = async () => {
-    // Promote this tab's pending temp colours to assigned — Run is the
-    // commit trigger per the node-colour strategy doc.
-    promoteTempColors(topicActiveNodeIds);
     await executeAnalysisRerun({
       hasUnrunChanges: hasTopicChanges,
       clearResults,
@@ -652,9 +641,6 @@ function TopicModelingFeature({
       <TopicModelingParameterPanel
         nodeInputs={nodeInputs}
         onColumnChange={handleColumnChange}
-        nodeColors={nodeColors}
-        onNodeColorChange={handleColorChange}
-        defaultPalette={defaultPalette}
         actionState={actionState}
         corpusSamples={corpusSamples}
         nodeDocCounts={nodeDocCounts}
