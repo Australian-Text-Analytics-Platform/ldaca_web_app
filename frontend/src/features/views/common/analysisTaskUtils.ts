@@ -19,6 +19,7 @@ export type CanonicalTaskType =
 /** Called by: getTaskTypeCandidates when expanding legacy task labels because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const normalizeTaskTypeKey = (taskType: string): string => {
   const normalized = taskType.trim();
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- arbitrary string cast to keyof can index to undefined at runtime (no noUncheckedIndexedAccess)
   return CANONICAL_TASK_TYPE_MAP[normalized as keyof typeof CANONICAL_TASK_TYPE_MAP] ?? normalized;
 };
 
@@ -59,7 +60,7 @@ const normalizeTaskId = (value: unknown): string | null => {
 
 /** Collects unique valid task ids from local state, route params, or server responses. */
 /** Used by: src/features/views/common/clearAnalysis.ts, src/features/views/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-export const collectTaskIds = (candidateIds: Array<string | null | undefined>): string[] => {
+export const collectTaskIds = (candidateIds: (string | null | undefined)[]): string[] => {
   const ids = candidateIds
     .map((value) => normalizeTaskId(value))
     .filter((value): value is string => Boolean(value));
@@ -67,7 +68,7 @@ export const collectTaskIds = (candidateIds: Array<string | null | undefined>): 
 };
 
 interface ResolveAnalysisTaskIdOptions {
-  candidateIds: Array<string | null | undefined>;
+  candidateIds: (string | null | undefined)[];
   onResolved?: (taskId: string | null) => void;
 }
 

@@ -50,6 +50,7 @@ const routeTree = rootRoute.addChildren([indexRoute]);
 
 export const router = createRouter({
   routeTree,
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- treat an empty base path as unset and fall back to '/', not only null/undefined
   basepath: (typeof window !== 'undefined' && window.__BASE_PATH__) || '/',
 });
 

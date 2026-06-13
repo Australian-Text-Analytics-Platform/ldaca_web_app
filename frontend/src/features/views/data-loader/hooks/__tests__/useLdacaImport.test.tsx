@@ -66,9 +66,9 @@ describe('useLdacaImport', () => {
       useLdacaImport({ authHeaders, ldacaApiToken, refetchFiles, notify }),
     );
 
-    act(() => result.current.setLdacaImportOpen(true));
+    act(() => { result.current.setLdacaImportOpen(true); });
 
-    await waitFor(() => expect(result.current.featuredRecords).toEqual([cooeeRecord]));
+    await waitFor(() => { expect(result.current.featuredRecords).toEqual([cooeeRecord]); });
     expect(listLdacaFeaturedCollections).toHaveBeenCalledWith({
       headers: { ...authHeaders, 'X-LDACA-API-Token': ldacaApiToken },
       throwOnError: true,
@@ -109,7 +109,7 @@ describe('useLdacaImport', () => {
       useLdacaImport({ authHeaders, ldacaApiToken, refetchFiles, notify }),
     );
 
-    act(() => result.current.setLdacaImportOpen(true));
+    act(() => { result.current.setLdacaImportOpen(true); });
     await act(async () => {
       await result.current.handleLdacaImport(cooeeRecord.id);
     });

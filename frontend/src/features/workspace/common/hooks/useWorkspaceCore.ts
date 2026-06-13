@@ -72,7 +72,7 @@ export const useWorkspaceCore = () => {
   const updatePagination = useCallback(
     (nodeId: string, updater: (existing: PaginationState) => PaginationState) => {
       setPaginationState((prev) => {
-        const existing = prev[nodeId] || createDefaultPagination();
+        const existing = prev[nodeId] ?? createDefaultPagination();
         const next = updater(existing);
         if (next === existing) return prev;
         return { ...prev, [nodeId]: next };
@@ -83,24 +83,24 @@ export const useWorkspaceCore = () => {
 
   const updateCurrentPage = useCallback(
     (nodeId: string, page: number) =>
-      updatePagination(nodeId, (existing) =>
+      { updatePagination(nodeId, (existing) =>
         existing.currentPage === page ? existing : { ...existing, currentPage: page },
-      ),
+      ); },
     [updatePagination],
   );
 
   const updatePageSize = useCallback(
     (nodeId: string, pageSize: number) =>
-      updatePagination(nodeId, (existing) =>
+      { updatePagination(nodeId, (existing) =>
         existing.pageSize === pageSize && existing.currentPage === 1
           ? existing
           : { ...existing, pageSize, currentPage: 1 },
-      ),
+      ); },
     [updatePagination],
   );
 
   const getPaginationForNode = useCallback(
-    (nodeId?: string | null) => (nodeId && pagination[nodeId]) || createDefaultPagination(),
+    (nodeId?: string | null) => (nodeId ? pagination[nodeId] : undefined) ?? createDefaultPagination(),
     [pagination],
   );
 

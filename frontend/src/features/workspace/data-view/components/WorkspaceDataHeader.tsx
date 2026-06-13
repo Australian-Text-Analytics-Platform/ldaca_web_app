@@ -105,7 +105,7 @@ export const WorkspaceDataHeader = ({
               ref={inputRef}
               className="px-2 py-0.5 border rounded text-sm font-semibold text-gray-800"
               value={renameDraft.value}
-              onChange={(e) => setRenameDraft({ baseLabel: info.nodeLabel, value: e.target.value })}
+              onChange={(e) => { setRenameDraft({ baseLabel: info.nodeLabel, value: e.target.value }); }}
               onBlur={handleRenameCommit}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleRenameCommit();

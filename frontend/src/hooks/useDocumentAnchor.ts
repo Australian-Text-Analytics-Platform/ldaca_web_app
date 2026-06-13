@@ -30,6 +30,6 @@ export const useDocumentAnchor = ({ activeAnchor, loading, error }: UseDocumentA
     const timeoutId = window.setTimeout(() => {
       highlightTarget.classList.remove('tutorial-highlight');
     }, ANCHOR_HIGHLIGHT_DURATION_MS);
-    return () => window.clearTimeout(timeoutId);
+    return () => { window.clearTimeout(timeoutId); };
   }, [activeAnchor, error, loading]);
 };

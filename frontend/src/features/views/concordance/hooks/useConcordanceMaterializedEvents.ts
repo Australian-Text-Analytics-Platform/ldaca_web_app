@@ -4,7 +4,7 @@ import {
   useRef,
   type Dispatch,
   type SetStateAction,
-  type MutableRefObject,
+  type RefObject,
 } from 'react';
 import { toast } from 'sonner';
 import { concordanceTaskRequest } from '@/api/generated/sdk.gen';
@@ -13,13 +13,13 @@ import type { AnalysisMaterializedEvent } from '@/stores/analysisStore';
 import { useMaterializeLifecycle } from '../../common/hooks/useMaterializeLifecycle';
 import type { PaginationState } from './useConcordanceTaskFlow';
 
-type MaterializeSummary = {
+interface MaterializeSummary {
   recordCount: number;
   uniqueDocuments: number;
   totalDocuments: number;
-};
+}
 
-type Params = {
+interface Params {
   concordanceTaskId: string;
   materializeTaskIds: Record<string, string>;
   materializedEvents: AnalysisMaterializedEvent[];
@@ -33,23 +33,23 @@ type Params = {
   setMaterializedBins: Dispatch<SetStateAction<Record<string, ConcordanceDispersionBinRow[]>>>;
   setGlobalPageSize: Dispatch<SetStateAction<number>>;
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
-};
+}
 
-export type UseConcordanceMaterializedEventsResult = {
+export interface UseConcordanceMaterializedEventsResult {
   /**
    * Live ref tracking the most-recent non-empty concordance task id. Used by
    * downstream effects (bin fetcher) that need to keep working through brief
    * windows where `results.metadata.task_id` is undefined while a refetch is
    * in flight.
    */
-  concordanceTaskIdRef: MutableRefObject<string>;
+  concordanceTaskIdRef: RefObject<string>;
   /**
    * Reset the dedup tracker for processed `analysis_materialized` events.
    * Call this from the hydration callback so a re-run can re-apply events
    * for the new task.
    */
   resetProcessedEvents: () => void;
-};
+}
 
 /**
  * Owns the three effects that keep concordance state in sync with the task
@@ -109,6 +109,7 @@ export function useConcordanceMaterializedEvents({
             path: { task_id: parentTaskId },
             throwOnError: true,
           });
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- req is API-sourced; keep defensive default when the response body is null
           const reqObj = (req as Record<string, unknown>) ?? {};
           const paths =
             (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
@@ -137,9 +138,9 @@ export function useConcordanceMaterializedEvents({
       setGlobalPageSize(20);
       setNodePagination((prev) => {
         const updated = { ...prev };
-        Object.keys(updated).forEach((key) => {
-          updated[key] = { ...updated[key]!, pageSize: 20, currentPage: 1 };
-        });
+        for (const [key, value] of Object.entries(updated)) {
+          updated[key] = { ...value, pageSize: 20, currentPage: 1 };
+        }
         return updated;
       });
 

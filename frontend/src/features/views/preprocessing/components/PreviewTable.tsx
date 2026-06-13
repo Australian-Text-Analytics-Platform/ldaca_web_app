@@ -57,7 +57,7 @@ interface PreviewTableProps {
  * formatting in table cells.
  * Used by: local callers in preprocessing/PreviewTable module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
-function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow, unknown>[] {
+function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow>[] {
   return columnsToRender.map((col) => ({
     accessorKey: col,
     header: col,
@@ -103,7 +103,9 @@ export function PreviewTable({
   const columnsToRender =
     columns.length > 0
       ? columns
-      : data.length > 0 && typeof data[0] === 'object' && data[0] !== null
+      : // data rows come from the API; keep the explicit null guard before Object.keys.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        data.length > 0 && typeof data[0] === 'object' && data[0] !== null
         ? Object.keys(data[0])
         : [];
   const tableColSpan = Math.max(columnsToRender.length, 1);
@@ -148,7 +150,7 @@ export function PreviewTable({
               </label>
               <Select
                 value={String(pageSize)}
-                onValueChange={(value) => onPageSizeChange(Number(value))}
+                onValueChange={(value) => { onPageSizeChange(Number(value)); }}
                 disabled={loading}
               >
                 <SelectTrigger className="w-24">
@@ -253,7 +255,7 @@ export function PreviewTable({
                           <TableCell
                             key={cell.id}
                             className="max-w-xs truncate px-3 py-2 font-mono text-xs text-foreground"
-                            title={String(cellValue ?? '')}
+                            title={(cellValue ?? '') as string}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
@@ -271,13 +273,13 @@ export function PreviewTable({
         <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 py-4">
           <div className="text-sm text-muted-foreground">
             {pagination
-              ? `${pagination.total_rows} row${pagination.total_rows === 1 ? '' : 's'} · page ${currentPage} of ${displayTotalPages}`
+              ? `${String(pagination.total_rows)} row${pagination.total_rows === 1 ? '' : 's'} · page ${String(currentPage)} of ${String(displayTotalPages)}`
               : 'Preview ready'}
           </div>
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              onClick={() => table.setPageIndex(currentPage - 2)}
+              onClick={() => { table.setPageIndex(currentPage - 2); }}
               disabled={currentPage <= 1 || loading}
               variant="outline"
               size="sm"
@@ -287,7 +289,7 @@ export function PreviewTable({
             <span className="text-sm text-muted-foreground">Page {currentPage}</span>
             <Button
               type="button"
-              onClick={() => table.setPageIndex(currentPage)}
+              onClick={() => { table.setPageIndex(currentPage); }}
               disabled={currentPage >= displayTotalPages || loading}
               variant="outline"
               size="sm"

@@ -15,6 +15,7 @@ import { ServerPaginationFooter } from '@/features/views/common/components/Serve
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import type { SourceRowPagination } from '@/api/generated/types.gen';
 import { QUOTATION_DOCUMENT_COLUMN } from '../../common/generatedColumns';
+import { toCellText } from '../quotationCellText';
 import { QuotationHighlightedCell, type QuotationHoverState } from './QuotationHighlightedCell';
 
 type QuotationRow = Record<string, unknown>;
@@ -96,7 +97,7 @@ export function QuotationNodeBlock({
   const pageSize = pagination?.page_size ?? 50;
   const rowCount = pagination?.total_source_rows ?? 0;
 
-  const columns: ColumnDef<QuotationRow, unknown>[] = cols.map((columnName) => ({
+  const columns: ColumnDef<QuotationRow>[] = cols.map((columnName) => ({
     id: columnName,
     accessorFn: (row) => row[columnName],
     header: () => {
@@ -105,7 +106,7 @@ export function QuotationNodeBlock({
         <button
           type="button"
           className="flex items-center gap-1.5 select-none"
-          onClick={() => onSort(nodeId, columnName)}
+          onClick={() => { onSort(nodeId, columnName); }}
         >
           <span>{columnName}</span>
           <ArrowUpDown className={`h-3 w-3 ${active ? 'text-foreground' : 'opacity-60'}`} />
@@ -118,7 +119,7 @@ export function QuotationNodeBlock({
       if (Boolean(textCol) && columnName === QUOTATION_DOCUMENT_COLUMN) {
         return (
           <QuotationHighlightedCell
-            text={typeof value === 'string' ? value : String(value ?? '')}
+            text={typeof value === 'string' ? value : toCellText(value)}
             row={data}
             cellKey={`${nodeId}:${row.id}:${columnName}`}
             contextLength={contextLength}
@@ -127,7 +128,7 @@ export function QuotationNodeBlock({
           />
         );
       }
-      return value !== undefined && value !== null ? String(value) : '';
+      return value !== undefined && value !== null ? toCellText(value) : '';
     },
   }));
 
@@ -194,7 +195,7 @@ export function QuotationNodeBlock({
                   <TableRow
                     key={row.id}
                     className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer"
-                    onClick={() => onRowClick(row.original)}
+                    onClick={() => { onRowClick(row.original); }}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell

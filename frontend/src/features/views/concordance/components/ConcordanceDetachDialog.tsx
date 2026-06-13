@@ -5,7 +5,7 @@ import {
   type DetachDialogNodeOption,
 } from '../../common/components/DetachColumnsDialog';
 
-type Props = {
+interface Props {
   open: boolean;
   onOpenChange: Dispatch<SetStateAction<boolean>>;
   isDetaching: boolean;
@@ -15,7 +15,7 @@ type Props = {
   selectAllDetachColumns: () => void;
   deselectAllDetachColumns: () => void;
   handleDetachConfirm: () => Promise<void> | void;
-};
+}
 
 /** Rendered by: ConcordanceFeature to adapt the shared detach-column dialog to concordance result exports because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface. */
 export function ConcordanceDetachDialog({

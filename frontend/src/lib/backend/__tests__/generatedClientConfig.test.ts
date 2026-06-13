@@ -29,7 +29,7 @@ describe('generatedClientConfig', () => {
     const config = createClientConfig({ baseUrl: 'http://api.test/api', fetch: fetchMock });
 
     await requireFetch(config.fetch)(
-      new Request(`${config.baseUrl}/config/`, { credentials: config.credentials }),
+      new Request(`${String(config.baseUrl)}/config/`, { credentials: config.credentials }),
     );
 
     const [request] = fetchMock.mock.calls[0] as [Request];
@@ -49,7 +49,7 @@ describe('generatedClientConfig', () => {
     });
 
     await expect(
-      requireFetch(config.fetch)(new Request(`${config.baseUrl}/config/`)),
+      requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/config/`)),
     ).rejects.toMatchObject({
       code: 'NETWORK',
       name: 'ApiError',

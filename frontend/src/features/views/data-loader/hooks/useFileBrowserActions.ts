@@ -58,7 +58,7 @@ export function useFileBrowserActions({
         throwOnError: true,
       });
       await refetchFiles();
-      notify('success', `Moved ${sourcePath.split('/').at(-1)}.`);
+      notify('success', `Moved ${String(sourcePath.split('/').at(-1))}.`);
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to move file.');
     }

@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
-type AnalysisRunningStateCardProps = {
+interface AnalysisRunningStateCardProps {
   title?: string;
   message: string;
   taskId?: string | null;
   progress?: number | null;
   startedAt?: string | number | null;
-};
+}
 
 // Backend sends started_at as time.time() (Unix seconds). Convert to ms when needed.
 /** Called by: running-state elapsed time calculations because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
@@ -32,10 +32,10 @@ function useElapsedSeconds(startedAt: string | number | null | undefined): numbe
     const start = typeof startedAt === 'number' ? toMs(startedAt) : Date.parse(startedAt);
     if (isNaN(start)) return;
     /** Called by: the interval timer and initial effect pass because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    const tick = () => { setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000))); };
     tick();
     const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); };
   }, [startedAt]);
 
   return elapsed;
@@ -43,10 +43,10 @@ function useElapsedSeconds(startedAt: string | number | null | undefined): numbe
 
 /** Called by: AnalysisRunningStateCard when rendering elapsed runtime text because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 function formatElapsed(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 60) return `${String(seconds)}s`;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return s === 0 ? `${m} min` : `${m} min ${s}s`;
+  return s === 0 ? `${String(m)} min` : `${String(m)} min ${String(s)}s`;
 }
 
 /**

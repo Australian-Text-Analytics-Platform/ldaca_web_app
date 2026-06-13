@@ -40,14 +40,11 @@ type NodeColumnSource = string[] | ColumnInfo[];
  * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
  */
 const resolveNodeId = (node: NodeLike, idx: number): string => {
-  return (
-    node?.id ||
-    node?.node_id ||
-    node?.data?.id ||
-    node?.data?.node_id ||
-    node?.unique_id ||
-    `node-${idx}`
-  );
+  const candidates = [node.id, node.node_id, node.data?.id, node.data?.node_id, node.unique_id];
+  for (const candidate of candidates) {
+    if (candidate) return candidate;
+  }
+  return `node-${String(idx)}`;
 };
 
 /** Canonicalizes typed column info before option lists compare/filter data types. */
@@ -140,7 +137,7 @@ export const useAutoNodeColumns = ({
       if (!infos.length) {
         infos = mapColumnsToInfo(node);
       }
-      if (!infos.length && fallbackToAllColumnsRef.current && Array.isArray(node?.columns)) {
+      if (!infos.length && fallbackToAllColumnsRef.current && Array.isArray(node.columns)) {
         infos = normalizeColumnInfos(node.columns as NodeColumnSource);
       }
       if (allowedDataTypesRef.current?.length) {
@@ -153,17 +150,20 @@ export const useAutoNodeColumns = ({
     setSelectionsState((prev) => {
       const prevMap = new Map(prev.map((s) => [s.nodeId, s.column]));
       const nextSelections = ids.map((nodeId, idx) => {
+        // idx is bounded by ids.length, which mirrors nodes.length (resolveNodeId never yields a
+        // falsy id, so filter(Boolean) drops nothing); the indexed node is always present.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const node = nodes[idx]!;
         const columnInfos = deriveColumnInfosLocal(node);
         const columns = columnInfos.map((col) => col.name);
-        let column = prevMap.get(nodeId) || '';
+        let column = prevMap.get(nodeId) ?? '';
 
         if (!column) {
           const documentColumn = extractDocumentColumn(node);
           if (documentColumn && columns.includes(documentColumn)) {
             column = documentColumn;
           } else if (!docTypeOnlyRef.current && columns.length > 0) {
-            column = columns[0] || '';
+            column = columns[0] ?? '';
           }
         }
 
@@ -207,7 +207,7 @@ export const useAutoNodeColumns = ({
       if (!infos.length) {
         infos = mapColumnsToInfo(node);
       }
-      if (!infos.length && fallbackToAllColumns && Array.isArray(node?.columns)) {
+      if (!infos.length && fallbackToAllColumns && Array.isArray(node.columns)) {
         infos = normalizeColumnInfos(node.columns as NodeColumnSource);
       }
       if (allowedDataTypes?.length) {

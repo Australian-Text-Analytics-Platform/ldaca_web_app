@@ -58,13 +58,15 @@ const comparePeriodBounds = (left: unknown, right: unknown): number => {
     return left - right;
   }
 
-  const leftTime = new Date(String(left)).getTime();
-  const rightTime = new Date(String(right)).getTime();
+  const leftTime = new Date(left as string | number).getTime();
+  const rightTime = new Date(right as string | number).getTime();
   if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime)) {
     return leftTime - rightTime;
   }
 
-  return String(left).localeCompare(String(right));
+  return String((left as string | number | boolean | null | undefined) ?? '').localeCompare(
+    String((right as string | number | boolean | null | undefined) ?? ''),
+  );
 };
 
 // Formats sequential chart x-axis labels for timestamps while preserving raw non-date values.
@@ -73,13 +75,13 @@ const comparePeriodBounds = (left: unknown, right: unknown): number => {
  * Flow: return a placeholder for empty values, format parseable dates with month/year/day detail, then preserve raw non-date labels.
  */
 export const formatTimeLabel = (value?: string | number) => {
-  if (value === undefined || value === null || value === '') return '—';
+  if (value === undefined || value === '') return '—';
   // Numeric input is interpreted as epoch-milliseconds (this is what the
   // linear x-axis passes in for datetime columns). Pass it to Date
   // directly — stringifying first would yield e.g. `"846764800000"`,
   // which `Date.parse` doesn't recognise as a date and falls through to
   // the raw number, putting epoch-ms on the axis ticks.
-  const parsed = typeof value === 'number' ? new Date(value) : new Date(String(value));
+  const parsed = typeof value === 'number' ? new Date(value) : new Date(value);
   if (!Number.isNaN(parsed.getTime())) {
     const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short' };
     if (
@@ -95,7 +97,7 @@ export const formatTimeLabel = (value?: string | number) => {
 interface SequentialAnalysisState {
   currentWorkspaceId: string | null;
   activeNodeId: string | null;
-  nodeColumnSelections: Array<{ nodeId: string; column: string }>;
+  nodeColumnSelections: { nodeId: string; column: string }[];
   timeColumn: string;
   groupByColumns: string[];
   frequency: SequentialFrequency;
@@ -120,7 +122,7 @@ interface SequentialAnalysisActions {
   ) => void;
   setChartType: (value: ChartTypeOption) => void;
   setLocalTaskId: (value: string | null) => void;
-  setNodeColumnSelections: (selections: Array<{ nodeId: string; column: string }>) => void;
+  setNodeColumnSelections: (selections: { nodeId: string; column: string }[]) => void;
   setTimeColumn: (value: string) => void;
   lockCurrentSchema: (schema?: Record<string, string>) => void;
   resolveTaskId: () => Promise<string | null>;
@@ -134,11 +136,11 @@ interface SequentialAnalysisLock {
   getAuthHeaders: () => Record<string, string>;
 }
 
-type Params = {
+interface Params {
   state: SequentialAnalysisState;
   actions: SequentialAnalysisActions;
   lock: SequentialAnalysisLock;
-};
+}
 
 /** Builds the submit, clear, chart-type, and chart-shaping logic for sequential analysis. */
 /**
@@ -189,6 +191,7 @@ export function useSequentialAnalysisTaskFlow({
       return;
     }
 
+    /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty column/time strings must fall through to the next fallback source */
     const picked =
       nodeColumnSelections.find((s) => s.nodeId === nodeIdForAnalysis)?.column ||
       timeColumn ||
@@ -196,6 +199,7 @@ export function useSequentialAnalysisTaskFlow({
         | string
         | undefined) ||
       '';
+    /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
     if (!picked) {
       toast.error('Please select a time column');
       return;
@@ -250,7 +254,7 @@ export function useSequentialAnalysisTaskFlow({
       setIsAnalyzing(true);
       const authHeaders = getAuthHeaders();
       const headers =
-        Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
+        Object.keys(authHeaders).length > 0 ? (authHeaders) : {};
       const { data: result } = await runSequentialAnalysis({
         body: request,
         headers,
@@ -262,7 +266,7 @@ export function useSequentialAnalysisTaskFlow({
       const enrichedResult = {
         ...result,
         analysis_params: {
-          ...((result as Record<string, unknown>)?.analysis_params as Record<string, unknown>),
+          ...((result as Record<string, unknown>).analysis_params as Record<string, unknown>),
           group_by_columns: validGroupByColumns,
           time_column: picked,
           frequency,
@@ -275,7 +279,7 @@ export function useSequentialAnalysisTaskFlow({
         },
       };
       const resolvedChartType = isChartTypeOption(
-        (enrichedResult as Record<string, unknown>)?.chart_type,
+        (enrichedResult as Record<string, unknown>).chart_type,
       )
         ? ((enrichedResult as Record<string, unknown>).chart_type as ChartTypeOption)
         : chartType;
@@ -316,7 +320,7 @@ export function useSequentialAnalysisTaskFlow({
     if (!currentWorkspaceId) return;
     const authHeaders = getAuthHeaders();
     const headers =
-      Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
+      Object.keys(authHeaders).length > 0 ? (authHeaders) : {};
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return;
@@ -334,7 +338,7 @@ export function useSequentialAnalysisTaskFlow({
   const chartData = (() => {
     if (!results?.data || !Array.isArray(results.data)) return [];
 
-    const groupingColumns = (results?.analysis_params as Record<string, unknown> | undefined)
+    const groupingColumns = (results.analysis_params as Record<string, unknown> | undefined)
       ?.group_by_columns;
     const effectiveGroupColumns = Array.isArray(groupingColumns)
       ? groupingColumns
@@ -342,10 +346,11 @@ export function useSequentialAnalysisTaskFlow({
         ? groupByColumns
         : [];
 
-    if (!effectiveGroupColumns || effectiveGroupColumns.length === 0) {
+    if (effectiveGroupColumns.length === 0) {
       return results.data.map((item: Record<string, unknown>) => ({
         ...item,
         time_period:
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty formatted label must fall through to the raw period
           (item.time_period_formatted as string | undefined) ||
           (item.time_period as string | undefined),
         sequential_count: item.sequential_count,
@@ -355,12 +360,14 @@ export function useSequentialAnalysisTaskFlow({
     const timeMap = new Map<string, SequentialAnalysisDatum>();
     const allGroupKeys = new Set<string>();
     results.data.forEach((item: Record<string, unknown>) => {
+      /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty formatted/raw labels must fall through to the '' default */
       const timePeriod =
         (item.time_period_formatted as string | undefined) ||
         (item.time_period as string | undefined) ||
         '';
+      /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
       const groupKey = effectiveGroupColumns
-        .map((col: string) => String(item[col] ?? ''))
+        .map((col: string) => String((item[col] as string | number | undefined) ?? ''))
         .join(' - ');
       allGroupKeys.add(groupKey);
       if (!timeMap.has(timePeriod)) {
@@ -397,8 +404,8 @@ export function useSequentialAnalysisTaskFlow({
     });
 
     return Array.from(timeMap.values()).sort((a, b) => {
-      const aTime = String(a.time_period ?? '');
-      const bTime = String(b.time_period ?? '');
+      const aTime = String((a.time_period as string | number | undefined) ?? '');
+      const bTime = String((b.time_period as string | number | undefined) ?? '');
       return aTime.localeCompare(bTime);
     });
   })();

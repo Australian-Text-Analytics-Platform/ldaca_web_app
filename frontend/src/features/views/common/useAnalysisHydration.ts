@@ -66,7 +66,6 @@ export interface UseAnalysisHydrationReturn<TPreferences> {
 const normalizePreferencePayload = <TPreferences extends Record<string, unknown>>(
   partial: TPreferences,
 ): TPreferences => {
-  if (!partial) return partial;
   const normalized: Record<string, unknown> = { ...partial };
 
   if (typeof normalized.token_limit === 'number') {
@@ -155,13 +154,13 @@ export function useAnalysisHydration<
         }
 
         const requestPromise = fetchRequest
-          ? Promise.resolve(fetchRequest(taskId)).catch((error) => {
+          ? Promise.resolve(fetchRequest(taskId)).catch((error: unknown) => {
               logHydrationFailure('request fetch failed', error);
               return null;
             })
           : Promise.resolve(null);
         const resultPromise = fetchResult
-          ? Promise.resolve(fetchResult(taskId)).catch((error) => {
+          ? Promise.resolve(fetchResult(taskId)).catch((error: unknown) => {
               logHydrationFailure('result fetch failed', error);
               return null;
             })
@@ -211,7 +210,7 @@ export function useAnalysisHydration<
 
   /** Called by: analysis panels through the persistPreferences return value because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
   const persistPreferencesSafe = async (partial: TPreferences) => {
-    if (!persistPreferences || !workspaceId || !partial) return;
+    if (!persistPreferences || !workspaceId) return;
     const normalized = normalizePreferencePayload(partial);
     await persistPreferences(normalized);
   };

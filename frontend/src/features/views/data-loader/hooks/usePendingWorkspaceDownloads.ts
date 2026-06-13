@@ -5,10 +5,10 @@ import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
-type PendingDownload = {
+interface PendingDownload {
   taskId: string;
   workspaceName: string;
-};
+}
 
 /**
  * Removes one workspace download from the pending map without mutating the
@@ -23,16 +23,16 @@ const omitPendingDownload = (
   return Object.fromEntries(Object.entries(pendingDownloads).filter(([id]) => id !== workspaceId));
 };
 
-type UsePendingWorkspaceDownloadsOptions = {
+interface UsePendingWorkspaceDownloadsOptions {
   authHeaders: Record<string, string>;
   notify: Notify;
-};
+}
 
-export type PendingWorkspaceDownloadsHandle = {
+export interface PendingWorkspaceDownloadsHandle {
   startDownload: (workspaceId: string, workspaceName: string) => Promise<void>;
   isStarting: (workspaceId: string) => boolean;
   isPending: (workspaceId: string) => boolean;
-};
+}
 
 /**
  * Tracks asynchronous workspace ZIP downloads. The workspace manager uses this
@@ -62,6 +62,8 @@ export function usePendingWorkspaceDownloads({
           headers: authHeaders,
           throwOnError: true,
         });
+        // defensive against a malformed API response that omits metadata/task_id
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const taskId = response?.metadata?.task_id;
         if (!taskId) throw new Error('No task ID returned');
         setPendingDownloads((prev) => ({ ...prev, [workspaceId]: { taskId, workspaceName } }));
@@ -115,6 +117,8 @@ export function usePendingWorkspaceDownloads({
   const failPendingDownload = useCallback(
     (workspaceId: string, message: string | undefined) => {
       dismissPendingDownload(workspaceId);
+      // an empty failure message should fall through to the generic copy
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
       notify('error', message || 'Workspace download failed.');
     },
     [dismissPendingDownload, notify],
@@ -133,7 +137,7 @@ export function usePendingWorkspaceDownloads({
           completePendingDownload(workspaceId, taskId, workspaceName),
         );
       } else if (task.state === 'failed' || task.state === 'cancelled') {
-        void Promise.resolve().then(() => failPendingDownload(workspaceId, task.message));
+        void Promise.resolve().then(() => { failPendingDownload(workspaceId, task.message); });
       }
     }
   }, [tasks, pendingDownloads, completePendingDownload, failPendingDownload]);

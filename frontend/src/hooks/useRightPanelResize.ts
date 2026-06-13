@@ -34,8 +34,8 @@ export const useRightPanelResize = () => {
     persistKey: 'ldaca.layout.asidePanelRatio',
     onLiveUpdate: (next) => {
       if (isRightCollapsed) return;
-      if (mainRef.current) mainRef.current.style.width = `${(1 - next) * 100}%`;
-      if (asideRef.current) asideRef.current.style.width = `${next * 100}%`;
+      if (mainRef.current) mainRef.current.style.width = `${String((1 - next) * 100)}%`;
+      if (asideRef.current) asideRef.current.style.width = `${String(next * 100)}%`;
     },
   });
 

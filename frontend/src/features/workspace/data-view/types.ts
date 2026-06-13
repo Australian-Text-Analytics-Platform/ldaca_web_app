@@ -19,7 +19,7 @@ export type FilterOperator = 'contains' | 'eq' | 'startswith' | 'endswith';
 export type NodeShape = [number | null, number | null];
 
 /** Rich node shape used by the workspace graph/table view. */
-export type WorkspaceNode = {
+export interface WorkspaceNode {
   node_id: string;
   name: string;
   shape: NodeShape;
@@ -33,14 +33,14 @@ export type WorkspaceNode = {
   dtypes?: Record<string, string>;
   tokenizer_models?: Record<string, string>;
   [key: string]: unknown;
-};
+}
 
 /** Compact schema payload used by column pickers that do not need full node metadata. */
-export type NodeSchemaResponse = {
+export interface NodeSchemaResponse {
   node_id: string;
   schema: Record<string, string>;
   columns: string[];
   column_types: Record<string, string>;
   is_text_data: boolean;
   document_column?: string;
-};
+}

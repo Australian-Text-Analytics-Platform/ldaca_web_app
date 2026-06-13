@@ -98,6 +98,7 @@ function TokenizerModelSelector({
         >
           <SelectTrigger className="w-full text-sm" aria-label="Tokenizer model">
             <SelectValue placeholder="Select model">
+              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty value should display the placeholder, not '' */}
               {selectedModel?.label ?? (value ? value : 'Select Model')}
             </SelectValue>
           </SelectTrigger>

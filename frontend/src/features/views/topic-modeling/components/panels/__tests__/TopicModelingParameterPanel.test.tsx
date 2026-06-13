@@ -20,7 +20,7 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
   NodeInputsPanel: () => <div data-testid="node-inputs-panel" />,
 }));
 
-const nodeInputsFixture = (selectedNodes: Array<{ id?: string; name?: string }> = []) => ({
+const nodeInputsFixture = (selectedNodes: { id?: string; name?: string }[] = []) => ({
   inputs: selectedNodes.map((node) => ({ node_id: node.id ?? '', column: 'text' })),
   resolvedNodes: selectedNodes.map((node) => ({
     id: node.id ?? '',
@@ -91,7 +91,7 @@ describe('TopicModelingParameterPanel', () => {
   it('keeps the raw topic size value input while editing', () => {
     render(<TopicModelingParameterPanel {...baseProps} topicSizeValue={25} />);
 
-    const input = screen.getByLabelText('Minimum topic size') as HTMLInputElement;
+    const input = screen.getByLabelText<HTMLInputElement>('Minimum topic size');
 
     fireEvent.change(input, { target: { value: '' } });
     expect(input.value).toBe('');
@@ -132,7 +132,7 @@ describe('TopicModelingParameterPanel', () => {
       />,
     );
 
-    const input = screen.getByLabelText('Sampling percentage for corpus 1') as HTMLInputElement;
+    const input = screen.getByLabelText<HTMLInputElement>('Sampling percentage for corpus 1');
     // Input shows 100 (not stored 40) when disabled
     expect(input.value).toBe('100');
     // Full doc count displayed

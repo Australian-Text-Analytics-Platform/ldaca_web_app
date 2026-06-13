@@ -27,7 +27,7 @@ import {
   type TaggedBinRow,
 } from '../concordanceViewModels';
 
-type Props = {
+interface Props {
   rows: ConcordanceDispersionRow[];
   textColumn: string;
   binCount: number;
@@ -82,7 +82,7 @@ type Props = {
     totals: ReadonlyMap<string, number>;
     selectedTotals: ReadonlyMap<string, number> | null;
   }) => void;
-};
+}
 
 const AGGREGATE_DEFAULT_COLOR = '#0284c7';
 const AGGREGATE_LINE_LABEL = 'All matches';
@@ -102,7 +102,7 @@ const formatBinRange = (binCenter: number, binCount: number): string => {
   if (width >= 2) {
     const lower = idx === 0 ? 0 : Math.round(idx * width) + 1;
     const upper = Math.round((idx + 1) * width);
-    return `${lower}-${upper}%`;
+    return `${String(lower)}-${String(upper)}%`;
   }
   const lower = idx * width;
   const upper = (idx + 1) * width;
@@ -114,7 +114,7 @@ const SOURCE_DASH_STYLES: (string | undefined)[] = [undefined, '6 4'];
 /** Used by: ConcordanceDispersionSummary chart axis to format ticks as relative-position percentages because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const formatTickLabel = (value: number): string => {
   if (!Number.isFinite(value)) return '';
-  return `${Math.round(value)}%`;
+  return `${String(Math.round(value))}%`;
 };
 
 /** Used by: ConcordanceDispersionSummary legend/count derivation to split combined text/source series keys because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
@@ -173,7 +173,7 @@ export function ConcordanceDispersionSummary({
   const useMaterialised = materialised && showAllProcessed && materialisedBinsReady;
 
   const { bins, sources, totalsByKey } = useMemo(() => {
-    if (useMaterialised && materialisedBins) {
+    if (useMaterialised) {
       return buildDispersionBinsFromBinned(materialisedBins, binCount, {
         lowercaseMatches,
         splitBySource,
@@ -237,7 +237,7 @@ export function ConcordanceDispersionSummary({
         if (key === 'binCenter' || key === DISPERSION_AGGREGATE_KEY) continue;
         const { text } = stripSeriesKey(key);
         if (!text) continue;
-        out.set(text, (out.get(text) ?? 0) + (Number(val) || 0));
+        out.set(text, (out.get(text) ?? 0) + (val || 0));
       }
     }
     return out;
@@ -399,7 +399,7 @@ export function ConcordanceDispersionSummary({
             <span>Chart</span>
             <select
               value={chartType}
-              onChange={(e) => onChartTypeChange(e.target.value as MultiSeriesChartType)}
+              onChange={(e) => { onChartTypeChange(e.target.value as MultiSeriesChartType); }}
               className="h-7 rounded border border-input bg-background px-2 text-sm"
             >
               <option value="line">Line</option>
@@ -412,7 +412,7 @@ export function ConcordanceDispersionSummary({
           variant="outline"
           size="icon"
           aria-label="Download dispersion summary"
-          onClick={() => setDownloadDialogOpen(true)}
+          onClick={() => { setDownloadDialogOpen(true); }}
           disabled={series.length === 0}
         >
           <Download className="h-4 w-4" />
@@ -429,7 +429,7 @@ export function ConcordanceDispersionSummary({
           type: 'number',
           domain: [0, 100],
           ticks: X_AXIS_TICKS,
-          tickFormatter: formatTickLabel as never,
+          tickFormatter: formatTickLabel,
         }}
         yAxis={{ allowDecimals: false }}
         tooltip={{
@@ -459,7 +459,7 @@ export function ConcordanceDispersionSummary({
         <select
           value={showAllProcessed ? 'whole' : 'page'}
           disabled={!materialisedBinsReady}
-          onChange={(e) => setShowAllProcessed(e.target.value === 'whole')}
+          onChange={(e) => { setShowAllProcessed(e.target.value === 'whole'); }}
           className="h-7 rounded border border-input bg-background px-2 text-sm font-medium"
           aria-label="Aggregation scope"
         >

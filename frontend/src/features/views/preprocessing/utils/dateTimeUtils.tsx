@@ -54,7 +54,7 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>(
       if (typeof externalRef === 'function') {
         externalRef(el);
       } else if (externalRef) {
-        (externalRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+        (externalRef).current = el;
       }
     };
 
@@ -315,7 +315,7 @@ export function DateTimePickerField({
                     type="time"
                     step={1}
                     value={timeValue}
-                    onChange={(event) => handleTimeChange(event.target.value)}
+                    onChange={(event) => { handleTimeChange(event.target.value); }}
                     className="appearance-none pl-8 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                   />
                 </div>

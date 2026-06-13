@@ -1,18 +1,18 @@
 import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
 import { isNonEmptyString } from '../common';
 
-export type TokenFrequencyRow = { token: string; frequency: number };
+export interface TokenFrequencyRow { token: string; frequency: number }
 
 export type TokenFrequencyStatisticsEntry = NonNullable<
   TokenFrequencyResponse['statistics']
 >[number];
 
-export type NormalizedNodeResult = {
+export interface NormalizedNodeResult {
   nodeId: string;
   displayName: string;
   rows: TokenFrequencyRow[];
   metadata: Record<string, unknown>;
-};
+}
 
 export type NodeResultView = NormalizedNodeResult & {
   filteredRows: TokenFrequencyRow[];
@@ -82,9 +82,9 @@ export const buildResponseDisplayNameHints = (
   results?: TokenFrequencyResponse | null,
 ): Record<string, string> => {
   const mapping: Record<string, string> = {};
-  const metadataNodeNames = ((results?.metadata as Record<string, unknown> | null | undefined)
+  const metadataNodeNames = ((results?.metadata)
     ?.node_display_names ?? {}) as Record<string, unknown>;
-  if (metadataNodeNames && typeof metadataNodeNames === 'object') {
+  if (typeof metadataNodeNames === 'object') {
     Object.entries(metadataNodeNames).forEach(([id, name]) => {
       if (isNonEmptyString(name)) {
         mapping[id] = name;
@@ -95,8 +95,8 @@ export const buildResponseDisplayNameHints = (
   if (results?.data && typeof results.data === 'object') {
     Object.entries(results.data as Record<string, unknown>).forEach(([, value]) => {
       const entryMetadata = extractMetadata(value);
-      const metaNodeId = entryMetadata['node_id'];
-      const metaDisplayName = entryMetadata['display_name'];
+      const metaNodeId = entryMetadata.node_id;
+      const metaDisplayName = entryMetadata.display_name;
       if (isNonEmptyString(metaNodeId) && isNonEmptyString(metaDisplayName)) {
         mapping[metaNodeId] = metaDisplayName;
       }
@@ -114,11 +114,11 @@ export const buildResponseDisplayNameHints = (
 export const computeAnalysisNodeIds = (
   paramsNodeIds: unknown,
   lastCompareNodeIds: string[],
-  nodeColumnSelections: Array<{ nodeId: string }>,
+  nodeColumnSelections: { nodeId: string }[],
 ): string[] => {
-  const combined: Array<string | null | undefined> = [];
+  const combined: (string | null | undefined)[] = [];
   if (Array.isArray(paramsNodeIds)) {
-    combined.push(...paramsNodeIds);
+    combined.push(...(paramsNodeIds as string[]));
   }
   combined.push(...lastCompareNodeIds);
   combined.push(...nodeColumnSelections.map((sel) => sel.nodeId));
@@ -161,7 +161,7 @@ export const normalizeNodeResults = (
     entries.find(([key, value]) => {
       if (usedKeys.has(key)) return false;
       const metadata = extractMetadata(value);
-      return isNonEmptyString(metadata['node_id']) && metadata['node_id'] === nodeId;
+      return isNonEmptyString(metadata.node_id) && metadata.node_id === nodeId;
     });
 
   return nodeIds.map((nodeId, index) => {
@@ -221,14 +221,14 @@ export const deriveNodeDisplayResults = (
    */
   const shouldFilterToken = (token: unknown) => {
     if (!hasStopFilter) return false;
-    const normalizedToken = String(token ?? '').toLowerCase();
+    const normalizedToken = typeof token === 'string' ? token.toLowerCase() : '';
     return appliedStopSet.has(normalizedToken);
   };
 
   return normalizedNodeResults.map((result) => {
     const rawRows = Array.isArray(result.rows) ? result.rows : [];
     const filteredRows = hasStopFilter
-      ? rawRows.filter((row) => !shouldFilterToken(row?.token))
+      ? rawRows.filter((row) => !shouldFilterToken(row.token))
       : rawRows;
 
     let displayRows: TokenFrequencyRow[];
@@ -237,7 +237,7 @@ export const deriveNodeDisplayResults = (
     } else {
       const limitedRows: TokenFrequencyRow[] = [];
       for (const row of rawRows) {
-        if (shouldFilterToken(row?.token)) continue;
+        if (shouldFilterToken(row.token)) continue;
         limitedRows.push(row);
         if (limitedRows.length >= normalizedLimit) break;
       }
@@ -245,7 +245,7 @@ export const deriveNodeDisplayResults = (
     }
 
     const maxFrequencyRaw =
-      rawRows.length > 0 ? maxBy(rawRows, (r) => Number(r?.frequency) || 0, 0) : 0;
+      rawRows.length > 0 ? maxBy(rawRows, (r) => r.frequency || 0, 0) : 0;
     const maxFrequency = maxFrequencyRaw > 0 ? maxFrequencyRaw : 1;
 
     return {

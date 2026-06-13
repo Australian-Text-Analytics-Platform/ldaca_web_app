@@ -25,7 +25,7 @@ const SIDEBAR_WIDTH = '16rem';
 /** Mobile sheet sidebar width used when `useIsMobile` switches to sheet rendering. */
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 
-type SidebarContextProps = {
+interface SidebarContextProps {
   state: 'expanded' | 'collapsed';
   open: boolean;
   setOpen: (open: boolean) => void;
@@ -33,7 +33,7 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
-};
+}
 
 /** Context carrying open/collapse state for all sidebar primitives. */
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -87,7 +87,8 @@ function SidebarProvider({
 
   /** Called by: SidebarTrigger and provider consumers that toggle the sidebar because the caller needs one documented boundary for the lookup, event, or state handoff step. */
   const toggleSidebar = () => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
+    if (isMobile) setOpenMobile((open) => !open);
+    else setOpen((open) => !open);
   };
 
   // Exposes a stable styling state for Tailwind data-attribute selectors.
@@ -587,7 +588,7 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<'div'> & {
   showIcon?: boolean;
 }) {
-  const [width] = React.useState(() => `${Math.floor(Math.random() * 40) + 50}%`);
+  const [width] = React.useState(() => `${String(Math.floor(Math.random() * 40) + 50)}%`);
 
   return (
     <div

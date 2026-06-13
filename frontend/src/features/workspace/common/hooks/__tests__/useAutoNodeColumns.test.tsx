@@ -276,10 +276,10 @@ describe('useAutoNodeColumns', () => {
         }),
       );
 
-      expect(result.current.columnOptions['n1']?.columns).toEqual([
+      expect(result.current.columnOptions.n1?.columns).toEqual([
         { name: 'created_at', dataType: 'datetime' },
       ]);
-      expect(result.current.columnOptions['n1']?.filteredOutByType).toBe(false);
+      expect(result.current.columnOptions.n1?.filteredOutByType).toBe(false);
     });
 
     it('marks filteredOutByType=true when none of the columns match the allowed types', () => {
@@ -297,8 +297,8 @@ describe('useAutoNodeColumns', () => {
         }),
       );
 
-      expect(result.current.columnOptions['n1']?.filteredOutByType).toBe(true);
-      expect(result.current.columnOptions['n1']?.columns).toEqual(
+      expect(result.current.columnOptions.n1?.filteredOutByType).toBe(true);
+      expect(result.current.columnOptions.n1?.columns).toEqual(
         expect.arrayContaining([
           { name: 'category', dataType: 'string' },
           { name: 'priority', dataType: 'integer' },
@@ -320,7 +320,7 @@ describe('useAutoNodeColumns', () => {
           workspaceId: 'ws-max',
           /** Reads each node's own columns so max-node trimming is the only variable. */
           /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-          getNodeColumns: (n) => (n.columns as string[]) ?? [],
+          getNodeColumns: (n) => (n.columns as string[] | undefined) ?? [],
         }),
       );
 
@@ -329,7 +329,7 @@ describe('useAutoNodeColumns', () => {
       expect(Object.keys(result.current.columnOptions)).toEqual(
         expect.arrayContaining(['n1', 'n2']),
       );
-      expect(result.current.columnOptions['n3']).toBeUndefined();
+      expect(result.current.columnOptions.n3).toBeUndefined();
     });
   });
 });

@@ -12,7 +12,7 @@ import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../
 // identity is stable across renders.
 const STOPWORD_SEPARATOR_RE = /[,\n\r]+/;
 
-type UseTokenFrequencyPreferencesParams = {
+interface UseTokenFrequencyPreferencesParams {
   currentWorkspaceId: string | null;
   results: TokenFrequencyResponse | null;
   setResults: React.Dispatch<React.SetStateAction<TokenFrequencyResponse | null>>;
@@ -23,7 +23,7 @@ type UseTokenFrequencyPreferencesParams = {
   maxTokenLimitInput: number;
   /** When false, the stopwords / token-limit handlers update local client state only and skip the backend persist roundtrip. Defaults to ``true``. */
   persistEnabled?: boolean;
-};
+}
 
 /** Owns token-frequency preference UI state and persistence for stop words and display limits. */
 /**
@@ -79,7 +79,7 @@ export const useTokenFrequencyPreferences = ({
     }
 
     if (nextLimit !== null) {
-      void Promise.resolve().then(() => applyTokenLimitState(nextLimit));
+      void Promise.resolve().then(() => { applyTokenLimitState(nextLimit); });
     }
   }, [applyTokenLimitState, backendTokenLimit, tokenLimitOverride]);
 
@@ -177,13 +177,12 @@ export const useTokenFrequencyPreferences = ({
         delete analysisParams.limit;
 
         const stopWordsArray =
-          prefs.stopWords !== undefined
-            ? prefs.stopWords
-            : Array.isArray(prev.stop_words)
-              ? prev.stop_words
-              : Array.isArray(metadata.stop_words)
-                ? metadata.stop_words
-                : [];
+          prefs.stopWords ??
+          (Array.isArray(prev.stop_words)
+            ? prev.stop_words
+            : Array.isArray(metadata.stop_words)
+              ? metadata.stop_words
+              : []);
 
         metadata.stop_words = stopWordsArray;
         analysisParams.stop_words = stopWordsArray;
@@ -196,7 +195,7 @@ export const useTokenFrequencyPreferences = ({
           stop_words: stopWordsArray,
           message: prev.message,
           state: prev.state,
-        } as TokenFrequencyResponse;
+        };
       });
     },
     [setResults, maxTokenLimitInput],

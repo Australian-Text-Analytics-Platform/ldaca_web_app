@@ -38,7 +38,9 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
   recentPresets: ResolvedPreset[];
 }
 
-const NO_OP = () => {};
+const NO_OP = () => {
+  /* no-op fallback for an absent onChange handler */
+};
 
 /**
  * Binds an analysis tab's persisted ``inputs`` to {@link useNodeInputs}, wiring
@@ -59,7 +61,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   const { nodes, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
 
-  const allNodes = useMemo(() => (nodes ?? []) as WorkspaceNodeLike[], [nodes]);
+  const allNodes = useMemo(() => nodes as WorkspaceNodeLike[], [nodes]);
   const value = useMemo(() => tabInputs ?? [], [tabInputs]);
   const onChange = onTabInputsChange ?? NO_OP;
 
@@ -131,6 +133,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     const currentIds = new Set(value.map((i) => i.node_id));
     return (recentGroups ?? [])
       .map((ids) => {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ids are pre-filtered by nodeNameById.has(id)
         const labels = ids.filter((id) => nodeNameById.has(id)).map((id) => nodeNameById.get(id)!);
         const addableIds = ids.filter(
           (id) => nodeNameById.has(id) && !currentIds.has(id) && result.getAddRejection(id) === null,
@@ -144,7 +147,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   return {
     ...result,
     addNodes,
-    graphSelectedIds: (selectedNodeIds ?? []) as string[],
+    graphSelectedIds: selectedNodeIds,
     workspaceId: currentWorkspaceId ?? null,
     recentPresets,
   };

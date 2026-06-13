@@ -35,7 +35,7 @@ export function ClearEmbeddingCacheMenuItem() {
         headers: getAuthHeaders(),
         throwOnError: true,
       });
-      setStats(resp.data ?? null);
+      setStats(resp.data);
     } catch {
       // Leave stats null; dialog will show a generic warning without sizes.
     }
@@ -49,13 +49,13 @@ export function ClearEmbeddingCacheMenuItem() {
         headers: getAuthHeaders(),
         throwOnError: true,
       });
-      const freed = resp.data?.bytes_freed ?? 0;
-      const files = resp.data?.files_removed ?? 0;
+      const freed = resp.data.bytes_freed;
+      const files = resp.data.files_removed;
       if (files === 0) {
         toast('Embedding cache was already empty.');
       } else {
         toast(
-          `Cleared ${files} cached embedding ${files === 1 ? 'file' : 'files'} (${formatBytes(freed)} reclaimed).`,
+          `Cleared ${String(files)} cached embedding ${files === 1 ? 'file' : 'files'} (${formatBytes(freed)} reclaimed).`,
         );
       }
     } catch (error) {
@@ -68,7 +68,7 @@ export function ClearEmbeddingCacheMenuItem() {
       if (stats === null) return 'Calculating size of cached embeddings…\n\n';
       if (stats.files === 0)
         return 'The embedding cache is currently empty — nothing to clear.\n\n';
-      return `${stats.files} cached embedding ${stats.files === 1 ? 'file' : 'files'} will be deleted, freeing ${formatBytes(stats.bytes)} of disk space.\n\n`;
+      return `${String(stats.files)} cached embedding ${stats.files === 1 ? 'file' : 'files'} will be deleted, freeing ${formatBytes(stats.bytes)} of disk space.\n\n`;
     })() +
     'Topic modelling caches per-document embeddings so re-running on the same texts is fast. Clearing this cache means future topic modelling on those texts will need to recompute every embedding from scratch and may take noticeably longer (especially for large corpora).';
 

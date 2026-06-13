@@ -36,15 +36,15 @@ export function WorkspaceControls() {
   const [nameAlertMessage, setNameAlertMessage] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const currentWorkspaceName = currentWorkspace?.name || '';
+  const currentWorkspaceName = currentWorkspace?.name ?? '';
   const isEditing = renameDraft?.baseName === currentWorkspaceName;
 
-  const selectedCount = selectedNodeIds?.length ?? 0;
+  const selectedCount = selectedNodeIds.length;
   const canBatchDelete = selectedCount >= MIN_BATCH_DELETE_COUNT;
 
   /** Builds the confirmation list for the selected graph nodes, sorted by name. */
   const selectedForDelete = (() => {
-    if (!workspaceGraph || !selectedNodeIds || selectedNodeIds.length === 0) return [];
+    if (!workspaceGraph || selectedNodeIds.length === 0) return [];
     const idSet = new Set(selectedNodeIds);
     return workspaceGraph.nodes
       .filter((node) => idSet.has(node.id))
@@ -64,7 +64,7 @@ export function WorkspaceControls() {
       // don't cascade. Settle rather than all-or-nothing so one failure
       // doesn't abort the rest of the batch.
       await Promise.allSettled(selectedForDelete.map((item) => deleteNode(item.id)));
-      clearSelection?.();
+      clearSelection();
       setDeleteConfirmOpen(false);
     } finally {
       setIsDeleting(false);
@@ -117,7 +117,7 @@ export function WorkspaceControls() {
           className="px-2 py-1 border rounded text-sm"
           value={renameDraft.value}
           onChange={(e) =>
-            setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value })
+            { setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value }); }
           }
           onBlur={() => {
             void handleRenameCommit();
@@ -131,6 +131,7 @@ export function WorkspaceControls() {
         />
       ) : (
         <span className="text-sm font-semibold text-gray-800">
+          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- show placeholder for an empty name, not only null/undefined */}
           {currentWorkspace?.name || 'No Workspace'}
         </span>
       )}
@@ -169,7 +170,7 @@ export function WorkspaceControls() {
                 ? 'bg-destructive text-destructive-foreground border-destructive shadow-sm hover:bg-destructive/90 hover:border-destructive/90'
                 : 'text-gray-600 hover:text-gray-800'
             }`}
-            onClick={() => setDeleteConfirmOpen(true)}
+            onClick={() => { setDeleteConfirmOpen(true); }}
             disabled={isDeleting}
             title="Delete the selected data blocks"
           >
@@ -204,7 +205,7 @@ export function WorkspaceControls() {
                 }}
                 disabled={isDeleting || !canBatchDelete}
               >
-                {isDeleting ? 'Deleting…' : `Delete ${selectedForDelete.length}`}
+                {isDeleting ? 'Deleting…' : `Delete ${String(selectedForDelete.length)}`}
               </AlertDialogAction>
             </Button>
           </AlertDialogFooter>
@@ -221,7 +222,7 @@ export function WorkspaceControls() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setNameAlertOpen(false)}>Got it</AlertDialogAction>
+            <AlertDialogAction onClick={() => { setNameAlertOpen(false); }}>Got it</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

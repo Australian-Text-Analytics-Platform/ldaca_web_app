@@ -13,10 +13,10 @@ import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 import { ConcordanceDispersionNodeBlock } from './ConcordanceDispersionNodeBlock';
 
-type Section = { columns: string[]; color?: string; disabled?: boolean };
+interface Section { columns: string[]; color?: string; disabled?: boolean }
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
-export type ConcordanceResultsPanelProps = {
+export interface ConcordanceResultsPanelProps {
   // Result + view orchestration
   results: ConcordanceAnalysisResponse;
   resultsRef: RefObject<HTMLDivElement | null>;
@@ -104,7 +104,7 @@ export type ConcordanceResultsPanelProps = {
    * dispatches the actual detach call(s).
    */
   onDispersionDetach: (
-    nodes: Array<{ nodeId: string; column: string; nodeLabel: string }>,
+    nodes: { nodeId: string; column: string; nodeLabel: string }[],
     selectedBins: ReadonlySet<number> | null,
     binCount: number,
     options?: {
@@ -114,7 +114,7 @@ export type ConcordanceResultsPanelProps = {
   ) => Promise<void> | void;
   /** Read-only flag that disables mutation surfaces while preserving pagination, sorting, chart interaction, and exports. */
   readOnly?: boolean;
-};
+}
 
 /**
  * Rendered by: ConcordanceFeature to coordinate table and dispersion result blocks because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
@@ -206,12 +206,12 @@ export function ConcordanceResultsPanel({
           {panelSelectedNodes.length > 1 && (
             <Tabs
               value={viewMode}
-              onValueChange={(mode) => handleViewModeChange(mode as 'separated' | 'combined')}
+              onValueChange={(mode) => { handleViewModeChange(mode as 'separated' | 'combined'); }}
               className="w-full md:w-auto"
             >
               <TabsList aria-label="Concordance view mode">
                 <TabsTrigger value="separated">Separated</TabsTrigger>
-                {results?.combinable && (
+                {results.combinable && (
                   <TabsTrigger value="combined">
                     {combinedLoading ? (
                       <span className="flex items-center gap-1">
@@ -250,7 +250,7 @@ export function ConcordanceResultsPanel({
             <div className="flex flex-wrap items-center gap-4">
               <MetadataColumnSelector
                 availableColumns={availableMetadataColumns}
-                selectedColumns={selectedMetadataColumns ?? []}
+                selectedColumns={selectedMetadataColumns}
                 onSelectedColumnsChange={setSelectedMetadataColumns}
                 sections={metadataColumnSections}
                 disabledReason={metadataDisabledReason}
@@ -263,7 +263,7 @@ export function ConcordanceResultsPanel({
                 <input
                   type="checkbox"
                   checked={proportionalDispersionBars}
-                  onChange={(e) => setProportionalDispersionBars(e.target.checked)}
+                  onChange={(e) => { setProportionalDispersionBars(e.target.checked); }}
                   className="h-4 w-4"
                 />
                 <span>Bar length proportional to text length</span>
@@ -273,7 +273,7 @@ export function ConcordanceResultsPanel({
                   <span>Sources:</span>
                   <select
                     value={combinedSourceMode}
-                    onChange={(e) => setCombinedSourceMode(e.target.value as 'aggregate' | 'split')}
+                    onChange={(e) => { setCombinedSourceMode(e.target.value as 'aggregate' | 'split'); }}
                     className="h-7 rounded border border-input bg-background px-2 text-sm"
                   >
                     <option value="aggregate">Aggregate</option>
@@ -317,7 +317,7 @@ export function ConcordanceResultsPanel({
       </CardHeader>
       <CardContent>
         <div ref={resultsViewportRef} className="space-y-4">
-          {results.data && Object.keys(results.data).length > 0 ? (
+          {Object.keys(results.data).length > 0 ? (
             <div
               className={`grid gap-4 ${viewMode === 'combined' ? 'grid-cols-1' : 'grid-cols-1'}`}
             >
@@ -330,39 +330,36 @@ export function ConcordanceResultsPanel({
                   const approxIndex = keyedOrder.indexOf(nodeName);
                   let node = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
                     const d = n.data as Record<string, unknown> | undefined;
+                    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node id
                     return ((d?.name as string | undefined) || n.id) === nodeName;
                   });
-                  if (!node) {
-                    node = panelSelectedNodes.find((n: WorkspaceNodeLike) => n.id === nodeName);
-                  }
-                  if (!node) {
-                    node = panelSelectedNodes.find((n: WorkspaceNodeLike) => n.name === nodeName);
-                  }
+                  node ??= panelSelectedNodes.find((n: WorkspaceNodeLike) => n.id === nodeName);
+                  node ??= panelSelectedNodes.find((n: WorkspaceNodeLike) => n.name === nodeName);
                   const mappedNodeId = labelToNodeId?.[nodeName];
                   if (!node && mappedNodeId) {
                     node = panelSelectedNodes.find((n: WorkspaceNodeLike) => n.id === mappedNodeId);
                   }
-                  if (!node) {
-                    node = panelSelectedNodes[approxIndex];
-                  }
+                  node ??= panelSelectedNodes[approxIndex];
 
+                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string id must fall back to the mapped id, then ''
                   const resolvedNodeId = node?.id || mappedNodeId || '';
                   const paginationKey = resolvedNodeId || nodeName;
                   const requestNodeId = resolvedNodeId || nodeName;
                   const selection = effectiveNodeColumnSelections.find(
                     (sel) => sel.nodeId === resolvedNodeId,
                   );
-                  const column = selection?.column || '';
+                  const column = selection?.column ?? '';
 
-                  const nodeDisplayName = (node?.name || nodeName) as string;
+                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node key
+                  const nodeDisplayName = node?.name || nodeName;
                   const nodeColor =
-                    sourceColorMap[nodeName.toLowerCase()] ||
-                    sourceColorMap[(node?.id || '').toLowerCase()] ||
-                    sourceColorMap[(node?.name || '').toLowerCase()] ||
+                    sourceColorMap[nodeName.toLowerCase()] ??
+                    sourceColorMap[(node?.id ?? '').toLowerCase()] ??
+                    sourceColorMap[(node?.name ?? '').toLowerCase()] ??
                     defaultPalette[approxIndex % defaultPalette.length];
 
                   const blockContext = {
-                    nodeId: node?.id || '',
+                    nodeId: node?.id ?? '',
                     paginationKey,
                     requestNodeId,
                     column,

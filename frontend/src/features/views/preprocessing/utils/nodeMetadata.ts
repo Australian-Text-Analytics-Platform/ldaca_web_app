@@ -34,7 +34,7 @@ export const buildWorkspaceNodeMap = (
 ): Map<string, WorkspaceNodeLike> => {
   const map = new Map<string, WorkspaceNodeLike>();
   workspaceNodes.forEach((node, index) => {
-    const key = getNodeKey(node, `node-${index}`);
+    const key = getNodeKey(node, `node-${String(index)}`);
     if (key && !map.has(key)) {
       map.set(key, node);
     }
@@ -52,7 +52,7 @@ export const extractNodeColumns = (node: WorkspaceNodeLike | null | undefined): 
     return (base.columns as unknown[]).map((entry) => String(entry));
   }
   if (base.schema && typeof base.schema === 'object') {
-    return Object.keys(base.schema as Record<string, unknown>);
+    return Object.keys(base.schema);
   }
   return [];
 };

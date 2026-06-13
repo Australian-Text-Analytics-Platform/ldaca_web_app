@@ -45,7 +45,7 @@ interface SortState {
 export interface WorkspaceColumnHeaderProps {
   column: string;
   /** TanStack column instance, used to drive pin state. */
-  colInst: TableColumn<DataRow, unknown>;
+  colInst: TableColumn<DataRow>;
 
   // Mutation state
   currentType: string;
@@ -128,7 +128,7 @@ export function WorkspaceColumnHeader({
       {/* Pin */}
       <button
         type="button"
-        onClick={() => colInst.pin(isPinnedLeft ? false : 'left')}
+        onClick={() => { colInst.pin(isPinnedLeft ? false : 'left'); }}
         className={cn(
           'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
           isPinnedLeft && 'text-primary',
@@ -321,7 +321,7 @@ export function WorkspaceColumnHeader({
       {isFiltered && (
         <button
           type="button"
-          onClick={() => onClearFilter(column)}
+          onClick={() => { onClearFilter(column); }}
           className="inline-flex h-5 items-center gap-0.5 rounded-full bg-primary/10 px-1.5 text-[10px] font-medium text-primary hover:bg-primary/20"
           aria-label={`Clear filter on ${column}`}
         >

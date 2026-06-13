@@ -1,7 +1,7 @@
 import React from 'react';
 import logo from '../../../logo.png';
 
-type BlockingScreenProps = {
+interface BlockingScreenProps {
   title: string;
   description: string;
   status?: string;
@@ -9,7 +9,7 @@ type BlockingScreenProps = {
   error?: string | null;
   actions?: React.ReactNode;
   showLogo?: boolean;
-};
+}
 
 /**
  * Shared full-screen gate used by startup/auth flows when the app cannot yet

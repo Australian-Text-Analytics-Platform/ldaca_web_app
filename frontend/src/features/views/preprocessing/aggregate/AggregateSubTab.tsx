@@ -38,8 +38,12 @@ export function AggregateSubTab(props: AggregateSubTabComponentProps) {
 const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string => {
   const [selectedNode] = takeMostRecent(props.selectedNodes, 1);
   if (selectedNode) {
+    // Empty-string ids should fall through to the next candidate, so keep `||`.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     return selectedNode.id || selectedNode.node_id || props.selectedNodeId || 'none';
   }
+  // Empty selectedNodeId should fall back to 'none', so keep `||`.
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   return props.selectedNodeId || 'none';
 };
 
@@ -94,10 +98,10 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                       type="button"
                       draggable={!basicBuilder.disabled}
                       onDragStart={(event) =>
-                        basicBuilder.handlers.columnDragStart(event, col.name, col.dataType)
+                        { basicBuilder.handlers.columnDragStart(event, col.name, col.dataType); }
                       }
                       onDragEnd={basicBuilder.handlers.paletteDragEnd}
-                      onClick={() => basicBuilder.addColumnToken(col.name, col.dataType)}
+                      onClick={() => { basicBuilder.addColumnToken(col.name, col.dataType); }}
                       className={cn(
                         'select-none rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
                         basicBuilder.disabled
@@ -113,7 +117,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                     draggable={!basicBuilder.disabled}
                     onDragStart={basicBuilder.handlers.customDragStart}
                     onDragEnd={basicBuilder.handlers.paletteDragEnd}
-                    onClick={() => basicBuilder.addCustomToken()}
+                    onClick={() => { basicBuilder.addCustomToken(); }}
                     className={cn(
                       'select-none rounded-full border border-border bg-background px-3 py-1 text-sm text-foreground shadow-sm transition',
                       basicBuilder.disabled
@@ -173,11 +177,11 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                             className={cn('group', basicBuilder.disabled && 'opacity-70')}
                             draggable={!basicBuilder.disabled && !isEditing}
                             onDragStart={(event) =>
-                              basicBuilder.handlers.existingTokenDragStart(event, token.id)
+                              { basicBuilder.handlers.existingTokenDragStart(event, token.id); }
                             }
                             onDragEnd={basicBuilder.handlers.existingTokenDragEnd}
                             onDragOver={(event) =>
-                              basicBuilder.handlers.tokenDragOver(token.id, event)
+                              { basicBuilder.handlers.tokenDragOver(token.id, event); }
                             }
                           >
                             <div
@@ -193,7 +197,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                                   <Input
                                     value={basicBuilder.customDraft}
                                     onChange={basicBuilder.handlers.customDraftChange}
-                                    onBlur={() => basicBuilder.finishCustomEdit(true)}
+                                    onBlur={() => { basicBuilder.finishCustomEdit(true); }}
                                     onKeyDown={basicBuilder.handlers.customInputKeyDown}
                                     spellCheck={false}
                                     autoCorrect="off"
@@ -205,7 +209,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                                 ) : (
                                   <button
                                     type="button"
-                                    onClick={() => basicBuilder.startEditingCustom(token.id)}
+                                    onClick={() => { basicBuilder.startEditingCustom(token.id); }}
                                     className="text-sm font-medium tracking-tight text-background transition hover:text-background/80"
                                   >
                                     {token.value || '""'}
@@ -219,7 +223,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                                     ''
                                   }
                                   column={token.column}
-                                  onSelect={(op) => basicBuilder.addOperation(token.id, op)}
+                                  onSelect={(op) => { basicBuilder.addOperation(token.id, op); }}
                                   disabled={basicBuilder.disabled}
                                 >
                                   <button
@@ -233,7 +237,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                               {!isCustom &&
                                 token.operations.map((op, idx) => (
                                   <span
-                                    key={`${op}-${idx}`}
+                                    key={`${op}-${String(idx)}`}
                                     className="flex items-center gap-0.5 border-l border-background/30 pl-1"
                                   >
                                     <span className="font-mono text-xs text-background/70">
@@ -241,7 +245,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                                     </span>
                                     <button
                                       type="button"
-                                      onClick={() => basicBuilder.removeOperation(token.id, idx)}
+                                      onClick={() => { basicBuilder.removeOperation(token.id, idx); }}
                                       className="inline-flex size-3.5 items-center justify-center rounded-full hover:bg-background/20 focus-visible:outline-hidden"
                                       aria-label={`Remove ${op}`}
                                       disabled={basicBuilder.disabled}
@@ -252,11 +256,11 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                                 ))}
                               <button
                                 type="button"
-                                onClick={() => basicBuilder.removeToken(token.id)}
+                                onClick={() => { basicBuilder.removeToken(token.id); }}
                                 className="ml-1 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-background/30 text-background/60 transition hover:border-background/60 hover:text-background focus-visible:outline-hidden group-hover:border-background/60 group-hover:text-background"
                                 aria-label="Remove token"
                                 disabled={basicBuilder.disabled}
-                                onMouseDown={(event) => event.stopPropagation()}
+                                onMouseDown={(event) => { event.stopPropagation(); }}
                               >
                                 <X className="size-2.5" />
                               </button>

@@ -28,21 +28,21 @@ const FREQUENCY_FORMATS: { value: FrequencyFormatOption; label: string }[] = [
   { value: 'markdown', label: 'Markdown' },
 ];
 
-type TokenFrequencyDownloadDialogProps = {
+interface TokenFrequencyDownloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: DownloadDialogMode;
   onConfirm: (options: { format: string; includeStopWords: boolean }) => void;
-};
+}
 
 /** Used by: TokenFrequencyDownloadDialogContent to select the initial export format for the current mode because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const getDefaultFormat = (mode: DownloadDialogMode) => (mode === 'wordcloud' ? 'png' : 'csv');
 
-type TokenFrequencyDownloadDialogContentProps = {
+interface TokenFrequencyDownloadDialogContentProps {
   mode: DownloadDialogMode;
   onConfirm: (options: { format: string; includeStopWords: boolean }) => void;
   onOpenChange: (open: boolean) => void;
-};
+}
 
 /**
  * Rendered by: TokenFrequencyDownloadDialog as the modal body for format and stop-word options because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
@@ -99,7 +99,7 @@ const TokenFrequencyDownloadDialogContent = ({
           <Checkbox
             id="include-stop-words"
             checked={includeStopWords}
-            onCheckedChange={(checked) => setIncludeStopWords(checked === true)}
+            onCheckedChange={(checked) => { setIncludeStopWords(checked === true); }}
           />
           <Label htmlFor="include-stop-words" className="text-sm cursor-pointer">
             Download stop words as well

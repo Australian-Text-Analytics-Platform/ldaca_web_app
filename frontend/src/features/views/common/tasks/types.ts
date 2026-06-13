@@ -39,7 +39,7 @@ export type AnalysisTaskBannerFallbackInput =
   | ((status: AnalysisTaskStatus) => AnalysisTaskBannerFallback | null);
 
 export interface UseAnalysisTaskFlowOptions {
-  taskType: CanonicalAnalysisTaskType | string;
+  taskType: CanonicalAnalysisTaskType | (string & {});
   isTabActive?: boolean;
   workspaceId?: string | null;
   manualActiveTaskId?: string | null;

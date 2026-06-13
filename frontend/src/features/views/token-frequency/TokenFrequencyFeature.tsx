@@ -113,7 +113,7 @@ const TokenFrequencyFeature = ({
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeIds = nodeInputs.resolvedNodes.map((r) => r.id);
   const applyInputsFromSelections = (
-    selections: Array<{ nodeId: string; column?: string | null }>,
+    selections: { nodeId: string; column?: string | null }[],
   ) => {
     onTabInputsChange?.(
       selections
@@ -228,12 +228,12 @@ const TokenFrequencyFeature = ({
     },
     /** Pushes fetched task results into guarded component state. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    onResultFetched: (result) => setResultSafely(result),
+    onResultFetched: (result) => { setResultSafely(result); },
     /** Rehydrates controls from a persisted result when the feature reconnects to a task. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedResult: (result) => {
       if (!result) return;
-      const requestData = result?.analysis_params ?? {};
+      const requestData = result.analysis_params ?? {};
       const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
       if (!tabInputs || tabInputs.length === 0) {
         applyInputsFromSelections(selections);
@@ -241,12 +241,12 @@ const TokenFrequencyFeature = ({
       setLastCompareNodeIds(nodeIds);
       setStudyNodeId(nodeIds[1] ?? null);
       applyTokenLimitState(
-        typeof requestData?.token_limit === 'number' ? requestData.token_limit : null,
+        typeof requestData.token_limit === 'number' ? requestData.token_limit : null,
       );
       setResultSafely(result);
       if (Array.isArray(result.stop_words)) {
         const normalizedStops = result.stop_words
-          .map((word) => String(word).trim().toLowerCase())
+          .map((word) => word.trim().toLowerCase())
           .filter(Boolean);
         setAppliedStopSet(new Set(normalizedStops));
         setStopWords(normalizedStops.join(', '));
@@ -263,8 +263,8 @@ const TokenFrequencyFeature = ({
         ? (reqObj.node_ids as string[]).slice(0, 2)
         : [];
       const node_columns: Record<string, string> =
-        (reqObj.node_columns as Record<string, string>) || {};
-      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+        (reqObj.node_columns as Record<string, string> | undefined) ?? {};
+      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] ?? '' }));
       if (!tabInputs || tabInputs.length === 0) {
         applyInputsFromSelections(sels);
       }
@@ -287,7 +287,7 @@ const TokenFrequencyFeature = ({
     /** Removes token-frequency tasks from the shared analysis store after local cleanup. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     pruneGlobalTasks: (taskIds) =>
-      setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)),
+      { setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)); },
   });
 
   const effectiveNodeColumnSelections = nodeColumnSelections;
@@ -374,7 +374,8 @@ const TokenFrequencyFeature = ({
     panelSelectedNodes.forEach((node) => {
       const nodeId = typeof node.id === 'string' ? node.id : '';
       if (!nodeId) return;
-      map[nodeId] = (node.name || node.label || nodeId) as string;
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty name/label should fall back to the next display source, not render blank
+      map[nodeId] = (node.name || node.label || nodeId);
     });
     return map;
   }, [panelSelectedNodes]);
@@ -439,6 +440,7 @@ const TokenFrequencyFeature = ({
     (nodeId: string, fallbackKey?: string) => {
       if (displayNameMap[nodeId]) return displayNameMap[nodeId];
       if (nodeIdToName[nodeId]) return nodeIdToName[nodeId];
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty fallbackKey/nodeId should fall back to the next display source, not render blank
       return fallbackKey || nodeId || 'Unknown node';
     },
     [displayNameMap, nodeIdToName],
@@ -447,7 +449,7 @@ const TokenFrequencyFeature = ({
   const analysisNodeIds = useMemo(
     () =>
       computeAnalysisNodeIds(
-        (results?.analysis_params as Record<string, unknown> | null | undefined)?.node_ids,
+        (results?.analysis_params)?.node_ids,
         lastCompareNodeIds,
         effectiveNodeColumnSelections,
       ),
@@ -491,7 +493,9 @@ const TokenFrequencyFeature = ({
   const renameStatisticsKeysForExport = useCallback(
     (rows: unknown[]): unknown[] => {
       if (analysisNodeIds.length !== 2) return rows;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length === 2 checked above guarantees indices 0 and 1 exist
       const referenceName = computeDisplayName(analysisNodeIds[0]!, 'reference');
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length === 2 checked above guarantees indices 0 and 1 exist
       const studyName = computeDisplayName(analysisNodeIds[1]!, 'study');
       const keyMap: Record<string, string> = {
         freq_reference: `OR_${referenceName}`,
@@ -543,11 +547,12 @@ const TokenFrequencyFeature = ({
     const ctx = pendingDownloadRef.current;
     if (!ctx) return;
 
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty label/displayName/nodeKey should fall back to the next archive name source, not produce an empty filename
     const archiveLabel = ctx.label || ctx.displayName || ctx.nodeKey || 'analysis';
     const shouldBundleStopWords = includeStopWords && Boolean(stopWords);
     const comparisonArchiveLabels = analysisNodeIds
       .slice(0, 2)
-      .map((nodeId, index) => computeDisplayName(nodeId, `node-${index + 1}`));
+      .map((nodeId, index) => computeDisplayName(nodeId, `node-${String(index + 1)}`));
 
     try {
       if (ctx.mode === 'wordcloud' && ctx.nodeKey) {
@@ -555,6 +560,7 @@ const TokenFrequencyFeature = ({
         if (svg) {
           if (shouldBundleStopWords) {
             const primaryFile = await buildWordCloudExportFile(svg, {
+              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty displayName should fall back to the nodeKey, not render blank
               displayName: ctx.displayName || ctx.nodeKey,
               fallbackKey: ctx.nodeKey,
               format: format as WordCloudFormat,
@@ -572,6 +578,7 @@ const TokenFrequencyFeature = ({
             ]);
           } else {
             downloadWordCloudAs(svg, {
+              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty displayName should fall back to the nodeKey, not render blank
               displayName: ctx.displayName || ctx.nodeKey,
               fallbackKey: ctx.nodeKey,
               format: format as WordCloudFormat,
@@ -583,16 +590,18 @@ const TokenFrequencyFeature = ({
         if (shouldBundleStopWords) {
           await downloadExportBundleAsZip(buildTokenFrequencyZipFilename([archiveLabel]), [
             buildFrequencyExportFile(
+              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty label should fall back to the default 'frequencies' name
               ctx.label || 'frequencies',
-              ctx.rows as Array<Record<string, unknown>>,
+              ctx.rows as Record<string, unknown>[],
               format as FrequencyFormat,
             ),
             buildStopWordsExportFile(stopWords, archiveLabel),
           ]);
         } else {
           downloadFrequencyRowsAs(
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty label should fall back to the default 'frequencies' name
             ctx.label || 'frequencies',
-            ctx.rows as Array<Record<string, unknown>>,
+            ctx.rows as Record<string, unknown>[],
             format as FrequencyFormat,
           );
         }
@@ -624,7 +633,7 @@ const TokenFrequencyFeature = ({
     (nodeId) => !(effectiveTokenizerModelsByNode[nodeId] ?? '').trim(),
   );
 
-  const lastRunRequest = (serverRequest as Record<string, unknown> | null) ?? null;
+  const lastRunRequest = (serverRequest) ?? null;
   const currentTokenFrequencyParams = {};
   const serverTokenFrequencyParams = (_request: Record<string, unknown>) => ({});
   const hasLastRun = Boolean(lastRunRequest);
@@ -730,7 +739,7 @@ const TokenFrequencyFeature = ({
             column={column}
             value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
             onChange={(model, detectedLanguage) =>
-              void handleTokenizerModelChange(nodeId, column, model, detectedLanguage)
+              { handleTokenizerModelChange(nodeId, column, model, detectedLanguage); }
             }
             getAuthHeaders={getAuthHeaders}
             disabled={false}

@@ -88,8 +88,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const zoom = useStore((s) => s.transform[2]);
   const isZoomedOut = zoom < COMPACT_NODE_ZOOM_THRESHOLD;
 
-  const nodeName = node?.name || 'Loading...';
-  const nodeShape = node?.shape;
+  const nodeName = node.name || 'Loading...';
+  const nodeShape = node.shape;
 
   /** Cancels any pending delayed toolbar hide. */
   const cancelToolbarHide = () => {
@@ -115,7 +115,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     }, TOOLBAR_HIDE_DELAY_MS);
   };
 
-  useEffect(() => () => cancelToolbarHide(), []);
+  useEffect(() => () => { cancelToolbarHide(); }, []);
 
   // Close menu when clicking outside (capture to beat React Flow internal handlers)
   useEffect(() => {
@@ -131,7 +131,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       }
     };
     document.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    return () => document.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+    return () => { document.removeEventListener('pointerdown', handlePointerDown, { capture: true }); };
   }, [showMenu]);
 
   /**
@@ -151,7 +151,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleDeleteConfirm = () => {
-    if (node?.node_id) {
+    if (node.node_id) {
       onDelete(node.node_id);
     }
     setShowDeleteConfirm(false);
@@ -165,7 +165,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleRenameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
-    setNewName(node?.name || '');
+    setNewName(node.name || '');
     setIsRenaming(true);
     setTimeout(() => {
       renameInputRef.current?.focus();
@@ -178,10 +178,10 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    * Called by: CustomNode internal event, effect, or helper flow.
    * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
-  const handleRenameSubmit = (e: React.FormEvent) => {
+  const handleRenameSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onRename && node?.node_id && newName.trim()) {
+    if (onRename && node.node_id && newName.trim()) {
       onRename(node.node_id, newName.trim());
     }
     setIsRenaming(false);
@@ -217,7 +217,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleCopyNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
-    if (onCopy && node?.node_id) {
+    if (onCopy && node.node_id) {
       onCopy(node.node_id);
     }
   };
@@ -230,7 +230,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleUndoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
-    if (onUndo && node?.node_id && node?.can_undo) {
+    if (onUndo && node.node_id && node.can_undo) {
       onUndo(node.node_id);
     }
   };
@@ -243,7 +243,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleRedoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
-    if (onRedo && node?.node_id && node?.can_redo) {
+    if (onRedo && node.node_id && node.can_redo) {
       onRedo(node.node_id);
     }
   };
@@ -255,10 +255,10 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleCopyId = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node?.node_id) {
+    if (node.node_id) {
       void navigator.clipboard.writeText(node.node_id);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => { setCopied(false); }, 2000);
     }
   };
 
@@ -295,9 +295,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const formatShapePart = (value: number | null | undefined) =>
     typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
 
-  const shapeLabel = nodeShape
-    ? `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`
-    : null;
+  const shapeLabel = `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`;
 
   const menuButtonClassName =
     'relative flex h-8 w-8 items-center justify-center rounded-md border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
@@ -318,7 +316,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node?.node_id) onAddToSelection?.(node.node_id);
+    if (node.node_id) onAddToSelection?.(node.node_id);
   };
 
   /**
@@ -378,7 +376,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
             <button
               onClick={handleUndoNode}
-              disabled={!node?.can_undo}
+              disabled={!node.can_undo}
               className="w-full border-t border-border/60 px-3 py-2 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent hover:bg-muted/60"
             >
               Undo
@@ -386,7 +384,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
             <button
               onClick={handleRedoNode}
-              disabled={!node?.can_redo}
+              disabled={!node.can_redo}
               className="w-full border-t border-border/60 px-3 py-2 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent hover:bg-muted/60"
             >
               Redo
@@ -550,12 +548,12 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
                 ref={renameInputRef}
                 type="text"
                 value={newName}
-                onChange={(e) => setNewName(e.target.value)}
+                onChange={(e) => { setNewName(e.target.value); }}
                 onBlur={handleRenameCancel}
                 onKeyDown={handleRenameKeyDown}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => { e.stopPropagation(); }}
+                onClick={(e) => { e.stopPropagation(); }}
+                onPointerDown={(e) => { e.stopPropagation(); }}
                 className="nodrag nopan relative z-50 w-full rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-bold focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 style={{
                   fontSize: '14px',
@@ -583,8 +581,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       {/* Node Body */}
       <div className="p-3 bg-white rounded-b-lg space-y-1">
         <div className="flex items-center justify-between group">
-          <div className="font-mono text-xs text-gray-500 truncate max-w-45" title={node?.node_id}>
-            id: {node?.node_id?.substring(0, 8)}...
+          <div className="font-mono text-xs text-gray-500 truncate max-w-45" title={node.node_id}>
+            id: {node.node_id.substring(0, 8)}...
           </div>
           <button
             onClick={handleCopyId}

@@ -30,7 +30,7 @@ export type WorkspaceListItem = Partial<WorkspaceSummary> & {
   dataframe_count?: number;
 };
 
-export type WorkspaceManagerCardProps = {
+export interface WorkspaceManagerCardProps {
   workspaces: WorkspaceListItem[];
   currentWorkspaceId: string | null;
   busy: boolean;
@@ -42,7 +42,7 @@ export type WorkspaceManagerCardProps = {
   onRefresh: () => void;
   onLoadWorkspace: (workspaceId: string | null) => void;
   onDeleteWorkspace: (workspaceId: string) => void;
-};
+}
 
 /**
  * Lists saved workspaces and their quick actions. `DataLoaderFeature` uses it
@@ -170,7 +170,7 @@ export function WorkspaceManagerCard({
                         aria-label={
                           isFavorite(workspaceId) ? 'Remove from favorites' : 'Add to favorites'
                         }
-                        onClick={() => toggleFavorite(workspaceId)}
+                        onClick={() => { toggleFavorite(workspaceId); }}
                       >
                         <Star
                           className={`h-4 w-4 ${
@@ -180,6 +180,8 @@ export function WorkspaceManagerCard({
                           }`}
                         />
                       </Button>
+                      {/* an empty workspace name should fall through to its id */}
+                      {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
                       <span>{workspace.name || workspaceId}</span>
                       <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
@@ -195,15 +197,19 @@ export function WorkspaceManagerCard({
                         <DropdownMenuContent align="start" className="max-w-xs">
                           <DropdownMenuLabel>Description</DropdownMenuLabel>
                           <div className="px-2 py-1.5 text-sm text-popover-foreground whitespace-pre-wrap">
+                            {/* an empty/whitespace description should fall through to the placeholder */}
+                            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
                             {workspace.description?.trim() || 'No description added yet.'}
                           </div>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                     <div className="text-xs text-muted-foreground">
+                      {/* an empty modified_at timestamp should fall through to updated_at */}
+                      {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
                       Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} |{' '}
                       {blockCount} data block{blockCount === 1 ? '' : 's'} | Size{' '}
-                      {formatBytes(Number(workspace.workspace_size_Byte || 0))}
+                      {formatBytes(workspace.workspace_size_Byte ?? 0)}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -219,7 +225,7 @@ export function WorkspaceManagerCard({
                       <Button
                         size="sm"
                         variant={isActive ? 'outline' : 'secondary'}
-                        onClick={() => onLoadWorkspace(isActive ? null : workspaceId)}
+                        onClick={() => { onLoadWorkspace(isActive ? null : workspaceId); }}
                         disabled={hasActiveTask}
                       >
                         {isActive ? 'Unload' : 'Load'}
@@ -229,6 +235,8 @@ export function WorkspaceManagerCard({
                       size="sm"
                       variant="outline"
                       onClick={() =>
+                        // an empty workspace name should fall through to its id
+                        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                         void downloads.startDownload(workspaceId, workspace.name || workspaceId)
                       }
                       disabled={
@@ -245,7 +253,7 @@ export function WorkspaceManagerCard({
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => onDeleteWorkspace(workspaceId)}
+                      onClick={() => { onDeleteWorkspace(workspaceId); }}
                     >
                       <Trash2 className="mr-1.5 h-4 w-4" /> Delete
                     </Button>

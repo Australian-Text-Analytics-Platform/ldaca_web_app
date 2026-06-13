@@ -8,14 +8,14 @@ import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisC
 import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
-type TopicModelingTopic = {
+interface TopicModelingTopic {
   id: number;
   label: string;
   size: number[];
   total_size: number;
   x: number;
   y: number;
-};
+}
 type TopicModelingResult = {
   state?: string | null;
   data?: {
@@ -29,7 +29,7 @@ type TopicModelingResult = {
 
 const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
 
-type Props = {
+interface Props {
   topicWaitingBanner: {
     status: 'running' | 'queued';
     taskId: string | null;
@@ -68,12 +68,12 @@ type Props = {
   randomSeed?: number;
   detachDialogOpen: boolean;
   setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  detachNodeOptions: Array<{
+  detachNodeOptions: {
     node_id: string;
     node_name: string;
     available_columns: string[];
     disabled_columns?: string[];
-  }>;
+  }[];
   selectedDetachColumns: Record<string, string[]>;
   toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
   selectAllDetachColumns: () => void;
@@ -81,7 +81,7 @@ type Props = {
   handleDetachConfirm: () => Promise<void> | void;
   /** Read-only flag that disables Add to Workspace and exact-topic re-aggregation while leaving chart exploration controls active. */
   readOnly?: boolean;
-};
+}
 
 /**
  * Rendered by: TopicModelingFeature to show results, controls, detach dialog, and chart export affordances because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
@@ -126,7 +126,9 @@ export function TopicModelingResultsPanel({
 }: Props) {
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
   const runningMessage =
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty message should fall back to the next source, not render blank
     runningTask?.message || topicWaitingBanner?.message || result?.message || 'Task running';
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty task id should fall back to the banner's id, so falsy '' must fall through
   const runningTaskId = runningTask?.task_id || topicWaitingBanner?.taskId;
   const runningProgress = typeof runningTask?.progress === 'number' ? runningTask.progress : null;
   const isFailedState = result?.state === 'failed' && !isRunningState;
@@ -160,6 +162,7 @@ export function TopicModelingResultsPanel({
 
         {isFailedState ? (
           <p className="text-sm text-muted-foreground">
+            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty failure message should fall back to the default text, not render blank */}
             {result.message || 'Topic modeling failed'}
           </p>
         ) : null}
@@ -212,7 +215,7 @@ export function TopicModelingResultsPanel({
                       ) : selectedTopicIds.size > 0 ? (
                         <>
                           <Plus className="mr-2 h-4 w-4" />
-                          {`Add to Workspace (${selectedTopicIds.size} topics)`}
+                          {`Add to Workspace (${String(selectedTopicIds.size)} topics)`}
                         </>
                       ) : (
                         <>

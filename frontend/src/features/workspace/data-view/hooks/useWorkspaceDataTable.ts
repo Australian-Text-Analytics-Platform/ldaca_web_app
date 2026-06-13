@@ -87,10 +87,10 @@ const resolveNodeDisplayLabel = (
     return undefined;
   }
 
+  // Empty name falls back to id, so `||` is intentional (a blank node name should show the id).
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   return node.name || node.id;
 };
-
-const EMPTY_NODE_IDS: string[] = [];
 
 /**
  * Composes workspace data, selection, actions, and table callbacks into the
@@ -125,7 +125,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
-  const normalizedSelectedNodeIds = selectedNodeIds ?? EMPTY_NODE_IDS;
+  const normalizedSelectedNodeIds = selectedNodeIds;
   const multiSelectedNodes = selectedNodes.filter(Boolean);
   const shouldShowTabs = multiSelectedNodes.length > 1;
   const activeNodeId = selectedNode?.id ?? multiSelectedNodes[0]?.id ?? null;
@@ -134,7 +134,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const nodeById = (() => {
     const map = new Map<string, (typeof multiSelectedNodes)[number]>();
     multiSelectedNodes.forEach((node) => {
-      if (node?.id) {
+      if (node.id) {
         map.set(node.id, node);
       }
     });
@@ -215,18 +215,18 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const canRedo = Boolean(selectedNodeCapabilities?.can_redo);
 
   const header: WorkspaceDataTableHeaderInfo = {
-    nodeLabel: resolveNodeDisplayLabel(selectedNode) || 'Unknown node',
+    nodeLabel: resolveNodeDisplayLabel(selectedNode) ?? 'Unknown node',
     tabPosition,
     totalTabs: multiSelectedNodes.length,
     isEmptyTable: Array.isArray(nodeData.data) && nodeData.data.length === 0,
   };
 
   const nodeActions: WorkspaceDataTableNodeActions = {
-    onUndo: selectedNode?.id && undoNode ? () => void undoNode(selectedNode.id) : undefined,
-    onRedo: selectedNode?.id && redoNode ? () => void redoNode(selectedNode.id) : undefined,
-    onDelete: selectedNode?.id && deleteNode ? () => void deleteNode(selectedNode.id) : undefined,
+    onUndo: selectedNode?.id ? () => void undoNode(selectedNode.id) : undefined,
+    onRedo: selectedNode?.id ? () => void redoNode(selectedNode.id) : undefined,
+    onDelete: selectedNode?.id ? () => void deleteNode(selectedNode.id) : undefined,
     onRename:
-      selectedNode?.id && renameNode
+      selectedNode?.id
         ? (newName: string) => void renameNode(selectedNode.id, newName)
         : undefined,
     onQueryPlan: selectedNode?.id
@@ -236,7 +236,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
             path: { node_id: selectedNode.id },
             throwOnError: true,
           });
-          return resp.plan ?? null;
+          return resp.plan;
         }
       : undefined,
     canUndo,
@@ -246,7 +246,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const tabs: WorkspaceSelectionTabsState = {
     shouldShowTabs,
     tabs: displayTabIds.map((id) =>
-      buildTabDescriptor(id, resolveNodeDisplayLabel(nodeById.get(id)) || id, id === activeNodeId),
+      buildTabDescriptor(id, resolveNodeDisplayLabel(nodeById.get(id)) ?? id, id === activeNodeId),
     ),
     tabPosition,
     totalTabs: multiSelectedNodes.length,
@@ -287,6 +287,8 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     if (next.length === 0) {
       handleSortingChange(undefined, undefined);
     } else {
+      // next is non-empty here, so next[0] is guaranteed present.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       handleSortingChange(next[0]!.id, next[0]!.desc);
     }
   };
@@ -300,9 +302,11 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     if (next.length === 0) {
       handleFilterChange(undefined, undefined, undefined);
     } else {
+      // next is non-empty here, so next[0] is guaranteed present.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const filter = next[0]!;
       const parts = filter.value as { value: string; op: string };
-      handleFilterChange(String(filter.id), parts.value, parts.op);
+      handleFilterChange(filter.id, parts.value, parts.op);
     }
   };
 
@@ -347,7 +351,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const table: WorkspaceTableProps = {
     data: nodeData.data,
     loading: isLoading.nodeData,
-    workspaceId: currentWorkspaceId || undefined,
+    workspaceId: currentWorkspaceId ?? undefined,
     nodeId: selectedNode?.id,
     documentColumn: getNodeDocumentColumn(selectedNode),
     onCast: selectedNodeIdForCallbacks ? handleCast : undefined,
@@ -355,7 +359,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onDeleteColumn: selectedNodeIdForCallbacks ? handleDeleteColumn : undefined,
     onRefreshSchema: selectedNodeIdForCallbacks ? handleRefreshSchema : undefined,
     pagination: nodeData.pagination,
-    rowCount: nodeData.pagination?.total_rows ?? 0,
+    rowCount: nodeData.pagination.total_rows,
     sorting,
     onSortingChange,
     columnFilters,

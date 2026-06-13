@@ -17,7 +17,7 @@ const REGISTRY_SCHEMA_VERSION = 1 as const;
 
 type RegistryMeta = NonNullable<RegistryShape['meta']>;
 
-type State = {
+interface State {
   registry: RegistryShape;
   meta: RegistryMeta | null;
   /** ms-since-epoch of last successful remote fetch. null = never. */
@@ -25,25 +25,25 @@ type State = {
   /** Set to true once the first remote refresh attempt has completed
    *  (success OR failure). Used to gate "stale registry" UI. */
   remoteAttempted: boolean;
-};
+}
 
-type Actions = {
+interface Actions {
   /**
    * Merge a freshly-fetched remote registry over the bundled fallback.
    * Pass `null` to mark remote-attempted without changing the merged
    * registry (e.g. on fetch failure when no cached payload exists).
    */
   applyRemote: (payload: PartialRemoteRegistry | null) => void;
-};
+}
 
 /** Shape we accept from the wire. Every section is optional so newer apps
  *  can read older docs JSON without breaking. */
-export type PartialRemoteRegistry = {
+export interface PartialRemoteRegistry {
   tutorial?: Record<string, DocTarget>;
   info?: Record<string, DocTarget>;
   reference?: Record<string, DocTarget>;
   meta?: RegistryMeta;
-};
+}
 
 /** Overlays remote doc targets on top of the bundled fallback while preserving offline entries. */
 /** Used by: useRegistryStore in the tutorials module because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
@@ -64,12 +64,12 @@ export const useRegistryStore = create<State & Actions>((set) => ({
    * Why: documentation consumers need one registry path for bundled, cached, and remote content.
    */
   applyRemote: (payload) =>
-    set(() => ({
+    { set(() => ({
       registry: mergeBundledWithRemote(payload),
       meta: payload?.meta ?? null,
       lastFetchedAt: payload ? Date.now() : null,
       remoteAttempted: true,
-    })),
+    })); },
 }));
 
 export { REGISTRY_SCHEMA_VERSION };

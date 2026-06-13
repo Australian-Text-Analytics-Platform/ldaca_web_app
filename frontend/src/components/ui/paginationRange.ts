@@ -16,7 +16,7 @@ export type PaginationRangeItem = number | 'dots';
 export const buildPaginationRange = (
   current: number,
   totalPages: number | undefined,
-  hasNext: boolean = false,
+  hasNext = false,
 ): PaginationRangeItem[] => {
   if (typeof totalPages === 'number' && totalPages > 0) {
     const total = Math.max(totalPages, 1);

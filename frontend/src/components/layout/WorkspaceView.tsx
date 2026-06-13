@@ -30,8 +30,8 @@ function WorkspaceView() {
      * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
      */
     onLiveUpdate: (next) => {
-      if (topRef.current) topRef.current.style.height = `${next * 100}%`;
-      if (bottomRef.current) bottomRef.current.style.height = `${(1 - next) * 100}%`;
+      if (topRef.current) topRef.current.style.height = `${String(next * 100)}%`;
+      if (bottomRef.current) bottomRef.current.style.height = `${String((1 - next) * 100)}%`;
     },
   });
 
@@ -40,7 +40,7 @@ function WorkspaceView() {
       <InsetCard
         ref={topRef}
         className="min-h-30 p-2 pb-1"
-        style={{ height: `calc(${ratio * 100}% - 0.25rem)` }}
+        style={{ height: `calc(${String(ratio * 100)}% - 0.25rem)` }}
       >
         <div className="p-2 bg-muted border-b border-border shrink-0">
           <WorkspaceControls />
@@ -65,7 +65,7 @@ function WorkspaceView() {
       <InsetCard
         ref={bottomRef}
         className="min-h-30 p-2 pt-1"
-        style={{ height: `calc(${(1 - ratio) * 100}% - 0.25rem)` }}
+        style={{ height: `calc(${String((1 - ratio) * 100)}% - 0.25rem)` }}
       >
         <div className="flex-1 min-h-0">
           <WorkspaceDataTableFeature />

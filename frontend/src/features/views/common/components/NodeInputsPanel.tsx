@@ -125,9 +125,12 @@ export function NodeInputsPanel({
     if (!ids.length) return;
     const rejections = onAddNodes(ids);
     if (rejections.length === 1) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length===1 guarantees index 0 exists
       toast.warning(`Couldn't add node: ${rejections[0]!.reason}`);
     } else if (rejections.length > 1) {
-      toast.warning(`Couldn't add ${rejections.length} nodes (incompatible or already added).`);
+      toast.warning(
+        `Couldn't add ${String(rejections.length)} nodes (incompatible or already added).`,
+      );
     }
   };
 
@@ -162,7 +165,7 @@ export function NodeInputsPanel({
     const { nodeId } = args;
     const resolved = columnByNode.get(nodeId);
     const columns = (resolved?.columnOptions ?? []).map((c) => c.name);
-    const value = resolved?.column && resolved.column.length ? resolved.column : CLEAR_COLUMN_VALUE;
+    const value = resolved?.column.length ? resolved.column : CLEAR_COLUMN_VALUE;
     const label = typeof columnLabel === 'function' ? columnLabel(args) : columnLabel;
     const selector = (
       <NodeColumnSelector
@@ -173,7 +176,7 @@ export function NodeInputsPanel({
         label={label}
         disabled={disabled}
         noColumnsMessage="No compatible column for this node"
-        onChange={(next) => onColumnChange(nodeId, next === CLEAR_COLUMN_VALUE ? '' : (next ?? ''))}
+        onChange={(next) => { onColumnChange(nodeId, next === CLEAR_COLUMN_VALUE ? '' : next); }}
       />
     );
     const addon = renderColumnAddon?.({ ...args, column: resolved?.column ?? '', columns });
@@ -187,7 +190,7 @@ export function NodeInputsPanel({
   };
 
   const count = originalCount ?? resolvedNodes.length;
-  const countLabel = maxNodes != null ? `${count}/${maxNodes}` : `${count}`;
+  const countLabel = maxNodes != null ? `${String(count)}/${String(maxNodes)}` : String(count);
   const statusVariantClass = {
     info: 'border-sky-500/50 bg-sky-100/60 text-sky-900',
     warning: 'border-amber-500/60 bg-amber-100/60 text-amber-900',
@@ -264,7 +267,7 @@ export function NodeInputsPanel({
                     </div>
                     {recentPresets.map((preset, idx) => (
                       <button
-                        key={`${preset.ids.join('|')}-${idx}`}
+                        key={`${preset.ids.join('|')}-${String(idx)}`}
                         type="button"
                         disabled={preset.addableIds.length === 0}
                         title={
@@ -317,7 +320,7 @@ export function NodeInputsPanel({
                   <Input
                     autoFocus
                     value={blockSearch}
-                    onChange={(e) => setBlockSearch(e.target.value)}
+                    onChange={(e) => { setBlockSearch(e.target.value); }}
                     placeholder="Search data blocks…"
                     className="h-8 pl-7 text-sm"
                   />

@@ -37,8 +37,8 @@ describe('deriveNodeDisplayResults', () => {
     // 20 raw tokens: 10 are stop words interleaved with 10 content tokens
     const rawTokens: string[] = [];
     for (let i = 0; i < 10; i++) {
-      rawTokens.push(`stop${i}`);
-      rawTokens.push(`content${i}`);
+      rawTokens.push(`stop${String(i)}`);
+      rawTokens.push(`content${String(i)}`);
     }
     const node = makeNode(buildRows(rawTokens));
     const stopWords = new Set(rawTokens.filter((t) => t.startsWith('stop')));
@@ -59,7 +59,7 @@ describe('deriveNodeDisplayResults', () => {
   });
 
   it('returns all rows when no stop words and no limit', () => {
-    const tokens = Array.from({ length: 50 }, (_, i) => `token${i}`);
+    const tokens = Array.from({ length: 50 }, (_, i) => `token${String(i)}`);
     const node = makeNode(buildRows(tokens));
 
     const result = deriveNodeDisplayResults([node], new Set(), null)[0]!;

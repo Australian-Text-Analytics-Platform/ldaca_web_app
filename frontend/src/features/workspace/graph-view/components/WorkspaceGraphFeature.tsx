@@ -8,7 +8,6 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
-  type NodeTypes,
 } from '@xyflow/react';
 import { CircleOff, Loader2, Map, Network } from 'lucide-react';
 
@@ -134,7 +133,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
       <ReactFlow
         nodes={graph.nodes}
         edges={graph.edges}
-        nodeTypes={graph.nodeTypes as unknown as NodeTypes}
+        nodeTypes={graph.nodeTypes}
         onNodesChange={graph.handleNodesChange}
         onEdgesChange={graph.handleEdgesChange}
         onNodeClick={graph.handleNodeClick}
@@ -160,7 +159,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         <Controls position="top-right">
           <OverviewToggle
             active={showOverview}
-            onToggle={() => setShowOverview((value) => !value)}
+            onToggle={() => { setShowOverview((value) => !value); }}
           />
           <DeselectButton
             disabled={!graph.canClearSelection}

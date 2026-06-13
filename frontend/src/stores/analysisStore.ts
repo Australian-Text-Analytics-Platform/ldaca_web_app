@@ -63,7 +63,7 @@ export interface PendingConcordance {
   result?: ConcordanceAnalysisResponse;
   source?: string;
   searchWord?: string;
-  selectedNodes?: Array<{ id?: string; [key: string]: unknown }>;
+  selectedNodes?: { id?: string; [key: string]: unknown }[];
   nodeColumnSelections?: NodeColumnSelection[];
   nodeColors?: Record<string, string>;
   autoRun?: boolean;
@@ -113,25 +113,25 @@ export const useAnalysisStore = create<AnalysisState>()(
     /** Replaces or updates task summaries received from polling/SSE task streams. */
     /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
     setTasks: (tasks) =>
-      set((state) => {
+      { set((state) => {
         state.tasks = typeof tasks === 'function' ? tasks(state.tasks) : tasks;
-      }),
+      }); },
     /** Stores the concordance payload that should be consumed after an auto-run handoff. */
     /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
     setPendingConcordance: (payload) =>
-      set((state) => {
+      { set((state) => {
         state.pendingConcordance = { ...payload, timestamp: payload.timestamp ?? Date.now() };
-      }),
+      }); },
     /** Clears the concordance handoff once the destination feature consumes it. */
     /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
     clearPendingConcordance: () =>
-      set((state) => {
+      { set((state) => {
         state.pendingConcordance = null;
-      }),
+      }); },
     /** Records worker materialization events so feature tabs can react without refetch races. */
     /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
     pushMaterializedEvent: (event) =>
-      set((state) => {
+      { set((state) => {
         materializedEventSequence += 1;
         state.materializedEvents.unshift({
           ...event,
@@ -140,6 +140,6 @@ export const useAnalysisStore = create<AnalysisState>()(
         if (state.materializedEvents.length > MATERIALIZED_EVENT_HISTORY_LIMIT) {
           state.materializedEvents.length = MATERIALIZED_EVENT_HISTORY_LIMIT;
         }
-      }),
+      }); },
   })),
 );

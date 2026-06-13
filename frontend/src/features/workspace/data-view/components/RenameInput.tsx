@@ -34,7 +34,7 @@ export function RenameInput({ column, disabled, onSubmit, onCancel }: RenameInpu
       ref={inputRef}
       value={draft}
       disabled={disabled}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => { setDraft(e.target.value); }}
       onBlur={() => {
         if (!disabled) onSubmit(column, draft);
       }}

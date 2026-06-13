@@ -40,11 +40,9 @@ export const useNodeColumnPersistence = ({
       return;
     }
     const persisted = columnPersistence.readAll(persistenceCtx);
-    if (persisted) {
-      const hydrated = Object.entries(persisted).map(([nodeId, column]) => ({ nodeId, column }));
-      setSelectionsState(hydrated);
-      lastSelectedIdsRef.current = hydrated.map(({ nodeId }) => nodeId);
-    }
+    const hydrated = Object.entries(persisted).map(([nodeId, column]) => ({ nodeId, column }));
+    setSelectionsState(hydrated);
+    lastSelectedIdsRef.current = hydrated.map(({ nodeId }) => nodeId);
   }, [persist, workspaceId, storageScope]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -64,6 +62,8 @@ export const useNodeColumnPersistence = ({
         if (
           updated.length === prev.length &&
           updated.every(
+            // Lengths are equal and indexes shared, so prev[i] is always present here.
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             (sel, i) => sel.nodeId === prev[i]!.nodeId && sel.column === prev[i]!.column,
           )
         ) {

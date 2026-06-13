@@ -23,12 +23,12 @@ import {
 } from '../utils/fileTreeHelpers';
 import { formatBytes } from '../utils/format';
 
-type FileMoveTarget = {
+interface FileMoveTarget {
   key: string;
   directoryPath: string;
-};
+}
 
-export type FileTreeProps = {
+export interface FileTreeProps {
   nodes: FileTreeNode[];
   selectedFile: string | null;
   loadingFiles: boolean;
@@ -42,7 +42,7 @@ export type FileTreeProps = {
   onCreateFolderInside: (parentPath: string, parentLabel: string) => void;
   onOpenCitation: (directory: FileTreeDirectory, readmePath: string | null) => void;
   onMoveFile: (sourcePath: string, targetDirectoryPath: string) => Promise<void> | void;
-};
+}
 
 /**
  * Renders the nested file browser for uploaded data. `DataLoaderFeature` uses
@@ -189,15 +189,15 @@ export function FileTree({
       draggable
       data-file-path={file.path}
       data-testid={`file-row-${file.path}`}
-      onDragStart={(event) => handleTreeFileDragStart(event, file.path)}
+      onDragStart={(event) => { handleTreeFileDragStart(event, file.path); }}
       onDragEnd={handleTreeFileDragEnd}
       onDragEnter={(event) =>
-        handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)
+        { handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event); }
       }
       onDragOver={(event) =>
-        handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)
+        { handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event); }
       }
-      onDragLeave={(event) => handleDirectoryDragLeave(`file:${file.path}`, event)}
+      onDragLeave={(event) => { handleDirectoryDragLeave(`file:${file.path}`, event); }}
       onDrop={(event) => void handleDirectoryDrop(parentDirectoryPath, event)}
       className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 ${
         selectedFile === file.path ? 'bg-muted/50' : ''
@@ -222,7 +222,7 @@ export function FileTree({
             size="sm"
             variant="ghost"
             className="h-7 px-2"
-            onClick={() => onPreviewFile(file.path)}
+            onClick={() => { onPreviewFile(file.path); }}
           >
             <Eye className="h-3.5 w-3.5" />
             <span className="hidden lg:inline">Preview</span>
@@ -249,7 +249,7 @@ export function FileTree({
             size="sm"
             variant="ghost"
             className="h-7 px-2"
-            onClick={() => onDownloadFile(file.path)}
+            onClick={() => { onDownloadFile(file.path); }}
           >
             <DownloadIcon className="h-3.5 w-3.5" />
             <span className="hidden xl:inline">Download</span>
@@ -258,7 +258,7 @@ export function FileTree({
             size="sm"
             variant="ghost"
             className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => onDeleteFile(file.path)}
+            onClick={() => { onDeleteFile(file.path); }}
             disabled={loadingFiles}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -292,9 +292,9 @@ export function FileTree({
           }`}
           data-folder-path={node.path}
           data-testid={`folder-row-${node.path}`}
-          onDragEnter={(event) => handleDirectoryDragOver(`folder:${node.path}`, node.path, event)}
-          onDragOver={(event) => handleDirectoryDragOver(`folder:${node.path}`, node.path, event)}
-          onDragLeave={(event) => handleDirectoryDragLeave(`folder:${node.path}`, event)}
+          onDragEnter={(event) => { handleDirectoryDragOver(`folder:${node.path}`, node.path, event); }}
+          onDragOver={(event) => { handleDirectoryDragOver(`folder:${node.path}`, node.path, event); }}
+          onDragLeave={(event) => { handleDirectoryDragLeave(`folder:${node.path}`, event); }}
           onDrop={(event) => void handleDirectoryDrop(node.path, event)}
         >
           <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md">
@@ -316,7 +316,7 @@ export function FileTree({
                 className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
                 aria-label={`View citation for ${node.name}`}
                 title="View citation"
-                onClick={() => onOpenCitation(node, citationFile.path)}
+                onClick={() => { onOpenCitation(node, citationFile.path); }}
               >
                 <Quote className="h-3.5 w-3.5" />
               </Button>
@@ -328,7 +328,7 @@ export function FileTree({
             className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
             aria-label={`Add folder inside ${node.name}`}
             title={`Add folder inside ${node.name}`}
-            onClick={() => onCreateFolderInside(node.path, node.name)}
+            onClick={() => { onCreateFolderInside(node.path, node.name); }}
           >
             <FolderPlus className="h-3.5 w-3.5" />
           </Button>

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 
 export interface FilePreviewData {
-  previewData: Array<Record<string, unknown>>;
+  previewData: Record<string, unknown>[];
   columns: string[];
   loading: boolean;
   error: string | null;
@@ -110,7 +110,7 @@ export function FilePreviewContent({
             {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">Sheet</label>
-                <Select value={selectedSheet || ''} onValueChange={handleSheetChange}>
+                <Select value={selectedSheet ?? ''} onValueChange={handleSheetChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a sheet" />
                   </SelectTrigger>
@@ -159,9 +159,9 @@ export function FilePreviewContent({
                             <td
                               key={column}
                               className="max-w-48 truncate px-2 py-1"
-                              title={String(row[column] ?? '')}
+                              title={String((row[column] ?? '') as string | number | boolean)}
                             >
-                              {String(row[column] ?? '')}
+                              {String((row[column] ?? '') as string | number | boolean)}
                             </td>
                           ))}
                         </tr>

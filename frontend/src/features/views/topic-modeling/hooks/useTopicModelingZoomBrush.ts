@@ -1,37 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import { computeZoomDomain, type ZoomDomain } from '../topicModelingAdapters';
 
-type BrushRect = {
+interface BrushRect {
   startX: number;
   startY: number;
   currentX: number;
   currentY: number;
-};
+}
 
-type TopicPoint = {
+interface TopicPoint {
   x: number;
   y: number;
-};
+}
 
-type ZoomState<TTopic extends TopicPoint> = {
+interface ZoomState<TTopic extends TopicPoint> {
   topics: TTopic[];
   domain: ZoomDomain;
-};
+}
 
-type TooltipLike<TTopic> = {
+interface TooltipLike<TTopic> {
   x: number;
   y: number;
   topic: TTopic | null;
-};
+}
 
-type Params<TTopic extends TopicPoint> = {
+interface Params<TTopic extends TopicPoint> {
   topics: TTopic[];
   chartWidth: number;
   chartHeight: number;
   chartPadding: number;
   setHoveredTopicId: (value: number | null) => void;
   setTooltip: React.Dispatch<React.SetStateAction<TooltipLike<TTopic>>>;
-};
+}
 
 /** Manages click-drag zoom brushing for the topic-modeling bubble chart. */
 /**

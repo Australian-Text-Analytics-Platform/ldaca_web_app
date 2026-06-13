@@ -16,7 +16,9 @@ import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRaw
  * Used by: local callers in preprocessing/useReplaceSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
 const getNodeId = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
-  node.id || node.node_id || `node-${fallbackIndex}`;
+  // Empty-string ids fall through to the next candidate, so keep `||`.
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  node.id || node.node_id || `node-${String(fallbackIndex)}`;
 
 export interface ReplaceSubTabProps {
   selectedNodeId: string | null;

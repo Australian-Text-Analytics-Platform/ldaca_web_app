@@ -10,16 +10,12 @@ interface GroupedResultsPageSizeSummaryProps<
 }
 
 /** Called by: GroupedResultsPageSizeSummary when backend totals are unavailable because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-const countGroupedResultInstances = <Row extends Record<string, unknown>>(
-  groups: Row[][],
-): number => {
+const countGroupedResultInstances = (groups: Record<string, unknown>[][]): number => {
   return groups.reduce((total, group) => total + group.length, 0);
 };
 
 /** Called by: GroupedResultsPageSizeSummary for grouped source-document counts because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-const countGroupedResultDocuments = <Row extends Record<string, unknown>>(
-  groups: Row[][],
-): number => {
+const countGroupedResultDocuments = (groups: Record<string, unknown>[][]): number => {
   return groups.length;
 };
 
@@ -43,7 +39,7 @@ export function GroupedResultsPageSizeSummary<Row extends Record<string, unknown
       (Found {instanceCount} instance{instanceCount === 1 ? '' : 's'} in {documentCount} document
       {documentCount === 1 ? '' : 's'}
       {totalProcessed != null
-        ? ` after processing ${totalProcessed} document${totalProcessed === 1 ? '' : 's'}`
+        ? ` after processing ${String(totalProcessed)} document${totalProcessed === 1 ? '' : 's'}`
         : ''}
       ).
     </>

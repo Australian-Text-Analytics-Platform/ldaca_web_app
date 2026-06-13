@@ -41,7 +41,7 @@ describe('useTokenFrequencyPreferences', () => {
       await result.current.handleAddDefaultStopWords('zh');
     });
 
-    await waitFor(() => expect(result.current.stopWords).toContain('的'));
+    await waitFor(() => { expect(result.current.stopWords).toContain('的'); });
   });
 
   it('does not add default stop words when no language is chosen', async () => {
@@ -60,13 +60,13 @@ describe('useTokenFrequencyPreferences', () => {
     await act(async () => {
       await result.current.handleAddDefaultStopWords('en');
     });
-    await waitFor(() => expect(result.current.stopWords).toContain('about'));
+    await waitFor(() => { expect(result.current.stopWords).toContain('about'); });
 
     await act(async () => {
       await result.current.handleAddDefaultStopWords('zh');
     });
 
-    await waitFor(() => expect(result.current.stopWords).toContain('的'));
+    await waitFor(() => { expect(result.current.stopWords).toContain('的'); });
     expect(result.current.stopWords).toContain('about');
   });
 });

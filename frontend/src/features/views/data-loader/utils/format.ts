@@ -10,7 +10,7 @@ export const formatBytes = (bytes?: number | null): string => {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const idx = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
   const value = bytes / 1024 ** idx;
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[idx]}`;
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[idx] ?? ''}`;
 };
 
 /**
@@ -39,8 +39,8 @@ export const formatTimestamp = (value?: number | string | null): string => {
  * Used by: useDataLoaderWorkspaceActions hook, WorkspaceManagerCard component, DataLoaderFeature module (rg call sites/imports).
  */
 export const getWorkspaceId = (workspace: { id?: string; unique_id?: string }): string | null => {
-  const id = workspace?.id;
-  const uniqueId = workspace?.unique_id;
+  const id = workspace.id;
+  const uniqueId = workspace.unique_id;
   if (typeof id === 'string' && id) return id;
   if (typeof uniqueId === 'string' && uniqueId) return uniqueId;
   return null;

@@ -186,17 +186,20 @@ function DataLoaderFeature() {
     const aFav = favoriteWorkspaces.includes(aId) ? 1 : 0;
     const bFav = favoriteWorkspaces.includes(bId) ? 1 : 0;
     if (aFav !== bFav) return bFav - aFav;
-    const aTime = Date.parse(String(a?.modified_at || a?.created_at || ''));
-    const bTime = Date.parse(String(b?.modified_at || b?.created_at || ''));
+    // modified_at/created_at may be '' and must fall through to the next timestamp source
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    const aTime = Date.parse(a.modified_at || a.created_at || '');
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    const bTime = Date.parse(b.modified_at || b.created_at || '');
     return (bTime || 0) - (aTime || 0);
   });
 
   const totalFileCount = fileTree.reduce((sum, node) => sum + countFilesInNode(node), 0);
 
   const currentWorkspace =
-    workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId) || null;
+    workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId) ?? null;
 
-  const nodeCount = workspaceGraph?.nodes?.length ?? currentWorkspace?.total_nodes ?? 0;
+  const nodeCount = workspaceGraph?.nodes.length ?? currentWorkspace?.total_nodes ?? 0;
 
   /**
    * Bridges the add-file dialog to workspace node creation. The AddFilePanel
@@ -220,6 +223,8 @@ function DataLoaderFeature() {
     }
   };
 
+  // an empty data folder should fall through to the default 'data/' location
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   const workspaceFolder = dataFolder || 'data/';
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
   // Block workspace switching/unloading while a task on the active workspace
@@ -253,7 +258,7 @@ function DataLoaderFeature() {
       </div>
 
       <div ref={splitContainerRef} className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 overflow-hidden" style={{ flexBasis: `${topRatio * 100}%` }}>
+        <div className="min-h-0 overflow-hidden" style={{ flexBasis: `${String(topRatio * 100)}%` }}>
           <div className="grid h-full min-h-0 gap-4 lg:grid-cols-2">
             <ActiveWorkspaceCard
               currentWorkspace={currentWorkspace}
@@ -294,7 +299,7 @@ function DataLoaderFeature() {
 
         <div
           className="flex min-h-0 flex-col overflow-hidden"
-          style={{ flexBasis: `${(1 - topRatio) * 100}%` }}
+          style={{ flexBasis: `${String((1 - topRatio) * 100)}%` }}
         >
           <Card className="flex h-full flex-col overflow-hidden">
             <CardHeader>
@@ -345,7 +350,7 @@ function DataLoaderFeature() {
                 <div className="flex items-center gap-1">
                   <Button
                     variant="outline"
-                    onClick={() => setLdacaImportOpen(true)}
+                    onClick={() => { setLdacaImportOpen(true); }}
                     disabled={ldacaImporting}
                   >
                     <DownloadIcon className="mr-2 h-4 w-4" /> Import from LDaCA
@@ -396,7 +401,7 @@ function DataLoaderFeature() {
                         size="icon"
                         variant="ghost"
                         className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0"
-                        onClick={() => openCreateFolderDialog('', 'root')}
+                        onClick={() => { openCreateFolderDialog('', 'root'); }}
                         disabled={creatingFolder}
                         aria-label="Add root folder"
                         title="Add root folder"
@@ -419,7 +424,7 @@ function DataLoaderFeature() {
                         size="icon"
                         variant="ghost"
                         className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0"
-                        onClick={() => openCreateFolderDialog('', 'root')}
+                        onClick={() => { openCreateFolderDialog('', 'root'); }}
                         disabled={creatingFolder}
                         aria-label="Add root folder"
                         title="Add root folder"
@@ -443,7 +448,7 @@ function DataLoaderFeature() {
                           onDeleteFile={(file) => {
                             void handleDeleteFile(file);
                           }}
-                          onWarnNoWorkspace={() => setWorkspaceAlertOpen(true)}
+                          onWarnNoWorkspace={() => { setWorkspaceAlertOpen(true); }}
                           onCreateFolderInside={openCreateFolderDialog}
                           onOpenCitation={(directory, readmePath) => {
                             void openCitation(directory, readmePath);
@@ -467,13 +472,13 @@ function DataLoaderFeature() {
         filename={previewFile}
         open={Boolean(previewFile)}
         /** Clears the selected preview file when the preview dialog closes. */
-        onClose={() => setPreviewFile(null)}
+        onClose={() => { setPreviewFile(null); }}
       />
       <AddFilePanel
         filename={addFileName}
         open={Boolean(addFileName)}
         /** Clears the pending file-to-workspace selection when the add dialog closes. */
-        onClose={() => setAddFileName(null)}
+        onClose={() => { setAddFileName(null); }}
         onConfirm={handleAddToWorkspace}
       />
       <DataLoaderDialogs
@@ -483,7 +488,7 @@ function DataLoaderFeature() {
            * Dismisses the no-workspace alert owned by DataLoaderDialogs.
            * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
            */
-          onClose: () => setWorkspaceAlertOpen(false),
+          onClose: () => { setWorkspaceAlertOpen(false); },
         }}
         workspaceNameAlert={{
           message: workspaceNameAlert,

@@ -153,6 +153,8 @@ const toCategoricalPrimitive = (value: unknown): CategoricalPrimitive => {
   if (value instanceof Date) {
     return value.toISOString();
   }
+  // value is a non-primitive object here; String() is the intended last resort.
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
   return String(value);
 };
 
@@ -171,7 +173,7 @@ const getCategoricalOptionKey = (value: CategoricalPrimitive): string => {
  */
 const getDefaultOperatorForType = (dataType: string): FilterCondition['operator'] => {
   const operators = getOperatorsForType(dataType);
-  return (operators[0]?.value as FilterCondition['operator']) ?? 'eq';
+  return (operators[0]?.value as FilterCondition['operator'] | undefined) ?? 'eq';
 };
 
 /**
@@ -288,7 +290,7 @@ export const useFilterSubTabSections = (
         columns.push({ name: colName, dataType: normalizedDataType });
       });
     } else if (selectedNode?.schema) {
-      Object.keys(selectedNode.schema as Record<string, unknown>).forEach((colName) => {
+      Object.keys(selectedNode.schema).forEach((colName) => {
         columns.push({ name: colName, dataType: 'string' });
       });
     }
@@ -305,7 +307,7 @@ export const useFilterSubTabSections = (
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node: WorkspaceNodeLike) => {
       const key =
-        (node.id as string | undefined) ??
+        (node.id) ??
         ((node as Record<string, unknown>).node_id as string | undefined);
       if (key) {
         map.set(key, node);
@@ -359,11 +361,14 @@ export const useFilterSubTabSections = (
           path: { column_name: column, node_id: selectedNodeId },
           throwOnError: true,
         });
+        // response is the typed API body; guard defensively against a null payload.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const rawValues: unknown[] = Array.isArray(response?.unique_values)
           ? response.unique_values
           : [];
         const includeNullOption = dataType === 'categorical';
-        const hasNullFromResponse = includeNullOption && Boolean(response?.has_null);
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        const hasNullFromResponse = includeNullOption && response?.has_null;
         const optionList = buildCategoricalOptionEntries(rawValues, hasNullFromResponse);
 
         setCategoricalOptions((prev) => ({
@@ -442,6 +447,8 @@ export const useFilterSubTabSections = (
   }, [selectedNodeId]);
 
   const autoNodeName = buildFilterAutoNodeName({
+    // Empty node name should fall back to the id, so keep `||`.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     baseName: selectedNode?.name || selectedNodeId,
     conditions,
     logic,
@@ -606,7 +613,7 @@ export const useFilterSubTabSections = (
             currentWorkspaceId &&
             (value === 'gte' || value === 'lte')
           ) {
-              void prefillNumericValue(id, updated.column, value as FilterCondition['operator']);
+              void prefillNumericValue(id, updated.column, value);
           }
         }
 
@@ -618,6 +625,9 @@ export const useFilterSubTabSections = (
       setOptionSearchQueries((prev) => ({ ...prev, [id]: '' }));
     }
 
+    // nextCategoricalColumnToLoad is mutated inside the setConditions updater
+    // above; TS cannot track the closure mutation, so keep this runtime check.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (nextCategoricalColumnToLoad) {
       const targetCondition = conditions.find((entry) => entry.id === id);
       const targetType =
@@ -648,7 +658,7 @@ export const useFilterSubTabSections = (
           id={`negate-${condition.id}`}
           checked={Boolean(condition.negate)}
           onCheckedChange={(checked) =>
-            handleConditionChange(condition.id, 'negate', checked === true)
+            { handleConditionChange(condition.id, 'negate', checked === true); }
           }
           disabled={rowDisabled}
         />
@@ -662,7 +672,7 @@ export const useFilterSubTabSections = (
               id={`regex-${condition.id}`}
               checked={Boolean(condition.regex)}
               onCheckedChange={(checked) =>
-                handleConditionChange(condition.id, 'regex', checked === true)
+                { handleConditionChange(condition.id, 'regex', checked === true); }
               }
               disabled={rowDisabled}
             />
@@ -673,7 +683,7 @@ export const useFilterSubTabSections = (
               id={`case-sensitive-${condition.id}`}
               checked={Boolean(condition.caseSensitive)}
               onCheckedChange={(checked) =>
-                handleConditionChange(condition.id, 'caseSensitive', checked === true)
+                { handleConditionChange(condition.id, 'caseSensitive', checked === true); }
               }
               disabled={rowDisabled}
             />
@@ -700,6 +710,8 @@ export const useFilterSubTabSections = (
    * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const getConditionOperatorOptions = (condition: FilterConditionWithId) =>
+    // Empty dataType should fall back to 'string', so keep `||`.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     getOperatorsForType(condition.dataType || 'string');
 
   /**
@@ -728,6 +740,9 @@ export const useFilterSubTabSections = (
 
           let newValue: ConditionValue;
 
+          // describeData stats come from the API; empty/falsy values should fall
+          // back to '', so keep `||` here.
+          /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
           switch (operator) {
             case 'eq':
               newValue = describeData.median || describeData.min || '';
@@ -747,6 +762,7 @@ export const useFilterSubTabSections = (
             default:
               newValue = '';
           }
+          /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
           return { ...c, value: newValue };
         }),
@@ -780,7 +796,7 @@ export const useFilterSubTabSections = (
         prev.map((c) => {
           if (c.id !== conditionId) return c;
 
-          let newValue: ConditionValue = (c.value as string | number) ?? '';
+          let newValue: ConditionValue = (c.value) ?? '';
 
           switch (operator) {
             case 'gte':
@@ -815,6 +831,8 @@ export const useFilterSubTabSections = (
       return (
         <input
           type="text"
+          // condition.value is a primitive in this branch; String() coerces it.
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string
           value={condition.operator === 'between' ? '' : String(condition.value ?? '')}
           disabled
           placeholder={
@@ -825,6 +843,8 @@ export const useFilterSubTabSections = (
       );
     }
 
+    // Empty dataType should fall back to 'string', so keep `||`.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const dataType = condition.dataType || 'string';
 
     if (dataType === 'tmdist') {
@@ -835,10 +855,10 @@ export const useFilterSubTabSections = (
       // categorical options); threshold is stored as a 0..1 fraction.
       const current =
         condition.value && typeof condition.value === 'object' && 'topic_id' in condition.value
-          ? (condition.value as { topic_id: number; threshold: number })
+          ? (condition.value)
           : { topic_id: 0, threshold: 0.05 };
       const patch = (next: Partial<{ topic_id: number; threshold: number }>) =>
-        handleConditionChange(condition.id, 'value', { ...current, ...next });
+        { handleConditionChange(condition.id, 'value', { ...current, ...next }); };
 
       const key = condition.column ? getCategoricalKey(condition.column) : null;
       const optionState = key ? categoricalOptions[key] : undefined;
@@ -852,8 +872,8 @@ export const useFilterSubTabSections = (
         <div className="flex flex-1 flex-wrap items-center gap-1.5">
           <Select
             value={String(current.topic_id)}
-            onValueChange={(v) => patch({ topic_id: Number(v) })}
-            disabled={disabled || topicIds.length === 0}
+            onValueChange={(v) => { patch({ topic_id: Number(v) }); }}
+            disabled={topicIds.length === 0}
           >
             <SelectTrigger className="w-32" aria-label="Topic">
               <SelectValue placeholder={optionState?.loading ? 'Loading…' : 'Topic'} />
@@ -869,11 +889,11 @@ export const useFilterSubTabSections = (
           <Select
             value={condition.operator}
             onValueChange={(v) =>
-              handleConditionChange(
+              { handleConditionChange(
                 condition.id,
                 'operator',
                 v as FilterConditionWithId['operator'],
-              )
+              ); }
             }
             disabled={disabled}
           >
@@ -894,6 +914,8 @@ export const useFilterSubTabSections = (
             max={100}
             step={1}
             aria-label="Proportion percentage"
+            // current.threshold comes from form state and may be missing at runtime.
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             value={Math.round((current.threshold ?? 0) * 100)}
             onChange={(e) => {
               const pct = Math.min(100, Math.max(0, Number(e.target.value) || 0));
@@ -914,7 +936,7 @@ export const useFilterSubTabSections = (
       const optionEntries = optionState?.options ?? [];
       const searchQuery = optionSearchQueries[condition.id] ?? '';
       const selectedValues = Array.isArray(condition.value)
-        ? (condition.value as Array<unknown>).map(toCategoricalPrimitive)
+        ? (condition.value as unknown[]).map(toCategoricalPrimitive)
         : [];
       const selectedKeys = new Set(selectedValues.map((entry) => getCategoricalOptionKey(entry)));
       const isLoadingOptions = optionState?.loading ?? false;
@@ -933,7 +955,6 @@ export const useFilterSubTabSections = (
        * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
        */
       const toggleValue = (entry: FilterChecklistOption, nextChecked: boolean) => {
-        if (disabled) return;
         if (nextChecked) {
           if (selectedKeys.has(entry.key)) return;
           updateSelections([...selectedValues, toCategoricalPrimitive(entry.value)]);
@@ -949,7 +970,6 @@ export const useFilterSubTabSections = (
        * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
        */
       const handleSelectAll = () => {
-        if (disabled) return;
         updateSelections(optionEntries.map((entry) => entry.value));
       };
 
@@ -958,7 +978,6 @@ export const useFilterSubTabSections = (
        * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
        */
       const handleSelectVisible = (visibleOptions: FilterChecklistOption[]) => {
-        if (disabled) return;
         const merged = new Map<string, CategoricalPrimitive>(
           selectedValues.map((entry) => [getCategoricalOptionKey(entry), entry]),
         );
@@ -973,12 +992,11 @@ export const useFilterSubTabSections = (
        * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
        */
       const handleClearAll = () => {
-        if (disabled) return;
         updateSelections([]);
       };
 
       const onSelectAllForMode =
-        searchQuery.trim().length > 0 ? handleSelectVisible : () => handleSelectAll();
+        searchQuery.trim().length > 0 ? handleSelectVisible : () => { handleSelectAll(); };
 
       return (
         <FilterValueChecklist
@@ -990,7 +1008,7 @@ export const useFilterSubTabSections = (
           error={optionError}
           searchQuery={searchQuery}
           onSearchQueryChange={(query) =>
-            setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query }))
+            { setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query })); }
           }
           onToggleOption={toggleValue}
           onSelectAll={onSelectAllForMode}
@@ -1005,8 +1023,10 @@ export const useFilterSubTabSections = (
     if (dataType === 'boolean') {
       return (
         <Select
+          // condition.value is a boolean in this branch; String() coerces it.
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string
           value={String(condition.value)}
-          onValueChange={(value) => handleConditionChange(condition.id, 'value', value === 'true')}
+          onValueChange={(value) => { handleConditionChange(condition.id, 'value', value === 'true'); }}
           disabled={disabled}
         >
           <SelectTrigger className="flex-1">
@@ -1025,8 +1045,8 @@ export const useFilterSubTabSections = (
         const rangeValue: ConditionRange =
           condition.value &&
           typeof condition.value === 'object' &&
-          'start' in (condition.value as Record<string, unknown>)
-            ? (condition.value as ConditionRange)
+          'start' in condition.value
+            ? (condition.value)
             : { start: null, end: null };
         const startStr =
           typeof rangeValue.start === 'string'
@@ -1046,10 +1066,10 @@ export const useFilterSubTabSections = (
               <DateTimePickerField
                 value={startStr}
                 onChange={(v) =>
-                  handleConditionChange(condition.id, 'value', {
+                  { handleConditionChange(condition.id, 'value', {
                     start: v,
                     end: rangeValue.end ?? null,
-                  })
+                  }); }
                 }
                 placeholder={ISO_PLACEHOLDER}
               />
@@ -1058,10 +1078,10 @@ export const useFilterSubTabSections = (
               <DateTimePickerField
                 value={endStr}
                 onChange={(v) =>
-                  handleConditionChange(condition.id, 'value', {
+                  { handleConditionChange(condition.id, 'value', {
                     start: rangeValue.start ?? null,
                     end: v,
-                  })
+                  }); }
                 }
                 placeholder={ISO_PLACEHOLDER}
               />
@@ -1078,7 +1098,7 @@ export const useFilterSubTabSections = (
       return (
         <DateTimePickerField
           value={singleVal}
-          onChange={(v) => handleConditionChange(condition.id, 'value', v)}
+          onChange={(v) => { handleConditionChange(condition.id, 'value', v); }}
           placeholder={ISO_PLACEHOLDER}
         />
       );
@@ -1089,7 +1109,9 @@ export const useFilterSubTabSections = (
         <input
           type="number"
           step={dataType === 'float' ? 'any' : '1'}
-          value={condition.value === null ? '' : String(condition.value ?? '')}
+          // condition.value is a primitive in this branch; String() coerces it.
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string
+          value={condition.value === null ? '' : String(condition.value)}
           onChange={(e) => {
             const raw = e.target.value;
             if (raw === '') {
@@ -1109,8 +1131,10 @@ export const useFilterSubTabSections = (
     return (
       <input
         type="text"
+        // condition.value is a primitive in this branch; String() coerces it.
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         value={String(condition.value)}
-        onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value)}
+        onChange={(e) => { handleConditionChange(condition.id, 'value', e.target.value); }}
         placeholder="Enter value"
         className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
         disabled={disabled}
@@ -1157,7 +1181,7 @@ export const useFilterSubTabSections = (
   const summaryText =
     conditions.length === 0
       ? 'Define at least one condition to enable preview and filtering.'
-      : `${conditions.length} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`;
+      : `${String(conditions.length)} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`;
 
   const hasApplicablePreviewRows =
     conditionsComplete && !previewLoading && !previewError && previewData.length > 0;

@@ -23,7 +23,8 @@ export type NodeColumnSource = string[] | ColumnInfo[];
  * Used by: analysis node selectors and per-node result panels because backend nodes may arrive with id, node_id, or neither in tests and fixtures.
  */
 export const getNodeIdentifier = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
-  node.id || node.node_id || `node-${fallbackIndex}`;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty id/node_id should fall through to the index fallback
+  node.id || node.node_id || `node-${String(fallbackIndex)}`;
 
 /**
  * Resolves the human label used by shared node-selection controls while keeping
@@ -31,4 +32,5 @@ export const getNodeIdentifier = (node: WorkspaceNodeLike, fallbackIndex: number
  * Used by: NodeSelectionList and shared selection panels because labels should prefer backend names, then labels, then stable ids when metadata is sparse.
  */
 export const getNodeDisplayName = (node: WorkspaceNodeLike, fallbackId: string): string =>
-  (node.name as string | undefined) || (node.label as string | undefined) || fallbackId;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty name/label should fall through to the next display option
+  (node.name) || (node.label) || fallbackId;

@@ -2,29 +2,29 @@ import React from 'react';
 import { getReadableTextColor, interpolateColor, type ZoomDomain } from '../topicModelingAdapters';
 import { matchChecklistOption } from '@/features/views/preprocessing/filter/utils/checklistSearch';
 
-type TopicModelingTopic = {
+interface TopicModelingTopic {
   id: number;
   label: string;
   size: number[];
   total_size: number;
   x: number;
   y: number;
-};
+}
 
-type BrushRect = {
+interface BrushRect {
   startX: number;
   startY: number;
   currentX: number;
   currentY: number;
-};
+}
 
-type TooltipState = {
+interface TooltipState {
   x: number;
   y: number;
   topic: TopicModelingTopic | null;
-};
+}
 
-type Params = {
+interface Params {
   topics: TopicModelingTopic[];
   activeDomain: ZoomDomain | null;
   chartWidth: number;
@@ -48,7 +48,7 @@ type Params = {
   onToggleTopicSelection: (id: number) => void;
   topicSearchQuery: string;
   handleResetZoom: () => void;
-};
+}
 
 // Resolves the corpus colour for one bubble segment from assigned node colours or defaults.
 /**
@@ -63,6 +63,7 @@ const resolvePanelColor = (
 ) => {
   const nodeId = panelNodeIds[index];
   if (nodeId) {
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty color string should fall back to the next color source, so falsy '' must fall through
     return nodeColors[nodeId] || defaultPalette[index] || fallback;
   }
   return fallback;
@@ -226,7 +227,7 @@ export function useTopicModelingBubbleChart({
         }}
       >
         {topics.map((topic) => {
-          const sizes = topic.size || [];
+          const sizes = topic.size;
           const proportion =
             corpusCount === 2 && topic.total_size > 0 ? (sizes[1] ?? 0) / topic.total_size : 0.5;
           const colorA = resolvePanelColor(
@@ -256,7 +257,7 @@ export function useTopicModelingBubbleChart({
           return (
             <g
               key={topic.id}
-              transform={`translate(${cx},${cy})`}
+              transform={`translate(${String(cx)},${String(cy)})`}
               opacity={isFilteredOut ? 0.18 : undefined}
               style={{ cursor: isFilteredOut ? 'default' : isBrushing ? 'grabbing' : 'pointer' }}
               onMouseEnter={(event) => {
@@ -275,7 +276,7 @@ export function useTopicModelingBubbleChart({
                 if (isBrushing || isFilteredOut || !chartRef.current) return;
                 const bounds = chartRef.current.getBoundingClientRect();
                 setTooltip((previous) =>
-                  previous.topic && previous.topic.id === topic.id
+                  previous.topic?.id === topic.id
                     ? {
                         x: event.clientX - bounds.left + 12,
                         y: event.clientY - bounds.top + 12,
@@ -318,7 +319,7 @@ export function useTopicModelingBubbleChart({
                 className="pointer-events-none select-none"
                 fill="#1e293b"
               >
-                {`T${topic.id}`}
+                {`T${String(topic.id)}`}
               </text>
             </g>
           );

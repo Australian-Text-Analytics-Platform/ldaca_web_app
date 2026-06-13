@@ -9,8 +9,8 @@ const buildNodeOptions = (
   overrides: Partial<DetachDialogNodeOption>[] = [],
 ): DetachDialogNodeOption[] =>
   overrides.map((override, idx) => ({
-    node_id: override.node_id ?? `node-${idx + 1}`,
-    node_name: override.node_name ?? `Node ${idx + 1}`,
+    node_id: override.node_id ?? `node-${String(idx + 1)}`,
+    node_name: override.node_name ?? `Node ${String(idx + 1)}`,
     available_columns: override.available_columns ?? [],
     disabled_columns: override.disabled_columns ?? [],
   }));
@@ -101,12 +101,12 @@ describe('useDetachColumnsState', () => {
       act(() => {
         result.current.toggleDetachColumn('n1', 'col_b', true); // not in available_columns
       });
-      expect(result.current.selectedDetachColumns['n1']).toEqual(['col_b']);
+      expect(result.current.selectedDetachColumns.n1).toEqual(['col_b']);
 
       act(() => {
         result.current.selectAllDetachColumns();
       });
-      expect(result.current.selectedDetachColumns['n1']).toEqual(['col_a']);
+      expect(result.current.selectedDetachColumns.n1).toEqual(['col_a']);
     });
   });
 

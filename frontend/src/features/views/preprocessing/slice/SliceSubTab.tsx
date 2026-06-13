@@ -27,7 +27,7 @@ type SliceSubTabComponentProps = SliceSubTabProps & {
  * Rendered by: DataPreprocessingFeature module, PreviewTable component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
 export function SliceSubTab(props: SliceSubTabComponentProps) {
-  const selectedNodeLabel = deriveNodeLabel(props.selectedNode) || props.selectedNodeId || '';
+  const selectedNodeLabel = deriveNodeLabel(props.selectedNode) || (props.selectedNodeId ?? '');
   const selectedNodeKey = `${props.selectedNodeId ?? ''}:${selectedNodeLabel}`;
 
   return <SliceSubTabContent key={selectedNodeKey} {...props} />;
@@ -78,7 +78,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
 
           <Tabs
             value={form.mode}
-            onValueChange={(value) => form.setMode(value as 'slice' | 'random_sample')}
+            onValueChange={(value) => { form.setMode(value as 'slice' | 'random_sample'); }}
           >
             <TabsList>
               <TabsTrigger value="slice" disabled={!hasSelection}>
@@ -101,7 +101,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                     type="number"
                     min={0}
                     value={form.offsetInput}
-                    onChange={(event) => form.setOffsetInput(event.target.value)}
+                    onChange={(event) => { form.setOffsetInput(event.target.value); }}
                     disabled={!hasSelection}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -118,7 +118,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                     type="number"
                     min={1}
                     value={form.lengthInput}
-                    onChange={(event) => form.setLengthInput(event.target.value)}
+                    onChange={(event) => { form.setLengthInput(event.target.value); }}
                     onBlur={form.onLengthBlur}
                     disabled={!hasSelection}
                     placeholder="Number of rows to include"
@@ -140,7 +140,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                     min={0}
                     step="any"
                     value={form.sampleSizeInput}
-                    onChange={(event) => form.setSampleSizeInput(event.target.value)}
+                    onChange={(event) => { form.setSampleSizeInput(event.target.value); }}
                     onBlur={form.onSampleSizeBlur}
                     disabled={!hasSelection}
                     placeholder="e.g. 0.4 for 40% or 100 for 100 rows"
@@ -162,7 +162,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                       min={0}
                       step="1"
                       value={form.randomSeedInput}
-                      onChange={(event) => form.setRandomSeedInput(event.target.value)}
+                      onChange={(event) => { form.setRandomSeedInput(event.target.value); }}
                       disabled={!hasSelection || form.noRandomSeed}
                       placeholder={form.noRandomSeed ? 'No seed' : 'Seed'}
                       className="w-28"
@@ -170,7 +170,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                     <Checkbox
                       id="no-random-seed"
                       checked={form.noRandomSeed}
-                      onCheckedChange={(checked) => form.setNoRandomSeed(checked === true)}
+                      onCheckedChange={(checked) => { form.setNoRandomSeed(checked === true); }}
                       disabled={!hasSelection}
                     />
                     <Label
@@ -198,13 +198,13 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
               id="slice-new-node-name"
               type="text"
               value={form.newNodeName}
-              onChange={(event) => form.setNewNodeName(event.target.value)}
+              onChange={(event) => { form.setNewNodeName(event.target.value); }}
               onKeyDown={(event) =>
-                acceptPlaceholderOnTab({
+                { acceptPlaceholderOnTab({
                   event,
                   value: form.newNodeName,
                   setValue: form.setNewNodeName,
-                })
+                }); }
               }
               placeholder={form.newNodeNamePlaceholder}
               disabled={!hasSelection}

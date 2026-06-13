@@ -434,9 +434,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     );
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
 
-    const sampleNameInput = (await screen.findByPlaceholderText(
-      'Corpus_sampled_fr_0_4_rs_7',
-    )) as HTMLInputElement;
+    const sampleNameInput = await screen.findByPlaceholderText<HTMLInputElement>('Corpus_sampled_fr_0_4_rs_7');
     const addButton = within(samplePanel).getByRole('button', { name: 'Add to Workspace' });
 
     sampleNameInput.focus();

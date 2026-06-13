@@ -57,12 +57,14 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
   };
 
   return {
-    previewData: data?.preview || [],
-    columns: data?.columns || (data?.preview?.[0] ? Object.keys(data.preview[0]) : []),
+    previewData: data?.preview ?? [],
+    columns: data?.columns ?? (data?.preview[0] ? Object.keys(data.preview[0]) : []),
     totalRows: data?.total_rows ?? 0,
+    // file_type is a required non-empty backend type identifier; '' should fall back to null
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     fileType: data?.file_type || null,
-    sheetNames: data?.sheet_names || null,
-    supportedTypes: data?.supported_types || [],
+    sheetNames: data?.sheet_names ?? null,
+    supportedTypes: data?.supported_types ?? [],
     selectedSheet: selectedSheet ?? data?.selected_sheet ?? null,
     setSelectedSheet,
     page,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { hintRegistry } from '../hintRegistry';
-import type { HintConditionId, HintDefinition } from '../types';
+import type { HintConditionId } from '../types';
 
 /**
  * Sanity tests for the hint registry. The registry is otherwise dead code
@@ -50,7 +50,7 @@ describe('hintRegistry', () => {
   });
 
   it('every entry has either an anchorHintId or a resolveAnchor', () => {
-    for (const hint of hintRegistry as HintDefinition[]) {
+    for (const hint of hintRegistry) {
       const ok = !!hint.anchorHintId || typeof hint.resolveAnchor === 'function';
       expect(ok, `Hint "${hint.id}" needs anchorHintId or resolveAnchor`).toBe(true);
     }

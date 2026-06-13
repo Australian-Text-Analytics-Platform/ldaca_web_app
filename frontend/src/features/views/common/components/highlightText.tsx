@@ -8,7 +8,7 @@ import React from 'react';
  */
 export const highlightMatchInText = (
   textValue: string,
-  ranges: Array<{ start: unknown; end: unknown }>,
+  ranges: { start: unknown; end: unknown }[],
   fallbackMatch?: string,
   fallbackCaseSensitive?: boolean,
 ): React.ReactNode => {
@@ -58,7 +58,7 @@ export const highlightMatchInText = (
     return textValue;
   }
 
-  const mergedRanges: Array<{ start: number; end: number }> = [];
+  const mergedRanges: { start: number; end: number }[] = [];
   normalizedRanges.forEach((range) => {
     const previous = mergedRanges[mergedRanges.length - 1];
     if (!previous || range.start > previous.end) {
@@ -73,14 +73,14 @@ export const highlightMatchInText = (
   mergedRanges.forEach((range, index) => {
     if (cursor < range.start) {
       children.push(
-        <React.Fragment key={`plain-${index}`}>
+        <React.Fragment key={`plain-${String(index)}`}>
           {textValue.slice(cursor, range.start)}
         </React.Fragment>,
       );
     }
     children.push(
       <mark
-        key={`mark-${range.start}-${range.end}`}
+        key={`mark-${String(range.start)}-${String(range.end)}`}
         className="bg-yellow-200 text-gray-900 rounded px-1"
       >
         {textValue.slice(range.start, range.end)}

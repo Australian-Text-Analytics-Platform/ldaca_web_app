@@ -118,7 +118,7 @@ export const buildFilterAutoNodeName = ({
   conditions: FilterConditionWithId[];
   logic: string;
 }): string => {
-  const base = (baseName || '').trim() || DEFAULT_NAME_FALLBACK;
+  const base = (baseName ?? '').trim() || DEFAULT_NAME_FALLBACK;
   const completeConditions = conditions.filter(isConditionComplete);
 
   if (completeConditions.length === 0) {
@@ -155,28 +155,28 @@ export const buildSamplingAutoNodeName = ({
   noRandomSeed?: boolean;
   isFullShuffle?: boolean;
 }): string => {
-  const base = (baseName || '').trim() || DEFAULT_NAME_FALLBACK;
+  const base = (baseName ?? '').trim() || DEFAULT_NAME_FALLBACK;
 
   if (mode === 'slice') {
     const start =
       Number.isInteger(offset) && (offset ?? 0) >= 0 ? (offset ?? 0) : DEFAULT_SLICE_OFFSET;
 
     if (!Number.isInteger(length) || length === undefined) {
-      return `${base}_sliced_from_${start}`;
+      return `${base}_sliced_from_${String(start)}`;
     }
 
     if (length <= 0) {
-      return `${base}_sliced_from_${start}_length_${length}`;
+      return `${base}_sliced_from_${String(start)}_length_${String(length)}`;
     }
 
     const end = start + length - 1;
-    return `${base}_sliced_from_${start}_to_${end}`;
+    return `${base}_sliced_from_${String(start)}_to_${String(end)}`;
   }
 
   const seedToken = noRandomSeed
     ? '_true_random'
     : typeof randomSeed === 'number' && Number.isInteger(randomSeed) && randomSeed >= 0
-      ? `_rs_${randomSeed}`
+      ? `_rs_${String(randomSeed)}`
       : '';
 
   if (isFullShuffle) {
@@ -204,6 +204,6 @@ export const buildExpressionAutoNodeName = ({
   baseName: string | null | undefined;
   context: keyof typeof EXPRESSION_CONTEXT_SUFFIX;
 }): string => {
-  const base = (baseName || '').trim() || DEFAULT_NAME_FALLBACK;
+  const base = (baseName ?? '').trim() || DEFAULT_NAME_FALLBACK;
   return `${base}_${EXPRESSION_CONTEXT_SUFFIX[context]}`;
 };

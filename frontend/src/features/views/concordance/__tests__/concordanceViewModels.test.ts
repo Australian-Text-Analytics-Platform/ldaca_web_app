@@ -78,7 +78,7 @@ describe('concordanceViewModels', () => {
 
 describe('buildCombinedSlice', () => {
   const makeSlice = (
-    rows: Array<Array<Record<string, unknown>>>,
+    rows: Record<string, unknown>[][],
     overrides: Partial<ConcordanceNodeResult> = {},
   ): ConcordanceNodeResult => ({
     columns: ['CONC_matched_text', 'speaker'],

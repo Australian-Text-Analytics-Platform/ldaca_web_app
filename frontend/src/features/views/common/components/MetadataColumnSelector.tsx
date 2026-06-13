@@ -12,7 +12,7 @@ import {
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { normalizeMetadataColumns } from './metadataColumnSelection';
 
-export type MetadataColumnSection = {
+export interface MetadataColumnSection {
   columns: string[];
   /**
    * Optional foreground colour applied to the items in this section. When
@@ -28,9 +28,9 @@ export type MetadataColumnSection = {
    * combined table.
    */
   disabled?: boolean;
-};
+}
 
-type MetadataColumnSelectorProps = {
+interface MetadataColumnSelectorProps {
   availableColumns: string[];
   selectedColumns: string[];
   onSelectedColumnsChange: (columns: string[]) => void;
@@ -49,7 +49,7 @@ type MetadataColumnSelectorProps = {
    * intersecting metadata columns.
    */
   disabledReason?: string;
-};
+}
 
 /**
  * Renders the shared metadata-column dropdown used by analysis result tables to
@@ -75,7 +75,7 @@ export function MetadataColumnSelector({
   const selectableColumns = useSections
     ? Array.from(
         new Set(
-          sections!
+          sections
             .filter((s) => !s.disabled)
             .flatMap((s) => normalizeMetadataColumns(s.columns))
             .filter((c) => normalizedAvailableColumns.includes(c)),
@@ -124,7 +124,7 @@ export function MetadataColumnSelector({
             // "Select all" only operates on selectable columns; selections
             // already in disabled sections are preserved untouched.
             onCheckedChange={(checked) => {
-              if (checked === true) {
+              if (checked) {
                 onSelectedColumnsChange(
                   normalizeMetadataColumns([...normalizedSelectedColumns, ...selectableColumns]),
                 );
@@ -134,29 +134,29 @@ export function MetadataColumnSelector({
                 );
               }
             }}
-            onSelect={(event) => event.preventDefault()}
+            onSelect={(event) => { event.preventDefault(); }}
             disabled={selectableColumns.length === 0}
           >
             Select all
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           {useSections
-            ? sections!.flatMap((section, sectionIdx) => {
+            ? sections.flatMap((section, sectionIdx) => {
                 const items = normalizeMetadataColumns(section.columns).filter((column) =>
                   normalizedAvailableColumns.includes(column),
                 );
                 if (items.length === 0) return [];
                 const out: React.ReactNode[] = [];
                 if (sectionIdx > 0) {
-                  out.push(<DropdownMenuSeparator key={`sep-${sectionIdx}`} />);
+                  out.push(<DropdownMenuSeparator key={`sep-${String(sectionIdx)}`} />);
                 }
                 items.forEach((column) => {
                   out.push(
                     <DropdownMenuCheckboxItem
-                      key={`${sectionIdx}-${column}`}
+                      key={`${String(sectionIdx)}-${column}`}
                       checked={normalizedSelectedColumns.includes(column)}
-                      onCheckedChange={(checked) => toggleColumn(column, checked === true)}
-                      onSelect={(event) => event.preventDefault()}
+                      onCheckedChange={(checked) => { toggleColumn(column, checked); }}
+                      onSelect={(event) => { event.preventDefault(); }}
                       disabled={section.disabled}
                       style={section.color ? { color: section.color } : undefined}
                     >
@@ -170,8 +170,8 @@ export function MetadataColumnSelector({
                 <DropdownMenuCheckboxItem
                   key={column}
                   checked={normalizedSelectedColumns.includes(column)}
-                  onCheckedChange={(checked) => toggleColumn(column, checked === true)}
-                  onSelect={(event) => event.preventDefault()}
+                  onCheckedChange={(checked) => { toggleColumn(column, checked); }}
+                  onSelect={(event) => { event.preventDefault(); }}
                 >
                   {column}
                 </DropdownMenuCheckboxItem>

@@ -74,7 +74,7 @@ export const useSequentialResultSummary = (
   fallbacks: Fallbacks,
 ): SequentialResultSummary =>
   useMemo(() => {
-    const params = (results?.analysis_params ?? {}) as Record<string, unknown>;
+    const params = (results?.analysis_params ?? {});
 
     const timeColumn = (params.time_column as string | undefined) ?? fallbacks.timeColumn;
     const groupBy = (params.group_by_columns as string[] | undefined) ?? fallbacks.groupBy;
@@ -106,7 +106,7 @@ export const useSequentialResultSummary = (
         ? 'Numeric bins'
         : rawFrequency === 'custom'
           ? customIntervalValue && customIntervalUnit
-            ? `Every ${customIntervalValue} ${customIntervalUnit}`
+            ? `Every ${String(customIntervalValue)} ${customIntervalUnit}`
             : 'Custom interval'
           : rawFrequency;
 

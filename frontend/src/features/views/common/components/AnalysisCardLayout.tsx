@@ -7,13 +7,13 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 import { Loader2, Play, Square, Trash2 } from 'lucide-react';
 
-type HelpConfig = {
+interface HelpConfig {
   targetKey: string;
   label?: string;
   tooltip?: string;
-};
+}
 
-type AnalysisCardLayoutProps = {
+interface AnalysisCardLayoutProps {
   title: React.ReactNode;
   info?: HelpConfig;
   help?: HelpConfig;
@@ -40,7 +40,7 @@ type AnalysisCardLayoutProps = {
   children: React.ReactNode;
   footer?: React.ReactNode;
   cardRef?: React.RefObject<HTMLDivElement | null>;
-};
+}
 
 /**
  * Provides the shared card chrome for analysis feature panels, including help
@@ -119,9 +119,10 @@ export function AnalysisCardLayout({
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => {
-                  void actions.onStop!();
+                  void actions.onStop?.();
                 }}
                 variant="outline"
+                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean OR: disabled when either flag is true
                 disabled={actions.stopDisabled || actions.isStopping}
               >
                 {actions.isStopping ? (

@@ -143,7 +143,7 @@ const SequentialAnalysisFeature = ({
   const selectedNode = nodeInputs.resolvedNodes[0]?.node ?? null;
   const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
   const applyInputsFromSelections = (
-    selections: Array<{ nodeId: string; column?: string | null }>,
+    selections: { nodeId: string; column?: string | null }[],
   ) => {
     onTabInputsChange?.(
       selections
@@ -197,9 +197,9 @@ const SequentialAnalysisFeature = ({
     useSchemaManagement({
       nodeId: activeNodeId,
       isLocked: false,
-      workspaceId: currentWorkspaceId || undefined,
+      workspaceId: currentWorkspaceId ?? undefined,
       getAuthHeaders,
-      nodeData: nodeData ?? undefined,
+      nodeData,
       selectedNode: selectedNode ?? undefined,
     });
 
@@ -260,26 +260,19 @@ const SequentialAnalysisFeature = ({
     // Applies freshly fetched task results to chart state after lifecycle polling completes.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onResultFetched: (resultData) => {
-      if (!resultData) return;
       setDetachNodeName('');
       setSelectedPeriodIndices(new Set());
       lastClickedIndexRef.current = null;
       const resolvedChartType = isChartTypeOption(
-        (resultData as Record<string, unknown>)?.chart_type,
+        (resultData).chart_type,
       )
-        ? ((resultData as Record<string, unknown>).chart_type as ChartTypeOption)
+        ? ((resultData).chart_type)
         : chartType;
       setResultSafely({
-        ...(resultData as Record<string, unknown>),
+        ...(resultData),
         analysis_params: {
-          ...(((results as Record<string, unknown> | null)?.analysis_params as Record<
-            string,
-            unknown
-          >) ?? {}),
-          ...(((resultData as Record<string, unknown>)?.analysis_params as Record<
-            string,
-            unknown
-          >) ?? {}),
+          ...(((results)?.analysis_params) ?? {}),
+          ...(((resultData).analysis_params) ?? {}),
         },
         chart_type: resolvedChartType,
       });
@@ -294,12 +287,12 @@ const SequentialAnalysisFeature = ({
       lastClickedIndexRef.current = null;
       const hydratedParams = hydratedParamsRef.current;
       const enriched = {
-        ...(resultPayload as Record<string, unknown>),
+        ...(resultPayload),
         analysis_params: {
-          ...(((resultPayload as Record<string, unknown>)?.analysis_params as Record<
+          ...((resultPayload).analysis_params as Record<
             string,
             unknown
-          >) ?? {}),
+          >),
           ...(hydratedParams
             ? {
                 group_by_columns: hydratedParams.groupByColumns,
@@ -316,9 +309,9 @@ const SequentialAnalysisFeature = ({
         },
       };
       const resolvedChartType = isChartTypeOption(
-        (resultPayload as Record<string, unknown>)?.chart_type,
+        (resultPayload).chart_type,
       )
-        ? ((resultPayload as Record<string, unknown>).chart_type as ChartTypeOption)
+        ? ((resultPayload).chart_type)
         : chartType;
       setResults({ ...enriched, chart_type: resolvedChartType });
       setChartType(resolvedChartType);
@@ -326,13 +319,13 @@ const SequentialAnalysisFeature = ({
     // Restores sequential request parameters, selection lock, and schema after reload.
     // Called by: useAnalysisFeature hydration because Trends restores must rebuild time-column selection, bucket settings, grouping columns, and case handling from the submitted request. Flow: unwrap request data, apply numeric or datetime controls, restore node/group selections, then release hydration state.
     onHydratedRequest: async (requestPayload) => {
-      const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<
+      const req = ((requestPayload as Record<string, unknown>).data ?? requestPayload) as Record<
         string,
         unknown
       > | null;
       if (!req) return;
       setHydratingSelection(true);
-      const nodeIdStr = String(req.node_id || req.nodeId || '');
+      const nodeIdStr = (req.node_id ?? req.nodeId ?? '') as string;
       const reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
       const reqColumnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
       const lockedNumericOrigin =
@@ -384,13 +377,13 @@ const SequentialAnalysisFeature = ({
         typeof req.custom_interval_value === 'number' &&
         Number.isInteger(req.custom_interval_value) &&
         req.custom_interval_value > 0
-          ? (req.custom_interval_value as number)
+          ? (req.custom_interval_value)
           : null;
       const lockedCustomIntervalUnit =
         reqColumnType === 'datetime' &&
         lockedFrequency === 'custom' &&
         isCustomIntervalUnit(req.custom_interval_unit)
-          ? (req.custom_interval_unit as SequentialCustomIntervalUnit)
+          ? (req.custom_interval_unit)
           : null;
       if (lockedFrequency === 'custom' && reqColumnType === 'datetime') {
         setCustomIntervalValueInput(
@@ -460,7 +453,7 @@ const SequentialAnalysisFeature = ({
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getExtraTaskIdCandidates: () =>
       [
-        (resultRef.current as Record<string, unknown> | null)?.metadata as
+        (resultRef.current)?.metadata as
           | Record<string, unknown>
           | undefined,
       ].map((m) => m?.task_id as string | undefined),
@@ -468,7 +461,7 @@ const SequentialAnalysisFeature = ({
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getClearTaskIdSources: () =>
       [
-        (resultRef.current as Record<string, unknown> | null)?.metadata as
+        (resultRef.current)?.metadata as
           | Record<string, unknown>
           | undefined,
       ].map((m) => m?.task_id as string | undefined),
@@ -512,7 +505,7 @@ const SequentialAnalysisFeature = ({
 
   const activeColumnInfo = timeCompatibleColumns.find((column) => column.name === activeTimeColumn);
   const activeColumnType = normalizeTypeName(
-    activeColumnInfo?.dataType || (timeCompatibleColumns[0]?.dataType ?? 'datetime'),
+    activeColumnInfo?.dataType ?? (timeCompatibleColumns[0]?.dataType ?? 'datetime'),
   );
   const derivedColumnType: 'datetime' | 'numeric' =
     NUMERIC_TYPE_SET.has(activeColumnType) ? 'numeric' : 'datetime';
@@ -528,7 +521,7 @@ const SequentialAnalysisFeature = ({
     ? customIntervalUnit
     : null;
 
-  const lastRunRequest = (serverRequest as Record<string, unknown> | null) ?? null;
+  const lastRunRequest = (serverRequest) ?? null;
   const currentSequentialParams = {
     frequency,
     group_by_columns: normalizeStringArray(groupByColumns),
@@ -557,17 +550,19 @@ const SequentialAnalysisFeature = ({
           : null,
       custom_interval_value:
         serverIsCustomDatetime && typeof request.custom_interval_value === 'number'
-          ? Number(request.custom_interval_value)
+          ? request.custom_interval_value
           : null,
       custom_interval_unit:
         serverIsCustomDatetime && isCustomIntervalUnit(request.custom_interval_unit)
-          ? (request.custom_interval_unit as SequentialCustomIntervalUnit)
+          ? (request.custom_interval_unit)
           : null,
       case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true,
     };
   };
-  const serverNodeId = lastRunRequest ? String(lastRunRequest.node_id || lastRunRequest.nodeId || '') : '';
-  const serverColumn = lastRunRequest ? String(lastRunRequest.time_column || '') : '';
+  const serverNodeId = lastRunRequest
+    ? ((lastRunRequest.node_id ?? lastRunRequest.nodeId ?? '') as string)
+    : '';
+  const serverColumn = lastRunRequest ? ((lastRunRequest.time_column ?? '') as string) : '';
   const hasLastRun = Boolean(lastRunRequest);
   const hasParamsChanged = !lastRunRequest
     ? true
@@ -590,10 +585,13 @@ const SequentialAnalysisFeature = ({
   useEffect(() => {
     if (hydratingSelection) return;
     const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
+    // Empty selected/option column names must fall through to the next source, so
+    // logical-OR (not nullish) is intentional here.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const nextColumn = selection?.column || timeColumnOptions[0] || '';
     if (nextColumn && nextColumn !== timeColumn) {
-      const id = requestAnimationFrame(() => setTimeColumn(nextColumn));
-      return () => cancelAnimationFrame(id);
+      const id = requestAnimationFrame(() => { setTimeColumn(nextColumn); });
+      return () => { cancelAnimationFrame(id); };
     }
   }, [hydratingSelection, activeNodeId, timeColumnOptions, nodeColumnSelections, timeColumn]);
 
@@ -673,7 +671,7 @@ const SequentialAnalysisFeature = ({
       setResults,
       setChartType,
       setLocalTaskId,
-      setNodeColumnSelections: (selections) => applyInputsFromSelections(selections),
+      setNodeColumnSelections: (selections) => { applyInputsFromSelections(selections); },
       setTimeColumn,
       lockCurrentSchema,
       resolveTaskId,
@@ -768,7 +766,7 @@ const SequentialAnalysisFeature = ({
   });
 
   const rawResultRows = Array.isArray(results?.data)
-    ? (results.data as Array<Record<string, unknown>>)
+    ? (results.data as Record<string, unknown>[])
     : [];
 
   const effectiveGroupBy = summaryGroupBy;
@@ -777,7 +775,7 @@ const SequentialAnalysisFeature = ({
    * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
    */
   const foldGroupValue = (raw: unknown): string => {
-    const str = raw == null ? '' : String(raw);
+    const str = String((raw as string | number | boolean | null | undefined) ?? '');
     return str;
   };
 
@@ -833,7 +831,7 @@ const SequentialAnalysisFeature = ({
 
   const selectedTimeBucketKeys = new Set(
     Array.from(selectedPeriodIndices)
-      .map((index) => String(chartData[index]?.time_period ?? ''))
+      .map((index) => String((chartData[index]?.time_period as string | number | undefined) ?? ''))
       .filter((value) => value.length > 0),
   );
 
@@ -841,7 +839,7 @@ const SequentialAnalysisFeature = ({
   /**
    * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
    */
-  const sumSequentialDocs = (rows: Array<Record<string, unknown>>) =>
+  const sumSequentialDocs = (rows: Record<string, unknown>[]) =>
     rows.reduce((total, row) => {
       const count = row.sequential_count;
       return total + (typeof count === 'number' ? count : Number(count ?? 0));
@@ -886,14 +884,14 @@ const SequentialAnalysisFeature = ({
     const header: ChartExportHeaderItem[] = [
       { label: 'Data Block', value: nodeName },
       { label: 'Time Column', value: summaryTimeColumn || '—' },
-      { label: 'Frequency', value: summaryFrequency ?? '—' },
-      { label: 'Total', value: `${totalPointCount}/${totalDocumentCount}` },
-      { label: 'Shown', value: `${shownPointCount}/${shownDocumentCount}` },
-      { label: 'Chosen', value: `${chosenPointCount}/${chosenDocumentCount}` },
+      { label: 'Frequency', value: summaryFrequency },
+      { label: 'Total', value: `${String(totalPointCount)}/${String(totalDocumentCount)}` },
+      { label: 'Shown', value: `${String(shownPointCount)}/${String(shownDocumentCount)}` },
+      { label: 'Chosen', value: `${String(chosenPointCount)}/${String(chosenDocumentCount)}` },
       { label: 'Groups', value: summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None' },
     ];
     const legend: ChartExportLegendItem[] = groupKeys.map((key, idx) => ({
-      label: (chartConfig[key]?.label as string | undefined) ?? key,
+      label: (chartConfig[key]?.label) ?? key,
       color: chartConfig[key]?.color ?? getPaletteColor(idx) ?? '#888888',
       type: chartType === 'line' ? 'line' : chartType === 'bar' ? 'bar' : 'area',
       hidden: hiddenKeys.has(key),
@@ -1029,7 +1027,7 @@ const SequentialAnalysisFeature = ({
           }}
           xAxisType={xAxisType}
           onXAxisTypeChange={setXAxisType}
-          onDownloadClick={() => setDownloadDialogOpen(true)}
+          onDownloadClick={() => { setDownloadDialogOpen(true); }}
           chartData={chartData}
           chartConfig={chartConfig}
           groupKeys={groupKeys}

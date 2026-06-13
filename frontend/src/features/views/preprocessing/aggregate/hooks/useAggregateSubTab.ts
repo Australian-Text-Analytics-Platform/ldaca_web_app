@@ -41,7 +41,7 @@ export type BasicToken =
   | { id: string; kind: 'column'; column: string; dtype: string; operations: string[] }
   | { id: string; kind: 'custom'; value: string };
 
-export type DropIndicator = { tokenId: string; position: 'before' | 'after' };
+export interface DropIndicator { tokenId: string; position: 'before' | 'after' }
 
 export type DragPayload =
   | { source: 'palette'; kind: 'column'; column: string; dtype: string }
@@ -73,7 +73,7 @@ export interface AggregateSubTabProps {
 
 export interface NodeSelectionConfig {
   effectiveNodes: WorkspaceNodeLike[];
-  nodeColumnSelections: Array<{ nodeId: string; column: string }>;
+  nodeColumnSelections: { nodeId: string; column: string }[];
   nodeColors: Record<string, string>;
   defaultPalette: string[];
   originalCount: number;
@@ -193,12 +193,14 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   } = props;
 
   const effectiveNodes = (() => {
-    if (selectedNodes?.length) {
+    if (selectedNodes.length) {
       return takeMostRecent(selectedNodes, 1);
     }
     if (selectedNodeId) {
       const fallback = workspaceNodes.find((node, idx) => {
-        const identifier = node.id || node.node_id || `node-${idx}`;
+        // Empty-string ids fall through to the next candidate, so keep `||`.
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+        const identifier = node.id || node.node_id || `node-${String(idx)}`;
         return identifier === selectedNodeId;
       });
       if (fallback) {
@@ -209,8 +211,10 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   })();
 
   const limitedNodeId = (() => {
-    if (!effectiveNodes.length) return null;
-    const first = effectiveNodes[0]!;
+    const first = effectiveNodes[0];
+    if (!first) return null;
+    // Empty-string ids fall through to the next candidate, so keep `||`.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     return first.id || first.node_id || null;
   })();
 
@@ -235,7 +239,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const workspaceNodeMap = (() => {
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node, idx) => {
-      const id = node.id || node.node_id || `node-${idx}`;
+      // Empty-string ids fall through to the next candidate, so keep `||`.
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      const id = node.id || node.node_id || `node-${String(idx)}`;
       if (id) map.set(id, node);
     });
     return map;
@@ -627,6 +633,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       if (!raw) return null;
       try {
         const candidate = JSON.parse(raw) as DragPayload;
+        // candidate is untrusted JSON.parse output, so validate it is an object.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         return candidate && typeof candidate === 'object' ? candidate : null;
       } catch {
         return null;
@@ -634,6 +642,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     };
 
     const dt = event.dataTransfer;
+    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (dt) {
       const BASIC_TOKEN_MIME = 'application/x-ldaca-builder-token';
       const direct = decode(dt.getData(BASIC_TOKEN_MIME));
@@ -693,6 +703,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       return;
     }
     const dt = event.dataTransfer;
+    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!dt) return;
     const payload: DragPayload = { source: 'palette', kind: 'column', column, dtype };
     lastDragPayloadRef.current = payload;
@@ -711,6 +723,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       return;
     }
     const dt = event.dataTransfer;
+    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!dt) return;
     const payload: DragPayload = { source: 'palette', kind: 'custom' };
     lastDragPayloadRef.current = payload;
@@ -737,6 +751,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       finishCustomEdit(true);
     }
     const dt = event.dataTransfer;
+    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!dt) return;
     const payload: DragPayload = { source: 'existing', id: tokenId };
     lastDragPayloadRef.current = payload;
@@ -784,6 +800,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     if (basicDisabled) return;
     event.preventDefault();
     const dt = event.dataTransfer;
+    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (dt) {
       dt.dropEffect = dt.effectAllowed === 'move' ? 'move' : 'copy';
     }
@@ -831,6 +849,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     if (payload.source === 'palette') {
       if (payload.kind === 'column') {
         addColumnToken(payload.column, payload.dtype, insertIndex);
+        // payload comes from untrusted JSON.parse; keep the explicit kind check.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       } else if (payload.kind === 'custom') {
         addCustomToken(insertIndex);
       }
@@ -838,6 +858,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       return;
     }
 
+    // payload comes from untrusted JSON.parse; keep the explicit source check.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (payload.source === 'existing') {
       moveBasicToken(payload.id, insertIndex);
     }
@@ -917,10 +939,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const nodeColumnSelections = limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : [];
 
-  const nodeColors = (limitedNodeId ? { [limitedNodeId]: SINGLE_NODE_PALETTE[0]! } : {}) as Record<
-    string,
-    string
-  >;
+  const nodeColors = (limitedNodeId
+    ? // SINGLE_NODE_PALETTE is a non-empty module constant, so index 0 exists.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      { [limitedNodeId]: SINGLE_NODE_PALETTE[0]! }
+    : {}) as Record<string, string>;
 
   return {
     activeNodeId,
@@ -930,7 +953,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       nodeColumnSelections,
       nodeColors,
       defaultPalette: SINGLE_NODE_PALETTE,
-      originalCount: selectedNodes?.length ?? 0,
+      originalCount: selectedNodes.length,
     },
     expression: {
       expression,

@@ -28,6 +28,22 @@ const getNumericIndex = (value: unknown): number | null => {
   return null;
 };
 
+/**
+ * Coerce an unknown concordance cell value to a display string.
+ *
+ * Behaves exactly like the historical ``String(value ?? '')`` call sites
+ * (null/undefined → '', primitives stringified) but keeps the result typed as
+ * ``string`` so the strict template/stringification lints pass. The cast is to
+ * a primitive union, so runtime coercion is byte-identical to the old code for
+ * every input — concordance cells are scalars in practice.
+ *
+ * Used by: ConcordanceDispersionCell.tsx, ConcordanceDispersionNodeBlock.tsx,
+ * ConcordanceTableNodeBlock.tsx and this module because every hit/metadata cell
+ * renders an unknown Polars value as text.
+ */
+export const toCellText = (value: unknown): string =>
+  String((value as string | number | boolean | null | undefined) ?? '');
+
 /** Flattens grouped concordance hits for the standard table-oriented view. */
 /**
  * Used by: concordanceViewModels.test.ts, ConcordanceTableNodeBlock.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
@@ -62,8 +78,8 @@ export function buildCombinedSlice(
   page: number,
   pageSize: number,
 ): ConcordanceNodeResult {
-  const leftRows = leftSlice.data ?? [];
-  const rightRows = rightSlice.data ?? [];
+  const leftRows = leftSlice.data;
+  const rightRows = rightSlice.data;
 
   const interleaved: ConcordanceNodeResult['data'] = [];
   let li = 0;
@@ -71,35 +87,41 @@ export function buildCombinedSlice(
   let useLeft = true;
   while (li < leftRows.length || ri < rightRows.length) {
     if (useLeft) {
-      if (li < leftRows.length) {
-        interleaved.push(leftRows[li]!);
+      const leftRow = leftRows[li];
+      if (leftRow !== undefined) {
+        interleaved.push(leftRow);
         li += 1;
-      } else if (ri < rightRows.length) {
-        interleaved.push(rightRows[ri]!);
-        ri += 1;
-        useLeft = !useLeft;
-        continue;
       } else {
+        const rightRow = rightRows[ri];
+        if (rightRow !== undefined) {
+          interleaved.push(rightRow);
+          ri += 1;
+          useLeft = !useLeft;
+          continue;
+        }
         break;
       }
     } else {
-      if (ri < rightRows.length) {
-        interleaved.push(rightRows[ri]!);
+      const rightRow = rightRows[ri];
+      if (rightRow !== undefined) {
+        interleaved.push(rightRow);
         ri += 1;
-      } else if (li < leftRows.length) {
-        interleaved.push(leftRows[li]!);
-        li += 1;
-        useLeft = !useLeft;
-        continue;
       } else {
+        const leftRow = leftRows[li];
+        if (leftRow !== undefined) {
+          interleaved.push(leftRow);
+          li += 1;
+          useLeft = !useLeft;
+          continue;
+        }
         break;
       }
     }
     useLeft = !useLeft;
   }
 
-  const leftColumns = leftSlice.columns ?? [];
-  const rightColumns = rightSlice.columns ?? [];
+  const leftColumns = leftSlice.columns;
+  const rightColumns = rightSlice.columns;
   let columns: string[] = leftColumns.length > 0 ? leftColumns : rightColumns;
   if (leftColumns.length > 0 && rightColumns.length > 0) {
     columns = Array.from(new Set([...leftColumns, ...rightColumns]));
@@ -109,7 +131,9 @@ export function buildCombinedSlice(
   const rightPag = rightSlice.pagination;
   const totalSourceRows = Math.max(leftPag.total_source_rows, rightPag.total_source_rows);
   const totalSourcePages = Math.max(leftPag.total_source_pages, rightPag.total_source_pages);
-  const resolvedPageSize = leftPag.page_size || rightPag.page_size || pageSize;
+  const resolvedPageSize =
+    leftPag.page_size || rightPag.page_size || pageSize;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string sort_by means "unsorted" and must fall back to the other node, then null
   const effectiveSortBy = leftSlice.sorting.sort_by || rightSlice.sorting.sort_by || null;
 
   return {
@@ -146,7 +170,10 @@ export function buildDispersionRows(groups: ConcordanceGroupedRow[]): Concordanc
       return [];
     }
 
-    const firstHit = group[0]!;
+    const firstHit = group[0];
+    if (firstHit === undefined) {
+      return [];
+    }
     const metadataEntries = Object.entries(firstHit).filter(([key]) => !CORE_COLUMN_SET.has(key));
     return [
       {
@@ -212,7 +239,7 @@ export type DispersionBinDatum = {
   binCenter: number;
 } & Record<string, number>;
 
-export type BuildDispersionBinsOptions = {
+export interface BuildDispersionBinsOptions {
   lowercaseMatches?: boolean;
   splitBySource?: boolean;
   /**
@@ -221,7 +248,7 @@ export type BuildDispersionBinsOptions = {
    * matches" — the plot shows a single overall distribution line.
    */
   aggregateAll?: boolean;
-};
+}
 
 /** Series key used when {@link BuildDispersionBinsOptions.aggregateAll} is true. */
 export const DISPERSION_AGGREGATE_KEY = '__dispersion_total__';
@@ -238,16 +265,16 @@ const fillEmptyBins = (bins: DispersionBinDatum[], totalsByKey: Record<string, n
   const keys = Object.keys(totalsByKey);
   for (const bin of bins) {
     for (const key of keys) {
-      if (bin[key] === undefined) bin[key] = 0;
+      bin[key] ??= 0;
     }
   }
 };
 
-export type BuildDispersionBinsResult = {
+export interface BuildDispersionBinsResult {
   bins: DispersionBinDatum[];
   totalsByKey: Record<string, number>;
   sources: string[];
-};
+}
 
 /** Builds normalized hit-count bins from raw grouped rows for client-side previews. */
 /**
@@ -272,22 +299,23 @@ export function buildDispersionBins(
   for (const row of rows) {
     const docLength = getDispersionTextLength(row, textColumn);
     if (docLength <= 0) continue;
-    const rowSource = String(row.__source_node ?? '');
+    const rowSource = toCellText(row.__source_node);
     const hits = getDispersionHits(row);
     for (const hit of hits) {
       const startIdx = getNumericIndex(hit[CONCORDANCE_COLUMN_KEYS.startIdx]);
       if (startIdx === null) continue;
       const ratio = Math.min(0.99999, startIdx / docLength);
       const binIdx = Math.min(safeBinCount - 1, Math.max(0, Math.floor(ratio * safeBinCount)));
-      const rawText = String(hit[CONCORDANCE_COLUMN_KEYS.matchedText] ?? '');
+      const rawText = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);
       if (!rawText) continue;
       const text = lowercaseMatches ? rawText.toLowerCase() : rawText;
-      const source = rowSource || String(hit.__source_node ?? '');
+      const source = rowSource || toCellText(hit.__source_node);
       if (source) sourceSet.add(source);
       const baseKey = aggregateAll ? DISPERSION_AGGREGATE_KEY : text;
       const seriesKey =
         splitBySource && source ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${source}` : baseKey;
-      const bin = bins[binIdx]!;
+      const bin = bins[binIdx];
+      if (bin === undefined) continue;
       bin[seriesKey] = (bin[seriesKey] ?? 0) + 1;
       totalsByKey[seriesKey] = (totalsByKey[seriesKey] ?? 0) + 1;
     }
@@ -354,16 +382,17 @@ export function buildDispersionBinsFromBinned(
     if (sourceBinIdx < 0 || sourceBinIdx >= DISPERSION_SERVER_BIN_COUNT) continue;
     const count = typeof row.count === 'number' && Number.isFinite(row.count) ? row.count : 0;
     if (count <= 0) continue;
-    const rawText = String(row.matched_text ?? '');
+    const rawText = row.matched_text ?? '';
     if (!rawText) continue;
     const text = lowercaseMatches ? rawText.toLowerCase() : rawText;
-    const source = String(row.__source_node ?? '');
+    const source = row.__source_node ?? '';
     if (source) sourceSet.add(source);
     const displayIdx = Math.min(targetCount - 1, Math.floor(sourceBinIdx / step));
     const baseKey = aggregateAll ? DISPERSION_AGGREGATE_KEY : text;
     const seriesKey =
       splitBySource && source ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${source}` : baseKey;
-    const bin = bins[displayIdx]!;
+    const bin = bins[displayIdx];
+    if (bin === undefined) continue;
     bin[seriesKey] = (bin[seriesKey] ?? 0) + count;
     totalsByKey[seriesKey] = (totalsByKey[seriesKey] ?? 0) + count;
   }
@@ -391,7 +420,7 @@ export function buildDispersionBinsFromBinned(
  * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
  */
 export function formatBinIndicesAsRangeLabel(
-  binIndices: ReadonlySet<number> | ReadonlyArray<number>,
+  binIndices: ReadonlySet<number> | readonly number[],
   binCount: number,
 ): string {
   const arr = Array.from(binIndices);
@@ -399,16 +428,20 @@ export function formatBinIndicesAsRangeLabel(
   const safeBinCount = Math.max(1, Math.floor(binCount));
   const width = 100 / safeBinCount;
   const sorted = [...arr].sort((a, b) => a - b);
-  const spans: Array<[number, number]> = [];
-  let start = sorted[0]!;
-  let end = sorted[0]!;
+  const spans: [number, number][] = [];
+  const [firstBin] = sorted;
+  if (firstBin === undefined) return '';
+  let start = firstBin;
+  let end = firstBin;
   for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i] === end + 1) {
-      end = sorted[i]!;
+    const current = sorted[i];
+    if (current === undefined) continue;
+    if (current === end + 1) {
+      end = current;
     } else {
       spans.push([start, end]);
-      start = sorted[i]!;
-      end = sorted[i]!;
+      start = current;
+      end = current;
     }
   }
   spans.push([start, end]);
@@ -417,7 +450,7 @@ export function formatBinIndicesAsRangeLabel(
     if (width >= 2) {
       const lower = s === 0 ? 0 : Math.round(s * width) + 1;
       const upper = Math.round((e + 1) * width);
-      return `${lower}-${upper}%`;
+      return `${String(lower)}-${String(upper)}%`;
     }
     const lower = s * width;
     const upper = (e + 1) * width;

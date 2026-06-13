@@ -15,15 +15,15 @@ import { TokenFrequencyUnifiedTokenSection } from '../results/TokenFrequencyUnif
 
 type ResultsView = 'cloud' | 'list';
 
-type RunningTask = {
+interface RunningTask {
   task_id: string;
   state?: string;
   message?: string;
   progress?: number;
   progress_message?: string;
-};
+}
 
-type TokenFrequencyResultsPanelProps = {
+interface TokenFrequencyResultsPanelProps {
   results: TokenFrequencyResponse | null;
   isRunning: boolean;
   runningTask?: RunningTask | null;
@@ -66,7 +66,7 @@ type TokenFrequencyResultsPanelProps = {
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
 
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
-};
+}
 
 /**
  * Rendered by: TokenFrequencyFeature to show running status, controls, and token-frequency result sections because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
@@ -202,6 +202,7 @@ export const TokenFrequencyResultsPanel = ({
   }
 
   const runningMessage =
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty progress_message/message should fall back to the next source, not render blank
     runningTask?.progress_message || runningTask?.message || 'Running token frequency analysis…';
   const runningTaskId = runningTask?.task_id;
   const runningProgress = typeof runningTask?.progress === 'number' ? runningTask.progress : null;
@@ -227,11 +228,12 @@ export const TokenFrequencyResultsPanel = ({
 
       {isFailedState ? (
         <p className="text-sm text-muted-foreground">
-          {results?.message || 'Analysis failed to complete.'}
+          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty failure message should fall back to the default text, not render blank */}
+          {results.message || 'Analysis failed to complete.'}
         </p>
       ) : null}
 
-      {isSuccessfulState && results ? (
+      {isSuccessfulState ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
@@ -247,7 +249,7 @@ export const TokenFrequencyResultsPanel = ({
                 id="stop-words"
                 rows={4}
                 value={stopWords}
-                onChange={(event) => onStopWordsChange(event.target.value)}
+                onChange={(event) => { onStopWordsChange(event.target.value); }}
                 onBlur={onStopWordsApply}
                 placeholder="the, and, of"
                 disabled={isLoadingStopWords}
@@ -371,7 +373,7 @@ export const TokenFrequencyResultsPanel = ({
 
           <Tabs
             value={resultsView}
-            onValueChange={(value) => setResultsView(value as ResultsView)}
+            onValueChange={(value) => { setResultsView(value as ResultsView); }}
             data-testid="token-frequency-results-view-tabs"
           >
             <TabsList>
@@ -409,7 +411,7 @@ export const TokenFrequencyResultsPanel = ({
                   <Input
                     placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
                     value={listTokenFilter}
-                    onChange={(event) => setListTokenFilter(event.target.value)}
+                    onChange={(event) => { setListTokenFilter(event.target.value); }}
                     className="h-8"
                   />
                   {listTokenFilter ? (
@@ -417,7 +419,7 @@ export const TokenFrequencyResultsPanel = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setListTokenFilter('')}
+                      onClick={() => { setListTokenFilter(''); }}
                     >
                       Clear
                     </Button>
@@ -431,7 +433,7 @@ export const TokenFrequencyResultsPanel = ({
             normalizedNodeResults={normalizedNodeResults}
             nodeDisplayResults={nodeDisplayResults}
             lastCompareNodeIds={lastCompareNodeIds}
-            statistics={results?.statistics}
+            statistics={results.statistics}
             appliedStopSet={appliedStopSet}
             effectiveTokenLimit={effectiveTokenLimit}
             defaultTokenLimit={defaultTokenLimit}

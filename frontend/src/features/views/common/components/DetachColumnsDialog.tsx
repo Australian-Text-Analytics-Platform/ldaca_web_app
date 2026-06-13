@@ -15,7 +15,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 
-export type DetachDialogNodeOption = {
+export interface DetachDialogNodeOption {
   node_id: string;
   node_name: string;
   available_columns: string[];
@@ -26,9 +26,9 @@ export type DetachDialogNodeOption = {
   /** Column the analysis ran on. Bolded in the column list so it
    * stands out from sibling metadata columns. */
   text_column?: string | null;
-};
+}
 
-type DetachColumnsDialogProps = {
+interface DetachColumnsDialogProps {
   open: boolean;
   onOpenChange: Dispatch<SetStateAction<boolean>>;
   isDetaching: boolean;
@@ -51,7 +51,7 @@ type DetachColumnsDialogProps = {
    * and quotation already include useful mandatory columns and can
    * detach with no optional column ticked. */
   confirmDisabledReason?: string;
-};
+}
 
 /**
  * Renders the shared detach-columns confirmation dialog used by analysis tools
@@ -75,11 +75,11 @@ export function DetachColumnsDialog({
   confirmDisabledReason,
 }: DetachColumnsDialogProps) {
   const canSelectAll = detachNodeOptions.some((node) => {
-    const selected = new Set(selectedDetachColumns[node.node_id] || []);
+    const selected = new Set(selectedDetachColumns[node.node_id] ?? []);
     return node.available_columns.some((column) => !selected.has(column));
   });
   const canDeselectAll = detachNodeOptions.some((node) => {
-    const selected = new Set(selectedDetachColumns[node.node_id] || []);
+    const selected = new Set(selectedDetachColumns[node.node_id] ?? []);
     return node.available_columns.some((column) => selected.has(column));
   });
 
@@ -89,7 +89,7 @@ export function DetachColumnsDialog({
   // can still supply its own stricter reason via `confirmDisabledReason`.
   const emptySelectionReason = detachNodeOptions.some((node) => {
     const hasColumns = node.available_columns.length > 0;
-    const selectedCount = (selectedDetachColumns[node.node_id] || []).length;
+    const selectedCount = (selectedDetachColumns[node.node_id] ?? []).length;
     return hasColumns && selectedCount === 0;
   })
     ? 'Select at least one column from each data block to add to workspace.'
@@ -140,7 +140,7 @@ export function DetachColumnsDialog({
                 <div className="mb-2 text-sm font-semibold text-foreground">{node.node_name}</div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {node.available_columns.map((column) => {
-                    const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
+                    const checked = (selectedDetachColumns[node.node_id] ?? []).includes(column);
                     const isAnalysisColumn = column === node.text_column;
                     return (
                       <label
@@ -150,7 +150,7 @@ export function DetachColumnsDialog({
                         <Checkbox
                           checked={checked}
                           onCheckedChange={(value: boolean | 'indeterminate') =>
-                            toggleDetachColumn(node.node_id, column, value === true)
+                            { toggleDetachColumn(node.node_id, column, value === true); }
                           }
                           disabled={isDetaching}
                         />

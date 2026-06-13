@@ -73,11 +73,11 @@ interface JoinPreviewConfig {
   onPageSizeChange: (size: number) => void;
 }
 
-type JoinColumnDraft = {
+interface JoinColumnDraft {
   nodeId: string;
   columnsKey: string;
   value: string;
-};
+}
 
 interface JoinApplyState {
   run: () => Promise<void>;
@@ -113,7 +113,7 @@ const describeSharedColumns = (count: number, columns: string[]): string => {
   const preview = columns.slice(0, 4).join(', ');
   const suffix = columns.length > 4 ? ', …' : '';
   const list = preview ? ` (${preview}${suffix})` : '';
-  return `Found ${count} shared column${count === 1 ? '' : 's'}${list}.`;
+  return `Found ${String(count)} shared column${count === 1 ? '' : 's'}${list}.`;
 };
 
 /**
@@ -344,8 +344,13 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     });
 
     return {
+      // response comes from the generated API client; guard defensively against a
+      // malformed/empty payload that the typed contract does not capture.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       columns: Array.isArray(response?.columns) ? response.columns : [],
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       pagination: response?.pagination ?? null,
     };
   };
@@ -361,7 +366,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     pageSize: joinPreviewPageSize,
     setPage: setJoinPreviewPage,
     setPageSize: setJoinPreviewPageSize,
-  } = usePreprocessingPreview<JoinPreviewRequestPayload, PreviewRow>({
+  } = usePreprocessingPreview<JoinPreviewRequestPayload>({
     request: joinPreviewRequest,
     signature: joinPreviewSignature,
     fetcher: joinPreviewFetcher,
@@ -372,6 +377,8 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     if (
       joinPreviewData.length > 0 &&
       typeof joinPreviewData[0] === 'object' &&
+      // preview rows come from the API; keep the explicit null guard.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       joinPreviewData[0] !== null
     ) {
       return Object.keys(joinPreviewData[0]);

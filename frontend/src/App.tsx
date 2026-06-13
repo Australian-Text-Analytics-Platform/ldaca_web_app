@@ -43,7 +43,7 @@ function App() {
           actions={
             <button
               type="button"
-              onClick={() => openModal('feedback')}
+              onClick={() => { openModal('feedback'); }}
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               Send feedback
@@ -51,7 +51,7 @@ function App() {
           }
         />
         <Suspense fallback={null}>
-          <FeedbackPanel open={feedbackOpen} onClose={() => closeModal('feedback')} />
+          <FeedbackPanel open={feedbackOpen} onClose={() => { closeModal('feedback'); }} />
         </Suspense>
         <DocsEolBanner />
         <Toaster />
@@ -85,7 +85,7 @@ function AuthGate() {
 
   useEffect(() => {
     if (phase.status !== 'bootstrapping') return;
-    const timeoutId = window.setTimeout(() => setLaggingHintReady(true), LAG_HINT_DELAY_MS);
+    const timeoutId = window.setTimeout(() => { setLaggingHintReady(true); }, LAG_HINT_DELAY_MS);
     return () => {
       window.clearTimeout(timeoutId);
       setLaggingHintReady(false);

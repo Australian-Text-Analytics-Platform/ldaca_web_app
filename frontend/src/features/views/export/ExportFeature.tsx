@@ -73,7 +73,7 @@ const getDownloadExtension = (selectedFormat: string) =>
 function ExportFeature() {
   const { selectedNodes: rawSelectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
-  const selectedNodes = rawSelectedNodes ?? [];
+  const selectedNodes = rawSelectedNodes;
   const { getAuthHeaders } = useAuth();
   const [format, setFormat] = useState('csv');
   const [exporting, setExporting] = useState(false);
@@ -81,7 +81,9 @@ function ExportFeature() {
 
   const nodeIds = selectedNodes.map((n: GraphNode, idx: number) => {
     const data = n.data as Record<string, unknown> | undefined;
-    return n.id || String(n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? `node-${idx}`);
+    // Id aliases come from WorkspaceNodeInfo's `unknown` index signature; the
+    // chain always resolves to a string id at runtime, so assert string.
+    return n.id || ((n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? `node-${String(idx)}`) as string);
   });
 
   // Subscribe to the global node-colour store. Reuses whatever colour was
@@ -97,8 +99,10 @@ function ExportFeature() {
    */
   const toDisplay = (n: GraphNode) => {
     const data = n.data as Record<string, unknown> | undefined;
-    const id = n.id || String(n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? '');
-    const name = String(data?.nodeName ?? data?.label ?? n.label ?? n.name ?? id);
+    // Id/name aliases come from the `unknown` index signature; they resolve to
+    // strings at runtime, so assert string instead of stringifying objects.
+    const id = n.id || ((n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? '') as string);
+    const name = (data?.nodeName ?? data?.label ?? n.label ?? n.name) as string;
     const shapeArr = Array.isArray(data?.shape)
       ? (data.shape as (number | string | null | undefined)[])
       : null;
@@ -109,7 +113,7 @@ function ExportFeature() {
     const formatDimension = (value: number | string | null | undefined) =>
       typeof value === 'number' || typeof value === 'string' ? value : '?';
     const shape = shapeArr
-      ? `${formatDimension(shapeArr[0])} × ${formatDimension(shapeArr[1])}`
+      ? `${String(formatDimension(shapeArr[0]))} × ${String(formatDimension(shapeArr[1]))}`
       : null;
     return { id, name, shape };
   };
@@ -148,7 +152,7 @@ function ExportFeature() {
   const describeResponseError = async (resp: Response): Promise<string> => {
     try {
       const text = await resp.text();
-      if (!text) return `HTTP ${resp.status}`;
+      if (!text) return `HTTP ${String(resp.status)}`;
       try {
         const parsed = JSON.parse(text) as { detail?: unknown };
         if (typeof parsed.detail === 'string' && parsed.detail.trim()) return parsed.detail;
@@ -157,7 +161,7 @@ function ExportFeature() {
       }
       return text.length > 500 ? `${text.slice(0, 500)}\u2026` : text;
     } catch {
-      return `HTTP ${resp.status}`;
+      return `HTTP ${String(resp.status)}`;
     }
   };
 
@@ -177,8 +181,13 @@ function ExportFeature() {
       const multiple = nodeIds.length > 1;
       const ext = multiple ? 'zip' : getDownloadExtension(format);
       const filename = multiple
+        // Empty workspace name/id should fall back to the next label, so keep `||`.
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
-        : `${toDisplay(selectedNodes[0]!).name || nodeIds[0]}.${ext}`;
+        // selectedNodes[0] exists here: handleExportAll returns early when nodeIds
+        // is empty, and this branch only runs for a single selected node.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        : `${(toDisplay(selectedNodes[0]!).name || nodeIds[0]) ?? ''}.${ext}`;
 
       if (isDesktopApp) {
         const fullPath = await tauriDownloadToDisk(url, headers, filename);
@@ -268,7 +277,7 @@ function ExportFeature() {
             </div>
             <Badge variant={selectedNodes.length ? 'default' : 'outline'}>
               {selectedNodes.length
-                ? `${selectedNodes.length} data block${selectedNodes.length > 1 ? 's' : ''} selected`
+                ? `${String(selectedNodes.length)} data block${selectedNodes.length > 1 ? 's' : ''} selected`
                 : 'No data blocks selected'}
             </Badge>
           </div>
@@ -283,11 +292,11 @@ function ExportFeature() {
               )}
               {selectedNodes.map((n: GraphNode) => {
                 const info = toDisplay(n);
-                const status = downloadingIds[info.id ?? ''] ?? 'idle';
+                const status = downloadingIds[info.id] ?? 'idle';
                 const isDownloading = status === 'downloading';
                 // Reuse the colour the analysis tabs have already assigned
                 // to this node. Same node ⇒ same colour everywhere.
-                const nameColor = nodeColors[info.id ?? ''];
+                const nameColor = nodeColors[info.id];
                 return (
                   <div
                     key={info.id}
@@ -328,7 +337,7 @@ function ExportFeature() {
                 <Label className="text-foreground block text-sm font-medium">Format</Label>
                 <HelpIcon targetKey="analysis.export.format" label="Export format selector" />
               </div>
-              <Select value={format} onValueChange={(value) => setFormat(value)}>
+              <Select value={format} onValueChange={(value) => { setFormat(value); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a format" />
                 </SelectTrigger>

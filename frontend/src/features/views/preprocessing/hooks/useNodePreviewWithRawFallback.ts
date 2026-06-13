@@ -19,7 +19,7 @@ interface RawishResponse {
 const normaliseResponse = (response: RawishResponse | null | undefined) => ({
   data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
   columns: Array.isArray(response?.columns) ? (response.columns as string[]) : [],
-  pagination: (response?.pagination as PreviewPagination) ?? null,
+  pagination: (response?.pagination as PreviewPagination | undefined) ?? null,
 });
 
 interface PreviewRequest<P> {
@@ -68,7 +68,7 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
  */
 export const useNodePreviewWithRawFallback = <P>(
   opts: UseNodePreviewWithRawFallbackOptions<P>,
-): UsePreprocessingPreviewResult<PreviewRow> => {
+): UsePreprocessingPreviewResult => {
   const {
     nodeId,
     operationPayload,

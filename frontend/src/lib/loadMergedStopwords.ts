@@ -81,7 +81,7 @@ const getStopwordList = (iso6393Code: string): string[] => {
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 function resolveMergedStopwords(
-  languages: ReadonlyArray<string | null | undefined>,
+  languages: readonly (string | null | undefined)[],
 ): MergedStopwordsResult {
   const seen = new Set<string>();
   const ordered: { language: string; stopwordLanguage: string }[] = [];
@@ -122,7 +122,7 @@ function resolveMergedStopwords(
 /** Used by: src/features/views/token-frequency/hooks/useTokenFrequencyPreferences.ts, src/lib/__tests__/loadMergedStopwords.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
 // eslint-disable-next-line @typescript-eslint/require-await
 export async function loadMergedStopwords(args: {
-  languages: ReadonlyArray<string | null | undefined>;
+  languages: readonly (string | null | undefined)[];
 }): Promise<MergedStopwordsResult> {
   return resolveMergedStopwords(args.languages);
 }

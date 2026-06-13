@@ -32,13 +32,13 @@ interface FreshNodesState {
    * workspace graph, mark any new arrivals as fresh. On the very
    * first call (when seenIds is empty), don't mark anything fresh —
    * those are pre-existing nodes from the loaded workspace. */
-  observeNodeIds(currentIds: ReadonlyArray<string>): void;
+  observeNodeIds(currentIds: readonly string[]): void;
   /** Drop nodeIds from ``freshIds``. Called on first interaction. */
-  markInteracted(nodeIds: ReadonlyArray<string>): void;
+  markInteracted(nodeIds: readonly string[]): void;
   /** Drop nodeIds from ``seenIds`` AND ``freshIds`` — typically called
    * when a node is deleted from the workspace, so a future re-creation
    * with the same id (unlikely but possible) is treated as new. */
-  forgetNodeIds(nodeIds: ReadonlyArray<string>): void;
+  forgetNodeIds(nodeIds: readonly string[]): void;
   reset(): void;
 }
 
@@ -94,9 +94,9 @@ export const useFreshNodesStore = create<FreshNodesState>()(
     /** Resets session-only freshness state for tests and workspace-session resets. */
     /** Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
     reset: () =>
-      set((state) => {
+      { set((state) => {
         state.seenIds = new Set();
         state.freshIds = new Set();
-      }),
+      }); },
   })),
 );

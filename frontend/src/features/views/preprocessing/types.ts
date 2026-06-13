@@ -39,10 +39,10 @@ export type FilterRequest = Omit<
  * `filter/utils/serializers.ts` widens this into the `value: unknown`
  * the API accepts.
  */
-export type ConditionRange = { start: string | Date | null; end: string | Date | null };
+export interface ConditionRange { start: string | Date | null; end: string | Date | null }
 /** Value shape for a TMDist (topic-distribution) filter condition: keep rows
  * where one topic's proportion (0..1) compares against the threshold. */
-export type TmdistConditionValue = { topic_id: number; threshold: number };
+export interface TmdistConditionValue { topic_id: number; threshold: number }
 export type ConditionValue =
   | string
   | number
@@ -51,7 +51,7 @@ export type ConditionValue =
   | ConditionRange
   | TmdistConditionValue
   | null
-  | Array<string | number | boolean | Date | null>;
+  | (string | number | boolean | Date | null)[];
 
 export interface ConditionColumnOption {
   name: string;
@@ -73,7 +73,7 @@ export interface FilterConditionWithId {
   regex?: boolean;
   caseSensitive?: boolean;
   dataType?: string;
-  [key: string]: ConditionValue | string | boolean | undefined;
+  [key: string]: ConditionValue | undefined;
 }
 
 export { type NodeDataPagination as PreviewPagination } from '@/features/workspace/data-view/types';
@@ -135,7 +135,7 @@ export const PREVIEW_PAGE_SIZE_OPTIONS = [10, 20, 50];
 export const MAX_CONCAT_NODES = 6;
 export const MAX_JOIN_NODES = 2;
 
-export const JOIN_TYPE_OPTIONS: Array<{ value: JoinType; description: string }> = [
+export const JOIN_TYPE_OPTIONS: { value: JoinType; description: string }[] = [
   { value: 'inner', description: 'Only rows with matching keys in both data blocks.' },
   {
     value: 'left',

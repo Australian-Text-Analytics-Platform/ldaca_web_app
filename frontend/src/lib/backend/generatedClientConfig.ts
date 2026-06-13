@@ -39,10 +39,10 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
  */
 const createTimeout = (sourceSignal?: AbortSignal) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => { controller.abort(); }, DEFAULT_TIMEOUT_MS);
   /** Preserves the caller's abort reason when we chain their signal. */
   /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-  const abortFromSource = () => controller.abort(sourceSignal?.reason);
+  const abortFromSource = () => { controller.abort(sourceSignal?.reason); };
 
   if (sourceSignal?.aborted) {
     abortFromSource();
@@ -102,10 +102,12 @@ const parseErrorResponse = async (response: Response): Promise<ApiError> => {
 
   const parsed = detail && typeof detail === 'object' ? (detail as Record<string, unknown>) : null;
   const message =
+    /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- fall through empty-string messages to the next candidate, not only null/undefined */
     (typeof parsed?.message === 'string' && parsed.message) ||
     formatErrorDetail(parsed?.detail) ||
     formatErrorDetail(detail) ||
-    `HTTP ${response.status}`;
+    `HTTP ${String(response.status)}`;
+  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
   return new ApiError(message, { status: response.status, detail });
 };

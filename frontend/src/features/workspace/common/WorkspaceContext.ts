@@ -3,16 +3,16 @@ import type { useWorkspaceInternal } from './hooks/useWorkspaceInternal';
 
 type WorkspaceInternal = ReturnType<typeof useWorkspaceInternal>;
 
-export type WorkspaceDataSlice = {
+export interface WorkspaceDataSlice {
   workspaces: WorkspaceInternal['workspaces'];
   currentWorkspace: WorkspaceInternal['currentWorkspace'];
   currentWorkspaceId: WorkspaceInternal['currentWorkspaceId'];
   nodes: WorkspaceInternal['nodes'];
   workspaceGraph: WorkspaceInternal['workspaceGraph'];
   nodeData: WorkspaceInternal['nodeData'];
-};
+}
 
-export type WorkspaceSelectionSlice = {
+export interface WorkspaceSelectionSlice {
   selectedNode: WorkspaceInternal['selectedNode'];
   selectedNodes: WorkspaceInternal['selectedNodes'];
   selectedNodeId: WorkspaceInternal['selectedNodeId'];
@@ -22,12 +22,12 @@ export type WorkspaceSelectionSlice = {
   handleSortingChange: WorkspaceInternal['handleSortingChange'];
   handleFilterChange: WorkspaceInternal['handleFilterChange'];
   getPaginationForNode: WorkspaceInternal['getPaginationForNode'];
-};
+}
 
-export type WorkspaceStatusSlice = {
+export interface WorkspaceStatusSlice {
   isLoading: WorkspaceInternal['isLoading'];
   errors: WorkspaceInternal['errors'];
-};
+}
 
 export type WorkspaceActionsSlice = WorkspaceInternal['actions'];
 

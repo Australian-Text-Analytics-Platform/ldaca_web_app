@@ -11,18 +11,18 @@ import { APP_VERSION, APP_BUILD_DATE, APP_BUILD, DOCS_BASE_URL } from '@/config/
 import { useZoom } from '@/hooks/useZoom';
 import { useDocumentAnchor } from '@/hooks/useDocumentAnchor';
 
-export type DocumentTarget = {
+export interface DocumentTarget {
   file: string;
   anchor: string;
   label?: string;
-};
+}
 
 export type DocumentType = 'tutorial' | 'warning' | 'information' | 'reference';
 
-type NavigationState = {
+interface NavigationState {
   propTarget: DocumentTarget | null | undefined;
   currentTarget: DocumentTarget | null;
-};
+}
 
 /** Document viewer defaults keyed by modal type for help/info/reference routes. */
 const DOC_CONFIG: Record<DocumentType, { title: string; defaultFile: string }> = {
@@ -86,7 +86,7 @@ const resolveDocUrl = (requestedFile: string): string => {
   if (BUNDLED_FILES.has(requestedFile)) {
     return resolveLocalDocUrl(requestedFile);
   }
-  const remoteBase = DOCS_BASE_URL?.trim();
+  const remoteBase = DOCS_BASE_URL.trim();
   if (remoteBase) {
     try {
       const baseWithSlash = remoteBase.endsWith('/') ? remoteBase : `${remoteBase}/`;
@@ -144,7 +144,7 @@ function DocumentView({
         const requestedFile = currentTarget?.file ?? config.defaultFile;
         const url = resolveDocUrl(requestedFile);
         const resp = await fetch(url, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok) throw new Error(`HTTP ${String(resp.status)}`);
         const text = await resp.text();
         // Substitute build-time placeholders so docs like
         // `references/general.md` can show the current app version /
@@ -199,7 +199,7 @@ function DocumentView({
         const [rawPath, rawHash] = href.split('#');
         const nextAnchor = rawHash ? rawHash.trim() : '';
         let nextFile = baseFile;
-        if (rawPath && rawPath.trim()) {
+        if (rawPath?.trim()) {
           const trimmed = rawPath.trim();
           if (trimmed.startsWith('/')) {
             nextFile = normalizePath(trimmed.replace(/^\/+/, ''));
@@ -297,7 +297,7 @@ function DocumentView({
         <div
           className="prose prose-slate prose-img:mx-auto mx-auto"
           style={{
-            transform: `scale(${zoom})`,
+            transform: `scale(${String(zoom)})`,
             transformOrigin: 'top center',
           }}
         >

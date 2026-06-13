@@ -14,15 +14,15 @@
  * (see `docs/refactoring/online-tutorial-migration.md` §3.10B).
  */
 
-export type DocTarget = {
+export interface DocTarget {
   file: string;
   anchor: string;
   label?: string;
-};
+}
 
 export type DocLinkKind = 'tutorial' | 'info' | 'reference';
 
-export type RegistryShape = {
+export interface RegistryShape {
   tutorial: Record<string, DocTarget>;
   info: Record<string, DocTarget>;
   reference: Record<string, DocTarget>;
@@ -35,7 +35,7 @@ export type RegistryShape = {
     /** Date (ISO-8601) when this docs version is no longer supported. */
     eolDate?: string;
   };
-};
+}
 
 const tutorial = {
   'ui.tool-choice': {

@@ -152,7 +152,7 @@ const DEFAULT_PAGE_SIZE = 5;
 // these instances exist solely to drive ServerPaginationFooter page math from
 // rowCount (the backend's source-row totals).
 const EMPTY_ANNOTATOR_ROWS: Record<string, unknown>[] = [];
-const EMPTY_ANNOTATOR_COLUMNS: ColumnDef<Record<string, unknown>, unknown>[] = [];
+const EMPTY_ANNOTATOR_COLUMNS: ColumnDef<Record<string, unknown>>[] = [];
 
 /** Converts arbitrary backend cell values into editable/displayable text for annotation review cells. */
 /**
@@ -166,9 +166,11 @@ const stringifyCell = (value: unknown): string => {
     try {
       return JSON.stringify(value);
     } catch {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string -- fallback for objects JSON.stringify cannot serialize (e.g. circular refs)
       return String(value);
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- value is a non-object primitive after the guards above
   return String(value);
 };
 
@@ -212,7 +214,7 @@ function AiAnnotatorFeature() {
   const [isClearing, setIsClearing] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>([]);
   const [resultNodeId, setResultNodeId] = useState<string | null>(null);
   const [resultNode, setResultNode] = useState<AiAnnotationNodeResult | null>(null);
   const [isPaging, setIsPaging] = useState(false);
@@ -323,7 +325,7 @@ function AiAnnotatorFeature() {
     }
 
     const nodeData = data[firstNodeId] ?? null;
-    if (nodeData && response?.metadata) {
+    if (nodeData && response.metadata) {
       nodeData.metadata = { ...(nodeData.metadata ?? {}), ...response.metadata };
     }
 
@@ -370,8 +372,8 @@ function AiAnnotatorFeature() {
     // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onResultFetched: (result, _fetchedTaskId) => {
       aiAnnotationResultRef.current = result;
-      applyResponseResult(result ?? null);
-      setStatusMessage(result?.message ?? 'AI annotation results loaded.');
+      applyResponseResult(result);
+      setStatusMessage(result.message);
     },
     // Rehydrates persisted result payloads when the tab regains a known task.
     // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -439,10 +441,10 @@ function AiAnnotatorFeature() {
         path: { task_id: resolvedTaskId },
         throwOnError: true,
       });
-      setLocalTaskId(response?.metadata?.task_id ?? resolvedTaskId);
-      aiAnnotationResultRef.current = response ?? null;
-      applyResponseResult(response ?? null);
-      setStatusMessage(response?.message ?? 'AI annotation results updated.');
+      setLocalTaskId(response.metadata?.task_id ?? resolvedTaskId);
+      aiAnnotationResultRef.current = response;
+      applyResponseResult(response);
+      setStatusMessage(response.message);
     } catch (error) {
       setStatusMessage(
         `Failed to load AI annotation page: ${error instanceof Error ? error.message : String(error)}`,
@@ -466,13 +468,14 @@ function AiAnnotatorFeature() {
         headers: getAuthHeaders(),
         throwOnError: true,
       });
-      const models = response?.data?.models ?? [];
+      const models = response.data.models;
       setAvailableModels(models);
       const modelIds = models.map((m) => m.id);
       if (models.length > 0 && (!model.trim() || !modelIds.includes(model))) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- models.length > 0 guard guarantees index 0
         setModel(models[0]!.id);
       }
-      setStatusMessage(response?.message ?? 'Model catalog loaded.');
+      setStatusMessage(response.message);
     } catch (error) {
       setStatusMessage(
         `Failed to load models: ${error instanceof Error ? error.message : String(error)}`,
@@ -526,7 +529,8 @@ function AiAnnotatorFeature() {
         body: {
           column: selectedColumn,
           new_node_name: buildDetachNodeName(
-            String(displayedNodes[0]?.name || displayedNodes[0]?.id || selectedNodeId),
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty node name/id should fall through to the next identifier
+            displayedNodes[0]?.name || displayedNodes[0]?.id || selectedNodeId,
             '_ai_annotation',
           ),
           annotation_column: aiAnnotationColumn.trim() ? aiAnnotationColumn : null,
@@ -545,7 +549,7 @@ function AiAnnotatorFeature() {
         throwOnError: true,
       });
 
-      const detachTaskId = (response as { metadata?: { task_id?: string } })?.metadata?.task_id;
+      const detachTaskId = (response as { metadata?: { task_id?: string } }).metadata?.task_id;
       setStatusMessage(
         detachTaskId
           ? `AI annotation detach started (task: ${detachTaskId}).`
@@ -599,9 +603,9 @@ function AiAnnotatorFeature() {
       });
 
       extractAndSetTaskId(response, setLocalTaskId);
-      aiAnnotationResultRef.current = response ?? null;
-      applyResponseResult(response ?? null);
-      setStatusMessage(response?.message ?? 'AI annotation request submitted.');
+      aiAnnotationResultRef.current = response;
+      applyResponseResult(response);
+      setStatusMessage(response.message);
 
     } catch (error) {
       setStatusMessage(
@@ -633,7 +637,7 @@ function AiAnnotatorFeature() {
   const resultRows = resultNode?.data ?? [];
   const resultColumns = resultNode?.columns ?? [];
   const annotationColumns = Array.isArray(resultNode?.metadata?.annotation_columns)
-    ? (resultNode?.metadata?.annotation_columns as string[])
+    ? (resultNode.metadata.annotation_columns as string[])
     : [];
   const inferredTextColumn =
     (selectedColumn && resultColumns.includes(selectedColumn) ? selectedColumn : null) ??
@@ -676,7 +680,7 @@ function AiAnnotatorFeature() {
   /**
    * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
    */
-  const buildEditKey = (rowIndex: number, providerName: string) => `${rowIndex}::${providerName}`;
+  const buildEditKey = (rowIndex: number, providerName: string) => `${String(rowIndex)}::${providerName}`;
 
   // Reads the saved annotation value from the row payload for comparison during auto-save.
   /**
@@ -696,9 +700,9 @@ function AiAnnotatorFeature() {
       if (!item || typeof item !== 'object') {
         return false;
       }
-      return String((item as Record<string, unknown>).provider ?? '') === providerName;
+      return stringifyCell((item as Record<string, unknown>).provider) === providerName;
     }) as Record<string, unknown> | undefined;
-    return found ? String(found.annotation ?? '') : '';
+    return found ? stringifyCell(found.annotation) : '';
   };
 
   // Chooses the draft value when present, otherwise falling back to the persisted annotation.
@@ -761,24 +765,22 @@ function AiAnnotatorFeature() {
         query: { page: pg, page_size: pgSize },
         throwOnError: true,
       });
-      const rows = response.data ?? [];
-      const columns = response.columns ?? [];
+      const rows = response.data;
+      const columns = response.columns;
       const pagination = response.pagination;
       setReviewData({
         data: rows,
         columns,
         metadata: { annotation_columns: [annotationCol] },
-        pagination: pagination
-          ? {
-              page: pagination.page ?? pg,
-              page_size: pagination.page_size ?? pgSize,
-              total_source_rows: pagination.total_rows,
-              total_source_pages: pagination.total_pages,
-              result_count: rows.length,
-              has_next: pagination.has_next ?? false,
-              has_prev: pagination.has_prev ?? false,
-            }
-          : undefined,
+        pagination: {
+          page: pagination.page,
+          page_size: pagination.page_size,
+          total_source_rows: pagination.total_rows,
+          total_source_pages: pagination.total_pages,
+          result_count: rows.length,
+          has_next: pagination.has_next,
+          has_prev: pagination.has_prev,
+        },
       });
       setReviewNodeId(nodeId);
       setStatusMessage('Review data loaded.');
@@ -804,9 +806,9 @@ function AiAnnotatorFeature() {
         query: { annotation_column: annotationCol },
         throwOnError: true,
       });
-      const providers = response?.data?.providers ?? [];
+      const providers = response.data.providers;
       setReviewGlobalProviders(
-        Array.from(new Set(providers.map((name) => String(name).trim()).filter(Boolean))),
+        Array.from(new Set(providers.map((name) => name.trim()).filter(Boolean))),
       );
     } catch (error) {
       setStatusMessage(
@@ -829,9 +831,9 @@ function AiAnnotatorFeature() {
         query: { annotation_column: annotationCol },
         throwOnError: true,
       });
-      const categories = response?.data?.categories ?? [];
+      const categories = response.data.categories;
       setReviewGlobalCategories(
-        Array.from(new Set(categories.map((name) => String(name).trim()).filter(Boolean))),
+        Array.from(new Set(categories.map((name) => name.trim()).filter(Boolean))),
       );
     } catch (error) {
       setStatusMessage(
@@ -996,8 +998,8 @@ function AiAnnotatorFeature() {
                     Boolean(item) && typeof item === 'object',
                 )
                 .map((item) => ({
-                  provider: String(item.provider ?? ''),
-                  annotation: String(item.annotation ?? ''),
+                  provider: stringifyCell(item.provider),
+                  annotation: stringifyCell(item.annotation),
                 }))
             : [];
 
@@ -1010,6 +1012,7 @@ function AiAnnotatorFeature() {
             return entry;
           });
 
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `replaced` is mutated inside the map callback; TS control-flow analysis does not track the closure mutation
           if (!replaced) {
             nextEntries.push({ provider: providerName, annotation: trimmedNextValue });
           }
@@ -1064,7 +1067,7 @@ function AiAnnotatorFeature() {
     isReviewLoading;
 
   useEffect(() => {
-    void Promise.resolve().then(() => setReviewEdits({}));
+    void Promise.resolve().then(() => { setReviewEdits({}); });
   }, [resultNodeId, page, pageSize]);
 
   // Footer-only TanStack instance for the annotate results table (the bespoke
@@ -1205,7 +1208,7 @@ function AiAnnotatorFeature() {
         </p>
         <Tabs
           value={panelTab}
-          onValueChange={(value) => setPanelTab(value as 'ai-annotation' | 'review')}
+          onValueChange={(value) => { setPanelTab(value as 'ai-annotation' | 'review'); }}
         >
           <TabsList className="mb-4">
             <TabsTrigger value="ai-annotation">AI Annotation</TabsTrigger>
@@ -1269,7 +1272,7 @@ function AiAnnotatorFeature() {
                     </Label>
                     <Select
                       value={aiAnnotationColumn || '__none__'}
-                      onValueChange={(value) => setAiAnnotationColumn(value === '__none__' ? '' : value)}
+                      onValueChange={(value) => { setAiAnnotationColumn(value === '__none__' ? '' : value); }}
                     >
                       <SelectTrigger id="ai-annotation-column" className="w-full text-sm">
                         <SelectValue placeholder="Select annotation column" />
@@ -1289,7 +1292,7 @@ function AiAnnotatorFeature() {
                     <Label htmlFor="ai-annotator-endpoint-preset">Endpoint</Label>
                     <Select
                       value={endpointPreset}
-                      onValueChange={(value) => setEndpointPreset(value as EndpointPreset)}
+                      onValueChange={(value) => { setEndpointPreset(value as EndpointPreset); }}
                     >
                       <SelectTrigger id="ai-annotator-endpoint-preset">
                         <SelectValue placeholder="Select endpoint" />
@@ -1330,7 +1333,7 @@ function AiAnnotatorFeature() {
                       <Input
                         id="ai-annotator-custom-url"
                         value={customBaseUrl}
-                        onChange={(event) => setCustomBaseUrl(event.target.value)}
+                        onChange={(event) => { setCustomBaseUrl(event.target.value); }}
                         placeholder="e.g. http://localhost:11434/v1"
                       />
                     </div>
@@ -1343,7 +1346,7 @@ function AiAnnotatorFeature() {
                     id="ai-annotator-api-key"
                     type="password"
                     value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
+                    onChange={(event) => { setApiKey(event.target.value); }}
                     placeholder={
                       endpointPreset === 'openai'
                         ? 'Required for OpenAI'
@@ -1359,7 +1362,7 @@ function AiAnnotatorFeature() {
                   <textarea
                     id="ai-annotator-classes"
                     value={classesText}
-                    onChange={(event) => setClassesText(event.target.value)}
+                    onChange={(event) => { setClassesText(event.target.value); }}
                     className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     placeholder="support: Supportive stance"
                   />
@@ -1371,7 +1374,7 @@ function AiAnnotatorFeature() {
                   type="button"
                   variant="ghost"
                   className="h-auto px-0 text-sm"
-                  onClick={() => setShowAdvanced((value) => !value)}
+                  onClick={() => { setShowAdvanced((value) => !value); }}
                 >
                   <Wrench className="mr-2 h-4 w-4" />
                   Advanced Parameters
@@ -1393,7 +1396,7 @@ function AiAnnotatorFeature() {
                           step="0.1"
                           min="0"
                           value={temperature}
-                          onChange={(event) => setTemperature(event.target.value)}
+                          onChange={(event) => { setTemperature(event.target.value); }}
                         />
                       </div>
 
@@ -1406,7 +1409,7 @@ function AiAnnotatorFeature() {
                           min="0"
                           max="1"
                           value={topP}
-                          onChange={(event) => setTopP(event.target.value)}
+                          onChange={(event) => { setTopP(event.target.value); }}
                         />
                       </div>
 
@@ -1416,7 +1419,7 @@ function AiAnnotatorFeature() {
                           id="ai-annotator-seed"
                           type="number"
                           value={seed}
-                          onChange={(event) => setSeed(event.target.value)}
+                          onChange={(event) => { setSeed(event.target.value); }}
                         />
                       </div>
 
@@ -1427,7 +1430,7 @@ function AiAnnotatorFeature() {
                           type="number"
                           min="1"
                           value={batchSize}
-                          onChange={(event) => setBatchSize(event.target.value)}
+                          onChange={(event) => { setBatchSize(event.target.value); }}
                         />
                       </div>
                     </div>
@@ -1439,7 +1442,7 @@ function AiAnnotatorFeature() {
                       <textarea
                         id="ai-annotator-examples"
                         value={examplesText}
-                        onChange={(event) => setExamplesText(event.target.value)}
+                        onChange={(event) => { setExamplesText(event.target.value); }}
                         className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         placeholder="This policy is fair => support"
                       />
@@ -1587,7 +1590,7 @@ function AiAnnotatorFeature() {
                     <TableBody>
                       {resultRows.length > 0 ? (
                         resultRows.map((row, rowIndex) => (
-                          <TableRow key={`${rowIndex}`}>
+                          <TableRow key={String(rowIndex)}>
                             {visibleColumns.map((columnName) => (
                               <TableCell key={columnName} className="align-top">
                                 {stringifyCell(row[columnName])}
@@ -1626,7 +1629,7 @@ function AiAnnotatorFeature() {
       {/* Review result panel */}
       {panelTab === 'review' && reviewData && reviewNodeId
         ? (() => {
-            const rvRows = reviewData.data ?? [];
+            const rvRows = reviewData.data;
             const rvPagination = reviewData.pagination;
             const rvPage = rvPagination?.page ?? 1;
             const rvPageSize = rvPagination?.page_size ?? DEFAULT_PAGE_SIZE;
@@ -1642,7 +1645,7 @@ function AiAnnotatorFeature() {
                       (item): item is Record<string, unknown> =>
                         Boolean(item) && typeof item === 'object',
                     )
-                    .map((item) => String(item.provider ?? '').trim())
+                    .map((item) => stringifyCell(item.provider).trim())
                     .filter(Boolean);
                 }),
               ),
@@ -1660,7 +1663,7 @@ function AiAnnotatorFeature() {
                       (item): item is Record<string, unknown> =>
                         Boolean(item) && typeof item === 'object',
                     )
-                    .map((item) => String(item.annotation ?? '').trim())
+                    .map((item) => stringifyCell(item.annotation).trim())
                     .filter(Boolean);
                 }),
               ),
@@ -1729,7 +1732,7 @@ function AiAnnotatorFeature() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7 rounded-full border border-border/60 hover:border-border"
-                                  onClick={() => setIsAddAnnotatorDialogOpen(true)}
+                                  onClick={() => { setIsAddAnnotatorDialogOpen(true); }}
                                   aria-label="Add annotator"
                                   title="Add annotator"
                                 >
@@ -1743,13 +1746,13 @@ function AiAnnotatorFeature() {
                               rvRows.map((row, rowIdx) => {
                                 const rowIndex = (Math.max(rvPage, 1) - 1) * rvPageSize + rowIdx;
                                 return (
-                                  <TableRow key={`${rowIndex}`}>
+                                  <TableRow key={String(rowIndex)}>
                                     <TableCell className="align-top max-w-xl whitespace-pre-wrap wrap-break-word">
                                       {stringifyCell(row[reviewTextColumn])}
                                     </TableCell>
                                     {rvProviders.map((providerName) => (
                                       <TableCell
-                                        key={`${rowIndex}-${providerName}`}
+                                        key={`${String(rowIndex)}-${providerName}`}
                                         className="align-top min-w-40"
                                       >
                                         <Select
@@ -1833,7 +1836,7 @@ function AiAnnotatorFeature() {
                       </AlertDialogHeader>
                       <Input
                         value={newProviderName}
-                        onChange={(event) => setNewProviderName(event.target.value)}
+                        onChange={(event) => { setNewProviderName(event.target.value); }}
                         placeholder="e.g. userA"
                         autoFocus
                       />
@@ -1863,7 +1866,7 @@ function AiAnnotatorFeature() {
                       </AlertDialogHeader>
                       <Input
                         value={newCategoryName}
-                        onChange={(event) => setNewCategoryName(event.target.value)}
+                        onChange={(event) => { setNewCategoryName(event.target.value); }}
                         placeholder="e.g. mixed"
                         autoFocus
                       />

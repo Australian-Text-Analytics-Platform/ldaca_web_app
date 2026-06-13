@@ -25,9 +25,15 @@ afterAll(() => {
 
 global.ResizeObserver = class {
   /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-  observe() {}
+  observe() {
+    /* no-op mock */
+  }
   /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-  unobserve() {}
+  unobserve() {
+    /* no-op mock */
+  }
   /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-  disconnect() {}
+  disconnect() {
+    /* no-op mock */
+  }
 };

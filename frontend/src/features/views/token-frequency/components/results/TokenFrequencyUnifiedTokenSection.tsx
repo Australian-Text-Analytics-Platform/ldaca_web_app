@@ -30,7 +30,7 @@ const UNIFIED_CLOUD_MIN_FONT_PX = 12;
 const UNIFIED_CLOUD_MAX_FONT_FLOOR = 40;
 const UNIFIED_CLOUD_MAX_FONT_CEILING = 170;
 
-type TokenFrequencyUnifiedTokenSectionProps = {
+interface TokenFrequencyUnifiedTokenSectionProps {
   normalizedNodeResults: NormalizedNodeResult[];
   nodeDisplayResults: NodeResultView[];
   lastCompareNodeIds: string[];
@@ -55,7 +55,7 @@ type TokenFrequencyUnifiedTokenSectionProps = {
    * statistics table when in list view. Cloud rendering is unaffected.
    */
   tokenFilter?: string;
-};
+}
 
 /** Used by: TokenFrequencyUnifiedTokenSectionInner to parse backend statistic values for unified-cloud scoring because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const parseStatisticsNumericValue = (value: unknown): number => {
@@ -115,14 +115,14 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
 
   const statsSource = Array.isArray(statistics) && statistics.length > 0 ? statistics : [];
   const cloudStats = (Array.isArray(statsSource) ? statsSource : [])
-    .filter((s) => !appliedStopSet.has(String(s?.token ?? '').toLowerCase()))
+    .filter((s) => !appliedStopSet.has(s.token.toLowerCase()))
     .map((s) => ({
-      token: String(s?.token ?? ''),
-      o1: Number(s?.freq_reference) || 0,
-      o2: Number(s?.freq_study) || 0,
-      p1: parseStatisticsNumericValue(s?.percent_reference),
-      p2: parseStatisticsNumericValue(s?.percent_study),
-      logratio: parseStatisticsNumericValue(s?.log_ratio),
+      token: s.token,
+      o1: s.freq_reference || 0,
+      o2: s.freq_study || 0,
+      p1: parseStatisticsNumericValue(s.percent_reference),
+      p2: parseStatisticsNumericValue(s.percent_study),
+      logratio: parseStatisticsNumericValue(s.log_ratio),
     }))
     .map((s) => ({
       ...s,
@@ -143,8 +143,8 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
 
   const remaining = Math.max(0, cloudLimit - selectedCloudStats.length);
   if (remaining > 0 && sortedByRank.length > selectedCloudStats.length) {
-    const nextLow = sortedByRank[low.length] || null;
-    const nextHigh = sortedByRank[sortedByRank.length - high.length - 1] || null;
+    const nextLow = sortedByRank[low.length] ?? null;
+    const nextHigh = sortedByRank[sortedByRank.length - high.length - 1] ?? null;
     const pick = (() => {
       const al = nextLow ? Math.abs(nextLow.juxRank) : -1;
       const ah = nextHigh ? Math.abs(nextHigh.juxRank) : -1;
@@ -158,7 +158,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
     .filter((s) => (selectedSeen.has(s.token) ? false : (selectedSeen.add(s.token), true)))
     .slice(0, Math.min(cloudLimit, selectedCloudStats.length));
 
-  const maxCloudTotal = Math.max(1, ...selectedCloudStats.map((s) => Number(s.total) || 0));
+  const maxCloudTotal = Math.max(1, ...selectedCloudStats.map((s) => s.total || 0));
 
   /** Used by: TokenFrequencyUnifiedTokenSectionInner color blending to convert hex swatches into RGB channels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
   const hexToRgb = (hex: string) => {
@@ -196,7 +196,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
     };
   });
   const proportionByToken = new Map<string, number>(
-    words.map((word) => [word.text, Number(word.proportion) || 0.5]),
+    words.map((word) => [word.text, word.proportion || 0.5]),
   );
 
   // Measure the card body so the SVG fills the actual available width
@@ -251,7 +251,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
               size="sm"
               aria-label="Download word cloud"
               title="Download word cloud"
-              onClick={() => onDownloadWordCloud('unified', 'Unified Word Cloud')}
+              onClick={() => { onDownloadWordCloud('unified', 'Unified Word Cloud'); }}
             >
               <Download className="h-4 w-4" />
             </Button>
@@ -295,7 +295,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
 
                 <div className="flex w-full justify-center overflow-visible">
                   <svg
-                    ref={(element) => registerWordCloudRef('unified', element)}
+                    ref={(element) => { registerWordCloudRef('unified', element); }}
                     width={effectiveCloudWidth}
                     height={effectiveCloudHeight}
                     xmlns="http://www.w3.org/2000/svg"
@@ -322,11 +322,13 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
                               key={tokenText}
                               fill={blend(Math.max(0, Math.min(1, proportion)))}
                               textAnchor="middle"
-                              transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
+                              transform={`translate(${String(word.x)}, ${String(word.y)}) rotate(${String(word.rotate)})`}
                               fontSize={word.size}
                               fontFamily={word.font}
                               className="cursor-pointer transition-colors"
-                              onClick={() => tokenText && onTokenClick(tokenText)}
+                              onClick={() => {
+                                if (tokenText) onTokenClick(tokenText);
+                              }}
                               onContextMenu={(event) => {
                                 event.preventDefault();
                                 if (tokenText) {
@@ -366,7 +368,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
             return (
               <TokenFrequencyStatisticsTable
                 statistics={statistics.filter(
-                  (entry) => !appliedStopSet.has(String(entry?.token ?? '').toLowerCase()),
+                  (entry) => !appliedStopSet.has(entry.token.toLowerCase()),
                 )}
                 onDownloadFrequencyCsv={onDownloadFrequencyCsv}
                 tokenFilter={tokenFilter}

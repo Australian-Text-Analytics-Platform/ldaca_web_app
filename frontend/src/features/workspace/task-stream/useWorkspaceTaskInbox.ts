@@ -47,17 +47,17 @@ const normalizeTimestamp = (value: unknown): number => {
 const sortTasksByTime = (tasks: TaskItem[] = []) =>
   tasks.toSorted((a, b) => {
     const tb = normalizeTimestamp(
-      (b as InternalTask)?.__event_timestamp ??
-        b?.finished_at ??
-        b?.started_at ??
-        b?.created_at ??
+      (b as InternalTask).__event_timestamp ??
+        b.finished_at ??
+        b.started_at ??
+        b.created_at ??
         0,
     );
     const ta = normalizeTimestamp(
-      (a as InternalTask)?.__event_timestamp ??
-        a?.finished_at ??
-        a?.started_at ??
-        a?.created_at ??
+      (a as InternalTask).__event_timestamp ??
+        a.finished_at ??
+        a.started_at ??
+        a.created_at ??
         0,
     );
     return tb - ta;
@@ -71,7 +71,7 @@ const sortTasksByTime = (tasks: TaskItem[] = []) =>
 const buildTaskMap = (tasks: TaskItem[] = []) => {
   const map = new Map<string, TaskItem>();
   tasks.forEach((task) => {
-    const taskId = task?.task_id;
+    const taskId = task.task_id;
     if (taskId) {
       map.set(taskId, task);
     }
@@ -93,7 +93,9 @@ const TERMINAL_STATES = new Set(['successful', 'failed', 'cancelled']);
  * Used by: local callers in workspace/useWorkspaceTaskInbox module because backend states must be compared case-insensitively.
  * Flow: coerce missing states to an empty string and lowercase the result before terminal-state checks.
  */
-const normalizeState = (value: unknown): string => String(value ?? '').toLowerCase();
+const normalizeState = (value: unknown): string =>
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- value may be a non-string state; default coercion is intended
+  String(value ?? '').toLowerCase();
 
 /**
  * Reads the synthetic event timestamp attached during merge.
@@ -101,7 +103,7 @@ const normalizeState = (value: unknown): string => String(value ?? '').toLowerCa
  * Flow: extract the client-only timestamp marker from merged task rows and normalize it through the same timestamp parser.
  */
 const getEventTimestamp = (task: TaskItem | undefined): number =>
-  normalizeTimestamp((task as InternalTask | undefined)?.__event_timestamp ?? 0);
+  normalizeTimestamp((task)?.__event_timestamp ?? 0);
 
 /**
  * Reads the synthetic event sequence used to break same-timestamp ties.
@@ -109,7 +111,7 @@ const getEventTimestamp = (task: TaskItem | undefined): number =>
  * Flow: read the client-only sequence marker, accept only finite numbers, and default missing metadata to zero.
  */
 const getEventSequence = (task: TaskItem | undefined): number => {
-  const value = (task as InternalTask | undefined)?.__event_sequence;
+  const value = (task)?.__event_sequence;
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 };
 
@@ -178,7 +180,7 @@ const mergeTaskUpdates = (
   const nextMap = options.replaceAll ? new Map<string, TaskItem>() : new Map(previousMap);
 
   updates.forEach(({ task, eventTimestamp, eventSequence }) => {
-    if (!task || !task.task_id) return;
+    if (!task.task_id) return;
 
     const existing = nextMap.get(task.task_id) ?? previousMap.get(task.task_id);
     const merged: InternalTask = {
@@ -208,7 +210,7 @@ const TERMINAL_TASK_STATES = new Set(['successful', 'failed', 'cancelled']);
  * Flow: ignore missing and tab-owned task types, then refresh only terminal background tasks that can mutate graph data.
  */
 const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
-  if (!task?.task_type || !task?.state) {
+  if (!task?.task_type || !task.state) {
     return false;
   }
   if (TAB_ASSOCIATED_TASK_TYPES.has(task.task_type)) {
@@ -289,23 +291,24 @@ export const useWorkspaceTaskInbox = (
       }
       case 'task_changed': {
         if (payload.task) {
+          const changedTask = payload.task;
           const seq = nextEventSequence();
           const eventTimestamp = normalizeTimestamp(payload.timestamp);
           setTasks((prevTasks: TaskItem[]) =>
             mergeTaskUpdates(prevTasks, [
               {
-                task: payload.task as TaskItem,
+                task: changedTask,
                 eventTimestamp,
                 eventSequence: seq,
               },
             ]),
           );
 
-          if (payload.task?.task_type === 'ldaca_import' && payload.task.state === 'successful') {
+          if (changedTask.task_type === 'ldaca_import' && changedTask.state === 'successful') {
             void queryClient.invalidateQueries({ queryKey: queryKeys.files });
           }
 
-          if (workspaceId && shouldRefreshGraphFallback(payload.task as TaskItem)) {
+          if (workspaceId && shouldRefreshGraphFallback(changedTask)) {
             void queryClient.invalidateQueries({
               queryKey: queryKeys.workspaceGraph(workspaceId),
             });
@@ -337,18 +340,22 @@ export const useWorkspaceTaskInbox = (
             parentTaskId,
             parentNodeId,
             materializedPath,
-            timestamp: normalizeTimestamp(payload.timestamp) ?? Date.now(),
+            timestamp: normalizeTimestamp(payload.timestamp),
           });
         }
         break;
       }
       case 'analysis_save_failed': {
         if (payload.task_type === 'topic_modeling') {
+          // Empty/missing message falls back to a generic label, so `||` is intentional.
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           setTransientError(payload.message || 'Analysis save failed');
         }
         break;
       }
       case 'error': {
+        // Empty/missing message falls back to a generic label, so `||` is intentional.
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         setTransientError(payload.message || 'Task stream error');
         break;
       }

@@ -15,14 +15,14 @@ export const useZoom = ({ keyboardShortcuts = false, initial = 1 }: UseZoomOptio
   const clamp = useCallback((v: number) => Math.min(DOC_ZOOM_MAX, Math.max(DOC_ZOOM_MIN, v)), []);
 
   const zoomIn = useCallback(
-    () => setZoom((z) => clamp(parseFloat((z + DOC_ZOOM_STEP).toFixed(2)))),
+    () => { setZoom((z) => clamp(parseFloat((z + DOC_ZOOM_STEP).toFixed(2)))); },
     [clamp],
   );
   const zoomOut = useCallback(
-    () => setZoom((z) => clamp(parseFloat((z - DOC_ZOOM_STEP).toFixed(2)))),
+    () => { setZoom((z) => clamp(parseFloat((z - DOC_ZOOM_STEP).toFixed(2)))); },
     [clamp],
   );
-  const zoomReset = useCallback(() => setZoom(1), []);
+  const zoomReset = useCallback(() => { setZoom(1); }, []);
 
   useEffect(() => {
     if (!keyboardShortcuts) return;
@@ -40,7 +40,7 @@ export const useZoom = ({ keyboardShortcuts = false, initial = 1 }: UseZoomOptio
       }
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => { window.removeEventListener('keydown', onKeyDown); };
   }, [keyboardShortcuts, clamp]);
 
   return { zoom, zoomIn, zoomOut, zoomReset, clamp };

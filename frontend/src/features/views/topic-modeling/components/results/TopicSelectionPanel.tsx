@@ -3,16 +3,16 @@ import { Search, X } from 'lucide-react';
 import { matchChecklistOption } from '@/features/views/preprocessing/filter/utils/checklistSearch';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
-type TopicLike = {
+interface TopicLike {
   id: number;
   label: string;
   size?: number[];
   total_size?: number | null;
   x?: number;
   y?: number;
-};
+}
 
-type Props = {
+interface Props {
   topics: TopicLike[];
   selectedTopicIds: Set<number>;
   onToggleTopicSelection: (id: number) => void;
@@ -24,7 +24,7 @@ type Props = {
   renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
   hoveredTopicId: number | null;
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
-};
+}
 
 /** Used by: TopicSelectionPanel filtering to check whether a topic is inside the current zoom domain because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 function isTopicInDomain(topic: TopicLike, domain: ZoomDomain): boolean {
@@ -98,8 +98,8 @@ export function TopicSelectionPanel({
                 <div
                   key={topic.id}
                   className={`flex items-center justify-between rounded-lg border border-border p-2 transition-colors ${isHovered ? 'bg-accent' : 'bg-muted/50'}`}
-                  onMouseEnter={() => setHoveredTopicId(topic.id)}
-                  onMouseLeave={() => setHoveredTopicId(null)}
+                  onMouseEnter={() => { setHoveredTopicId(topic.id); }}
+                  onMouseLeave={() => { setHoveredTopicId(null); }}
                 >
                   <div className="min-w-0 flex-1">
                     <span className="text-sm font-medium text-foreground">Topic {topic.id}</span>
@@ -110,8 +110,8 @@ export function TopicSelectionPanel({
                   <button
                     type="button"
                     className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => onToggleTopicSelection(topic.id)}
-                    aria-label={`Remove topic ${topic.id}`}
+                    onClick={() => { onToggleTopicSelection(topic.id); }}
+                    aria-label={`Remove topic ${String(topic.id)}`}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -132,7 +132,7 @@ export function TopicSelectionPanel({
           <input
             type="text"
             value={topicSearchQuery}
-            onChange={(e) => onTopicSearchQueryChange(e.target.value)}
+            onChange={(e) => { onTopicSearchQueryChange(e.target.value); }}
             placeholder="Search representative words…"
             className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring focus:outline-hidden"
           />
@@ -151,15 +151,15 @@ export function TopicSelectionPanel({
                     ? 'border-l-[3px] border-l-green-500 border-green-200 bg-green-50/60 dark:border-green-800 dark:bg-green-950/20'
                     : 'border-border/60 bg-card'
                 } ${isHovered ? (isSelected ? 'bg-green-100/80 dark:bg-green-950/30' : 'bg-accent/70') : ''}`}
-                onClick={() => onToggleTopicSelection(topic.id)}
+                onClick={() => { onToggleTopicSelection(topic.id); }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     onToggleTopicSelection(topic.id);
                   }
                 }}
-                onMouseEnter={() => setHoveredTopicId(topic.id)}
-                onMouseLeave={() => setHoveredTopicId(null)}
+                onMouseEnter={() => { setHoveredTopicId(topic.id); }}
+                onMouseLeave={() => { setHoveredTopicId(null); }}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">Topic {topic.id}</span>

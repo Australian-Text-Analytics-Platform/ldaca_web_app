@@ -29,7 +29,7 @@ const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
   /** Loads workspace summaries for selectors and launch screens. */
   sorting: { sort_by: null, descending: false },
   filtering: { column: null, value: null, op: 'contains' },
-}) as NodeDataResponse;
+});
 
 interface WorkspaceQueriesParams {
   authHeaders: Record<string, string>;
@@ -142,13 +142,13 @@ export const useWorkspaceQueries = ({
     staleTime: 30 * 1000,
   });
 
-  const workspaces = workspacesQuery.data || [];
+  const workspaces = workspacesQuery.data ?? [];
   const currentWorkspace =
-    workspaces.find((workspace) => workspace.id === currentWorkspaceId) || null;
-  const workspaceGraph = graphQuery.data || null;
+    workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? null;
+  const workspaceGraph = graphQuery.data ?? null;
 
   const nodes = workspaceGraph?.nodes ?? [];
-  const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null;
 
   const selectedNodes = selectedNodeIds
     .map((id: string) => nodes.find((node) => node.id === id))
@@ -174,11 +174,11 @@ export const useWorkspaceQueries = ({
 
   const queryErrorState = useMemo(
     () => ({
-      workspaces: workspacesQuery.error?.message || null,
-      currentWorkspace: currentWorkspaceQuery.error?.message || null,
-      nodes: graphQuery.error?.message || null,
-      graph: graphQuery.error?.message || null,
-      nodeData: nodeDataQuery.error?.message || null,
+      workspaces: workspacesQuery.error?.message ?? null,
+      currentWorkspace: currentWorkspaceQuery.error?.message ?? null,
+      nodes: graphQuery.error?.message ?? null,
+      graph: graphQuery.error?.message ?? null,
+      nodeData: nodeDataQuery.error?.message ?? null,
     }),
     [
       workspacesQuery.error?.message,

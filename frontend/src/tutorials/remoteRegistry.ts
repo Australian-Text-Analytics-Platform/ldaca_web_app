@@ -22,11 +22,11 @@ import {
 
 const CACHE_KEY = 'ldaca.docs.registry.v1';
 
-type CachedEnvelope = {
+interface CachedEnvelope {
   schemaVersion: number;
   fetchedAt: number;
   payload: PartialRemoteRegistry;
-};
+}
 
 /** Validates only the loose shape the frontend needs before merging remote docs data. */
 /**

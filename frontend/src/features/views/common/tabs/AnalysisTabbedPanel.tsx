@@ -49,6 +49,7 @@ export function AnalysisTabbedPanel({
 }: AnalysisTabbedPanelProps) {
   const items: ChromeTabItem[] = tabs.map((tab) => ({
     id: tab.tab_id,
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty title should fall back to 'Untitled'
     title: tab.title || 'Untitled',
   }));
 

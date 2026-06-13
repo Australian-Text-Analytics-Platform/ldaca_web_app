@@ -10,7 +10,10 @@ export const normalizeIsoDraft = (txt: string): string => {
   if (!s) return s;
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s += 'T00:00:00+00:00';
   if (/T\d{2}:\d{2}(\+00:00)?$/.test(s))
-    s = s.replace(/T(\d{2}:\d{2})(\+00:00)?$/, (_m, hm, tz) => `T${hm}:00${tz || '+00:00'}`);
+    s = s.replace(
+      /T(\d{2}:\d{2})(\+00:00)?$/,
+      (_m: string, hm: string, tz: string | undefined) => `T${hm}:00${tz ?? '+00:00'}`,
+    );
   if (/T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) s += '+00:00';
   s = s.replace(/Z$/, '+00:00');
   return s;
@@ -31,7 +34,7 @@ export const parseIsoToLocalDate = (input: string): Date | null => {
   if (/T\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2})?$/.test(candidate)) {
     candidate = candidate.replace(
       /T(\d{2}:\d{2})(Z|[+-]\d{2}:?\d{2})?$/,
-      (_m, hm, tz) => `T${hm}:00${tz || '+00:00'}`,
+      (_m: string, hm: string, tz: string | undefined) => `T${hm}:00${tz ?? '+00:00'}`,
     );
   }
   if (/T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(candidate)) {
@@ -41,7 +44,7 @@ export const parseIsoToLocalDate = (input: string): Date | null => {
   const d = new Date(candidate);
   if (isNaN(d.getTime())) return null;
   try {
-    const m = candidate.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(candidate);
     if (m) {
       const [, Y, M, D, H, Min, S] = m;
       return new Date(Number(Y), Number(M) - 1, Number(D), Number(H), Number(Min), Number(S));
@@ -63,7 +66,7 @@ const padNumber = (value: number): string => value.toString().padStart(2, '0');
  * Used by: dateTimeUtils utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  */
 export const toIsoUtcString = (date: Date): string => {
-  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}:${padNumber(date.getSeconds())}+00:00`;
+  return `${String(date.getFullYear())}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}:${padNumber(date.getSeconds())}+00:00`;
 };
 
 /**

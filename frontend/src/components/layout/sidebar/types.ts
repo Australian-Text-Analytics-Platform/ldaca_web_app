@@ -4,9 +4,10 @@ export type SidebarTaskStatus =
   | 'successful'
   | 'failed'
   | 'cancelled'
-  | string;
+  // Keep literal autocomplete while still accepting arbitrary backend status strings.
+  | (string & {});
 
-export type SidebarTaskRecord = {
+export interface SidebarTaskRecord {
   task_id: string;
   task_type?: string;
   name?: string;
@@ -20,11 +21,11 @@ export type SidebarTaskRecord = {
   finished_at?: number | string | null;
   progress?: number;
   progress_message?: string;
-};
+}
 
 export type SidebarNodeShape = [number | null, number | null];
 
-export type SidebarWorkspaceNode = {
+export interface SidebarWorkspaceNode {
   id: string;
   name?: string;
   label?: string;
@@ -38,4 +39,4 @@ export type SidebarWorkspaceNode = {
     shape?: SidebarNodeShape;
     [key: string]: unknown;
   };
-};
+}

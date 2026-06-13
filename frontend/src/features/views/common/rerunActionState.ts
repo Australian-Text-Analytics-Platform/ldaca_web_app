@@ -14,7 +14,7 @@ import { normalizeStringArray } from './parameterComparison';
  * Used by: every analysis ``*Feature`` to derive its primary action button and
  * the clear button, so all views share one consistent post-run experience.
  */
-export type RerunActionStateInput = {
+export interface RerunActionStateInput {
   hasWorkspace: boolean;
   /** Inputs + any required params form a runnable request. */
   isRunnable: boolean;
@@ -24,14 +24,14 @@ export type RerunActionStateInput = {
   hasChanges: boolean;
   isBusy?: boolean;
   hasResults?: boolean;
-};
+}
 
-export type RerunActionState = {
+export interface RerunActionState {
   runDisabled: boolean;
   clearDisabled: boolean;
   runLabel: 'Run' | 'Re-run';
   runDisabledReason: string | undefined;
-};
+}
 
 /**
  * Derives the primary button label/disabled state and the clear-button state.
@@ -67,10 +67,10 @@ export const getRerunActionState = ({
 };
 
 /** A request's node selection, normalized for order-independent comparison. */
-export type NodeSelectionSignature = {
+export interface NodeSelectionSignature {
   nodeIds: string[];
   nodeColumns: Record<string, string>;
-};
+}
 
 /**
  * Builds an order-independent signature of the current node inputs.
@@ -83,7 +83,7 @@ export const nodeSelectionSignature = (
   const nodeIds = normalizeStringArray(selections.map((s) => s.nodeId));
   const nodeColumns: Record<string, string> = {};
   selections.forEach((s) => {
-    if (s.nodeId) nodeColumns[s.nodeId] = s.column ?? '';
+    if (s.nodeId) nodeColumns[s.nodeId] = s.column;
   });
   return { nodeIds, nodeColumns };
 };

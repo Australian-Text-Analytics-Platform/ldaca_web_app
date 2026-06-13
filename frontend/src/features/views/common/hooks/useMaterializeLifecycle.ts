@@ -10,7 +10,7 @@ const TERMINAL_STATES: ReadonlySet<TerminalState> = new Set(['successful', 'fail
 const isTerminalState = (value: unknown): value is TerminalState =>
   typeof value === 'string' && TERMINAL_STATES.has(value as TerminalState);
 
-export type UseMaterializeLifecycleParams = {
+export interface UseMaterializeLifecycleParams {
   /**
    * Task type to subscribe to via {@link useAnalysisTaskStatus}, e.g.
    * `'concordance_materialize'` or `'quotation_materialize'`.
@@ -32,7 +32,7 @@ export type UseMaterializeLifecycleParams = {
    * state (`failed` or `cancelled`). Use it to surface a toast.
    */
   onTerminalFailure?: (nodeId: string, state: 'failed' | 'cancelled') => void;
-};
+}
 
 /**
  * Watches `<feature>_materialize` task status and, on terminal state, clears
@@ -69,10 +69,10 @@ export function useMaterializeLifecycle({
     if (trackedEntries.length === 0) return;
 
     for (const task of status.tasks) {
-      const taskId = task?.task_id;
+      const taskId = task.task_id;
       if (!taskId) continue;
       if (processedTaskIdsRef.current.has(taskId)) continue;
-      const state = task?.state;
+      const state = task.state;
       if (!isTerminalState(state)) continue;
 
       const nodeEntry = trackedEntries.find(([, trackedId]) => trackedId === taskId);

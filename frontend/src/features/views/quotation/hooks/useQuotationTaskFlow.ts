@@ -48,11 +48,8 @@ function getErrorMessage(error: unknown): string {
       /* ignore */
     }
   }
-  if (
-    typeof (err as Record<string, unknown>)?.message === 'string' &&
-    ((err as Record<string, unknown>)?.message as string).trim().length
-  )
-    return (err as Record<string, unknown>).message as string;
+  const message = err?.message;
+  if (typeof message === 'string' && message.trim().length) return message;
   return 'An unexpected error occurred while loading quotations.';
 }
 
@@ -104,11 +101,11 @@ interface QuotationLock {
   openEngineDialog: () => void;
 }
 
-type Params = {
+interface Params {
   state: QuotationState;
   actions: QuotationActions;
   lock: QuotationLock;
-};
+}
 
 /** Bundles quotation task lifecycle handlers so the feature component stays render-focused. */
 /**
@@ -168,8 +165,10 @@ export function useQuotationTaskFlow({
    */
   const resolveNodeLabel = (nodeId: string): string => {
     const match = displayedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nodeId);
+    // node label fields may be '' and must fall through to the next identifier source
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const rawLabel = match?.name || match?.label || match?.id || nodeId;
-    return String(rawLabel);
+    return rawLabel;
   };
   // Converts the UI engine selection into the backend request shape, validating remote URLs first.
   /**
@@ -254,6 +253,8 @@ export function useQuotationTaskFlow({
   ) => {
     if (!currentWorkspaceId) return null;
     const selection = activeSelections.find((s) => s.nodeId === nodeId);
+    // an empty column override should fall through to the active selection's column
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const column = overrides?.columnOverride || selection?.column;
     if (!column) return null;
 
@@ -319,7 +320,7 @@ export function useQuotationTaskFlow({
     if (!context) return null;
 
     const { nodeId, column } = context;
-    const st = nodeState[nodeId] || {
+    const st = nodeState[nodeId] ?? {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
       sortBy: undefined,
@@ -327,10 +328,10 @@ export function useQuotationTaskFlow({
     };
 
     const payload: QuotationResultQuery = {
-      page: overrides.page ?? st.currentPage ?? 1,
-      page_size: overrides.page_size ?? st.pageSize ?? DEFAULT_PAGE_SIZE,
+      page: overrides.page ?? st.currentPage,
+      page_size: overrides.page_size ?? st.pageSize,
       sort_by: overrides.sort_by ?? st.sortBy ?? null,
-      descending: overrides.descending ?? st.descending ?? false,
+      descending: overrides.descending ?? st.descending,
     };
 
     try {
@@ -342,7 +343,7 @@ export function useQuotationTaskFlow({
         path: { task_id: taskId },
         throwOnError: true,
       });
-      if (!response || !('columns' in response)) return null;
+      if (!('columns' in response)) return null;
       applyContextLengthPreferenceFromResult(response);
       updateResultState(nodeId, column, response);
       setHasLoaded(true);
@@ -421,9 +422,9 @@ export function useQuotationTaskFlow({
    * Flow: ignore non-sortable columns, toggle sort direction for repeated columns, then fetch fresh unlocked results or update locked stored results.
    */
   const handleSort = async (nodeId: string, column: string) => {
-    const sortableColumns = new Set(originalColumnsByNode[nodeId] || []);
+    const sortableColumns = new Set(originalColumnsByNode[nodeId] ?? []);
     if (!sortableColumns.has(column)) return;
-    const st = nodeState[nodeId] || {
+    const st = nodeState[nodeId] ?? {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
       sortBy: undefined,

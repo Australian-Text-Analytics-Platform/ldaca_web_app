@@ -12,8 +12,8 @@ describe('isStaleAnalysisResult', () => {
   it('should reject polling regressions from terminal states', () => {
     expect(
       isStaleAnalysisResult(
-        { state: 'successful', value: 'final' },
-        { state: 'running', value: 'old poll' },
+        { state: 'successful', value: 'final' } as ResultState,
+        { state: 'running', value: 'old poll' } as ResultState,
       ),
     ).toBe(true);
   });

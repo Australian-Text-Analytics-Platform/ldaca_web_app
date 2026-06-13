@@ -61,7 +61,11 @@ const LDACA_PORTAL_COLLECTION_URL = 'https://data.ldaca.edu.au/collection';
 function formatLdacaStat(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ');
   if (value === undefined || value === null) return '';
-  return String(value);
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
 }
 
 /**
@@ -74,6 +78,8 @@ function ldacaFilterOptions(records: LdacaSearchResult[], field: 'collections' |
   const seen = new Set<string>();
   const values: string[] = [];
   for (const record of records) {
+    // record is an Oni API response; the array field may be absent at runtime despite the type
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     for (const value of record[field] ?? []) {
       if (!seen.has(value)) {
         seen.add(value);
@@ -108,10 +114,13 @@ function formatLdacaFilterLabel(value: string) {
  * Used by: local callers in data-loader/DataLoaderDialogs module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
 function ldacaRecordUrl(record: LdacaSearchResult) {
+  // crate_id may be '' on malformed records and must fall through to id to build a valid URL
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   const identifier = record.crate_id || record.id;
   if (/^https?:\/\//i.test(identifier)) return identifier;
 
   const encodedIdentifier = encodeURIComponent(identifier);
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   const encodedCrateId = encodeURIComponent(record.crate_id || identifier);
   return `${LDACA_PORTAL_COLLECTION_URL}?id=${encodedIdentifier}&_crateId=${encodedCrateId}`;
 }
@@ -132,6 +141,8 @@ function LdacaRecordCard({
   importingId?: string;
   onImport: (recordId: string) => void;
 }) {
+  // stats is an Oni API field; guard against malformed records that omit it
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const stats = Object.entries(record.stats || {}).slice(0, 3);
   const isImporting = importingId === record.id;
 
@@ -151,6 +162,8 @@ function LdacaRecordCard({
               </a>
             </h3>
             <p className="text-muted-foreground text-xs break-all">
+              {/* crate_id may be '' on malformed records and must fall through to id */}
+              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
               {record.crate_id || record.id}
             </p>
           </div>
@@ -163,6 +176,8 @@ function LdacaRecordCard({
                 {typeName}
               </Badge>
             ))}
+            {/* file_formats is an Oni API field that may be absent at runtime despite the type */}
+            {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
             {(record.file_formats ?? []).slice(0, 3).map((fileFormat) => (
               <Badge key={fileFormat} variant="outline" className="text-xs">
                 {fileFormat}
@@ -191,7 +206,7 @@ function LdacaRecordCard({
           type="button"
           size="sm"
           className="shrink-0"
-          onClick={() => onImport(record.id)}
+          onClick={() => { onImport(record.id); }}
           disabled={!record.importable || Boolean(importingId)}
         >
           {isImporting ? (
@@ -206,7 +221,7 @@ function LdacaRecordCard({
   );
 }
 
-export type DataLoaderDialogsProps = {
+export interface DataLoaderDialogsProps {
   noWorkspaceAlert: {
     open: boolean;
     onClose: () => void;
@@ -267,7 +282,7 @@ export type DataLoaderDialogsProps = {
     loading: boolean;
     onClose: () => void;
   };
-};
+}
 
 /**
  * Collects the modal/dialog surfaces owned by the Data Loader. The feature
@@ -336,7 +351,7 @@ export function DataLoaderDialogs({
    * preference action used by `DataLoaderFeature`.
    * Called by: DataLoaderDialogs internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const handleTokenSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleTokenSubmit = (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedToken = tokenDraft.trim();
     if (!trimmedToken) {
@@ -380,6 +395,8 @@ export function DataLoaderDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Invalid workspace name</AlertDialogTitle>
             <AlertDialogDescription>
+              {/* an empty alert message should fall through to the default copy */}
+              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
               {workspaceNameAlert.message ||
                 'Workspace names cannot include path separators or traversal sequences.'}
             </AlertDialogDescription>
@@ -401,7 +418,9 @@ export function DataLoaderDialogs({
             <AlertDialogTitle>Delete workspace?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteWorkspace.target
-                ? `This will permanently delete "${deleteWorkspace.target.name || deleteWorkspace.target.id}" and its data. This action cannot be undone.`
+                ? // an empty workspace name should fall through to the id
+                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+                  `This will permanently delete "${deleteWorkspace.target.name || deleteWorkspace.target.id}" and its data. This action cannot be undone.`
                 : 'This will permanently delete the workspace and its data. This action cannot be undone.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -469,7 +488,7 @@ export function DataLoaderDialogs({
                 <Select
                   value={ldacaImport.searchMethod}
                   onValueChange={(value) =>
-                    ldacaImport.onSearchMethodChange(value as LdacaSearchMethod)
+                    { ldacaImport.onSearchMethodChange(value as LdacaSearchMethod); }
                   }
                 >
                   <SelectTrigger id="ldaca-search-method">
@@ -489,7 +508,7 @@ export function DataLoaderDialogs({
                 <Input
                   id="ldaca-search-query"
                   value={ldacaImport.query}
-                  onChange={(event) => ldacaImport.onQueryChange(event.target.value)}
+                  onChange={(event) => { ldacaImport.onQueryChange(event.target.value); }}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' && canSearch && !ldacaImport.searching) {
                       event.preventDefault();
@@ -600,7 +619,7 @@ export function DataLoaderDialogs({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => ldacaImport.onOpenChange(false)}
+              onClick={() => { ldacaImport.onOpenChange(false); }}
               disabled={ldacaImport.importing}
             >
               Close
@@ -643,7 +662,7 @@ export function DataLoaderDialogs({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => handleTokenDialogOpenChange(false)}
+                onClick={() => { handleTokenDialogOpenChange(false); }}
               >
                 Cancel
               </Button>
@@ -675,13 +694,13 @@ export function DataLoaderDialogs({
               <Input
                 id="new-folder-name"
                 value={createFolder.name}
-                onChange={(event) => createFolder.onNameChange(event.target.value)}
+                onChange={(event) => { createFolder.onNameChange(event.target.value); }}
                 placeholder="Enter folder name"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => createFolder.onOpenChange(false)}>
+            <Button variant="outline" onClick={() => { createFolder.onOpenChange(false); }}>
               Cancel
             </Button>
             <Button
@@ -732,6 +751,8 @@ export function DataLoaderDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Invalid folder name</AlertDialogTitle>
             <AlertDialogDescription>
+              {/* an empty alert message should fall through to the default copy */}
+              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
               {folderNameAlert.message ||
                 'Folder names cannot include path separators or traversal sequences.'}
             </AlertDialogDescription>

@@ -4,14 +4,14 @@
  * Used by: TokenizerModelSelector and tokenizer selector unit tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  */
 export function collectDocumentColumnText(
-  rows: Array<Record<string, unknown>> | undefined,
+  rows: Record<string, unknown>[] | undefined,
   column: string,
 ): string {
   if (!rows?.length || !column) return '';
   return rows
     .map((row) => row[column])
     .filter((value) => value != null)
-    .map((value) => String(value).trim())
+    .map((value) => (typeof value === 'string' ? value : JSON.stringify(value)).trim())
     .filter(Boolean)
     .join('\n');
 }

@@ -43,7 +43,7 @@ export interface SequentialAnalysisResultsPanelProps {
   onXAxisTypeChange: (value: SequentialXAxisType) => void;
   onDownloadClick: () => void;
 
-  chartData: Array<Record<string, unknown>>;
+  chartData: Record<string, unknown>[];
   chartConfig: Record<string, { label?: string; color?: string }>;
   groupKeys: string[];
   groupPointCounts: Record<string, number>;
@@ -114,7 +114,7 @@ export function SequentialAnalysisResultsPanel({
           <span className="text-sm text-muted-foreground">Chart Type</span>
           <Select
             value={chartType}
-            onValueChange={(value) => onChartTypeChange(value as ChartTypeOption)}
+            onValueChange={(value) => { onChartTypeChange(value as ChartTypeOption); }}
           >
             <SelectTrigger className="w-35 text-sm">
               <SelectValue placeholder="Select chart" />
@@ -131,7 +131,7 @@ export function SequentialAnalysisResultsPanel({
           </span>
           <Select
             value={xAxisType}
-            onValueChange={(value) => onXAxisTypeChange(value as SequentialXAxisType)}
+            onValueChange={(value) => { onXAxisTypeChange(value as SequentialXAxisType); }}
           >
             <SelectTrigger
               className="w-35 text-sm"
@@ -175,7 +175,7 @@ export function SequentialAnalysisResultsPanel({
             <div className="mt-1 text-base font-semibold capitalize text-foreground">
               {summary.columnType === 'numeric'
                 ? summary.numericInterval != null
-                  ? `${summary.numericInterval}${summary.numericOrigin != null ? ` (origin ${summary.numericOrigin})` : ''}`
+                  ? `${String(summary.numericInterval)}${summary.numericOrigin != null ? ` (origin ${String(summary.numericOrigin)})` : ''}`
                   : '—'
                 : summary.frequencyDisplay}
             </div>
@@ -185,7 +185,7 @@ export function SequentialAnalysisResultsPanel({
               Total
             </span>
             <div className="mt-1 text-base font-semibold text-foreground">
-              {`${counts.total}/${counts.totalDocuments}`}
+              {`${String(counts.total)}/${String(counts.totalDocuments)}`}
             </div>
           </div>
           <div className="rounded-md border border-border/60 p-3">
@@ -193,7 +193,7 @@ export function SequentialAnalysisResultsPanel({
               Shown
             </span>
             <div className="mt-1 text-base font-semibold text-foreground">
-              {`${counts.shown}/${counts.shownDocuments}`}
+              {`${String(counts.shown)}/${String(counts.shownDocuments)}`}
             </div>
           </div>
           <div className="rounded-md border border-border/60 p-3">
@@ -201,7 +201,7 @@ export function SequentialAnalysisResultsPanel({
               Chosen
             </span>
             <div className="mt-1 text-base font-semibold text-foreground">
-              {`${counts.chosen}/${counts.chosenDocuments}`}
+              {`${String(counts.chosen)}/${String(counts.chosenDocuments)}`}
             </div>
           </div>
           <div className="rounded-md border border-border/60 p-3">

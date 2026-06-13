@@ -202,7 +202,7 @@ export const useUIStore = create<UIStore>()(
           set((state) => {
             state.modals[kind] = true;
             if (target !== undefined) {
-              state.modalTargets[kind] = target ?? null;
+              state.modalTargets[kind] = target;
             }
           }),
 

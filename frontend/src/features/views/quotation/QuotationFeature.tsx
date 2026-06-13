@@ -62,6 +62,7 @@ import {
 } from '../common';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { toCellText } from './quotationCellText';
 import { hasParameterDiff } from '../common/parameterComparison';
 
 import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
@@ -146,18 +147,18 @@ function buildQuotationResultState(
         }
       };
       addSpan(
-        row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx],
-        row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx],
+        row[QUOTATION_COLUMN_KEYS.speakerStartIdx],
+        row[QUOTATION_COLUMN_KEYS.speakerEndIdx],
         'speaker',
       );
       addSpan(
-        row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx],
-        row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx],
+        row[QUOTATION_COLUMN_KEYS.quoteStartIdx],
+        row[QUOTATION_COLUMN_KEYS.quoteEndIdx],
         'quote',
       );
       addSpan(
-        row?.[QUOTATION_COLUMN_KEYS.verbStartIdx],
-        row?.[QUOTATION_COLUMN_KEYS.verbEndIdx],
+        row[QUOTATION_COLUMN_KEYS.verbStartIdx],
+        row[QUOTATION_COLUMN_KEYS.verbEndIdx],
         'verb',
       );
       return { ...row, __spans: spans };
@@ -227,7 +228,7 @@ function QuotationFeature({
   const activeSelections = nodeColumnSelections;
   const activeNodeIds = nodeInputs.resolvedNodes.map((node) => node.id).slice(0, 1);
   const applyInputsFromSelections = (
-    selections: Array<{ nodeId: string; column?: string | null }>,
+    selections: { nodeId: string; column?: string | null }[],
   ) => {
     onTabInputsChange?.(
       selections
@@ -255,8 +256,8 @@ function QuotationFeature({
   const setEngineDialogOpen = useUIStore((state) => state.setModalOpen);
   const openModal = useUIStore((state) => state.openModal);
   const closeModal = useUIStore((state) => state.closeModal);
-  const openEngineDialog = () => openModal('quotationEngine');
-  const closeEngineDialog = () => closeModal('quotationEngine');
+  const openEngineDialog = () => { openModal('quotationEngine'); };
+  const closeEngineDialog = () => { closeModal('quotationEngine'); };
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   // Metadata visibility derives from the selected columns: any selection
   // shows the corresponding metadata columns in the results table.
@@ -348,7 +349,7 @@ function QuotationFeature({
   };
 
   useEffect(() => {
-    void Promise.resolve().then(() => setEngineError(null));
+    void Promise.resolve().then(() => { setEngineError(null); });
   }, [engineConfig.type, engineConfig.url]);
 
   const quotationResultRef = useRef<QuotationAnalysisResponse | null>(null);
@@ -393,6 +394,8 @@ function QuotationFeature({
     // Applies freshly fetched results to the active node table after lifecycle polling finishes.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onResultFetched: (result, _taskId) => {
+      // defensive: the analysis lifecycle may deliver an empty result on edge cases
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!result) return;
       const targetNode = displayedNodes[0];
       const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
@@ -420,12 +423,15 @@ function QuotationFeature({
     // Restores saved request settings, materialization metadata, and legacy tab inputs after reload.
     // Called by: useAnalysisFeature hydration because quotation restores must reapply engine settings, selected node/column, materialized path, and context length before rendering results. Flow: unwrap request data, normalize remote engine state, restore selection/materialization, then seed inputs once when a pre-input tab is loaded.
     onHydratedRequest: (requestPayload) => {
-      const requestData = ((requestPayload as Record<string, unknown>)?.data ??
+      const requestData = ((requestPayload as Record<string, unknown>).data ??
         requestPayload) as Record<string, unknown> | null;
       if (!requestData) return;
-      const nodeId = String(requestData?.node_id || requestData?.nodeId || '');
-      const column = String(requestData?.column || '');
-      const reqEngine = (requestData?.engine ?? null) as QuotationEngineConfig | null;
+      // legacy node_id/nodeId fields are unknown strings; '' must fall through to the next source
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      const nodeId = (requestData.node_id || requestData.nodeId || '') as string;
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      const column = (requestData.column || '') as string;
+      const reqEngine = (requestData.engine as QuotationEngineConfig | null) ?? null;
       if (!nodeId) return;
       if (reqEngine?.type === 'remote') {
         const trimmed = (reqEngine.url ?? '').trim();
@@ -479,7 +485,7 @@ function QuotationFeature({
   const applyContextLengthPreferenceFromResult = (
     payload: QuotationAnalysisResponse | Record<string, unknown>,
   ) => {
-    const prefs = payload?.preferences as Record<string, unknown> | undefined;
+    const prefs = payload.preferences as Record<string, unknown> | undefined;
     const prefValue = Number(prefs?.context_length ?? prefs?.contextLength);
     if (!Number.isFinite(prefValue)) {
       return;
@@ -552,7 +558,7 @@ function QuotationFeature({
     displayedNodes.some((node, idx) => {
       const nodeId = getNodeIdentifier(node, idx);
       const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
-      return !selection || !selection.column;
+      return !selection?.column;
     });
 
   const canRunQuotation =
@@ -590,7 +596,7 @@ function QuotationFeature({
   const materializeSummary = liveMaterializeSummary;
   const resultsByNode = liveResultsByNode;
 
-  const lastRunRequest = (serverRequest as Record<string, unknown> | null) ?? null;
+  const lastRunRequest = serverRequest ?? null;
   const currentQuotationParams = {
     engine_type: resolvedEnginePayload.type,
     engine_url:
@@ -604,13 +610,18 @@ function QuotationFeature({
     );
     return {
       engine_type: serverEngineType,
+      // an empty remote engine URL should resolve to null
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
       engine_url: serverEngineType === 'remote' ? serverEngineUrl || null : null,
     };
   };
   const serverNodeId = lastRunRequest
-    ? String(lastRunRequest.node_id || lastRunRequest.nodeId || '')
+    ? // legacy node_id/nodeId fields are unknown strings; '' must fall through to the next source
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      ((lastRunRequest.node_id || lastRunRequest.nodeId || '') as string)
     : '';
-  const serverColumn = lastRunRequest ? String(lastRunRequest.column || '') : '';
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  const serverColumn = lastRunRequest ? ((lastRunRequest.column || '') as string) : '';
   const hasLastRun = Boolean(lastRunRequest);
   const hasParamsChanged = !lastRunRequest
     ? true
@@ -731,10 +742,12 @@ function QuotationFeature({
             path: { task_id: parentTaskId },
             throwOnError: true,
           });
+          // defensive against a malformed API response that returns a non-object request body
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           const reqObj = (req as Record<string, unknown>) ?? {};
           const path =
             typeof reqObj.materialized_path === 'string'
-              ? (reqObj.materialized_path as string)
+              ? reqObj.materialized_path
               : null;
           if (path) {
             setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
@@ -819,7 +832,7 @@ function QuotationFeature({
    */
   const handleDetachConfirm = async () => {
     if (!pendingDetachNodeId) return;
-    const selectedColumns = selectedDetachColumns[pendingDetachNodeId] || [];
+    const selectedColumns = selectedDetachColumns[pendingDetachNodeId] ?? [];
     await handleDetach(
       pendingDetachNodeId,
       selectedColumns,
@@ -914,7 +927,7 @@ function QuotationFeature({
     <>
       <Dialog
         open={engineDialogOpen}
-        onOpenChange={(open) => setEngineDialogOpen('quotationEngine', open)}
+        onOpenChange={(open) => { setEngineDialogOpen('quotationEngine', open); }}
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -933,6 +946,8 @@ function QuotationFeature({
                 onValueChange={(value) => {
                   const next = value as QuotationEngineType;
                   if (next === 'remote') {
+                    // empty URLs should fall through to the next source
+                    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                     const url = lastRemoteUrl || engineConfig.url || '';
                     setEngineConfigStore({ type: 'remote', url });
                   } else {
@@ -1157,7 +1172,7 @@ function QuotationFeature({
                   className={`text-xs ${contextLengthError ? 'text-destructive' : 'text-muted-foreground'}`}
                 >
                   {contextLengthError ??
-                    `Enter a whole number between 0 and ${MAX_CONTEXT_LENGTH}.`}
+                    `Enter a whole number between 0 and ${String(MAX_CONTEXT_LENGTH)}.`}
                 </span>
               </div>
             </CardHeader>
@@ -1165,11 +1180,11 @@ function QuotationFeature({
               {displayedNodes.map((node, idx) => {
                 const nodeId = getNodeIdentifier(node, idx);
                 const selection = activeSelections.find((s) => s.nodeId === nodeId);
-                const textCol = selection?.column || '';
+                const textCol = selection?.column ?? '';
 
                 const resultState = resultsByNode[nodeId];
                 const rowsWithQuotes = (resultState?.rows ?? []).filter(
-                  (row) => row?.[QUOTATION_COLUMN_KEYS.quote],
+                  (row) => row[QUOTATION_COLUMN_KEYS.quote],
                 );
                 const visibleMetadataColumns = showMetadata ? resolvedMetadataColumns : [];
 
@@ -1189,7 +1204,7 @@ function QuotationFeature({
                     cols={cols}
                     rows={rowsWithQuotes}
                     pagination={resultState?.pagination}
-                    sortBy={resultState?.sorting?.sort_by}
+                    sortBy={resultState?.sorting.sort_by}
                     contextLength={contextLength}
                     hoverState={hoverState}
                     onHoverChange={setHoverState}
@@ -1199,7 +1214,7 @@ function QuotationFeature({
                     onRowClick={(row) => {
                       const record = { ...row };
                       const rawFullText = record[textCol];
-                      const fullText = rawFullText == null ? undefined : String(rawFullText);
+                      const fullText = rawFullText == null ? undefined : toCellText(rawFullText);
                       const quotationGeneratedCols = Object.values(QUOTATION_COLUMN_KEYS);
                       openRowDetail({
                         record,
@@ -1227,8 +1242,8 @@ function QuotationFeature({
                             // document breakdown until the summary lands.
                             <>
                               (Found{' '}
-                              {(resultState?.pagination?.total_source_rows ?? 0).toLocaleString()}{' '}
-                              {(resultState?.pagination?.total_source_rows ?? 0) === 1
+                              {(resultState?.pagination.total_source_rows ?? 0).toLocaleString()}{' '}
+                              {(resultState?.pagination.total_source_rows ?? 0) === 1
                                 ? 'quotation'
                                 : 'quotations'}{' '}
                               across the materialised corpus.)
@@ -1237,7 +1252,7 @@ function QuotationFeature({
                         ) : (
                           <GroupedResultsPageSizeSummary
                             groups={resultState?.groupedRows ?? []}
-                            totalProcessed={resultState?.pagination?.page_size}
+                            totalProcessed={resultState?.pagination.page_size}
                           />
                         )
                       }
@@ -1308,7 +1323,7 @@ function QuotationFeature({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorDialogOpen(false)}>OK</AlertDialogAction>
+            <AlertDialogAction onClick={() => { setErrorDialogOpen(false); }}>OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1336,19 +1351,19 @@ function QuotationFeature({
                 summaryFields: [
                   {
                     label: 'Quote Type',
-                    value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quoteType] ?? ''),
+                    value: toCellText(detailPayload.record[QUOTATION_COLUMN_KEYS.quoteType]),
                   },
                   {
                     label: 'Speaker',
-                    value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.speaker] ?? ''),
+                    value: toCellText(detailPayload.record[QUOTATION_COLUMN_KEYS.speaker]),
                   },
                   {
                     label: 'Verb',
-                    value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.verb] ?? ''),
+                    value: toCellText(detailPayload.record[QUOTATION_COLUMN_KEYS.verb]),
                   },
                   {
                     label: 'Quote',
-                    value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quote] ?? ''),
+                    value: toCellText(detailPayload.record[QUOTATION_COLUMN_KEYS.quote]),
                   },
                 ],
                 // Reuses the quotation detail renderer to show highlighted source text in the row panel.

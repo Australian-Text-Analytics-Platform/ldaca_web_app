@@ -87,7 +87,7 @@ export function allowedColumnsForNode(
   getColumnInfos?: ColumnInfoGetter,
 ): ColumnInfo[] {
   const fromGetter = getColumnInfos?.(node);
-  const infos = fromGetter && fromGetter.length ? fromGetter : mapColumnsToInfo(node);
+  const infos = fromGetter?.length ? fromGetter : mapColumnsToInfo(node);
   if (!constraints.allowedDataTypes?.length) return infos;
   return filterColumnsByType(infos, constraints.allowedDataTypes);
 }
@@ -131,7 +131,7 @@ export function validateAdd(
   if (constraints.maxNodes != null && current.length >= constraints.maxNodes) {
     return constraints.maxNodes === 1
       ? 'This view accepts a single node — remove the current one first'
-      : `This view accepts at most ${constraints.maxNodes} nodes`;
+      : `This view accepts at most ${String(constraints.maxNodes)} nodes`;
   }
   const allowed = allowedColumnsForNode(node, constraints, getColumnInfos);
   if (constraints.allowedDataTypes?.length && allowed.length === 0) {

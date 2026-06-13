@@ -29,7 +29,7 @@ import {
   getDispersionBarWidthPercent,
   getDispersionHits,
   getDispersionTextLength,
-  type ConcordanceDispersionRow,
+  toCellText,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
 } from '../concordanceViewModels';
@@ -48,7 +48,7 @@ const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are 
 // exists purely to drive ServerPaginationFooter's page math from rowCount
 // (which walks SOURCE documents, not displayed bin rows).
 const EMPTY_DISPERSION_ROWS: Record<string, unknown>[] = [];
-const EMPTY_DISPERSION_COLUMNS: ColumnDef<Record<string, unknown>, unknown>[] = [];
+const EMPTY_DISPERSION_COLUMNS: ColumnDef<Record<string, unknown>>[] = [];
 
 /** Used by: ConcordanceDispersionNodeBlock display-column assembly to prevent duplicate dispersion/metadata cells because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const dedupeColumns = (cols: string[]): string[] => {
@@ -83,7 +83,7 @@ const getDispersionColumnStyle = (
     return undefined;
   }
 
-  const columnWidth = `${Math.floor(visibleWidth * DISPERSION_COLUMN_WIDTH_RATIO)}px`;
+  const columnWidth = `${String(Math.floor(visibleWidth * DISPERSION_COLUMN_WIDTH_RATIO))}px`;
   return {
     width: columnWidth,
     minWidth: columnWidth,
@@ -95,9 +95,9 @@ const getDispersionColumnStyle = (
 // table extends beyond the viewport when needed, enabling horizontal scroll.
 /** Used by: ConcordanceDispersionNodeBlock tables to size visible metadata columns consistently because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const getMetadataColumnStyle = (isMetadataVisible: boolean): React.CSSProperties | undefined =>
-  isMetadataVisible ? { minWidth: `${METADATA_COLUMN_MIN_WIDTH_PX}px` } : undefined;
+  isMetadataVisible ? { minWidth: `${String(METADATA_COLUMN_MIN_WIDTH_PX)}px` } : undefined;
 
-export type ConcordanceDispersionNodeBlockProps = {
+export interface ConcordanceDispersionNodeBlockProps {
   nodeKey: string;
   nodeData: ConcordanceResultEntry;
   context: {
@@ -160,7 +160,7 @@ export type ConcordanceDispersionNodeBlockProps = {
   getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
   isBlockMaterialised: (nodeKey: string) => boolean;
   onDispersionDetach: (
-    nodes: Array<{ nodeId: string; column: string; nodeLabel: string }>,
+    nodes: { nodeId: string; column: string; nodeLabel: string }[],
     selectedBins: ReadonlySet<number> | null,
     binCount: number,
     options?: {
@@ -181,7 +181,7 @@ export type ConcordanceDispersionNodeBlockProps = {
   setCombinedPage: (page: number) => void;
   /** Read-only flag that disables Process All / Process Both / Dispersion Detach buttons while leaving chart exploration controls active. */
   readOnly?: boolean;
-};
+}
 
 /**
  * Rendered by: ConcordanceResultsPanel for each concordance dispersion result block because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
@@ -271,7 +271,7 @@ export function ConcordanceDispersionNodeBlock({
   const paginationTable = useServerTable<Record<string, unknown>>({
     data: EMPTY_DISPERSION_ROWS,
     columns: EMPTY_DISPERSION_COLUMNS,
-    rowCount: nodeData.pagination?.total_source_rows ?? 0,
+    rowCount: nodeData.pagination.total_source_rows,
     pageIndex: activePage - 1,
     pageSize: globalPageSize,
     onPaginationChange: (next) => {
@@ -293,7 +293,7 @@ export function ConcordanceDispersionNodeBlock({
       ? rows.reduce((max, row) => Math.max(max, getDispersionTextLength(row, column)), 0)
       : 0;
     const metaCols = nodeData.metadata.metadata_columns;
-    const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) =>
+    const visibleMetaCols = selectedMetadataColumns.filter((columnName) =>
       metaCols.includes(columnName),
     );
     const rawDisplayColumns = showMetadata
@@ -323,7 +323,7 @@ export function ConcordanceDispersionNodeBlock({
                   for (const nid of combinedNodeIds) {
                     if (materializedPaths[nid]) continue;
                     const col =
-                      effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                      effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
                     if (!col) continue;
                     void handleMaterialize(nid, col);
                   }
@@ -358,7 +358,7 @@ export function ConcordanceDispersionNodeBlock({
             </DisabledReasonTooltip>
             {(() => {
               const combinedSelection =
-                (selectedBinIndices['__COMBINED__'] as ReadonlySet<number> | undefined) ??
+                (selectedBinIndices.__COMBINED__ as ReadonlySet<number> | undefined) ??
                 EMPTY_BIN_SELECTION;
               const combinedMaterialisedBins = getMaterializedBinsForKey('__COMBINED__');
               const combinedHasSelection = combinedSelection.size > 0;
@@ -402,7 +402,8 @@ export function ConcordanceDispersionNodeBlock({
                           const sourceNode = panelSelectedNodes.find(
                             (node, idx) => getNodeIdentifier(node, idx) === nid,
                           );
-                          const label = (sourceNode?.name || sourceNode?.id || nid) as string;
+                          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string name/id must fall back to the next identifier
+                          const label = sourceNode?.name || sourceNode?.id || nid;
                           return { nodeId: nid, column: col, nodeLabel: label };
                         })
                         .filter(
@@ -422,7 +423,7 @@ export function ConcordanceDispersionNodeBlock({
                     <Plus className="mr-2 h-4 w-4" />
                     Add to Workspace
                     {combinedHasSelection
-                      ? ` (${combinedSelection.size} bin${combinedSelection.size === 1 ? '' : 's'})`
+                      ? ` (${String(combinedSelection.size)} bin${combinedSelection.size === 1 ? '' : 's'})`
                       : ''}
                   </Button>
                 </DisabledReasonTooltip>
@@ -464,7 +465,7 @@ export function ConcordanceDispersionNodeBlock({
                 ) : (
                   rows.map((row: Record<string, unknown>, idx: number) => {
                     const rawSrc = row.__source_node;
-                    const normalized = rawSrc ? rawSrc.toString().toLowerCase() : undefined;
+                    const normalized = rawSrc ? toCellText(rawSrc).toLowerCase() : undefined;
                     let color = normalized ? sourceColorMap[normalized] : undefined;
                     if (!color && rawSrc && normalized) {
                       const entry = Object.entries(sourceColorMap).find(([k]) =>
@@ -474,14 +475,14 @@ export function ConcordanceDispersionNodeBlock({
                     }
                     if (!color) {
                       if (rawSrc) {
-                        const chars = Array.from(rawSrc.toString()) as string[];
+                        const chars = Array.from(toCellText(rawSrc));
                         const hash = chars.reduce((a, c) => a + c.charCodeAt(0), 0);
                         color = defaultPalette[hash % defaultPalette.length];
                       } else {
                         color = '#ffffff';
                       }
                     }
-                    const bg = `${color}20`;
+                    const bg = `${String(color)}20`;
                     return (
                       <TableRow
                         key={idx}
@@ -499,24 +500,24 @@ export function ConcordanceDispersionNodeBlock({
                                 (n as Record<string, unknown>).data &&
                                 typeof (n as Record<string, unknown>).data === 'object'
                                   ? ((n as Record<string, unknown>).data as Record<string, unknown>)
-                                      ?.name
+                                      .name
                                   : undefined,
                                 n.label,
                                 (n as Record<string, unknown>).data &&
                                 typeof (n as Record<string, unknown>).data === 'object'
                                   ? ((n as Record<string, unknown>).data as Record<string, unknown>)
-                                      ?.label
+                                      .label
                                   : undefined,
                               ]
                                 .filter(Boolean)
                                 .map((v) => String(v).toLowerCase());
-                              return candidates.includes(String(sourceLabel).toLowerCase());
+                              return candidates.includes(toCellText(sourceLabel).toLowerCase());
                             });
                             const sel =
                               nodeObj &&
                               effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
                             if (nodeObj && sel?.column) {
-                              handleRowClick(row, String(nodeObj.id ?? ''), sel.column, hits);
+                              handleRowClick(row, nodeObj.id ?? '', sel.column, hits);
                             }
                           }
                         }}
@@ -544,10 +545,8 @@ export function ConcordanceDispersionNodeBlock({
                                 lowercaseMatches={lowercaseMatches}
                                 hiddenMatchedTexts={hiddenMatchedTexts}
                               />
-                            ) : row[c] !== undefined && row[c] !== null ? (
-                              String(row[c])
                             ) : (
-                              ''
+                              toCellText(row[c])
                             )}
                           </TableCell>
                         ))}
@@ -597,7 +596,7 @@ export function ConcordanceDispersionNodeBlock({
             table={paginationTable}
             pageIndex={activePage - 1}
             pageSize={globalPageSize}
-            rowCount={nodeData.pagination?.total_source_rows ?? 0}
+            rowCount={nodeData.pagination.total_source_rows}
             pageSizeLabel="Documents per batch"
             pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
             loading={combinedLoading}
@@ -622,8 +621,8 @@ export function ConcordanceDispersionNodeBlock({
           )}
           {!proportionalDispersionBars &&
             (() => {
-              const dispersionRows = rows as ConcordanceDispersionRow[];
-              const sourceNames = panelSelectedNodes.map((n) => n.name).filter(Boolean) as string[];
+              const dispersionRows = rows;
+              const sourceNames = panelSelectedNodes.map((n) => n.name).filter(Boolean);
               const dataBlockLabel = sourceNames.length > 0 ? sourceNames.join(', ') : 'Combined';
               const materialisedBins = getMaterializedBinsForKey('__COMBINED__');
               const materialised = isBlockMaterialised('__COMBINED__');
@@ -647,12 +646,12 @@ export function ConcordanceDispersionNodeBlock({
                   onBinCountChange={onBinCountChange}
                   selection={{
                     selectedIndices:
-                      (selectedBinIndices['__COMBINED__'] as ReadonlySet<number> | undefined) ??
+                      (selectedBinIndices.__COMBINED__ as ReadonlySet<number> | undefined) ??
                       EMPTY_BIN_SELECTION,
                     /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-                    onSelect: (index, shiftHeld) => onBinSelect('__COMBINED__', index, shiftHeld),
+                    onSelect: (index, shiftHeld) => { onBinSelect('__COMBINED__', index, shiftHeld); },
                     /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-                    onClear: () => onClearBinSelection('__COMBINED__'),
+                    onClear: () => { onClearBinSelection('__COMBINED__'); },
                   }}
                   onLegendCountsChange={handleLegendCountsChange}
                 />
@@ -671,7 +670,7 @@ export function ConcordanceDispersionNodeBlock({
     : 0;
   const allCols = nodeData.columns;
   const metaCols = nodeData.metadata.metadata_columns;
-  const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) =>
+  const visibleMetaCols = selectedMetadataColumns.filter((columnName) =>
     metaCols.includes(columnName),
   );
   const rawDisplayColumns = showMetadata
@@ -684,7 +683,7 @@ export function ConcordanceDispersionNodeBlock({
 
   const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
 
-  const detachingKey = detachNodeId ?? '';
+  const detachingKey = detachNodeId;
   const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
   // Two side-by-side data blocks share one synced page size, so processing only
@@ -717,7 +716,10 @@ export function ConcordanceDispersionNodeBlock({
             className="inline-block h-3 w-3 shrink-0 rounded-full"
             style={{ backgroundColor: context.nodeColor }}
           />
-          <h3 className="text-sm font-medium text-foreground">{context.displayName || nodeKey}</h3>
+          <h3 className="text-sm font-medium text-foreground">
+            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key */}
+            {context.displayName || nodeKey}
+          </h3>
         </div>
       )}
       <div
@@ -795,10 +797,8 @@ export function ConcordanceDispersionNodeBlock({
                             lowercaseMatches={lowercaseMatches}
                             hiddenMatchedTexts={hiddenMatchedTexts}
                           />
-                        ) : row[colKey] !== null && row[colKey] !== undefined ? (
-                          String(row[colKey])
                         ) : (
-                          ''
+                          toCellText(row[colKey])
                         )}
                       </TableCell>
                     ))}
@@ -829,17 +829,17 @@ export function ConcordanceDispersionNodeBlock({
               totalProcessed={batchProcessedCount(nodeData.pagination)}
             />
           );
-        return summary ? (
+        return (
           <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
             {summary}
           </div>
-        ) : null;
+        );
       })()}
       <ServerPaginationFooter
         table={paginationTable}
         pageIndex={activePage - 1}
         pageSize={globalPageSize}
-        rowCount={nodeData.pagination?.total_source_rows ?? 0}
+        rowCount={nodeData.pagination.total_source_rows}
         pageSizeLabel="Documents per batch"
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
@@ -852,7 +852,7 @@ export function ConcordanceDispersionNodeBlock({
               for (const nid of processTargetIds) {
                 if (materializedPaths[nid]) continue;
                 const col = isMultiBlock
-                  ? effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || ''
+                  ? (effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '')
                   : column;
                 if (!col) continue;
                 void handleMaterialize(nid, col);
@@ -929,7 +929,8 @@ export function ConcordanceDispersionNodeBlock({
                 onClick={() => {
                   if (!detachNodeId) return;
                   const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-                  const label = (detachNode?.name || nodeKey) as string;
+                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node key
+                  const label = detachNode?.name || nodeKey;
                   void onDispersionDetach(
                     [{ nodeId: detachNodeId, column, nodeLabel: label }],
                     nodeSelection,
@@ -955,7 +956,7 @@ export function ConcordanceDispersionNodeBlock({
                     <Plus className="mr-2 h-4 w-4" />
                     Add to Workspace
                     {nodeHasSelection
-                      ? ` (${nodeSelection.size} bin${nodeSelection.size === 1 ? '' : 's'})`
+                      ? ` (${String(nodeSelection.size)} bin${nodeSelection.size === 1 ? '' : 's'})`
                       : ''}
                   </>
                 )}
@@ -983,7 +984,8 @@ export function ConcordanceDispersionNodeBlock({
       )}
       {!proportionalDispersionBars &&
         (() => {
-          const dispersionRows = rows as ConcordanceDispersionRow[];
+          const dispersionRows = rows;
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key
           const dataBlockLabel = context.displayName || nodeKey;
           const materialisedBins = getMaterializedBinsForKey(nodeKey);
           const materialised = isBlockMaterialised(nodeKey);
@@ -1010,9 +1012,9 @@ export function ConcordanceDispersionNodeBlock({
                   (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
                   EMPTY_BIN_SELECTION,
                 /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-                onSelect: (index, shiftHeld) => onBinSelect(nodeKey, index, shiftHeld),
+                onSelect: (index, shiftHeld) => { onBinSelect(nodeKey, index, shiftHeld); },
                 /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-                onClear: () => onClearBinSelection(nodeKey),
+                onClear: () => { onClearBinSelection(nodeKey); },
               }}
               onLegendCountsChange={handleLegendCountsChange}
             />

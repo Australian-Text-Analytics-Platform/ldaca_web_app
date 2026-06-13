@@ -21,5 +21,5 @@ export function formatBytes(bytes: number): string {
   const units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
   const idx = Math.min(units.length - 1, Math.floor(Math.log10(bytes) / 3));
   const value = bytes / Math.pow(1000, idx);
-  return `${value < 10 && idx > 0 ? value.toFixed(1) : Math.round(value)} ${units[idx]}`;
+  return `${value < 10 && idx > 0 ? value.toFixed(1) : String(Math.round(value))} ${units[idx] ?? ''}`;
 }

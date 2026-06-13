@@ -51,7 +51,7 @@ export const captureFeedbackContext = (
   app_version: APP_VERSION,
   app_build: APP_BUILD,
   deployment: resolveDeployment(),
-  feature: useUIStore.getState().currentView ?? '',
+  feature: useUIStore.getState().currentView,
   user_role: overrides.user_role ?? 'anonymous',
   submitted_at: new Date().toISOString(),
 });
@@ -63,7 +63,7 @@ export const captureFeedbackContext = (
 export const buildSurveyUrl = (base: string, ctx: FeedbackContext): string => {
   const url = new URL(base);
   for (const [key, value] of Object.entries(ctx)) {
-    if (value) url.searchParams.set(key, value);
+    if (value) url.searchParams.set(key, String(value));
   }
   return url.toString();
 };

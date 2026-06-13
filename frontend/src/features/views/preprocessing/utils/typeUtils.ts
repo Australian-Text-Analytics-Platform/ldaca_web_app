@@ -90,9 +90,13 @@ export const formatPreviewValue = (value: unknown): string => {
     try {
       return JSON.stringify(value);
     } catch {
+      // Last-resort coercion when JSON.stringify fails (e.g. circular refs).
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       return String(value);
     }
   }
+  // value is now symbol/bigint/function; String() is the intended last resort.
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
   return String(value);
 };
 

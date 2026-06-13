@@ -46,13 +46,13 @@ export interface UsePreprocessingPreviewResult<Row = PreviewRow> {
 const DEFAULT_DEBOUNCE_MS = 600;
 const DEFAULT_PAGE_SIZE = 10;
 
-type PaginationState = {
+interface PaginationState {
   signature: string;
   initialPage: number;
   initialPageSize: number;
   page: number;
   pageSize: number;
-};
+}
 
 /**
  * Shared debounced preview loader for preprocessing tabs. Operation-specific
@@ -83,7 +83,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
       return JSON.stringify(request);
     } catch {
       // eslint-disable-next-line react-hooks/purity -- Fallback for non-serializable requests; only reached when JSON.stringify throws
-      return `preview-signature-${Date.now()}`;
+      return `preview-signature-${String(Date.now())}`;
     }
   })();
 
@@ -174,7 +174,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
             });
           }
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           if (cancelled || controller.signal.aborted) return;
           const message = err instanceof Error ? err.message : 'Failed to load preview data';
           setError(message);

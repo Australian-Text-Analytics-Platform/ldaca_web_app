@@ -8,7 +8,7 @@ export interface TokenFrequencyAnalysisParams {
 export interface TokenFrequencyNodeContextArgs {
   lastCompareNodeIds?: string[];
   analysisParams?: TokenFrequencyAnalysisParams | null | undefined;
-  selectedNodes?: Array<{ id?: string | null | undefined }>;
+  selectedNodes?: { id?: string | null | undefined }[];
   nodeColumnSelections: NodeColumnSelection[];
   maxNodes?: number;
 }
@@ -56,7 +56,7 @@ export function resolveTokenFrequencyNodeContext({
   const orderedCandidates = dedupePreserveOrder([
     ...lastCompareNodeIds.filter(isValidId),
     ...(analysisParams?.node_ids ?? []).filter(isValidId),
-    ...selectedNodes.map((node) => node?.id).filter(isValidId),
+    ...selectedNodes.map((node) => node.id).filter(isValidId),
   ]);
 
   const candidateIds = orderedCandidates.slice(0, maxNodes);
@@ -66,7 +66,7 @@ export function resolveTokenFrequencyNodeContext({
 
   const selectionMap = new Map<string, string>();
   nodeColumnSelections.forEach((sel) => {
-    if (isValidId(sel?.nodeId) && isValidId(sel?.column)) {
+    if (isValidId(sel.nodeId) && isValidId(sel.column)) {
       selectionMap.set(sel.nodeId, sel.column);
     }
   });

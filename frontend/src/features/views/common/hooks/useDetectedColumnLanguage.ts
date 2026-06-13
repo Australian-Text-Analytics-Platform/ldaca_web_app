@@ -53,7 +53,8 @@ export function useDetectedColumnLanguage({
     /** Called by: TanStack Query to fetch sample rows for language detection. */
     queryFn: async () => {
       const { data } = await getNodeData({
-        path: { node_id: nodeId as string },
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- queryFn only runs when canFetchSample guarantees nodeId is set
+        path: { node_id: nodeId! },
         query: { page: 1, page_size: LANGUAGE_SAMPLE_PAGE_SIZE },
         headers: getAuthHeaders(),
         throwOnError: true,
@@ -63,13 +64,13 @@ export function useDetectedColumnLanguage({
   });
 
   const sampleText = collectDocumentColumnText(
-    sampleQuery.data?.data as Array<Record<string, unknown>> | undefined,
+    sampleQuery.data?.data,
     column ?? '',
   );
 
   const detectionQuery = useQuery({
     queryKey: ['tokenizer-language-detection', workspaceId, nodeId, column, sampleText.slice(0, 512)],
-    enabled: Boolean(enabled) && sampleText.length > 0,
+    enabled: enabled && sampleText.length > 0,
     staleTime: 5 * 60_000,
     retry: false,
     /** Called by: TanStack Query once sample text is available. */

@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react';
+import { type SyntheticEvent, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -51,7 +51,7 @@ function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, '
   const { dataFolder, refreshAuth } = useAuth();
   const { currentWorkspaceId } = useWorkspaceData();
   const { setCurrentWorkspace } = useWorkspaceActions();
-  const [path, setPath] = useState(dataFolder || '');
+  const [path, setPath] = useState(dataFolder ?? '');
   const [isLoading, setIsLoading] = useState(false);
 
   /** Called by: the DataFolderDialogContent Browse button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
@@ -82,7 +82,7 @@ function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, '
    * Called by: the DataFolderDialogContent form onSubmit prop because the interaction needs a single handler that validates state, runs the action, and updates feedback.
    * Flow: validate a non-empty path, clear the active workspace when the directory changes, update backend config, refresh auth/files/workspaces, and toast outcomes.
    */
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
     const nextPath = path.trim();
     if (!nextPath) return;
@@ -137,7 +137,7 @@ function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, '
               <Input
                 id="path"
                 value={path}
-                onChange={(e) => setPath(e.target.value)}
+                onChange={(e) => { setPath(e.target.value); }}
                 className="flex-1"
                 placeholder="/path/to/data"
               />
@@ -156,7 +156,7 @@ function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, '
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => { onOpenChange(false); }}>
             Cancel
           </Button>
           <Button type="submit" disabled={isLoading || !path.trim()}>

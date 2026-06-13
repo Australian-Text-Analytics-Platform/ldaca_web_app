@@ -5,7 +5,7 @@
  * Flow: inspect top-level message text first, then fall back to nested detail payloads before returning no inline error.
  */
 export const getInvalidWorkspaceNameMessage = (error: unknown): string | null => {
-  const rawMessage = (error as { message?: unknown })?.message;
+  const rawMessage = (error as { message?: unknown } | null)?.message;
   if (
     typeof rawMessage === 'string' &&
     rawMessage.toLowerCase().includes('invalid workspace name')
@@ -13,11 +13,11 @@ export const getInvalidWorkspaceNameMessage = (error: unknown): string | null =>
     return rawMessage;
   }
 
-  const detail = (error as { detail?: unknown })?.detail;
+  const detail = (error as { detail?: unknown } | null)?.detail;
   if (detail && typeof detail === 'object') {
     const detailMessage =
-      (detail as { detail?: unknown; message?: unknown })?.detail ??
-      (detail as { message?: unknown })?.message;
+      (detail as { detail?: unknown; message?: unknown }).detail ??
+      (detail as { message?: unknown }).message;
     if (
       typeof detailMessage === 'string' &&
       detailMessage.toLowerCase().includes('invalid workspace name')

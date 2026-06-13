@@ -1,10 +1,10 @@
 /** Default result row limit used by analysis panels when preferences are absent. */
 export const DEFAULT_TOKEN_LIMIT = 25;
 
-type ClampResult = {
+interface ClampResult {
   limit: number;
   wasClamped: boolean;
-};
+}
 
 /**
  * Keeps display limits in the backend-supported positive integer range while
@@ -52,7 +52,7 @@ export const toFiniteNumber = (value: unknown): number | null => {
 export const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
-export type AnalysisNodeColumnSelection = { nodeId: string; column: string };
+export interface AnalysisNodeColumnSelection { nodeId: string; column: string }
 
 export interface ParsedAnalysisNodeRequest {
   nodeIds: string[];
@@ -88,7 +88,7 @@ export const parseAnalysisNodeRequest = (
 
   const selections: AnalysisNodeColumnSelection[] = nodeIds.map((nodeId) => ({
     nodeId,
-    column: nodeColumns[nodeId] || '',
+    column: nodeColumns[nodeId] ?? '',
   }));
 
   return { nodeIds, nodeColumns, selections };

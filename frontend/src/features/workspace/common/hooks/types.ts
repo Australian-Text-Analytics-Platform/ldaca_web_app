@@ -1,4 +1,4 @@
-export type PaginationState = {
+export interface PaginationState {
   currentPage: number;
   totalPages: number;
   pageSize: number;
@@ -8,7 +8,7 @@ export type PaginationState = {
   filterColumn?: string;
   filterValue?: string;
   filterOp?: string;
-};
+}
 
 export type PaginationMap = Record<string, PaginationState>;
 

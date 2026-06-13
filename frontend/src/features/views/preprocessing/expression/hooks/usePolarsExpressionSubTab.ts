@@ -41,7 +41,7 @@ export interface GroupByAggState {
 const newId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    : `${String(Date.now())}-${Math.random().toString(36).slice(2)}`;
 
 /**
  * Creates an empty expression row with a stable id for React list keys.
@@ -125,6 +125,8 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const [serializedRequest, setSerializedRequest] = useState<PolarsExpressionRequest | null>(null);
   const [evalError, setEvalError] = useState<string | null>(null);
 
+  // DEFAULT_PALETTE is a non-empty module constant, so index 0 exists.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const nodeColors = { [effectiveNode?.id ?? '']: DEFAULT_PALETTE[0]! };
 
   /**

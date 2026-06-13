@@ -18,8 +18,8 @@ function PlaceholderHarness() {
         aria-label="Generated name"
         value={value}
         placeholder="Suggested_output_name"
-        onChange={(event) => setValue(event.target.value)}
-        onKeyDown={(event) => acceptPlaceholderOnTab({ event, value, setValue })}
+        onChange={(event) => { setValue(event.target.value); }}
+        onKeyDown={(event) => { acceptPlaceholderOnTab({ event, value, setValue }); }}
       />
       <button type="button">Next</button>
     </div>
@@ -32,7 +32,7 @@ describe('acceptPlaceholderOnTab', () => {
 
     render(<PlaceholderHarness />);
 
-    const input = screen.getByLabelText('Generated name') as HTMLInputElement;
+    const input = screen.getByLabelText<HTMLInputElement>('Generated name');
     const nextButton = screen.getByRole('button', { name: 'Next' });
 
     input.focus();

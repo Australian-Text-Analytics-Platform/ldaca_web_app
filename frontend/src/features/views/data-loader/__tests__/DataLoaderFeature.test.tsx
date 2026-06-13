@@ -25,18 +25,18 @@ const {
   mockListLdacaFeaturedCollections: vi.fn(),
 }));
 
-type MockWorkspaceState = {
-  workspaces: Array<{
+interface MockWorkspaceState {
+  workspaces: {
     id: string;
     name: string;
     description: string;
     created_at: string;
     updated_at: string;
     dataframe_count: number;
-  }>;
+  }[];
   currentWorkspaceId: string | null;
   workspaceGraph: { nodes: unknown[] };
-};
+}
 
 let mockWorkspaceState: MockWorkspaceState = {
   workspaces: [
@@ -571,7 +571,7 @@ describe('DataLoaderFeature citation UI', () => {
 
     await user.upload(uploadInput!, [firstFile, secondFile]);
 
-    await waitFor(() => expect(mockHandleUploadFile).toHaveBeenCalledTimes(2));
+    await waitFor(() => { expect(mockHandleUploadFile).toHaveBeenCalledTimes(2); });
     expect(mockHandleUploadFile).toHaveBeenNthCalledWith(1, firstFile);
     expect(mockHandleUploadFile).toHaveBeenNthCalledWith(2, secondFile);
   });
@@ -598,7 +598,7 @@ describe('DataLoaderFeature citation UI', () => {
       },
     });
 
-    await waitFor(() => expect(mockHandleUploadFile).toHaveBeenCalledTimes(2));
+    await waitFor(() => { expect(mockHandleUploadFile).toHaveBeenCalledTimes(2); });
     expect(mockHandleUploadFile).toHaveBeenNthCalledWith(1, firstFile);
     expect(mockHandleUploadFile).toHaveBeenNthCalledWith(2, secondFile);
   });

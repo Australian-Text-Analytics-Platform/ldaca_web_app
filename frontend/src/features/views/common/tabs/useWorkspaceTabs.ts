@@ -31,7 +31,7 @@ import {
 } from './tabStateOps';
 
 /** Query key for the whole-workspace tab state (shared across analysis types). */
-function workspaceTabsQueryKey(workspaceId: string): Array<string> {
+function workspaceTabsQueryKey(workspaceId: string): string[] {
   return ['workspace-tabs', workspaceId];
 }
 
@@ -81,9 +81,11 @@ export function useWorkspaceTabs(
     queryFn: async () => {
       const { data: payload } = await getWorkspaceTabs({
         headers: getAuthHeaders(),
-        path: { workspace_id: workspaceId as string },
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- query is enabled only when workspaceId is set
+        path: { workspace_id: workspaceId! },
         throwOnError: true,
       });
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- API payload may be undefined at runtime
       return payload ?? EMPTY_TABS_STATE;
     },
   });
@@ -101,6 +103,7 @@ export function useWorkspaceTabs(
         path: { workspace_id: workspaceId },
         throwOnError: true,
       });
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- API response may be undefined at runtime
       return saved ?? next;
     },
   });
@@ -133,7 +136,7 @@ export function useWorkspaceTabs(
       const { state: next, tabId } = createTabInState(
         current,
         analysisType,
-        title ?? `Analysis ${count + 1}`,
+        title ?? `Analysis ${String(count + 1)}`,
       );
       commit(next);
       return tabId;
@@ -142,36 +145,36 @@ export function useWorkspaceTabs(
   );
 
   const closeTab = useCallback(
-    (tabId: string) => commit(closeTabInState(readState(), analysisType, tabId)),
+    (tabId: string) => { commit(closeTabInState(readState(), analysisType, tabId)); },
     [analysisType, readState, commit],
   );
 
   const renameTab = useCallback(
     (tabId: string, title: string) =>
-      commit(renameTabInState(readState(), analysisType, tabId, title)),
+      { commit(renameTabInState(readState(), analysisType, tabId, title)); },
     [analysisType, readState, commit],
   );
 
   const setActiveTab = useCallback(
-    (tabId: string) => commit(setActiveTabInState(readState(), analysisType, tabId)),
+    (tabId: string) => { commit(setActiveTabInState(readState(), analysisType, tabId)); },
     [analysisType, readState, commit],
   );
 
   const reorderTabs = useCallback(
     (orderedTabIds: string[]) =>
-      commit(reorderTabsInState(readState(), analysisType, orderedTabIds)),
+      { commit(reorderTabsInState(readState(), analysisType, orderedTabIds)); },
     [analysisType, readState, commit],
   );
 
   const setTabTask = useCallback(
     (tabId: string, taskId: string | null) =>
-      commit(setTabTaskInState(readState(), analysisType, tabId, taskId)),
+      { commit(setTabTaskInState(readState(), analysisType, tabId, taskId)); },
     [analysisType, readState, commit],
   );
 
   const setTabInputs = useCallback(
     (tabId: string, inputs: AnalysisTabInput[]) =>
-      commit(setTabInputsInState(readState(), analysisType, tabId, inputs)),
+      { commit(setTabInputsInState(readState(), analysisType, tabId, inputs)); },
     [analysisType, readState, commit],
   );
 

@@ -77,11 +77,11 @@ export const computeDagreLayout = (
 
   edges.forEach((edge) => g.setEdge(edge.source, edge.target));
 
-  dagre.layout(g);
+  dagre.layout(g as Parameters<typeof dagre.layout>[0]);
 
   const positions = new Map<string, { x: number; y: number }>();
   nodes.forEach((node, index) => {
-    const layoutNode = g.node(node.id);
+    const layoutNode = g.node(node.id) as { x: number; y: number } | undefined;
     if (layoutNode) {
       positions.set(node.id, {
         x: layoutNode.x - DEFAULT_NODE_WIDTH / 2,

@@ -21,11 +21,11 @@ declare global {
   }
 }
 
-export type ApiEnvOptions = {
+export interface ApiEnvOptions {
   explicitBase?: string; // override (useful for tests)
   windowLocation?: Location; // injection for testability
   localStorageGet?: (k: string) => string | null; // allow mock
-};
+}
 
 /** Resolves the dev backend port used when the SPA is served separately from FastAPI. */
 /** Called by: getApiBase in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
@@ -66,7 +66,7 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
     return `${window.location.origin}${window.__BASE_PATH__}/api`;
   }
 
-  const loc = options.windowLocation || window.location;
+  const loc = options.windowLocation ?? window.location;
   const { origin, hostname, port } = loc;
   const backendPort = getBackendPort();
 

@@ -28,7 +28,7 @@ import {
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_FREQ_COLUMNS,
 } from '../../common/generatedColumns';
-import { batchProcessedCount, flattenConcordanceGroups } from '../concordanceViewModels';
+import { batchProcessedCount, flattenConcordanceGroups, toCellText } from '../concordanceViewModels';
 
 type ConcordanceRow = Record<string, unknown>;
 type ConcordanceGroupedRow = ConcordanceRow[];
@@ -74,18 +74,18 @@ const dedupeColumns = (cols: string[]): string[] => {
  * Used by: CombinedConcordanceTable and PerNodeConcordanceTable because both
  * paths need identical cell rendering driven off the display columns.
  */
-function buildConcordanceColumns(displayColumns: string[]): ColumnDef<ConcordanceRow, unknown>[] {
+function buildConcordanceColumns(displayColumns: string[]): ColumnDef<ConcordanceRow>[] {
   return displayColumns.map((columnKey) => ({
     id: columnKey,
     accessorFn: (row) => row[columnKey],
     cell: ({ getValue }) => {
       const value = getValue();
-      return value !== undefined && value !== null ? String(value) : '';
+      return toCellText(value);
     },
   }));
 }
 
-export type ConcordanceTableNodeBlockProps = {
+export interface ConcordanceTableNodeBlockProps {
   nodeKey: string;
   nodeData: ConcordanceResultEntry;
   context: {
@@ -142,7 +142,7 @@ export type ConcordanceTableNodeBlockProps = {
   openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
   /** Read-only flag that disables Process All and Add to Workspace buttons while pagination, sort, and row details remain active. */
   readOnly?: boolean;
-};
+}
 
 /**
  * Rendered by: ConcordanceResultsPanel for each table-oriented concordance result block.
@@ -198,12 +198,10 @@ function CombinedConcordanceTable({
   const rows = flattenConcordanceGroups(groupedRows);
   const allColumns = nodeData.columns;
   const metaCols = nodeData.metadata.metadata_columns;
-  const concCols = (
-    nodeData.metadata.concordance_columns?.length
-      ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
-      : CORE_COLS
-  ) as string[];
-  const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) =>
+  const concCols = nodeData.metadata.concordance_columns.length
+    ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
+    : CORE_COLS;
+  const visibleMetaCols = selectedMetadataColumns.filter((columnName) =>
     metaCols.includes(columnName),
   );
   const rawDisplayColumns = showMetadata
@@ -215,7 +213,7 @@ function CombinedConcordanceTable({
   const table = useServerTable<ConcordanceRow>({
     data: rows,
     columns,
-    rowCount: nodeData.pagination?.total_source_rows ?? 0,
+    rowCount: nodeData.pagination.total_source_rows,
     pageIndex: combinedPage - 1,
     pageSize: globalPageSize,
     // Bridges TanStack paging to the combined-view page + page-size handlers.
@@ -250,7 +248,7 @@ function CombinedConcordanceTable({
                 for (const nid of combinedNodeIds) {
                   if (materializedPaths[nid]) continue;
                   const col =
-                    effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                    effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
                   if (!col) continue;
                   void handleMaterialize(nid, col);
                 }
@@ -290,11 +288,12 @@ function CombinedConcordanceTable({
                 const nodes = combinedNodeIds
                   .map((nid) => {
                     const col =
-                      effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || '';
+                      effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
                     const sourceNode = panelSelectedNodes.find(
                       (node, idx) => getNodeIdentifier(node, idx) === nid,
                     );
-                    const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
+                    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string name/id must fall back to the next identifier
+                    const sourceLabel = sourceNode?.name || sourceNode?.id || nid;
                     return { nodeId: nid, column: col, nodeLabel: sourceLabel };
                   })
                   .filter((n) => n.column);
@@ -349,7 +348,7 @@ function CombinedConcordanceTable({
                 table.getRowModel().rows.map((tableRow) => {
                   const row = tableRow.original;
                   const rawSrc = row.__source_node;
-                  const normalized = rawSrc ? rawSrc.toString().toLowerCase() : undefined;
+                  const normalized = rawSrc ? toCellText(rawSrc).toLowerCase() : undefined;
                   let color = normalized ? sourceColorMap[normalized] : undefined;
                   if (!color && rawSrc && normalized) {
                     // Fallback: loose match (substring) when exact lookup fails.
@@ -361,14 +360,14 @@ function CombinedConcordanceTable({
                   if (!color) {
                     // Final fallback: deterministic by hashing the source string.
                     if (rawSrc) {
-                      const chars = Array.from(rawSrc.toString()) as string[];
+                      const chars = Array.from(toCellText(rawSrc));
                       const hash = chars.reduce((a, c) => a + c.charCodeAt(0), 0);
                       color = defaultPalette[hash % defaultPalette.length];
                     } else {
                       color = '#ffffff';
                     }
                   }
-                  const bg = `${color}20`;
+                  const bg = `${String(color)}20`;
                   return (
                     <TableRow
                       key={tableRow.id}
@@ -383,24 +382,24 @@ function CombinedConcordanceTable({
                               (n as Record<string, unknown>).data &&
                               typeof (n as Record<string, unknown>).data === 'object'
                                 ? ((n as Record<string, unknown>).data as Record<string, unknown>)
-                                    ?.name
+                                    .name
                                 : undefined,
                               n.label,
                               (n as Record<string, unknown>).data &&
                               typeof (n as Record<string, unknown>).data === 'object'
                                 ? ((n as Record<string, unknown>).data as Record<string, unknown>)
-                                    ?.label
+                                    .label
                                 : undefined,
                             ]
                               .filter(Boolean)
                               .map((v) => String(v).toLowerCase());
-                            return candidates.includes(rawSrc.toString().toLowerCase());
+                            return candidates.includes(toCellText(rawSrc).toLowerCase());
                           });
                           const sel =
                             nodeObj &&
                             effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
                           if (nodeObj && sel?.column) {
-                            handleRowClick(row, String(nodeObj.id ?? ''), sel.column);
+                            handleRowClick(row, nodeObj.id ?? '', sel.column);
                           }
                         }
                       }}
@@ -452,7 +451,7 @@ function CombinedConcordanceTable({
           table={table}
           pageIndex={combinedPage - 1}
           pageSize={globalPageSize}
-          rowCount={nodeData.pagination?.total_source_rows ?? 0}
+          rowCount={nodeData.pagination.total_source_rows}
           pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per batch'}
           pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
           loading={combinedLoading}
@@ -510,12 +509,10 @@ function PerNodeConcordanceTable({
   const rows = flattenConcordanceGroups(groupedRows);
   const allCols = nodeData.columns;
   const metaCols = nodeData.metadata.metadata_columns;
-  const concCols = (
-    nodeData.metadata.concordance_columns?.length
-      ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
-      : CORE_COLS
-  ) as string[];
-  const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) =>
+  const concCols = nodeData.metadata.concordance_columns.length
+    ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
+    : CORE_COLS;
+  const visibleMetaCols = selectedMetadataColumns.filter((columnName) =>
     metaCols.includes(columnName),
   );
   const rawDisplayColumns = showMetadata
@@ -535,7 +532,7 @@ function PerNodeConcordanceTable({
   const table = useServerTable<ConcordanceRow>({
     data: rows,
     columns,
-    rowCount: nodeData.pagination?.total_source_rows ?? 0,
+    rowCount: nodeData.pagination.total_source_rows,
     pageIndex: currentPage - 1,
     pageSize: globalPageSize,
     // Bridges TanStack paging to the per-node page + page-size handlers.
@@ -550,7 +547,7 @@ function PerNodeConcordanceTable({
     },
   });
 
-  const detachingKey = detachNodeId ?? '';
+  const detachingKey = detachNodeId;
   const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
   // Two side-by-side data blocks share one synced page size, so processing only
@@ -583,7 +580,10 @@ function PerNodeConcordanceTable({
             className="inline-block h-3 w-3 shrink-0 rounded-full"
             style={{ backgroundColor: context.nodeColor }}
           />
-          <h3 className="text-sm font-medium text-foreground">{context.displayName || nodeKey}</h3>
+          <h3 className="text-sm font-medium text-foreground">
+            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key */}
+            {context.displayName || nodeKey}
+          </h3>
         </div>
       )}
       <div
@@ -674,17 +674,17 @@ function PerNodeConcordanceTable({
               totalProcessed={batchProcessedCount(nodeData.pagination)}
             />
           );
-        return summary ? (
+        return (
           <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
             {summary}
           </div>
-        ) : null;
+        );
       })()}
       <ServerPaginationFooter
         table={table}
         pageIndex={currentPage - 1}
         pageSize={globalPageSize}
-        rowCount={nodeData.pagination?.total_source_rows ?? 0}
+        rowCount={nodeData.pagination.total_source_rows}
         pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per batch'}
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
@@ -697,7 +697,7 @@ function PerNodeConcordanceTable({
               for (const nid of processTargetIds) {
                 if (materializedPaths[nid]) continue;
                 const col = isMultiBlock
-                  ? effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column || ''
+                  ? (effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '')
                   : column;
                 if (!col) continue;
                 void handleMaterialize(nid, col);
@@ -742,7 +742,8 @@ function PerNodeConcordanceTable({
             onClick={() => {
               if (detachNodeId) {
                 const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-                const detachLabel = (detachNode?.name || nodeKey) as string;
+                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node key
+                const detachLabel = detachNode?.name || nodeKey;
                 openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
               }
             }}

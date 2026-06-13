@@ -22,8 +22,12 @@ describe('executeAnalysisRerun', () => {
   });
 
   it('runs directly when the current request matches the last run', async () => {
-    const clearResults = vi.fn(async () => {});
-    const runFreshAnalysis = vi.fn(async () => {});
+    const clearResults = vi.fn(async () => {
+      /* no-op mock */
+    });
+    const runFreshAnalysis = vi.fn(async () => {
+      /* no-op mock */
+    });
 
     await executeAnalysisRerun({
       hasUnrunChanges: false,
@@ -36,12 +40,16 @@ describe('executeAnalysisRerun', () => {
   });
 
   it('passes rerun clear options through to clearResults', async () => {
-    const clearResults = vi.fn(async () => {});
+    const clearResults = vi.fn(async () => {
+      /* no-op mock */
+    });
 
     await executeAnalysisRerun({
       hasUnrunChanges: true,
       clearResults,
-      runFreshAnalysis: vi.fn(async () => {}),
+      runFreshAnalysis: vi.fn(async () => {
+        /* no-op mock */
+      }),
       clearOptionsOnRerun: { preserveLocalState: true },
     });
 

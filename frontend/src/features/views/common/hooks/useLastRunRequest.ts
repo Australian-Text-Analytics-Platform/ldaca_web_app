@@ -14,13 +14,13 @@ export const lastRunRequestQueryKey = (
   return taskId === undefined ? base : ([...base, taskId ?? 'none'] as const);
 };
 
-type Args = {
+interface Args {
   analysisType: LastRunAnalysisType;
   workspaceId: string | null;
   getAuthHeaders: () => Record<string, string>;
   /** Active analysis tab's task id; null means the tab has not run yet. */
   taskId?: string | null;
-};
+}
 
 /**
  * Fetches the backend request payload for an analysis tab's last run.

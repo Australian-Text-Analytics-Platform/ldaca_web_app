@@ -36,6 +36,10 @@ export function useWorkspaceUiStateSync(
   currentWorkspaceId: string | null | undefined,
   getAuthHeaders: () => Record<string, string>,
 ): void {
+  // Zustand store actions are plain closures (no `this` binding), so referencing the action
+  // here is safe; arrow-wrapping/binding would change its identity every render and re-fire the
+  // hydration effect below.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const hydrateColors = useNodeColorsStore((s) => s.hydrateColors);
   // Track whether we're currently in the GET → hydrate window so we
   // don't immediately PUT the hydrated state straight back.
@@ -69,7 +73,7 @@ export function useWorkspaceUiStateSync(
         hydrateColors(next);
         hydratedWorkspaceIdRef.current = currentWorkspaceId;
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (cancelled) return;
         // Best-effort hydration — if the network/auth call fails we
         // leave the store empty and let the user re-roll colours
@@ -117,7 +121,7 @@ export function useWorkspaceUiStateSync(
           headers: getAuthHeaders(),
           path: { workspace_id: currentWorkspaceId },
           throwOnError: true,
-        }).catch((err) => {
+        }).catch((err: unknown) => {
           console.warn(`Failed to persist workspace ui_state for ${currentWorkspaceId}:`, err);
         });
       }, DEBOUNCE_MS);

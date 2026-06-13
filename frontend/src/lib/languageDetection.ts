@@ -11,14 +11,12 @@ let languageDetectorPromise: Promise<MediaPipeLanguageDetector> | null = null;
 /** Loads the MediaPipe detector once so repeated local guesses do not reload WASM/model assets. */
 /** Called by: detectLanguageIso6391 in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 async function getLanguageDetector(): Promise<MediaPipeLanguageDetector> {
-  if (!languageDetectorPromise) {
-    languageDetectorPromise = import('@mediapipe/tasks-text').then(
-      async ({ FilesetResolver, LanguageDetector }) => {
-        const fileset = await FilesetResolver.forTextTasks(MEDIAPIPE_TEXT_TASKS_WASM_URL);
-        return LanguageDetector.createFromModelPath(fileset, MEDIAPIPE_LANGUAGE_DETECTOR_MODEL_URL);
-      },
-    );
-  }
+  languageDetectorPromise ??= import('@mediapipe/tasks-text').then(
+    async ({ FilesetResolver, LanguageDetector }) => {
+      const fileset = await FilesetResolver.forTextTasks(MEDIAPIPE_TEXT_TASKS_WASM_URL);
+      return LanguageDetector.createFromModelPath(fileset, MEDIAPIPE_LANGUAGE_DETECTOR_MODEL_URL);
+    },
+  );
   return languageDetectorPromise;
 }
 

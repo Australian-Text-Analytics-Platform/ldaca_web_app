@@ -72,7 +72,7 @@ export function NodeColorPicker({
                 swatch.toLowerCase() === color.toLowerCase() && 'ring-2 ring-primary',
               )}
               style={{ backgroundColor: swatch }}
-              onClick={() => onChange(swatch)}
+              onClick={() => { onChange(swatch); }}
               aria-label={`Set color ${swatch}`}
             />
           ))}
@@ -95,8 +95,8 @@ export function NodeColorPicker({
               setHexInput(color.toUpperCase());
               setHexEditing(true);
             }}
-            onBlur={() => setHexEditing(false)}
-            onChange={(event) => handleHexChange(event.target.value)}
+            onBlur={() => { setHexEditing(false); }}
+            onChange={(event) => { handleHexChange(event.target.value); }}
             maxLength={7}
             placeholder="#000000"
             aria-label="Hex color"

@@ -21,11 +21,16 @@ export interface NodeSnapshot {
  * Flow: accept array or object schema payloads, normalize type names, and default malformed values to string columns.
  */
 export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
-  const rawSchema = (info as Record<string, unknown>)?.schema;
+  const rawSchema =
+    info && typeof info === 'object' ? (info as Record<string, unknown>).schema : undefined;
 
   if (Array.isArray(rawSchema)) {
     return Object.fromEntries(
-      rawSchema.map((c: Record<string, unknown>) => [c.name, c.js_type || 'string']),
+      (rawSchema as { name?: unknown; js_type?: unknown }[]).map((c) => [
+        // Runtime values are column descriptors from the backend; name is always a string.
+        c.name as string,
+        typeof c.js_type === 'string' && c.js_type.length > 0 ? c.js_type : 'string',
+      ]),
     );
   } else if (rawSchema && typeof rawSchema === 'object') {
     return Object.fromEntries(
@@ -62,7 +67,7 @@ export async function createNodeSnapshot(
 
   return {
     id: nodeId,
-    name: String(name),
+    name,
     columns,
     schema,
     shape: shape ?? undefined,
@@ -89,7 +94,7 @@ export async function createNodeSnapshots(
           id: nodeId,
           name: nodeId,
           columns: [],
-          schema: {} as Record<string, string>,
+          schema: {},
         };
       }
     }),
@@ -213,12 +218,12 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /** Schema seen by task builders: locked while a task is running, live otherwise. */
-  const effectiveSchema = isLocked ? lockedSchema || currentSchema : currentSchema;
+  const effectiveSchema = isLocked ? (lockedSchema ?? currentSchema) : currentSchema;
 
   /** Column options for parameter panels, with node payload fallbacks while schema fetches. */
   const availableColumns = (() => {
     // Primary: use schema if available
-    if (effectiveSchema && Object.keys(effectiveSchema).length > 0) {
+    if (Object.keys(effectiveSchema).length > 0) {
       return Object.entries(effectiveSchema).map(([name, jsType]) => ({
         name,
         dataType: jsType,
@@ -226,22 +231,26 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     }
 
     // Fallback: parse from nodeData or selectedNode
-    const columns: Array<{ name: string; dataType: string }> = [];
-    const nodeDataAny = nodeData as Record<string, unknown> | undefined;
-    const selectedNodeAny = selectedNode as Record<string, unknown> | undefined;
+    const columns: { name: string; dataType: string }[] = [];
+    const nodeDataAny = nodeData;
+    const selectedNodeAny = selectedNode;
 
-    if (nodeDataAny?.columns && Array.isArray(nodeDataAny.columns) && nodeDataAny?.dtypes) {
+    if (nodeDataAny?.columns && Array.isArray(nodeDataAny.columns) && nodeDataAny.dtypes) {
       const dtypes = nodeDataAny.dtypes as Record<string, unknown>;
       (nodeDataAny.columns as string[]).forEach((colName: string) => {
-        const rawDataType = dtypes[colName] || 'unknown';
-        const normalizedDataType = normalizeTypeName(String(rawDataType));
+        const rawDataType = dtypes[colName];
+        const normalizedDataType = normalizeTypeName(
+          typeof rawDataType === 'string' && rawDataType.length > 0 ? rawDataType : 'unknown',
+        );
         columns.push({ name: colName, dataType: normalizedDataType });
       });
     } else if (nodeDataAny?.dtypes && typeof nodeDataAny.dtypes === 'object') {
       const dtypes = nodeDataAny.dtypes as Record<string, unknown>;
       Object.keys(dtypes).forEach((colName) => {
-        const rawDataType = dtypes[colName] || 'unknown';
-        const normalizedDataType = normalizeTypeName(String(rawDataType));
+        const rawDataType = dtypes[colName];
+        const normalizedDataType = normalizeTypeName(
+          typeof rawDataType === 'string' && rawDataType.length > 0 ? rawDataType : 'unknown',
+        );
         columns.push({ name: colName, dataType: normalizedDataType });
       });
     } else if (selectedNodeAny?.data && typeof selectedNodeAny.data === 'object') {
@@ -250,9 +259,11 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
         // selectedNode.data.schema may be array or mapping
         const schemaObj = Array.isArray(dataObj.schema)
           ? Object.fromEntries(
-              (dataObj.schema as Array<Record<string, unknown>>).map(
-                (c: Record<string, unknown>) => [c.name, c.js_type || 'string'],
-              ),
+              (dataObj.schema as { name?: unknown; js_type?: unknown }[]).map((c) => [
+                // Backend column descriptor: name is always a string at runtime.
+                c.name as string,
+                typeof c.js_type === 'string' && c.js_type.length > 0 ? c.js_type : 'string',
+              ]),
             )
           : dataObj.schema;
         Object.entries(schemaObj as Record<string, unknown>).forEach(([colName, jsType]) => {
@@ -279,7 +290,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
    * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
    */
   const lockCurrentSchema = (schemaToLock?: Record<string, string>) => {
-    setLockedSchema(schemaToLock || currentSchema);
+    setLockedSchema(schemaToLock ?? currentSchema);
   };
 
   /** Re-enables live schema updates after a task completes or is cleared. */

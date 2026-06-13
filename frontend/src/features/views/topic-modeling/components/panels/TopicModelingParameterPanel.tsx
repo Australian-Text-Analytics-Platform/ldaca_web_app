@@ -8,17 +8,17 @@ import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisC
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 
-export type CorpusSample = {
+export interface CorpusSample {
   percent: string;
   enabled: boolean;
-};
+}
 
-type NumericInputDraft = {
+interface NumericInputDraft {
   source: number;
   value: string;
-};
+}
 
-type Props = {
+interface Props {
   nodeInputs: UseTabNodeInputsResult;
   onColumnChange: (nodeId: string, column: string) => void;
   nodeColors: Record<string, string>;
@@ -60,7 +60,7 @@ type Props = {
   onClear: () => void | Promise<void>;
   hasMissingColumns: boolean;
   resultState?: string;
-};
+}
 /**
  * Rendered by: TopicModelingFeature to show the topic-modeling parameter form and shared actions because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
@@ -223,7 +223,7 @@ export function TopicModelingParameterPanel({
               // Placeholder row — same height as a real row, no interaction
               return (
                 <div
-                  key={`placeholder-${idx}`}
+                  key={`placeholder-${String(idx)}`}
                   className="flex items-center gap-2 opacity-25"
                   style={{ minHeight: '2rem' }}
                 >
@@ -241,7 +241,7 @@ export function TopicModelingParameterPanel({
                 {/* Coloured circle radio toggle */}
                 <button
                   type="button"
-                  onClick={() => onCorpusSampleChange(idx, { enabled: !sample.enabled })}
+                  onClick={() => { onCorpusSampleChange(idx, { enabled: !sample.enabled }); }}
                   aria-label={sample.enabled ? 'Disable sampling' : 'Enable sampling'}
                   className="h-5 w-5 shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
@@ -258,7 +258,7 @@ export function TopicModelingParameterPanel({
 
                 {/* % input — vertically aligned across rows by identical prefix */}
                 <Input
-                  aria-label={`Sampling percentage for corpus ${idx + 1}`}
+                  aria-label={`Sampling percentage for corpus ${String(idx + 1)}`}
                   type="number"
                   min={1}
                   max={100}
@@ -266,7 +266,7 @@ export function TopicModelingParameterPanel({
                   value={displayPercent}
                   disabled={!sample.enabled}
                   className="h-8 w-14 shrink-0 px-1.5 text-center text-sm"
-                  onChange={(e) => onCorpusSampleChange(idx, { percent: e.target.value })}
+                  onChange={(e) => { onCorpusSampleChange(idx, { percent: e.target.value }); }}
                   onBlur={(e) => {
                     const raw = Number(e.target.value);
                     const clamped = Math.min(100, Math.max(1, isNaN(raw) ? 1 : Math.round(raw)));
@@ -339,7 +339,7 @@ export function TopicModelingParameterPanel({
                       ? ' text-muted-foreground'
                       : ''
               }`}
-              onChange={(e) => setTopicSizeValueDraft(e.target.value)}
+              onChange={(e) => { setTopicSizeValueDraft(e.target.value); }}
               onBlur={handleTopicSizeValueBlur}
             />
           </div>
@@ -356,7 +356,7 @@ export function TopicModelingParameterPanel({
               step={1}
               value={randomSeed}
               className={`h-8 w-24 text-right text-sm${!randomSeedUserSet ? ' text-muted-foreground' : ''}`}
-              onChange={(e) => onRandomSeedChange(Math.max(0, Number(e.target.value) || 0))}
+              onChange={(e) => { onRandomSeedChange(Math.max(0, Number(e.target.value) || 0)); }}
             />
           </div>
 
@@ -369,7 +369,7 @@ export function TopicModelingParameterPanel({
               reason={
                 representativeWordsCountServerMax
                   ? (representativeWordsCountLockedReason ??
-                    `Adjustable up to ${representativeWordsCountCap} after modelling. Clear Results to fit with a higher count.`)
+                    `Adjustable up to ${String(representativeWordsCountCap)} after modelling. Clear Results to fit with a higher count.`)
                   : undefined
               }
             >
@@ -381,7 +381,7 @@ export function TopicModelingParameterPanel({
                 step={1}
                 value={representativeWordsCountDraft}
                 className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
-                onChange={(e) => setRepresentativeWordsCountDraft(e.target.value)}
+                onChange={(e) => { setRepresentativeWordsCountDraft(e.target.value); }}
                 onBlur={handleRepresentativeWordsCountBlur}
               />
             </DisabledReasonTooltip>

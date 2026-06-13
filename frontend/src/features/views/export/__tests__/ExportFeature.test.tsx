@@ -101,7 +101,7 @@ vi.mock('@/components/ui/select', async () => {
         <select
           aria-label="Format"
           value={context.value}
-          onChange={(event) => context.onValueChange(event.target.value)}
+          onChange={(event) => { context.onValueChange(event.target.value); }}
         >
           {children}
         </select>

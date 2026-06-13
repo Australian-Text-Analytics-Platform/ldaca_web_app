@@ -31,10 +31,10 @@ const resolveUniqueFilename = async (
   const stem = dot > 0 ? filename.slice(0, dot) : filename;
   const ext = dot > 0 ? filename.slice(dot) : '';
   for (let i = 1; i < 1000; i++) {
-    const candidate = `${stem} (${i})${ext}`;
+    const candidate = `${stem} (${String(i)})${ext}`;
     if (!(await exists(candidate, { baseDir }))) return candidate;
   }
-  return `${stem}-${Date.now()}${ext}`;
+  return `${stem}-${String(Date.now())}${ext}`;
 };
 
 /** Uses native browser download UI for web builds where destination/progress are already visible. */
@@ -87,7 +87,7 @@ const tauriDownload = async (blob: Blob, filename: string) => {
 
   const finalName = await resolveUniqueFilename(
     toBasename(filename),
-    exists as (p: string, o: { baseDir: number }) => Promise<boolean>,
+    exists,
     BaseDirectory.Download,
   );
   const bytes = new Uint8Array(await blob.arrayBuffer());

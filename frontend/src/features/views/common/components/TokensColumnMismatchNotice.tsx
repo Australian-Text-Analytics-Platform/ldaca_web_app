@@ -1,23 +1,23 @@
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
-type NodeWithTokenizerModels = {
+interface NodeWithTokenizerModels {
   id?: unknown;
   node_id?: unknown;
   tokenizer_models?: unknown;
   [key: string]: unknown;
-};
+}
 
-type Selection = {
+interface Selection {
   nodeId: string;
   column?: string;
-};
+}
 
-export type TokensColumnMismatchNoticeProps = {
-  nodes: ReadonlyArray<NodeWithTokenizerModels>;
-  selections: ReadonlyArray<Selection>;
+export interface TokensColumnMismatchNoticeProps {
+  nodes: readonly NodeWithTokenizerModels[];
+  selections: readonly Selection[];
   className?: string;
-};
+}
 
 /** Called by: TokensColumnMismatchNotice when matching selections to workspace nodes because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const nodeMatchesId = (node: NodeWithTokenizerModels, id: string) =>

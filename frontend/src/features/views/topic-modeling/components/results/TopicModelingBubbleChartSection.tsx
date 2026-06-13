@@ -13,7 +13,7 @@ import {
 } from '@/lib/chartExport';
 import { saveBlob } from '@/lib/download';
 
-type TopicLike = {
+interface TopicLike {
   id: number;
   label: string;
   representative_words?: string[];
@@ -21,9 +21,9 @@ type TopicLike = {
   total_size?: number | null;
   x?: number;
   y?: number;
-};
+}
 
-type Props = {
+interface Props {
   topics: TopicLike[];
   chartRef: React.RefObject<HTMLDivElement | null>;
   handleResetZoom: () => void;
@@ -46,7 +46,7 @@ type Props = {
    * post-fit control row (topic count, re-aggregate
    * slider, Add to Workspace). */
   controlRowSlot?: React.ReactNode;
-};
+}
 
 const OVERLAY_BTN =
   'flex items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
@@ -154,7 +154,7 @@ export function TopicModelingBubbleChartSection({
       { label: 'Topics', value: String(topics.length) },
     ];
 
-    const includeCSV = extras['includeCSV'] ?? false;
+    const includeCSV = extras.includeCSV ?? false;
 
     try {
       // Anything beyond the image alone forces the zip path so the
@@ -175,13 +175,11 @@ export function TopicModelingBubbleChartSection({
         const zip = new JSZip();
         zip.file(imageFilename, imageBlob);
 
-        if (includeCSV) {
-          const csvContent = buildTopicsCSV(topics, selectedTopicIds, nodeNames ?? []);
-          zip.file(
-            `${safeBaseName}_tm_topics.csv`,
-            new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }),
-          );
-        }
+        const csvContent = buildTopicsCSV(topics, selectedTopicIds, nodeNames ?? []);
+        zip.file(
+          `${safeBaseName}_tm_topics.csv`,
+          new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }),
+        );
 
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         await saveBlob(zipBlob, `${safeBaseName}_tm.zip`);
@@ -224,7 +222,7 @@ export function TopicModelingBubbleChartSection({
             <button
               type="button"
               className={OVERLAY_BTN}
-              onClick={() => setDownloadDialogOpen(true)}
+              onClick={() => { setDownloadDialogOpen(true); }}
               title="Download chart"
               aria-label="Download chart"
             >

@@ -50,7 +50,7 @@ export function OperationPopover({
       .then((res) => {
         if (!cancelled) setOperations(res.data.operations);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       });
     return () => {
@@ -91,7 +91,7 @@ export function OperationPopover({
               <p className="px-2 py-3 text-center text-sm text-muted-foreground">Loading…</p>
             )}
             {error && <p className="px-2 py-3 text-center text-sm text-destructive">{error}</p>}
-            {operations && operations['str'] && (
+            {operations?.str && (
               <div className="mb-2">
                 <p className="px-2 py-1 text-xs font-semibold text-muted-foreground">Special</p>
                 {[
@@ -101,7 +101,7 @@ export function OperationPopover({
                   <button
                     key={op}
                     type="button"
-                    onClick={() => handleSelect(op)}
+                    onClick={() => { handleSelect(op); }}
                     className={cn(
                       'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
                       'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden',
@@ -121,7 +121,7 @@ export function OperationPopover({
                     <button
                       key={qualifiedMethod}
                       type="button"
-                      onClick={() => handleSelect(qualifiedMethod)}
+                      onClick={() => { handleSelect(qualifiedMethod); }}
                       className={cn(
                         'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
                         'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden',

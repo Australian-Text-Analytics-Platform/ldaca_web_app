@@ -65,11 +65,11 @@ import {
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
 
-type NavItem = {
+interface NavItem {
   id: ViewType;
   label: string;
   icon: LucideIcon;
-};
+}
 
 type SectionKey = 'views' | 'nodes' | 'tasks';
 
@@ -325,14 +325,14 @@ function Sidebar() {
                       className="absolute -top-1 left-0 right-0 h-2 cursor-row-resize"
                       role="separator"
                       aria-label={`Resize ${title}`}
-                      onMouseDown={(event) => handleResizeStart(previousKey, key, event)}
+                      onMouseDown={(event) => { handleResizeStart(previousKey, key, event); }}
                     />
                   ) : null}
                   <div className="flex items-center border-b border-border/40 bg-muted/40">
                     <button
                       type="button"
                       className="flex min-w-0 flex-1 items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                      onClick={() => toggleSection(key)}
+                      onClick={() => { toggleSection(key); }}
                       aria-expanded={!collapsed}
                     >
                       <span className="flex items-center gap-1">{title}</span>
@@ -428,7 +428,7 @@ function Sidebar() {
                   {!collapsed && (
                     <div className="flex h-full flex-col overflow-hidden">
                       <div
-                        ref={(node) => assignSectionScrollRef(key, node)}
+                        ref={(node) => { assignSectionScrollRef(key, node); }}
                         className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-sm"
                       >
                         {key === 'views' && renderViewsBody()}
@@ -476,6 +476,7 @@ function Sidebar() {
                   />
                 </p>
                 <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
+                  {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- treat an empty path as unconfigured, not only null/undefined */}
                   {dataFolder || 'Not configured'}
                 </p>
               </div>
@@ -501,7 +502,7 @@ function Sidebar() {
             <Button
               variant="ghost"
               className="flex-1 justify-center"
-              onClick={() => openModal('tutorial', tutorialIndexTarget)}
+              onClick={() => { openModal('tutorial', tutorialIndexTarget); }}
             >
               <BookOpen className="h-4 w-4" />
               <span>Tutorial</span>
@@ -509,7 +510,7 @@ function Sidebar() {
             <Button
               variant="ghost"
               className="flex-1 justify-center"
-              onClick={() => openModal('feedback')}
+              onClick={() => { openModal('feedback'); }}
             >
               <MessageSquare className="h-4 w-4" />
               <span>Feedback</span>

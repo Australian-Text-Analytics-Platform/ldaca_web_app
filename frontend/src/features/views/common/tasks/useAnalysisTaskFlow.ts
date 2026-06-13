@@ -49,6 +49,7 @@ export const useAnalysisTaskFlow = (
   })();
 
   const banner = (() => {
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty trimmed message should collapse to undefined
     const trimmedMessage = status.bannerMessage?.trim() || undefined;
     if (status.bannerStatus) {
       return {
@@ -69,6 +70,7 @@ export const useAnalysisTaskFlow = (
       return {
         status: 'running' as const,
         taskId: resolvedFallbackBanner.taskId ?? effectiveActiveTaskId,
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty trimmed message should collapse to undefined
         message: resolvedFallbackBanner.message?.trim() || undefined,
       };
     }
@@ -137,6 +139,7 @@ export const useAnalysisTaskFlow = (
     void refreshResultsRef.current(context);
   }, [workspaceId, status.terminalTask, isTabActive, taskType]);
 
+  /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- boolean OR chain: hasActiveTask is truthy if any source is truthy */
   const hasActiveTask = Boolean(
     effectiveActiveTaskId ||
       status.runningTask?.task_id ||
@@ -144,6 +147,7 @@ export const useAnalysisTaskFlow = (
       status.terminalTask?.task_id ||
       status.tasks.length > 0,
   );
+  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
   return {
     status,

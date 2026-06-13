@@ -165,6 +165,8 @@ export function useLdacaImport({
    * refresh files, and clear the row-level importing flag.
    */
   const handleLdacaImport = async (recordId?: string) => {
+    // an empty recordId should fall through to the typed search query
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const target = (recordId || searchQuery).trim();
     if (!target) return;
 

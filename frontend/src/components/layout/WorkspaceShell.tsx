@@ -78,7 +78,7 @@ export function WorkspaceShell() {
         <ErrorBoundary>
           <SidebarProvider
             className="bg-linear-to-br from-slate-50 to-blue-50"
-            style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` } as React.CSSProperties}
+            style={{ ['--sidebar-width' as string]: `${String(sidebarWidth)}px` }}
           >
             <DocumentModalHost />
             <RefreshStatusBanner />
@@ -104,7 +104,7 @@ export function WorkspaceShell() {
 
               <SidebarInset className="flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
                 <Suspense fallback={null}>
-                  <FeedbackPanel open={feedbackOpen} onClose={() => closeModal('feedback')} />
+                  <FeedbackPanel open={feedbackOpen} onClose={() => { closeModal('feedback'); }} />
                 </Suspense>
 
                 <header className="border-border/40 border-b bg-white px-4 py-3 md:hidden">
@@ -122,7 +122,7 @@ export function WorkspaceShell() {
                         isRightCollapsed ? 'pr-2' : 'pr-1'
                       } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
                       style={{
-                        width: isRightCollapsed ? '100%' : `${(1 - asidePanelRatio) * 100}%`,
+                        width: isRightCollapsed ? '100%' : `${String((1 - asidePanelRatio) * 100)}%`,
                         minWidth: 280,
                       }}
                       innerClassName={
@@ -157,7 +157,7 @@ export function WorkspaceShell() {
                       className={`relative flex h-full flex-col overflow-hidden bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
                         isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
                       }`}
-                      style={{ width: isRightCollapsed ? 0 : `${asidePanelRatio * 100}%` }}
+                      style={{ width: isRightCollapsed ? 0 : `${String(asidePanelRatio * 100)}%` }}
                     >
                       {!isRightCollapsed && (
                         <button

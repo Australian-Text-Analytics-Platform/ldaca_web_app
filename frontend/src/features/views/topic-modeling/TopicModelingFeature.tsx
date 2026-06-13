@@ -79,7 +79,7 @@ function TopicModelingFeature({
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeIds = nodeInputs.resolvedNodes.map((node) => node.id);
   const applyInputsFromSelections = (
-    selections: Array<{ nodeId: string; column?: string | null }>,
+    selections: { nodeId: string; column?: string | null }[],
   ) => {
     onTabInputsChange?.(
       selections
@@ -207,16 +207,14 @@ function TopicModelingFeature({
     // Restores selected nodes, columns, and topic parameters from the stored request.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedRequest: (requestPayload) => {
-      const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<
-        string,
-        unknown
-      >;
+      const raw = requestPayload as Record<string, unknown> | null;
+      const req = (raw?.data ?? requestPayload) as Record<string, unknown> | null;
       if (!req) return;
       const nodeIds: string[] = Array.isArray(req.node_ids)
         ? (req.node_ids as string[]).slice(0, 2)
         : [];
-      const node_columns = (req.node_columns || {}) as Record<string, string>;
-      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+      const node_columns = (req.node_columns ?? {}) as Record<string, string>;
+      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] ?? '' }));
       if (!tabInputs || tabInputs.length === 0) {
         applyInputsFromSelections(sels);
       }
@@ -243,16 +241,16 @@ function TopicModelingFeature({
     // Removes completed topic tasks from the global task list after clear/delete operations.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     pruneGlobalTasks: (taskIds) =>
-      setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)),
+      { setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)); },
     // Finds task ids embedded in result metadata for status recovery.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getExtraTaskIdCandidates: () => [
-      (resultRef.current as TopicModelingResponse | null)?.metadata?.task_id,
+      (resultRef.current)?.metadata?.task_id,
     ],
     // Finds task ids embedded in result metadata for clear operations.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getClearTaskIdSources: () => [
-      (resultRef.current as TopicModelingResponse | null)?.metadata?.task_id,
+      (resultRef.current)?.metadata?.task_id,
     ],
     // Treats hydrated running results as active tasks for shared banner/action state.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -387,7 +385,7 @@ function TopicModelingFeature({
 
   const panelHasMissingColumns = panelNodeIds.some((nodeId) => {
     const selection = effectiveNodeColumnSelections.find((sel) => sel.nodeId === nodeId);
-    return !selection || !selection.column;
+    return !selection?.column;
   });
 
   // sample_fractions diff: server stores `null` (or absent) when sampling
@@ -397,7 +395,7 @@ function TopicModelingFeature({
    * Called by: TopicModelingFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
    */
   const normalizeSampleFractions = (raw: unknown, nodeCount: number): (number | null)[] => {
-    const list = Array.isArray(raw) ? raw : [];
+    const list: unknown[] = Array.isArray(raw) ? raw : [];
     return Array.from({ length: nodeCount }, (_, idx) => {
       const value = list[idx];
       if (typeof value === 'number' && value > 0 && value < 1) return value;
@@ -406,14 +404,14 @@ function TopicModelingFeature({
   };
 
   const currentSampleFractions = corpusSamples.slice(0, panelNodeIds.length).map((s) => {
-    if (!s?.enabled) return null;
+    if (!s.enabled) return null;
     const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
     return pct >= 100 ? null : pct / 100;
   });
 
   const currentTopicParams = {
-    random_seed: Number(randomSeed),
-    min_topic_size: Number(topicSizeValue),
+    random_seed: randomSeed,
+    min_topic_size: topicSizeValue,
     sample_fractions: normalizeSampleFractions(currentSampleFractions, panelNodeIds.length),
   };
   const serverTopicParams = (request: Record<string, unknown>) => ({
@@ -495,12 +493,12 @@ function TopicModelingFeature({
   }, [topicSizeValue, combinedEffective]);
 
   const showSamplingWarning =
-    combinedEffective > 0 && combinedEffective < 5 * (topicSizeValue ?? DEFAULT_TOPIC_SIZE_VALUE);
+    combinedEffective > 0 && combinedEffective < 5 * topicSizeValue;
 
   const sampleFractionsForRequest = useMemo(
     () =>
       corpusSamples.slice(0, panelNodeIds.length).map((s) => {
-        if (!s?.enabled) return null;
+        if (!s.enabled) return null;
         const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
         return pct >= 100 ? null : pct / 100;
       }),
@@ -508,7 +506,7 @@ function TopicModelingFeature({
   );
   const hasAnySampling = sampleFractionsForRequest.some((f) => f !== null);
 
-  const rawTopics: TopicModelingTopic[] = result?.data?.topics || [];
+  const rawTopics: TopicModelingTopic[] = result?.data?.topics ?? [];
   // Rebuild each topic's label from its representative_words sliced to the
   // current "Words per topic" display cap, so changing that input updates
   // the bottom list without a rerun. Falls back to the server-built label
@@ -580,7 +578,7 @@ function TopicModelingFeature({
     },
   });
 
-  const corpusCount = result?.data?.corpus_sizes?.length || 0;
+  const corpusCount = result?.data?.corpus_sizes.length ?? 0;
   const chartPadding = 40;
   const chartHeight = Math.min(520, Math.max(320, Math.round(chartWidth * 0.55)));
 
@@ -646,6 +644,7 @@ function TopicModelingFeature({
     });
   };
 
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- this is a truthiness OR: a falsy banner/result/error must fall through to the next, so ?? would short-circuit incorrectly
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
 
   return (
@@ -726,8 +725,8 @@ function TopicModelingFeature({
           activeDomain={activeDomain}
           nodeNames={
             panelSelectedNodes
-              .map((n) => (n.name as string | undefined) ?? (n.id as string | undefined) ?? '')
-              .filter(Boolean) as string[]
+              .map((n) => (n.name) ?? (n.id) ?? '')
+              .filter(Boolean)
           }
           randomSeed={randomSeed}
           detachDialogOpen={detachDialogOpen}

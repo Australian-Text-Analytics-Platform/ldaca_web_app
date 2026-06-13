@@ -44,10 +44,10 @@ export const normalizeUnknownStringArray = (value: unknown): string[] => {
   );
 };
 
-export type ServerEngineConfig = {
+export interface ServerEngineConfig {
   type: 'local' | 'remote';
   url: string | null;
-};
+}
 
 /**
  * Reads engine settings from both nested and legacy flat request payloads so
@@ -71,6 +71,7 @@ export const getServerEngineConfig = (
     typeof (request as { engine_type?: unknown }).engine_type === 'string'
       ? (request as { engine_type: string }).engine_type
       : null;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string engine type should fall through to the next source
   const type = (typeFromEngine || typeFromRoot || 'local') === 'remote' ? 'remote' : 'local';
 
   const urlFromEngine =
@@ -81,6 +82,7 @@ export const getServerEngineConfig = (
     typeof (request as { engine_url?: unknown }).engine_url === 'string'
       ? (request as { engine_url: string }).engine_url
       : null;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string engine url should fall through to the next source
   const rawUrl = urlFromEngine || urlFromRoot;
 
   if (type !== 'remote' || !rawUrl) {

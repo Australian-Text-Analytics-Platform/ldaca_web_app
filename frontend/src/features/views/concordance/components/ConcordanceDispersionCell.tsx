@@ -1,8 +1,9 @@
 type ConcordanceGroupedRow = Record<string, unknown>[];
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CONCORDANCE_COLUMN_KEYS } from '../../common/generatedColumns';
+import { toCellText } from '../concordanceViewModels';
 
-type Props = {
+interface Props {
   hits: ConcordanceGroupedRow;
   textLength?: number;
   barWidthPercent?: number;
@@ -10,7 +11,7 @@ type Props = {
   matchedTextColors?: Record<string, string>;
   lowercaseMatches?: boolean;
   hiddenMatchedTexts?: Set<string>;
-};
+}
 
 const DEFAULT_BAR_COLOR = '#0284c7';
 
@@ -52,7 +53,7 @@ export function ConcordanceDispersionCell({
         <div
           className="relative h-6 overflow-hidden rounded-sm bg-slate-100"
           data-testid="concordance-dispersion-bar"
-          style={{ width: `${widthPercent}%` }}
+          style={{ width: `${String(widthPercent)}%` }}
         >
           <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-slate-300" />
           {hits.map((hit, index) => {
@@ -60,7 +61,7 @@ export function ConcordanceDispersionCell({
             if (startIndex === null) {
               return null;
             }
-            const rawText = String(hit[CONCORDANCE_COLUMN_KEYS.matchedText] ?? '');
+            const rawText = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);
             const normalizedText = lowercaseMatches ? rawText.toLowerCase() : rawText;
             if (hiddenMatchedTexts?.has(normalizedText)) {
               return null;
@@ -70,14 +71,14 @@ export function ConcordanceDispersionCell({
               ? (matchedTextColors?.[normalizedText] ?? DEFAULT_BAR_COLOR)
               : undefined;
             const matchTextColor = barColor ?? DEFAULT_BAR_COLOR;
-            const leftContext = String(hit[CONCORDANCE_COLUMN_KEYS.leftContext] ?? '');
-            const rightContext = String(hit[CONCORDANCE_COLUMN_KEYS.rightContext] ?? '');
+            const leftContext = toCellText(hit[CONCORDANCE_COLUMN_KEYS.leftContext]);
+            const rightContext = toCellText(hit[CONCORDANCE_COLUMN_KEYS.rightContext]);
             return (
-              <Tooltip key={`${startIndex}-${index}`}>
+              <Tooltip key={`${String(startIndex)}-${String(index)}`}>
                 <TooltipTrigger asChild>
                   <span
                     className="absolute top-0 h-full w-1.5 -translate-x-1/2 cursor-default"
-                    style={{ left: `${leftPercent}%` }}
+                    style={{ left: `${String(leftPercent)}%` }}
                   >
                     <span
                       className={`pointer-events-none absolute top-1/2 left-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full${barColor ? '' : ' bg-sky-600'}`}

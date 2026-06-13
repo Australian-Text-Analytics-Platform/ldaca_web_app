@@ -71,6 +71,7 @@ export function getActiveTabId(
   if (tabs.length === 0) return null;
   const active = group.active_tab_id;
   if (active && tabs.some((t) => t.tab_id === active)) return active;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- tabs is non-empty (length===0 returns above)
   return tabs[0]!.tab_id;
 }
 
@@ -138,6 +139,7 @@ export function closeTabInState(
       activeId = null;
     } else {
       const neighbour = nextTabs[Math.max(0, idx - 1)];
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- nextTabs is non-empty in this branch (length===0 handled above)
       activeId = neighbour ? neighbour.tab_id : nextTabs[0]!.tab_id;
     }
   }
@@ -251,6 +253,7 @@ export function reorderTabsInState(
   }
   const unchanged =
     nextTabs.length === tabs.length &&
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- equal lengths guarantee tabs[index] exists
     nextTabs.every((tab, index) => tab.tab_id === tabs[index]!.tab_id);
   if (unchanged) return withGroup(state, analysisType, group);
   return withGroup(state, analysisType, { ...group, tabs: nextTabs });

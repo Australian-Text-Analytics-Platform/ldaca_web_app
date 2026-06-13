@@ -8,7 +8,7 @@ import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
 import { useElementWidth } from '@/lib/useElementWidth';
 
-type TokenFrequencySingleTokenSectionProps = {
+interface TokenFrequencySingleTokenSectionProps {
   nodeDisplayResults: NodeResultView[];
   getColorForNode: (nodeId: string, index?: number) => string;
   onTokenClick: (token: string) => void;
@@ -29,7 +29,7 @@ type TokenFrequencySingleTokenSectionProps = {
    * undefined, falls back to the cloud-side limit (`displayRows`).
    */
   listLimit?: number;
-};
+}
 
 const VISIBLE_BAR_ROWS = 10;
 const BAR_ROW_HEIGHT_REM = 2;
@@ -52,14 +52,14 @@ const SINGLE_CLOUD_MIN_FONT_PX = 11;
 const SINGLE_CLOUD_MAX_FONT_FLOOR = 36;
 const SINGLE_CLOUD_MAX_FONT_CEILING = 160;
 
-type SingleNodeWordCloudProps = {
+interface SingleNodeWordCloudProps {
   nodeKey: string;
-  words: Array<{ text: string; value: number }>;
+  words: { text: string; value: number }[];
   color: string;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
   onTokenClick: (token: string) => void;
   onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
-};
+}
 
 /**
  * Per-node word-cloud SVG that sizes itself to its parent container via
@@ -106,7 +106,7 @@ const SingleNodeWordCloud = memo(
     return (
       <div ref={containerRef} className="w-full">
         <svg
-          ref={(element) => registerWordCloudRef(nodeKey, element)}
+          ref={(element) => { registerWordCloudRef(nodeKey, element); }}
           width={cloudWidth}
           height={cloudHeight}
           className="overflow-visible"
@@ -130,11 +130,13 @@ const SingleNodeWordCloud = memo(
                   key={word.text}
                   fill={color}
                   textAnchor="middle"
-                  transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
+                  transform={`translate(${String(word.x)}, ${String(word.y)}) rotate(${String(word.rotate)})`}
                   fontSize={word.size}
                   fontFamily={word.font}
                   className="cursor-pointer transition-colors"
-                  onClick={() => word.text && onTokenClick(word.text)}
+                  onClick={() => {
+                    if (word.text) onTokenClick(word.text);
+                  }}
                   onContextMenu={(event) => {
                     event.preventDefault();
                     if (word.text) {
@@ -143,7 +145,7 @@ const SingleNodeWordCloud = memo(
                   }}
                   style={{ cursor: 'pointer' }}
                 >
-                  {word.text || ''}
+                  {word.text ?? ''}
                 </Text>
               ))
             }
@@ -174,7 +176,7 @@ const TokenFrequencySingleTokenSectionInner = ({
   // Refs for each per-node list scroll container, used to synchronise vertical
   // scrolling across the side-by-side list view. We keep refs on the
   // component (not on each Card) so the parent can broadcast scroll events.
-  const listScrollRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const listScrollRefs = useRef<(HTMLDivElement | null)[]>([]);
   const isSyncingScrollRef = useRef(false);
 
   /**
@@ -234,7 +236,7 @@ const TokenFrequencySingleTokenSectionInner = ({
   return (
     <div className={singleNodeLayoutClassName} data-testid="token-frequency-single-layout">
       {nodeDisplayResults.map((result, index) => {
-        const nodeKey = result.nodeId || result.displayName || `node-${index}`;
+        const nodeKey = result.nodeId || result.displayName || `node-${String(index)}`;
         const color = getColorForNode(result.nodeId || result.displayName, index);
         const displayRows = Array.isArray(result.displayRows) ? result.displayRows : [];
         // List view uses its own (typically larger) cap on the full
@@ -250,21 +252,21 @@ const TokenFrequencySingleTokenSectionInner = ({
         const listSourceRows = filteredRowsAll.slice(0, listSliceCap);
         // Then apply the wildcard filter for list view; cloud view stays unaffected.
         // Preserve each row's original 1-based rank so filtering doesn't renumber rows.
-        const filteredListRows: Array<{ row: (typeof listSourceRows)[number]; rank: number }> =
+        const filteredListRows: { row: (typeof listSourceRows)[number]; rank: number }[] =
           listSourceRows
             .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
-            .filter(({ row }) => matchesTokenFilter(String(row?.token ?? '')));
+            .filter(({ row }) => matchesTokenFilter(row.token));
         const listMaxFrequency = Math.max(
           1,
-          ...filteredListRows.map(({ row }) => Number(row.frequency) || 0),
+          ...filteredListRows.map(({ row }) => row.frequency || 0),
         );
         const words = displayRows.map((item) => ({
-          text: String(item?.token ?? ''),
-          value: Number(item?.frequency) || 0,
+          text: item.token,
+          value: item.frequency || 0,
         }));
 
         return (
-          <Card key={`${result.nodeId || result.displayName}-${index}`} className="h-full">
+          <Card key={`${result.nodeId || result.displayName}-${String(index)}`} className="h-full">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <CardTitle className="min-w-0 flex-1 wrap-anywhere whitespace-normal text-base font-semibold">
@@ -280,7 +282,7 @@ const TokenFrequencySingleTokenSectionInner = ({
                       size="sm"
                       aria-label="Download word cloud"
                       title="Download word cloud"
-                      onClick={() => onDownloadWordCloud(nodeKey, result.displayName)}
+                      onClick={() => { onDownloadWordCloud(nodeKey, result.displayName); }}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -292,10 +294,10 @@ const TokenFrequencySingleTokenSectionInner = ({
                       aria-label="Download frequencies"
                       title="Download frequencies"
                       onClick={() =>
-                        onDownloadFrequencyCsv(
+                        { onDownloadFrequencyCsv(
                           result.displayName,
                           Array.isArray(result.filteredRows) ? result.filteredRows : result.rows,
-                        )
+                        ); }
                       }
                     >
                       <Download className="h-4 w-4" />
@@ -327,16 +329,16 @@ const TokenFrequencySingleTokenSectionInner = ({
                 }}
                 onScroll={handleListScroll(index)}
                 className={view === 'list' ? 'space-y-2 overflow-y-auto pr-1' : 'hidden'}
-                style={view === 'list' ? { maxHeight: `${BAR_LIST_MAX_HEIGHT_REM}rem` } : undefined}
+                style={view === 'list' ? { maxHeight: `${String(BAR_LIST_MAX_HEIGHT_REM)}rem` } : undefined}
               >
                 {filteredListRows.map(({ row, rank }) => {
-                  const frequency = Number(row.frequency) || 0;
+                  const frequency = row.frequency || 0;
                   const widthPct = Math.max(3, Math.round((frequency / listMaxFrequency) * 100));
                   return (
                     <div
                       key={`${result.nodeId}-${row.token}`}
                       className="grid items-center gap-2"
-                      style={{ gridTemplateColumns: `${rankWidthCh}ch minmax(0,1fr) 90px` }}
+                      style={{ gridTemplateColumns: `${String(rankWidthCh)}ch minmax(0,1fr) 90px` }}
                     >
                       <span className="text-right text-xs tabular-nums text-muted-foreground">
                         {rank}.
@@ -344,7 +346,7 @@ const TokenFrequencySingleTokenSectionInner = ({
                       <button
                         type="button"
                         className="group relative h-8 overflow-hidden rounded border text-left"
-                        onClick={() => onTokenClick(row.token)}
+                        onClick={() => { onTokenClick(row.token); }}
                         onContextMenu={(event) => {
                           event.preventDefault();
                           onTokenRightClick(row.token, event);
@@ -353,7 +355,7 @@ const TokenFrequencySingleTokenSectionInner = ({
                       >
                         <span
                           className="absolute inset-y-0 left-0 rounded bg-primary/20 group-hover:bg-primary/30"
-                          style={{ width: `${widthPct}%`, backgroundColor: color }}
+                          style={{ width: `${String(widthPct)}%`, backgroundColor: color }}
                         />
                         <span className="relative z-10 block truncate px-2 text-sm font-medium">
                           {row.token}

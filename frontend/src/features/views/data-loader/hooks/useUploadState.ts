@@ -16,6 +16,8 @@ interface UseUploadStateParams {
  * Used by: local callers in data-loader/useUploadState module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
 function isFileDrag(event: DragEvent<HTMLElement>) {
+  // dataTransfer/types are typed non-null by React but can be absent on some browsers/synthetic drags
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   return Array.from(event.dataTransfer?.types ?? []).includes('Files');
 }
 
@@ -80,9 +82,9 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
 
       if (failedFiles.length === 0) {
         if (uploadedCount === 1) {
-          notify('success', `Uploaded ${selectedFiles[0]?.name}.`);
+          notify('success', `Uploaded ${selectedFiles[0]?.name ?? ''}.`);
         } else {
-          notify('success', `Uploaded ${uploadedCount} files.`);
+          notify('success', `Uploaded ${String(uploadedCount)} files.`);
         }
         return;
       }
@@ -91,7 +93,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
         notify(
           'error',
           `Failed to upload ${
-            failedFiles.length === 1 ? failedFiles[0] : `${failedFiles.length} files`
+            failedFiles.length === 1 ? (failedFiles[0] ?? '') : `${String(failedFiles.length)} files`
           }.`,
         );
         return;
@@ -99,7 +101,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
 
       notify(
         'error',
-        `Uploaded ${uploadedCount} of ${selectedFiles.length} files. Failed: ${failedFiles.join(', ')}.`,
+        `Uploaded ${String(uploadedCount)} of ${String(selectedFiles.length)} files. Failed: ${failedFiles.join(', ')}.`,
       );
     } finally {
       setUploadingFiles(false);

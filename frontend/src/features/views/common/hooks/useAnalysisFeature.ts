@@ -33,7 +33,7 @@ interface AnalysisResultLike {
  * `hydrationTaskId`. When that prop is present but null, the tab has not run
  * yet and must not fall back to the workspace's global current/terminal task.
  */
-const hasTabOwnedTaskId = (config: UseAnalysisFeatureConfig<unknown>): boolean =>
+const hasTabOwnedTaskId = (config: UseAnalysisFeatureConfig): boolean =>
   Object.prototype.hasOwnProperty.call(config, 'hydrationTaskId');
 
 export interface ClearAnalysisUiOptions {
@@ -46,7 +46,7 @@ export interface ClearAnalysisUiOptions {
 
 export interface UseAnalysisFeatureConfig<TResult = unknown> {
   analysisType: LastRunAnalysisType;
-  taskType: CanonicalAnalysisTaskType | string;
+  taskType: CanonicalAnalysisTaskType | (string & {});
   workspaceId: string | null;
   getAuthHeaders: () => Record<string, string>;
   isTabActive: boolean;
@@ -57,14 +57,14 @@ export interface UseAnalysisFeatureConfig<TResult = unknown> {
   /** Fetch a task's result from the backend */
   fetchResult: (taskId: string, headers: Record<string, string>) => Promise<TResult | null>;
   /** Optionally fetch a task's request payload (used during hydration) */
-  fetchRequest?: (taskId: string, headers: Record<string, string>) => Promise<unknown | null>;
+  fetchRequest?: (taskId: string, headers: Record<string, string>) => Promise<unknown>;
 
   /** Called when a terminal task result is fetched */
   onResultFetched: (result: TResult, taskId: string) => void;
   /** Called during hydration with the server result */
   onHydratedResult?: (result: TResult | null) => void | Promise<void>;
   /** Called during hydration with the server request */
-  onHydratedRequest?: (request: unknown | null) => void | Promise<void>;
+  onHydratedRequest?: (request: unknown) => void | Promise<void>;
   /** Called after the clear lifecycle completes */
   onCleared: (clearedTaskIds: string[], options?: ClearAnalysisUiOptions) => void;
 
@@ -76,9 +76,9 @@ export interface UseAnalysisFeatureConfig<TResult = unknown> {
   pruneGlobalTasks?: (taskIds: string[]) => void;
 
   /** Extra task ID candidates for resolution beyond the built-in sources */
-  getExtraTaskIdCandidates?: () => Array<string | null | undefined>;
+  getExtraTaskIdCandidates?: () => (string | null | undefined)[];
   /** Extra task ID sources used only during clear */
-  getClearTaskIdSources?: () => Array<string | null | undefined>;
+  getClearTaskIdSources?: () => (string | null | undefined)[];
   /** Custom check for whether the result indicates a running state (default: result.state === 'running') */
   isResultRunning?: (result: TResult | null) => boolean;
 
@@ -105,7 +105,7 @@ export interface UseAnalysisFeatureReturn {
   isRunning: boolean;
   isStopping: boolean;
   setIsRunning: (running: boolean) => void;
-  runningRef: React.MutableRefObject<boolean>;
+  runningRef: React.RefObject<boolean>;
 
   taskStatus: AnalysisTaskStatus;
   banner: AnalysisTaskBannerState | null;
@@ -115,7 +115,7 @@ export interface UseAnalysisFeatureReturn {
     taskId: string | null,
     expectedState: 'successful' | 'failed',
   ) => Promise<void>;
-  lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
+  lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
 
   hydrateFromServer: () => Promise<void>;
   hydrationState: HydrationState;
@@ -172,7 +172,7 @@ export function useAnalysisFeature<TResult = unknown>(
   // ---- Workspace change cleanup ----
   useEffect(() => {
     lastFetchedRef.current = { taskId: null, state: null };
-    void Promise.resolve().then(() => setLocalTaskId(null));
+    void Promise.resolve().then(() => { setLocalTaskId(null); });
   }, [config.workspaceId]);
 
   // Returns the cached last-run request data (fetched once by useLastRunRequest).
@@ -197,7 +197,7 @@ export function useAnalysisFeature<TResult = unknown>(
   useEffect(() => {
     if (!localTaskId || !config.workspaceId) return;
     const cached = readLastRunRequestCache(localTaskId);
-    if (cached && cached.taskId === localTaskId) return;
+    if (cached?.taskId === localTaskId) return;
     void queryClient.invalidateQueries({
       queryKey: lastRunRequestQueryKey(config.analysisType, config.workspaceId),
     });
@@ -220,11 +220,12 @@ export function useAnalysisFeature<TResult = unknown>(
     const cfg = configRef.current;
     if (!cfg.workspaceId) return Promise.resolve(null);
 
-    const metadataTaskId = (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id ?? null;
+    const metadataTaskId =
+      (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id ?? null;
     const status = taskStatusRef.current;
     const extra = cfg.getExtraTaskIdCandidates?.() ?? [];
     const cachedLastRun = readLastRunRequestCache(cfg.hydrationTaskId ?? localTaskIdRef.current);
-    const isTabOwnedTask = hasTabOwnedTaskId(cfg as UseAnalysisFeatureConfig<unknown>);
+    const isTabOwnedTask = hasTabOwnedTaskId(cfg as UseAnalysisFeatureConfig);
     const statusCandidates = isTabOwnedTask
       ? []
       : [
@@ -267,11 +268,11 @@ export function useAnalysisFeature<TResult = unknown>(
       return;
     }
 
-    const isTabOwnedTask = hasTabOwnedTaskId(cfg as UseAnalysisFeatureConfig<unknown>);
+    const isTabOwnedTask = hasTabOwnedTaskId(cfg as UseAnalysisFeatureConfig);
     const ownedTaskIds = collectTaskIds([
       cfg.hydrationTaskId,
       localTaskIdRef.current,
-      (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id,
+      (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id,
       ...(cfg.getExtraTaskIdCandidates?.() ?? []),
     ]);
     if (isTabOwnedTask && taskId && !ownedTaskIds.includes(taskId)) {
@@ -306,7 +307,7 @@ export function useAnalysisFeature<TResult = unknown>(
 
       cfg.onResultFetched(result, resolvedTaskId);
 
-      const state = (result as AnalysisResultLike)?.state as string | undefined;
+      const state = (result as AnalysisResultLike | null)?.state;
       if (state === 'successful' || state === 'failed') {
         setIsRunning(false);
         lastFetchedRef.current = { taskId: resolvedTaskId, state };
@@ -323,10 +324,9 @@ export function useAnalysisFeature<TResult = unknown>(
    * Called by: useAnalysisTaskFlow when the tracked task reaches terminal state because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
    */
   const handleTaskRefresh = async (context: AnalysisTaskFlowRefreshContext): Promise<void> => {
-    if (context.reason !== 'terminal') return;
     if (!configRef.current.isTabActive) return;
     if (context.taskState !== 'successful' && context.taskState !== 'failed') return;
-    await fetchAndApplyResult(context.taskId ?? null, context.taskState as 'successful' | 'failed');
+    await fetchAndApplyResult(context.taskId ?? null, context.taskState);
   };
 
   // ---- Fallback banner ----
@@ -340,15 +340,16 @@ export function useAnalysisFeature<TResult = unknown>(
     const cfg = configRef.current;
     const resultRunning = cfg.isResultRunning
       ? cfg.isResultRunning(cfg.resultRef.current)
-      : (cfg.resultRef.current as AnalysisResultLike)?.state === 'running';
+      : (cfg.resultRef.current as AnalysisResultLike | null)?.state === 'running';
 
     if (!resultRunning) return null;
 
     return {
       taskId:
-        (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id ??
+        (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id ??
         status.activeTaskId ??
         null,
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty trimmed message should collapse to undefined (no banner message)
       message: status.bannerMessage?.trim() || undefined,
     };
   };
@@ -401,7 +402,7 @@ export function useAnalysisFeature<TResult = unknown>(
       ? async (taskId) => {
           if (!taskId) return null;
           const cached = readLastRunRequestCache(taskId);
-          if (cached && cached.taskId === taskId && cached.serverRequest) {
+          if (cached?.taskId === taskId && cached.serverRequest) {
             return cached.serverRequest;
           }
           return (
@@ -430,8 +431,7 @@ export function useAnalysisFeature<TResult = unknown>(
       }
     },
     applyRequest: config.onHydratedRequest
-      ? (request: unknown | null | undefined) =>
-          configRef.current.onHydratedRequest?.(request ?? null)
+      ? (request: unknown) => configRef.current.onHydratedRequest?.(request ?? null)
       : undefined,
     applyResult: config.onHydratedResult
       ? (result: TResult | null | undefined) => configRef.current.onHydratedResult?.(result ?? null)
@@ -451,8 +451,8 @@ export function useAnalysisFeature<TResult = unknown>(
     void hydrateFromServer().then(() => {
       // Update dedup ref so fetchAndApplyResult won't re-fetch what hydration already loaded
       const result = configRef.current.resultRef.current as AnalysisResultLike | null;
-      const state = result?.state as string | undefined;
-      const taskId = result?.metadata?.task_id as string | undefined;
+      const state = result?.state;
+      const taskId = result?.metadata?.task_id;
       if (taskId && (state === 'successful' || state === 'failed')) {
         lastFetchedRef.current = { taskId, state };
       }
@@ -479,7 +479,7 @@ export function useAnalysisFeature<TResult = unknown>(
       queryClient,
       taskIdSources: [
         localTaskIdRef.current,
-        (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id,
+        (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id,
         status?.activeTaskId,
         status?.runningTask?.task_id,
         status?.successfulTask?.task_id,
@@ -514,7 +514,7 @@ export function useAnalysisFeature<TResult = unknown>(
       status?.runningTask?.task_id,
       status?.activeTaskId,
       localTaskIdRef.current,
-      (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id,
+      (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id,
     ]);
     const taskId = taskIds[0] ?? (await resolveTaskId());
     if (!taskId) return;

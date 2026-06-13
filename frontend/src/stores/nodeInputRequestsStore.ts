@@ -42,7 +42,7 @@ export const useNodeInputRequestsStore = create<NodeInputRequestsStore>()(
 
       /** Queues a graph-button add intent for the currently active view. */
       requestAdd: (workspaceId, view, nodeId) =>
-        set((state) => {
+        { set((state) => {
           if (!workspaceId || !view || !nodeId) return;
           state.requests.push({
             id: state.nextId,
@@ -51,13 +51,13 @@ export const useNodeInputRequestsStore = create<NodeInputRequestsStore>()(
             nodeIds: [nodeId],
           });
           state.nextId += 1;
-        }),
+        }); },
 
       /** Removes a consumed request after the active view has handled it. */
       consume: (id) =>
-        set((state) => {
+        { set((state) => {
           state.requests = state.requests.filter((request) => request.id !== id);
-        }),
+        }); },
     })),
     { name: 'node-input-requests-store' },
   ),

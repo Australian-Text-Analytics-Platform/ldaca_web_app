@@ -16,7 +16,7 @@ export const clampContextLength = (value: number): number => {
   return Math.max(0, Math.min(MAX_CONTEXT_LENGTH, Math.floor(value)));
 };
 
-export type HighlightSpan = { start: number; end: number; types: string[] };
+export interface HighlightSpan { start: number; end: number; types: string[] }
 
 export interface ContextClipResult {
   text: string;
@@ -76,7 +76,7 @@ export const clipTextAroundSpans = (
   }
 
   const regex = /\S+/g;
-  const words: Array<{ start: number; end: number }> = [];
+  const words: { start: number; end: number }[] = [];
   let match: RegExpExecArray | null;
   while ((match = regex.exec(text)) !== null) {
     words.push({ start: match.index, end: match.index + match[0].length });
@@ -115,7 +115,8 @@ export const clipTextAroundSpans = (
    */
   const findWordIndexBeforeOrAt = (pos: number) => {
     for (let i = 0; i < words.length; i++) {
-      const word = words[i]!;
+      const word = words[i];
+      if (!word) continue;
       if (pos < word.start) {
         return Math.max(0, i - 1);
       }
@@ -132,7 +133,8 @@ export const clipTextAroundSpans = (
    */
   const findWordIndexAfterOrAt = (pos: number) => {
     for (let i = 0; i < words.length; i++) {
-      const word = words[i]!;
+      const word = words[i];
+      if (!word) continue;
       if (pos <= word.end) {
         return i;
       }

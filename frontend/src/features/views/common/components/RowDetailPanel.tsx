@@ -22,11 +22,11 @@ export interface RowDetailCustomization {
   /** Label shown in the dialog title parentheses, e.g. "Concordance" */
   label?: string;
   /** Key-value pairs shown in the metadata grid below the title */
-  summaryFields?: Array<{
+  summaryFields?: {
     label: string;
     value: React.ReactNode;
     highlight?: boolean;
-  }>;
+  }[];
   /**
    * Custom renderer for the full-text section.
    * Receives the raw text and the full row record.
@@ -63,6 +63,7 @@ export interface RowDetailPanelProps {
 const formatMetadataValue = (value: unknown): string => {
   if (value === null || value === undefined) return 'null';
   if (typeof value === 'object') return JSON.stringify(value, null, 2);
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- value is a non-object primitive after the guards above; String() never yields '[object Object]'
   return String(value);
 };
 
@@ -87,7 +88,9 @@ export function RowDetailPanel({
   if (textColumn) excludeSet.add(textColumn);
 
   const rawText =
-    fullText ?? (textColumn && record[textColumn] != null ? String(record[textColumn]) : undefined);
+    fullText ??
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- text column holds document text (string content); explicit String() guards against non-string cells
+    (textColumn && record[textColumn] != null ? String(record[textColumn]) : undefined);
 
   const titleSuffix = customization?.label ? ` (${customization.label})` : '';
 
@@ -116,7 +119,7 @@ export function RowDetailPanel({
           {customization?.summaryFields && customization.summaryFields.length > 0 && (
             <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
               {customization.summaryFields.map((field) => (
-                <div key={String(field.label)}>
+                <div key={field.label}>
                   <span className="font-medium text-gray-700">{field.label}:</span>
                   <span
                     className={`ml-2 ${field.highlight ? 'font-mono bg-yellow-100 px-1 rounded' : ''}`}

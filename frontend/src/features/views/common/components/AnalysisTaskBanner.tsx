@@ -43,7 +43,7 @@ function AnalysisTaskBanner({
   className,
   children,
 }: AnalysisTaskBannerProps) {
-  const styles = statusStyles[status] ?? statusStyles.running;
+  const styles = statusStyles[status];
   const trimmedMessage = message?.trim();
 
   return (

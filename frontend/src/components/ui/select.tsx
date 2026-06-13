@@ -17,7 +17,7 @@ type SelectTriggerProps = SelectPrimitive.SelectTriggerProps &
 
 /** Trigger button wrapper used by app selects for consistent focus and chevron styling. */
 const SelectTrigger = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Trigger>,
+  React.ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Trigger
@@ -38,7 +38,7 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 /** Scroll-up affordance shown by long select option lists. */
 const SelectScrollUpButton = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
+  React.ComponentRef<typeof SelectPrimitive.ScrollUpButton>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.ScrollUpButton
@@ -53,7 +53,7 @@ SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
 
 /** Scroll-down affordance shown by long select option lists. */
 const SelectScrollDownButton = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
+  React.ComponentRef<typeof SelectPrimitive.ScrollDownButton>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.ScrollDownButton
@@ -70,7 +70,7 @@ type SelectContentProps = SelectPrimitive.SelectContentProps & { children?: Reac
 
 /** Portal-backed select content panel used by dropdown option lists. */
 const SelectContent = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Content>,
+  React.ComponentRef<typeof SelectPrimitive.Content>,
   SelectContentProps
 >(({ className, children, position = 'popper', ...props }, ref) => (
   <SelectPrimitive.Portal>
@@ -102,7 +102,7 @@ SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 /** Select label row used to name grouped option sets. */
 const SelectLabel = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Label>,
+  React.ComponentRef<typeof SelectPrimitive.Label>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
@@ -116,7 +116,7 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName;
 type SelectItemProps = SelectPrimitive.SelectItemProps & { children?: React.ReactNode };
 
 /** Select option row with checkmark indicator for chosen values. */
-const SelectItem = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Item>, SelectItemProps>(
+const SelectItem = React.forwardRef<React.ComponentRef<typeof SelectPrimitive.Item>, SelectItemProps>(
   ({ className, children, ...props }, ref) => (
     <SelectPrimitive.Item
       ref={ref}
@@ -139,7 +139,7 @@ SelectItem.displayName = SelectPrimitive.Item.displayName;
 
 /** Select separator used to divide option groups. */
 const SelectSeparator = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Separator>,
+  React.ComponentRef<typeof SelectPrimitive.Separator>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator

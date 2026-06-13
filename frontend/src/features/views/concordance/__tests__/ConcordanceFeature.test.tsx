@@ -16,7 +16,9 @@ const renderWithClient = (ui: React.ReactElement) => {
 };
 
 const handleSearchMock = vi.fn();
-const clearResultsMock = vi.fn(async () => {});
+const clearResultsMock = vi.fn(async () => {
+  /* mock: resolves immediately */
+});
 let latestTaskFlowParams: { state?: Record<string, unknown> } | null = null;
 let mockPendingConcordance: Record<string, unknown> | null = null;
 let mockHydrationState = { status: 'idle' as const, lastHydratedAt: 1 };
@@ -156,7 +158,7 @@ vi.mock('@/components/ui/confirm-dialog', () => ({
       <div>
         <div>{title}</div>
         <div>{description}</div>
-        <button type="button" onClick={() => onOpenChange(false)}>
+        <button type="button" onClick={() => { onOpenChange(false); }}>
           {cancelText}
         </button>
         <button
@@ -291,7 +293,7 @@ vi.mock('../../common', async () => {
   const ReactModule = await import('react');
   return {
     /** Mirrors the shared node-id helper with a deterministic fallback for fixtures. */
-    getNodeIdentifier: (node: { id?: string }, index: number) => node.id ?? `node-${index}`,
+    getNodeIdentifier: (node: { id?: string }, index: number) => node.id ?? `node-${String(index)}`,
     /** Supplies the last-run request used only for Run/Re-run button diffing. */
     useLastRunRequest: () => ({
       serverRequest: {

@@ -8,7 +8,7 @@ const getIsMobile = (): boolean => {
   if (typeof window === 'undefined') {
     return false;
   }
-  return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`).matches;
+  return window.matchMedia(`(max-width: ${String(MOBILE_BREAKPOINT - 1)}px)`).matches;
 };
 
 /** Tracks the app's mobile breakpoint for components that change interaction affordances. */
@@ -21,7 +21,7 @@ export const useIsMobile = (): boolean => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const mediaQuery = window.matchMedia(`(max-width: ${String(MOBILE_BREAKPOINT - 1)}px)`);
 
     /** Syncs state from the MediaQueryList for both modern and legacy listener APIs. */
     /** Used by: useIsMobile callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
@@ -33,11 +33,14 @@ export const useIsMobile = (): boolean => {
 
     if (typeof mediaQuery.addEventListener === 'function') {
       mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
+      return () => { mediaQuery.removeEventListener('change', handleChange); };
     }
 
+    // Legacy MediaQueryList fallback for browsers without addEventListener.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional fallback for older browsers lacking addEventListener
     mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional fallback for older browsers lacking removeEventListener
+    return () => { mediaQuery.removeListener(handleChange); };
   }, []);
 
   return isMobile;

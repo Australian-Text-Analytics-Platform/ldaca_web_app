@@ -94,7 +94,7 @@ export const useColumnMutations = ({
       .then((schema) => {
         if (!cancelled) applySchema(schema);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         if (!cancelled) console.error('useColumnMutations: failed to refresh schema', error);
       });
     return () => {

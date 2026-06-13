@@ -61,7 +61,7 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
       <div className="flex w-full flex-wrap items-center justify-between gap-3">
         <div className="text-xs text-muted-foreground">
           Page {page + 1}
-          {totalRows ? ` of ~${Math.ceil(totalRows / pageSize)}` : ''}
+          {totalRows ? ` of ~${String(Math.ceil(totalRows / pageSize))}` : ''}
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={handlePrev} disabled={!canPrev || loading} variant="outline" size="sm">
@@ -70,7 +70,7 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
           <Button onClick={handleNext} disabled={!canNext || loading} variant="outline" size="sm">
             Next
           </Button>
-          <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
+          <Select value={String(pageSize)} onValueChange={(value) => { setPageSize(Number(value)); }}>
             <SelectTrigger className="w-20">
               <SelectValue />
             </SelectTrigger>

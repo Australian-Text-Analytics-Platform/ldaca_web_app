@@ -30,8 +30,8 @@ export function useHintConditions(): {
   );
 
   const noActiveWorkspace = !currentWorkspaceId;
-  const workspaceHasNoNodes = !!currentWorkspaceId && (workspaceGraph?.nodes?.length ?? 0) === 0;
-  const workspaceHasNodes = !!currentWorkspaceId && (workspaceGraph?.nodes?.length ?? 0) > 0;
+  const workspaceHasNoNodes = !!currentWorkspaceId && (workspaceGraph?.nodes.length ?? 0) === 0;
+  const workspaceHasNodes = !!currentWorkspaceId && (workspaceGraph?.nodes.length ?? 0) > 0;
 
   // "File uploaded without an active workspace": user uploaded something but
   // hasn't created/loaded a workspace yet. This is a separate hint id from
@@ -49,8 +49,8 @@ export function useHintConditions(): {
     if (nodes.length === 0) return true;
     const basename = lastUploadedFilePath.split('/').pop() ?? lastUploadedFilePath;
     const matched = nodes.some((node) => {
-      const id = String((node as { id?: unknown }).id ?? '');
-      const data = (node as { data?: { name?: unknown } }).data;
+      const id = String((node as { id?: string | number }).id ?? '');
+      const data = (node as { data?: { name?: string | number } }).data;
       const name = String(data?.name ?? '');
       return (
         id === lastUploadedFilePath ||

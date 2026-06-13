@@ -131,7 +131,7 @@ export const useWorkspaceInternal = () => {
     [queryLoadingState, operationsLoading],
   );
 
-  const operationsError = Object.values(operationErrorsRecord)[0] || null;
+  const operationsError = Object.values(operationErrorsRecord)[0] ?? null;
   const errors = useMemo(
     () => ({
       ...queryErrorState,

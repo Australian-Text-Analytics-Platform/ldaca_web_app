@@ -24,7 +24,7 @@ import {
 
 export interface ServerTableOptions<TData> {
   data: TData[];
-  columns: ColumnDef<TData, unknown>[];
+  columns: ColumnDef<TData>[];
   rowCount: number;
   pageIndex?: number;
   pageSize?: number;

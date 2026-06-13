@@ -39,7 +39,7 @@ const TOOL_LABELS: Record<string, string> = {
  * Used by: local callers in data-loader/SampleDataPanel module.
  */
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024) return `${String(bytes)} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
@@ -57,6 +57,8 @@ function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
     partial: { label: '⚠ Partial', className: 'text-yellow-600 dark:text-yellow-400' },
     not_downloaded: { label: '○ Not downloaded', className: 'text-muted-foreground' },
   };
+  // backend status may fall outside the typed union; fall back to the not-downloaded chip
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const { label, className } = map[status] ?? map.not_downloaded;
   return <span className={cn('text-xs font-medium whitespace-nowrap', className)}>{label}</span>;
 }
@@ -179,7 +181,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
    * Toggles optional remote collections in the dataset import dialog.
    * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const toggle = (id: string) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggle = (id: string) => { setChecked((prev) => ({ ...prev, [id]: !prev[id] })); };
 
   /**
    * Imports selected sample datasets and refreshes the parent file browser once
@@ -215,7 +217,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
       setOpen(false);
     } catch (err) {
       toast.dismiss(loadingToastId);
-      toast.error((err as Error)?.message || 'Failed to import sample data.');
+      toast.error((err as Error).message || 'Failed to import sample data.');
     } finally {
       setImporting(false);
     }
@@ -225,7 +227,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)}>
+      <Button variant="outline" onClick={() => { setOpen(true); }}>
         <FolderPlus className="mr-2 h-4 w-4" /> Import sample data
       </Button>
 
@@ -257,7 +259,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
                             id={`sdc-${col.id}`}
                             checked={getChecked(col)}
                             disabled={col.bundled}
-                            onCheckedChange={() => toggle(col.id)}
+                            onCheckedChange={() => { toggle(col.id); }}
                           />
                           <label
                             htmlFor={`sdc-${col.id}`}
@@ -272,7 +274,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
                               className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
                               aria-label={`View README for ${col.name}`}
                               title="View README"
-                              onClick={() => setViewingReadme({ path: readme, name: col.name })}
+                              onClick={() => { setViewingReadme({ path: readme, name: col.name }); }}
                             >
                               <Quote className="h-3.5 w-3.5" />
                             </Button>
@@ -314,7 +316,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={importing}>
+            <Button variant="outline" onClick={() => { setOpen(false); }} disabled={importing}>
               Close
             </Button>
           </DialogFooter>
@@ -325,7 +327,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
       <ReadmeViewer
         path={viewingReadme?.path ?? null}
         collectionName={viewingReadme?.name ?? ''}
-        onClose={() => setViewingReadme(null)}
+        onClose={() => { setViewingReadme(null); }}
       />
     </>
   );

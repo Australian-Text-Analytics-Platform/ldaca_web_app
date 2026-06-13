@@ -8,14 +8,14 @@ export const CHART_IMAGE_FORMATS: { value: ChartImageFormat; label: string }[] =
   { value: 'jpeg', label: 'JPEG' },
 ];
 
-export type ChartExportHeaderItem = { label: string; value: string };
-export type ChartExportLegendItem = {
+export interface ChartExportHeaderItem { label: string; value: string }
+export interface ChartExportLegendItem {
   label: string;
   color: string;
   type?: 'line' | 'bar' | 'area';
   /** When true the item is rendered faded + struck-through, mirroring the web UI toggle state */
   hidden?: boolean;
-};
+}
 
 export interface DownloadChartOptions {
   nodeName?: string;
@@ -47,7 +47,7 @@ const toChartFilename = (
 /** Escapes user/content labels before embedding them into composed SVG downloads. */
 /** Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const escSvg = (s: string): string =>
-  String(s)
+  s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -68,7 +68,9 @@ const serializeChartSvg = (
   if ((!width || !height) && viewBox) {
     const parts = viewBox.split(' ').map(Number);
     if (parts.length === 4) {
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall back on 0/NaN viewBox dimensions, not only undefined
       width = parts[2] || width;
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall back on 0/NaN viewBox dimensions, not only undefined
       height = parts[3] || height;
     }
   }
@@ -179,21 +181,21 @@ const renderCompositeBitmap = async (
 
   // Header — row 1: centred node name; row 2: compact info pairs
   if (header.length) {
-    ctx.font = `600 ${HEADER_TITLE_FONT}px system-ui,-apple-system,sans-serif`;
+    const [titleItem] = header;
+    ctx.font = `600 ${String(HEADER_TITLE_FONT)}px system-ui,-apple-system,sans-serif`;
     ctx.fillStyle = '#111827';
     ctx.textAlign = 'center';
-    ctx.fillText(header[0]!.value, svgWidth / 2, PAD + HEADER_TITLE_H);
+    if (titleItem) ctx.fillText(titleItem.value, svgWidth / 2, PAD + HEADER_TITLE_H);
     ctx.textAlign = 'left';
 
     const infoItems = header.slice(1);
     if (infoItems.length) {
-      ctx.font = `${HEADER_INFO_FONT}px system-ui,-apple-system,sans-serif`;
+      ctx.font = `${String(HEADER_INFO_FONT)}px system-ui,-apple-system,sans-serif`;
       ctx.fillStyle = '#6b7280';
       ctx.textAlign = 'center';
       const colW = svgWidth / infoItems.length;
       const infoY = PAD + HEADER_TITLE_H + HEADER_INFO_H;
-      for (let i = 0; i < infoItems.length; i++) {
-        const item = infoItems[i]!;
+      for (const [i, item] of infoItems.entries()) {
         ctx.fillText(`${item.label}: ${item.value}`, PAD + i * colW + colW / 2, infoY);
       }
       ctx.textAlign = 'left';
@@ -217,10 +219,9 @@ const renderCompositeBitmap = async (
   if (legend.length) {
     const perRow = Math.max(1, Math.floor(svgWidth / APPROX_LEGEND_ITEM_W));
     const startY = headerH + svgHeight + PAD / 2;
-    ctx.font = `${LEGEND_FONT}px system-ui,-apple-system,sans-serif`;
+    ctx.font = `${String(LEGEND_FONT)}px system-ui,-apple-system,sans-serif`;
 
-    for (let i = 0; i < legend.length; i++) {
-      const item = legend[i]!;
+    for (const [i, item] of legend.entries()) {
       const row = Math.floor(i / perRow);
       const col = i % perRow;
       const rowCount = Math.min(perRow, legend.length - row * perRow);
@@ -268,7 +269,10 @@ const renderCompositeBitmap = async (
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error('Failed to encode canvas to blob'))),
+      (b) => {
+        if (b) resolve(b);
+        else reject(new Error('Failed to encode canvas to blob'));
+      },
       options.format === 'jpeg' ? 'image/jpeg' : 'image/png',
       options.format === 'jpeg' ? 0.92 : undefined,
     );
@@ -295,27 +299,29 @@ const buildCompositeSvg = (
 
   const headerLines: string[] = [];
   if (header.length) {
+    const [titleItem] = header;
     const titleY = PAD + HEADER_TITLE_H;
-    headerLines.push(
-      `<text x="${svgWidth / 2}" y="${titleY}" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="${HEADER_TITLE_FONT}" font-weight="600" fill="#111827">${escSvg(header[0]!.value)}</text>`,
-    );
+    if (titleItem) {
+      headerLines.push(
+        `<text x="${String(svgWidth / 2)}" y="${String(titleY)}" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="${String(HEADER_TITLE_FONT)}" font-weight="600" fill="#111827">${escSvg(titleItem.value)}</text>`,
+      );
+    }
 
     const infoItems = header.slice(1);
     if (infoItems.length) {
       const infoY = PAD + HEADER_TITLE_H + HEADER_INFO_H;
       const colW = svgWidth / infoItems.length;
-      for (let i = 0; i < infoItems.length; i++) {
-        const item = infoItems[i]!;
+      for (const [i, item] of infoItems.entries()) {
         const cx = PAD + i * colW + colW / 2;
         headerLines.push(
-          `<text x="${cx}" y="${infoY}" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="${HEADER_INFO_FONT}" fill="#6b7280">${escSvg(item.label)}: ${escSvg(item.value)}</text>`,
+          `<text x="${String(cx)}" y="${String(infoY)}" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="${String(HEADER_INFO_FONT)}" fill="#6b7280">${escSvg(item.label)}: ${escSvg(item.value)}</text>`,
         );
       }
     }
 
     const divY = computeHeaderH(header) - 1 - DIVIDER_GAP;
     headerLines.push(
-      `<line x1="0" y1="${divY}" x2="${svgWidth}" y2="${divY}" stroke="#e5e7eb" stroke-width="1"/>`,
+      `<line x1="0" y1="${String(divY)}" x2="${String(svgWidth)}" y2="${String(divY)}" stroke="#e5e7eb" stroke-width="1"/>`,
     );
   }
 
@@ -323,8 +329,7 @@ const buildCompositeSvg = (
   if (legend.length) {
     const perRow = Math.max(1, Math.floor(svgWidth / APPROX_LEGEND_ITEM_W));
     const startY = headerH + svgHeight + PAD / 2;
-    for (let i = 0; i < legend.length; i++) {
-      const item = legend[i]!;
+    for (const [i, item] of legend.entries()) {
       const row = Math.floor(i / perRow);
       const col = i % perRow;
       const rowCount = Math.min(perRow, legend.length - row * perRow);
@@ -335,17 +340,17 @@ const buildCompositeSvg = (
       legendLines.push(`<g${gAttrs}>`);
       if (item.type === 'line') {
         legendLines.push(
-          `<line x1="${x}" y1="${cy}" x2="${x + SWATCH_W}" y2="${cy}" stroke="${escSvg(item.color)}" stroke-width="2"/>`,
-          `<circle cx="${x + SWATCH_W / 2}" cy="${cy}" r="3" fill="${escSvg(item.color)}"/>`,
+          `<line x1="${String(x)}" y1="${String(cy)}" x2="${String(x + SWATCH_W)}" y2="${String(cy)}" stroke="${escSvg(item.color)}" stroke-width="2"/>`,
+          `<circle cx="${String(x + SWATCH_W / 2)}" cy="${String(cy)}" r="3" fill="${escSvg(item.color)}"/>`,
         );
       } else {
         legendLines.push(
-          `<rect x="${x}" y="${cy - SWATCH_H / 2}" width="${SWATCH_W}" height="${SWATCH_H}" rx="2" fill="${escSvg(item.color)}"/>`,
+          `<rect x="${String(x)}" y="${String(cy - SWATCH_H / 2)}" width="${String(SWATCH_W)}" height="${String(SWATCH_H)}" rx="2" fill="${escSvg(item.color)}"/>`,
         );
       }
       const decoration = item.hidden ? ' text-decoration="line-through"' : '';
       legendLines.push(
-        `<text x="${x + SWATCH_W + SWATCH_TEXT_GAP}" y="${cy + LEGEND_FONT / 2 - 1}" font-family="system-ui,-apple-system,sans-serif" font-size="${LEGEND_FONT}" fill="#374151"${decoration}>${escSvg(item.label)}</text>`,
+        `<text x="${String(x + SWATCH_W + SWATCH_TEXT_GAP)}" y="${String(cy + LEGEND_FONT / 2 - 1)}" font-family="system-ui,-apple-system,sans-serif" font-size="${String(LEGEND_FONT)}" fill="#374151"${decoration}>${escSvg(item.label)}</text>`,
       );
       legendLines.push('</g>');
     }
@@ -354,10 +359,10 @@ const buildCompositeSvg = (
   const inner = svgString.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
 
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${totalH}">`,
-    `<rect width="${svgWidth}" height="${totalH}" fill="white"/>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${String(svgWidth)}" height="${String(totalH)}">`,
+    `<rect width="${String(svgWidth)}" height="${String(totalH)}" fill="white"/>`,
     ...headerLines,
-    `<g transform="translate(0,${headerH})">${inner}</g>`,
+    `<g transform="translate(0,${String(headerH)})">${inner}</g>`,
     ...legendLines,
     '</svg>',
   ].join('\n');

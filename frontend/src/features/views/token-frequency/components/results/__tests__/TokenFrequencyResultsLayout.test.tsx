@@ -24,8 +24,8 @@ vi.mock('@visx/wordcloud', () => ({
     children,
     words,
   }: {
-    children: (cloudWords: Array<Record<string, unknown>>) => React.ReactNode;
-    words: Array<Record<string, unknown>>;
+    children: (cloudWords: Record<string, unknown>[]) => React.ReactNode;
+    words: Record<string, unknown>[];
   }) => (
     <g data-testid="mock-wordcloud">
       {children(
@@ -130,7 +130,7 @@ const baseUnifiedSectionProps = {
 describe('Token frequency result layouts', () => {
   it('renders all configured tokens instead of truncating after thirty', () => {
     const displayRows = Array.from({ length: 50 }, (_, index) => ({
-      token: `token-${index + 1}`,
+      token: `token-${String(index + 1)}`,
       frequency: 50 - index,
     }));
 

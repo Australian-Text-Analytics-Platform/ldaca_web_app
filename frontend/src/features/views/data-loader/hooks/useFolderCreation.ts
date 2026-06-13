@@ -66,7 +66,9 @@ export function useFolderCreation({ authHeaders, refetchFiles, notify }: UseFold
       setCreateFolderOpen(false);
       setNewFolderName('');
     } catch (error) {
-      const message = (error as { message?: string })?.message || 'Failed to create folder.';
+      // read message off any thrown value; an empty message should fall through to the fallback
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      const message = (error as { message?: string } | undefined)?.message || 'Failed to create folder.';
       if (message.toLowerCase().includes('invalid folder name')) {
         setFolderNameAlert(message);
         return;
@@ -90,7 +92,7 @@ export function useFolderCreation({ authHeaders, refetchFiles, notify }: UseFold
      * Consumed by: DataLoaderDialogs because it needs to dismiss validation alerts
      * while leaving folder mutation state inside this hook.
      */
-    closeFolderNameAlert: () => setFolderNameAlert(null),
+    closeFolderNameAlert: () => { setFolderNameAlert(null); },
     openCreateFolderDialog,
     handleCreateFolder,
   };

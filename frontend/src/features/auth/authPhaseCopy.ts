@@ -24,7 +24,7 @@ export const formatTimestamp = (value?: number | null): string | null => {
 
 /** Called by: authPhaseCopy status builders and RefreshStatusBanner retry copy because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 export const formatAttemptLabel = (attempts: number): string =>
-  `${Math.min(attempts, REFRESH_FAILURE_THRESHOLD)}/${REFRESH_FAILURE_THRESHOLD}`;
+  `${String(Math.min(attempts, REFRESH_FAILURE_THRESHOLD))}/${String(REFRESH_FAILURE_THRESHOLD)}`;
 
 /**
  * Maps an `AuthPhase` to the `BlockingScreen` copy used by app startup.
@@ -50,13 +50,14 @@ export const getBlockingCopy = (
   }
 
   if (phase.status === 'fatal') {
+    const lastFailureLabel = formatTimestamp(phase.lastFailureAt);
     return {
       title: 'Reconnecting your session',
       description:
         'Multiple background refresh attempts failed, so we paused the workspace until the backend responds again.',
       status: `Retrying (${formatAttemptLabel(phase.attempts)})…`,
-      hint: formatTimestamp(phase.lastFailureAt)
-        ? `Last failure at ${formatTimestamp(phase.lastFailureAt)}. Check your connection or restart the backend, then retry below.`
+      hint: lastFailureLabel
+        ? `Last failure at ${lastFailureLabel}. Check your connection or restart the backend, then retry below.`
         : 'Check your connection or restart the backend, then retry below.',
       error: phase.error,
     };

@@ -51,7 +51,7 @@ export const PER_VIEW_ACTIVE_LIMIT: Record<ViewType, number | 'all'> = {
 export interface NodeVisualContext {
   /** Workspace selection order (latest selection at the end of the
    * array). Drives the "last-N" derivation. */
-  selectedNodeIds: ReadonlyArray<string>;
+  selectedNodeIds: readonly string[];
   /** Currently-visible analytics view. Determines the active-limit. */
   currentView: ViewType;
   /** ``Record<nodeId, hexColor>`` from the global ``useNodeColorsStore``.

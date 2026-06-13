@@ -56,7 +56,7 @@ export function NodeSelectionList({
   cardClassName,
 }: NodeSelectionListProps) {
   const derivedNodeIds =
-    nodeIds && nodeIds.length === nodes.length
+    nodeIds?.length === nodes.length
       ? nodeIds
       : nodes.map((node, index) => getNodeIdentifier(node, index));
 
@@ -87,8 +87,9 @@ export function NodeSelectionList({
       {nodes.map((node, index) => {
         const nodeId = derivedNodeIds[index];
         if (!nodeId) return null;
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/no-non-null-assertion -- empty color string should fall through to the palette; palette index is always in range with the '#000000' fallback
         const color = (nodeColors[nodeId] ||
-          (palette.length ? palette[index % palette.length] : '#000000')) as string;
+          (palette.length ? palette[index % palette.length] : '#000000'))!;
         const title = getNodeTitle(node, nodeId, index);
         return (
           <Card
@@ -104,7 +105,7 @@ export function NodeSelectionList({
                 <NodeColorPicker
                   color={color}
                   palette={palette}
-                  onChange={(next) => onColorChange(nodeId, next)}
+                  onChange={(next) => { onColorChange(nodeId, next); }}
                 />
               </div>
             )}
@@ -113,7 +114,7 @@ export function NodeSelectionList({
                 type="button"
                 aria-label={`Remove ${title}`}
                 title={`Remove ${title}`}
-                onClick={() => onRemoveNode(nodeId)}
+                onClick={() => { onRemoveNode(nodeId); }}
                 className={cn(
                   'pointer-events-auto absolute top-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-muted/80 text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground',
                   showColorPicker && onColorChange ? 'right-9' : 'right-2',
@@ -138,7 +139,7 @@ export function NodeSelectionList({
                 </div>
               )}
             </CardHeader>
-            {(renderNodeBody || renderExtraNodeContent) && (
+            {(renderNodeBody ?? renderExtraNodeContent) && (
               <CardContent className="space-y-2 px-3 pb-3 pt-0">
                 {renderNodeBody?.({ node, nodeId, index, color })}
                 {renderExtraNodeContent?.({ node, nodeId, index, color })}

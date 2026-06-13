@@ -20,7 +20,7 @@ const normalizeTimestamp = (value: unknown): number => {
 /** Picks the freshest timestamp available on a task, including stream-only event metadata. */
 /** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const getTaskTimestamp = (task?: TaskItem | null) => {
-  const anyTask = task as (TaskItem & { __event_timestamp?: unknown }) | undefined | null;
+  const anyTask = task;
   return (
     normalizeTimestamp(anyTask?.__event_timestamp) ||
     normalizeTimestamp(
@@ -32,7 +32,7 @@ const getTaskTimestamp = (task?: TaskItem | null) => {
 /** Breaks timestamp ties using task-stream event order when events arrive in the same millisecond. */
 /** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const getTaskEventSequence = (task?: TaskItem | null) => {
-  const anyTask = task as (TaskItem & { __event_sequence?: unknown }) | undefined | null;
+  const anyTask = task;
   return typeof anyTask?.__event_sequence === 'number' && Number.isFinite(anyTask.__event_sequence)
     ? anyTask.__event_sequence
     : 0;
@@ -66,7 +66,7 @@ export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTask
 
   const filteredTasks = Array.isArray(tasks)
     ? tasks.filter((task) => {
-        const rawType = typeof task?.task_type === 'string' ? task.task_type : '';
+        const rawType = typeof task.task_type === 'string' ? task.task_type : '';
         return candidateSet.has(rawType);
       })
     : ([] as TaskItem[]);
@@ -79,13 +79,13 @@ export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTask
     return getTaskEventSequence(b) - getTaskEventSequence(a);
   });
 
-  const runningTask = sortedTasks.find((task) => task?.state === 'running') ?? null;
+  const runningTask = sortedTasks.find((task) => task.state === 'running') ?? null;
   const queuedTask =
-    sortedTasks.find((task) => isPendingTaskState((task?.state ?? '').toLowerCase())) ?? null;
-  const successfulTask = sortedTasks.find((task) => task?.state === 'successful') ?? null;
-  const failedTask = sortedTasks.find((task) => task?.state === 'failed') ?? null;
-  const cancelledTask = sortedTasks.find((task) => task?.state === 'cancelled') ?? null;
-  const terminalTask = sortedTasks.find((task) => isTerminalTaskState(task?.state)) ?? null;
+    sortedTasks.find((task) => isPendingTaskState((task.state ?? '').toLowerCase())) ?? null;
+  const successfulTask = sortedTasks.find((task) => task.state === 'successful') ?? null;
+  const failedTask = sortedTasks.find((task) => task.state === 'failed') ?? null;
+  const cancelledTask = sortedTasks.find((task) => task.state === 'cancelled') ?? null;
+  const terminalTask = sortedTasks.find((task) => isTerminalTaskState(task.state)) ?? null;
 
   const latestTask = sortedTasks[0] ?? null;
   const latestState = (latestTask?.state ?? '').toLowerCase();

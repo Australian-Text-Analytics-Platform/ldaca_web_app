@@ -8,7 +8,6 @@ import { saveBlob } from '@/lib/download';
 const toSafeExportFilename = (label: string, suffix: string, extension: string) => {
   const base =
     (label || 'token-frequency')
-      .toString()
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -35,7 +34,7 @@ const buildTimestampFragment = (date: Date = new Date()) =>
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 const toRawStandaloneFilename = (label: string, suffix: string, extension: string) => {
-  const base = (label || 'token-frequency').toString().trim() || 'token-frequency';
+  const base = (label || 'token-frequency').trim() || 'token-frequency';
   return `${base}_${suffix}.${extension}`;
 };
 
@@ -45,7 +44,8 @@ const toRawStandaloneFilename = (label: string, suffix: string, extension: strin
  * Flow: trim the label, keep the basename, replace forbidden filename characters and control codes, then truncate to a nonempty archive segment.
  */
 const toArchiveNameSegment = (label: string, maxLength = 20) => {
-  const raw = (label || 'analysis').toString().trim() || 'analysis';
+  const raw = (label || 'analysis').trim() || 'analysis';
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty trimmed basename segment must fall back to the full raw label, so falsy '' must fall through
   const tail = raw.split('/').pop()?.trim() || raw;
   const safe =
     tail
@@ -76,10 +76,10 @@ export const buildTokenFrequencyZipFilename = (labels: string[], date: Date = ne
   return `${buildTimestampFragment(date)}_${base}.zip`;
 };
 
-export type ExportedDownloadFile = {
+export interface ExportedDownloadFile {
   filename: string;
   blob: Blob;
-};
+}
 
 /** Delegates blob saving to the shared browser/Tauri download adapter. */
 /**
@@ -96,6 +96,7 @@ const triggerBlobDownload = (blob: Blob, filename: string) => {
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 const downloadExportedFile = (file: ExportedDownloadFile, overrideFilename?: string) => {
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty override filename must fall back to the file's own name, so falsy '' must fall through
   triggerBlobDownload(file.blob, overrideFilename || file.filename);
 };
 
@@ -106,12 +107,12 @@ const DEFAULT_TOKEN_COLUMNS = ['token', 'frequency'] as const;
  * Called by: tokenFrequencyExport analysis helper module as a local helper in this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  * Flow: collect first-seen row keys across all rows, fall back to token/frequency defaults when empty, then flag the default token shape.
  */
-const deriveExportColumns = (rows: Array<Record<string, unknown>>) => {
+const deriveExportColumns = (rows: Record<string, unknown>[]) => {
   const seen = new Set<string>();
   const columns: string[] = [];
 
   for (const row of rows) {
-    for (const key of Object.keys(row ?? {})) {
+    for (const key of Object.keys(row)) {
       if (seen.has(key)) continue;
       seen.add(key);
       columns.push(key);
@@ -161,7 +162,13 @@ const toCellString = (value: unknown) => {
   if (value === null || value === undefined) {
     return '';
   }
-  return String(value);
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return JSON.stringify(value);
 };
 
 /** Orders row values according to the derived export columns and default token headers. */
@@ -174,10 +181,10 @@ const getRowValues = (
   isDefaultTokenFrequencyShape: boolean,
 ) => {
   if (isDefaultTokenFrequencyShape) {
-    return [toCellString(row?.token), toCellString(row?.frequency)];
+    return [toCellString(row.token), toCellString(row.frequency)];
   }
 
-  return columns.map((column) => toCellString(row?.[column]));
+  return columns.map((column) => toCellString(row[column]));
 };
 
 /** Escapes a value for RFC-style quoted CSV output. */
@@ -197,7 +204,7 @@ const escapeMarkdownValue = (value: string) =>
 /**
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
-const serializeRowsAsCsv = (rows: Array<Record<string, unknown>>) => {
+const serializeRowsAsCsv = (rows: Record<string, unknown>[]) => {
   const { columns, isDefaultTokenFrequencyShape } = deriveExportColumns(rows);
   const headers = getExportHeaders(columns, isDefaultTokenFrequencyShape);
 
@@ -214,7 +221,7 @@ const serializeRowsAsCsv = (rows: Array<Record<string, unknown>>) => {
  * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  * Flow: derive columns and headers, write the Markdown header and separator rows, escape each cell, then join table lines.
  */
-const serializeRowsAsMarkdown = (rows: Array<Record<string, unknown>>) => {
+const serializeRowsAsMarkdown = (rows: Record<string, unknown>[]) => {
   const { columns, isDefaultTokenFrequencyShape } = deriveExportColumns(rows);
   const headers = getExportHeaders(columns, isDefaultTokenFrequencyShape);
 
@@ -333,7 +340,7 @@ export const buildWordCloudExportFile = async (
  */
 export const buildFrequencyExportFile = (
   label: string,
-  rows: Array<Record<string, unknown>>,
+  rows: Record<string, unknown>[],
   format: FrequencyFormat,
 ): ExportedDownloadFile => {
   if (format === 'markdown') {
@@ -378,6 +385,7 @@ export const downloadExportBundleAsZip = async (
 ) => {
   if (files.length === 0) return;
   if (files.length === 1) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length === 1 checked above guarantees index 0 exists
     downloadExportedFile(files[0]!);
     return;
   }
@@ -407,7 +415,9 @@ const serializeSvg = (svg: SVGSVGElement): { svgString: string; width: number; h
   if ((!width || !height) && viewBox) {
     const parts = viewBox.split(' ').map((part) => Number(part));
     if (parts.length === 4) {
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a 0/NaN viewBox dimension must fall back to the existing width, so falsy values must fall through (?? would keep them)
       width = parts[2] || width;
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a 0/NaN viewBox dimension must fall back to the existing height, so falsy values must fall through (?? would keep them)
       height = parts[3] || height;
     }
   }
@@ -461,7 +471,7 @@ export const downloadWordCloudAs = (
  */
 export const downloadFrequencyRowsAs = (
   label: string,
-  rows: Array<Record<string, unknown>>,
+  rows: Record<string, unknown>[],
   format: FrequencyFormat,
 ) => {
   if (typeof window === 'undefined') return;

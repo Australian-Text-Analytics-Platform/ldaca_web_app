@@ -35,7 +35,7 @@ export type TagProps = React.ComponentProps<'span'> &
     asChild?: boolean;
   };
 
-const Tag = React.forwardRef<React.ElementRef<'span'>, TagProps>(
+const Tag = React.forwardRef<React.ComponentRef<'span'>, TagProps>(
   ({ className, tone, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : 'span';
 

@@ -31,7 +31,7 @@ describe('useNodeColorsStore — assigned-only paths', () => {
     // Grey doubles as the "no colour" indicator, so the auto-assign
     // palette excludes it. Walking through 24 nodes — twice the
     // palette length — must never produce a grey assignment.
-    const ids = Array.from({ length: 24 }, (_, i) => `n${i}`);
+    const ids = Array.from({ length: 24 }, (_, i) => `n${String(i)}`);
     useNodeColorsStore.getState().ensureColors(ids);
     const { colors } = useNodeColorsStore.getState();
     for (const id of ids) {
@@ -70,7 +70,7 @@ describe('useNodeColorsStore — per-tab temp layer', () => {
     // Seed assigned with a non-grey colour so the random roll path
     // fires (not the "prefer assigned" short-circuit), then verify
     // grey never lands on any of a large batch of nodes.
-    const ids = Array.from({ length: 50 }, (_, i) => `n${i}`);
+    const ids = Array.from({ length: 50 }, (_, i) => `n${String(i)}`);
     useNodeColorsStore.getState().ensureTempColors('concordance', ids);
     const tab = useNodeColorsStore.getState().temps.concordance ?? {};
     for (const id of ids) {

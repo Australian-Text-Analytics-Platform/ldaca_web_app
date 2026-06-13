@@ -10,7 +10,7 @@ import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs'
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
 
-type TokenFrequencyParameterPanelProps = {
+interface TokenFrequencyParameterPanelProps {
   nodeInputs: UseTabNodeInputsResult;
   onColumnChange: (nodeId: string, column: string) => void;
   nodeColors: Record<string, string>;
@@ -36,7 +36,7 @@ type TokenFrequencyParameterPanelProps = {
   getColorForNode: (nodeId: string, index?: number) => string;
   computeDisplayName: (nodeId: string) => string;
   renderTokenizerModelSelector?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
-};
+}
 
 /**
  * Rendered by: TokenFrequencyFeature to show setup controls and selection locking because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
@@ -133,7 +133,7 @@ export const TokenFrequencyParameterPanel = ({
                             name="study-node"
                             value={option.id}
                             checked={isActive}
-                            onChange={() => onStudyNodeChange(option.id)}
+                            onChange={() => { onStudyNodeChange(option.id); }}
                             className="sr-only"
                           />
                           <span

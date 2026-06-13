@@ -30,7 +30,7 @@ const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
       typeof condition.value === 'object' &&
       'start' in condition.value
     ) {
-      const range = condition.value as ConditionRange;
+      const range = condition.value;
       /**
        * Normalizes one range edge to the nullable ISO/string payload expected by the API.
        * Called by: serializeConditionsForRequest internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
@@ -56,10 +56,10 @@ const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
       value,
     };
 
-    if (condition.negate !== undefined) payload.negate = Boolean(condition.negate);
-    if (condition.regex !== undefined) payload.regex = Boolean(condition.regex);
+    if (condition.negate !== undefined) payload.negate = condition.negate;
+    if (condition.regex !== undefined) payload.regex = condition.regex;
     if (condition.caseSensitive !== undefined)
-      payload.case_sensitive = Boolean(condition.caseSensitive);
+      payload.case_sensitive = condition.caseSensitive;
 
     return payload;
   });
@@ -77,7 +77,7 @@ export const buildFilterRequestPayload = (
 ): FilterRequest => ({
   conditions: serializeConditionsForRequest(conditions),
   logic,
-  new_node_name: newNodeName && newNodeName.trim() ? newNodeName : undefined,
+  new_node_name: newNodeName?.trim() ? newNodeName : undefined,
 });
 
 /**

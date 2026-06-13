@@ -81,7 +81,7 @@ export function JoinSubTab(props: JoinSubTabComponentProps) {
                 <Label htmlFor="join-type">Join type</Label>
                 <HelpIcon targetKey="preprocessing.join.join-type" label="Join type selector" />
               </div>
-              <Select value={joinType} onValueChange={(value) => setJoinType(value as JoinType)}>
+              <Select value={joinType} onValueChange={(value) => { setJoinType(value as JoinType); }}>
                 <SelectTrigger id="join-type">
                   <SelectValue placeholder="Select join type" />
                 </SelectTrigger>
@@ -109,13 +109,13 @@ export function JoinSubTab(props: JoinSubTabComponentProps) {
               id="join-new-node-name"
               value={joinNewNodeName}
               placeholder={joinNamePlaceholder}
-              onChange={(event) => setJoinNewNodeName(event.target.value)}
+              onChange={(event) => { setJoinNewNodeName(event.target.value); }}
               onKeyDown={(event) =>
-                acceptPlaceholderOnTab({
+                { acceptPlaceholderOnTab({
                   event,
                   value: joinNewNodeName,
                   setValue: setJoinNewNodeName,
-                })
+                }); }
               }
               autoComplete="off"
               className="min-w-0 flex-1"

@@ -107,7 +107,7 @@ const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences =>
   hidden_views: data.hidden_views ?? [],
   favorite_workspaces: data.favorite_workspaces ?? [],
   quotation: {
-    engine: (data.quotation?.engine ?? { type: 'local' }) as QuotationEngineConfig,
+    engine: (data.quotation?.engine ?? { type: 'local' }),
     last_remote_url: data.quotation?.last_remote_url ?? '',
   },
   default_tokenizer_model: data.default_tokenizer_model ?? null,
@@ -135,7 +135,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
       immer((set, get) => ({
         hiddenViews: [...DEFAULT_HIDDEN_VIEWS],
         favoriteWorkspaces: [],
-        quotationEngine: { type: 'local' } as QuotationEngineConfig,
+        quotationEngine: { type: 'local' },
         quotationLastRemoteUrl: '',
         defaultTokenizerModel: null,
         ldacaOniApiToken: null,

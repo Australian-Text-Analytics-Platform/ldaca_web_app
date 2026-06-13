@@ -27,8 +27,12 @@ describe('PreviewTable', () => {
         page={1}
         pageSize={10}
         documentColumn="document"
-        onPageSizeChange={() => {}}
-        onPageChange={() => {}}
+        onPageSizeChange={() => {
+          /* no-op for test */
+        }}
+        onPageChange={() => {
+          /* no-op for test */
+        }}
       />,
     );
 

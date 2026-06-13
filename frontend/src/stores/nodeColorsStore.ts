@@ -95,7 +95,7 @@ interface NodeColorsState {
    * everything else is swept.
    *
    * Idempotent — no-op when nothing needs sweeping. */
-  pruneStaleColors(activeNodeIds: ReadonlyArray<string>): void;
+  pruneStaleColors(activeNodeIds: readonly string[]): void;
 
   /** Test / future workspace-reset path. */
   reset(): void;
@@ -110,8 +110,10 @@ function pickRandomPaletteAvoiding(avoid: ReadonlySet<string>): string {
     // excluded from auto-assign per UNASSIGNED_NODE_COLOR). Fall back
     // to a random auto-assign colour rather than blocking; duplicates
     // inside one tab are rare in practice.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- random index is always within palette bounds
     return AUTO_ASSIGN_PALETTE[Math.floor(Math.random() * AUTO_ASSIGN_PALETTE.length)]!;
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- random index is always within the non-empty free list bounds
   return free[Math.floor(Math.random() * free.length)]!;
 }
 
@@ -132,6 +134,7 @@ export const useNodeColorsStore = create<NodeColorsState>()(
         for (const id of nodeIds) {
           if (!id || state.colors[id]) continue;
           const palettePos = state.assignmentOrder.length % AUTO_ASSIGN_PALETTE.length;
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- modulo index is always within palette bounds
           state.colors[id] = AUTO_ASSIGN_PALETTE[palettePos]!;
           state.assignmentOrder.push(id);
         }
@@ -266,10 +269,10 @@ export const useNodeColorsStore = create<NodeColorsState>()(
     /** Clears all assigned and temporary colours for tests and workspace reset flows. */
     /** Consumed by: useNodeColorsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
     reset: () =>
-      set((state) => {
+      { set((state) => {
         state.colors = {};
         state.assignmentOrder = [];
         state.temps = {};
-      }),
+      }); },
   })),
 );

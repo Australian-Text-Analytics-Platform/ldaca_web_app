@@ -82,7 +82,9 @@ export const useWorkspaceTaskStreamClient = (
     lastEventTimestamp: null,
   });
 
-  const reconnectRef = useRef<() => void>(() => {});
+  const reconnectRef = useRef<() => void>(() => {
+    // No-op until the connect effect installs the real reconnect handler.
+  });
   const onEventRef = useRef<typeof onEvent>(onEvent);
 
   useEffect(() => {
@@ -95,7 +97,7 @@ export const useWorkspaceTaskStreamClient = (
      * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
      * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
      */
-    const fn = () => reconnectRef.current();
+    const fn = () => { reconnectRef.current(); };
     return fn;
   })();
 
@@ -103,7 +105,9 @@ export const useWorkspaceTaskStreamClient = (
   useEffect(() => {
     if (!enabled) {
       setState({ status: 'idle', error: null, reconnectAttempt: 0, lastEventTimestamp: null });
-      reconnectRef.current = () => {};
+      reconnectRef.current = () => {
+        // No-op: stream is disabled, so there is nothing to reconnect.
+      };
       return;
     }
 
@@ -230,6 +234,9 @@ export const useWorkspaceTaskStreamClient = (
           scheduleReconnect(attempt);
         };
       } catch (error) {
+        // `active` is flipped to false by the cleanup closure during async teardown; TS narrows it
+        // to `true` here and can't see that mutation, so keep this cancellation guard.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (!active) return;
         const message = error instanceof Error ? error.message : 'Connection error';
         setState({
@@ -252,7 +259,9 @@ export const useWorkspaceTaskStreamClient = (
 
     return () => {
       active = false;
-      reconnectRef.current = () => {};
+      reconnectRef.current = () => {
+        // No-op after teardown so a stale reconnect call does nothing.
+      };
       closeStream();
       setState({ status: 'idle', error: null, reconnectAttempt: 0, lastEventTimestamp: null });
     };

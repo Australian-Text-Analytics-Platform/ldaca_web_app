@@ -120,13 +120,13 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
               id="filter-new-node-name"
               type="text"
               value={newNodeInput.value}
-              onChange={(event) => newNodeInput.setValue(event.target.value)}
+              onChange={(event) => { newNodeInput.setValue(event.target.value); }}
               onKeyDown={(event) =>
-                acceptPlaceholderOnTab({
+                { acceptPlaceholderOnTab({
                   event,
                   value: newNodeInput.value,
                   setValue: newNodeInput.setValue,
-                })
+                }); }
               }
               placeholder={newNodeInput.placeholder}
               disabled={newNodeInput.disabled}

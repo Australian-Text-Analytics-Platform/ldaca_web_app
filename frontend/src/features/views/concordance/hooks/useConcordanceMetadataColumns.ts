@@ -6,18 +6,18 @@ import type {
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 
-type Section = { columns: string[]; color?: string; disabled?: boolean };
+interface Section { columns: string[]; color?: string; disabled?: boolean }
 
-export type ConcordanceMetadataColumnSet = {
+export interface ConcordanceMetadataColumnSet {
   availableMetadataColumns: string[];
   metadataColumnSections: Section[];
   metadataDisabledReason: string | undefined;
-};
+}
 
-type GetColumnInfo = (node: WorkspaceNodeLike, idx: number) => Array<{ name?: string }>;
+type GetColumnInfo = (node: WorkspaceNodeLike, idx: number) => { name?: string }[];
 type ResolveNodeIdForKey = (nodeKey: string) => string | null;
 
-type Params = {
+interface Params {
   results: ConcordanceAnalysisResponse | null;
   panelSelectedNodes: WorkspaceNodeLike[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
@@ -25,7 +25,7 @@ type Params = {
   viewMode: 'separated' | 'combined';
   nodeColors: Record<string, string>;
   resolveNodeIdForKey: ResolveNodeIdForKey;
-};
+}
 
 /**
  * Compute the list of metadata columns + per-section visibility for the
@@ -56,7 +56,7 @@ export function useConcordanceMetadataColumns({
     const perBlock: { nodeKey: string; columns: string[] }[] = [];
     for (const [nodeKey, entry] of Object.entries(resultEntries)) {
       if (nodeKey === '__COMBINED__') continue;
-      const nodeEntry = entry as ConcordanceResultEntry;
+      const nodeEntry: ConcordanceResultEntry = entry;
       const cols = nodeEntry.metadata.metadata_columns.filter((c) => c && c !== '__source_node');
       perBlock.push({ nodeKey, columns: cols });
     }
@@ -64,7 +64,8 @@ export function useConcordanceMetadataColumns({
       panelSelectedNodes.forEach((node, idx) => {
         const rawId = (node as { id?: string }).id;
         const rawName = (node as { name?: string }).name;
-        const nodeKey = rawName || rawId || `node-${idx}`;
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string name/id should fall back to the next identifier
+        const nodeKey = rawName || rawId || `node-${String(idx)}`;
         const sel = rawId
           ? effectiveNodeColumnSelections.find((s) => s.nodeId === rawId)
           : undefined;
@@ -84,9 +85,8 @@ export function useConcordanceMetadataColumns({
     if (perBlock.length <= 1) {
       if (allColumns.length > 0) sections.push({ columns: allColumns });
     } else {
-      const common = perBlock[0]!.columns.filter((c) =>
-        perBlock.every((b) => b.columns.includes(c)),
-      );
+      const common =
+        perBlock[0]?.columns.filter((c) => perBlock.every((b) => b.columns.includes(c))) ?? [];
       if (isCombinedView && common.length === 0 && perBlock.some((b) => b.columns.length > 0)) {
         disabledReason =
           'The selected data blocks share no metadata columns; nothing to display in Combined view.';

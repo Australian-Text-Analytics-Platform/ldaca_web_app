@@ -16,7 +16,7 @@ import type { RerunActionState } from '@/features/views/common/rerunActionState'
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 
-export type ConcordanceParameterPanelProps = {
+export interface ConcordanceParameterPanelProps {
   // Selection (add-node-as-needed)
   nodeInputs: UseTabNodeInputsResult;
   handleColumnChange: (nodeId: string, column: string) => void;
@@ -54,7 +54,7 @@ export type ConcordanceParameterPanelProps = {
   isStopping?: boolean;
   handleClearResults: () => Promise<void>;
   renderTokenizerModelSelector?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
-};
+}
 
 /**
  * Rendered by: ConcordanceFeature to own concordance parameters because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
@@ -103,6 +103,7 @@ export function ConcordanceParameterPanel({
   // DisabledReasonTooltip wiring intact without ever disabling the controls.
   const readOnly = false;
   const readOnlyReason: string | undefined = undefined;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string or false reason must collapse to undefined (no tooltip)
   const readOnlyOrReason = (reason?: string | false) => reason || undefined;
 
   return (
@@ -160,7 +161,7 @@ export function ConcordanceParameterPanel({
                 <input
                   type="text"
                   value={searchWord}
-                  onChange={(e) => setSearchWord(e.target.value)}
+                  onChange={(e) => { setSearchWord(e.target.value); }}
                   disabled={readOnly}
                   placeholder={
                     searchMode === 'tokens'
@@ -183,7 +184,7 @@ export function ConcordanceParameterPanel({
                   <input
                     type="number"
                     value={numLeftTokens}
-                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 0)}
+                    onChange={(e) => { setNumLeftTokens(parseInt(e.target.value) || 0); }}
                     disabled={readOnly}
                     min="0"
                     max="50"
@@ -202,7 +203,7 @@ export function ConcordanceParameterPanel({
                   <input
                     type="number"
                     value={numRightTokens}
-                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 0)}
+                    onChange={(e) => { setNumRightTokens(parseInt(e.target.value) || 0); }}
                     disabled={readOnly}
                     min="0"
                     max="50"
@@ -264,7 +265,7 @@ export function ConcordanceParameterPanel({
                       <input
                         type="checkbox"
                         checked={wholeWord}
-                        onChange={(e) => setWholeWord(e.target.checked)}
+                        onChange={(e) => { setWholeWord(e.target.checked); }}
                         disabled={regex || readOnly}
                         className="h-4 w-4"
                       />
@@ -301,7 +302,7 @@ export function ConcordanceParameterPanel({
                     <input
                       type="checkbox"
                       checked={caseSensitive}
-                      onChange={(e) => setCaseSensitive(e.target.checked)}
+                      onChange={(e) => { setCaseSensitive(e.target.checked); }}
                       disabled={readOnly}
                       className="h-4 w-4"
                     />
@@ -314,6 +315,7 @@ export function ConcordanceParameterPanel({
         </div>
       </CardContent>
       <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
+        {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- readOnly is an intentional always-false placeholder kept for future read-only wiring */}
         {!readOnly && (
           <>
             <DisabledReasonTooltip reason={runDisabledReason}>

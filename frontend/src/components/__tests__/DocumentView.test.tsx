@@ -15,7 +15,7 @@ describe('DocumentView (docType="tutorial")', () => {
       ok: true,
       /** Called by: DocumentView test fetch mock when markdown content is requested because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
       text: () => Promise.resolve('# Tutorial'),
-    }) as unknown as typeof fetch;
+    });
   });
 
   afterEach(() => {
@@ -31,8 +31,8 @@ describe('DocumentView (docType="tutorial")', () => {
       />,
     );
 
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => { expect(global.fetch).toHaveBeenCalled(); });
+    await waitFor(() => { expect(global.fetch).toHaveBeenCalledTimes(1); });
 
     rerender(
       <DocumentView
@@ -41,6 +41,6 @@ describe('DocumentView (docType="tutorial")', () => {
       />,
     );
 
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => { expect(global.fetch).toHaveBeenCalledTimes(1); });
   });
 });

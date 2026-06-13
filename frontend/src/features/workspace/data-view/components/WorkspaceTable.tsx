@@ -107,6 +107,8 @@ export function WorkspaceTable({
   // it manages. To break the cycle, derive `columns` from `sanitizedData`
   // first, then fall back to whatever `columnTypes` ends up being.
   const initialColumns = useMemo(() => {
+    // DataRow is typed non-null, but rows arrive from API/JSON so guard malformed (null) rows.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const firstRow = sanitizedData.find((row) => row && typeof row === 'object');
     return firstRow ? Object.keys(firstRow) : [];
   }, [sanitizedData]);
@@ -151,9 +153,13 @@ export function WorkspaceTable({
     columns.forEach((col) => {
       let maxLen = col.length;
       for (const row of sampleRows) {
+        // DataRow is typed non-null, but rows arrive from API/JSON so guard malformed (null) rows.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (!row || typeof row !== 'object') continue;
         const raw = row[col];
         if (raw == null) continue;
+        // Cell values may be objects; default stringification matches the existing width heuristic.
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         const display = typeof raw === 'string' ? raw : String(raw);
         maxLen = Math.max(maxLen, display.length);
         if (maxLen > WIDE_COLUMN_THRESHOLD) {
@@ -167,7 +173,7 @@ export function WorkspaceTable({
 
   // Filter helpers
   const activeFilter = columnFilters.length > 0 ? columnFilters[0] : null;
-  const activeFilterColumn = activeFilter ? String(activeFilter.id) : null;
+  const activeFilterColumn = activeFilter ? activeFilter.id : null;
   const activeFilterParts = activeFilter?.value as
     | { value: string; op: FilterOperator }
     | undefined;
@@ -217,7 +223,7 @@ export function WorkspaceTable({
   };
 
   // Build column definitions
-  const columnDefs: ColumnDef<DataRow, unknown>[] = columns.map((column) => {
+  const columnDefs: ColumnDef<DataRow>[] = columns.map((column) => {
     const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
     const isColumnLoading = Boolean(loadingCast[column]);
     const isColumnMutating = Boolean(columnActionLoading[column]);
@@ -244,13 +250,13 @@ export function WorkspaceTable({
      * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
      */
     const onToggleExpand = () =>
-      setExpandedColumns((prev) => {
+      { setExpandedColumns((prev) => {
         if (prev[column]) {
           const { [column]: _, ...rest } = prev;
           return rest;
         }
         return { ...prev, [column]: true };
-      });
+      }); };
 
     return {
       id: column,
@@ -259,7 +265,7 @@ export function WorkspaceTable({
        * Called by: WorkspaceTable object consumers.
        * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
        */
-      accessorFn: (row) => row?.[column],
+      accessorFn: (row) => row[column],
       /**
        * Renders the interactive workspace column header controls.
        * Called by: WorkspaceTable object consumers.
@@ -282,18 +288,18 @@ export function WorkspaceTable({
           isWideColumn={isWideColumn}
           isCollapsedColumn={isCollapsedColumn}
           onToggleExpand={onToggleExpand}
-          sortState={sortState ? { id: sortState.id, desc: Boolean(sortState.desc) } : undefined}
-          onSort={() => handleSort(column)}
+          sortState={sortState ? { id: sortState.id, desc: sortState.desc } : undefined}
+          onSort={() => { handleSort(column); }}
           isFiltered={isFiltered}
           currentFilterOp={isFiltered && activeFilterParts ? activeFilterParts.op : 'contains'}
           currentFilterValue={isFiltered && activeFilterParts ? activeFilterParts.value : ''}
           onApplyFilter={applyFilter}
           onClearFilter={clearFilter}
-          onStartRename={() => startRename(column)}
+          onStartRename={() => { startRename(column); }}
           onSubmitRename={submitRename}
           onCancelRename={cancelRename}
-          onTypeChange={(newType) => handleTypeChange(column, newType)}
-          onRequestDelete={() => requestDeleteColumn(column)}
+          onTypeChange={(newType) => { handleTypeChange(column, newType); }}
+          onRequestDelete={() => { requestDeleteColumn(column); }}
         />
       ),
       /**
@@ -308,6 +314,8 @@ export function WorkspaceTable({
         if (currentType === 'tmdist') {
           return <TopicDistributionBar value={cellValue} />;
         }
+        // Cell values may be structs/objects; default stringification preserves prior display text.
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         const displayValue = cellValue == null ? '' : String(cellValue);
         return (
           <span className="block truncate" title={displayValue}>
@@ -330,7 +338,7 @@ export function WorkspaceTable({
             : EXPANDED_COLUMN_MAX_WIDTH
           : undefined,
       },
-    } satisfies ColumnDef<DataRow, unknown>;
+    } satisfies ColumnDef<DataRow>;
   });
 
   // TanStack Table instance (server-side)
@@ -392,7 +400,7 @@ export function WorkspaceTable({
    * Flow: read the column pin state, set sticky offsets, then add edge shadows for pinned sides.
    */
   const getPinnedStyles = (
-    col: TableColumn<DataRow, unknown>,
+    col: TableColumn<DataRow>,
     variant: 'header' | 'cell',
   ): React.CSSProperties | undefined => {
     const pinState = col.getIsPinned();
@@ -403,13 +411,13 @@ export function WorkspaceTable({
     };
     if (variant === 'header') style.top = 0;
     if (pinState === 'left') {
-      style.left = `${col.getStart('left')}px`;
+      style.left = `${String(col.getStart('left'))}px`;
       style.boxShadow =
         variant === 'header'
           ? '2px 0 0 -1px rgba(15, 23, 42, 0.12)'
           : '2px 0 0 -1px rgba(15, 23, 42, 0.08)';
-    } else if (pinState === 'right') {
-      style.right = `${col.getStart('right')}px`;
+    } else {
+      style.right = `${String(col.getStart('right'))}px`;
       style.boxShadow =
         variant === 'header'
           ? '-2px 0 0 -1px rgba(15, 23, 42, 0.12)'
@@ -451,11 +459,11 @@ export function WorkspaceTable({
                           header.column.getIsPinned() ? 'bg-muted shadow-sm' : 'bg-muted',
                         )}
                         style={{
-                          ...(meta?.headerMinWidth ? { minWidth: `${meta.headerMinWidth}px` } : {}),
+                          ...(meta?.headerMinWidth ? { minWidth: `${String(meta.headerMinWidth)}px` } : {}),
                           ...(meta?.headerMaxWidth !== undefined
                             ? {
-                                maxWidth: `${meta.headerMaxWidth}px`,
-                                width: `${meta.headerMaxWidth}px`,
+                                maxWidth: `${String(meta.headerMaxWidth)}px`,
+                                width: `${String(meta.headerMaxWidth)}px`,
                                 overflow: 'hidden',
                               }
                             : {}),
@@ -502,11 +510,11 @@ export function WorkspaceTable({
                           cell.column.getIsPinned() ? 'bg-white' : undefined,
                         )}
                         style={{
-                          ...(meta?.cellMinWidth ? { minWidth: `${meta.cellMinWidth}px` } : {}),
+                          ...(meta?.cellMinWidth ? { minWidth: `${String(meta.cellMinWidth)}px` } : {}),
                           ...(meta?.cellMaxWidth !== undefined
                             ? {
-                                maxWidth: `${meta.cellMaxWidth}px`,
-                                width: `${meta.cellMaxWidth}px`,
+                                maxWidth: `${String(meta.cellMaxWidth)}px`,
+                                width: `${String(meta.cellMaxWidth)}px`,
                                 overflow: 'hidden',
                               }
                             : {}),
@@ -556,6 +564,8 @@ export function WorkspaceTable({
           .slice(0, 25)
           .map((row) => {
             const v = row[datetimeModal.column];
+            // Sample values may be objects; default stringification preserves prior behavior.
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
             return v == null ? '' : String(v);
           })
           .filter(Boolean)}
@@ -565,7 +575,7 @@ export function WorkspaceTable({
         open={deleteColumnDialogOpen}
         onOpenChange={setDeleteColumnDialogOpen}
         title="Delete Column"
-        description={`Are you sure you want to delete column "${columnToDelete}"? You can undo this action afterwards.`}
+        description={`Are you sure you want to delete column "${String(columnToDelete)}"? You can undo this action afterwards.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"

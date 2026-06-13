@@ -12,8 +12,8 @@ export interface NodeNameEntry {
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export const buildSelectionNameById = (
-  selectedNodes: Array<NodeNameEntry | null | undefined>,
-  panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null,
+  selectedNodes: (NodeNameEntry | null | undefined)[],
+  panelSelectedNodes?: (NodeNameEntry | null | undefined)[] | null,
 ): Record<string, string> => {
   const mapping: Record<string, string> = {};
 
@@ -39,13 +39,13 @@ export const buildSelectionNameById = (
  * Used by: tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
  */
 export const buildSelectionNameKey = (
-  selectedNodes: Array<NodeNameEntry | null | undefined>,
-  panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null,
+  selectedNodes: (NodeNameEntry | null | undefined)[],
+  panelSelectedNodes?: (NodeNameEntry | null | undefined)[] | null,
 ): string => {
   const mapping = buildSelectionNameById(selectedNodes, panelSelectedNodes);
   return Object.keys(mapping)
     .sort()
-    .map((nodeId) => `${nodeId}:${mapping[nodeId]}`)
+    .map((nodeId) => `${nodeId}:${String(mapping[nodeId])}`)
     .join('|');
 };
 
@@ -88,7 +88,7 @@ export const deriveBackendStopWordsKey = (results?: TokenFrequencyResponse | nul
   const stopWords = deriveBackendStopWords(results);
   if (!Array.isArray(stopWords) || stopWords.length === 0) return '';
   return stopWords
-    .map((item) => String(item).trim().toLowerCase())
+    .map((item) => item.trim().toLowerCase())
     .filter((item) => item.length > 0)
     .join('|');
 };

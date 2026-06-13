@@ -31,12 +31,12 @@ interface AnalysisState {
 interface AnalysisActions {
   setLocalTaskId: (value: string | null) => void;
   setIsRunning: (value: boolean) => void;
-  runningRef: React.MutableRefObject<boolean>;
+  runningRef: React.RefObject<boolean>;
   setResultsSafely: (value: TokenFrequencyResponse | null) => void;
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setAppliedStopSet: React.Dispatch<React.SetStateAction<Set<string>>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
-  lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
+  lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
   // Reports the run's assigned task id back to the owning tab. No-op when not
   // tab-mounted.
   onTaskIdAssigned?: (taskId: string | null) => void;
@@ -54,12 +54,12 @@ interface NavigationActions {
   getColorForNode: (nodeId: string, index?: number) => string;
 }
 
-type UseTokenFrequencyTaskFlowParams = {
+interface UseTokenFrequencyTaskFlowParams {
   state: AnalysisState;
   actions: AnalysisActions;
   lock: LockActions;
   navigation: NavigationActions;
-};
+}
 
 /** Owns submit, result hydration, and cross-feature navigation for token-frequency tasks. */
 /**
@@ -176,7 +176,7 @@ export const useTokenFrequencyTaskFlow = ({
 
       if (Array.isArray(response.stop_words)) {
         const normalizedStops = response.stop_words
-          .map((word: string) => String(word).trim().toLowerCase())
+          .map((word: string) => word.trim().toLowerCase())
           .filter(Boolean);
         setAppliedStopSet(new Set(normalizedStops));
         setStopWords(normalizedStops.join(', '));
@@ -193,7 +193,7 @@ export const useTokenFrequencyTaskFlow = ({
         state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: null,
-      } as TokenFrequencyResponse);
+      });
       setIsRunning(false);
       runningRef.current = false;
     }
@@ -213,7 +213,7 @@ export const useTokenFrequencyTaskFlow = ({
 
   const handleTokenClick = useCallback(
     (token: string) => {
-      const trimmedToken = token?.toString() ?? '';
+      const trimmedToken = token;
       const analysisParams = (results?.analysis_params ??
         null) as TokenFrequencyAnalysisParams | null;
 
@@ -257,14 +257,13 @@ export const useTokenFrequencyTaskFlow = ({
 
       const nodeDetails = uniqueNodeIds.map((id) => ({
         id,
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty locked/derived name should fall back to the next source, not render blank
         name: lockedNodeNameMap[id] || nodeIdToName[id] || id,
       }));
 
       const pendingNodeColors: Record<string, string> = { ...nodeColors };
       uniqueNodeIds.forEach((id, index) => {
-        if (!pendingNodeColors[id]) {
-          pendingNodeColors[id] = getColorForNode(id, index);
-        }
+        pendingNodeColors[id] ??= getColorForNode(id, index);
       });
 
       setPendingConcordance({

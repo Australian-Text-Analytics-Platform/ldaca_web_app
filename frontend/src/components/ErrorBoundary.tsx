@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   /** Called by: React to render either protected children or the caller-selected fallback because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
   override render() {
     if (this.state.hasError) {
-      const Fallback = this.props.fallback || DefaultErrorFallback;
+      const Fallback = this.props.fallback ?? DefaultErrorFallback;
       return <Fallback error={this.state.error} resetError={this.resetError} />;
     }
 
@@ -66,6 +66,7 @@ function DefaultErrorFallback({ error, resetError }: { error?: Error; resetError
       <div className="text-red-600 text-xl font-semibold mb-4">Something went wrong</div>
 
       <div className="text-red-700 text-sm mb-6 max-w-md text-center">
+        {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall back to generic copy when message is an empty string, not only null/undefined */}
         {error?.message || 'An unexpected error occurred. Please try again.'}
       </div>
 
@@ -78,7 +79,7 @@ function DefaultErrorFallback({ error, resetError }: { error?: Error; resetError
         </button>
 
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => { window.location.reload(); }}
           className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
         >
           Reload Page

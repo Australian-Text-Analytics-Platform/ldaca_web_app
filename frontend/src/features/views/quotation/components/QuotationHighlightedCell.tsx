@@ -52,7 +52,7 @@ export function QuotationHighlightedCell({
   onHoverChange,
 }: QuotationHighlightedCellProps) {
   if (typeof text !== 'string' || !text.length) {
-    return <>{text ?? ''}</>;
+    return <>{text}</>;
   }
 
   const spans: HighlightSpan[] = [];
@@ -70,24 +70,24 @@ export function QuotationHighlightedCell({
     }
   };
 
-  if (Array.isArray(row?.__spans) && row.__spans.length > 0) {
-    (row.__spans as Array<Record<string, unknown>>).forEach((s) =>
-      addSpan(s?.start, s?.end, s?.type as string | undefined),
+  if (Array.isArray(row.__spans) && row.__spans.length > 0) {
+    (row.__spans as Record<string, unknown>[]).forEach((s) =>
+      { addSpan(s.start, s.end, s.type as string | undefined); },
     );
   } else {
     addSpan(
-      row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx],
-      row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx],
+      row[QUOTATION_COLUMN_KEYS.speakerStartIdx],
+      row[QUOTATION_COLUMN_KEYS.speakerEndIdx],
       'speaker',
     );
     addSpan(
-      row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx],
-      row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx],
+      row[QUOTATION_COLUMN_KEYS.quoteStartIdx],
+      row[QUOTATION_COLUMN_KEYS.quoteEndIdx],
       'quote',
     );
     addSpan(
-      row?.[QUOTATION_COLUMN_KEYS.verbStartIdx],
-      row?.[QUOTATION_COLUMN_KEYS.verbEndIdx],
+      row[QUOTATION_COLUMN_KEYS.verbStartIdx],
+      row[QUOTATION_COLUMN_KEYS.verbEndIdx],
       'verb',
     );
   }
@@ -116,11 +116,11 @@ export function QuotationHighlightedCell({
   });
   const points = Array.from(bounds).sort((a, b) => a - b);
 
-  const segs: Array<{ start: number; end: number; types: string[] }> = [];
+  const segs: { start: number; end: number; types: string[] }[] = [];
   for (let i = 0; i < points.length - 1; i++) {
-    const s = points[i]!;
-    const e = points[i + 1]!;
-    if (e <= s) continue;
+    const s = points[i];
+    const e = points[i + 1];
+    if (s === undefined || e === undefined || e <= s) continue;
     const covering = workingSpans
       .filter((sp) => sp.start < e && sp.end > s)
       .flatMap((sp) => sp.types);
@@ -136,19 +136,18 @@ export function QuotationHighlightedCell({
         className="text-[10px] font-semibold px-1 py-0.5 rounded border mr-1 align-baseline cursor-pointer"
         style={{
           color: '#0f172a',
-          borderColor: TYPE_COLORS[t] || '#334155',
+          borderColor: TYPE_COLORS[t] ?? '#334155',
           backgroundColor:
-            hoverState &&
-            hoverState.key === cellKey &&
+            hoverState?.key === cellKey &&
             hoverState.segIndex === segIndex &&
             hoverState.type === t
-              ? hexToRgba(TYPE_COLORS[t] || '#cbd5e1', 0.28)
+              ? hexToRgba(TYPE_COLORS[t] ?? '#cbd5e1', 0.28)
               : '#f1f5f9',
         }}
         onMouseEnter={() =>
-          onHoverChange({ key: cellKey, segIndex, type: t as QuotationHighlightType })
+          { onHoverChange({ key: cellKey, segIndex, type: t as QuotationHighlightType }); }
         }
-        onMouseLeave={() => onHoverChange(null)}
+        onMouseLeave={() => { onHoverChange(null); }}
       >
         {t.toUpperCase()}
       </span>
@@ -162,18 +161,14 @@ export function QuotationHighlightedCell({
         const str = workingText.slice(seg.start, seg.end);
         if (!seg.types.length) return <span key={i}>{str}</span>;
         const style = buildUnderlineStyle(seg.types);
-        const isHoveredSeg = !!(
-          hoverState &&
-          hoverState.key === cellKey &&
-          hoverState.segIndex === i
-        );
+        const isHoveredSeg = hoverState?.key === cellKey && hoverState.segIndex === i;
         const colorForSeg =
           hoverState?.type && isHoveredSeg && seg.types.includes(hoverState.type)
             ? hoverState.type
             : undefined;
         const bgStyle: React.CSSProperties = isHoveredSeg
           ? {
-              backgroundColor: hexToRgba(TYPE_COLORS[colorForSeg || 'quote'] || '#cbd5e1', 0.22),
+              backgroundColor: hexToRgba(TYPE_COLORS[colorForSeg ?? 'quote'] ?? '#cbd5e1', 0.22),
               borderRadius: 3,
               paddingLeft: 1,
               paddingRight: 1,
@@ -185,8 +180,8 @@ export function QuotationHighlightedCell({
             {renderLabels(seg.types, i)}
             <span
               style={{ ...style, ...bgStyle }}
-              onMouseEnter={() => onHoverChange({ key: cellKey, segIndex: i, type: segHoverType })}
-              onMouseLeave={() => onHoverChange(null)}
+              onMouseEnter={() => { onHoverChange({ key: cellKey, segIndex: i, type: segHoverType }); }}
+              onMouseLeave={() => { onHoverChange(null); }}
             >
               {str}
             </span>
@@ -194,7 +189,7 @@ export function QuotationHighlightedCell({
         );
       })}
       {clipped.suffixEllipsis && <span className="ml-1 text-muted-foreground">...</span>}
-      {row?.[QUOTATION_COLUMN_KEYS.quoteType] ? (
+      {row[QUOTATION_COLUMN_KEYS.quoteType] ? (
         <span className="ml-1 align-baseline text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
           {String(row[QUOTATION_COLUMN_KEYS.quoteType])}
         </span>

@@ -21,10 +21,10 @@ import { queryKeys } from './queryKeys';
 
 export type NodeInfo = NodeInfoResponse;
 
-type BaseQueryArgs = {
+interface BaseQueryArgs {
   workspaceId: string;
   nodeId: string;
-};
+}
 
 type HeadersArgs = BaseQueryArgs & {
   headers: Record<string, string>;
@@ -69,7 +69,7 @@ export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
   },
 });
 
-export type FetchNodeInfoArgs = {
+export interface FetchNodeInfoArgs {
   queryClient: QueryClient;
   workspaceId: string;
   nodeId: string;
@@ -77,7 +77,7 @@ export type FetchNodeInfoArgs = {
   force?: boolean;
   headers?: Record<string, string>;
   getAuthHeaders?: () => Record<string, string>;
-};
+}
 
 /**
  * Non-hook fetcher used by mutation success handlers, hydration callbacks,

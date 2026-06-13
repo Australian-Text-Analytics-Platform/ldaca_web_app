@@ -27,12 +27,12 @@ export const extractColumnTypes = (
     return {};
   }
 
-  if (schema.column_types && Object.keys(schema.column_types).length > 0) {
+  if (Object.keys(schema.column_types).length > 0) {
     return schema.column_types;
   }
 
-  if (schema.schema && typeof schema.schema === 'object') {
-    return schema.schema as Record<string, string>;
+  if (typeof schema.schema === 'object') {
+    return schema.schema;
   }
 
   return {};

@@ -93,7 +93,7 @@ export const useStackedSplits = <KeyT extends string>(
       if (entry) setContainerHeight(entry.contentRect.height);
     });
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   const activeSectionTotal = useMemo(() => {

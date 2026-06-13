@@ -110,7 +110,7 @@ function FillDefaultStopWordsDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() => { onOpenChange(false); }}
             disabled={isLoading}
           >
             Cancel

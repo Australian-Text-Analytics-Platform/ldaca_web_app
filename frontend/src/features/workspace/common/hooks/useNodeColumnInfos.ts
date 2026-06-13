@@ -24,7 +24,7 @@ const resolveNodeId = (node: NodeLike | null | undefined, fallbackIndex: number)
       return candidate;
     }
   }
-  return `node-${fallbackIndex}`;
+  return `node-${String(fallbackIndex)}`;
 };
 
 export interface UseNodeColumnInfosResult {
@@ -87,7 +87,7 @@ export const useNodeColumnInfos = (params: {
     const nodeId = resolveNodeId(node, idx);
     if (!nodeId) return [];
     const cached = columnInfoCache[nodeId];
-    if (cached && cached.length) {
+    if (cached?.length) {
       return cached;
     }
     return mapColumnsToInfo(node);

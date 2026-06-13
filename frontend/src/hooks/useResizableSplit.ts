@@ -32,7 +32,7 @@ export type ResizableSplitOrientation = 'horizontal' | 'vertical';
 export type ResizableSplitMode = 'percent' | 'pixel';
 export type ResizableSplitAnchor = 'start' | 'end';
 
-type UseResizableSplitOptions = {
+interface UseResizableSplitOptions {
   /** Default 'horizontal' (top/bottom panes). */
   orientation?: ResizableSplitOrientation;
   /** Default 'percent'. */
@@ -80,9 +80,9 @@ type UseResizableSplitOptions = {
    * silent (Safari private mode, etc).
    */
   persistKey?: string;
-};
+}
 
-export type ResizableSplitHandle = {
+export interface ResizableSplitHandle {
   containerRef: React.RefObject<HTMLDivElement | null>;
   value: number;
   setValue: React.Dispatch<React.SetStateAction<number>>;
@@ -101,7 +101,7 @@ export type ResizableSplitHandle = {
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onDoubleClick: () => void;
   };
-};
+}
 
 const DEFAULT_PERCENT_MIN = 0.15;
 const DEFAULT_PERCENT_MAX = 0.85;
@@ -310,8 +310,8 @@ export function useResizableSplit({
         orientation === 'horizontal' ? event.key === 'ArrowUp' : event.key === 'ArrowLeft';
       const isEndward =
         orientation === 'horizontal' ? event.key === 'ArrowDown' : event.key === 'ArrowRight';
-      const startwardDelta = anchor === 'end' ? +step : -step;
-      const endwardDelta = anchor === 'end' ? -step : +step;
+      const startwardDelta = anchor === 'end' ? step : -step;
+      const endwardDelta = anchor === 'end' ? -step : step;
       if (isStartward) {
         event.preventDefault();
         setValue((prev) => clamp(prev + startwardDelta));

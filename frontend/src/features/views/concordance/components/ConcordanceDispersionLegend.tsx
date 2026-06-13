@@ -1,4 +1,4 @@
-type Props = {
+interface Props {
   matchedTexts: string[];
   matchedTextColors: Record<string, string>;
   hiddenMatchedTexts: Set<string>;
@@ -21,7 +21,7 @@ type Props = {
    * never collapsed) and ``n`` is the full-graph total.
    */
   selectedTotals?: ReadonlyMap<string, number> | null;
-};
+}
 
 const DEFAULT_COLOR = '#0284c7';
 
@@ -46,14 +46,16 @@ export function ConcordanceDispersionLegend({
         const isHidden = hiddenMatchedTexts.has(text);
         const total = totals.get(text) ?? 0;
         const selected = selectedTotals?.get(text) ?? 0;
-        const countSuffix = hasSelection ? ` (${selected}/${total})` : ` (${total})`;
+        const countSuffix = hasSelection
+          ? ` (${String(selected)}/${String(total)})`
+          : ` (${String(total)})`;
         return (
           <button
             key={text}
             type="button"
             className="flex cursor-pointer items-center gap-2 rounded px-2 py-0.5 transition-opacity hover:bg-muted/60"
             style={{ opacity: isHidden ? 0.4 : 1 }}
-            onClick={() => onToggle(text)}
+            onClick={() => { onToggle(text); }}
             aria-pressed={!isHidden}
             aria-label={isHidden ? `Show ${text}` : `Hide ${text}`}
           >

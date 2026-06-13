@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { type QueryClient, useMutation, isCancelledError } from '@tanstack/react-query';
+import { type QueryClient, useMutation, CancelledError } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   addNodeToWorkspace,
@@ -108,8 +108,8 @@ export const useWorkspaceNodeMutations = ({
    * Why: because action helpers need one guard before they call generated APIs that require workspace context.
    */
   const invalidateWorkspaceSummaries = () => {
-    void void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
-    void void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
   };
 
   /**
@@ -188,7 +188,7 @@ export const useWorkspaceNodeMutations = ({
      * Flow: update local selection, clear node selection, then invalidate old and new workspace queries.
      */
     onSuccess: (_data, workspaceId, context) => {
-      const previousId = context?.previousId ?? null;
+      const previousId = context.previousId ?? null;
       const nextId = workspaceId ?? null;
       // The selection store is canonical; the server query only bootstraps it.
       setCurrentWorkspaceId(nextId);
@@ -244,7 +244,7 @@ export const useWorkspaceNodeMutations = ({
      */
     mutationFn: ({ name, description }: { name: string; description?: string }) =>
       createWorkspace({
-        body: { name, description: description || '' },
+        body: { name, description: description ?? '' },
         headers: authHeaders,
         throwOnError: true,
       }).then(({ data }) => data),
@@ -262,7 +262,7 @@ export const useWorkspaceNodeMutations = ({
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
     onSuccess: (data) => {
-      const newWorkspaceId = (data?.id as string | undefined) ?? null;
+      const newWorkspaceId = (data.id as string | undefined) ?? null;
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
       if (newWorkspaceId) {
         // Backend already marks the new workspace as current; sync the
@@ -291,7 +291,7 @@ export const useWorkspaceNodeMutations = ({
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
     mutationFn: (workspaceId: string) => {
-      if (!workspaceId?.trim()) {
+      if (!workspaceId.trim()) {
         throw new Error('workspaceId is required');
       }
       return deleteWorkspace({
@@ -314,7 +314,7 @@ export const useWorkspaceNodeMutations = ({
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
     onSuccess: (data: Record<string, unknown>, workspaceId) => {
-      const deletedWorkspaceId = (data?.id as string | undefined) ?? workspaceId;
+      const deletedWorkspaceId = (data.id as string | undefined) ?? workspaceId;
       if (currentWorkspaceId && deletedWorkspaceId === currentWorkspaceId) {
         setCurrentWorkspaceId(null);
         clearSelection();
@@ -349,7 +349,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('saveWorkspace'),
+    onMutate: () => { startOperation('saveWorkspace'); },
     /**
      * Closes save progress after the backend writes the workspace.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -388,7 +388,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('updateWorkspaceName'),
+    onMutate: () => { startOperation('updateWorkspaceName'); },
     /**
      * Refreshes workspace summary caches after a successful rename.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -429,7 +429,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('updateWorkspaceDescription'),
+    onMutate: () => { startOperation('updateWorkspaceDescription'); },
     /**
      * Revalidates workspace metadata once the description is saved.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -717,7 +717,7 @@ export const useWorkspaceNodeMutations = ({
         void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
       }
       invalidateWorkspaceSummaries();
-      const changes = response?.dtype_normalization;
+      const changes = response.dtype_normalization;
       if (changes && changes.length > 0) {
         const lines = changes.map(
           (c) => `${c.column}: ${c.from_dtype} → ${c.to_dtype} (${c.reason})`,
@@ -725,7 +725,7 @@ export const useWorkspaceNodeMutations = ({
         const heading =
           changes.length === 1
             ? '1 column was normalized to the standard dtype'
-            : `${changes.length} columns were normalized to standard dtypes`;
+            : `${String(changes.length)} columns were normalized to standard dtypes`;
         void toast.info(heading, {
           description: lines.join('\n'),
           duration: 10000,
@@ -769,8 +769,8 @@ export const useWorkspaceNodeMutations = ({
       const request = {
         left_node_id: leftNodeId,
         right_node_id: rightNodeId,
-        left_on: leftColumns[0] || '',
-        right_on: rightColumns[0] || '',
+        left_on: leftColumns[0] ?? '',
+        right_on: rightColumns[0] ?? '',
         how: joinType as 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross',
         new_node_name: newNodeName,
       };
@@ -792,7 +792,7 @@ export const useWorkspaceNodeMutations = ({
             queryKeys.workspaceGraph(currentWorkspaceId),
           )
         : undefined;
-      const previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
+      const previousNodeIds = (previousGraph?.nodes ?? []).map((node) => node.id);
       clearSelection();
       return { previousNodeIds };
     },
@@ -804,7 +804,7 @@ export const useWorkspaceNodeMutations = ({
      */
     onSuccess: async (createdNode: Record<string, unknown>, _vars, context) => {
       let newId =
-        (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
+        (createdNode.node_id as string | undefined) ?? (createdNode.id as string | undefined);
       if (!newId && currentWorkspaceId) {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.workspaceGraph(currentWorkspaceId),
@@ -813,7 +813,7 @@ export const useWorkspaceNodeMutations = ({
           queryKeys.workspaceGraph(currentWorkspaceId),
         );
         if (freshGraph?.nodes) {
-          const prevIds = context?.previousNodeIds || [];
+          const prevIds = context.previousNodeIds;
           const diff = freshGraph.nodes
             .map((node) => node.id)
             .filter((id) => !prevIds.includes(id));
@@ -873,7 +873,7 @@ export const useWorkspaceNodeMutations = ({
             queryKeys.workspaceGraph(currentWorkspaceId),
           )
         : undefined;
-      const previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
+      const previousNodeIds = (previousGraph?.nodes ?? []).map((node) => node.id);
       clearSelection();
       return { previousNodeIds };
     },
@@ -885,7 +885,7 @@ export const useWorkspaceNodeMutations = ({
      */
     onSuccess: async (createdNode: Record<string, unknown>, _vars, context) => {
       let newId =
-        (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
+        (createdNode.node_id as string | undefined) ?? (createdNode.id as string | undefined);
       if (!newId && currentWorkspaceId) {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.workspaceGraph(currentWorkspaceId),
@@ -894,7 +894,7 @@ export const useWorkspaceNodeMutations = ({
           queryKeys.workspaceGraph(currentWorkspaceId),
         );
         if (freshGraph?.nodes) {
-          const prevIds = context?.previousNodeIds || [];
+          const prevIds = context.previousNodeIds;
           const diff = freshGraph.nodes
             .map((node) => node.id)
             .filter((id) => !prevIds.includes(id));
@@ -994,7 +994,7 @@ export const useWorkspaceNodeMutations = ({
     onSuccess: (_response, variables) => {
       if (currentWorkspaceId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        if (variables?.nodeId) {
+        if (variables.nodeId) {
           void queryClient.invalidateQueries({
             queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId),
           });
@@ -1096,7 +1096,7 @@ export const useWorkspaceNodeMutations = ({
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
     onSuccess: (_data, variables) => {
-      if (currentWorkspaceId && variables?.nodeId) {
+      if (currentWorkspaceId && variables.nodeId) {
         invalidateNodeInfoQuery(queryClient, currentWorkspaceId, variables.nodeId);
         void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
         void queryClient.invalidateQueries({
@@ -1156,7 +1156,7 @@ export const useWorkspaceNodeMutations = ({
     onSuccess: (_data, variables) => {
       if (currentWorkspaceId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        if (variables?.nodeId) {
+        if (variables.nodeId) {
           void queryClient.invalidateQueries({
             queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId),
           });
@@ -1206,7 +1206,7 @@ export const useWorkspaceNodeMutations = ({
     onSuccess: (_data, variables) => {
       if (currentWorkspaceId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        if (variables?.nodeId) {
+        if (variables.nodeId) {
           void queryClient.invalidateQueries({
             queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId),
           });
@@ -1255,7 +1255,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('detachConcordance'),
+    onMutate: () => { startOperation('detachConcordance'); },
     /**
      * Refreshes graph lineage after concordance detach adds nodes.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -1301,7 +1301,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('detachConcordanceDispersion'),
+    onMutate: () => { startOperation('detachConcordanceDispersion'); },
     /**
      * Revalidates graph state after dispersion detach is accepted.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -1340,7 +1340,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('materializeConcordance'),
+    onMutate: () => { startOperation('materializeConcordance'); },
     /**
      * Ends materialization progress once the backend accepts the request.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -1378,7 +1378,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('quotation'),
+    onMutate: () => { startOperation('quotation'); },
     /**
      * Closes quotation progress once results arrive.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -1423,7 +1423,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('detachQuotation'),
+    onMutate: () => { startOperation('detachQuotation'); },
     /**
      * Refreshes graph lineage after quotation detach adds nodes.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -1462,7 +1462,7 @@ export const useWorkspaceNodeMutations = ({
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
      * Why: because each TanStack mutation lifecycle step needs to connect generated API work with operation tracking, errors, and cache invalidation.
      */
-    onMutate: () => startOperation('materializeQuotation'),
+    onMutate: () => { startOperation('materializeQuotation'); },
     /**
      * Ends quotation materialization progress after backend acceptance.
      * Called by: useMutation option object inside useWorkspaceNodeMutations.
@@ -1802,7 +1802,7 @@ export const useWorkspaceNodeMutations = ({
         const graphData = queryClient.getQueryData<WorkspaceGraphResponse>(
           queryKeys.workspaceGraph(currentWorkspaceId),
         );
-        const existingNodes = graphData?.nodes || [];
+        const existingNodes = graphData?.nodes ?? [];
         const nodeExists = existingNodes.some((node) => node.id === nodeId);
         if (!nodeExists) {
           return null;
@@ -1830,7 +1830,7 @@ export const useWorkspaceNodeMutations = ({
           // CancelledError in that race. TanStack's CancelledError sets
           // ``error.message === "CancelledError"`` but leaves ``error.name`` at
           // ``"Error"``, so use the exported type guard rather than name-sniffing.
-          if (isCancelledError(error)) {
+          if (error instanceof CancelledError) {
             return null;
           } else {
             console.error('Failed to refresh node schema:', error);

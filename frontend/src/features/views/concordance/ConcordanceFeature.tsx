@@ -56,6 +56,7 @@ import {
 } from '../common/hooks/usePersistNodeDocumentColumn';
 import {
   DISPERSION_DEFAULT_BIN_COUNT,
+  toCellText,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
 } from './concordanceViewModels';
@@ -165,7 +166,7 @@ function ConcordanceFeature({
   });
   /** Replaces this tab's inputs from a node/column selection list (hydration + handoff). */
   const applyInputsFromSelections = (
-    sels: Array<{ nodeId: string; column?: string | null }>,
+    sels: { nodeId: string; column?: string | null }[],
   ) => {
     onTabInputsChange?.(
       sels
@@ -289,7 +290,7 @@ function ConcordanceFeature({
   const nodeColors: Record<string, string> = liveNodeColors;
 
   const concordanceTaskId = useMemo(() => {
-    const md = (liveResults as ConcordanceAnalysisResponse | null)?.metadata as
+    const md = (liveResults)?.metadata as
       | Record<string, unknown>
       | undefined;
     const value = md?.task_id ?? md?.taskId;
@@ -408,8 +409,10 @@ function ConcordanceFeature({
     const tagged: TaggedBinRow[] = [];
     for (const id of ids) {
       const node = panelSelectedNodes.find((n: WorkspaceNodeLike) => n.id === id);
-      const sourceLabel = (node?.name as string | undefined) ?? id;
-      for (const row of materializedBins[id]!) {
+      const sourceLabel = node?.name ?? id;
+      const bins = materializedBins[id];
+      if (!bins) continue;
+      for (const row of bins) {
         tagged.push({ ...row, __source_node: sourceLabel });
       }
     }
@@ -423,14 +426,14 @@ function ConcordanceFeature({
       const binRows = getMaterializedBinsForKey(nodeKey);
       if (binRows) {
         for (const row of binRows) {
-          const raw = String(row.matched_text ?? '');
+          const raw = row.matched_text ?? '';
           if (raw) seen.add(lowercaseMatches ? raw.toLowerCase() : raw);
         }
         continue;
       }
       for (const group of nodeData.data) {
         for (const hit of group) {
-          const raw = String(hit[CONCORDANCE_COLUMN_KEYS.matchedText] ?? '');
+          const raw = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);
           if (raw) seen.add(lowercaseMatches ? raw.toLowerCase() : raw);
         }
       }
@@ -450,6 +453,7 @@ function ConcordanceFeature({
   const matchedTextColorMap = useMemo(
     (): Record<string, string> =>
       Object.fromEntries(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- i % length is always a valid index of the non-empty palette
         allMatchedTexts.map((t, i) => [t, EXTENDED_PALETTE[i % EXTENDED_PALETTE.length]!]),
       ),
     [allMatchedTexts],
@@ -511,8 +515,8 @@ function ConcordanceFeature({
       const candidateIds = [node.id, node.node_id]
         .map((val) => (typeof val === 'string' ? val : null))
         .filter(Boolean) as string[];
-      const primaryId = candidateIds[0] ?? `node-${idx}`;
-      const assigned = (nodeColors[primaryId] || defaultPalette[idx % defaultPalette.length])!;
+      const primaryId = candidateIds[0] ?? `node-${String(idx)}`;
+      const assigned = nodeColors[primaryId] ?? defaultPalette[idx % defaultPalette.length] ?? '';
       const variants = new Set<string>();
       [primaryId, node.name, node.name, node.label, node.label].forEach((value) => {
         if (typeof value === 'string' && value.trim()) {
@@ -639,7 +643,7 @@ function ConcordanceFeature({
     openDetail: openRowDetail,
   } = useRowDetailDialog();
   const [concordanceDetailExtra, setConcordanceDetailExtra] = useState<{
-    concordanceHits: Array<Record<string, unknown>>;
+    concordanceHits: Record<string, unknown>[];
     caseSensitive: boolean;
   } | null>(null);
 
@@ -688,28 +692,28 @@ function ConcordanceFeature({
     /** Copies freshly fetched task results into the feature's safe-result state. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onResultFetched: (resultData) => {
-      if (resultData) {
-        setResults(resultData as ConcordanceAnalysisResponse);
-      }
+      setResults(resultData);
     },
     /** Accepts restored result payloads from persisted analysis tasks. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onHydratedResult: (resultPayload) => {
       const res = resultPayload?.data ?? resultPayload;
       if (res) {
-        setResults(resultPayload as ConcordanceAnalysisResponse);
+        setResults(resultPayload);
       }
     },
     /** Restores concordance form controls and materialized caches from a saved request. */
     // Called by: useAnalysisFeature hydration because restored concordance tasks must rebuild node selections, search options, materialized paths, and bin caches together. Flow: unwrap the saved request, apply form fields, restore materialized metadata, then lock the submitted nodes.
     onHydratedRequest: (requestPayload) => {
-      const req = (requestPayload as Record<string, unknown>)?.data ?? requestPayload;
+      const req = (requestPayload as Record<string, unknown> | undefined)?.data ?? requestPayload;
       if (!req || typeof req !== 'object') return;
       const reqObj = req as Record<string, unknown>;
-      const nodeIds: string[] = Array.isArray(reqObj.node_ids) ? reqObj.node_ids.slice(0, 2) : [];
+      const nodeIds: string[] = Array.isArray(reqObj.node_ids)
+        ? (reqObj.node_ids.slice(0, 2) as string[])
+        : [];
       const node_columns: Record<string, string> =
-        (reqObj.node_columns as Record<string, string>) || {};
-      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+        (reqObj.node_columns as Record<string, string> | undefined) ?? {};
+      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] ?? '' }));
       // Legacy migration only: a tab that ran before the add-node-as-needed
       // model has a task_id but no persisted inputs. Seed them once from the
       // saved request. Tabs created under the new model already carry inputs,
@@ -717,7 +721,7 @@ function ConcordanceFeature({
       if (!tabInputs || tabInputs.length === 0) {
         applyInputsFromSelections(sels);
       }
-      setSearchWord(String(reqObj.search_word || ''));
+      setSearchWord(toCellText(reqObj.search_word));
       setNumLeftTokens(Number(reqObj.num_left_tokens ?? 10));
       setNumRightTokens(Number(reqObj.num_right_tokens ?? 10));
       const hydratedRegex = !!reqObj.regex;
@@ -868,9 +872,9 @@ function ConcordanceFeature({
     setGlobalPageSize(newSize);
     setNodePagination((prev) => {
       const updated = { ...prev };
-      Object.keys(updated).forEach((nid) => {
-        updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
-      });
+      for (const [nid, value] of Object.entries(updated)) {
+        updated[nid] = { ...value, pageSize: newSize, currentPage: 1 };
+      }
       return updated;
     });
     void persistResultPreferences({ pageSize: newSize });
@@ -878,7 +882,7 @@ function ConcordanceFeature({
 
   // Run vs Re-run: with no locking, the primary button is gated purely by
   // whether the current params or node inputs differ from the last run.
-  const lastRunRequest = (serverRequest as Record<string, unknown> | null) ?? null;
+  const lastRunRequest = (serverRequest) ?? null;
   /** Normalizes a saved concordance request's params for diffing against live form values. */
   const concordanceServerParams = (request: Record<string, unknown>) => ({
     search_word: typeof request.search_word === 'string' ? request.search_word : '',
@@ -949,21 +953,21 @@ function ConcordanceFeature({
     if (prefsSyncedRef.current) return;
     prefsSyncedRef.current = true;
 
-    const analysisParams = results?.analysis_params ?? {};
+    const analysisParams = results.analysis_params ?? {};
     const preferenceSource =
-      results?.preferences ??
-      ((analysisParams as Record<string, unknown>)?.preferences as
+      results.preferences ??
+      ((analysisParams as Record<string, unknown>).preferences as
         | Record<string, unknown>
         | undefined) ??
       {};
 
     // Fall back to the first node's resolved pagination.page_size (which reflects
     // server-side estimation) when the analysis params don't carry it.
-    const firstNodeEntry = results?.data ? Object.values(results.data)[0] : undefined;
-    const firstNodePageSize = firstNodeEntry?.pagination?.page_size;
+    const firstNodeEntry = Object.values(results.data)[0];
+    const firstNodePageSize = firstNodeEntry?.pagination.page_size;
 
     const nextPageSize =
-      preferenceSource?.page_size ?? analysisParams?.page_size ?? firstNodePageSize;
+      preferenceSource.page_size ?? analysisParams.page_size ?? firstNodePageSize;
     if (
       typeof nextPageSize === 'number' &&
       Number.isFinite(nextPageSize) &&
@@ -975,16 +979,16 @@ function ConcordanceFeature({
         setGlobalPageSize(nextPageSize);
         setNodePagination((prev) => {
           const updated = { ...prev };
-          Object.keys(updated).forEach((nodeId) => {
+          for (const [nodeId, value] of Object.entries(updated)) {
             updated[nodeId] = {
-              ...updated[nodeId]!,
+              ...value,
               pageSize: nextPageSize,
             };
-          });
+          }
           return updated;
         });
       });
-      return () => cancelAnimationFrame(id);
+      return () => { cancelAnimationFrame(id); };
     }
   }, [results, globalPageSize, setNodePagination]);
 
@@ -1032,7 +1036,7 @@ function ConcordanceFeature({
     hydrationState,
     selectedNodes,
     setSearchWord,
-    setNodeColumnSelections: (sels) => applyInputsFromSelections(sels),
+    setNodeColumnSelections: (sels) => { applyInputsFromSelections(sels); },
     selectNodes,
     handleColorChange,
   });
@@ -1083,7 +1087,7 @@ function ConcordanceFeature({
       setShouldAutoSearch(false);
       void handleSearch(true);
     });
-    return () => cancelAnimationFrame(id);
+    return () => { cancelAnimationFrame(id); };
   }, [shouldAutoSearch, handleSearch, setShouldAutoSearch]);
 
   /** Delegates clearing to the shared analysis lifecycle only when a workspace is active. */
@@ -1144,7 +1148,7 @@ function ConcordanceFeature({
     const record = { ...primaryRecord };
     const rawFullText = record[column];
     const fullText =
-      rawFullText === null || rawFullText === undefined ? undefined : String(rawFullText);
+      rawFullText === null || rawFullText === undefined ? undefined : toCellText(rawFullText);
 
     setConcordanceDetailExtra({
       concordanceHits,
@@ -1180,7 +1184,7 @@ function ConcordanceFeature({
         },
         {
           label: 'L1 Word',
-          value: String(record[CONCORDANCE_COLUMN_KEYS.leftToken] ?? ''),
+          value: toCellText(record[CONCORDANCE_COLUMN_KEYS.leftToken]),
         },
         ...(record[CONCORDANCE_COLUMN_KEYS.leftTokenFreq] != null
           ? [
@@ -1192,7 +1196,7 @@ function ConcordanceFeature({
           : []),
         {
           label: 'R1 Word',
-          value: String(record[CONCORDANCE_COLUMN_KEYS.rightToken] ?? ''),
+          value: toCellText(record[CONCORDANCE_COLUMN_KEYS.rightToken]),
         },
         ...(record[CONCORDANCE_COLUMN_KEYS.rightTokenFreq] != null
           ? [
@@ -1265,7 +1269,7 @@ function ConcordanceFeature({
    */
   const handleDetachConfirm = async () => {
     for (const n of pendingDetachNodes) {
-      const cols = selectedDetachColumns[n.nodeId] || [];
+      const cols = selectedDetachColumns[n.nodeId] ?? [];
       await handleDetach(
         n.nodeId,
         n.column,
@@ -1326,7 +1330,7 @@ function ConcordanceFeature({
       const options = responses
         .flatMap((response) => response.data?.nodes ?? [])
         .map((node) => {
-          const disabled = new Set(node.disabled_columns || []);
+          const disabled = new Set(node.disabled_columns ?? []);
           return {
             ...node,
             available_columns: node.available_columns.filter(
@@ -1362,7 +1366,7 @@ function ConcordanceFeature({
   const handleDispersionDetachConfirm = async () => {
     const binsSet = pendingDispersionBinSelection ? new Set(pendingDispersionBinSelection) : null;
     for (const n of pendingDispersionDetachNodes) {
-      const cols = selectedDispersionColumns[n.nodeId] || [];
+      const cols = selectedDispersionColumns[n.nodeId] ?? [];
       await handleDispersionDetach(n.nodeId, n.column, {
         nodeLabel: n.nodeLabel,
         materializedPath: materializedPaths[n.nodeId] ?? null,
@@ -1435,7 +1439,7 @@ function ConcordanceFeature({
             column={column}
             value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
             onChange={(model, detectedLanguage) =>
-              void handleTokenizerModelChange(nodeId, column, model, detectedLanguage)
+              { handleTokenizerModelChange(nodeId, column, model, detectedLanguage); }
             }
             getAuthHeaders={getAuthHeaders}
             disabled={false}
@@ -1532,7 +1536,7 @@ function ConcordanceFeature({
         <Card>
           <CardContent>
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {results?.message ?? 'The search failed. Please try again.'}
+              {results.message}
             </div>
           </CardContent>
         </Card>

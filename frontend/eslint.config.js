@@ -12,15 +12,16 @@ export default tseslint.config([
   {
     extends: [
       js.configs.recommended,
-      // Type-aware strict harness. strictTypeChecked catches the bug classes
-      // that AI-generated code most often introduces: `any` propagation
-      // (no-unsafe-*), floating/misused promises, unsafe member access, and
-      // bad stringification (no-base-to-string). These are correctness rules,
-      // not cosmetics — we deliberately skip stylisticTypeChecked so the gate
-      // stays focused on bugs. projectService below provides the type info
-      // these rules require. Existing violations are grandfathered in
-      // eslint-suppressions.json; new code must satisfy every rule.
+      // Ideal type-aware harness for an AI-assisted codebase. We run the full
+      // strict + stylistic type-checked presets with no dial-backs and no
+      // grandfathering: every rule is enforced everywhere. strictTypeChecked
+      // catches correctness bugs (any-propagation, floating promises,
+      // impossible conditions, bad stringification); stylisticTypeChecked
+      // enforces consistent, modern idioms (nullish coalescing, optional
+      // chaining, consistent type defs). projectService below supplies the
+      // type information these rules require.
       ...tseslint.configs.strictTypeChecked,
+      ...tseslint.configs.stylisticTypeChecked,
     ],
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
@@ -36,11 +37,9 @@ export default tseslint.config([
       'react-refresh': reactRefresh,
     },
     rules: {
-      // React Hooks — all recommended-latest rules, then dial back the
-      // two new React 19 rules that many legitimate patterns still trigger.
+      // React Hooks — full recommended-latest ruleset at preset severity,
+      // including the React 19 set-state-in-effect and purity rules.
       ...reactHooks.configs['recommended-latest'].rules,
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/purity': 'warn',
 
       // The strict preset sets no-unused-vars to 'error' but without
       // ignore patterns. The patterns below are the universally-standard
@@ -77,41 +76,6 @@ export default tseslint.config([
       ],
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/require-await': 'error',
-
-      // ── strictTypeChecked tuning ──────────────────────────────────
-      // These type-aware rules are kept, but their high-noise members are
-      // configured for this codebase so the gate stays signal, not churn.
-
-      // Template literals legitimately interpolate numbers/booleans/nullish
-      // (ids, counts, flags). Allow those primitives; still flag objects,
-      // which is the real `[object Object]` bug class.
-      '@typescript-eslint/restrict-template-expressions': [
-        'error',
-        {
-          allowNumber: true,
-          allowBoolean: true,
-          allowNullish: true,
-          allowRegExp: true,
-          allowArray: true,
-        },
-      ],
-
-      // `<div onClick={() => doThing()}>` is idiomatic React; the void-return
-      // arrow shorthand is not confusing here.
-      '@typescript-eslint/no-confusing-void-expression': [
-        'error',
-        { ignoreArrowShorthand: true },
-      ],
-
-      // Off: with `noUncheckedIndexedAccess` + intentional defensive guards
-      // (checking values the types claim are always present, e.g. at API and
-      // worker boundaries), this rule fires overwhelmingly on safe code. The
-      // TS compiler already covers the genuinely-impossible cases.
-      '@typescript-eslint/no-unnecessary-condition': 'off',
-
-      // noUncheckedIndexedAccess (tsconfig) covers array/object indexing safety.
-      // Non-null assertions are allowed at logically-guaranteed access sites.
-      '@typescript-eslint/no-non-null-assertion': 'off',
 
       // React Refresh — warn-only; constant exports are fine (e.g. queryKeys)
       'react-refresh/only-export-components': [

@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 
 /** One {topic_id, proportion} entry as delivered by the backend TMDist column. */
-type DistributionEntry = { topic_id: number; proportion: number };
+interface DistributionEntry { topic_id: number; proportion: number }
 
-type Props = {
+interface Props {
   /** Raw cell value from a TMDist column: a list of {topic_id, proportion}. */
   value: unknown;
-};
+}
 
 /**
  * Deterministic vivid color for a topic id (stable across rows so the same
@@ -64,17 +64,17 @@ export function TopicDistributionBar({ value }: Props) {
         className="flex h-4 w-full overflow-hidden rounded-sm ring-1 ring-border/60"
         role="img"
         aria-label={entries
-          .map((e) => `Topic ${e.topic_id}: ${((e.proportion / total) * 100).toFixed(1)}%`)
+          .map((e) => `Topic ${String(e.topic_id)}: ${((e.proportion / total) * 100).toFixed(1)}%`)
           .join(', ')}
       >
         {entries.map((entry, i) => {
           const pct = (entry.proportion / total) * 100;
           return (
             <div
-              key={`${entry.topic_id}-${i}`}
+              key={`${String(entry.topic_id)}-${String(i)}`}
               className="h-full"
-              style={{ width: `${pct}%`, backgroundColor: topicColor(entry.topic_id) }}
-              title={`Topic ${entry.topic_id}: ${pct.toFixed(1)}%`}
+              style={{ width: `${String(pct)}%`, backgroundColor: topicColor(entry.topic_id) }}
+              title={`Topic ${String(entry.topic_id)}: ${pct.toFixed(1)}%`}
             />
           );
         })}
@@ -84,14 +84,14 @@ export function TopicDistributionBar({ value }: Props) {
           const pct = (entry.proportion / total) * 100;
           return (
             <span
-              key={`${entry.topic_id}-${i}`}
+              key={`${String(entry.topic_id)}-${String(i)}`}
               className="inline-flex items-center gap-1 text-[10px] leading-none text-muted-foreground"
             >
               <span
                 className="inline-block h-2 w-2 rounded-[2px]"
                 style={{ backgroundColor: topicColor(entry.topic_id) }}
               />
-              {entry.topic_id < 0 ? 'outlier' : `T${entry.topic_id}`} {pct.toFixed(0)}%
+              {entry.topic_id < 0 ? 'outlier' : `T${String(entry.topic_id)}`} {pct.toFixed(0)}%
             </span>
           );
         })}

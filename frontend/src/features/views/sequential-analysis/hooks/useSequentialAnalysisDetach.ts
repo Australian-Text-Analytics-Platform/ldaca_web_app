@@ -44,7 +44,7 @@ export function useSequentialAnalysisDetach({
   const [isDetaching, setIsDetaching] = useState(false);
 
   const rawRows = Array.isArray(results?.data)
-    ? (results.data as Array<Record<string, unknown>>)
+    ? (results.data as Record<string, unknown>[])
     : [];
   const groupByColumns = Array.isArray(
     (results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns,
@@ -57,7 +57,7 @@ export function useSequentialAnalysisDetach({
 
     const dedupedVisibleGroups = new Map<string, Record<string, unknown>>();
     rawRows.forEach((row) => {
-      const groupKey = groupByColumns.map((column) => String(row[column] ?? '')).join(' - ');
+      const groupKey = groupByColumns.map((column) => String((row[column] as string | number | undefined) ?? '')).join(' - ');
       if (excludedGroupKeys.has(groupKey)) {
         return;
       }
@@ -72,7 +72,7 @@ export function useSequentialAnalysisDetach({
     return Array.from(dedupedVisibleGroups.values()).map((values) => ({ values }));
   })();
 
-  const sourceName = String(panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data');
+  const sourceName = panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data';
   const defaultNodeName = `${sourceName}_trend`;
 
   // Sends the selected periods and visible groups to the backend detach task.
@@ -105,7 +105,7 @@ export function useSequentialAnalysisDetach({
       return;
     }
 
-    if (visibleGroups && visibleGroups.length === 0) {
+    if (visibleGroups?.length === 0) {
       toast.error('No visible groups remain on the chart to add to the workspace');
       return;
     }

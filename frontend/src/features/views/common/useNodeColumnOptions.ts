@@ -110,7 +110,7 @@ const buildNodeColumnOptionsMap = ({
 
     const infos = getNodeColumns
       ? normalizeColumnInfos(getNodeColumns(node))
-      : mapColumnsToInfo(node as Record<string, unknown>);
+      : mapColumnsToInfo(node);
 
     acc[nodeId] = buildEntry(nodeId, infos, allowedDataTypes, fallbackToAllColumns);
     return acc;

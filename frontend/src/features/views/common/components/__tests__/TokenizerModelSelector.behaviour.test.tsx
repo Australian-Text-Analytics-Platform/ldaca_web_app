@@ -50,12 +50,14 @@ const renderSelector = ({
 
 describe('TokenizerModelSelector', () => {
   beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- jsdom may not implement hasPointerCapture despite lib.dom types
     if (!HTMLElement.prototype.hasPointerCapture) {
       Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
         configurable: true,
         value: vi.fn(() => false),
       });
     }
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- jsdom may not implement scrollIntoView despite lib.dom types
     if (!HTMLElement.prototype.scrollIntoView) {
       Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
         configurable: true,
@@ -90,7 +92,7 @@ describe('TokenizerModelSelector', () => {
 
     await user.click(screen.getByRole('combobox', { name: /tokenizer model/i }));
 
-    await waitFor(() => expect(getTokenizerModels).toHaveBeenCalledTimes(1));
+    await waitFor(() => { expect(getTokenizerModels).toHaveBeenCalledTimes(1); });
     expect(await screen.findByText('Recommended')).toBeInTheDocument();
     expect(screen.getByTestId('tokenizer-model-recommendations')).toHaveClass('rounded-lg');
     expect(screen.getByText('Plain words (English)')).toBeInTheDocument();

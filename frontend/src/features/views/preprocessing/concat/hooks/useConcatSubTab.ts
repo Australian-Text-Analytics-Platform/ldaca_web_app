@@ -132,11 +132,11 @@ const buildConcatNodeSummaries = (nodes: WorkspaceNodeLike[]): ConcatNodeSummary
     const columns = extractNodeColumns(node);
     const rawDtypes = extractNodeDtypes(node);
 
-    const uniqueColumns = Array.from(new Set(columns.map((name) => String(name))));
+    const uniqueColumns = Array.from(new Set(columns));
     const normalizedColumns = uniqueColumns.toSorted((a, b) => a.localeCompare(b));
     const normalizedDtypes = normalizedColumns.reduce<Record<string, string>>((acc, column) => {
       const dtype = rawDtypes[column];
-      acc[column] = dtype ? dtype.toString().toLowerCase() : '';
+      acc[column] = dtype ? dtype.toLowerCase() : '';
       return acc;
     }, {});
 
@@ -179,6 +179,8 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
     return result;
   }
 
+  // summaries has at least two entries (guarded by the length check above).
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const base = summaries[0]!;
   if (!base.normalizedColumns.length) {
     result.issues = `${base.displayName || base.nodeId} has no columns to align.`;
@@ -217,6 +219,8 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
         .sort()
         .map(
           (column) =>
+            // Empty dtype strings should display as 'unknown', so keep `||`.
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
             `${column} (${baseDtypes[column] || 'unknown'} vs ${summary.dtypes[column] || 'unknown'})`,
         )
         .join(', ');
@@ -234,7 +238,7 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
 
   if (result.mismatches.length === 0) {
     result.ready = true;
-    result.issues = `Ready to stack ${summaries.length} data blocks (${result.baseColumnCount} columns).`;
+    result.issues = `Ready to stack ${String(summaries.length)} data blocks (${String(result.baseColumnCount)} columns).`;
   } else {
     result.issues = 'Resolve schema mismatches before stacking.';
   }
@@ -327,9 +331,14 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     pageSize: number;
   }) => {
     const response = await concatPreview(request.nodeIds, page, pageSize, request.deduplicate);
+    // response comes from the generated API client; guard defensively against a
+    // malformed/empty payload that the typed contract does not capture.
     return {
-      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      data: Array.isArray(response?.data) ? response.data : [],
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       columns: Array.isArray(response?.columns) ? response.columns : [],
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       pagination: response?.pagination ?? null,
     };
   };
@@ -345,7 +354,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     pageSize: concatPreviewPageSize,
     setPage: setConcatPreviewPage,
     setPageSize: setConcatPreviewPageSize,
-  } = usePreprocessingPreview<ConcatPreviewRequestPayload, PreviewRow>({
+  } = usePreprocessingPreview<ConcatPreviewRequestPayload>({
     request: concatPreviewRequest,
     signature: concatPreviewSignature,
     fetcher: concatPreviewFetcher,
@@ -356,6 +365,8 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     if (
       concatPreviewData.length > 0 &&
       typeof concatPreviewData[0] === 'object' &&
+      // preview rows come from the API; keep the explicit null guard.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       concatPreviewData[0] !== null
     ) {
       return Object.keys(concatPreviewData[0]);
@@ -422,6 +433,8 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     selectedNodes: concatSelectedNodes,
     nodeColumnSelections: concatNodeIds.map((nodeId) => ({ nodeId, column: '' })),
     nodeColors: concatNodeIds.reduce<Record<string, string>>((acc, nodeId, index) => {
+      // index % length is always a valid index of the non-empty palette.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       acc[nodeId] = DEFAULT_CONCAT_PALETTE[index % DEFAULT_CONCAT_PALETTE.length]!;
       return acc;
     }, {}),
@@ -437,7 +450,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
 
   const extraSelectionMessage =
     concatOriginalCount > MAX_CONCAT_NODES
-      ? `Using the most recent ${MAX_CONCAT_NODES} of ${concatOriginalCount} selected data blocks. Deselect extras to choose which ones to include.`
+      ? `Using the most recent ${String(MAX_CONCAT_NODES)} of ${String(concatOriginalCount)} selected data blocks. Deselect extras to choose which ones to include.`
       : null;
 
   return {

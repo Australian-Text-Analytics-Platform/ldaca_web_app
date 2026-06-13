@@ -62,7 +62,7 @@ export const useBackendHealth = () => {
       .then((url) => {
         if (!cancelled) setHealthUrl(url);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error('Failed to resolve backend health URL', err);
         if (!cancelled) setHealthUrl('/health');
       });
@@ -98,10 +98,12 @@ export const useBackendHealth = () => {
       try {
         const resp = await fetch(healthUrl, { cache: 'no-store' });
         if (resp.ok) {
-          const body = await resp.json();
-          const healthy = Boolean(
-            body && (body.status === 'healthy' || body.status === 'operational'),
-          );
+          const body: unknown = await resp.json();
+          const healthy =
+            typeof body === 'object' &&
+            body !== null &&
+            'status' in body &&
+            (body.status === 'healthy' || body.status === 'operational');
           if (healthy) {
             if (!cancelled) {
               setReady(true);
@@ -110,7 +112,7 @@ export const useBackendHealth = () => {
             return;
           }
         }
-        throw new Error(`HTTP ${resp.status}`);
+        throw new Error(`HTTP ${String(resp.status)}`);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Backend not reachable');

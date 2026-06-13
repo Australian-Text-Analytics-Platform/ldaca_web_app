@@ -37,15 +37,15 @@ interface TopicModelingState {
    * Used to build ``topic_meanings_override`` on detach so the detached
    * meanings node mirrors what's on screen, not the fit-time artifact.
    */
-  displayedTopics?: ReadonlyArray<{ id: number; representative_words?: string[] }>;
+  displayedTopics?: readonly { id: number; representative_words?: string[] }[];
 }
 
 interface TopicModelingActions {
   setIsRunning: (value: boolean) => void;
-  runningRef: React.MutableRefObject<boolean>;
+  runningRef: React.RefObject<boolean>;
   setError: (value: string | null) => void;
   setResultSafely: (value: TopicModelingResponse | null) => void;
-  lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
+  lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
   resolveTopicModelingTaskId: () => Promise<string | null>;
   setLocalTaskId: (id: string | null) => void;
   // Reports the run's assigned task id back to the owning tab. No-op when not
@@ -58,11 +58,11 @@ interface TopicModelingLock {
   queryClient: QueryClient;
 }
 
-type Params = {
+interface Params {
   state: TopicModelingState;
   actions: TopicModelingActions;
   lock: TopicModelingLock;
-};
+}
 
 // Builds deterministic topic-result node names, including sampling context when present.
 /**
@@ -210,7 +210,7 @@ export function useTopicModelingTaskFlow({
         path: { task_id: taskId },
         throwOnError: true,
       });
-      const nodes = resp?.data?.nodes ?? [];
+      const nodes = resp.data?.nodes ?? [];
       setDetachNodeOptions(nodes);
       // Default-select only the generated topic columns (TOPIC_top1,
       // TOPIC_distribution) when the backend marks them; source columns start
@@ -254,7 +254,7 @@ export function useTopicModelingTaskFlow({
           return [
             node.node_id,
             buildTopicDetachNodeName(
-              String(node.node_name || node.node_id),
+              node.node_name || node.node_id,
               sampleFraction,
               randomSeed,
             ),
@@ -291,8 +291,8 @@ export function useTopicModelingTaskFlow({
         path: { task_id: taskId },
         throwOnError: true,
       });
-      if (resp?.state !== 'successful') {
-        throw new Error(resp?.message || 'Topic detach failed');
+      if (resp.state !== 'successful') {
+        throw new Error(resp.message || 'Topic detach failed');
       }
 
       await Promise.all([

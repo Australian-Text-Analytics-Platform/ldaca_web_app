@@ -125,7 +125,7 @@ export function ChromeTabs({
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return undefined;
-    const update = () => setContainerWidth(element.clientWidth);
+    const update = () => { setContainerWidth(element.clientWidth); };
     update();
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
@@ -214,7 +214,7 @@ export function ChromeTabs({
     });
   }, [draftTitle, onRename]);
 
-  const cancelRename = useCallback(() => setRenamingId(null), []);
+  const cancelRename = useCallback(() => { setRenamingId(null); }, []);
 
   const beginRename = useCallback(
     (tab: ChromeTabItem) => {
@@ -246,7 +246,7 @@ export function ChromeTabs({
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag?.pointerId !== event.pointerId) return;
     const delta = event.clientX - drag.startX;
 
     if (!drag.moved) {
@@ -269,7 +269,7 @@ export function ChromeTabs({
 
   const handlePointerUp = (tab: ChromeTabItem, event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag?.pointerId !== event.pointerId) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -316,10 +316,10 @@ export function ChromeTabs({
               role="tab"
               aria-selected={isActive}
               data-chrome-tab
-              onPointerDown={(event) => handlePointerDown(tab, event)}
+              onPointerDown={(event) => { handlePointerDown(tab, event); }}
               onPointerMove={handlePointerMove}
-              onPointerUp={(event) => handlePointerUp(tab, event)}
-              style={{ width: widths[index], transform: `translateX(${translateX}px)` }}
+              onPointerUp={(event) => { handlePointerUp(tab, event); }}
+              style={{ width: widths[index], transform: `translateX(${String(translateX)}px)` }}
               className={cn(
                 'group absolute top-0 left-0 flex h-full items-center rounded-t-lg text-sm select-none',
                 isDragging
@@ -342,10 +342,10 @@ export function ChromeTabs({
                 <input
                   ref={renameInputRef}
                   value={draftTitle}
-                  onChange={(event) => setDraftTitle(event.target.value)}
+                  onChange={(event) => { setDraftTitle(event.target.value); }}
                   onBlur={finishRename}
                   onKeyDown={handleRenameKeyDown}
-                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => { event.stopPropagation(); }}
                   className="mx-2 w-full min-w-0 bg-transparent text-sm outline-none"
                   aria-label="Rename tab"
                 />
@@ -390,7 +390,7 @@ export function ChromeTabs({
                 <button
                   type="button"
                   aria-label="Close tab"
-                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => { event.stopPropagation(); }}
                   onClick={(event) => {
                     event.stopPropagation();
                     onClose(id);
@@ -412,7 +412,7 @@ export function ChromeTabs({
             type="button"
             aria-label="New tab"
             onClick={onCreate}
-            style={{ transform: `translateX(${totalWidth}px)` }}
+            style={{ transform: `translateX(${String(totalWidth)}px)` }}
             className="absolute top-1/2 left-0 z-1 -translate-y-1/2 ml-1 rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800"
           >
             <Plus className="h-4 w-4" />

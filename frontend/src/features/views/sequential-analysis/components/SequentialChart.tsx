@@ -29,6 +29,9 @@ const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are 
 
 const readOnlyDisabledReason = (readOnly: boolean, fallback?: string | false) => {
   if (readOnly) return READ_ONLY_DISABLED_REASON;
+  // A falsy fallback ('' or false) intentionally collapses to undefined here, so
+  // logical-OR (not nullish) is required.
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   return fallback || undefined;
 };
 
@@ -37,7 +40,7 @@ const toNumericX = (row: SequentialAnalysisDatum): number => {
   const raw = row.period_start ?? row.time_period;
   if (typeof raw === 'number') return raw;
   if (raw == null) return Number.NaN;
-  const parsed = new Date(String(raw)).getTime();
+  const parsed = new Date(raw as string | number).getTime();
   if (!Number.isNaN(parsed)) return parsed;
   const asNumber = Number(raw);
   return Number.isNaN(asNumber) ? Number.NaN : asNumber;
@@ -139,13 +142,13 @@ export function SequentialChart({
               <Input
                 id="sequential-new-node-name"
                 value={detachNodeName}
-                onChange={(event) => onDetachNodeNameChange(event.target.value)}
+                onChange={(event) => { onDetachNodeNameChange(event.target.value); }}
                 onKeyDown={(event) =>
-                  acceptPlaceholderOnTab({
+                  { acceptPlaceholderOnTab({
                     event,
                     value: detachNodeName,
                     setValue: onDetachNodeNameChange,
-                  })
+                  }); }
                 }
                 placeholder={detachNodeNamePlaceholder}
                 disabled={isDetaching || readOnly}
@@ -187,7 +190,7 @@ export function SequentialChart({
 
   const series: MultiSeriesChartSeries[] = visibleKeys.map((key, idx) => {
     const color = String(chartConfig[key]?.color ?? getPaletteColor(idx));
-    const label = (chartConfig[key]?.label as string | undefined) ?? key;
+    const label = (chartConfig[key]?.label) ?? key;
     return {
       key,
       color,
@@ -206,7 +209,7 @@ export function SequentialChart({
         // ~10 round-number ticks; `minTickGap=20` still drops ticks on
         // narrow charts so they can't overlap.
         tickCount: 10,
-        tickFormatter: formatNumericTick as never,
+        tickFormatter: formatNumericTick,
         angle: -45,
         height: 100,
         minTickGap: 20,
@@ -237,7 +240,10 @@ export function SequentialChart({
       />
       <div className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4">
         {groupKeys.map((key) => {
-          const color = String(chartConfig[key]?.color ?? '#8884d8');
+          const color = chartConfig[key]?.color ?? '#8884d8';
+          // An empty series label intentionally falls through to the series key,
+          // so logical-OR (not nullish) is required.
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           const label = chartConfig[key]?.label || key;
           const isHidden = hiddenKeys.has(key);
           return (
@@ -246,7 +252,7 @@ export function SequentialChart({
               type="button"
               className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 transition-opacity hover:bg-muted/60"
               style={{ opacity: isHidden ? 0.4 : 1 }}
-              onClick={() => toggleKey(key)}
+              onClick={() => { toggleKey(key); }}
               aria-pressed={!isHidden}
               aria-label={isHidden ? `Show ${label}` : `Hide ${label}`}
             >
@@ -294,13 +300,13 @@ export function SequentialChart({
               <Input
                 id="sequential-new-node-name"
                 value={detachNodeName}
-                onChange={(event) => onDetachNodeNameChange(event.target.value)}
+                onChange={(event) => { onDetachNodeNameChange(event.target.value); }}
                 onKeyDown={(event) =>
-                  acceptPlaceholderOnTab({
+                  { acceptPlaceholderOnTab({
                     event,
                     value: detachNodeName,
                     setValue: onDetachNodeNameChange,
-                  })
+                  }); }
                 }
                 placeholder={detachNodeNamePlaceholder}
                 disabled={isDetaching || readOnly}

@@ -21,7 +21,7 @@ export interface ColumnInfo {
  * Canonical types: `tmdist`, `annotation`, `list[string]`, `string`, `datetime`,
  * `boolean`, `integer`, `float`, `categorical`, `struct`, `unknown`.
  */
-const TYPE_RULES: Array<[(s: string) => boolean, string]> = [
+const TYPE_RULES: [(s: string) => boolean, string][] = [
   [
     (s) =>
       s === 'tmdist' ||
@@ -123,8 +123,9 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
       typeof rawType === 'string'
         ? rawType
         : rawType != null
-          ? String(rawType)
-          : typeMap.get(name) || undefined,
+          ? // eslint-disable-next-line @typescript-eslint/no-base-to-string -- rawType is a backend dtype value; default coercion is intended
+            String(rawType)
+          : typeMap.get(name),
     );
 
     if (!typeMap.has(name)) {
@@ -133,16 +134,16 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
       return;
     }
 
-    const existingType = typeMap.get(name) || 'string';
+    const existingType = typeMap.get(name) ?? 'string';
     if (existingType === 'string' && normalizedType !== 'string') {
       typeMap.set(name, normalizedType);
     }
   };
 
-  const schema = (n?.data as Record<string, unknown>)?.schema ?? n?.schema;
+  const schema = (n.data as Record<string, unknown> | undefined)?.schema ?? n.schema;
   if (Array.isArray(schema)) {
     schema.forEach((entry: Record<string, unknown>) =>
-      register(entry?.name, entry?.js_type || entry?.type || entry?.dtype),
+      { register(entry.name, entry.js_type ?? entry.type ?? entry.dtype); },
     );
   } else if (schema && typeof schema === 'object') {
     Object.entries(schema as Record<string, unknown>).forEach(([name, entry]) => {
@@ -150,17 +151,17 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
     });
   }
 
-  const dtypes = (n?.data as Record<string, unknown>)?.dtypes ?? n?.dtypes;
+  const dtypes = (n.data as Record<string, unknown> | undefined)?.dtypes ?? n.dtypes;
   if (dtypes && typeof dtypes === 'object') {
-    Object.entries(dtypes).forEach(([name, dtype]) => register(name, dtype));
+    Object.entries(dtypes).forEach(([name, dtype]) => { register(name, dtype); });
   }
 
-  const columns = (n?.data as Record<string, unknown>)?.columns ?? n?.columns;
+  const columns = (n.data as Record<string, unknown> | undefined)?.columns ?? n.columns;
   if (Array.isArray(columns)) {
-    columns.forEach((name: unknown) => register(name));
+    columns.forEach((name: unknown) => { register(name); });
   }
 
-  return columnOrder.map((name) => ({ name, dataType: typeMap.get(name) || 'string' }));
+  return columnOrder.map((name) => ({ name, dataType: typeMap.get(name) ?? 'string' }));
 };
 
 /**

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Capture the options each call passes to usePreprocessingPreview so we can
 // assert on the signature + fetcher routing without firing real timers.
-type CapturedOptions = {
+interface CapturedOptions {
   signature: string;
   request: unknown;
   fetcher: (params: {
@@ -13,7 +13,7 @@ type CapturedOptions = {
     signal: AbortSignal;
   }) => Promise<unknown>;
   debounceMs?: number;
-};
+}
 
 const usePreprocessingPreviewMock = vi.hoisted(() =>
   vi.fn<(options: CapturedOptions) => Record<string, unknown>>(),
@@ -48,7 +48,7 @@ import { useNodePreviewWithRawFallback } from '../useNodePreviewWithRawFallback'
 const lastCapturedOptions = (): CapturedOptions => {
   const calls = usePreprocessingPreviewMock.mock.calls;
   expect(calls.length).toBeGreaterThan(0);
-  return calls[calls.length - 1]![0]!;
+  return calls[calls.length - 1]![0];
 };
 
 describe('useNodePreviewWithRawFallback', () => {

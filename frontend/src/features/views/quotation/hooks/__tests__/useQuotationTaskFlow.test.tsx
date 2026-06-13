@@ -94,7 +94,7 @@ describe('useQuotationTaskFlow', () => {
         engine: { type: 'local' },
       }),
     );
-    const initialRequest = quotationSearch.mock.calls[0]?.at(1) as
+    const initialRequest = (quotationSearch.mock.calls[0] as unknown[] | undefined)?.[1] as
       | Record<string, unknown>
       | undefined;
     expect(initialRequest).toBeDefined();
@@ -160,7 +160,7 @@ describe('useQuotationTaskFlow', () => {
       await result.current.fetchQuotations('node-1');
     });
 
-    const paginatedRequest = quotationSearch.mock.calls[0]?.at(1) as
+    const paginatedRequest = (quotationSearch.mock.calls[0] as unknown[] | undefined)?.[1] as
       | Record<string, unknown>
       | undefined;
     expect(paginatedRequest).toBeDefined();

@@ -35,7 +35,7 @@ export function interpolateColor(colorA: string, colorB: string, t: number): str
   const g = Math.round(g1 + (g2 - g1) * t);
   const b = Math.round(b1 + (b2 - b1) * t);
 
-  return `rgb(${r}, ${g}, ${b})`;
+  return `rgb(${String(r)}, ${String(g)}, ${String(b)})`;
 }
 
 /** Chooses readable text colour for chips rendered on arbitrary node colours. */

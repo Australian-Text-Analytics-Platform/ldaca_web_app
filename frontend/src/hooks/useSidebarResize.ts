@@ -23,8 +23,8 @@ export const useSidebarResize = () => {
     onLiveUpdate: (next) => {
       const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
       const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
-      if (gapEl) gapEl.style.width = `${next}px`;
-      if (containerEl) containerEl.style.width = `${next}px`;
+      if (gapEl) gapEl.style.width = `${String(next)}px`;
+      if (containerEl) containerEl.style.width = `${String(next)}px`;
     },
     onDragEnd: () => {
       const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');

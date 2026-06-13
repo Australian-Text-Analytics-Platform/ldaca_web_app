@@ -6,7 +6,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 interface LoginScreenProps {
   isLoading?: boolean;
   error?: string | null;
-  authMethods?: Array<{ name: string; display_name: string; enabled: boolean }>;
+  authMethods?: { name: string; display_name: string; enabled: boolean }[];
 }
 
 /**

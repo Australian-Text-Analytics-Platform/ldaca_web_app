@@ -70,11 +70,11 @@ interface ConcordanceLock {
   ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
 }
 
-type Params = {
+interface Params {
   state: ConcordanceState;
   actions: ConcordanceActions;
   lock: ConcordanceLock;
-};
+}
 
 /** Centralizes concordance submit, pagination, sorting, detach, and materialize actions. */
 /**
@@ -162,7 +162,7 @@ export function useConcordanceTaskFlow({
             ? ({
                 ...response,
                 data: { ...prev.data, ...response.data },
-              } as ConcordanceAnalysisResponse)
+              })
             : response,
         );
       } else {
@@ -215,14 +215,12 @@ export function useConcordanceTaskFlow({
 
     const updatedPagination = { ...nodePagination };
     requestNodeIds.forEach((nodeId) => {
-      if (!updatedPagination[nodeId]) {
-        updatedPagination[nodeId] = {
-          currentPage: 1,
-          pageSize: globalPageSize,
-          sortBy: '',
-          descending: false,
-        };
-      }
+      updatedPagination[nodeId] ??= {
+        currentPage: 1,
+        pageSize: globalPageSize,
+        sortBy: '',
+        descending: false,
+      };
       if (resetPage && (!targetNodeId || targetNodeId === nodeId)) {
         updatedPagination[nodeId].currentPage = 1;
       }
@@ -237,7 +235,8 @@ export function useConcordanceTaskFlow({
       setCombinedPage(1);
     }
 
-    const firstNodeId = requestNodeIds[0]!;
+    const firstNodeId = requestNodeIds[0];
+    if (firstNodeId === undefined) return;
     const firstNodePagination = updatedPagination[firstNodeId];
     if (!firstNodePagination) return;
 
@@ -274,7 +273,7 @@ export function useConcordanceTaskFlow({
       const assignedTaskId = extractAndSetTaskId(response, setLocalTaskId);
       onTaskIdAssigned?.(assignedTaskId);
 
-      if (response?.combinable === false && viewMode === 'combined') {
+      if (response.combinable === false && viewMode === 'combined') {
         setViewMode('separated');
       }
     } catch (error) {
@@ -283,7 +282,7 @@ export function useConcordanceTaskFlow({
         state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: {},
-      } as ConcordanceAnalysisResponse);
+      });
     } finally {
       setIsSearching(false);
     }
@@ -295,7 +294,7 @@ export function useConcordanceTaskFlow({
    * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
    */
   const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
-    const currentNodePagination = nodePagination[nodeKey] || {
+    const currentNodePagination = nodePagination[nodeKey] ?? {
       currentPage: 1,
       pageSize: globalPageSize,
       sortBy: '',
@@ -341,7 +340,7 @@ export function useConcordanceTaskFlow({
    * Flow: read current node pagination, update the target page locally, then refetch stored results with page/sort overrides while toggling node loading.
    */
   const handlePageChange = (newPage: number, nodeKey: string, requestNodeId?: string) => {
-    const currentNodePagination = nodePagination[nodeKey] || {
+    const currentNodePagination = nodePagination[nodeKey] ?? {
       currentPage: 1,
       pageSize: globalPageSize,
       sortBy: '',
@@ -365,6 +364,7 @@ export function useConcordanceTaskFlow({
           node_id: targetNodeId,
           page: newPage,
           page_size: currentNodePagination.pageSize,
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string sortBy means "no sort" and must collapse to undefined
           sort_by: currentNodePagination.sortBy || undefined,
           descending: currentNodePagination.descending,
         };

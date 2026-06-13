@@ -42,9 +42,11 @@ const HEX_RE = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 function parseHex(hex: string): { r: number; g: number; b: number } | null {
-  const match = hex.match(HEX_RE);
+  const match = HEX_RE.exec(hex);
   if (!match) return null;
-  let raw = match[1]!;
+  const group = match[1];
+  if (group === undefined) return null;
+  let raw = group;
   if (raw.length === 3)
     raw = raw
       .split('')

@@ -109,6 +109,7 @@ export function moveInOrder(order: string[], fromIndex: number, toIndex: number)
   }
   const next = [...order];
   const [moved] = next.splice(fromIndex, 1);
-  next.splice(toIndex, 0, moved!);
+  if (moved === undefined) return order;
+  next.splice(toIndex, 0, moved);
   return next;
 }

@@ -84,7 +84,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   /** Deletes a graph node through workspace actions. */
   const handleDelete = useCallback(
     (nodeId: string) => {
-      if (!nodeId || !deleteNode) {
+      if (!nodeId) {
         return;
       }
       void deleteNode(nodeId);
@@ -95,7 +95,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   /** Renames a graph node through workspace actions. */
   const handleRename = useCallback(
     (nodeId: string, newName: string) => {
-      if (!nodeId || !newName?.trim() || !renameNode) {
+      if (!nodeId || !newName.trim()) {
         return;
       }
       void renameNode(nodeId, newName.trim());
@@ -106,7 +106,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   /** Clones a graph node through workspace actions. */
   const handleCopy = useCallback(
     (nodeId: string) => {
-      if (!nodeId || !copyNode) {
+      if (!nodeId) {
         return;
       }
       void copyNode(nodeId);
@@ -117,7 +117,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   /** Applies an undo operation to a graph node. */
   const handleUndo = useCallback(
     (nodeId: string) => {
-      if (!nodeId || !undoNode) {
+      if (!nodeId) {
         return;
       }
       void undoNode(nodeId);
@@ -128,7 +128,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   /** Applies a redo operation to a graph node. */
   const handleRedo = useCallback(
     (nodeId: string) => {
-      if (!nodeId || !redoNode) {
+      if (!nodeId) {
         return;
       }
       void redoNode(nodeId);
@@ -141,6 +141,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   // — it just renders what data carries. See the strategy doc for the
   // active/focus split rules.
   const assignedColors = useNodeColorsStore((state) => state.colors);
+  // Zustand store actions are stable closures and never rely on `this`, so
+  // selecting them directly is safe despite unbound-method.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const pruneStaleColors = useNodeColorsStore((state) => state.pruneStaleColors);
   const currentView = useUIStore((state) => state.currentView);
   // "Fresh" = nodes that appeared mid-session (detach / join / stack /
@@ -149,7 +152,11 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   // find them in a busy workspace. ``observeNodeIds`` is called from
   // a useEffect below so the side-effect doesn't fire inside useMemo.
   const freshIds = useFreshNodesStore((state) => state.freshIds);
+  // Zustand store actions are stable closures and never rely on `this`, so
+  // selecting them directly is safe despite unbound-method.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const observeNodeIds = useFreshNodesStore((state) => state.observeNodeIds);
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const markInteracted = useFreshNodesStore((state) => state.markInteracted);
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
 
@@ -187,7 +194,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
 
     const positions = computeDagreLayout(
       workspaceGraph.nodes.map((n: GraphNode) => ({ id: n.id })),
-      (workspaceGraph.edges || []).map((edge: GraphEdge) => ({
+      workspaceGraph.edges.map((edge: GraphEdge) => ({
         source: edge.source,
         target: edge.target,
       })),
@@ -213,9 +220,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       const documentColumn =
         typeof node.document === 'string' && node.document.trim().length > 0 ? node.document : null;
 
-      const rawShape = Array.isArray((node as { shape?: unknown }).shape)
-        ? ((node as { shape?: unknown[] }).shape as unknown[])
-        : null;
+      const shapeCandidate = (node as { shape?: unknown[] }).shape;
+      const rawShape: unknown[] | null = Array.isArray(shapeCandidate) ? shapeCandidate : null;
       const parsedShape: [number | null, number | null] =
         rawShape && rawShape.length >= 2
           ? [
@@ -224,7 +230,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             ]
           : [null, null];
 
-      const position = positions.get(node.id) || { x: index * 320, y: 50 };
+      const position = positions.get(node.id) ?? { x: index * 320, y: 50 };
 
       return {
         id: node.id,
@@ -233,7 +239,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         data: {
           node: {
             node_id: node.id,
-            name: node.name || `Node ${index + 1}`,
+            name: node.name || `Node ${String(index + 1)}`,
             shape: parsedShape,
             columns,
             preview: [],
@@ -246,9 +252,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             column_schema: columnSchema,
           },
           isMultiSelected:
-            (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
+            selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
           visualInfo: nodeVisualInfo(node.id, {
-            selectedNodeIds: selectedNodeIds ?? [],
+            selectedNodeIds,
             currentView,
             assignedColors,
           }),
@@ -262,9 +268,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         },
         hidden: false,
         selectable: true,
-        selected: selectedNodeIds?.includes?.(node.id) ?? false,
+        selected: selectedNodeIds.includes(node.id),
         connectable: false,
-      } as Node;
+      };
     });
   }, [
     workspaceGraph,
@@ -285,7 +291,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       return [];
     }
     return workspaceGraph.edges.map((edge: GraphEdge, index: number) => ({
-      id: `edge-${edge.source}-${edge.target}-${index}`,
+      id: `edge-${edge.source}-${edge.target}-${String(index)}`,
       source: edge.source,
       target: edge.target,
       type: 'default',
@@ -300,6 +306,10 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   }, [workspaceGraph]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
+  // The explicit <Edge> is required: without it the hook infers the narrow
+  // shape of `initialEdges`, so `onEdgesChange` becomes OnEdgesChange<that
+  // shape> and no longer satisfies the OnEdgesChange<Edge> consumer below.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
 
   const currentNodeIds = nodes.map((node: Node) => node.id).join(',');
@@ -313,7 +323,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
    * identical and ``setNodes`` was skipped, leaving CustomNode rendered
    * with stale data. Encode ``state:X`` (state + the bold colour) so
    * any visible-colour change drives a re-render. */
-  type NodeDataSignatureShape = {
+  interface NodeDataSignatureShape {
     node?: {
       data_type?: string;
       document_column?: string;
@@ -323,7 +333,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     };
     visualInfo?: { state?: string; pair?: { X?: string } };
     isFresh?: boolean;
-  };
+  }
   /**
    * Encodes visible node fields so React Flow state refreshes when they change.
    * Called by: useWorkspaceGraph internal event, effect, or helper flow.
@@ -332,14 +342,14 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
    */
   const nodeSignatureFor = (node: Node): string => {
     const nd = node.data as NodeDataSignatureShape;
-    const dt = nd?.node?.data_type ?? 'unknown';
-    const docc = nd?.node?.document_column || '';
-    const name = nd?.node?.name || '';
-    const canUndo = nd?.node?.can_undo ? '1' : '0';
-    const canRedo = nd?.node?.can_redo ? '1' : '0';
-    const vis = nd?.visualInfo;
+    const dt = nd.node?.data_type ?? 'unknown';
+    const docc = nd.node?.document_column ?? '';
+    const name = nd.node?.name ?? '';
+    const canUndo = nd.node?.can_undo ? '1' : '0';
+    const canRedo = nd.node?.can_redo ? '1' : '0';
+    const vis = nd.visualInfo;
     const visToken = `${vis?.state ?? '-'}:${vis?.pair?.X ?? '-'}`;
-    const freshToken = nd?.isFresh ? '1' : '0';
+    const freshToken = nd.isFresh ? '1' : '0';
     return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}:${visToken}:${freshToken}`;
   };
 
@@ -387,18 +397,18 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     setNodes((existing) =>
       existing.map((node: Node) => ({
         ...node,
-        selected: selectedNodeIds?.includes?.(node.id) ?? false,
+        selected: selectedNodeIds.includes(node.id),
         data: {
           ...node.data,
           isMultiSelected:
-            (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
+            selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
         },
       })),
     );
   }, [selectedNodeIds, setNodes]);
 
   useEffect(() => {
-    if (!selectedNodeIds || selectedNodeIds.length === 0) {
+    if (selectedNodeIds.length === 0) {
       setNodes((existing) =>
         existing.map((node: Node) => ({
           ...node,
@@ -412,9 +422,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   /** Keeps React Flow select changes aligned with the app selection store. */
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      const normalized = (changes || []).map((change: NodeChange) => {
+      const normalized = changes.map((change: NodeChange) => {
         if (change.type === 'select') {
-          return { ...change, selected: selectedNodeIds?.includes?.(change.id) ?? false };
+          return { ...change, selected: selectedNodeIds.includes(change.id) };
         }
         return change;
       });
@@ -428,7 +438,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     setNodes((existing) =>
       existing.map((node: Node) => ({
         ...node,
-        selected: selectedNodeIds?.includes?.(node.id) ?? false,
+        selected: selectedNodeIds.includes(node.id),
       })),
     );
   }, [selectedNodeIds, setNodes]);
@@ -438,8 +448,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     (event, node) => {
       event.preventDefault();
       event.stopPropagation();
-      if (node && node.id) {
-        toggleNodeSelection?.(node.id);
+      if (node.id) {
+        toggleNodeSelection(node.id);
         // A click counts as "I've seen this" — clear the fresh-node
         // highlight even if the resulting selection toggle didn't
         // actually fire (e.g. parent disabled clicks).
@@ -450,19 +460,25 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   );
 
   /** No-op connection handler because graph edges are backend-derived. */
-  const handleConnect = useCallback((_connection: Connection) => {}, []);
+  const handleConnect = useCallback((_connection: Connection) => {
+    // No-op: graph edges are backend-derived, so user-drawn connections are ignored.
+  }, []);
 
   /** No-op connection-start handler retained for React Flow prop parity. */
   const handleConnectStart = useCallback(
     (
       _event: MouseEvent | TouchEvent,
       _params: { nodeId: string | null; handleId: string | null; handleType: string | null },
-    ) => {},
+    ) => {
+      // No-op: retained for React Flow prop parity; graph edges are backend-derived.
+    },
     [],
   );
 
   /** No-op connection-end handler retained for React Flow prop parity. */
-  const handleConnectEnd = useCallback((_event: MouseEvent | TouchEvent) => {}, []);
+  const handleConnectEnd = useCallback((_event: MouseEvent | TouchEvent) => {
+    // No-op: retained for React Flow prop parity; graph edges are backend-derived.
+  }, []);
 
   /** Fits the graph into view after React Flow initializes. */
   const handleInit = useCallback((instance: ReactFlowInstance) => {
@@ -473,14 +489,14 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     }
   }, []);
 
-  const selectedCount = selectedNodeIds?.length ?? 0;
-  const totalNodes = workspaceGraph?.nodes?.length ?? 0;
+  const selectedCount = selectedNodeIds.length;
+  const totalNodes = workspaceGraph?.nodes.length ?? 0;
 
   return {
     nodes,
     edges,
     nodeTypes,
-    isGraphLoading: Boolean(isLoading.graph),
+    isGraphLoading: isLoading.graph,
     showEmptyState: !isLoading.graph && !currentWorkspaceId,
     selectedCount,
     totalNodes,

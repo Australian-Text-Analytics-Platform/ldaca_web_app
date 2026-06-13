@@ -11,7 +11,7 @@ import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
-type Params = {
+interface Params {
   pendingConcordance: PendingConcordance | null;
   clearPendingConcordance: () => void;
   hydrationState: HydrationState;
@@ -23,12 +23,12 @@ type Params = {
   ) => void;
   selectNodes: (ids: string[]) => void;
   handleColorChange: (nodeId: string, color: string) => void;
-};
+}
 
-export type UseConcordancePendingHandoffResult = {
+export interface UseConcordancePendingHandoffResult {
   shouldAutoSearch: boolean;
   setShouldAutoSearch: Dispatch<SetStateAction<boolean>>;
-};
+}
 
 /**
  * Owns the queue + apply effects for `pendingConcordance` handoffs from
@@ -77,7 +77,7 @@ export function useConcordancePendingHandoff({
       setQueuedPendingConcordance(pendingConcordance);
       clearPendingConcordance();
     });
-    return () => cancelAnimationFrame(id);
+    return () => { cancelAnimationFrame(id); };
   }, [pendingConcordance, clearPendingConcordance]);
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export function useConcordancePendingHandoff({
     const rafIds: number[] = [];
     const word = queuedPendingConcordance.searchWord;
     if (word) {
-      rafIds.push(requestAnimationFrame(() => setSearchWord(word)));
+      rafIds.push(requestAnimationFrame(() => { setSearchWord(word); }));
     }
 
     if (
@@ -103,7 +103,7 @@ export function useConcordancePendingHandoff({
       queuedPendingConcordance.selectedNodes.length > 0
     ) {
       const targetIds = queuedPendingConcordance.selectedNodes
-        .map((node) => (typeof node?.id === 'string' ? node.id : ''))
+        .map((node) => (typeof node.id === 'string' ? node.id : ''))
         .filter((id): id is string => id.trim().length > 0);
       const effectiveTargetIds = takeMostRecent(targetIds, 2);
       if (effectiveTargetIds.length > 0) {
@@ -127,7 +127,7 @@ export function useConcordancePendingHandoff({
 
     if (queuedPendingConcordance.nodeColors) {
       Object.entries(queuedPendingConcordance.nodeColors).forEach(([nodeId, color]) => {
-        handleColorChange(nodeId, color as string);
+        handleColorChange(nodeId, color);
       });
     }
 

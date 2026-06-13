@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Drive useAnalysisTaskStatus directly so we don't have to set up the
 // analysis store + SSE plumbing for the smoke tests.
-type TaskStatusReturn = {
-  tasks: Array<{ task_id: string; state: string }>;
-};
+interface TaskStatusReturn {
+  tasks: { task_id: string; state: string }[];
+}
 
 const useAnalysisTaskStatusMock = vi.hoisted(() => vi.fn<() => TaskStatusReturn>());
 vi.mock('@/features/views/common/useAnalysisTaskStatus', () => ({
@@ -69,14 +69,14 @@ describe('useMaterializeLifecycle', () => {
     const onTerminalSuccess = mkSuccess();
 
     renderHook(() =>
-      useMaterializeLifecycle(
+      { useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: {},
           setNodeMaterializing,
           setMaterializeTaskIds,
           onTerminalSuccess,
         }),
-      ),
+      ); },
     );
 
     expect(setNodeMaterializing).not.toHaveBeenCalled();
@@ -92,13 +92,13 @@ describe('useMaterializeLifecycle', () => {
     const onTerminalSuccess = mkSuccess();
 
     renderHook(() =>
-      useMaterializeLifecycle(
+      { useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           setNodeMaterializing,
           onTerminalSuccess,
         }),
-      ),
+      ); },
     );
 
     expect(setNodeMaterializing).not.toHaveBeenCalled();
@@ -114,14 +114,14 @@ describe('useMaterializeLifecycle', () => {
     const onTerminalSuccess = mkSuccess();
 
     renderHook(() =>
-      useMaterializeLifecycle(
+      { useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           setNodeMaterializing,
           setMaterializeTaskIds,
           onTerminalSuccess,
         }),
-      ),
+      ); },
     );
 
     expect(onTerminalSuccess).toHaveBeenCalledWith('node-1', 't-1');
@@ -146,13 +146,13 @@ describe('useMaterializeLifecycle', () => {
     const onTerminalFailure = mkFailure();
 
     renderHook(() =>
-      useMaterializeLifecycle(
+      { useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           onTerminalSuccess,
           onTerminalFailure,
         }),
-      ),
+      ); },
     );
 
     expect(onTerminalSuccess).not.toHaveBeenCalled();
@@ -167,13 +167,13 @@ describe('useMaterializeLifecycle', () => {
     const setNodeMaterializing = mkMatBool();
 
     const { rerender } = renderHook(() =>
-      useMaterializeLifecycle(
+      { useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           onTerminalSuccess,
           setNodeMaterializing,
         }),
-      ),
+      ); },
     );
 
     expect(onTerminalSuccess).toHaveBeenCalledTimes(1);
@@ -194,12 +194,12 @@ describe('useMaterializeLifecycle', () => {
     const onTerminalSuccess = mkSuccess();
 
     renderHook(() =>
-      useMaterializeLifecycle(
+      { useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           onTerminalSuccess,
         }),
-      ),
+      ); },
     );
 
     expect(onTerminalSuccess).toHaveBeenCalledTimes(1);

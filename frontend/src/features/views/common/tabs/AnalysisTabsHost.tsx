@@ -106,9 +106,9 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
           key={activeTab.tab_id}
           tabId={activeTab.tab_id}
           tabTaskId={activeTab.task_id ?? null}
-          onTabTaskChange={(taskId) => setTabTask(activeTab.tab_id, taskId)}
+          onTabTaskChange={(taskId) => { setTabTask(activeTab.tab_id, taskId); }}
           tabInputs={activeTab.inputs ?? []}
-          onTabInputsChange={(inputs) => setTabInputs(activeTab.tab_id, inputs)}
+          onTabInputsChange={(inputs) => { setTabInputs(activeTab.tab_id, inputs); }}
         />
       ) : null}
     </AnalysisTabbedPanel>

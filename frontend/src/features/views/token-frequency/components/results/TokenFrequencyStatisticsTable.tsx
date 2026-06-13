@@ -36,7 +36,7 @@ export type EnhancedStatisticsRow = TokenFrequencyStatisticsEntry & {
   sort_significance: number;
 };
 
-type Props = {
+interface Props {
   statistics: TokenFrequencyStatisticsEntry[];
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
   /**
@@ -54,7 +54,7 @@ type Props = {
   referenceColor?: string | null;
   studyNodeName?: string | null;
   studyColor?: string | null;
-};
+}
 
 /** Used by: token-frequency statistics sorting helpers; parses backend statistic values, including string infinities because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const parseStatisticsNumericValue = (value: unknown): number => {
@@ -85,7 +85,7 @@ const formatSignedLL = (value: number): string => {
 };
 
 /** Used by: enhanceRows to convert significance stars into an ordinal sort key because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-const significanceRank = (sig: string | undefined): number => (sig || '').length;
+const significanceRank = (sig: string | undefined): number => (sig ?? '').length;
 
 /** Used by: TokenFrequencyStatisticsTable column definitions as the parent-controlled wildcard token filter because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const tokenWildcardFilter: FilterFn<EnhancedStatisticsRow> = (row, _columnId, filterValue) => {
@@ -144,7 +144,7 @@ const buildColumns = () => [
     header: 'Overuse',
     /** Used by: TanStack Table Overuse column to render direction as a compact colored badge because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     cell: (info) => {
-      const isOveruse = Boolean(info.getValue());
+      const isOveruse = info.getValue();
       const cls = isOveruse ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
       return (
         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>
@@ -200,7 +200,7 @@ const buildColumns = () => [
     header: 'Significance',
     /** Used by: TanStack Table Significance column to render stars as an accessibility-friendly badge because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
     cell: (info) => {
-      const significance = String(info.row.original.significance ?? '');
+      const significance = info.row.original.significance;
       const badgeClass =
         significance === '****'
           ? 'bg-red-100 text-red-800'
@@ -228,8 +228,8 @@ const buildColumns = () => [
  */
 const enhanceRows = (statistics: TokenFrequencyStatisticsEntry[]): EnhancedStatisticsRow[] =>
   statistics.map((stat) => {
-    const or = Number(stat.freq_reference) || 0;
-    const os = Number(stat.freq_study) || 0;
+    const or = stat.freq_reference || 0;
+    const os = stat.freq_study || 0;
     const overuse = os > or;
     const ll = parseStatisticsNumericValue(stat.log_likelihood_llv);
     const llAbs = Number.isFinite(ll) ? Math.abs(ll) : NaN;
@@ -238,7 +238,7 @@ const enhanceRows = (statistics: TokenFrequencyStatisticsEntry[]): EnhancedStati
       ...stat,
       overuse,
       signed_ll,
-      sort_token: String(stat.token ?? ''),
+      sort_token: stat.token,
       sort_freq_reference: parseStatisticsNumericValue(stat.freq_reference),
       sort_percent_reference: parseStatisticsNumericValue(stat.percent_reference),
       sort_freq_study: parseStatisticsNumericValue(stat.freq_study),
@@ -289,7 +289,7 @@ export const TokenFrequencyStatisticsTable = ({
     columns,
     state: { sorting, pagination, columnFilters },
     /** Used by: TanStack Table sorting state to keep large tables responsive during header clicks because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    onSortingChange: (updater) => startTransition(() => setSorting(updater)),
+    onSortingChange: (updater) => { startTransition(() => { setSorting(updater); }); },
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -318,6 +318,7 @@ export const TokenFrequencyStatisticsTable = ({
   const filteredCount = table.getFilteredRowModel().rows.length;
   const totalCount = data.length;
 
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty reference name must still let the study name show the caption, so falsy '' must fall through
   const hasCorpusCaption = Boolean(referenceNodeName || studyNodeName);
 
   return (
@@ -335,10 +336,12 @@ export const TokenFrequencyStatisticsTable = ({
           {hasCorpusCaption ? (
             <p className="text-xs text-muted-foreground">
               <span>Reference corpus: </span>
+              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty color string must map to undefined (no inline color), so falsy '' must fall through */}
               <span className="font-medium" style={{ color: referenceColor || undefined }}>
                 {referenceNodeName ?? '—'}
               </span>
               <span>; Study corpus: </span>
+              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty color string must map to undefined (no inline color), so falsy '' must fall through */}
               <span className="font-medium" style={{ color: studyColor || undefined }}>
                 {studyNodeName ?? '—'}
               </span>
@@ -440,7 +443,7 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="outline"
                   size="sm"
                   disabled={!table.getCanPreviousPage()}
-                  onClick={() => table.setPageIndex(0)}
+                  onClick={() => { table.setPageIndex(0); }}
                 >
                   First
                 </Button>
@@ -448,7 +451,7 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="outline"
                   size="sm"
                   disabled={!table.getCanPreviousPage()}
-                  onClick={() => table.previousPage()}
+                  onClick={() => { table.previousPage(); }}
                 >
                   Previous
                 </Button>
@@ -459,7 +462,7 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="outline"
                   size="sm"
                   disabled={!table.getCanNextPage()}
-                  onClick={() => table.nextPage()}
+                  onClick={() => { table.nextPage(); }}
                 >
                   Next
                 </Button>
@@ -467,7 +470,7 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="outline"
                   size="sm"
                   disabled={!table.getCanNextPage()}
-                  onClick={() => table.setPageIndex(pageCount - 1)}
+                  onClick={() => { table.setPageIndex(pageCount - 1); }}
                 >
                   Last
                 </Button>

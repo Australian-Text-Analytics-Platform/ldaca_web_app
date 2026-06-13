@@ -67,7 +67,7 @@ describe('AnalysisTabsHost', () => {
       <AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />,
     );
 
-    await waitFor(() => expect(createTab).toHaveBeenCalledWith('Analysis 1'));
+    await waitFor(() => { expect(createTab).toHaveBeenCalledWith('Analysis 1'); });
     expect(createTab).toHaveBeenCalledTimes(1);
 
     rerender(<AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />);

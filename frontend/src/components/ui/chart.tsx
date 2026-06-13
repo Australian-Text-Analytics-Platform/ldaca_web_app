@@ -14,9 +14,9 @@ export type ChartConfig = Record<
   }
 >;
 
-type ChartContextValue = {
+interface ChartContextValue {
   config: ChartConfig;
-};
+}
 
 /** Chart configuration context consumed by chart tooltip components. */
 const ChartContext = React.createContext<ChartContextValue | null>(null);
@@ -33,7 +33,6 @@ const useChartContext = () => {
 /** Called by: ChartContainer and ChartTooltipContent when deriving series CSS variables because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const slug = (key: string) =>
   key
-    .toString()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-');
 
@@ -45,11 +44,11 @@ interface ChartContainerProps extends React.HTMLAttributes<HTMLDivElement> {
 const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(
   ({ className, children, config, style, ...props }, ref) => {
     const cssVars: React.CSSProperties = (() => {
-      const entries = Object.entries(config).filter(([, value]) => value?.color);
+      const entries = Object.entries(config).filter(([, value]) => value.color);
       if (!entries.length) return style ?? {};
       const vars = entries.reduce<Record<string, string>>((acc, [key, value]) => {
         const variable = `--color-${slug(key)}`;
-        acc[variable] = value?.color ?? '';
+        acc[variable] = value.color ?? '';
         return acc;
       }, {});
       return {
@@ -90,13 +89,13 @@ const ChartTooltip = React.forwardRef<HTMLDivElement, ChartTooltipProps>(
 );
 ChartTooltip.displayName = 'ChartTooltip';
 
-type TooltipItem = {
+interface TooltipItem {
   name?: string | number;
   value?: number;
   payload?: Record<string, unknown>;
   dataKey?: string | number;
   color?: string;
-};
+}
 
 interface ChartTooltipContentProps {
   active?: boolean;
@@ -157,14 +156,15 @@ const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContent
                   />
                   <span className="font-medium text-card-foreground">
                     {data?.label ??
-                      (nameKey && item.payload && item.payload[nameKey] != null
-                        ? String(item.payload[nameKey])
+                      (nameKey && item.payload?.[nameKey] != null
+                        ? // eslint-disable-next-line @typescript-eslint/no-base-to-string -- recharts payload value is an untyped runtime label expected to be a primitive
+                          String(item.payload[nameKey])
                         : key)}
                   </span>
                   {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
                 </div>
                 <span className="font-mono text-card-foreground">
-                  {item.value?.toLocaleString?.() ?? item.value}
+                  {item.value?.toLocaleString() ?? item.value}
                 </span>
               </div>
             );

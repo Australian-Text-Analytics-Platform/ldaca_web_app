@@ -41,7 +41,7 @@ export interface ConditionBuilderProps<Condition extends ConditionBuilderItem> {
   renderValueInput: (condition: Condition, disabled: boolean) => React.ReactNode;
   renderConditionMetadata?: (condition: Condition, disabled: boolean) => React.ReactNode;
   shouldHideOperatorSelect?: (condition: Condition) => boolean;
-  getOperatorOptions: (condition: Condition) => Array<{ value: string; label: string }>;
+  getOperatorOptions: (condition: Condition) => { value: string; label: string }[];
   getColumnHintId?: (condition: Condition, index: number) => string | undefined;
 }
 
@@ -96,7 +96,7 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
           {conditions.length > 1 && (
             <Select
               value={logic}
-              onValueChange={(value) => onLogicChange(value as 'and' | 'or')}
+              onValueChange={(value) => { onLogicChange(value as 'and' | 'or'); }}
               disabled={disabled}
             >
               <SelectTrigger className="w-20">
@@ -162,11 +162,11 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                     <Select
                       value={condition.column}
                       onValueChange={(value) =>
-                        onConditionChange(
+                        { onConditionChange(
                           condition.id,
                           'column',
                           value as Condition[keyof Condition],
-                        )
+                        ); }
                       }
                       disabled={disabled}
                     >
@@ -190,11 +190,11 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                       <Select
                         value={condition.operator}
                         onValueChange={(value) =>
-                          onConditionChange(
+                          { onConditionChange(
                             condition.id,
                             'operator',
                             value as Condition[keyof Condition],
-                          )
+                          ); }
                         }
                         disabled={rowDisabled}
                       >
@@ -225,7 +225,7 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
 
                 {conditions.length > 1 && (
                   <Button
-                    onClick={() => onRemoveCondition(condition.id)}
+                    onClick={() => { onRemoveCondition(condition.id); }}
                     variant="ghost"
                     size="sm"
                     type="button"

@@ -13,7 +13,7 @@ import type {
 } from '@/api/generated/types.gen';
 import { buildCombinedSlice } from '../concordanceViewModels';
 
-type Params = {
+interface Params {
   viewMode: 'separated' | 'combined';
   setViewMode: Dispatch<SetStateAction<'separated' | 'combined'>>;
   results: ConcordanceAnalysisResponse | null;
@@ -25,9 +25,9 @@ type Params = {
     options?: { mergeNodeData?: boolean },
   ) => Promise<ConcordanceAnalysisResponse | null>;
   resultsRef: RefObject<HTMLDivElement | null>;
-};
+}
 
-export type UseConcordanceViewModeSwapResult = {
+export interface UseConcordanceViewModeSwapResult {
   /** Loading flag toggled while a Combined-view fetch is in flight. */
   combinedLoading: boolean;
   /**
@@ -36,7 +36,7 @@ export type UseConcordanceViewModeSwapResult = {
    * the results card before/after the table re-renders.
    */
   handleViewModeChange: (nextMode: 'separated' | 'combined') => void;
-};
+}
 
 /**
  * Owns the user-visible "separated ↔ combined" view-mode swap, plus the two
@@ -97,6 +97,9 @@ export function useConcordanceViewModeSwap({
         return;
       }
       const [leftId, rightId] = nodeKeys;
+      if (leftId === undefined || rightId === undefined) {
+        return;
+      }
 
       setCombinedLoading(true);
       try {
@@ -111,8 +114,8 @@ export function useConcordanceViewModeSwap({
           ),
         ]);
 
-        const leftSlice = leftResp?.data?.[leftId!];
-        const rightSlice = rightResp?.data?.[rightId!];
+        const leftSlice = leftResp?.data[leftId];
+        const rightSlice = rightResp?.data[rightId];
         if (!leftSlice || !rightSlice) {
           return;
         }
@@ -120,7 +123,7 @@ export function useConcordanceViewModeSwap({
         const combined = buildCombinedSlice(leftSlice, rightSlice, page, globalPageSize);
         setResults((prev) =>
           prev?.data
-            ? ({ ...prev, data: { ...prev.data, __COMBINED__: combined } } as ConcordanceAnalysisResponse)
+            ? ({ ...prev, data: { ...prev.data, __COMBINED__: combined } })
             : prev,
         );
       } finally {
@@ -131,10 +134,10 @@ export function useConcordanceViewModeSwap({
   );
 
   useEffect(() => {
-    if (viewMode === 'combined' && results && results.combinable === false) {
+    if (viewMode === 'combined' && results?.combinable === false) {
       // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
-      const id = requestAnimationFrame(() => setViewMode('separated'));
-      return () => cancelAnimationFrame(id);
+      const id = requestAnimationFrame(() => { setViewMode('separated'); });
+      return () => { cancelAnimationFrame(id); };
     }
   }, [viewMode, results, setViewMode]);
 
@@ -142,11 +145,10 @@ export function useConcordanceViewModeSwap({
     if (viewMode !== 'combined' || !results) {
       return;
     }
-    const taskId =
-      results?.metadata?.task_id ??
-      (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
-      '';
-    const key = `${taskId}|${combinedPage}|${globalPageSize}`;
+    const metadataRecord = results.metadata as Record<string, unknown> | undefined;
+    const rawTaskId = results.metadata?.task_id ?? metadataRecord?.taskId;
+    const taskId = typeof rawTaskId === 'string' ? rawTaskId : '';
+    const key = `${taskId}|${String(combinedPage)}|${String(globalPageSize)}`;
     if (lastCombinedQueryRef.current === key) {
       return;
     }
@@ -165,16 +167,15 @@ export function useConcordanceViewModeSwap({
       if (nextMode === 'combined' && results?.combinable) {
         // Pre-stamp the dedupe key so the combined-page effect doesn't also
         // fire a redundant fetch for the same (task, page, pageSize) tuple.
-        const taskId =
-          results?.metadata?.task_id ??
-          (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
-          '';
-        lastCombinedQueryRef.current = `${taskId}|${combinedPage}|${globalPageSize}`;
+        const metadataRecord = results.metadata as Record<string, unknown> | undefined;
+        const rawTaskId = results.metadata?.task_id ?? metadataRecord?.taskId;
+        const taskId = typeof rawTaskId === 'string' ? rawTaskId : '';
+        lastCombinedQueryRef.current = `${taskId}|${String(combinedPage)}|${String(globalPageSize)}`;
 
         const prevAnchor = resultsRef.current;
         if (prevAnchor) {
           const rect = prevAnchor.getBoundingClientRect();
-          prevAnchor.style.minHeight = `${rect.height}px`;
+          prevAnchor.style.minHeight = `${String(rect.height)}px`;
         }
 
         setTimeout(() => {

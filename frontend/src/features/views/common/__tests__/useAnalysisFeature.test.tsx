@@ -192,10 +192,10 @@ describe('useAnalysisFeature', () => {
       { initialProps: { taskId: null as string | null } },
     );
 
-    await waitFor(() => expect(hydrateFromServerMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => { expect(hydrateFromServerMock).toHaveBeenCalledTimes(1); });
 
     rerender({ taskId: 'new-run-task' });
 
-    await waitFor(() => expect(hydrateFromServerMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => { expect(hydrateFromServerMock).toHaveBeenCalledTimes(2); });
   });
 });

@@ -8,12 +8,12 @@ import { useUIStore } from '@/stores';
 import type { ColorPair } from '@/lib/color';
 import type { SidebarWorkspaceNode } from './types';
 
-type SidebarNodesSectionProps = {
+interface SidebarNodesSectionProps {
   nodes: SidebarWorkspaceNode[];
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
   onClearSelection?: () => void;
-};
+}
 
 /**
  * Sidebar selection glyph used by `SidebarNodesSection`. It maps node visual
@@ -53,7 +53,7 @@ function NodeCheckIcon({
  * Flow: read shape from node data or top-level payload, format numeric row/column parts, then fall back to unknown markers.
  */
 const formatShapeLabel = (node: SidebarWorkspaceNode): string => {
-  const rawShape = node.data?.shape || (node as { shape?: [number | null, number | null] }).shape;
+  const rawShape = node.data?.shape ?? (node as { shape?: [number | null, number | null] }).shape;
   if (!rawShape) {
     return '—';
   }
@@ -66,7 +66,8 @@ const formatShapeLabel = (node: SidebarWorkspaceNode): string => {
 
 /** Called by: SidebarNodesSection sorting and row labels because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const getNodeDisplayName = (node: SidebarWorkspaceNode): string =>
-  node?.data?.nodeName || node?.data?.label || node?.label || node?.name || node.id;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall through empty-string names to the next candidate, not only null/undefined
+  node.data?.nodeName || node.data?.label || node.label || node.name || node.id;
 
 /** Called by: SidebarNodesSection row onKeyDown handlers because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
 const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
@@ -92,7 +93,10 @@ function SidebarNodesSection({
   const assignedColors = useNodeColorsStore((state) => state.colors);
   const currentView = useUIStore((state) => state.currentView);
   const freshIds = useFreshNodesStore((state) => state.freshIds);
-  const markInteracted = useFreshNodesStore((state) => state.markInteracted);
+  const markInteracted = useFreshNodesStore((state) =>
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
+    state.markInteracted,
+  );
   const selectionContext = {
     selectedNodeIds: selectedNodeIds ?? [],
     currentView,
@@ -111,8 +115,8 @@ function SidebarNodesSection({
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const selectedSet = new Set(selectedIds);
     const selectedOrdered: SidebarWorkspaceNode[] = [];
-    for (let i = selectedIds.length - 1; i >= 0; i -= 1) {
-      const node = nodeById.get(selectedIds[i]!);
+    for (const id of [...selectedIds].reverse()) {
+      const node = nodeById.get(id);
       if (node) selectedOrdered.push(node);
     }
     const unselectedSorted = nodes
@@ -156,7 +160,7 @@ function SidebarNodesSection({
             return (
               <div
                 key={node.id}
-                onClick={() => handleToggle(node.id)}
+                onClick={() => { handleToggle(node.id); }}
                 onKeyDown={(event) => {
                   if (!isActivationKey(event)) {
                     return;

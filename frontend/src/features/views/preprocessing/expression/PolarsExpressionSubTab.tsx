@@ -134,7 +134,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
           {/* Context tabs */}
           <Tabs
             value={activeContext}
-            onValueChange={(v) => setActiveContext(v as typeof activeContext)}
+            onValueChange={(v) => { setActiveContext(v as typeof activeContext); }}
             className="space-y-3"
           >
             <TabsList className="flex flex-wrap gap-1">
@@ -152,7 +152,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                 value={filterCode}
                 onChange={setFilterCode}
                 onBlur={() => {
-                  void evalExpressions();
+                  evalExpressions();
                 }}
                 disabled={!hasNode}
                 placeholder='pl.col("column_name") > 0'
@@ -174,7 +174,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                       );
                     }}
                     onBlur={() => {
-                  void evalExpressions();
+                  evalExpressions();
                 }}
                     disabled={!hasNode}
                     placeholder='b = pl.col("a").cast(pl.Utf8)'
@@ -184,7 +184,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                     size="icon"
                     className="mt-1 shrink-0"
                     disabled={withColumns.length <= 1}
-                    onClick={() => setWithColumns((prev) => prev.filter((it) => it.id !== item.id))}
+                    onClick={() => { setWithColumns((prev) => prev.filter((it) => it.id !== item.id)); }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -193,7 +193,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setWithColumns((prev) => [...prev, blankExpression()])}
+                onClick={() => { setWithColumns((prev) => [...prev, blankExpression()]); }}
                 disabled={!hasNode}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
@@ -215,7 +215,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                       );
                     }}
                     onBlur={() => {
-                  void evalExpressions();
+                  evalExpressions();
                 }}
                     disabled={!hasNode}
                     placeholder='pl.col("a"), pl.col("b")'
@@ -226,7 +226,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                     className="mt-1 shrink-0"
                     disabled={selectExpressions.length <= 1}
                     onClick={() =>
-                      setSelectExpressions((prev) => prev.filter((it) => it.id !== item.id))
+                      { setSelectExpressions((prev) => prev.filter((it) => it.id !== item.id)); }
                     }
                   >
                     <Trash2 className="h-4 w-4" />
@@ -236,7 +236,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSelectExpressions((prev) => [...prev, blankExpression()])}
+                onClick={() => { setSelectExpressions((prev) => [...prev, blankExpression()]); }}
                 disabled={!hasNode}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
@@ -258,7 +258,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                       );
                     }}
                     onBlur={() => {
-                  void evalExpressions();
+                  evalExpressions();
                 }}
                     disabled={!hasNode}
                     placeholder='pl.col("date")'
@@ -288,7 +288,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                     size="icon"
                     className="mt-1 shrink-0"
                     disabled={sortItems.length <= 1}
-                    onClick={() => setSortItems((prev) => prev.filter((it) => it.id !== item.id))}
+                    onClick={() => { setSortItems((prev) => prev.filter((it) => it.id !== item.id)); }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -297,7 +297,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSortItems((prev) => [...prev, blankSortExpression()])}
+                onClick={() => { setSortItems((prev) => [...prev, blankSortExpression()]); }}
                 disabled={!hasNode}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
@@ -312,9 +312,9 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                 <Label className="text-xs font-medium">Grouping key expression</Label>
                 <CodeEditor
                   value={groupByState.keyCode}
-                  onChange={(val) => setGroupByState({ ...groupByState, keyCode: val })}
+                  onChange={(val) => { setGroupByState({ ...groupByState, keyCode: val }); }}
                   onBlur={() => {
-                  void evalExpressions();
+                  evalExpressions();
                 }}
                   disabled={!hasNode}
                   placeholder='pl.col("category")'
@@ -336,7 +336,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                         }));
                       }}
                       onBlur={() => {
-                  void evalExpressions();
+                  evalExpressions();
                 }}
                       disabled={!hasNode}
                       placeholder='total = pl.col("value").sum()'
@@ -347,10 +347,10 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                       className="mt-1 shrink-0"
                       disabled={groupByState.aggExpressions.length <= 1}
                       onClick={() =>
-                        setGroupByState((prev) => ({
+                        { setGroupByState((prev) => ({
                           ...prev,
                           aggExpressions: prev.aggExpressions.filter((it) => it.id !== item.id),
-                        }))
+                        })); }
                       }
                     >
                       <Trash2 className="h-4 w-4" />
@@ -361,10 +361,10 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    setGroupByState((prev) => ({
+                    { setGroupByState((prev) => ({
                       ...prev,
                       aggExpressions: [...prev.aggExpressions, blankExpression()],
-                    }))
+                    })); }
                   }
                   disabled={!hasNode}
                 >
@@ -378,7 +378,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
           {/* Eval button + error */}
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => {
-              void evalExpressions();
+              evalExpressions();
             }} disabled={!canEval}>
               <Play className="mr-1.5 h-3.5 w-3.5" />
               Preview
@@ -407,9 +407,9 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               className="min-w-0 flex-1"
               placeholder={newNodeNamePlaceholder}
               value={newNodeName}
-              onChange={(e) => setNewNodeName(e.target.value)}
+              onChange={(e) => { setNewNodeName(e.target.value); }}
               onKeyDown={(event) =>
-                acceptPlaceholderOnTab({ event, value: newNodeName, setValue: setNewNodeName })
+                { acceptPlaceholderOnTab({ event, value: newNodeName, setValue: setNewNodeName }); }
               }
               disabled={!canApply}
             />

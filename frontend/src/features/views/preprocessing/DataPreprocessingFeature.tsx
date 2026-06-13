@@ -44,7 +44,7 @@ const EMPTY_PREPROCESSING_INPUTS: [] = [];
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
 function DataPreprocessingFeature() {
-  const { currentWorkspaceId, nodes: workspaceNodes = [] } = useWorkspaceData();
+  const { currentWorkspaceId, nodes: workspaceNodes } = useWorkspaceData();
   const { getAuthHeaders, isAuthenticated } = useAuth();
   const {
     filterNode,
@@ -155,7 +155,9 @@ function DataPreprocessingFeature() {
         onClear={nodeInputs.clear}
         onColumnChange={nodeInputs.setColumn}
         nodeColors={{}}
-        onColorChange={() => {}}
+        onColorChange={() => {
+          /* Color changes are disabled here (showColorPicker is false). */
+        }}
         defaultPalette={['#2563eb', '#16a34a', '#f59e0b', '#ef4444']}
         showColorPicker={false}
         showColumnPicker={showInputColumnPicker}
@@ -187,7 +189,7 @@ function DataPreprocessingFeature() {
 
       <Tabs
         value={activeSubtab}
-        onValueChange={(value) => setActiveSubtab(value as DataPrepSubtab)}
+        onValueChange={(value) => { setActiveSubtab(value as DataPrepSubtab); }}
         className="space-y-4"
       >
         <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
@@ -329,7 +331,7 @@ function DataPreprocessingFeature() {
             <AlertDialogDescription>{alertMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setAlertOpen(false)}>OK</AlertDialogAction>
+            <AlertDialogAction onClick={() => { setAlertOpen(false); }}>OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -54,15 +54,15 @@ interface SliceHistory {
   randomSeed?: number;
 }
 
-type ScopedInlineError = {
+interface ScopedInlineError {
   signature: string;
   message: string;
-};
+}
 
-type ScopedSliceHistory = {
+interface ScopedSliceHistory {
   signature: string;
   result: SliceHistory;
-};
+}
 
 interface SliceSelectionPanelConfig {
   selectedNodes: WorkspaceNodeLike[];
@@ -225,6 +225,8 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     randomSeedInput,
     noRandomSeed,
     newNodeName,
+    // useSelector is not exported by the installed @tanstack/react-form version.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
   } = useStore(sliceForm.store, (state) => state.values);
   const [inlineErrorState, setInlineErrorState] = useState<ScopedInlineError | null>(null);
   const [isSlicing, setIsSlicing] = useState(false);
@@ -234,37 +236,37 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
    * Adapts the segmented mode control to the form store used by slice consumers.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setMode = (value: SamplingMode) => sliceForm.setFieldValue('mode', value);
+  const setMode = (value: SamplingMode) => { sliceForm.setFieldValue('mode', value); };
   /**
    * Updates the zero-based offset input for preview and apply payload construction.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setOffsetInput = (value: string) => sliceForm.setFieldValue('offsetInput', value);
+  const setOffsetInput = (value: string) => { sliceForm.setFieldValue('offsetInput', value); };
   /**
    * Updates the row-count input consumed by range validation and preview payloads.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setLengthInput = (value: string) => sliceForm.setFieldValue('lengthInput', value);
+  const setLengthInput = (value: string) => { sliceForm.setFieldValue('lengthInput', value); };
   /**
    * Updates the sample-size input used by random sampling validation.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setSampleSizeInput = (value: string) => sliceForm.setFieldValue('sampleSizeInput', value);
+  const setSampleSizeInput = (value: string) => { sliceForm.setFieldValue('sampleSizeInput', value); };
   /**
    * Updates the optional random seed field passed to sampling requests.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setRandomSeedInput = (value: string) => sliceForm.setFieldValue('randomSeedInput', value);
+  const setRandomSeedInput = (value: string) => { sliceForm.setFieldValue('randomSeedInput', value); };
   /**
    * Toggles seed omission so random samples can remain intentionally unseeded.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setNoRandomSeed = (value: boolean) => sliceForm.setFieldValue('noRandomSeed', value);
+  const setNoRandomSeed = (value: boolean) => { sliceForm.setFieldValue('noRandomSeed', value); };
   /**
    * Updates the optional node name consumed when adding the sampled node.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setNewNodeName = (value: string) => sliceForm.setFieldValue('newNodeName', value);
+  const setNewNodeName = (value: string) => { sliceForm.setFieldValue('newNodeName', value); };
 
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
@@ -272,7 +274,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     if (selectedNode) return selectedNode;
     if (!selectedNodeId) return null;
     return workspaceNodeMap.get(selectedNodeId) ?? null;
-  })() as WorkspaceNodeLike | null;
+  })();
 
   const selectedNodeLabel = (() => {
     if (!selectedNodeId) return '';
@@ -280,7 +282,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   })();
 
   const nodeRowCount: number | null = (() => {
-    const shape = activeNode?.shape as [number | null, number | null] | number[] | undefined;
+    const shape = activeNode?.shape;
     if (!Array.isArray(shape)) return null;
     const rows = shape[0];
     return typeof rows === 'number' && Number.isFinite(rows) && rows >= 0 ? Math.round(rows) : null;
@@ -292,6 +294,8 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     ? [{ nodeId: selectedNodeId, column: '' }]
     : [];
 
+  // SINGLE_NODE_PALETTE is a non-empty module constant, so index 0 exists.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: SINGLE_NODE_PALETTE[0]! } : {};
 
   const hasSelection = Boolean(selectedNodeId);
@@ -304,7 +308,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const trimmedLength = lengthInput.trim();
   const lengthNumber = trimmedLength.length > 0 ? Number(trimmedLength) : null;
   const lengthValid = lengthNumber !== null && Number.isInteger(lengthNumber) && lengthNumber >= 1;
-  const lengthValue = lengthNumber === null ? undefined : lengthNumber;
+  const lengthValue = lengthNumber ?? undefined;
 
   const trimmedSampleSize = sampleSizeInput.trim();
   const sampleSizeNumber = trimmedSampleSize.length > 0 ? Number(trimmedSampleSize) : null;
@@ -313,7 +317,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     Number.isFinite(sampleSizeNumber) &&
     sampleSizeNumber > 0 &&
     (sampleSizeNumber < 1 || Number.isInteger(sampleSizeNumber));
-  const sampleSizeValue = sampleSizeValid ? (sampleSizeNumber ?? undefined) : undefined;
+  const sampleSizeValue = sampleSizeValid ? sampleSizeNumber : undefined;
 
   const sampleSizeHint: string | null = (() => {
     if (trimmedSampleSize.length === 0 || sampleSizeValid) return null;
@@ -344,7 +348,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     mode === 'random_sample' &&
     nodeRowCount !== null &&
     sampleSizeValid &&
-    sampleSizeNumber !== null &&
     Number.isInteger(sampleSizeNumber) &&
     sampleSizeNumber >= nodeRowCount;
 
@@ -392,10 +395,10 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
         return 'Length is required – enter the number of rows to include in the slice.';
       }
       if (lengthValue === 0) {
-        return `Slice starting at row ${offsetNumber} returning zero rows (length = 0).`;
+        return `Slice starting at row ${String(offsetNumber)} returning zero rows (length = 0).`;
       }
       const endRow = offsetNumber + (lengthValue ?? 0) - 1;
-      return `Rows ${offsetNumber}–${endRow} inclusive (${lengthValue} total).`;
+      return `Rows ${String(offsetNumber)}–${String(endRow)} inclusive (${String(lengthValue)} total).`;
     }
 
     if (!sampleSizeValid) {
@@ -406,14 +409,14 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     }
     if (sampleSizeValue !== undefined && sampleSizeValue < 1) {
       if (randomSeedValue === undefined) {
-        return `Random sample using fraction ${sampleSizeValue}.`;
+        return `Random sample using fraction ${String(sampleSizeValue)}.`;
       }
-      return `Random sample using fraction ${sampleSizeValue} with seed ${randomSeedValue}.`;
+      return `Random sample using fraction ${String(sampleSizeValue)} with seed ${String(randomSeedValue)}.`;
     }
     if (randomSeedValue === undefined) {
-      return `Random sample of ${sampleSizeValue} rows.`;
+      return `Random sample of ${String(sampleSizeValue)} rows.`;
     }
-    return `Random sample of ${sampleSizeValue} rows with seed ${randomSeedValue}.`;
+    return `Random sample of ${String(sampleSizeValue)} rows with seed ${String(randomSeedValue)}.`;
   })();
 
   const lastResultSummary = (() => {
@@ -423,22 +426,22 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     if (lastResult.mode === 'random_sample') {
       const sizeLabel =
         lastResult.sampleSize !== undefined && lastResult.sampleSize < 1
-          ? `fraction ${lastResult.sampleSize}`
-          : `n=${lastResult.sampleSize}`;
+          ? `fraction ${String(lastResult.sampleSize)}`
+          : `n=${String(lastResult.sampleSize)}`;
       if (lastResult.randomSeed === undefined) {
         return `Last random sample "${lastResult.nodeName}" (${sizeLabel}).`;
       }
-      return `Last random sample "${lastResult.nodeName}" (${sizeLabel}, seed ${lastResult.randomSeed}).`;
+      return `Last random sample "${lastResult.nodeName}" (${sizeLabel}, seed ${String(lastResult.randomSeed)}).`;
     }
     const lastOffset = lastResult.offset ?? 0;
     if (lastResult.length === undefined) {
-      return `Last slice “${lastResult.nodeName}” (offset ${lastOffset} → end).`;
+      return `Last slice “${lastResult.nodeName}” (offset ${String(lastOffset)} → end).`;
     }
     if (lastResult.length === 0) {
-      return `Last slice “${lastResult.nodeName}” (offset ${lastOffset}, zero rows).`;
+      return `Last slice “${lastResult.nodeName}” (offset ${String(lastOffset)}, zero rows).`;
     }
     const endRow = lastOffset + lastResult.length - 1;
-    return `Last slice “${lastResult.nodeName}” (rows ${lastOffset}–${endRow}).`;
+    return `Last slice “${lastResult.nodeName}” (rows ${String(lastOffset)}–${String(endRow)}).`;
   })();
 
   const previewReady = hasSelection && (mode === 'slice' ? offsetValid : true);
@@ -503,7 +506,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     if (trimmedSampleSize.length === 0 || !sampleSizeValid) return;
     if (
       nodeRowCount !== null &&
-      sampleSizeNumber !== null &&
       Number.isInteger(sampleSizeNumber) &&
       sampleSizeNumber >= nodeRowCount
     ) {
@@ -583,18 +585,23 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       const response = await sliceNode(selectedNodeId, payload);
       const operationLabel =
         mode === 'slice' ? 'Slice' : isFullShuffle ? 'Shuffle' : 'Random sample';
-      if (response?.success === false) {
+      if (response.success === false) {
+        // Empty API messages should fall back to a default label, so keep `||`.
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         const message = response.message || `${operationLabel} operation failed`;
         setCurrentInlineError(message);
         onAlert(`${operationLabel} failed: ${message}`);
         return;
       }
+      // Empty API name values should fall through to the next candidate, so keep `||`.
+      /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
       const responseName =
-        response?.node_name?.trim?.() ||
-        response?.data?.node_name?.trim?.() ||
+        response.node_name?.trim() ||
+        response.data?.node_name?.trim() ||
         requestedName ||
         `${selectedNodeLabel || selectedNodeId}_${mode === 'slice' ? 'sliced' : isFullShuffle ? 'shuffled' : 'sampled'}`;
-      const resultNodeId = response?.node_id;
+      /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
+      const resultNodeId = response.node_id;
       setLastResultState({
         signature: resultSignature,
         result: {

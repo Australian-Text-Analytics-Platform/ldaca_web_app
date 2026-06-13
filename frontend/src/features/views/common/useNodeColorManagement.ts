@@ -51,6 +51,7 @@ export function useNodeColorManagement(
 ): UseNodeColorManagementReturn {
   const { activeNodeIds, tabKey } = config;
   const assignedColors = useNodeColorsStore((state) => state.colors);
+  /* eslint-disable @typescript-eslint/unbound-method -- Zustand store actions are this-free and selected by reference for stable identity */
   const ensureColors = useNodeColorsStore((state) => state.ensureColors);
   const setColor = useNodeColorsStore((state) => state.setColor);
   const tabTemps = useNodeColorsStore((state) => (tabKey ? (state.temps[tabKey] ?? null) : null));
@@ -58,6 +59,7 @@ export function useNodeColorManagement(
   const setTempColor = useNodeColorsStore((state) => state.setTempColor);
   const clearTempColors = useNodeColorsStore((state) => state.clearTempColors);
   const promoteTempColorsAction = useNodeColorsStore((state) => state.promoteTempColors);
+  /* eslint-enable @typescript-eslint/unbound-method */
 
   // Stable key so we don't re-fire the ensure/clear effects on every
   // render when the caller hands us a freshly-built array of the same

@@ -40,7 +40,7 @@ const FREQUENCY_LABELS: Record<SequentialFrequency, string> = {
 };
 
 /** Default dropdown — hourly..yearly + custom. */
-const DEFAULT_FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
+const DEFAULT_FREQUENCY_OPTIONS: { value: SequentialFrequency; label: string }[] = [
   { value: 'hourly', label: FREQUENCY_LABELS.hourly },
   { value: 'daily', label: FREQUENCY_LABELS.daily },
   { value: 'weekly', label: FREQUENCY_LABELS.weekly },
@@ -50,10 +50,10 @@ const DEFAULT_FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: stri
   { value: 'custom', label: FREQUENCY_LABELS.custom },
 ];
 
-const CUSTOM_INTERVAL_UNIT_OPTIONS: Array<{
+const CUSTOM_INTERVAL_UNIT_OPTIONS: {
   value: SequentialCustomIntervalUnit;
   label: string;
-}> = [
+}[] = [
   { value: 'seconds', label: 'seconds' },
   { value: 'minutes', label: 'minutes' },
   { value: 'hours', label: 'hours' },
@@ -77,7 +77,7 @@ export interface SequentialAnalysisParameterPanelProps {
   frequency: SequentialFrequency;
   onFrequencyChange: (value: SequentialFrequency) => void;
   /** Optional override for the frequency dropdown options. Defaults to the preset list (hourly..yearly + custom). */
-  frequencyOptions?: Array<{ value: SequentialFrequency; label: string }>;
+  frequencyOptions?: { value: SequentialFrequency; label: string }[];
   customIntervalValueInput: string;
   onCustomIntervalValueChange: (value: string) => void;
   customIntervalUnit: SequentialCustomIntervalUnit;
@@ -179,7 +179,7 @@ export function SequentialAnalysisParameterPanel({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Select
                   value={frequency}
-                  onValueChange={(value) => onFrequencyChange(value as SequentialFrequency)}
+                  onValueChange={(value) => { onFrequencyChange(value as SequentialFrequency); }}
                   disabled={inputsDisabled}
                 >
                   <SelectTrigger className={frequency === 'custom' ? 'w-full sm:w-44' : 'w-full'}>
@@ -201,7 +201,7 @@ export function SequentialAnalysisParameterPanel({
                       min="1"
                       step="1"
                       value={customIntervalValueInput}
-                      onChange={(event) => onCustomIntervalValueChange(event.target.value)}
+                      onChange={(event) => { onCustomIntervalValueChange(event.target.value); }}
                       placeholder="e.g. 30"
                       className="w-24"
                       disabled={inputsDisabled}
@@ -209,7 +209,7 @@ export function SequentialAnalysisParameterPanel({
                     <Select
                       value={customIntervalUnit}
                       onValueChange={(value) =>
-                        onCustomIntervalUnitChange(value as SequentialCustomIntervalUnit)
+                        { onCustomIntervalUnitChange(value as SequentialCustomIntervalUnit); }
                       }
                       disabled={inputsDisabled}
                     >
@@ -242,7 +242,7 @@ export function SequentialAnalysisParameterPanel({
                 <Input
                   type="number"
                   value={numericOriginInput}
-                  onChange={(event) => onNumericOriginChange(event.target.value)}
+                  onChange={(event) => { onNumericOriginChange(event.target.value); }}
                   placeholder="Auto-detect"
                   disabled={inputsDisabled}
                 />
@@ -259,7 +259,7 @@ export function SequentialAnalysisParameterPanel({
                   min="0"
                   step="any"
                   value={numericIntervalInput}
-                  onChange={(event) => onNumericIntervalChange(event.target.value)}
+                  onChange={(event) => { onNumericIntervalChange(event.target.value); }}
                   placeholder="e.g. 10"
                   disabled={inputsDisabled}
                 />
@@ -291,7 +291,7 @@ export function SequentialAnalysisParameterPanel({
             <div key={index} className="flex items-center space-x-2 mb-2">
               <Select
                 value={column}
-                onValueChange={(value) => onGroupByColumnChange(index, value)}
+                onValueChange={(value) => { onGroupByColumnChange(index, value); }}
                 disabled={inputsDisabled}
               >
                 <SelectTrigger className="flex-1">
@@ -307,13 +307,16 @@ export function SequentialAnalysisParameterPanel({
               </Select>
               {column && (
                 <UniqueValueCount
-                  workspaceId={currentWorkspaceId || ''}
+                  workspaceId={currentWorkspaceId ?? ''}
+                  // Empty active/selected node ids must fall through to the next
+                  // candidate, so logical-OR (not nullish) is intentional here.
+                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                   nodeId={activeNodeId || selectedNodeId || ''}
                   columnName={column}
                 />
               )}
               <Button
-                onClick={() => onRemoveGroupByColumn(index)}
+                onClick={() => { onRemoveGroupByColumn(index); }}
                 variant="destructive"
                 size="sm"
                 disabled={inputsDisabled}
@@ -329,7 +332,7 @@ export function SequentialAnalysisParameterPanel({
               <Checkbox
                 id="case-sensitive"
                 checked={caseSensitive}
-                onCheckedChange={(checked) => onCaseSensitiveChange(checked === true)}
+                onCheckedChange={(checked) => { onCaseSensitiveChange(checked === true); }}
                 disabled={inputsDisabled}
               />
               <label

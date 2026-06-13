@@ -14,19 +14,19 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { CHART_IMAGE_FORMATS, type ChartImageFormat } from '@/lib/chartExport';
 
-export type ChartDownloadExtraOption = {
+export interface ChartDownloadExtraOption {
   id: string;
   label: string;
   defaultChecked?: boolean;
-};
+}
 
-type Props = {
+interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title?: string;
   onConfirm: (format: ChartImageFormat, extras: Record<string, boolean>) => void;
   extraOptions?: ChartDownloadExtraOption[];
-};
+}
 
 /**
  * Dialog body used by chart result components to choose image format and export extras.
@@ -88,7 +88,7 @@ const ChartImageDownloadDialogContent = ({
               <label key={opt.id} className="flex cursor-pointer items-center gap-2">
                 <Checkbox
                   checked={extraStates[opt.id] ?? false}
-                  onCheckedChange={(checked) => toggleExtra(opt.id, checked === true)}
+                  onCheckedChange={(checked) => { toggleExtra(opt.id, checked === true); }}
                 />
                 <span className="text-sm">{opt.label}</span>
               </label>

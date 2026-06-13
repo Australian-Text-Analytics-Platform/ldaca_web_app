@@ -14,6 +14,7 @@ export function inferDatetimeFormat(
   if (!nonEmpty.length) return null;
 
   // Choose the sample with the most content (likely has time / tz info)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- nonEmpty is guaranteed non-empty by the length guard above
   const candidate = nonEmpty.toSorted((a, b) => b.length - a.length)[0]!.trim();
 
   let format = candidate;
@@ -40,8 +41,9 @@ export function inferDatetimeFormat(
   const escapeSep = (s: string) => (s === '.' ? '\\.' : s);
 
   // Month and day: attempt to respect separators - replace first 2-digit group after %Y separator with %m then next with %d
-  const dateSepMatch = format.match(/%Y([-/.])/);
+  const dateSepMatch = /%Y([-/.])/.exec(format);
   if (dateSepMatch) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- capture group 1 is guaranteed present when the regex matches
     const sep = dateSepMatch[1]!;
     const esc = escapeSep(sep);
     if (!hasMonthToken()) {

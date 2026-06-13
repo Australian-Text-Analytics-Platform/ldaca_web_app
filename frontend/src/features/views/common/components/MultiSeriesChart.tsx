@@ -47,7 +47,7 @@ export interface MultiSeriesChartXAxisConfig {
   /** Only meaningful when type='number'. */
   domain?: [number | 'auto' | 'dataMin', number | 'auto' | 'dataMax'];
   /** Fixed tick positions (number axis) or labels (category). */
-  ticks?: ReadonlyArray<number | string>;
+  ticks?: readonly (number | string)[];
   /**
    * Target number of auto-generated ticks (number axis only). Recharts snaps
    * to round-number positions, so the actual count may differ slightly. Has
@@ -83,10 +83,10 @@ export interface MultiSeriesChartSelectionConfig {
 }
 
 export interface MultiSeriesChartProps {
-  data: ReadonlyArray<Record<string, unknown>>;
+  data: readonly Record<string, unknown>[];
   /** Field in each row whose value forms the X axis. */
   xKey: string;
-  series: ReadonlyArray<MultiSeriesChartSeries>;
+  series: readonly MultiSeriesChartSeries[];
   /** Default 'line'. */
   chartType?: MultiSeriesChartType;
   xAxis?: MultiSeriesChartXAxisConfig;
@@ -161,11 +161,11 @@ export function MultiSeriesChart({
     const el = plotMeasureRef.current;
     if (!el) return;
     /** Called by: ResizeObserver and initial chart mount for overflow warnings because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    const update = () => setChartPixelWidth(el.clientWidth);
+    const update = () => { setChartPixelWidth(el.clientWidth); };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); };
   }, []);
   const showOverflowWarning =
     !suppressOverflowWarning && chartPixelWidth > 0 && data.length > chartPixelWidth;
@@ -192,7 +192,7 @@ export function MultiSeriesChart({
       }
     : undefined;
 
-  type DotProps = { cx?: number; cy?: number; index?: number };
+  interface DotProps { cx?: number; cy?: number; index?: number }
 
   /**
    * Called by: dotFor when line/area series need custom point rendering because selection state must alter point visibility without duplicating Recharts dot branches.
@@ -206,7 +206,7 @@ export function MultiSeriesChart({
     if (!hasSelection) {
       return singlePoint ? <circle cx={cx} cy={cy} r={4} fill={color} /> : null;
     }
-    if (selection!.selectedIndices.has(index)) {
+    if (selection.selectedIndices.has(index)) {
       return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
     }
     return <circle cx={cx} cy={cy} r={3} fill={color} fillOpacity={0.25} />;
@@ -247,8 +247,8 @@ export function MultiSeriesChart({
     <XAxis
       dataKey={xKey}
       type={xAxisType}
-      domain={xAxis?.domain as never}
-      ticks={xAxis?.ticks as never}
+      domain={xAxis?.domain}
+      ticks={xAxis?.ticks}
       tickCount={xAxis?.tickCount}
       tickFormatter={xAxis?.tickFormatter as never}
       angle={xAxis?.angle}
@@ -259,7 +259,7 @@ export function MultiSeriesChart({
   );
   const yAxisElement = <YAxis allowDecimals={yAxis?.allowDecimals} />;
 
-  const heightStyle = typeof height === 'number' ? { height: `${height}px` } : { height };
+  const heightStyle = typeof height === 'number' ? { height: `${String(height)}px` } : { height };
   const containerClass = ['w-full', interactive ? 'cursor-pointer' : null, className]
     .filter(Boolean)
     .join(' ');
@@ -299,8 +299,9 @@ export function MultiSeriesChart({
                   >
                     {selection
                       ? data.map((_, i) => (
+                          // eslint-disable-next-line @typescript-eslint/no-deprecated -- recharts <Cell> is the documented API for per-bar coloring with no drop-in replacement
                           <Cell
-                            key={`${s.key}-${i}`}
+                            key={`${s.key}-${String(i)}`}
                             fillOpacity={
                               !hasSelection || selection.selectedIndices.has(i) ? 1 : 0.25
                             }

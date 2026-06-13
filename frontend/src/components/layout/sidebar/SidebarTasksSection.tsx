@@ -11,22 +11,27 @@ const PROBLEMATIC_STATES = new Set(['failed', 'cancelled']);
 const ACTIVE_STATES = new Set(['pending', 'queued', 'submitted', 'running']);
 
 /** Display metadata consumed by task rows to keep icon, label, and color consistent. */
+const DEFAULT_STATUS_META = {
+  icon: AlertCircle,
+  className: 'text-muted-foreground',
+  label: 'Unknown',
+};
 const STATUS_META: Record<string, { icon: typeof Clock; className: string; label: string }> = {
   running: { icon: Clock, className: 'text-amber-600', label: 'Running' },
   successful: { icon: CheckCircle, className: 'text-green-600', label: 'Successful' },
   failed: { icon: XCircle, className: 'text-red-600', label: 'Failed' },
   cancelled: { icon: Square, className: 'text-muted-foreground', label: 'Cancelled' },
   pending: { icon: Clock, className: 'text-muted-foreground', label: 'Pending' },
-  default: { icon: AlertCircle, className: 'text-muted-foreground', label: 'Unknown' },
+  default: DEFAULT_STATUS_META,
 };
 
-type SidebarTasksSectionProps = {
+interface SidebarTasksSectionProps {
   tasks: SidebarTaskRecord[];
   isConnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
   onReconnect: () => void;
-};
+}
 
 /** Called by: SidebarTasksSection sorting and expanded timestamp formatting because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const normalizeTimestamp = (value: unknown): number => {
@@ -55,7 +60,7 @@ const taskTimestamp = (task: SidebarTaskRecord): number =>
 
 /** Called by: SidebarTasksSection task sorting because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const taskPriority = (task: SidebarTaskRecord): number => {
-  const state = String(task.state ?? '').toLowerCase();
+  const state = (task.state ?? '').toLowerCase();
   if (PROBLEMATIC_STATES.has(state)) return 0;
   if (ACTIVE_STATES.has(state)) return 1;
   if (state === 'successful') return 2;
@@ -64,6 +69,7 @@ const taskPriority = (task: SidebarTaskRecord): number => {
 
 /** Called by: SidebarTasksSection row rendering and accessibility labels because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
 const taskLabel = (task: SidebarTaskRecord): string => {
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall back to generic label when task_type is an empty string, not only null/undefined
   const typeLabel = task.task_type?.replace(/_/g, ' ') || 'task';
   return task.name ? `${typeLabel}: ${task.name}` : typeLabel;
 };
@@ -106,8 +112,9 @@ function SidebarTasksSection({
   };
 
   /** Called by: SidebarTasksSection row rendering for task status icons and labels because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
-  const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? STATUS_META['default']!;
+  const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? DEFAULT_STATUS_META;
 
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string error should still fall through to live connection status
   const connectionLabel = connectionError
     ? connectionError
     : isConnecting
@@ -154,7 +161,7 @@ function SidebarTasksSection({
                 key={task.task_id}
                 className={cn(
                   'rounded-md border bg-background text-left transition-colors',
-                  PROBLEMATIC_STATES.has(String(task.state ?? '').toLowerCase())
+                  PROBLEMATIC_STATES.has((task.state ?? '').toLowerCase())
                     ? 'border-red-200 bg-red-50/50 dark:border-red-950 dark:bg-red-950/20'
                     : 'border-border/40',
                 )}
@@ -165,7 +172,7 @@ function SidebarTasksSection({
                   aria-expanded={expanded}
                   aria-label={`Task: ${label}. ${expanded ? 'Collapse details' : 'Expand details'}`}
                   className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => toggleExpanded(task.task_id)}
+                  onClick={() => { toggleExpanded(task.task_id); }}
                   onKeyDown={(event) => {
                     if (event.key !== 'Enter' && event.key !== ' ') return;
                     event.preventDefault();

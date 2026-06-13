@@ -60,6 +60,7 @@ export function formatErrorDetail(detail: unknown): string | null {
       return null;
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- detail is a non-object primitive here (string/array/object handled above); String() is the safe fallback
   return String(detail);
 }
 
