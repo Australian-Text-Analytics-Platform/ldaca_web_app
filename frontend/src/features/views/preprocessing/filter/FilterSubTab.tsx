@@ -1,5 +1,5 @@
+import type { ReactNode } from 'react';
 import { Filter, Loader2, Plus } from 'lucide-react';
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import HelpIcon from '@/components/help/HelpIcon';
@@ -12,6 +12,10 @@ import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useFilterSubTabSections, type FilterSubTabProps } from './hooks/useFilterSubTabSections';
 import type { FilterConditionWithId } from '../types';
 
+type FilterSubTabComponentProps = FilterSubTabProps & {
+  renderNodeInputsPanel?: () => ReactNode;
+};
+
 /**
  * Renders the Filter preprocessing tab. It relies on `useFilterSubTabSections`
  * for condition state, categorical options, preview data, and apply behavior.
@@ -19,9 +23,9 @@ import type { FilterConditionWithId } from '../types';
  * Flow: read grouped configs from the hook, render selection/condition/preview panels, and send
  * condition edits/apply requests through hook actions.
  */
-export function FilterSubTab(props: FilterSubTabProps) {
+export function FilterSubTab(props: FilterSubTabComponentProps) {
+  const { renderNodeInputsPanel } = props;
   const {
-    selectionPanel,
     schemaState,
     conditionBuilder,
     newNodeInput,
@@ -30,7 +34,6 @@ export function FilterSubTab(props: FilterSubTabProps) {
     applyButtonDisabled,
     applyButtonDisabledReason,
     preview,
-    selectedNodesOriginalCount,
   } = useFilterSubTabSections(props);
 
   const { hasSelection, hasSchema, isSchemaLoading } = schemaState;
@@ -56,31 +59,7 @@ export function FilterSubTab(props: FilterSubTabProps) {
         </CardHeader>
 
         <CardContent className="space-y-4 pt-0">
-          <div data-hint-id="preprocessing.filter.node-selection">
-            <NodeSelectionPanel
-              selectedNodes={selectionPanel.selectedNodes}
-              nodeColumnSelections={selectionPanel.nodeColumnSelections}
-              onColumnChange={selectionPanel.onColumnChange}
-              nodeColors={selectionPanel.nodeColors}
-              onColorChange={selectionPanel.onColorChange}
-              defaultPalette={selectionPanel.defaultPalette}
-              maxCompare={1}
-              className="rounded-lg border border-border/60 bg-muted/40"
-              showColorPicker={false}
-              showColumnPicker={false}
-              showHeaderLabel
-              showShape
-              disabled={selectionPanel.disabled}
-              originalCount={selectedNodesOriginalCount}
-              headerAddon={
-                <HelpIcon
-                  targetKey="preprocessing.common.node-selection"
-                  label="Selected data blocks"
-                  className="h-4 w-4 text-muted-foreground"
-                />
-              }
-            />
-          </div>
+          {renderNodeInputsPanel?.()}
 
           {hasSelection && isSchemaLoading && (
             <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">

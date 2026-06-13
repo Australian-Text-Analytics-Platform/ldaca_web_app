@@ -1,9 +1,8 @@
 import { toast } from 'sonner';
-import type { QueryClient } from '@tanstack/react-query';
 import { runSequentialAnalysis, updateSequentialAnalysisTaskResult } from '@/api/generated/sdk.gen';
 import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
 import { type ChartConfig } from '@/components/ui/chart';
-import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
+import { extractAndSetTaskId } from '../../common';
 
 type SequentialAnalysisRequest = SequentialAnalysisRequestInput;
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
@@ -123,7 +122,6 @@ interface SequentialAnalysisActions {
   setLocalTaskId: (value: string | null) => void;
   setNodeColumnSelections: (selections: Array<{ nodeId: string; column: string }>) => void;
   setTimeColumn: (value: string) => void;
-  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   lockCurrentSchema: (schema?: Record<string, string>) => void;
   resolveTaskId: () => Promise<string | null>;
   clearResults: () => Promise<void>;
@@ -134,7 +132,6 @@ interface SequentialAnalysisActions {
 
 interface SequentialAnalysisLock {
   getAuthHeaders: () => Record<string, string>;
-  queryClient: QueryClient;
 }
 
 type Params = {
@@ -173,13 +170,12 @@ export function useSequentialAnalysisTaskFlow({
     setLocalTaskId,
     setNodeColumnSelections,
     setTimeColumn,
-    lockWithSnapshots,
     lockCurrentSchema,
     resolveTaskId,
     clearResults,
     onTaskIdAssigned,
   },
-  lock: { getAuthHeaders, queryClient },
+  lock: { getAuthHeaders },
 }: Params) {
   // Validates current parameters, submits the analysis request, and locks the selected node.
   /**
@@ -287,22 +283,7 @@ export function useSequentialAnalysisTaskFlow({
       setResults(normalizedResult);
       setChartType(resolvedChartType);
 
-      try {
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: {
-            node_ids: [nodeIdForAnalysis],
-            node_columns: { [nodeIdForAnalysis]: picked },
-          },
-          getAuthHeaders,
-          lockWithSnapshots,
-          queryClient,
-          maxNodes: 1,
-        });
-        lockCurrentSchema();
-      } catch {
-        /* ignore */
-      }
+      lockCurrentSchema();
     } catch (error) {
       console.error('Sequential analysis error:', error);
       toast.error(

@@ -1,23 +1,20 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
-import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
+import type { AnalysisTabInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 
-import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import {
   DEFAULT_TOKEN_LIMIT,
   parseAnalysisNodeRequest,
   getNodeIdentifier,
-  resetAnalysisSelectionAfterClear,
-  restoreAnalysisLockFromRequest,
-  getAnalysisActionState,
+  useLastRunRequest,
 } from '../common';
+import { useTabNodeInputs } from '../common/nodeInputs';
+import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { hasParameterDiff } from '../common/parameterComparison';
 import {
   buildResponseDisplayNameHints,
   computeAnalysisNodeIds,
@@ -50,7 +47,6 @@ import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog'
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
 import {
-  useAnalysisLock,
   useAnalysisFeature,
   useSafeResult,
   useNodeColorManagement,
@@ -73,7 +69,7 @@ const UNIFIED_WORDCLOUD_HEIGHT = 340;
 /** Coordinates token-frequency selection, execution, and export wiring for the analysis tab. */
 /**
  * Rendered by: TokenFrequencyTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
  * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
@@ -83,12 +79,16 @@ export interface TokenFrequencyFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
+  tabInputs?: AnalysisTabInput[];
+  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
 }
 
 const TokenFrequencyFeature = ({
   tabId,
   tabTaskId,
   onTabTaskChange,
+  tabInputs,
+  onTabInputsChange,
 }: TokenFrequencyFeatureProps = {}) => {
   const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
     Record<string, string>
@@ -97,40 +97,30 @@ const TokenFrequencyFeature = ({
   // language's defaults to append (guessed on the fly, not stored per column).
   const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const { getAuthHeaders } = useAuth();
-  const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspaceData();
-  const {
-    isLocked,
-    unlockSelection,
-    lockWithSnapshots,
-    nodeColumnSelections,
-    setNodeColumnSelection,
-    setNodeColumnSelections,
-    activeNodeIds,
-    activeNodeColumnSelections,
-    panelSelectedNodes: rawPanelSelectedNodes,
-  } = useAnalysisLock({
-    analysisType: 'token_frequencies',
-    workspaceId: currentWorkspace?.id ?? null,
-    getAuthHeaders,
-    // Tab-scoped locking: bind the lock to this tab's persisted task so it stays
-    // independent of sibling tabs. Null for a fresh tab that has not run yet.
-    taskId: tabTaskId ?? null,
-    allowedDataTypes: ['string'],
-    docTypeOnly: true,
-    maxNodes: 2,
+  const currentWorkspaceId = currentWorkspace?.id ?? null;
+  const nodeInputs = useTabNodeInputs({
+    tabInputs,
+    onTabInputsChange,
+    constraints: {
+      allowedDataTypes: ['string'],
+      docTypeOnly: true,
+      maxNodes: 2,
+    },
   });
-  // The frequency tool is strictly pairwise (keyness statistics are defined
-  // between exactly one reference and one study corpus). Cap the displayed
-  // selection to the two most-recent blocks regardless of how many the user
-  // has selected workspace-wide, so the third+ are silently dropped from
-  // every downstream consumer: parameter panel, reference radios, task-flow
-  // payload, name maps, etc.
-  const livePanelSelectedNodes = useMemo(
-    () => takeMostRecent(rawPanelSelectedNodes, 2),
-    [rawPanelSelectedNodes],
-  );
-  const { selectedNodes } = useWorkspaceSelection();
+  const nodeColumnSelections = nodeInputs.nodeColumnSelections;
+  const setNodeColumnSelection = nodeInputs.setColumn;
+  const panelSelectedNodes = nodeInputs.selectedNodes;
+  const activeNodeIds = nodeInputs.resolvedNodes.map((r) => r.id);
+  const applyInputsFromSelections = (
+    selections: Array<{ nodeId: string; column?: string | null }>,
+  ) => {
+    onTabInputsChange?.(
+      selections
+        .filter((selection) => selection.nodeId)
+        .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null })),
+    );
+  };
   const { selectNodes } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
@@ -142,14 +132,14 @@ const TokenFrequencyFeature = ({
   const [liveLastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
   const [liveStudyNodeId, setStudyNodeId] = useState<string | null>(null);
 
-  const panelSelectedNodes = livePanelSelectedNodes;
   const results = liveResults;
   const lastCompareNodeIds = liveLastCompareNodeIds;
   const studyNodeId = liveStudyNodeId;
 
   const panelNodeIds = useMemo(
     () =>
-      takeMostRecent(panelSelectedNodes, 2)
+      panelSelectedNodes
+        .slice(0, 2)
         .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
         .filter((id): id is string => Boolean(id)),
     [panelSelectedNodes, activeNodeIds],
@@ -172,7 +162,7 @@ const TokenFrequencyFeature = ({
   // ``tabKey`` routes colour changes through this tab's temp layer;
   // ``promoteTempColors`` is called from ``handleAnalyzeWithPromote``
   // below so a Run commits the preview to the global assigned store.
-  const tokenActiveNodeIds = takeMostRecent(panelNodeIds, 2);
+  const tokenActiveNodeIds = panelNodeIds.slice(0, 2);
   const {
     nodeColors: liveNodeColors,
     handleColorChange,
@@ -187,8 +177,13 @@ const TokenFrequencyFeature = ({
   const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
   const unifiedCloudContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const currentWorkspaceId = currentWorkspace?.id ?? null;
   const isActiveTab = currentView === 'token-frequency';
+  const { serverRequest } = useLastRunRequest({
+    analysisType: 'token_frequencies',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+    taskId: tabTaskId ?? null,
+  });
 
   const {
     resolveTaskId,
@@ -197,7 +192,6 @@ const TokenFrequencyFeature = ({
     setIsRunning,
     runningRef,
     taskStatus,
-    hasActiveTask,
     lastFetchedRef,
     clearResults,
     stopTask,
@@ -241,7 +235,9 @@ const TokenFrequencyFeature = ({
       if (!result) return;
       const requestData = result?.analysis_params ?? {};
       const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
-      setNodeColumnSelections(selections, { replace: true });
+      if (!tabInputs || tabInputs.length === 0) {
+        applyInputsFromSelections(selections);
+      }
       setLastCompareNodeIds(nodeIds);
       setStudyNodeId(nodeIds[1] ?? null);
       applyTokenLimitState(
@@ -258,7 +254,7 @@ const TokenFrequencyFeature = ({
     },
     /** Rehydrates node selections from a persisted request payload after task recovery. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
-    onHydratedRequest: async (requestPayload) => {
+    onHydratedRequest: (requestPayload) => {
       const raw = requestPayload as Record<string, unknown> | null;
       const req = raw?.data ?? raw;
       if (!req || typeof req !== 'object') return;
@@ -269,22 +265,10 @@ const TokenFrequencyFeature = ({
       const node_columns: Record<string, string> =
         (reqObj.node_columns as Record<string, string>) || {};
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-      setNodeColumnSelections(sels, { replace: true });
-      setStudyNodeId(nodeIds[1] ?? null);
-      if (nodeIds.length && currentWorkspaceId) {
-        try {
-          await restoreAnalysisLockFromRequest({
-            workspaceId: currentWorkspaceId,
-            requestData: req,
-            getAuthHeaders,
-            lockWithSnapshots,
-            queryClient,
-            maxNodes: 2,
-          });
-        } catch {
-          /* ignore */
-        }
+      if (!tabInputs || tabInputs.length === 0) {
+        applyInputsFromSelections(sels);
       }
+      setStudyNodeId(nodeIds[1] ?? null);
     },
     /** Clears local result and selection state when the feature reset action runs. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -294,9 +278,8 @@ const TokenFrequencyFeature = ({
         return;
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared.
+      // a task the user explicitly cleared. Inputs are intentionally preserved.
       onTabTaskChange?.(null);
-      resetAnalysisSelectionAfterClear({ unlockSelection });
       setLastCompareNodeIds([]);
       setStudyNodeId(null);
       resetPreferenceUiState();
@@ -307,9 +290,7 @@ const TokenFrequencyFeature = ({
       setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)),
   });
 
-  const effectiveNodeColumnSelections = useMemo(() => {
-    return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
-  }, [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
+  const effectiveNodeColumnSelections = nodeColumnSelections;
 
   const effectiveTokenizerModelsByNode = useMemo(() => {
     // Seed with models persisted to the backend from previous sessions,
@@ -384,14 +365,8 @@ const TokenFrequencyFeature = ({
   });
 
   const lockedNodeNameMap = useMemo(
-    () =>
-      isLocked
-        ? buildSelectionNameById(
-            panelSelectedNodes as NodeNameEntry[],
-            panelSelectedNodes as NodeNameEntry[],
-          )
-        : {},
-    [isLocked, panelSelectedNodes],
+    () => buildSelectionNameById(panelSelectedNodes as NodeNameEntry[], panelSelectedNodes as NodeNameEntry[]),
+    [panelSelectedNodes],
   );
 
   const nodeIdToName = useMemo(() => {
@@ -435,8 +410,6 @@ const TokenFrequencyFeature = ({
     },
     lock: {
       getAuthHeaders,
-      lockWithSnapshots,
-      queryClient,
     },
     navigation: {
       selectNodes,
@@ -558,7 +531,7 @@ const TokenFrequencyFeature = ({
   /** Completes the download dialog action by exporting the pending cloud, rows, or stop words. */
   /**
    * Called by: TokenFrequencyFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const handleDownloadConfirm = async ({
     format,
@@ -642,7 +615,6 @@ const TokenFrequencyFeature = ({
   const hasIncompleteSelections = effectiveNodeColumnSelections.some(
     (selection) => !selection.column,
   );
-  const displayNodeCount = panelSelectedNodes.length;
   const selectedNodeIdsWithColumns = orderedPanelNodeIds.filter((nodeId) =>
     effectiveNodeColumnSelections.some(
       (selection) => selection.nodeId === nodeId && selection.column,
@@ -652,14 +624,25 @@ const TokenFrequencyFeature = ({
     (nodeId) => !(effectiveTokenizerModelsByNode[nodeId] ?? '').trim(),
   );
 
-  const baseActionState = getAnalysisActionState({
+  const lastRunRequest = (serverRequest as Record<string, unknown> | null) ?? null;
+  const currentTokenFrequencyParams = {};
+  const serverTokenFrequencyParams = (_request: Record<string, unknown>) => ({});
+  const hasLastRun = Boolean(lastRunRequest);
+  const hasChanges = !lastRunRequest
+    ? true
+    : hasParameterDiff(currentTokenFrequencyParams, serverTokenFrequencyParams(lastRunRequest)) ||
+      hasNodeSelectionChanged(
+        nodeColumnSelections,
+        lastRunRequest.node_ids as string[] | undefined,
+        lastRunRequest.node_columns as Record<string, string> | undefined,
+      );
+  const baseActionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
-    hasSelection: panelSelectedNodes.length > 0 && !hasIncompleteSelections,
-    isLocked,
-    hasResults: Boolean(results),
+    isRunnable: panelSelectedNodes.length > 0 && !hasIncompleteSelections,
+    hasLastRun,
+    hasChanges,
     isBusy: isRunning,
-    hasActiveTask,
-    allowRunWhenLocked: false,
+    hasResults: Boolean(results),
   });
   const hasTokenizerModel = missingTokenizerModelNodeIds.length === 0;
   const actionState = {
@@ -684,7 +667,6 @@ const TokenFrequencyFeature = ({
    * Called by: TokenFrequencyFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleColumnChange = (nodeId: string, column: string) => {
-    if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
     void persistDocumentColumn(nodeId, column);
   };
@@ -699,7 +681,6 @@ const TokenFrequencyFeature = ({
     model: string,
     language: string | null,
   ) => {
-    if (isLocked) return;
     setLiveTokenizerModelsByNode((prev) => {
       if (model) return { ...prev, [nodeId]: model };
       const { [nodeId]: _removed, ...rest } = prev;
@@ -708,24 +689,14 @@ const TokenFrequencyFeature = ({
     void persistTokenizerPreference(nodeId, column, model, language);
   };
 
-  const { getColumnInfos } = useNodeColumnInfos({
-    workspaceId: currentWorkspaceId,
-    nodes: selectedNodes,
-    enabled: true,
-  });
-
   return (
     <div className="space-y-4">
       <TokenFrequencyParameterPanel
-        panelSelectedNodes={panelSelectedNodes}
-        effectiveNodeColumnSelections={effectiveNodeColumnSelections}
+        nodeInputs={nodeInputs}
         onColumnChange={handleColumnChange}
         nodeColors={nodeColors}
         onColorChange={handleColorChange}
         defaultPalette={defaultPalette}
-        isLocked={isLocked}
-        getNodeColumns={getColumnInfos}
-        displayNodeCount={displayNodeCount}
         actionState={actionState}
         isAnalyzing={isRunning}
         isStopping={isStopping}
@@ -762,8 +733,8 @@ const TokenFrequencyFeature = ({
               void handleTokenizerModelChange(nodeId, column, model, detectedLanguage)
             }
             getAuthHeaders={getAuthHeaders}
-            disabled={isLocked}
-            disabledReason="Clear results first to change tokenizer models"
+            disabled={false}
+            disabledReason={undefined}
           />
         )}
       />

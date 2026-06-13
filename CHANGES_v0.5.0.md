@@ -6,13 +6,13 @@
 
 ## 0. Submodule Commits
 
-| Submodule | From | To | Δ |
-|-----------|------|----|---|
-| `backend` | `9ac4558` | `0535f62` | 207 commits |
-| `docworkspace` | `ee95697` | `e82b22c` | 21 commits |
-| `polars-text` | `7c8b9b9` | `943543f` | 34 commits |
-| `polars-source-utils` | — | `c989c52` | **new** |
-| `ldaca-tabulator` | `b1efdff` | — | **removed** |
+| Submodule             | From      | To        | Δ           |
+| --------------------- | --------- | --------- | ----------- |
+| `backend`             | `9ac4558` | `0535f62` | 207 commits |
+| `docworkspace`        | `ee95697` | `e82b22c` | 21 commits  |
+| `polars-text`         | `7c8b9b9` | `943543f` | 34 commits  |
+| `polars-source-utils` | —         | `c989c52` | **new**     |
+| `ldaca-tabulator`     | `b1efdff` | —         | **removed** |
 
 ---
 
@@ -77,32 +77,32 @@ Node routes split from one file into 8: `nodes.py` (router), `nodes_crud.py`, `n
 
 ### 3.4 New Core Modules
 
-| Module | Purpose |
-|--------|---------|
-| `analysis_cache.py` | Lifecycle management for analysis side-effect caches (`materialized_*.parquet`) |
-| `analysis_helpers.py` | Shared analysis utilities |
-| `analysis/persistence.py` | Save/load analysis task records to disk per workspace |
-| `auth_service.py` (258 lines) | Authentication service |
-| `data_loading.py` | Dtype normalization on data load via canonical profile |
-| `embedding_cache.py` (283 lines) | DuckDB embedding cache, SHA-256 content-addressed, float16 storage |
-| `exceptions.py` | Centralized exception hierarchy |
-| `ldaca_tabular_config.py` | LDaCA tabular configuration parsing |
-| `oni_client.py` (578 lines) | Oni API client for LDaCA Data Portal integration |
-| `parent_watchdog.py` | Backend self-destructs when Tauri parent process dies |
-| `polars_expr_validator.py` (243 lines) | Polars expression validation with assignment support |
-| `polars_operations.py` | Polars operations registry |
-| `sample_data.py` | Sample data management |
-| `serialization.py` | Centralized serialization helpers |
-| `server_launcher.py` (143 lines) | Unified server entrypoint for desktop + dev |
-| `spa.py` (141 lines) | Single Page Application serving |
-| `task_artifacts.py` (270 lines) | Task artifact management with enhanced cleanup |
-| `tokenization.py` | Tokenization metadata registration on nodes |
-| `tokens_cache.py` (99 lines) | Per-user DuckDB token cache path resolution + hydration |
-| `user_folders.py` (201 lines) | Per-user folder path resolution |
-| `worker_tasks_download.py` | Download worker |
-| `worker_tasks_quotation.py` | Quotation analysis worker |
-| `worker_tasks_token.py` | Token frequency worker |
-| `worker_utils.py` | Shared worker utilities |
+| Module                                 | Purpose                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| `analysis_cache.py`                    | Lifecycle management for analysis side-effect caches (`materialized_*.parquet`) |
+| `analysis_helpers.py`                  | Shared analysis utilities                                                       |
+| `analysis/persistence.py`              | Save/load analysis task records to disk per workspace                           |
+| `auth_service.py` (258 lines)          | Authentication service                                                          |
+| `data_loading.py`                      | Dtype normalization on data load via canonical profile                          |
+| `embedding_cache.py` (283 lines)       | DuckDB embedding cache, SHA-256 content-addressed, float16 storage              |
+| `exceptions.py`                        | Centralized exception hierarchy                                                 |
+| `ldaca_tabular_config.py`              | LDaCA tabular configuration parsing                                             |
+| `oni_client.py` (578 lines)            | Oni API client for LDaCA Data Portal integration                                |
+| `parent_watchdog.py`                   | Backend self-destructs when Tauri parent process dies                           |
+| `polars_expr_validator.py` (243 lines) | Polars expression validation with assignment support                            |
+| `polars_operations.py`                 | Polars operations registry                                                      |
+| `sample_data.py`                       | Sample data management                                                          |
+| `serialization.py`                     | Centralized serialization helpers                                               |
+| `server_launcher.py` (143 lines)       | Unified server entrypoint for desktop + dev                                     |
+| `spa.py` (141 lines)                   | Single Page Application serving                                                 |
+| `task_artifacts.py` (270 lines)        | Task artifact management with enhanced cleanup                                  |
+| `tokenization.py`                      | Tokenization metadata registration on nodes                                     |
+| `tokens_cache.py` (99 lines)           | Per-user DuckDB token cache path resolution + hydration                         |
+| `user_folders.py` (201 lines)          | Per-user folder path resolution                                                 |
+| `worker_tasks_download.py`             | Download worker                                                                 |
+| `worker_tasks_quotation.py`            | Quotation analysis worker                                                       |
+| `worker_tasks_token.py`                | Token frequency worker                                                          |
+| `worker_utils.py`                      | Shared worker utilities                                                         |
 
 ### 3.5 New API Routes
 
@@ -118,6 +118,7 @@ Node routes split from one file into 8: `nodes.py` (router), `nodes_crud.py`, `n
 ### 3.6 Tokenization & Tokens Cache
 
 **Current implementation:** The token cache is DuckDB-based:
+
 - `tokens_cache.py`: `TOKENS_CACHE_FILENAME = "tokens.duckdb"`, per-user path via `get_user_cache_folder(user_id)`.
 - `hydrate_tokenization_lazyframe()` attaches a cache-backed Polars expression via `pl.col(...).text.tokenize(..., cache=path)`.
 - The actual cache engine lives in **polars-text** (`token_cache.py`): DuckDB schema with PK `(model, params_hash, content_hash)`, SHA-256 content-addressing, thread-safe via `threading.Lock`.
@@ -157,8 +158,9 @@ New `core/oni_client.py` (578 lines) for the LDaCA Data Portal Oni API: search r
 
 ### 3.10 Test Changes
 
-27 new test files added, 6 removed:
-- New: `test_analysis_cache.py`, `test_analysis_task_persistence.py`, `test_concordance_dispersion_detach_worker.py`, `test_concordance_materialize_tokens_mode.py`, `test_concordance_page_size_all.py`, `test_concordance_tokens_mode.py`, `test_embedding_cache.py`, `test_filter_datetime_dtype.py`, `test_ldaca_tabular_config.py`, `test_node_tokenizer_preferences_endpoints.py`, `test_oni_client.py`, `test_openapi_operation_ids.py`, `test_polars_expr_validator.py`, `test_schema_filter.py`, `test_set_current_task_eviction.py`, `test_settings_ldaca.py`, `test_tabs_endpoint.py`, `test_token_frequency_artifact_rebuild.py`, `test_token_frequency_derived_path.py`, `test_tokenization_propagation_endpoints.py`, `test_tokenization_tokenise.py`, `test_tokens_cache.py`, `test_tokens_schema_constants.py`, `test_topic_modeling_stopwords.py`, `test_ui_state_endpoint.py`
+Test file changes include:
+
+- New: `test_analysis_cache.py`, `test_analysis_task_persistence.py`, `test_concordance_dispersion_detach_worker.py`, `test_concordance_materialize_tokens_mode.py`, `test_concordance_page_size_all.py`, `test_concordance_tokens_mode.py`, `test_embedding_cache.py`, `test_filter_datetime_dtype.py`, `test_ldaca_tabular_config.py`, `test_node_tokenizer_preferences_endpoints.py`, `test_oni_client.py`, `test_openapi_operation_ids.py`, `test_polars_expr_validator.py`, `test_schema_filter.py`, `test_settings_ldaca.py`, `test_tabs_endpoint.py`, `test_token_frequency_artifact_rebuild.py`, `test_token_frequency_derived_path.py`, `test_tokenization_propagation_endpoints.py`, `test_tokenization_tokenise.py`, `test_tokens_cache.py`, `test_tokens_schema_constants.py`, `test_topic_modeling_stopwords.py`, `test_ui_state_endpoint.py`
 - Removed: `test_compute_column_expression.py`, `test_lazy_flow.py`, `test_text_default_stop_words.py`, `test_token_frequency_defaults.py`, `test_topic_modeling_clear_endpoint.py`, `test_data_casting.py`, `test_join_behavior.py`
 
 ---
@@ -170,6 +172,7 @@ New `core/oni_client.py` (578 lines) for the LDaCA Data Portal Oni API: search r
 **Deleted (9 files):** `api/auth.ts`, `api/config.ts`, `api/env.ts`, `api/files.ts`, `api/http.ts`, `api/nodes.ts`, `api/preferences.ts`, `api/text.ts`, `api/workspaces.ts`.
 
 **Added:** OpenAPI 3.1 spec (`frontend/openapi/ldaca-wordflow.openapi.json`, 16,866 lines) → `@hey-api/openapi-ts` generates 18 files (19,317 total lines) in `api/generated/`:
+
 - `types.gen.ts` (10,643 lines): All TypeScript request/response types
 - `sdk.gen.ts` (2,576 lines): Typed fetch functions for ~150 endpoints
 - `@tanstack/react-query.gen.ts` (4,174 lines): Query key factories, query options, and mutation hooks (154 mutations, ~100+ queries)
@@ -184,6 +187,7 @@ New `core/oni_client.py` (578 lines) for the LDaCA Data Portal Oni API: search r
 The old flat `features/analysis/` directory was restructured into two top-level namespaces:
 
 **`features/views/`** — All analysis views:
+
 - `common/` — Shared infrastructure: `useAnalysisFeature`, `useAnalysisLockMachine`, `useAnalysisTaskStatus`, `useNodeColorManagement`, `AnalysisTabsHost` + tab system, pagination, charts, node/column selectors, tokenizer model selector, detach dialogs
 - `ai-annotator/` — AI annotation (1,934 lines)
 - `concordance/` — KWIC concordance + dispersion tables and charts
@@ -196,12 +200,14 @@ The old flat `features/analysis/` directory was restructured into two top-level 
 - `topic-modeling/` — BERTopic bubble chart, topic selection
 
 **`features/workspace/`** — Workspace state management:
+
 - `common/` — `WorkspaceProvider` (4-slice context: Data, Selection, Status, Actions), `useWorkspaceInternal`, `useWorkspaceNodeMutations`, `useSchemaManagement`
 - `data-view/` — TanStack React Table with server-side pagination/sort/filter
 - `graph-view/` — React Flow DAG visualization with dagre layout
 - `task-stream/` — SSE EventSource client with task inbox merging into analysis store
 
 Key components relocated:
+
 - `CustomNode.tsx` → `features/workspace/graph-view/components/`
 - `TutorialView.tsx` → replaced by `components/DocumentView.tsx` (generic Markdown viewer)
 - `GoogleLogin.tsx` → `features/auth/components/`
@@ -217,6 +223,7 @@ Key components relocated:
 ### 4.4 Auth Architecture
 
 Custom auth state machine in `features/auth/hooks/useAuth.ts` + `stores/authStore.ts` (Zustand):
+
 - 5-phase lifecycle: `bootstrapping` → `ready` / `refreshing` → `degraded` → `fatal`
 - Google OAuth in multi-user mode (token exchange via `/google-auth`)
 - CILogon OIDC support added
@@ -227,6 +234,7 @@ Custom auth state machine in `features/auth/hooks/useAuth.ts` + `stores/authStor
 ### 4.5 State Management
 
 8 Zustand stores (all with `immer` middleware):
+
 - `authStore.ts` — Auth lifecycle, bearer token management
 - `uiStore.ts` — `currentView`, `visibleViews`, modals (6 kinds), hints, loading operations
 - `preferencesStore.ts` — Dual persistence (localStorage + debounced backend sync)
@@ -241,6 +249,7 @@ Workspace uses a 4-context pattern (`WorkspaceProvider`) to minimize re-renders.
 ### 4.6 Tabbed Analysis Shell
 
 All 5 analysis views share `AnalysisTabsHost`:
+
 - Per-workspace tab groups persisted in `tabs.json` via `useWorkspaceTabs` (React Query)
 - `AnalysisTabbedPanel` renders folder-style protruding tabs with rename/close/add
 - Each tab remounts the feature component keyed by `tabId`
@@ -249,16 +258,16 @@ All 5 analysis views share `AnalysisTabsHost`:
 
 ### 4.7 New Components
 
-| Component | Purpose |
-|-----------|---------|
-| `DocumentView.tsx` | Generic, zoomable, lazy-loaded Markdown viewer with placeholder substitution, internal link nav, anchor scrolling |
-| `DocumentModalHost.tsx` | Hosts 4 `<Dialog>` slots (tutorial, warning, info, reference) |
-| `DocLinkIcon.tsx` / `HelpIcon.tsx` / `InfoIcon.tsx` / `ReferenceIcon.tsx` | Unified documentation link icons resolving registry keys |
-| `WorkspaceShell.tsx` | Root layout: providers, modals, hints, 3-column layout (sidebar + content + right panel) |
-| `ChartImageDownloadDialog.tsx` | Shared AlertDialog for chart PNG/SVG/JPEG export |
-| `popover.tsx` | Radix-based popover primitives |
-| `disabled-reason-tooltip.tsx` | Wraps disabled controls with explanatory tooltip |
-| `paginationRange.ts` | Extracted pagination range builder utility |
+| Component                                                                 | Purpose                                                                                                           |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `DocumentView.tsx`                                                        | Generic, zoomable, lazy-loaded Markdown viewer with placeholder substitution, internal link nav, anchor scrolling |
+| `DocumentModalHost.tsx`                                                   | Hosts 4 `<Dialog>` slots (tutorial, warning, info, reference)                                                     |
+| `DocLinkIcon.tsx` / `HelpIcon.tsx` / `InfoIcon.tsx` / `ReferenceIcon.tsx` | Unified documentation link icons resolving registry keys                                                          |
+| `WorkspaceShell.tsx`                                                      | Root layout: providers, modals, hints, 3-column layout (sidebar + content + right panel)                          |
+| `ChartImageDownloadDialog.tsx`                                            | Shared AlertDialog for chart PNG/SVG/JPEG export                                                                  |
+| `popover.tsx`                                                             | Radix-based popover primitives                                                                                    |
+| `disabled-reason-tooltip.tsx`                                             | Wraps disabled controls with explanatory tooltip                                                                  |
+| `paginationRange.ts`                                                      | Extracted pagination range builder utility                                                                        |
 
 ### 4.8 Hints / Coach-Marks System
 
@@ -330,6 +339,7 @@ All 5 analysis tools share `useAnalysisLockMachine` + `useAnalysisLock`: freezes
 ### 7.1 5-Source Version Consistency
 
 Version strings live in 5 files that must agree:
+
 1. Root `pyproject.toml`
 2. `backend/pyproject.toml`
 3. `frontend/package.json`
@@ -377,4 +387,4 @@ Version strings live in 5 files that must agree:
 
 ---
 
-*End of changes.*
+_End of changes._

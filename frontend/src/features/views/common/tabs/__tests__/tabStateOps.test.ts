@@ -6,7 +6,9 @@ import {
   getActiveTabId,
   getTabs,
   renameTabInState,
+  reorderTabsInState,
   setActiveTabInState,
+  setTabInputsInState,
   setTabTaskInState,
 } from '../tabStateOps';
 
@@ -76,11 +78,55 @@ describe('tabStateOps', () => {
     expect(getTabs(state, TYPE)[0]!.task_id).toBeNull();
   });
 
+  it('creates new tabs without copying an existing tab task or inputs', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = setTabTaskInState(state, TYPE, 'a', 'task-123');
+    state = setTabInputsInState(state, TYPE, 'a', [{ node_id: 'node-1', column: 'text' }]);
+
+    state = createTabInState(state, TYPE, 'B', 'b').state;
+
+    expect(getTabs(state, TYPE)[0]).toMatchObject({
+      tab_id: 'a',
+      task_id: 'task-123',
+      inputs: [{ node_id: 'node-1', column: 'text' }],
+    });
+    expect(getTabs(state, TYPE)[1]).toMatchObject({
+      tab_id: 'b',
+      task_id: null,
+      inputs: [],
+    });
+    expect(getActiveTabId(state, TYPE)).toBe('b');
+  });
+
   it('falls back to the first tab when active_tab_id is dangling', () => {
     let state = createTabInState(null, TYPE, 'A', 'a').state;
     state = createTabInState(state, TYPE, 'B', 'b').state;
     // Simulate a stale active pointer.
     state = { groups: { [TYPE]: { tabs: getTabs(state, TYPE), active_tab_id: 'gone' } } };
     expect(getActiveTabId(state, TYPE)).toBe('a');
+  });
+
+  it('reorders a tab to the drop target position without changing the active tab', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, TYPE, 'B', 'b').state;
+    state = createTabInState(state, TYPE, 'C', 'c').state; // active = c
+    state = reorderTabsInState(state, TYPE, ['b', 'c', 'a']);
+    expect(getTabs(state, TYPE).map((t) => t.tab_id)).toEqual(['b', 'c', 'a']);
+    expect(getActiveTabId(state, TYPE)).toBe('c');
+  });
+
+  it('keeps omitted tabs and is a no-op for an unchanged order', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, TYPE, 'B', 'b').state;
+    // Omitting 'b' keeps it appended at the end rather than dropping it.
+    expect(getTabs(reorderTabsInState(state, TYPE, ['a']), TYPE).map((t) => t.tab_id)).toEqual([
+      'a',
+      'b',
+    ]);
+    // Same order leaves the tab sequence unchanged.
+    expect(getTabs(reorderTabsInState(state, TYPE, ['a', 'b']), TYPE).map((t) => t.tab_id)).toEqual([
+      'a',
+      'b',
+    ]);
   });
 });

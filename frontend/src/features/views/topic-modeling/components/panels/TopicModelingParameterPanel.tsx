@@ -4,12 +4,9 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
-import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
-import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
-import type { NodeLike } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
+import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
+import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 
 export type CorpusSample = {
   percent: string;
@@ -22,14 +19,11 @@ type NumericInputDraft = {
 };
 
 type Props = {
-  selectedNodes: Array<{ id?: string; name?: string }>;
-  nodeColumnSelections: NodeColumnSelection[];
+  nodeInputs: UseTabNodeInputsResult;
   onColumnChange: (nodeId: string, column: string) => void;
   nodeColors: Record<string, string>;
   onNodeColorChange: (nodeId: string, color: string) => void;
   defaultPalette: string[];
-  isLocked: boolean;
-  getNodeColumns: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
   actionState: {
     runDisabled: boolean;
     clearDisabled: boolean;
@@ -66,23 +60,17 @@ type Props = {
   onClear: () => void | Promise<void>;
   hasMissingColumns: boolean;
   resultState?: string;
-  /** Displayed when the panel is locked. Defaults to the standard
-   * "locked while results loaded" message. */
-  lockedMessage?: string;
 };
 /**
  * Rendered by: TopicModelingFeature to show the topic-modeling parameter form and shared actions because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export function TopicModelingParameterPanel({
-  selectedNodes,
-  nodeColumnSelections,
+  nodeInputs,
   onColumnChange,
   nodeColors,
   onNodeColorChange,
   defaultPalette,
-  isLocked,
-  getNodeColumns,
   actionState,
   corpusSamples,
   nodeDocCounts,
@@ -108,8 +96,8 @@ export function TopicModelingParameterPanel({
   onClear,
   hasMissingColumns,
   resultState,
-  lockedMessage = ANALYSIS_LOCKED_MESSAGE,
 }: Props) {
+  const selectedNodes = nodeInputs.selectedNodes;
   const [topicSizeDraft, setTopicSizeDraft] = useState<NumericInputDraft>(() => ({
     source: topicSizeValue,
     value: String(topicSizeValue),
@@ -149,7 +137,7 @@ export function TopicModelingParameterPanel({
   // up without rerunning. Pre-fit cap stays at 50 since there's no fitted
   // count to double yet.
   const representativeWordsCountCap =
-    isLocked && representativeWordsCountServerMax
+    representativeWordsCountServerMax
       ? Math.max(50, 2 * representativeWordsCountServerMax)
       : 50;
 
@@ -186,21 +174,21 @@ export function TopicModelingParameterPanel({
         runLabel: actionState.runLabel,
       }}
     >
-      <NodeSelectionPanel
-        selectedNodes={selectedNodes}
-        nodeColumnSelections={nodeColumnSelections}
+      <NodeInputsPanel
+        resolvedNodes={nodeInputs.resolvedNodes}
+        availableNodes={nodeInputs.availableNodes}
+        graphSelectedIds={nodeInputs.graphSelectedIds}
+        recentPresets={nodeInputs.recentPresets}
+        canAddMore={nodeInputs.canAddMore}
+        maxNodes={2}
+        onAddNodes={nodeInputs.addNodes}
+        getAddRejection={nodeInputs.getAddRejection}
+        onRemoveNode={nodeInputs.removeNode}
+        onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}
         nodeColors={nodeColors}
         onColorChange={onNodeColorChange}
         defaultPalette={defaultPalette}
-        getNodeColumns={getNodeColumns}
-        maxCompare={2}
-        showShape
-        disabled={isLocked}
-        locked={isLocked}
-        allowedDataTypes={['string']}
-        lockedMessage={lockedMessage}
-        originalCount={selectedNodes.length}
       />
 
       <div className="mt-4 grid grid-cols-2 gap-6">
@@ -379,7 +367,7 @@ export function TopicModelingParameterPanel({
             </Label>
             <DisabledReasonTooltip
               reason={
-                isLocked && representativeWordsCountServerMax
+                representativeWordsCountServerMax
                   ? (representativeWordsCountLockedReason ??
                     `Adjustable up to ${representativeWordsCountCap} after modelling. Clear Results to fit with a higher count.`)
                   : undefined

@@ -1,11 +1,12 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAnalysisFeature } from '../hooks/useAnalysisFeature';
 
-const { cancelTaskMock, clearAnalysisMock } = vi.hoisted(() => ({
+const { cancelTaskMock, clearAnalysisMock, hydrateFromServerMock } = vi.hoisted(() => ({
   cancelTaskMock: vi.fn(),
   clearAnalysisMock: vi.fn(),
+  hydrateFromServerMock: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -26,7 +27,7 @@ vi.mock('@/api/generated/sdk.gen', () => ({
 vi.mock('../useAnalysisHydration', () => ({
   /** Called by: useAnalysisFeature under test while keeping hydration inert because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useAnalysisHydration: () => ({
-    hydrateFromServer: vi.fn(() => Promise.resolve()),
+    hydrateFromServer: hydrateFromServerMock,
     hydrationState: { status: 'idle' as const },
   }),
 }));
@@ -57,6 +58,7 @@ describe('useAnalysisFeature', () => {
     clearAnalysisMock.mockImplementation(({ onCleanup }) => {
       onCleanup(['task-1']);
     });
+    hydrateFromServerMock.mockClear();
   });
 
   it('passes clear options through to onCleared cleanup handlers', async () => {
@@ -114,5 +116,86 @@ describe('useAnalysisFeature', () => {
       query: { task_id: 'task-1' },
       throwOnError: true,
     });
+  });
+
+  it('ignores terminal refreshes for another task when a tab has no task id', async () => {
+    const fetchResult = vi.fn(() => Promise.resolve({ state: 'successful' }));
+    const onResultFetched = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAnalysisFeature({
+        analysisType: 'token_frequencies',
+        taskType: 'token_frequencies',
+        workspaceId: 'workspace-1',
+        getAuthHeaders: () => ({}),
+        isTabActive: true,
+        hydrationTaskId: null,
+        resultRef: { current: null },
+        fetchResult,
+        onResultFetched,
+        onCleared: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.fetchAndApplyResult('task-from-first-tab', 'successful');
+    });
+
+    expect(fetchResult).not.toHaveBeenCalled();
+    expect(onResultFetched).not.toHaveBeenCalled();
+  });
+
+  it('fetches terminal refreshes for the task owned by the active tab', async () => {
+    const terminalResult = { state: 'successful', metadata: { task_id: 'owned-task' } };
+    const fetchResult = vi.fn(() => Promise.resolve(terminalResult));
+    const onResultFetched = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAnalysisFeature({
+        analysisType: 'token_frequencies',
+        taskType: 'token_frequencies',
+        workspaceId: 'workspace-1',
+        getAuthHeaders: () => ({}),
+        isTabActive: true,
+        hydrationTaskId: 'owned-task',
+        resultRef: { current: null },
+        fetchResult,
+        onResultFetched,
+        onCleared: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.fetchAndApplyResult('owned-task', 'successful');
+    });
+
+    expect(fetchResult).toHaveBeenCalledWith('owned-task', {});
+    expect(onResultFetched).toHaveBeenCalledWith(terminalResult, 'owned-task');
+  });
+
+  it('hydrates again when the owning tab task id changes after a run', async () => {
+    const baseConfig = {
+      analysisType: 'token_frequencies' as const,
+      taskType: 'token_frequencies',
+      workspaceId: 'workspace-1',
+      getAuthHeaders: () => ({}),
+      isTabActive: true,
+      resultRef: { current: null },
+      fetchResult: vi.fn(() => Promise.resolve(null)),
+      onResultFetched: vi.fn(),
+      onCleared: vi.fn(),
+    };
+
+    const { rerender } = renderHook(
+      ({ taskId }: { taskId: string | null }) =>
+        useAnalysisFeature({ ...baseConfig, hydrationTaskId: taskId }),
+      { initialProps: { taskId: null as string | null } },
+    );
+
+    await waitFor(() => expect(hydrateFromServerMock).toHaveBeenCalledTimes(1));
+
+    rerender({ taskId: 'new-run-task' });
+
+    await waitFor(() => expect(hydrateFromServerMock).toHaveBeenCalledTimes(2));
   });
 });

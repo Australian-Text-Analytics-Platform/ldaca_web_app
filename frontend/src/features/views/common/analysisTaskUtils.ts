@@ -68,39 +68,26 @@ export const collectTaskIds = (candidateIds: Array<string | null | undefined>): 
 
 interface ResolveAnalysisTaskIdOptions {
   candidateIds: Array<string | null | undefined>;
-  fetchCurrentTaskId?: () => Promise<string | null>;
   onResolved?: (taskId: string | null) => void;
 }
 
-/** Resolves the best task id for cleanup/result-fetch flows, falling back to a server lookup. */
+/** Resolves the best explicit task id for cleanup/result-fetch flows. */
 /**
  * Used by: src/features/views/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
- * Flow: prefer valid local candidate ids, optionally fetch the current server task id, normalize it, then notify the resolver callback.
+ * Flow: prefer valid local candidate ids, then notify the resolver callback.
  */
-export const resolveAnalysisTaskId = async ({
+export const resolveAnalysisTaskId = ({
   candidateIds,
-  fetchCurrentTaskId,
   onResolved,
-}: ResolveAnalysisTaskIdOptions): Promise<string | null> => {
+}: ResolveAnalysisTaskIdOptions): string | null => {
   const fromCandidates = collectTaskIds(candidateIds)[0] ?? null;
   if (fromCandidates) {
     onResolved?.(fromCandidates);
     return fromCandidates;
   }
 
-  if (!fetchCurrentTaskId) {
-    onResolved?.(null);
-    return null;
-  }
-
-  try {
-    const fetched = normalizeTaskId(await fetchCurrentTaskId());
-    onResolved?.(fetched);
-    return fetched;
-  } catch {
-    onResolved?.(null);
-    return null;
-  }
+  onResolved?.(null);
+  return null;
 };
 
 /** Removes completed/cleared tasks from the Zustand task list after task cleanup succeeds. */

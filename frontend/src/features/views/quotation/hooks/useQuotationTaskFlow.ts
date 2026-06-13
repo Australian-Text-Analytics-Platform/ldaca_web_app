@@ -1,5 +1,4 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { QueryClient } from '@tanstack/react-query';
 import { updateQuotationTaskResult } from '@/api/generated/sdk.gen';
 import type {
   QuotationAnalysisResponse,
@@ -10,11 +9,7 @@ import type {
   QuotationMaterializeRequest,
   AnalysisTaskActionResponse,
 } from '@/api/generated/types.gen';
-import {
-  getNodeIdentifier,
-  restoreAnalysisLockFromRequest,
-  extractAndSetTaskId,
-} from '../../common';
+import { getNodeIdentifier, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -63,9 +58,7 @@ function getErrorMessage(error: unknown): string {
 
 interface QuotationState {
   currentWorkspaceId: string | null;
-  isLocked: boolean;
   hasLoaded: boolean;
-  lockedNodesSnapshot: WorkspaceNodeLike[];
   displayedNodes: WorkspaceNodeLike[];
   activeSelections: NodeColumnSelection[];
   nodeState: Record<string, NodePaginationState>;
@@ -95,7 +88,6 @@ interface QuotationActions {
 
 interface QuotationLock {
   getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   resolveTaskId: () => Promise<string | null>;
   quotationSearch: (
     nodeId: string,
@@ -110,7 +102,6 @@ interface QuotationLock {
     request: QuotationMaterializeRequest,
   ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
   openEngineDialog: () => void;
-  queryClient: QueryClient;
 }
 
 type Params = {
@@ -127,9 +118,7 @@ type Params = {
 export function useQuotationTaskFlow({
   state: {
     currentWorkspaceId,
-    isLocked,
     hasLoaded,
-    lockedNodesSnapshot,
     displayedNodes,
     activeSelections,
     nodeState,
@@ -155,13 +144,11 @@ export function useQuotationTaskFlow({
   },
   lock: {
     getAuthHeaders,
-    lockWithSnapshots,
     resolveTaskId,
     quotationSearch,
     detachQuotation,
     materializeQuotation,
     openEngineDialog,
-    queryClient,
   },
 }: Params) {
   // Builds deterministic output names for detach operations from display labels.
@@ -180,9 +167,7 @@ export function useQuotationTaskFlow({
    * Called by: useQuotationTaskFlow as a local helper in this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
    */
   const resolveNodeLabel = (nodeId: string): string => {
-    const candidates =
-      isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot : displayedNodes;
-    const match = candidates.find((node, idx) => getNodeIdentifier(node, idx) === nodeId);
+    const match = displayedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nodeId);
     const rawLabel = match?.name || match?.label || match?.id || nodeId;
     return String(rawLabel);
   };
@@ -227,8 +212,7 @@ export function useQuotationTaskFlow({
     nodeId: string;
     column: string;
   } | null => {
-    const sourceNode =
-      isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0];
+    const sourceNode = displayedNodes[0];
     if (!sourceNode) return null;
     const nodeId = getNodeIdentifier(sourceNode, 0);
     const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
@@ -385,31 +369,6 @@ export function useQuotationTaskFlow({
       const outcome = await fetchQuotations(nodeId, { page: 1 });
       if (!outcome) return;
       setHasLoaded(true);
-      try {
-        const lockedSelections = activeSelections.filter(
-          (sel) => sel.nodeId === nodeId && sel.column,
-        );
-        const columnMap = lockedSelections.reduce<Record<string, string | undefined>>(
-          (acc, sel) => {
-            acc[sel.nodeId] = sel.column;
-            return acc;
-          },
-          {},
-        );
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: {
-            node_ids: [nodeId],
-            node_columns: columnMap,
-          },
-          getAuthHeaders,
-          lockWithSnapshots,
-          queryClient,
-          maxNodes: 1,
-        });
-      } catch {
-        /* ignore */
-      }
     } finally {
       setIsLoadingQuotations(false);
     }
@@ -420,14 +379,13 @@ export function useQuotationTaskFlow({
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
    */
   const handlePageChange = async (newPage: number) => {
-    const targetNode =
-      isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0];
+    const targetNode = displayedNodes[0];
     const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageChange(newPage);
       return;
     }
-    if (!isLocked || !hasLoaded) {
+    if (!hasLoaded) {
       baseHandlePageChange(newPage);
       return;
     }
@@ -440,14 +398,13 @@ export function useQuotationTaskFlow({
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
    */
   const handlePageSizeChange = async (pageSize: number) => {
-    const targetNode =
-      isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0];
+    const targetNode = displayedNodes[0];
     const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageSizeChange(pageSize);
       return;
     }
-    if (!isLocked || !hasLoaded) {
+    if (!hasLoaded) {
       baseHandlePageSizeChange(pageSize);
       return;
     }
@@ -474,7 +431,7 @@ export function useQuotationTaskFlow({
     };
     const isSame = st.sortBy === column;
     const nextDescending: boolean = isSame ? !st.descending : false;
-    if (!isLocked || !hasLoaded) {
+    if (!hasLoaded) {
       await fetchQuotations(nodeId, {
         page: 1,
         sortBy: column,

@@ -5,21 +5,20 @@ import { collectTaskIds, resolveAnalysisTaskId } from '@/features/views/common/a
 import { useAnalysisHydration, type HydrationState } from '../useAnalysisHydration';
 import { clearAnalysis } from '../clearAnalysis';
 import { useAnalysisTaskFlow } from '../tasks/useAnalysisTaskFlow';
-import { getCurrentAnalysisTask } from '../analysisTasksApi';
 import type {
   AnalysisTaskBannerState,
   AnalysisTaskFlowRefreshContext,
   CanonicalAnalysisTaskType,
 } from '../tasks/types';
 import {
-  analysisServerRequestLockQueryKey,
-  type ServerLockAnalysisType,
-} from './useAnalysisServerRequestLock';
+  lastRunRequestQueryKey,
+  type LastRunAnalysisType,
+} from './useLastRunRequest';
 import type { AnalysisTaskStatus } from '@/features/views/common/useAnalysisTaskStatus';
 
-interface CachedServerLock {
+interface CachedLastRunRequest {
   hasServerRequest: boolean;
-  currentTaskId: string | null;
+  taskId: string | null;
   serverRequest: Record<string, unknown> | null;
 }
 
@@ -28,6 +27,14 @@ interface AnalysisResultLike {
   state?: string;
   metadata?: { task_id?: string };
 }
+
+/**
+ * A tabbed analysis feature explicitly owns its task id through
+ * `hydrationTaskId`. When that prop is present but null, the tab has not run
+ * yet and must not fall back to the workspace's global current/terminal task.
+ */
+const hasTabOwnedTaskId = (config: UseAnalysisFeatureConfig<unknown>): boolean =>
+  Object.prototype.hasOwnProperty.call(config, 'hydrationTaskId');
 
 export interface ClearAnalysisUiOptions {
   preserveLocalState?: boolean;
@@ -38,7 +45,7 @@ export interface ClearAnalysisUiOptions {
 // ---------------------------------------------------------------------------
 
 export interface UseAnalysisFeatureConfig<TResult = unknown> {
-  analysisType: ServerLockAnalysisType;
+  analysisType: LastRunAnalysisType;
   taskType: CanonicalAnalysisTaskType | string;
   workspaceId: string | null;
   getAuthHeaders: () => Record<string, string>;
@@ -125,7 +132,7 @@ export interface UseAnalysisFeatureReturn {
  * Owns the common task lifecycle for analysis tabs: task id discovery, status
  * banners, hydration, stopping, result refresh, and clear/reset coordination.
  * Used by: task-backed analysis feature screens because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
 export function useAnalysisFeature<TResult = unknown>(
   config: UseAnalysisFeatureConfig<TResult>,
@@ -168,81 +175,78 @@ export function useAnalysisFeature<TResult = unknown>(
     void Promise.resolve().then(() => setLocalTaskId(null));
   }, [config.workspaceId]);
 
-  // Returns the cached server-lock data (fetched once by useAnalysisServerRequestLock).
+  // Returns the cached last-run request data (fetched once by useLastRunRequest).
   // Used to avoid refetching /current and /request during hydration.
-  const readServerLockCache = useCallback((): CachedServerLock | null => {
+  const readLastRunRequestCache = useCallback((taskId?: string | null): CachedLastRunRequest | null => {
     if (!configRef.current.workspaceId) return null;
     return (
-      queryClient.getQueryData<CachedServerLock>(
-        analysisServerRequestLockQueryKey(
+      queryClient.getQueryData<CachedLastRunRequest>(
+        lastRunRequestQueryKey(
           configRef.current.analysisType,
           configRef.current.workspaceId,
+          taskId,
         ),
       ) ?? null
     );
   }, [queryClient]);
 
-  // Invalidate the server-lock query only when the local task id truly diverges
-  // from the cached currentTaskId. Previously this fired on every localTaskId
+  // Invalidate the last-run request query only when the local task id truly diverges
+  // from the cached taskId. Previously this fired on every localTaskId
   // change (including ones produced by hydration itself), doubling /current
   // and /request traffic.
   useEffect(() => {
     if (!localTaskId || !config.workspaceId) return;
-    const cached = readServerLockCache();
-    if (cached && cached.currentTaskId === localTaskId) return;
+    const cached = readLastRunRequestCache(localTaskId);
+    if (cached && cached.taskId === localTaskId) return;
     void queryClient.invalidateQueries({
-      queryKey: analysisServerRequestLockQueryKey(config.analysisType, config.workspaceId),
+      queryKey: lastRunRequestQueryKey(config.analysisType, config.workspaceId),
     });
-  }, [localTaskId, config.workspaceId, config.analysisType, queryClient, readServerLockCache]);
+  }, [localTaskId, config.workspaceId, config.analysisType, queryClient, readLastRunRequestCache]);
 
   // ---- Task status ref (for async access inside resolveTaskId) ----
   const taskStatusRef = useRef<AnalysisTaskStatus | null>(null);
 
   // ---- Task ID resolution ----
   // Prefers, in order: locally-tracked ID → cached result metadata → cached
-  // server-lock currentTaskId (populated by useAnalysisServerRequestLock) →
-  // in-memory task-flow status → caller-supplied extras → network /current.
-  // The server-lock cache check means we almost never need to hit /current
-  // on hydration because the lock query fires on mount.
+  // last-run request taskId (populated by useLastRunRequest) →
+  // in-memory task-flow status → caller-supplied extras.
   /**
-   * Resolves the task id from the cheapest local source before falling back to
-   * backend current-task lookup, then records the winning id for future clears.
+  * Resolves the task id from explicit local/tab-owned sources, then records
+  * the winning id for future clears.
    * Called by: hydration, terminal result refresh, clear, and stop workflows because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-   * Flow: collect task-id candidates from refs, result metadata, server lock cache, task status, and caller extras; fall back to /current; then cache the resolved id.
+   * Flow: collect task-id candidates from refs, result metadata, last-run request cache, task status, and caller extras; then cache the resolved id.
    */
-  const resolveTaskId = async (): Promise<string | null> => {
+  const resolveTaskId = (): Promise<string | null> => {
     const cfg = configRef.current;
-    if (!cfg.workspaceId) return null;
+    if (!cfg.workspaceId) return Promise.resolve(null);
 
     const metadataTaskId = (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id ?? null;
     const status = taskStatusRef.current;
     const extra = cfg.getExtraTaskIdCandidates?.() ?? [];
-    const cachedLock = readServerLockCache();
+    const cachedLastRun = readLastRunRequestCache(cfg.hydrationTaskId ?? localTaskIdRef.current);
+    const isTabOwnedTask = hasTabOwnedTaskId(cfg as UseAnalysisFeatureConfig<unknown>);
+    const statusCandidates = isTabOwnedTask
+      ? []
+      : [
+          status?.activeTaskId,
+          status?.runningTask?.task_id,
+          status?.queuedTask?.task_id,
+          status?.terminalTask?.task_id,
+        ];
 
-    return resolveAnalysisTaskId({
-      candidateIds: [
-        cfg.hydrationTaskId ?? null,
-        localTaskIdRef.current,
-        metadataTaskId,
-        cachedLock?.currentTaskId ?? null,
-        status?.activeTaskId,
-        status?.runningTask?.task_id,
-        status?.queuedTask?.task_id,
-        status?.terminalTask?.task_id,
-        ...extra,
-      ],
-      /** Called by: resolveAnalysisTaskId as the last-resort backend lookup because callers need shared hook state and handlers without duplicating analysis lifecycle wiring. */
-      fetchCurrentTaskId: async () => {
-        const headers = cfg.getAuthHeaders();
-        const current = (await getCurrentAnalysisTask(cfg.analysisType, headers)) as Record<
-          string,
-          unknown
-        >;
-        const raw = Array.isArray(current?.task_ids) ? (current.task_ids as string[])[0] : null;
-        return typeof raw === 'string' && raw.trim().length > 0 ? raw : null;
-      },
-      onResolved: setLocalTaskId,
-    });
+    return Promise.resolve(
+      resolveAnalysisTaskId({
+        candidateIds: [
+          cfg.hydrationTaskId ?? null,
+          localTaskIdRef.current,
+          metadataTaskId,
+          cachedLastRun?.taskId ?? null,
+          ...statusCandidates,
+          ...extra,
+        ],
+        onResolved: setLocalTaskId,
+      }),
+    );
   }; // stable — uses refs internally
 
   // Fetches a task result, deduped against concurrent fetches (from either
@@ -263,8 +267,22 @@ export function useAnalysisFeature<TResult = unknown>(
       return;
     }
 
+    const isTabOwnedTask = hasTabOwnedTaskId(cfg as UseAnalysisFeatureConfig<unknown>);
+    const ownedTaskIds = collectTaskIds([
+      cfg.hydrationTaskId,
+      localTaskIdRef.current,
+      (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id,
+      ...(cfg.getExtraTaskIdCandidates?.() ?? []),
+    ]);
+    if (isTabOwnedTask && taskId && !ownedTaskIds.includes(taskId)) {
+      return;
+    }
+
     const resolvedTaskId = taskId ?? (await resolveTaskId());
     if (!resolvedTaskId) {
+      return;
+    }
+    if (isTabOwnedTask && !ownedTaskIds.includes(resolvedTaskId)) {
       return;
     }
 
@@ -370,22 +388,20 @@ export function useAnalysisFeature<TResult = unknown>(
   // ---- Hydration ----
   // `fetchRequest` and `fetchResult` below are deliberately cache-aware:
   // - `fetchRequest` returns the serverRequest already fetched by
-  //   useAnalysisServerRequestLock (same endpoint, same task id) instead of
+  //   useLastRunRequest (same endpoint, same task id) instead of
   //   hitting the network a second time.
   // - `fetchResult` shares fetchingTaskIdRef/lastFetchedRef with
   //   fetchAndApplyResult so a terminal-refresh + hydration racing for the
   //   same task id only produces one /result request.
   const { hydrateFromServer, hydrationState } = useAnalysisHydration({
     workspaceId: config.workspaceId,
-    analysisKey: config.analysisType,
-    getAuthHeaders: config.getAuthHeaders,
     resolveTaskId,
     onTaskIdResolved: setLocalTaskId,
     fetchRequest: config.fetchRequest
       ? async (taskId) => {
           if (!taskId) return null;
-          const cached = readServerLockCache();
-          if (cached && cached.currentTaskId === taskId && cached.serverRequest) {
+          const cached = readLastRunRequestCache(taskId);
+          if (cached && cached.taskId === taskId && cached.serverRequest) {
             return cached.serverRequest;
           }
           return (
@@ -427,7 +443,7 @@ export function useAnalysisFeature<TResult = unknown>(
 
   useEffect(() => {
     hydratedOnceRef.current = false;
-  }, [config.workspaceId]);
+  }, [config.workspaceId, config.hydrationTaskId]);
 
   useEffect(() => {
     if (!config.isTabActive || !config.workspaceId || hydratedOnceRef.current) return;
@@ -441,7 +457,7 @@ export function useAnalysisFeature<TResult = unknown>(
         lastFetchedRef.current = { taskId, state };
       }
     });
-  }, [config.isTabActive, config.workspaceId, hydrateFromServer]);
+  }, [config.isTabActive, config.workspaceId, config.hydrationTaskId, hydrateFromServer]);
 
   // ---- Clear ----
   /**

@@ -46,7 +46,7 @@ export interface UseNodeColumnInfosResult {
  * everywhere else in the app.
  */
 /**
- * Used by: src/features/views/ai-annotator/AiAnnotatorFeature.tsx, src/features/views/common/useAnalysisLockMachine.ts, src/features/views/concordance/ConcordanceFeature.tsx and 3 other importers because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: add-node-as-needed input hooks and analysis feature screens because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: resolve node ids, issue node-info queries, build a typed column cache, then return a fallback-aware getter and loading flag.
  */
 export const useNodeColumnInfos = (params: {

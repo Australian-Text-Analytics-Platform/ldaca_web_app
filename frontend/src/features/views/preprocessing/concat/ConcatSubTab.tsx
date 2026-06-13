@@ -1,6 +1,6 @@
+import type { ReactNode } from 'react';
 import { Layers, Loader2, Plus } from 'lucide-react';
 
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,10 @@ import { useConcatSubTab, type ConcatSubTabProps } from './hooks/useConcatSubTab
 
 export type { ConcatSubTabProps } from './hooks/useConcatSubTab';
 
+type ConcatSubTabComponentProps = ConcatSubTabProps & {
+  renderNodeInputsPanel?: () => ReactNode;
+};
+
 /**
  * Renders the Concatenate preprocessing sub-tab. It consumes `useConcatSubTab`
  * so schema analysis, preview fetching, and apply behavior stay out of the
@@ -23,9 +27,9 @@ export type { ConcatSubTabProps } from './hooks/useConcatSubTab';
  * Flow: collect selected nodes/schema analysis from its hook, render node ordering and mismatch
  * guidance, preview concatenation results, then expose apply controls.
  */
-export function ConcatSubTab(props: ConcatSubTabProps) {
+export function ConcatSubTab(props: ConcatSubTabComponentProps) {
+  const { renderNodeInputsPanel } = props;
   const {
-    selectionPanel,
     form,
     statusMessage,
     extraSelectionMessage,
@@ -55,31 +59,7 @@ export function ConcatSubTab(props: ConcatSubTabProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-          <NodeSelectionPanel
-            selectedNodes={selectionPanel.selectedNodes}
-            nodeColumnSelections={selectionPanel.nodeColumnSelections}
-            onColumnChange={selectionPanel.onColumnChange}
-            nodeColors={selectionPanel.nodeColors}
-            onColorChange={selectionPanel.onColorChange}
-            defaultPalette={selectionPanel.defaultPalette}
-            maxCompare={selectionPanel.maxCompare}
-            className="rounded-lg border border-border/60 bg-muted/40"
-            showColorPicker={false}
-            showColumnPicker={false}
-            showHeaderLabel
-            showShape
-            disabled={selectionPanel.disabled}
-            originalCount={selectionPanel.originalCount}
-            statusMessage={selectionPanel.statusMessage || undefined}
-            statusVariant={selectionPanel.statusVariant || undefined}
-            headerAddon={
-              <HelpIcon
-                targetKey="preprocessing.common.node-selection"
-                label="Selected data blocks"
-                className="h-4 w-4 text-muted-foreground"
-              />
-            }
-          />
+          {renderNodeInputsPanel?.()}
 
           {extraSelectionMessage && (
             <div className="rounded-md border border-amber-500/50 bg-amber-100/60 p-3 text-sm text-amber-900">

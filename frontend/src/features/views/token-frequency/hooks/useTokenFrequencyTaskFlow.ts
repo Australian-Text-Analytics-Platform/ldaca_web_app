@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import type { QueryClient } from '@tanstack/react-query';
 import { calculateTokenFrequencies } from '@/api/generated/sdk.gen';
 import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
@@ -8,15 +7,10 @@ import {
   resolveTokenFrequencyNodeContext,
   type TokenFrequencyAnalysisParams,
 } from '@/features/views/token-frequency/tokenFrequencyHelpers';
-import {
-  restoreAnalysisLockFromRequest,
-  extractAndSetTaskId,
-  type WorkspaceNodeLike,
-} from '../../common';
+import { extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';
 import { useWorkspaceTabs } from '../../common/tabs/useWorkspaceTabs';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 type TokenFrequencyRequest = TokenFrequencyRequestInput;
 
@@ -50,10 +44,6 @@ interface AnalysisActions {
 
 interface LockActions {
   getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (
-    nodes: Array<{ id: string; name?: string; columns?: string[] | null }>,
-  ) => void;
-  queryClient: QueryClient;
 }
 
 interface NavigationActions {
@@ -101,7 +91,7 @@ export const useTokenFrequencyTaskFlow = ({
     lastFetchedRef,
     onTaskIdAssigned,
   },
-  lock: { getAuthHeaders, lockWithSnapshots, queryClient },
+  lock: { getAuthHeaders },
   navigation: {
     selectNodes,
     setPendingConcordance,
@@ -138,7 +128,7 @@ export const useTokenFrequencyTaskFlow = ({
       return;
     }
 
-    const requestNodeIds = takeMostRecent(panelNodeIds, 2);
+    const requestNodeIds = panelNodeIds.slice(0, 2);
     const missingTokenizerModels = requestNodeIds.filter((nodeId) => {
       const model = (tokenizerModelsByNode[nodeId] ?? '').trim();
       return !model;
@@ -171,21 +161,6 @@ export const useTokenFrequencyTaskFlow = ({
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
       };
-
-      try {
-        if (request.node_ids.length) {
-          await restoreAnalysisLockFromRequest({
-            workspaceId: currentWorkspaceId,
-            requestData: request,
-            getAuthHeaders,
-            lockWithSnapshots,
-            queryClient,
-            maxNodes: 2,
-          });
-        }
-      } catch {
-        /* best effort lock */
-      }
 
       const { data: response } = await calculateTokenFrequencies({
         body: request,

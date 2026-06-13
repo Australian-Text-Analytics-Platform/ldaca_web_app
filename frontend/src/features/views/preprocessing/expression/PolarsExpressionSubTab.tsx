@@ -1,7 +1,7 @@
+import type { ReactNode } from 'react';
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
 import { CodeEditor } from '@/features/views/preprocessing/expression/CodeEditor';
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,10 @@ import {
 } from './hooks/usePolarsExpressionSubTab';
 
 export type { PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';
+
+type PolarsExpressionSubTabComponentProps = PolarsExpressionSubTabProps & {
+  renderNodeInputsPanel?: () => ReactNode;
+};
 
 const CONTEXT_LABELS: Record<string, string> = {
   filter: 'Filter',
@@ -61,11 +65,11 @@ function CodeHint({ context }: { context: string }) {
  * Flow: manage expression tabs and shared context, render editors/preview table, evaluate
  * expressions for preview, and apply column/sort/group operations through hook actions.
  */
-export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
+export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentProps) {
   const { isLoading } = props;
+  const { renderNodeInputsPanel } = props;
   const {
     effectiveNode,
-    nodeColors,
     activeContext,
     setActiveContext,
     newNodeName,
@@ -125,28 +129,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Node selection */}
-          <NodeSelectionPanel
-            selectedNodes={effectiveNode ? [effectiveNode] : []}
-            nodeColumnSelections={[]}
-            onColumnChange={() => undefined}
-            nodeColors={nodeColors}
-            onColorChange={() => undefined}
-            defaultPalette={['#2563eb']}
-            maxCompare={1}
-            className="rounded-lg border border-border/60 bg-muted/40"
-            showColorPicker={false}
-            showColumnPicker={false}
-            showHeaderLabel
-            showShape
-            headerAddon={
-              <HelpIcon
-                targetKey="preprocessing.common.node-selection"
-                label="Selected data blocks"
-                className="h-4 w-4 text-muted-foreground"
-              />
-            }
-          />
+          {renderNodeInputsPanel?.()}
 
           {/* Context tabs */}
           <Tabs

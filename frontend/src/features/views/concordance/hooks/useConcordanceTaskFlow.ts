@@ -1,5 +1,4 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { concordanceTaskResultPost, runConcordance } from '@/api/generated/sdk.gen';
 import {
@@ -12,16 +11,14 @@ import {
   type AnalysisTaskActionResponse,
 } from '@/api/generated/types.gen';
 import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
-import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
+import { extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 export type PaginationState = Record<string, NodePaginationState>;
 
 interface ConcordanceState {
   currentWorkspaceId: string | null;
   searchWord: string;
-  isLocked: boolean;
   activeNodeIds: string[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   globalPageSize: number;
@@ -35,13 +32,6 @@ interface ConcordanceState {
   caseSensitive: boolean;
   /** Selected concordance engine. */
   searchMode: 'regex' | 'tokens';
-  /**
-   * Active analysis tab id (when this feature is rendered inside a tab).
-   * Stamped onto the run request as ``tab_id`` so the backend keys the task's
-   * current-task slot per tab, letting a re-run supersede the prior task for
-   * this tab while leaving sibling tabs untouched. Undefined in non-tabbed use.
-   */
-  tabId?: string | null;
 }
 
 interface ConcordanceActions {
@@ -65,7 +55,6 @@ interface ConcordanceActions {
 
 interface ConcordanceLock {
   getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   resolveTaskId: () => Promise<string | null>;
   detachConcordance: (
     nodeId: string,
@@ -79,7 +68,6 @@ interface ConcordanceLock {
     nodeId: string,
     request: ConcordanceMaterializeRequest,
   ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
-  queryClient: QueryClient;
 }
 
 type Params = {
@@ -97,7 +85,6 @@ export function useConcordanceTaskFlow({
   state: {
     currentWorkspaceId,
     searchWord,
-    isLocked,
     activeNodeIds,
     effectiveNodeColumnSelections,
     globalPageSize,
@@ -110,7 +97,6 @@ export function useConcordanceTaskFlow({
     wholeWord,
     searchMode,
     caseSensitive,
-    tabId,
   },
   actions: {
     setNodePagination,
@@ -127,12 +113,10 @@ export function useConcordanceTaskFlow({
   },
   lock: {
     getAuthHeaders,
-    lockWithSnapshots,
     resolveTaskId,
     detachConcordance,
     detachConcordanceDispersion,
     materializeConcordance,
-    queryClient,
   },
 }: Params) {
   /** Builds stable derived node names for workspace outputs created by concordance actions. */
@@ -202,7 +186,6 @@ export function useConcordanceTaskFlow({
     allowWhenLocked = false,
   ) => {
     if (!currentWorkspaceId) return;
-    if (isLocked && !allowWhenLocked) return;
 
     const trimmedSearch = searchWord.trim();
     if (!trimmedSearch) {
@@ -211,7 +194,7 @@ export function useConcordanceTaskFlow({
     }
 
     const requestNodeIds = (() => {
-      const baseIds = takeMostRecent(activeNodeIds, 2);
+      const baseIds = activeNodeIds.slice(0, 2);
       if (targetNodeId && !baseIds.includes(targetNodeId)) {
         return [...baseIds, targetNodeId];
       }
@@ -277,9 +260,6 @@ export function useConcordanceTaskFlow({
         case_sensitive: caseSensitive,
         search_mode: searchMode,
       };
-      if (tabId) {
-        request.tab_id = tabId;
-      }
       const requestedSortBy = overrideSortBy ?? firstNodePagination.sortBy;
       if (requestedSortBy) {
         request.sort_by = requestedSortBy;
@@ -293,19 +273,6 @@ export function useConcordanceTaskFlow({
       setResults(response);
       const assignedTaskId = extractAndSetTaskId(response, setLocalTaskId);
       onTaskIdAssigned?.(assignedTaskId);
-
-      try {
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: { node_ids: requestNodeIds, node_columns: nodeColumns },
-          getAuthHeaders,
-          lockWithSnapshots,
-          queryClient,
-          maxNodes: 2,
-        });
-      } catch {
-        /* ignore */
-      }
 
       if (response?.combinable === false && viewMode === 'combined') {
         setViewMode('separated');

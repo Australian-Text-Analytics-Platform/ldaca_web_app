@@ -1,6 +1,6 @@
+import type { ReactNode } from 'react';
 import { Search } from 'lucide-react';
 
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,10 @@ import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSub
 
 export type { ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
+type ReplaceSubTabComponentProps = ReplaceSubTabProps & {
+  renderNodeInputsPanel?: () => ReactNode;
+};
+
 /**
  * Renders the Find/Transform preprocessing tab. It delegates regex/extract
  * state, preview, and apply behavior to `useReplaceSubTab`.
@@ -29,14 +33,13 @@ export type { ReplaceSubTabProps } from './hooks/useReplaceSubTab';
  * Flow: render target column/find-replace controls, show preview output, and delegate
  * apply/preview actions to the replace hook.
  */
-export function ReplaceSubTab(props: ReplaceSubTabProps) {
+export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
+  const { renderNodeInputsPanel } = props;
   const {
-    activeNodeId,
     hasSelection,
     effectiveNodes,
     stringColumns,
     selectedColumn,
-    setSelectedColumn,
     mode,
     setMode,
     n,
@@ -54,9 +57,6 @@ export function ReplaceSubTab(props: ReplaceSubTabProps) {
     applyDisabledReason,
     applyLoading,
     handleApply,
-    nodeColors,
-    defaultPalette,
-    selectedNodes,
     preview,
   } = useReplaceSubTab(props);
 
@@ -80,42 +80,13 @@ export function ReplaceSubTab(props: ReplaceSubTabProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-          <NodeSelectionPanel
-            selectedNodes={effectiveNodes}
-            nodeColumnSelections={
-              activeNodeId ? [{ nodeId: activeNodeId, column: selectedColumn }] : []
-            }
-            onColumnChange={(nodeId, column) => {
-              if (nodeId === activeNodeId) {
-                setSelectedColumn(column);
-              }
-            }}
-            nodeColors={nodeColors}
-            onColorChange={() => {}}
-            defaultPalette={defaultPalette}
-            maxCompare={1}
-            className="rounded-lg border border-border/60 bg-muted/40"
-            showColorPicker={false}
-            showColumnPicker
-            showHeaderLabel
-            showShape
-            disabled={controlsDisabled}
-            originalCount={selectedNodes.length}
-            allowedDataTypes={['string']}
-            fallbackToAllColumns={false}
-            statusMessage={
-              hasSelection && stringColumns.length === 0
-                ? 'The selected data block has no string columns available for regex operations.'
-                : undefined
-            }
-            headerAddon={
-              <HelpIcon
-                targetKey="preprocessing.common.node-selection"
-                label="Selected data blocks"
-                className="h-4 w-4 text-muted-foreground"
-              />
-            }
-          />
+          {renderNodeInputsPanel?.()}
+
+          {hasSelection && stringColumns.length === 0 && (
+            <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
+              The selected data block has no string columns available for regex operations.
+            </div>
+          )}
 
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-32 space-y-2">

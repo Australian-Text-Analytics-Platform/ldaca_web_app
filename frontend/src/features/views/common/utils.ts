@@ -1,6 +1,3 @@
-import type { QueryClient } from '@tanstack/react-query';
-import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '@/features/workspace/common/hooks/useSchemaManagement';
-
 /** Default result row limit used by analysis panels when preferences are absent. */
 export const DEFAULT_TOKEN_LIMIT = 25;
 
@@ -70,8 +67,8 @@ export interface AnalysisNodeRequestShape {
 
 /**
  * Extracts the node/column selection shape shared by multi-node analysis task
- * requests so hydration and lock restoration can reuse one parser.
- * Used by: token-frequency hydration and lock restoration because backend requests store node_ids and node_columns that must become ordered selections.
+ * requests so hydration and legacy tab-input migration can reuse one parser.
+ * Used by: analysis hydration because backend requests store node_ids and node_columns that must become ordered selections.
  * Flow: slice valid node_ids to the requested limit, read the node_columns map, then return node ids, column lookup, and ordered selections.
  */
 export const parseAnalysisNodeRequest = (
@@ -95,58 +92,4 @@ export const parseAnalysisNodeRequest = (
   }));
 
   return { nodeIds, nodeColumns, selections };
-};
-
-export interface RestoreAnalysisLockFromRequestArgs {
-  workspaceId?: string | null;
-  requestData: AnalysisNodeRequestShape | null | undefined;
-  getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
-  /** Shared TanStack QueryClient — node-info reads route through its cache. */
-  queryClient: QueryClient;
-  maxNodes?: number;
-}
-
-/**
- * Rebuilds the locked node snapshots from a persisted task request, allowing
- * feature panels and task-center restores to show the exact submitted columns.
- * Used by: analysis task-flow hooks and hydration callbacks because restoring a task request must lock the same submitted nodes and selected columns in the UI.
- */
-export const restoreAnalysisLockFromRequest = async ({
-  workspaceId,
-  requestData,
-  getAuthHeaders,
-  lockWithSnapshots,
-  queryClient,
-  maxNodes = 2,
-}: RestoreAnalysisLockFromRequestArgs): Promise<ParsedAnalysisNodeRequest> => {
-  const parsed = parseAnalysisNodeRequest(requestData, maxNodes);
-
-  if (workspaceId && parsed.nodeIds.length) {
-    const snapshots = await createNodeSnapshots(
-      workspaceId,
-      parsed.nodeIds,
-      getAuthHeaders,
-      queryClient,
-    );
-    const normalizedSnapshots = applySelectedColumnsToSnapshots(snapshots, parsed.nodeColumns);
-    lockWithSnapshots(normalizedSnapshots);
-  }
-
-  return parsed;
-};
-
-export interface ResetAnalysisSelectionAfterClearArgs {
-  unlockSelection: () => void;
-}
-
-/**
- * Provides a common post-clear hook for analyses that only need to unlock their
- * current selection after backend task records have been removed.
- * Used by: analysis clear handlers because tabs that only lock selections can release them through a tiny shared post-clear action.
- */
-export const resetAnalysisSelectionAfterClear = ({
-  unlockSelection,
-}: ResetAnalysisSelectionAfterClearArgs): void => {
-  unlockSelection();
 };

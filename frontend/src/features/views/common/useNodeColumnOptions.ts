@@ -120,7 +120,7 @@ const buildNodeColumnOptionsMap = ({
 /**
  * Hook wrapper around the pure column-option builder for components that receive
  * live workspace nodes from React state.
- * Used by: NodeSelectionPanel when building selectable columns for active nodes because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Used by: selection/input panels when building selectable columns for active nodes because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  */
 export const useNodeColumnOptions = (config: UseNodeColumnOptionsConfig): NodeColumnOptionsMap => {
   const { nodes = [], getNodeColumns, allowedDataTypes, fallbackToAllColumns } = config;

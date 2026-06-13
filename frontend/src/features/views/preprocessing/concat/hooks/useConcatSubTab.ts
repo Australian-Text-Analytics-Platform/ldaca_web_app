@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
-} from '@/features/views/common/components/NodeSelectionPanel';
+} from '@/features/views/common/nodeSelectionTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   ConcatNodeSummary,
@@ -111,7 +111,7 @@ export interface UseConcatSubTabResult {
 }
 
 /**
- * Placeholder handler for NodeSelectionPanel callbacks hidden in concat mode.
+ * Placeholder handler for display-only node input callbacks hidden in concat mode.
  * Used by: local callers in preprocessing/useConcatSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
 const noop = () => undefined;

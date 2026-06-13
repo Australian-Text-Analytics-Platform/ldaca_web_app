@@ -15,10 +15,33 @@ vi.mock('../../../../../../components/help/InfoIcon', () => ({
   default: () => null,
 }));
 
-vi.mock('../../../../../../components/NodeSelectionPanel', () => ({
-  // Used by: NodeSelectionPanel mock module factory to provide a stable marker because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-  default: () => <div data-testid="node-selection-panel" />,
+vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
+  // Used by: NodeInputsPanel mock module factory to provide a stable marker because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
+  NodeInputsPanel: () => <div data-testid="node-inputs-panel" />,
 }));
+
+const nodeInputsFixture = (selectedNodes: Array<{ id?: string; name?: string }> = []) => ({
+  inputs: selectedNodes.map((node) => ({ node_id: node.id ?? '', column: 'text' })),
+  resolvedNodes: selectedNodes.map((node) => ({
+    id: node.id ?? '',
+    name: node.name ?? node.id ?? '',
+    node,
+    column: 'text',
+    columnOptions: [{ name: 'text', dataType: 'string' }],
+  })),
+  selectedNodes,
+  nodeColumnSelections: selectedNodes.map((node) => ({ nodeId: node.id ?? '', column: 'text' })),
+  availableNodes: [],
+  canAddMore: true,
+  addNodes: vi.fn(() => []),
+  getAddRejection: vi.fn(() => null),
+  removeNode: vi.fn(),
+  clear: vi.fn(),
+  setColumn: vi.fn(),
+  graphSelectedIds: [],
+  workspaceId: 'workspace-1',
+  recentPresets: [],
+});
 
 vi.mock('../../../../common/components/AnalysisCardLayout', () => ({
   // Used by: AnalysisCardLayout mock module factory to preserve children under test because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
@@ -30,15 +53,11 @@ vi.mock('../../../../common/components/AnalysisCardLayout', () => ({
  * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
  */
 const baseProps = {
-  selectedNodes: [],
-  nodeColumnSelections: [],
+  nodeInputs: nodeInputsFixture(),
   onColumnChange: vi.fn(),
   nodeColors: {},
   onNodeColorChange: vi.fn(),
   defaultPalette: [],
-  isLocked: false,
-  // Used by: baseProps to supply an empty schema unless a test overrides column options because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-  getNodeColumns: () => [],
   actionState: { runDisabled: false, clearDisabled: false, runLabel: 'Run Analysis' },
   corpusSamples: [],
   nodeDocCounts: [],
@@ -91,7 +110,7 @@ describe('TopicModelingParameterPanel', () => {
     render(
       <TopicModelingParameterPanel
         {...baseProps}
-        selectedNodes={[{ id: 'n1', name: 'Corpus A' }]}
+        nodeInputs={nodeInputsFixture([{ id: 'n1', name: 'Corpus A' }])}
         corpusSamples={[{ percent: '50', enabled: true }]}
         nodeDocCounts={[8000]}
       />,
@@ -107,7 +126,7 @@ describe('TopicModelingParameterPanel', () => {
     render(
       <TopicModelingParameterPanel
         {...baseProps}
-        selectedNodes={[{ id: 'n1', name: 'Corpus A' }]}
+        nodeInputs={nodeInputsFixture([{ id: 'n1', name: 'Corpus A' }])}
         corpusSamples={[{ percent: '40', enabled: false }]}
         nodeDocCounts={[10000]}
       />,
@@ -124,7 +143,7 @@ describe('TopicModelingParameterPanel', () => {
     render(
       <TopicModelingParameterPanel
         {...baseProps}
-        selectedNodes={[{ id: 'n1', name: 'Corpus A' }]}
+        nodeInputs={nodeInputsFixture([{ id: 'n1', name: 'Corpus A' }])}
         corpusSamples={[{ percent: '10', enabled: true }]}
         nodeDocCounts={[1000]}
         showSamplingWarning={true}

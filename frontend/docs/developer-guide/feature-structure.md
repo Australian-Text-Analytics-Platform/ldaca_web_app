@@ -76,8 +76,12 @@ Shared code used by multiple views lives in `views/common/`:
 
 - `common/components/` — shared dialogs (`DetachColumnsDialog`, `DatetimeFormatPanel`),
   pagination, row detail, chart, metadata/tokenizer selectors.
-- `common/hooks/` — shared hooks (`useAnalysisFeature`, `useAnalysisLock`,
+- `common/hooks/` — shared hooks (`useAnalysisFeature`, `useLastRunRequest`,
   `useDetachColumnsState`, `useMaterializeLifecycle`, etc.).
+- `common/tabs/` — Chrome-style analysis tab host and `tabs.json` sidecar
+  bridge. Each tab owns an optional `task_id` and an `inputs` node set.
+- `common/nodeInputs/` — add-node-as-needed input resolution, validation, and
+  persistence helpers used by analysis tabs and preprocessing subtabs.
 - `common/utils/` — shared utilities (`datetimeFormatInfer`).
 - `common/` root — shared helpers (`analysisTaskUtils`, `generatedColumns`,
   `runOrUpdate`, `palette`, etc.).
@@ -92,6 +96,15 @@ component AND all the reusable sub-tab implementations (filter, slice, join,
 concat, replace, aggregate, expression). Sub-tabs own their form state and
 preview/apply hooks, then delegate actual workspace mutations to
 `useWorkspaceActions()`.
+
+Preprocessing uses the same `NodeInputsPanel` as task-backed analysis views,
+but persists inputs per `(workspaceId, subtab)` in `preprocessingInputsStore`
+instead of `tabs.json`. `DataPreprocessingFeature` owns that state and passes a
+single `renderNodeInputsPanel` slot into each subtab; the subtab renders it at
+the top of its parameter card so preprocessing follows the same layout as the
+functional analysis tabs. The selected input node's schema is fetched by node id
+from `GET /workspaces/nodes/{node_id}/data`, so preprocessing does not depend
+on graph selection to populate column controls.
 
 ## Workspace Features
 

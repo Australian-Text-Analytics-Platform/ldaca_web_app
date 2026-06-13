@@ -3,7 +3,7 @@
  * per-workspace tab group for a given analysis type and renders the active
  * tab's analysis panel beneath the protruding tab strip.
  *
- * Why this exists: the orchestration (load tab group → auto-create one tab →
+ * Why this exists: the orchestration (load tab group → auto-create one tab on entry →
  * draw the tab bar → mount the feature keyed by the active tab) is identical
  * across concordance, token-frequency, quotation, topic-modeling, and
  * sequential-analysis. Centralizing it here means every view shares exactly the
@@ -14,11 +14,12 @@
  * which ViewRouter lazy-loads. Each wrapper passes its own ``tabGroup`` and
  * ``Feature``.
  * Flow: resolve workspace + auth, load this workspace's tab group, auto-create
- * one empty tab when the group is empty, render the shared tab bar, then mount
+ * one empty tab only when entering an empty group, render the shared tab bar, then mount
  * ``Feature`` keyed by the active tab id so switching tabs gives each tab a
  * fresh, independently-hydrated panel instance.
  */
-import { useEffect, type ComponentType } from 'react';
+import { useEffect, useRef, type ComponentType } from 'react';
+import type { AnalysisTabInput } from '@/api/generated/types.gen';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { AnalysisTabbedPanel } from './AnalysisTabbedPanel';
@@ -32,6 +33,10 @@ export interface AnalysisTabFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
+  /** This tab's owned input node set (add-node-as-needed selection). */
+  tabInputs?: AnalysisTabInput[];
+  /** Commit a new input node set for this tab (persists to tabs.json). */
+  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
 }
 
 export interface AnalysisTabsHostProps {
@@ -50,6 +55,7 @@ export interface AnalysisTabsHostProps {
 export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
+  const autoCreateKeyRef = useRef<string | null>(null);
 
   const {
     tabs,
@@ -59,17 +65,27 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     closeTab,
     renameTab,
     setActiveTab,
+    reorderTabs,
     setTabTask,
+    setTabInputs,
   } = useWorkspaceTabs(currentWorkspaceId, tabGroup, getAuthHeaders);
 
-  // Requirement: entering an empty analysis view must present one ready tab so
-  // the user can configure and run immediately. Gate on !isLoading so we don't
-  // create a duplicate tab before the persisted group has hydrated.
+  // Requirement: entering an empty analysis view presents one ready tab, but
+  // closing the final tab while already there must leave the group empty until
+  // the user clicks +. Gate on !isLoading so persisted groups hydrate first.
   useEffect(() => {
-    if (currentWorkspaceId && !isLoading && tabs.length === 0) {
+    if (!currentWorkspaceId) {
+      autoCreateKeyRef.current = null;
+      return;
+    }
+    if (isLoading) return;
+    const autoCreateKey = `${currentWorkspaceId}:${tabGroup}`;
+    if (autoCreateKeyRef.current === autoCreateKey) return;
+    autoCreateKeyRef.current = autoCreateKey;
+    if (tabs.length === 0) {
       createTab('Analysis 1');
     }
-  }, [currentWorkspaceId, isLoading, tabs.length, createTab]);
+  }, [currentWorkspaceId, tabGroup, isLoading, tabs.length, createTab]);
 
   const activeTab = tabs.find((t) => t.tab_id === activeTabId) ?? null;
 
@@ -81,6 +97,7 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
       onClose={closeTab}
       onCreate={() => createTab()}
       onRename={renameTab}
+      onReorder={reorderTabs}
     >
       {activeTab ? (
         // key forces a fresh mount per tab so each tab hydrates its own task
@@ -90,6 +107,8 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
           tabId={activeTab.tab_id}
           tabTaskId={activeTab.task_id ?? null}
           onTabTaskChange={(taskId) => setTabTask(activeTab.tab_id, taskId)}
+          tabInputs={activeTab.inputs ?? []}
+          onTabInputsChange={(inputs) => setTabInputs(activeTab.tab_id, inputs)}
         />
       ) : null}
     </AnalysisTabbedPanel>

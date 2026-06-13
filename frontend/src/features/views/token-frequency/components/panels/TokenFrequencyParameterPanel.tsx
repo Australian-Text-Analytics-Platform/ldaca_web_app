@@ -1,28 +1,21 @@
-import NodeSelectionPanel, {
-  type NodeSelectionColumnAddonArgs,
-} from '@/features/views/common/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
+import {
+  NodeInputsPanel,
+  type NodeInputColumnAddonArgs,
+} from '@/features/views/common/components/NodeInputsPanel';
 import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
-import type {
-  WorkspaceNodeLike,
-  NodeColumnSource,
-} from '@/features/views/common/nodeSelectionTypes';
+import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
 
 type TokenFrequencyParameterPanelProps = {
-  panelSelectedNodes: WorkspaceNodeLike[];
-  effectiveNodeColumnSelections: NodeColumnSelection[];
+  nodeInputs: UseTabNodeInputsResult;
   onColumnChange: (nodeId: string, column: string) => void;
   nodeColors: Record<string, string>;
   onColorChange: (nodeId: string, color: string) => void;
   defaultPalette: string[];
-  isLocked: boolean;
-  getNodeColumns: (node: WorkspaceNodeLike, idx?: number) => NodeColumnSource;
-  displayNodeCount: number;
   actionState: {
     runDisabled: boolean;
     clearDisabled: boolean;
@@ -42,8 +35,7 @@ type TokenFrequencyParameterPanelProps = {
   onStudyNodeChange: (nodeId: string) => void;
   getColorForNode: (nodeId: string, index?: number) => string;
   computeDisplayName: (nodeId: string) => string;
-  renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
-  lockedMessage?: string;
+  renderTokenizerModelSelector?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
 };
 
 /**
@@ -51,15 +43,11 @@ type TokenFrequencyParameterPanelProps = {
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export const TokenFrequencyParameterPanel = ({
-  panelSelectedNodes,
-  effectiveNodeColumnSelections,
+  nodeInputs,
   onColumnChange,
   nodeColors,
   onColorChange,
   defaultPalette,
-  isLocked,
-  getNodeColumns,
-  displayNodeCount,
   actionState,
   isAnalyzing,
   onAnalyze,
@@ -75,8 +63,9 @@ export const TokenFrequencyParameterPanel = ({
   getColorForNode,
   computeDisplayName,
   renderTokenizerModelSelector,
-  lockedMessage = ANALYSIS_LOCKED_MESSAGE,
 }: TokenFrequencyParameterPanelProps) => {
+  const panelSelectedNodes = nodeInputs.selectedNodes;
+  const effectiveNodeColumnSelections: NodeColumnSelection[] = nodeInputs.nodeColumnSelections;
   const hasMultipleNodes = panelSelectedNodes.length >= 2;
   const nodeOptions = panelSelectedNodes
     .map((node, index) => {
@@ -133,16 +122,9 @@ export const TokenFrequencyParameterPanel = ({
                   {nodeOptions.map((option) => {
                     const isActive = (studyNodeId ?? nodeOptions[0]?.id) === option.id;
                     return (
-                      <DisabledReasonTooltip
-                        key={option.id}
-                        reason={
-                          isLocked
-                            ? 'Clear results first to change the study data block'
-                            : undefined
-                        }
-                      >
+                      <DisabledReasonTooltip key={option.id} reason={undefined}>
                         <label
-                          className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors${isLocked ? ' cursor-not-allowed opacity-60' : ''}`}
+                          className="inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors"
                           title={option.label}
                           aria-label={option.label}
                         >
@@ -151,7 +133,6 @@ export const TokenFrequencyParameterPanel = ({
                             name="study-node"
                             value={option.id}
                             checked={isActive}
-                            disabled={isLocked}
                             onChange={() => onStudyNodeChange(option.id)}
                             className="sr-only"
                           />
@@ -179,24 +160,23 @@ export const TokenFrequencyParameterPanel = ({
         ),
       }}
     >
-      <NodeSelectionPanel
-        selectedNodes={panelSelectedNodes}
-        nodeColumnSelections={effectiveNodeColumnSelections}
+      <NodeInputsPanel
+        resolvedNodes={nodeInputs.resolvedNodes}
+        availableNodes={nodeInputs.availableNodes}
+        graphSelectedIds={nodeInputs.graphSelectedIds}
+        recentPresets={nodeInputs.recentPresets}
+        canAddMore={nodeInputs.canAddMore}
+        maxNodes={2}
+        onAddNodes={nodeInputs.addNodes}
+        getAddRejection={nodeInputs.getAddRejection}
+        onRemoveNode={nodeInputs.removeNode}
+        onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}
         nodeColors={nodeColors}
         onColorChange={onColorChange}
         defaultPalette={defaultPalette}
-        maxCompare={2}
-        className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
-        showShape
-        disabled={isLocked}
-        locked={isLocked}
         showColorPicker
-        getNodeColumns={getNodeColumns}
-        allowedDataTypes={['string']}
-        originalCount={displayNodeCount}
-        lockedMessage={lockedMessage}
-        renderColumnControlAddon={renderTokenizerModelSelector}
+        renderColumnAddon={renderTokenizerModelSelector}
       />
       <TokensColumnMismatchNotice
         nodes={panelSelectedNodes}

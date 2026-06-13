@@ -28,9 +28,9 @@ export interface NodeColumnSelectorProps {
 }
 
 /**
- * Renders the shared column selector used by analysis parameter panels, including
- * preserved lock values and disabled-reason tooltips.
- * Used by: NodeSelectionPanel and feature-specific column selection controls because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Renders the shared column selector used by analysis parameter panels,
+ * including disabled-reason tooltips for unavailable controls.
+ * Used by: node input/selection panels and feature-specific column selection controls because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function NodeColumnSelector({
@@ -81,7 +81,9 @@ export function NodeColumnSelector({
           </SelectTrigger>
           <SelectContent>
             {clearOptionValue && (
-              <SelectItem value={clearOptionValue}>{clearOptionLabel}</SelectItem>
+              <SelectItem key={clearOptionValue} value={clearOptionValue}>
+                {clearOptionLabel}
+              </SelectItem>
             )}
             {optionValues.map((column) => (
               <SelectItem key={column} value={column}>

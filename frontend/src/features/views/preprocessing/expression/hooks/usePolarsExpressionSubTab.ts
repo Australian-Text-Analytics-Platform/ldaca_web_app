@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import type {
   FilterPreviewResponse,
   PolarsExpressionRequest,

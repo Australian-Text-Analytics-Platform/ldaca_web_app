@@ -71,7 +71,7 @@ export async function createNodeSnapshot(
 
 /** Builds resilient node snapshots for multi-node analysis requests, falling back per-node on fetch failure. */
 /**
- * Used by: src/features/views/common/useAnalysisLockMachine.ts, src/features/views/common/utils.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: schema hydration helpers and schema-management tests because callers need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: fetch snapshots concurrently, catch per-node failures, and substitute empty fallback snapshots so one bad node does not abort the batch.
  */
 export async function createNodeSnapshots(
@@ -100,7 +100,7 @@ export async function createNodeSnapshots(
 
 /** Narrows each snapshot to the selected analysis column while keeping a first-column fallback. */
 /**
- * Used by: src/features/views/common/useAnalysisLockMachine.ts, src/features/views/common/utils.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: schema hydration helpers and schema-management tests because callers need reusable fixtures or mocks before exercising the behavior under assertion.
  * Flow: choose each snapshot's selected column when present, fall back to its first valid column, then return narrowed snapshot copies for task submission.
  */
 export function applySelectedColumnsToSnapshots<T extends { id: string; columns?: string[] }>(

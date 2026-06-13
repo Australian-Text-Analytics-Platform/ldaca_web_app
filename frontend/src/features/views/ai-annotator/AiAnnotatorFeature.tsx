@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
+import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -16,7 +15,11 @@ import {
   runAiAnnotation,
   saveAiAnnotation,
 } from '@/api/generated/sdk.gen';
-import type { AiAnnotationNodeResult, AiAnnotationResponse } from '@/api/generated/types.gen';
+import type {
+  AiAnnotationNodeResult,
+  AiAnnotationResponse,
+  AnalysisTabInput,
+} from '@/api/generated/types.gen';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,13 +36,10 @@ import { useUIStore } from '@/stores/uiStore';
 import {
   getNodeIdentifier,
   useAnalysisFeature,
-  useAnalysisLockMachine,
   extractAndSetTaskId,
-  restoreAnalysisLockFromRequest,
-  resetAnalysisSelectionAfterClear,
   useNodeColorManagement,
 } from '../common';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
+import { useTabNodeInputs } from '../common/nodeInputs';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -186,12 +186,11 @@ const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
 /** Provides the AI annotation workspace tab, including task launch, result review, save, and detach flows. */
 /**
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
 function AiAnnotatorFeature() {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
-  const queryClient = useQueryClient();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'ai-annotator';
   const [endpointPreset, setEndpointPreset] = useState<EndpointPreset>(
@@ -248,25 +247,18 @@ function AiAnnotatorFeature() {
 
   // AI annotation tab: optional target annotation column
   const [aiAnnotationColumn, setAiAnnotationColumn] = useState('');
+  const [inputNodes, setInputNodes] = useState<AnalysisTabInput[]>([]);
 
-  const {
-    isLocked,
-    panelSelectedNodes,
-    displayNodeCount,
-    nodeColumnSelections,
-    activeNodeColumnSelections,
-    setNodeColumnSelection,
-    lockWithSnapshots,
-    unlockSelection,
-  } = useAnalysisLockMachine({
-    workspaceId: currentWorkspaceId,
-    getAuthHeaders,
-    allowedDataTypes: ['string'],
-    maxNodes: 1,
-    docTypeOnly: true,
+  const nodeInputs = useTabNodeInputs({
+    tabInputs: inputNodes,
+    onTabInputsChange: setInputNodes,
+    constraints: {
+      allowedDataTypes: ['string'],
+      maxNodes: 1,
+      docTypeOnly: true,
+    },
   });
-
-  const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
+  const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
   const displayedNodeIds = displayedNodes
     .map((node, idx) => getNodeIdentifier(node, idx))
     .filter((id): id is string => Boolean(id));
@@ -280,8 +272,8 @@ function AiAnnotatorFeature() {
       tabKey: 'ai-annotator',
     });
 
-  const effectiveSelections = (isLocked ? activeNodeColumnSelections : nodeColumnSelections).filter(
-    (selection) => displayedNodeIds.includes(selection.nodeId),
+  const effectiveSelections = nodeInputs.nodeColumnSelections.filter((selection) =>
+    displayedNodeIds.includes(selection.nodeId),
   );
 
   const { getColumnInfos } = useNodeColumnInfos({
@@ -294,7 +286,7 @@ function AiAnnotatorFeature() {
    * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleColumnChange = (nodeId: string, column: string) => {
-    setNodeColumnSelection(nodeId, column);
+    nodeInputs.setColumn(nodeId, column);
   };
 
   const selectedNodeId = displayedNodeIds[0] ?? null;
@@ -394,7 +386,7 @@ function AiAnnotatorFeature() {
     },
     // Restores annotation request parameters enough to rebuild the analysis lock.
     // Called by: AiAnnotatorFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
-    onHydratedRequest: async (requestPayload) => {
+    onHydratedRequest: (requestPayload) => {
       const requestData = (requestPayload as Record<string, unknown> | null) ?? null;
       if (!requestData) {
         return;
@@ -404,21 +396,14 @@ function AiAnnotatorFeature() {
       setAiAnnotationColumn(
         typeof hydratedAnnotationColumn === 'string' ? hydratedAnnotationColumn : '',
       );
-
-      try {
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: requestData as {
-            node_ids?: string[];
-            node_columns?: Record<string, string>;
-          },
-          getAuthHeaders,
-          lockWithSnapshots,
-          queryClient,
-          maxNodes: 1,
-        });
-      } catch {
-        // best-effort lock restoration
+      const nodeIds = Array.isArray(requestData.node_ids)
+        ? (requestData.node_ids as string[]).slice(0, 1)
+        : [];
+      const nodeColumns = (requestData.node_columns ?? {}) as Record<string, string>;
+      if (inputNodes.length === 0) {
+        setInputNodes(
+          nodeIds.map((nodeId) => ({ node_id: nodeId, column: nodeColumns[nodeId] ?? null })),
+        );
       }
     },
     // Resets local annotation state after the shared analysis lifecycle clears the task.
@@ -428,7 +413,6 @@ function AiAnnotatorFeature() {
       setResultNodeId(null);
       setResultNode(null);
       setStatusMessage('AI annotation state cleared.');
-      resetAnalysisSelectionAfterClear({ unlockSelection });
     },
   });
 
@@ -528,7 +512,7 @@ function AiAnnotatorFeature() {
   // Starts a backend detach task that materializes annotations into a new workspace node.
   /**
    * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const handleDetach = async () => {
     if (!selectedNodeId || !selectedColumn) {
@@ -579,7 +563,7 @@ function AiAnnotatorFeature() {
   // Submits the active node and column to the annotation backend and locks that context.
   /**
    * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const handleRun = async () => {
     if (!selectedNodeId || !selectedColumn) {
@@ -619,21 +603,6 @@ function AiAnnotatorFeature() {
       applyResponseResult(response ?? null);
       setStatusMessage(response?.message ?? 'AI annotation request submitted.');
 
-      try {
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: {
-            node_ids: [selectedNodeId],
-            node_columns: { [selectedNodeId]: selectedColumn },
-          },
-          getAuthHeaders,
-          lockWithSnapshots,
-          queryClient,
-          maxNodes: 1,
-        });
-      } catch {
-        // best-effort lock after run
-      }
     } catch (error) {
       setStatusMessage(
         `Failed to run AI annotation: ${error instanceof Error ? error.message : String(error)}`,
@@ -960,7 +929,7 @@ function AiAnnotatorFeature() {
   // Auto-saves a review cell when its draft differs from the persisted annotation value.
   /**
    * Called by: AiAnnotatorFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const handleReviewInputBlur = async (
     row: Record<string, unknown>,
@@ -1255,82 +1224,65 @@ function AiAnnotatorFeature() {
                   </p>
                 </div>
 
-                <NodeSelectionPanel
-                  selectedNodes={displayedNodes}
-                  nodeColumnSelections={[]}
-                  onColumnChange={() => {}}
+                <NodeInputsPanel
+                  resolvedNodes={nodeInputs.resolvedNodes}
+                  availableNodes={nodeInputs.availableNodes}
+                  graphSelectedIds={nodeInputs.graphSelectedIds}
+                  recentPresets={nodeInputs.recentPresets}
+                  canAddMore={nodeInputs.canAddMore}
+                  maxNodes={1}
+                  onAddNodes={nodeInputs.addNodes}
+                  getAddRejection={nodeInputs.getAddRejection}
+                  onRemoveNode={nodeInputs.removeNode}
+                  onClear={nodeInputs.clear}
+                  onColumnChange={handleColumnChange}
                   nodeColors={nodeColors}
                   onColorChange={handleColorChange}
-                  getNodeColumns={getColumnInfos}
                   defaultPalette={defaultPalette}
-                  maxCompare={1}
-                  className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
-                  showShape
                   showColorPicker
                   showColumnPicker={false}
-                  disabled={isLocked}
-                  locked={isLocked}
-                  originalCount={displayNodeCount}
-                  renderExtraNodeContent={() => (
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <div className="space-y-1">
-                        <Label
-                          className="text-xs font-medium text-muted-foreground"
-                          htmlFor="ai-text-column"
-                        >
-                          Text Column
-                        </Label>
-                        <Select
-                          value={selectedColumn}
-                          onValueChange={(value) => {
-                            if (selectedNodeId) {
-                              handleColumnChange(selectedNodeId, value);
-                            }
-                          }}
-                          disabled={isLocked}
-                        >
-                          <SelectTrigger id="ai-text-column" className="w-full text-sm">
-                            <SelectValue placeholder="Select text column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {aiStringColumns.map((ci) => (
-                              <SelectItem key={ci.name} value={ci.name}>
-                                {ci.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label
-                          className="text-xs font-medium text-muted-foreground"
-                          htmlFor="ai-annotation-column"
-                        >
-                          Annotation Column
-                        </Label>
-                        <Select
-                          value={aiAnnotationColumn || '__none__'}
-                          onValueChange={(value) =>
-                            setAiAnnotationColumn(value === '__none__' ? '' : value)
-                          }
-                          disabled={isLocked}
-                        >
-                          <SelectTrigger id="ai-annotation-column" className="w-full text-sm">
-                            <SelectValue placeholder="Select annotation column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">Create new annotation column</SelectItem>
-                            {aiAnnotationColumns.map((ci) => (
-                              <SelectItem key={ci.name} value={ci.name}>
-                                {ci.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
                 />
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-muted-foreground" htmlFor="ai-text-column">
+                      Text Column
+                    </Label>
+                    <Select
+                      value={selectedColumn}
+                      onValueChange={(value) => {
+                        if (selectedNodeId) handleColumnChange(selectedNodeId, value);
+                      }}
+                    >
+                      <SelectTrigger id="ai-text-column" className="w-full text-sm">
+                        <SelectValue placeholder="Select text column" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {aiStringColumns.map((ci) => (
+                          <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-muted-foreground" htmlFor="ai-annotation-column">
+                      Annotation Column
+                    </Label>
+                    <Select
+                      value={aiAnnotationColumn || '__none__'}
+                      onValueChange={(value) => setAiAnnotationColumn(value === '__none__' ? '' : value)}
+                    >
+                      <SelectTrigger id="ai-annotation-column" className="w-full text-sm">
+                        <SelectValue placeholder="Select annotation column" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Create new annotation column</SelectItem>
+                        {aiAnnotationColumns.map((ci) => (
+                          <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="space-y-2">
@@ -1507,75 +1459,56 @@ function AiAnnotatorFeature() {
                 </p>
               </div>
 
-              <NodeSelectionPanel
-                selectedNodes={displayedNodes}
-                nodeColumnSelections={[]}
-                onColumnChange={() => {}}
+              <NodeInputsPanel
+                resolvedNodes={nodeInputs.resolvedNodes}
+                availableNodes={nodeInputs.availableNodes}
+                graphSelectedIds={nodeInputs.graphSelectedIds}
+                recentPresets={nodeInputs.recentPresets}
+                canAddMore={nodeInputs.canAddMore}
+                maxNodes={1}
+                onAddNodes={nodeInputs.addNodes}
+                getAddRejection={nodeInputs.getAddRejection}
+                onRemoveNode={nodeInputs.removeNode}
+                onClear={nodeInputs.clear}
+                onColumnChange={handleColumnChange}
                 nodeColors={nodeColors}
                 onColorChange={handleColorChange}
-                getNodeColumns={getColumnInfos}
                 defaultPalette={defaultPalette}
-                maxCompare={1}
-                className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
-                showShape
                 showColorPicker
                 showColumnPicker={false}
-                disabled={isLocked}
-                locked={isLocked}
-                originalCount={displayNodeCount}
-                renderExtraNodeContent={() => (
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label
-                        className="text-xs font-medium text-muted-foreground"
-                        htmlFor="review-text-column"
-                      >
-                        Text Column
-                      </Label>
-                      <Select
-                        value={reviewTextColumn}
-                        onValueChange={setReviewTextColumn}
-                        disabled={isLocked}
-                      >
-                        <SelectTrigger id="review-text-column" className="w-full text-sm">
-                          <SelectValue placeholder="Select text column" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {reviewStringColumns.map((ci) => (
-                            <SelectItem key={ci.name} value={ci.name}>
-                              {ci.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label
-                        className="text-xs font-medium text-muted-foreground"
-                        htmlFor="review-annotation-column"
-                      >
-                        Annotation Column
-                      </Label>
-                      <Select
-                        value={reviewAnnotationColumn}
-                        onValueChange={setReviewAnnotationColumn}
-                        disabled={isLocked}
-                      >
-                        <SelectTrigger id="review-annotation-column" className="w-full text-sm">
-                          <SelectValue placeholder="Select annotation column" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {reviewAnnotationColumns.map((ci) => (
-                            <SelectItem key={ci.name} value={ci.name}>
-                              {ci.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
               />
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-muted-foreground" htmlFor="review-text-column">
+                    Text Column
+                  </Label>
+                  <Select value={reviewTextColumn} onValueChange={setReviewTextColumn}>
+                    <SelectTrigger id="review-text-column" className="w-full text-sm">
+                      <SelectValue placeholder="Select text column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {reviewStringColumns.map((ci) => (
+                        <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-muted-foreground" htmlFor="review-annotation-column">
+                    Annotation Column
+                  </Label>
+                  <Select value={reviewAnnotationColumn} onValueChange={setReviewAnnotationColumn}>
+                    <SelectTrigger id="review-annotation-column" className="w-full text-sm">
+                      <SelectValue placeholder="Select annotation column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {reviewAnnotationColumns.map((ci) => (
+                        <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

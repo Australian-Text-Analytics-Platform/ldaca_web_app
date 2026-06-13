@@ -20,7 +20,7 @@ export type NodeColumnSource = string[] | ColumnInfo[];
 /**
  * Gives shared analysis selection UIs a stable id even when backend previews use
  * either node_id or id fields, with index fallback for incomplete fixtures.
- * Used by: analysis node selectors, lock restoration, and per-node result panels because backend nodes may arrive with id, node_id, or neither in tests and fixtures.
+ * Used by: analysis node selectors and per-node result panels because backend nodes may arrive with id, node_id, or neither in tests and fixtures.
  */
 export const getNodeIdentifier = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
   node.id || node.node_id || `node-${fallbackIndex}`;

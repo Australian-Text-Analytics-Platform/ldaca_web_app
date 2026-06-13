@@ -5,7 +5,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
-} from '@/features/views/common/components/NodeSelectionPanel';
+} from '@/features/views/common/nodeSelectionTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   JoinPreviewRequestPayload,
@@ -27,6 +27,7 @@ const DEFAULT_JOIN_PALETTE = ['#2563eb', '#dc2626'];
 
 export interface JoinSubTabProps {
   selectedNodeIds: string[];
+  selectedNodeColumns: Record<string, string>;
   currentWorkspaceId: string | null;
   workspaceNodes: WorkspaceNodeLike[];
   joinNodes: (
@@ -149,8 +150,15 @@ const resolveJoinColumn = (
  * and keep auto-generated node names in sync with selections.
  */
 export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
-  const { selectedNodeIds, currentWorkspaceId, workspaceNodes, joinNodes, isLoading, onAlert } =
-    props;
+  const {
+    selectedNodeIds,
+    selectedNodeColumns,
+    currentWorkspaceId,
+    workspaceNodes,
+    joinNodes,
+    isLoading,
+    onAlert,
+  } = props;
   const { getAuthHeaders } = useAuth();
 
   const [joinLeftColumnDraft, setJoinLeftColumnDraft] = useState<JoinColumnDraft | null>(null);
@@ -211,11 +219,17 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   })();
 
   const preferredJoinColumn = sharedColumns[0];
+  const preferredLeftColumn = leftColumns.includes(selectedNodeColumns[joinLeftNodeId] ?? '')
+    ? selectedNodeColumns[joinLeftNodeId]
+    : preferredJoinColumn;
+  const preferredRightColumn = rightColumns.includes(selectedNodeColumns[joinRightNodeId] ?? '')
+    ? selectedNodeColumns[joinRightNodeId]
+    : preferredJoinColumn;
   const joinLeftColumn = needsColumns
-    ? resolveJoinColumn(joinLeftNodeId, leftColumns, joinLeftColumnDraft, preferredJoinColumn)
+    ? resolveJoinColumn(joinLeftNodeId, leftColumns, joinLeftColumnDraft, preferredLeftColumn)
     : '';
   const joinRightColumn = needsColumns
-    ? resolveJoinColumn(joinRightNodeId, rightColumns, joinRightColumnDraft, preferredJoinColumn)
+    ? resolveJoinColumn(joinRightNodeId, rightColumns, joinRightColumnDraft, preferredRightColumn)
     : '';
 
   const joinNodeSelections: NodeColumnSelection[] = (() => {
@@ -443,7 +457,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     columnLabelFn,
     onColumnChange: handleJoinColumnChange,
     onColorChange: handleJoinColorChange,
-    // Lets NodeSelectionPanel render column options from the hook's normalized
+    // Lets the preprocessing input panel render column options from the hook's normalized
     // workspace-node map instead of reading raw node metadata itself.
     // Called by: useJoinSubTab object consumers because consumers need this callback at the object boundary instead of recreating it inline.
     getNodeColumns: (node: WorkspaceNodeLike) => {

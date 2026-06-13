@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   concordanceDetachOptions,
@@ -23,17 +22,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import type { MultiSeriesChartType } from '@/features/views/common/components/MultiSeriesChart';
 import {
-  hasLockedParameterDiff,
-  resetAnalysisSelectionAfterClear,
-  restoreAnalysisLockFromRequest,
-  useAnalysisLock,
+  useLastRunRequest,
   useAnalysisFeature,
   useNodeColorManagement,
   useSafeResult,
   EXTENDED_PALETTE,
-  getAnalysisActionState,
-  executeAnalysisRunOrUpdate,
+  executeAnalysisRerun,
 } from '../common';
+import { useTabNodeInputs } from '../common/nodeInputs';
+import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { hasParameterDiff } from '../common/parameterComparison';
+import type { AnalysisTabInput } from '@/api/generated/types.gen';
 import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
@@ -74,7 +73,7 @@ type ConcordanceGroupedRow = Record<string, unknown>[];
 /** Orchestrates the full concordance analysis UI, task lifecycle, and detach flows. */
 /**
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props (optional): when rendered inside an analysis tab by
  * ConcordanceTabbedFeature, ``tabId`` identifies the active tab, ``tabTaskId``
@@ -86,12 +85,16 @@ export interface ConcordanceFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
+  tabInputs?: AnalysisTabInput[];
+  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
 }
 
 function ConcordanceFeature({
   tabId,
   tabTaskId,
   onTabTaskChange,
+  tabInputs,
+  onTabInputsChange,
 }: ConcordanceFeatureProps = {}) {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
@@ -108,7 +111,6 @@ function ConcordanceFeature({
   });
 
   const { getAuthHeaders } = useAuth();
-  const queryClient = useQueryClient();
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
@@ -118,31 +120,59 @@ function ConcordanceFeature({
     getAuthHeaders,
   });
   const {
-    isLocked,
-    lockWithSnapshots,
-    unlockSelection,
     nodeColumnSelections,
-    setNodeColumnSelection,
-    setNodeColumnSelections,
-    recomputeAutoColumns,
-    activeNodeColumnSelections,
-    activeNodeIds,
-    panelSelectedNodes: livePanelSelectedNodes,
-    displayNodeCount,
-    serverRequest,
-  } = useAnalysisLock({
+    setColumn: setNodeColumnSelection,
+    selectedNodes: panelSelectedNodes,
+    resolvedNodes: inputResolvedNodes,
+    addNodes,
+    removeNode,
+    clear: clearInputs,
+    getAddRejection,
+    availableNodes,
+    canAddMore,
+    graphSelectedIds,
+  } = useTabNodeInputs({
+    tabInputs,
+    onTabInputsChange,
+    constraints: {
+      allowedDataTypes: ['string'],
+      maxNodes: 2,
+      docTypeOnly: true,
+    },
+  });
+  // Shared node-inputs result re-bundled for the parameter panel.
+  const nodeInputs = {
+    nodeColumnSelections,
+    setColumn: setNodeColumnSelection,
+    selectedNodes: panelSelectedNodes,
+    resolvedNodes: inputResolvedNodes,
+    addNodes,
+    removeNode,
+    clear: clearInputs,
+    getAddRejection,
+    availableNodes,
+    canAddMore,
+    graphSelectedIds,
+  } as ReturnType<typeof useTabNodeInputs>;
+  // Add-node-as-needed model has no lock; ids derive from the inputs.
+  const activeNodeIds = inputResolvedNodes.map((r) => r.id);
+  // Last-run request, used only to compute the Run vs Re-run button state.
+  const { serverRequest } = useLastRunRequest({
     analysisType: 'concordance_analysis',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
-    // Tab-scoped locking: bind the lock to this tab's persisted task so it stays
-    // independent of sibling tabs (which share the same workspace +
-    // analysisType). tabTaskId is null for a fresh tab that has not run yet
-    // (unlocked).
     taskId: tabTaskId ?? null,
-    allowedDataTypes: ['string'],
-    maxNodes: 2,
-    docTypeOnly: true,
   });
+  /** Replaces this tab's inputs from a node/column selection list (hydration + handoff). */
+  const applyInputsFromSelections = (
+    sels: Array<{ nodeId: string; column?: string | null }>,
+  ) => {
+    onTabInputsChange?.(
+      sels
+        .filter((s) => s.nodeId)
+        .map((s) => ({ node_id: s.nodeId, column: s.column ?? null })),
+    );
+  };
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
   const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
   const setTasks = useAnalysisStore((state) => state.setTasks);
@@ -223,7 +253,6 @@ function ConcordanceFeature({
     useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
 
-  const panelSelectedNodes = livePanelSelectedNodes;
   const results = liveResults;
   const materializedPaths = liveMaterializedPaths;
   const materializedBins = liveMaterializedBins;
@@ -461,9 +490,7 @@ function ConcordanceFeature({
 
   // Hoisted up so the metadata-column hook can read it (it consults each
   // panel node's selected text column to exclude it from the metadata list).
-  const effectiveNodeColumnSelections = useMemo(() => {
-    return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
-  }, [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
+  const effectiveNodeColumnSelections = nodeColumnSelections;
 
   const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } =
     useConcordanceMetadataColumns({
@@ -623,7 +650,6 @@ function ConcordanceFeature({
     setIsRunning: setIsSearching,
     taskStatus: concordanceTaskStatus,
     banner: concordanceWaitingBanner,
-    hasActiveTask,
     hydrationState,
     clearResults,
     stopTask,
@@ -676,7 +702,7 @@ function ConcordanceFeature({
     },
     /** Restores concordance form controls and materialized caches from a saved request. */
     // Called by: useAnalysisFeature hydration because restored concordance tasks must rebuild node selections, search options, materialized paths, and bin caches together. Flow: unwrap the saved request, apply form fields, restore materialized metadata, then lock the submitted nodes.
-    onHydratedRequest: async (requestPayload) => {
+    onHydratedRequest: (requestPayload) => {
       const req = (requestPayload as Record<string, unknown>)?.data ?? requestPayload;
       if (!req || typeof req !== 'object') return;
       const reqObj = req as Record<string, unknown>;
@@ -684,7 +710,13 @@ function ConcordanceFeature({
       const node_columns: Record<string, string> =
         (reqObj.node_columns as Record<string, string>) || {};
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-      setNodeColumnSelections(sels, { replace: true });
+      // Legacy migration only: a tab that ran before the add-node-as-needed
+      // model has a task_id but no persisted inputs. Seed them once from the
+      // saved request. Tabs created under the new model already carry inputs,
+      // so we never clobber the user's curated selection here.
+      if (!tabInputs || tabInputs.length === 0) {
+        applyInputsFromSelections(sels);
+      }
       setSearchWord(String(reqObj.search_word || ''));
       setNumLeftTokens(Number(reqObj.num_left_tokens ?? 10));
       setNumRightTokens(Number(reqObj.num_right_tokens ?? 10));
@@ -728,18 +760,6 @@ function ConcordanceFeature({
         }
       }
       setMaterializeSummaries(nextSummaries);
-      try {
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: req,
-          getAuthHeaders,
-          lockWithSnapshots,
-          queryClient,
-          maxNodes: 2,
-        });
-      } catch {
-        /* ignore */
-      }
     },
     /** Clears result-specific state while preserving local controls when requested by handoff flows. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -753,9 +773,9 @@ function ConcordanceFeature({
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
       // a task the user explicitly cleared. Preserve-local-state clears (handoff
-      // flows) intentionally keep the tab→task link.
+      // flows) intentionally keep the tab→task link. Inputs are intentionally
+      // left intact so the user keeps their curated selection after clearing.
       onTabTaskChange?.(null);
-      resetAnalysisSelectionAfterClear({ unlockSelection });
     },
     /** Keeps the global task list free of concordance task duplicates after lifecycle updates. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -800,7 +820,6 @@ function ConcordanceFeature({
     state: {
       currentWorkspaceId,
       searchWord,
-      isLocked,
       activeNodeIds,
       effectiveNodeColumnSelections,
       globalPageSize,
@@ -813,7 +832,6 @@ function ConcordanceFeature({
       wholeWord,
       caseSensitive,
       searchMode,
-      tabId,
     },
     actions: {
       setNodePagination,
@@ -834,12 +852,10 @@ function ConcordanceFeature({
     },
     lock: {
       getAuthHeaders,
-      lockWithSnapshots,
       resolveTaskId,
       detachConcordance,
       detachConcordanceDispersion,
       materializeConcordance,
-      queryClient,
     },
   });
 
@@ -857,58 +873,65 @@ function ConcordanceFeature({
       });
       return updated;
     });
-    if (!isLocked) {
-      void persistResultPreferences({ pageSize: newSize });
-    }
+    void persistResultPreferences({ pageSize: newSize });
   };
 
-  const hasLockedParameterChanges = hasLockedParameterDiff({
-    isLocked,
-    serverRequest: (serverRequest as Record<string, unknown> | null) ?? null,
-    currentParams: {
-      search_word: searchWord,
-      num_left_tokens: numLeftTokens,
-      num_right_tokens: numRightTokens,
-      regex,
-      whole_word: wholeWord,
-      case_sensitive: caseSensitive,
-    },
-    /** Normalizes backend request aliases before comparing against live form values. */
-    // Called by: ConcordanceFeature lock diffing because submitted requests may use old token-count aliases and regex changes force whole_word false. Flow: read search/options from the request, normalize left/right token aliases and boolean flags, then return comparable concordance params.
-    getServerParams: (request) => ({
-      search_word: typeof request.search_word === 'string' ? request.search_word : '',
-      num_left_tokens:
-        typeof request.num_left_tokens === 'number'
-          ? request.num_left_tokens
-          : typeof request.num_tokens_left === 'number'
-            ? request.num_tokens_left
-            : 5,
-      num_right_tokens:
-        typeof request.num_right_tokens === 'number'
-          ? request.num_right_tokens
-          : typeof request.num_tokens_right === 'number'
-            ? request.num_tokens_right
-            : 5,
-      regex: typeof request.regex === 'boolean' ? request.regex : false,
-      whole_word:
-        typeof request.regex === 'boolean' && request.regex
-          ? false
-          : typeof request.whole_word === 'boolean'
-            ? request.whole_word
-            : true,
-      case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : false,
-    }),
+  // Run vs Re-run: with no locking, the primary button is gated purely by
+  // whether the current params or node inputs differ from the last run.
+  const lastRunRequest = (serverRequest as Record<string, unknown> | null) ?? null;
+  /** Normalizes a saved concordance request's params for diffing against live form values. */
+  const concordanceServerParams = (request: Record<string, unknown>) => ({
+    search_word: typeof request.search_word === 'string' ? request.search_word : '',
+    num_left_tokens:
+      typeof request.num_left_tokens === 'number'
+        ? request.num_left_tokens
+        : typeof request.num_tokens_left === 'number'
+          ? request.num_tokens_left
+          : 5,
+    num_right_tokens:
+      typeof request.num_right_tokens === 'number'
+        ? request.num_right_tokens
+        : typeof request.num_tokens_right === 'number'
+          ? request.num_tokens_right
+          : 5,
+    regex: typeof request.regex === 'boolean' ? request.regex : false,
+    whole_word:
+      typeof request.regex === 'boolean' && request.regex
+        ? false
+        : typeof request.whole_word === 'boolean'
+          ? request.whole_word
+          : true,
+    case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : false,
   });
+  const currentConcordanceParams = {
+    search_word: searchWord,
+    num_left_tokens: numLeftTokens,
+    num_right_tokens: numRightTokens,
+    regex,
+    whole_word: wholeWord,
+    case_sensitive: caseSensitive,
+  };
+  const hasLastRun = Boolean(lastRunRequest);
+  const hasChanges = !lastRunRequest
+    ? true
+    : hasParameterDiff(currentConcordanceParams, concordanceServerParams(lastRunRequest)) ||
+      hasNodeSelectionChanged(
+        nodeColumnSelections,
+        lastRunRequest.node_ids as string[] | undefined,
+        lastRunRequest.node_columns as Record<string, string> | undefined,
+      );
 
-  const actionState = getAnalysisActionState({
+  const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
-    hasSelection: panelSelectedNodes.length > 0,
-    isLocked,
-    hasResults: Boolean(results),
+    isRunnable:
+      panelSelectedNodes.length > 0 &&
+      Boolean(searchWord.trim()) &&
+      nodeColumnSelections.length > 0 &&
+      nodeColumnSelections.every((s) => Boolean(s.column)),
+    hasLastRun,
+    hasChanges,
     isBusy: isSearching,
-    hasActiveTask,
-    allowRunWhenLocked: hasLockedParameterChanges,
-    canUpdate: true,
+    hasResults: Boolean(results),
   });
 
   // Track whether initial preference hydration from server results has been
@@ -983,19 +1006,10 @@ function ConcordanceFeature({
     setNodePagination,
   });
 
-  // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
-  const selectedNodeIds = selectedNodes.map((node) => node.id).sort();
-  const selectedNodeIdsKey = selectedNodeIds.join('|');
-  const prevSelectedNodeIdsRef = React.useRef<string[] | null>(null);
-  useEffect(() => {
-    const prev = prevSelectedNodeIdsRef.current;
-    const curr = selectedNodeIds;
-    const changed = !prev || prev.length !== curr.length || prev.some((id, i) => id !== curr[i]);
-    if (changed && !isLocked) {
-      setResults(null);
-    }
-    prevSelectedNodeIdsRef.current = curr;
-  }, [selectedNodeIdsKey, isLocked, selectedNodeIds, setResults]);
+  // Preserve results across transient graph refetches. Under the add-node-as-
+  // needed model, editing a tab's inputs does NOT wipe the displayed results;
+  // it flips the primary button to "Re-run". So there is no selection-driven
+  // auto-clear effect here anymore.
 
   useEffect(() => {
     if (!currentWorkspaceId) {
@@ -1018,17 +1032,13 @@ function ConcordanceFeature({
     hydrationState,
     selectedNodes,
     setSearchWord,
-    setNodeColumnSelections,
+    setNodeColumnSelections: (sels) => applyInputsFromSelections(sels),
     selectNodes,
     handleColorChange,
   });
 
-  // Recompute auto columns if unlocked and selections empty but nodes exist
-  useEffect(() => {
-    if (!isLocked && selectedNodes.length > 0 && nodeColumnSelections.length === 0) {
-      recomputeAutoColumns();
-    }
-  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns]);
+  // No auto-column recompute: a node's default column is chosen at add-time by
+  // the node-inputs model, so there is no unlocked recompute effect here.
 
   // Color assignment now handled by stack allocator - no auto-fill effect needed
 
@@ -1056,7 +1066,6 @@ function ConcordanceFeature({
     model: string,
     language: string | null,
   ) => {
-    if (isLocked) return;
     setTokenizerModelsByNode((prev) => {
       if (model) return { ...prev, [nodeId]: model };
       const { [nodeId]: _removed, ...rest } = prev;
@@ -1096,13 +1105,13 @@ function ConcordanceFeature({
     // with. See the node-colour strategy doc — Run is the promotion
     // trigger.
     promoteTempColors(activeNodeIds);
-    await executeAnalysisRunOrUpdate({
-      hasLockedParameterChanges,
+    await executeAnalysisRerun({
+      hasUnrunChanges: hasChanges,
       clearResults: handleClearResults,
       /** Starts the feature-specific concordance search after shared update checks pass. */
       // Called by: handleRunOrUpdate through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
       runFreshAnalysis: () =>
-        handleSearch(true, undefined, undefined, undefined, undefined, hasLockedParameterChanges),
+        handleSearch(true, undefined, undefined, undefined, undefined, true),
     });
   };
 
@@ -1214,7 +1223,7 @@ function ConcordanceFeature({
   // --- Detach dialog helpers ---
   /**
    * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const openDetachDialog = async (
     nodes: { nodeId: string; column: string; nodeLabel: string }[],
@@ -1274,7 +1283,7 @@ function ConcordanceFeature({
   // --- Dispersion detach dialog helpers ---
   /**
    * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const openDispersionDetachDialog = async (
     nodes: { nodeId: string; column: string; nodeLabel: string }[],
@@ -1396,15 +1405,11 @@ function ConcordanceFeature({
   return (
     <div className="space-y-4">
       <ConcordanceParameterPanel
-        panelSelectedNodes={panelSelectedNodes}
-        effectiveNodeColumnSelections={effectiveNodeColumnSelections}
+        nodeInputs={nodeInputs}
         handleColumnChange={handleColumnChange}
         nodeColors={nodeColors}
         handleColorChange={handleColorChange}
         defaultPalette={defaultPalette}
-        getColumnInfos={getColumnInfos}
-        displayNodeCount={displayNodeCount}
-        isLocked={!!isLocked}
         searchWord={effSearchWord}
         setSearchWord={setSearchWord}
         numLeftTokens={effNumLeftTokens}
@@ -1433,7 +1438,7 @@ function ConcordanceFeature({
               void handleTokenizerModelChange(nodeId, column, model, detectedLanguage)
             }
             getAuthHeaders={getAuthHeaders}
-            disabled={!!isLocked}
+            disabled={false}
             disabledReason="Clear results first to change tokenizer models"
           />
         )}

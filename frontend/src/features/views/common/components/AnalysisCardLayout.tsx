@@ -61,7 +61,7 @@ export function AnalysisCardLayout({
 }: AnalysisCardLayoutProps) {
   const cardToneClassName = cn('w-full min-w-0', tone === 'error' && 'border-destructive/50');
   const runLabel = actions
-    ? (actions.runLabel ?? (actions.isRunning ? 'Running' : actions.hasResult ? 'Update' : 'Run'))
+    ? (actions.runLabel ?? (actions.isRunning ? 'Running' : actions.hasResult ? 'Re-run' : 'Run'))
     : 'Run';
 
   return (

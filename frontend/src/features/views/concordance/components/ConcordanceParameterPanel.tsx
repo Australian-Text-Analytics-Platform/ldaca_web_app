@@ -4,30 +4,25 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Play, Square, Trash2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisFeatureHeader } from '@/features/views/common/components/AnalysisFeatureHeader';
-import NodeSelectionPanel, {
-  type NodeSelectionColumnAddonArgs,
-} from '@/features/views/common/components/NodeSelectionPanel';
+import {
+  NodeInputsPanel,
+  type NodeInputColumnAddonArgs,
+} from '@/features/views/common/components/NodeInputsPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
 import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
-import type { AnalysisActionState, NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection } from '../../common';
+import type { RerunActionState } from '@/features/views/common/rerunActionState';
+import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
-import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
-
-type GetColumnInfo = (node: WorkspaceNodeLike | null | undefined, idx?: number) => ColumnInfo[];
 
 export type ConcordanceParameterPanelProps = {
-  // Selection
-  panelSelectedNodes: WorkspaceNodeLike[];
-  effectiveNodeColumnSelections: NodeColumnSelection[];
+  // Selection (add-node-as-needed)
+  nodeInputs: UseTabNodeInputsResult;
   handleColumnChange: (nodeId: string, column: string) => void;
   nodeColors: Record<string, string>;
   handleColorChange: (nodeId: string, color: string) => void;
   defaultPalette: string[];
-  getColumnInfos: GetColumnInfo;
-  displayNodeCount: number;
-  isLocked: boolean;
 
   // Search params
   searchWord: string;
@@ -53,14 +48,12 @@ export type ConcordanceParameterPanelProps = {
 
   // Action state
   isSearching: boolean;
-  actionState: AnalysisActionState;
+  actionState: RerunActionState;
   handleRunOrUpdate: () => Promise<void>;
   handleStopTask?: () => Promise<void>;
   isStopping?: boolean;
   handleClearResults: () => Promise<void>;
-  /** When true, the panel renders its controls for display only. */
-  readOnly?: boolean;
-  renderTokenizerModelSelector?: (args: NodeSelectionColumnAddonArgs) => React.ReactNode;
+  renderTokenizerModelSelector?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
 };
 
 /**
@@ -68,15 +61,11 @@ export type ConcordanceParameterPanelProps = {
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export function ConcordanceParameterPanel({
-  panelSelectedNodes,
-  effectiveNodeColumnSelections,
+  nodeInputs,
   handleColumnChange,
   nodeColors,
   handleColorChange,
   defaultPalette,
-  getColumnInfos,
-  displayNodeCount,
-  isLocked,
   searchWord,
   setSearchWord,
   numLeftTokens,
@@ -98,9 +87,10 @@ export function ConcordanceParameterPanel({
   handleStopTask,
   isStopping,
   handleClearResults,
-  readOnly = false,
   renderTokenizerModelSelector,
 }: ConcordanceParameterPanelProps) {
+  const effectiveNodeColumnSelections: NodeColumnSelection[] = nodeInputs.nodeColumnSelections;
+  const panelSelectedNodes: WorkspaceNodeLike[] = nodeInputs.selectedNodes;
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
     if (actionState.runDisabledReason) return actionState.runDisabledReason;
@@ -109,8 +99,11 @@ export function ConcordanceParameterPanel({
       return 'Select a column for each data block';
     return undefined;
   })();
-  const readOnlyReason = readOnly ? 'This panel is read-only.' : undefined;
-  const readOnlyOrReason = (reason?: string | false) => readOnlyReason ?? (reason || undefined);
+  // Add-node-as-needed model has no read-only panel; these keep the existing
+  // DisabledReasonTooltip wiring intact without ever disabling the controls.
+  const readOnly = false;
+  const readOnlyReason: string | undefined = undefined;
+  const readOnlyOrReason = (reason?: string | false) => reason || undefined;
 
   return (
     <Card>
@@ -124,24 +117,23 @@ export function ConcordanceParameterPanel({
         helpTooltip="Select data blocks, choose the search term, and set context options before running."
       />
       <CardContent className="space-y-4 pt-0">
-        <NodeSelectionPanel
-          selectedNodes={panelSelectedNodes}
-          nodeColumnSelections={effectiveNodeColumnSelections}
+        <NodeInputsPanel
+          resolvedNodes={nodeInputs.resolvedNodes}
+          availableNodes={nodeInputs.availableNodes}
+          graphSelectedIds={nodeInputs.graphSelectedIds}
+          recentPresets={nodeInputs.recentPresets}
+          canAddMore={nodeInputs.canAddMore}
+          maxNodes={2}
+          onAddNodes={nodeInputs.addNodes}
+          getAddRejection={nodeInputs.getAddRejection}
+          onRemoveNode={nodeInputs.removeNode}
+          onClear={nodeInputs.clear}
           onColumnChange={handleColumnChange}
           nodeColors={nodeColors}
           onColorChange={handleColorChange}
           defaultPalette={defaultPalette}
-          maxCompare={2}
-          className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-          showShape
-          disabled={!!isLocked || readOnly}
-          locked={!!isLocked || readOnly}
           showColorPicker={true}
-          getNodeColumns={getColumnInfos}
-          allowedDataTypes={['string']}
-          originalCount={displayNodeCount}
-          lockedMessage={readOnly ? 'This panel is read-only.' : ANALYSIS_LOCKED_MESSAGE}
-          renderColumnControlAddon={renderTokenizerModelSelector}
+          renderColumnAddon={renderTokenizerModelSelector}
         />
 
         <TokensColumnMismatchNotice

@@ -17,8 +17,8 @@ export type MetadataColumnSection = {
   /**
    * Optional foreground colour applied to the items in this section. When
    * provided, the dropdown skips section headers and relies on colour alone
-   * to differentiate which data block each column came from — the same
-   * colour is used for that block in the NodeSelectionPanel above.
+  * to differentiate which data block each column came from — the same
+  * colour is used for that block in the input panel above.
    */
   color?: string;
   /**

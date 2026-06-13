@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
-} from '@/features/views/common/components/NodeSelectionPanel';
+} from '@/features/views/common/nodeSelectionTypes';
 import { DateTimePickerField } from '../../utils/dateTimeUtils';
 import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from '../../utils/typeUtils';
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';

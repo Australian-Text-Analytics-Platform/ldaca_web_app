@@ -665,16 +665,22 @@ export type AnalysisSorting = {
 /**
  * AnalysisTab
  *
- * A single thin analysis tab.
+ * A single analysis tab.
  *
- * Carries only identity and a pointer to the analysis result it shows. All
- * parameters/node selection live on the referenced ``AnalysisTask.request``.
+ * Carries identity (``tab_id``), a pointer to the analysis result it shows
+ * (``task_id``), a display ``title``, and the ``inputs`` node set it analyses.
+ * Remaining analysis parameters live on the referenced
+ * ``AnalysisTask.request``.
  *
  * Used by:
  * - `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab
  * store round-trips this exact shape.
  */
 export type AnalysisTab = {
+    /**
+     * Inputs
+     */
+    inputs?: Array<AnalysisTabInput>;
     /**
      * Tab Id
      */
@@ -707,6 +713,32 @@ export type AnalysisTabGroup = {
      * Tabs
      */
     tabs?: Array<AnalysisTab>;
+};
+
+/**
+ * AnalysisTabInput
+ *
+ * One node selected as input for an analysis tab.
+ *
+ * Pairs a workspace ``node_id`` with an optional ``column`` pick (the single
+ * text/data column the analysis runs on; ``None`` until a column is chosen or
+ * for views that need no column). The frontend ``useNodeInputs`` hook adds,
+ * removes, and column-assigns these entries under the add-node-as-needed
+ * model.
+ *
+ * Used by:
+ * - `AnalysisTab.inputs` and the GET/PUT tab routes because the frontend tab
+ * store round-trips this exact shape.
+ */
+export type AnalysisTabInput = {
+    /**
+     * Column
+     */
+    column?: string | null;
+    /**
+     * Node Id
+     */
+    node_id: string;
 };
 
 /**
@@ -1183,10 +1215,6 @@ export type ConcordanceAnalysisRequest = {
      * Sort By
      */
     sort_by?: string | null;
-    /**
-     * Tab Id
-     */
-    tab_id?: string | null;
     /**
      * Whole Word
      */
@@ -1785,25 +1813,6 @@ export type CreateFolderResponse = {
      * Path
      */
     path: string;
-};
-
-/**
- * CurrentAnalysisTasksResponse
- *
- * Response schema returned by API routes and consumed by generated clients for current analysis tasks response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type CurrentAnalysisTasksResponse = {
-    /**
-     * Task Ids
-     */
-    task_ids: Array<string>;
 };
 
 /**
@@ -6934,37 +6943,6 @@ export type GetAiAnnotationModelsResponses = {
 
 export type GetAiAnnotationModelsResponse = GetAiAnnotationModelsResponses[keyof GetAiAnnotationModelsResponses];
 
-export type AiAnnotationCurrentTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/ai-annotation/tasks/current';
-};
-
-export type AiAnnotationCurrentTasksErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AiAnnotationCurrentTasksError = AiAnnotationCurrentTasksErrors[keyof AiAnnotationCurrentTasksErrors];
-
-export type AiAnnotationCurrentTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: CurrentAnalysisTasksResponse;
-};
-
-export type AiAnnotationCurrentTasksResponse = AiAnnotationCurrentTasksResponses[keyof AiAnnotationCurrentTasksResponses];
-
 export type AiAnnotationTaskRequestData = {
     body?: never;
     headers?: {
@@ -7122,37 +7100,6 @@ export type RunConcordanceResponses = {
 };
 
 export type RunConcordanceResponse = RunConcordanceResponses[keyof RunConcordanceResponses];
-
-export type ConcordanceCurrentTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/concordance/tasks/current';
-};
-
-export type ConcordanceCurrentTasksErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ConcordanceCurrentTasksError = ConcordanceCurrentTasksErrors[keyof ConcordanceCurrentTasksErrors];
-
-export type ConcordanceCurrentTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: CurrentAnalysisTasksResponse;
-};
-
-export type ConcordanceCurrentTasksResponse = ConcordanceCurrentTasksResponses[keyof ConcordanceCurrentTasksResponses];
 
 export type ConcordanceTaskDispersionBinsData = {
     body?: never;
@@ -9467,37 +9414,6 @@ export type UndoNodeOperationResponses = {
 
 export type UndoNodeOperationResponse = UndoNodeOperationResponses[keyof UndoNodeOperationResponses];
 
-export type QuotationCurrentTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/quotation/tasks/current';
-};
-
-export type QuotationCurrentTasksErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type QuotationCurrentTasksError = QuotationCurrentTasksErrors[keyof QuotationCurrentTasksErrors];
-
-export type QuotationCurrentTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: CurrentAnalysisTasksResponse;
-};
-
-export type QuotationCurrentTasksResponse = QuotationCurrentTasksResponses[keyof QuotationCurrentTasksResponses];
-
 export type QuotationTaskRequestData = {
     body?: never;
     headers?: {
@@ -9657,37 +9573,6 @@ export type SaveWorkspaceResponses = {
 };
 
 export type SaveWorkspaceResponse = SaveWorkspaceResponses[keyof SaveWorkspaceResponses];
-
-export type SequentialAnalysisCurrentTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/sequential-analysis/tasks/current';
-};
-
-export type SequentialAnalysisCurrentTasksErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type SequentialAnalysisCurrentTasksError = SequentialAnalysisCurrentTasksErrors[keyof SequentialAnalysisCurrentTasksErrors];
-
-export type SequentialAnalysisCurrentTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: CurrentAnalysisTasksResponse;
-};
-
-export type SequentialAnalysisCurrentTasksResponse = SequentialAnalysisCurrentTasksResponses[keyof SequentialAnalysisCurrentTasksResponses];
 
 export type DetachSequentialAnalysisTaskData = {
     body: SequentialAnalysisDetachRequest;
@@ -9897,37 +9782,6 @@ export type CalculateTokenFrequenciesResponses = {
 };
 
 export type CalculateTokenFrequenciesResponse = CalculateTokenFrequenciesResponses[keyof CalculateTokenFrequenciesResponses];
-
-export type TokenFrequenciesCurrentTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/token-frequencies/tasks/current';
-};
-
-export type TokenFrequenciesCurrentTasksErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type TokenFrequenciesCurrentTasksError = TokenFrequenciesCurrentTasksErrors[keyof TokenFrequenciesCurrentTasksErrors];
-
-export type TokenFrequenciesCurrentTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: CurrentAnalysisTasksResponse;
-};
-
-export type TokenFrequenciesCurrentTasksResponse = TokenFrequenciesCurrentTasksResponses[keyof TokenFrequenciesCurrentTasksResponses];
 
 export type TokenFrequenciesTaskRequestData = {
     body?: never;
@@ -10196,37 +10050,6 @@ export type GetTopicModelingEmbeddingCacheSizeResponses = {
 };
 
 export type GetTopicModelingEmbeddingCacheSizeResponse = GetTopicModelingEmbeddingCacheSizeResponses[keyof GetTopicModelingEmbeddingCacheSizeResponses];
-
-export type TopicModelingCurrentTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/topic-modeling/tasks/current';
-};
-
-export type TopicModelingCurrentTasksErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type TopicModelingCurrentTasksError = TopicModelingCurrentTasksErrors[keyof TopicModelingCurrentTasksErrors];
-
-export type TopicModelingCurrentTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: CurrentAnalysisTasksResponse;
-};
-
-export type TopicModelingCurrentTasksResponse = TopicModelingCurrentTasksResponses[keyof TopicModelingCurrentTasksResponses];
 
 export type DetachTopicModelingData = {
     body: TopicModelingDetachRequest;

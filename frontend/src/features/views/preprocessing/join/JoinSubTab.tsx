@@ -1,6 +1,6 @@
+import type { ReactNode } from 'react';
 import { Loader2, Merge, Plus } from 'lucide-react';
 
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,10 @@ import { useJoinSubTab, type JoinSubTabProps } from './hooks/useJoinSubTab';
 
 export type { JoinSubTabProps } from './hooks/useJoinSubTab';
 
+type JoinSubTabComponentProps = JoinSubTabProps & {
+  renderNodeInputsPanel?: () => ReactNode;
+};
+
 /**
  * Renders the Join preprocessing tab. It consumes `useJoinSubTab` for
  * two-node selection state, preview data, and apply behavior.
@@ -29,9 +33,9 @@ export type { JoinSubTabProps } from './hooks/useJoinSubTab';
  * Flow: consume join hook sections, render node/column selection, join type controls, preview
  * results, and apply state in one tab surface.
  */
-export function JoinSubTab(props: JoinSubTabProps) {
+export function JoinSubTab(props: JoinSubTabComponentProps) {
+  const { renderNodeInputsPanel } = props;
   const {
-    selectionPanel,
     sharedColumnsNotice,
     needsColumns,
     joinType,
@@ -65,31 +69,7 @@ export function JoinSubTab(props: JoinSubTabProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-          <NodeSelectionPanel
-            selectedNodes={selectionPanel.selectedNodes}
-            nodeColumnSelections={selectionPanel.nodeColumnSelections}
-            nodeColors={selectionPanel.nodeColors}
-            onColumnChange={selectionPanel.onColumnChange}
-            onColorChange={selectionPanel.onColorChange}
-            getNodeColumns={selectionPanel.getNodeColumns}
-            defaultPalette={selectionPanel.defaultPalette}
-            maxCompare={selectionPanel.maxCompare}
-            disabled={selectionPanel.disabled}
-            originalCount={selectionPanel.originalCount}
-            statusMessage={selectionPanel.statusMessage ?? undefined}
-            columnLabelFn={selectionPanel.columnLabelFn}
-            showColorPicker={false}
-            showHeaderLabel
-            showShape
-            className="rounded-lg border border-border/60 bg-muted/40"
-            headerAddon={
-              <HelpIcon
-                targetKey="preprocessing.common.node-selection"
-                label="Selected data blocks"
-                className="h-4 w-4 text-muted-foreground"
-              />
-            }
-          />
+          {renderNodeInputsPanel?.()}
 
           {needsColumns && sharedColumnsNotice && (
             <div className="text-xs text-muted-foreground">{sharedColumnsNotice}</div>

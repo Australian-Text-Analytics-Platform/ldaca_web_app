@@ -1,34 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   topicModelingTaskRequest,
   topicModelingTaskResult,
 } from '@/api/generated/sdk.gen';
 import type {
+  AnalysisTabInput,
   TopicModelingResponse,
   TopicModelingTopic,
 } from '@/api/generated/types.gen';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
-import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import {
-  hasLockedParameterDiff,
   getNodeIdentifier,
-  resetAnalysisSelectionAfterClear,
-  restoreAnalysisLockFromRequest,
-  useAnalysisLock,
+  useLastRunRequest,
   useAnalysisFeature,
   useSafeResult,
   useNodeColorManagement,
   DEFAULT_PALETTE,
-  getAnalysisActionState,
-  executeAnalysisRunOrUpdate,
+  executeAnalysisRerun,
 } from '../common';
+import { useTabNodeInputs } from '../common/nodeInputs';
+import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { hasParameterDiff } from '../common/parameterComparison';
 import {
   TopicModelingParameterPanel,
   type CorpusSample,
@@ -44,7 +41,7 @@ const DEFAULT_TOPIC_SIZE_VALUE = 10;
 /** Renders the topic-modeling workflow for live BERTopic runs and result exploration. */
 /**
  * Rendered by: TopicModelingTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
  * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
@@ -54,42 +51,52 @@ export interface TopicModelingFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
+  tabInputs?: AnalysisTabInput[];
+  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
 }
 
-function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModelingFeatureProps = {}) {
-  const { selectedNodes } = useWorkspaceSelection();
+function TopicModelingFeature({
+  tabId,
+  tabTaskId,
+  onTabTaskChange,
+  tabInputs,
+  onTabInputsChange,
+}: TopicModelingFeatureProps = {}) {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
-  const {
-    isLocked,
-    lockWithSnapshots,
-    unlockSelection,
-    nodeColumnSelections,
-    setNodeColumnSelection,
-    setNodeColumnSelections,
-    recomputeAutoColumns,
-    activeNodeIds,
-    activeNodeColumnSelections,
-    panelSelectedNodes: livePanelSelectedNodes,
-    serverRequest,
-  } = useAnalysisLock({
+  const nodeInputs = useTabNodeInputs({
+    tabInputs,
+    onTabInputsChange,
+    constraints: {
+      allowedDataTypes: ['string'],
+      maxNodes: 2,
+      docTypeOnly: true,
+    },
+  });
+  const nodeColumnSelections = nodeInputs.nodeColumnSelections;
+  const setNodeColumnSelection = nodeInputs.setColumn;
+  const panelSelectedNodes = nodeInputs.selectedNodes;
+  const activeNodeIds = nodeInputs.resolvedNodes.map((node) => node.id);
+  const applyInputsFromSelections = (
+    selections: Array<{ nodeId: string; column?: string | null }>,
+  ) => {
+    onTabInputsChange?.(
+      selections
+        .filter((selection) => selection.nodeId)
+        .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null })),
+    );
+  };
+  const { serverRequest } = useLastRunRequest({
     analysisType: 'topic_modeling',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
-    // Tab-scoped locking: bind the lock to this tab's persisted task. Null for a
-    // fresh tab that has not run yet (unlocked).
     taskId: tabTaskId ?? null,
-    allowedDataTypes: ['string'],
-    maxNodes: 2,
-    docTypeOnly: true,
   });
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
   });
-
-  const panelSelectedNodes = livePanelSelectedNodes;
 
   const typedServerRequest = serverRequest as {
     node_ids?: string[];
@@ -146,7 +153,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     stopTask,
     setLocalTaskId,
     banner: topicWaitingBanner,
-    hasActiveTask,
   } = useAnalysisFeature<TopicModelingResponse>({
     analysisType: 'topic_modeling',
     taskType: 'topic_modeling',
@@ -200,7 +206,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     },
     // Restores selected nodes, columns, and topic parameters from the stored request.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
-    onHydratedRequest: async (requestPayload) => {
+    onHydratedRequest: (requestPayload) => {
       const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<
         string,
         unknown
@@ -211,7 +217,9 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
         : [];
       const node_columns = (req.node_columns || {}) as Record<string, string>;
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-      setNodeColumnSelections(sels, { replace: true });
+      if (!tabInputs || tabInputs.length === 0) {
+        applyInputsFromSelections(sels);
+      }
       setRandomSeed(Number(req.random_seed ?? 42));
       setRandomSeedUserSet(true);
       setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
@@ -219,20 +227,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
       const hydratedTopicSizeValue = Number(req.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE);
       setTopicSizeValue(hydratedTopicSizeValue);
       setTopicSizeUserSet(true);
-      if (nodeIds.length && currentWorkspaceId) {
-        try {
-          await restoreAnalysisLockFromRequest({
-            workspaceId: currentWorkspaceId,
-            requestData: req,
-            getAuthHeaders,
-            lockWithSnapshots,
-            queryClient,
-            maxNodes: 2,
-          });
-        } catch {
-          /* ignore */
-        }
-      }
     },
     // Clears topic-specific result and error state after the shared lifecycle deletes results.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -243,9 +237,8 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
         return;
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared.
+      // a task the user explicitly cleared. Inputs are intentionally preserved.
       onTabTaskChange?.(null);
-      resetAnalysisSelectionAfterClear({ unlockSelection });
     },
     // Removes completed topic tasks from the global task list after clear/delete operations.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -333,7 +326,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
   };
 
   const topicRunningTask = taskStatus.runningTask;
-  const panelNodeIds = takeMostRecent(panelSelectedNodes, 2)
+  const panelNodeIds = panelSelectedNodes.slice(0, 2)
     .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
@@ -378,7 +371,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
 
   // ``tabKey`` routes colour changes through the per-tab temp layer
   // (commit on Run via ``promoteTempColors`` below).
-  const topicActiveNodeIds = takeMostRecent(panelNodeIds, 2);
+  const topicActiveNodeIds = panelNodeIds.slice(0, 2);
   const {
     nodeColors: liveNodeColors,
     handleColorChange,
@@ -390,14 +383,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
   });
   const nodeColors: Record<string, string> = liveNodeColors;
 
-  const effectiveNodeColumnSelections = useMemo(() => {
-    return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
-  }, [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
-
-  const { getColumnInfos } = useNodeColumnInfos({
-    workspaceId: currentWorkspaceId,
-    nodes: selectedNodes,
-  });
+  const effectiveNodeColumnSelections = nodeColumnSelections;
 
   const panelHasMissingColumns = panelNodeIds.some((nodeId) => {
     const selection = effectiveNodeColumnSelections.find((sel) => sel.nodeId === nodeId);
@@ -425,52 +411,39 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     return pct >= 100 ? null : pct / 100;
   });
 
-  const hasLockedParameterChanges = hasLockedParameterDiff({
-    isLocked,
-    serverRequest: typedServerRequest,
-    currentParams: {
-      random_seed: Number(randomSeed),
-      min_topic_size: Number(topicSizeValue),
-      // representative_words_count is a frontend display cap (bounded by
-      // the originally-fitted value); changes within range don't require
-      // a rerun and so are excluded here.
-      sample_fractions: normalizeSampleFractions(currentSampleFractions, panelNodeIds.length),
-    },
-    // Extracts comparable server-side parameters from the stored topic-modeling request.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    getServerParams: (request) => ({
-      random_seed: Number(request.random_seed),
-      min_topic_size: Number(request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
-      sample_fractions: normalizeSampleFractions(
-        (request as unknown as { sample_fractions?: unknown }).sample_fractions,
-        panelNodeIds.length,
-      ),
-    }),
+  const currentTopicParams = {
+    random_seed: Number(randomSeed),
+    min_topic_size: Number(topicSizeValue),
+    sample_fractions: normalizeSampleFractions(currentSampleFractions, panelNodeIds.length),
+  };
+  const serverTopicParams = (request: Record<string, unknown>) => ({
+    random_seed: Number(request.random_seed),
+    min_topic_size: Number(request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
+    sample_fractions: normalizeSampleFractions(
+      (request as unknown as { sample_fractions?: unknown }).sample_fractions,
+      panelNodeIds.length,
+    ),
   });
+  const hasLastRun = Boolean(typedServerRequest);
+  const hasTopicChanges = !typedServerRequest
+    ? true
+    : hasParameterDiff(currentTopicParams, serverTopicParams(typedServerRequest)) ||
+      hasNodeSelectionChanged(
+        effectiveNodeColumnSelections,
+        typedServerRequest.node_ids,
+        typedServerRequest.node_columns,
+      );
 
-  const actionState = getAnalysisActionState({
+  const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
-    hasSelection: panelNodeIds.length > 0,
-    isLocked,
-    hasResults: Boolean(result),
+    isRunnable: panelNodeIds.length > 0 && !panelHasMissingColumns,
+    hasLastRun,
+    hasChanges: hasTopicChanges,
     isBusy: isRunning,
-    hasActiveTask,
-    allowRunWhenLocked: hasLockedParameterChanges,
+    hasResults: Boolean(result),
   });
 
   // Color assignment now handled by stack allocator - no auto-fill effect needed
-
-  useEffect(() => {
-    if (!isLocked && panelNodeIds.length > 0 && nodeColumnSelections.length === 0) {
-      recomputeAutoColumns();
-    }
-  }, [
-    isLocked,
-    panelNodeIdsKey,
-    nodeColumnSelections.length,
-    recomputeAutoColumns,
-    panelNodeIds.length,
-  ]);
 
   // Auto-populate sampling fractions when selected nodes change, and treat
   // these auto-values as not-user-set so Clear Results can re-derive them.
@@ -488,7 +461,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
    * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleColumnChange = (nodeId: string, column: string) => {
-    if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
     void persistDocumentColumn(nodeId, column);
   };
@@ -604,7 +576,6 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     },
     lock: {
       getAuthHeaders,
-      lockWithSnapshots,
       queryClient,
     },
   });
@@ -632,7 +603,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     setTooltip,
   });
 
-  const colorNodeIds = isLocked ? takeMostRecent(activeNodeIds, 2) : panelNodeIds;
+  const colorNodeIds = panelNodeIds;
 
   const { bubbleElements, renderSizeComposition } = useTopicModelingBubbleChart({
     topics,
@@ -668,8 +639,8 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
     // Promote this tab's pending temp colours to assigned — Run is the
     // commit trigger per the node-colour strategy doc.
     promoteTempColors(topicActiveNodeIds);
-    await executeAnalysisRunOrUpdate({
-      hasLockedParameterChanges,
+    await executeAnalysisRerun({
+      hasUnrunChanges: hasTopicChanges,
       clearResults,
       runFreshAnalysis: handleRun,
     });
@@ -680,14 +651,11 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
   return (
     <div className="space-y-4">
       <TopicModelingParameterPanel
-        selectedNodes={panelSelectedNodes}
-        nodeColumnSelections={effectiveNodeColumnSelections}
+        nodeInputs={nodeInputs}
         onColumnChange={handleColumnChange}
         nodeColors={nodeColors}
         onNodeColorChange={handleColorChange}
         defaultPalette={defaultPalette}
-        isLocked={!!isLocked}
-        getNodeColumns={getColumnInfos}
         actionState={actionState}
         corpusSamples={corpusSamples}
         nodeDocCounts={nodeDocCounts}
@@ -713,7 +681,7 @@ function TopicModelingFeature({ tabId, tabTaskId, onTabTaskChange }: TopicModeli
         representativeWordsCount={representativeWordsCount}
         representativeWordsCountUserSet={representativeWordsCountUserSet}
         representativeWordsCountServerMax={
-          isLocked ? Number(typedServerRequest?.representative_words_count) || null : null
+          typedServerRequest ? Number(typedServerRequest.representative_words_count) || null : null
         }
         onRepresentativeWordsCountChange={(v) => {
           setRepresentativeWordsCount(v);

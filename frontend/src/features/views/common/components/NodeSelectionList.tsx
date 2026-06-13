@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
@@ -20,6 +21,8 @@ export interface NodeSelectionListProps {
   maxCompare: number;
   showColorPicker?: boolean;
   onColorChange?: (nodeId: string, color: string) => void;
+  /** When provided, each card shows an × button that removes that node from the inputs. */
+  onRemoveNode?: (nodeId: string) => void;
   renderNodeMeta?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   renderNodeBody?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   renderExtraNodeContent?: (args: NodeSelectionRenderArgs) => React.ReactNode;
@@ -32,7 +35,7 @@ export interface NodeSelectionListProps {
 /**
  * Displays the selected analysis data blocks as horizontally scrollable cards,
  * with optional colour controls and feature-provided per-node content slots.
- * Used by: NodeSelectionPanel and shared node-selection tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: NodeInputsPanel and shared node-selection tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function NodeSelectionList({
@@ -43,6 +46,7 @@ export function NodeSelectionList({
   maxCompare,
   showColorPicker = true,
   onColorChange,
+  onRemoveNode,
   renderNodeMeta,
   renderNodeBody,
   renderExtraNodeContent,
@@ -103,6 +107,20 @@ export function NodeSelectionList({
                   onChange={(next) => onColorChange(nodeId, next)}
                 />
               </div>
+            )}
+            {onRemoveNode && (
+              <button
+                type="button"
+                aria-label={`Remove ${title}`}
+                title={`Remove ${title}`}
+                onClick={() => onRemoveNode(nodeId)}
+                className={cn(
+                  'pointer-events-auto absolute top-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-muted/80 text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground',
+                  showColorPicker && onColorChange ? 'right-9' : 'right-2',
+                )}
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
             )}
             <CardHeader
               className={cn('space-y-1 px-3 pb-1.5', showColorPicker ? 'pt-3' : 'pt-2.5')}

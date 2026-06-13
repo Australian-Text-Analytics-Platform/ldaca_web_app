@@ -1,5 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   quotationDetachOptions,
   quotationTaskRequest,
@@ -7,21 +6,20 @@ import {
 } from '@/api/generated/sdk.gen';
 import type {
   QuotationAnalysisResponse,
+  AnalysisTabInput,
   QuotationEngineConfigInput,
   QuotationEngineType,
   QuotationMetadata,
 } from '@/api/generated/types.gen';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
+import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,21 +51,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2, Plus } from 'lucide-react';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   getNodeIdentifier,
   getServerEngineConfig,
-  hasLockedParameterDiff,
-  resetAnalysisSelectionAfterClear,
-  restoreAnalysisLockFromRequest,
-  useAnalysisLock,
+  useLastRunRequest,
   useAnalysisFeature,
   useNodeColorManagement,
-  getAnalysisActionState,
-  executeAnalysisRunOrUpdate,
+  executeAnalysisRerun,
   type NodePaginationState,
-  type WorkspaceNodeLike,
 } from '../common';
+import { useTabNodeInputs } from '../common/nodeInputs';
+import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { hasParameterDiff } from '../common/parameterComparison';
 
 import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
@@ -127,7 +122,7 @@ type QuotationDisplayRow = QuotationHitRow & {
  * closing over component state. */
 /**
  * Called by: QuotationFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
 function buildQuotationResultState(
   result: QuotationAnalysisResponse,
@@ -187,7 +182,7 @@ function buildQuotationResultState(
 /** Renders the quotation extraction workflow, including live runs and result materialisation. */
 /**
  * Rendered by: QuotationTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
  * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
@@ -197,43 +192,54 @@ export interface QuotationFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
+  tabInputs?: AnalysisTabInput[];
+  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
 }
 
-function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatureProps = {}) {
+function QuotationFeature({
+  tabId,
+  tabTaskId,
+  onTabTaskChange,
+  tabInputs,
+  onTabInputsChange,
+}: QuotationFeatureProps = {}) {
   const {
-    selectedNodes,
     handlePageChange: baseHandlePageChange,
     handlePageSizeChange: baseHandlePageSizeChange,
   } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
-  const queryClient = useQueryClient();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'quotation';
-  const {
-    isLocked,
-    lockWithSnapshots,
-    unlockSelection,
-    lockedNodesSnapshot,
-    nodeColumnSelections,
-    setNodeColumnSelection,
-    setNodeColumnSelections,
-    recomputeAutoColumns,
-    activeNodeColumnSelections,
-    panelSelectedNodes: livePanelSelectedNodes,
-    displayNodeCount,
-    serverRequest,
-  } = useAnalysisLock({
+  const nodeInputs = useTabNodeInputs({
+    tabInputs,
+    onTabInputsChange,
+    constraints: {
+      allowedDataTypes: ['string'],
+      maxNodes: 1,
+      docTypeOnly: true,
+    },
+  });
+  const nodeColumnSelections = nodeInputs.nodeColumnSelections;
+  const setNodeColumnSelection = nodeInputs.setColumn;
+  const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
+  const activeSelections = nodeColumnSelections;
+  const activeNodeIds = nodeInputs.resolvedNodes.map((node) => node.id).slice(0, 1);
+  const applyInputsFromSelections = (
+    selections: Array<{ nodeId: string; column?: string | null }>,
+  ) => {
+    onTabInputsChange?.(
+      selections
+        .filter((selection) => selection.nodeId)
+        .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null })),
+    );
+  };
+  const { serverRequest } = useLastRunRequest({
     analysisType: 'quotation_analysis',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
-    // Tab-scoped locking: bind the lock to this tab's persisted task. Null for a
-    // fresh tab that has not run yet (unlocked).
     taskId: tabTaskId ?? null,
-    allowedDataTypes: ['string'],
-    maxNodes: 1,
-    docTypeOnly: true,
   });
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
@@ -271,21 +277,6 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
     openDetail: openRowDetail,
   } = useRowDetailDialog();
 
-  const panelSelectedNodes = livePanelSelectedNodes;
-
-  const { getColumnInfos } = useNodeColumnInfos({
-    workspaceId: currentWorkspaceId,
-    nodes: panelSelectedNodes,
-  });
-
-  const activeSelections = useMemo(() => {
-    return isLocked ? activeNodeColumnSelections : nodeColumnSelections;
-  }, [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
-
-  const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
-  const activeNodeIds = displayedNodes
-    .map((node, idx) => getNodeIdentifier(node, idx))
-    .filter((id): id is string => Boolean(id));
   // ``tabKey`` routes colour changes through this tab's temp layer —
   // see the node-colour strategy doc. ``promoteTempColors`` is called
   // from ``handleRunOrUpdate`` below to commit the preview on Run.
@@ -302,10 +293,8 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
-    displayedNodes.forEach((node, idx) => {
-      const nodeId = getNodeIdentifier(node, idx);
-      if (!nodeId) return;
-      map[nodeId] = getColumnInfos(node).map((info) => info.name);
+    nodeInputs.resolvedNodes.forEach((resolved) => {
+      map[resolved.id] = resolved.columnOptions.map((info) => info.name);
     });
     return map;
   })();
@@ -351,7 +340,7 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
   // Opens the shared error dialog with a fallback message for unexpected quotation failures.
   /**
    * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const showErrorDialog = (message: string) => {
     setErrorDialogMessage(message || 'An unexpected error occurred.');
@@ -368,7 +357,6 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
     resolveTaskId,
     setLocalTaskId,
     banner: quotationWaitingBanner,
-    hasActiveTask,
     clearResults,
     stopTask,
     isStopping,
@@ -406,10 +394,7 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onResultFetched: (result, _taskId) => {
       if (!result) return;
-      const targetNode =
-        isLocked && lockedNodesSnapshot.length
-          ? (lockedNodesSnapshot[0] as WorkspaceNodeLike)
-          : displayedNodes[0];
+      const targetNode = displayedNodes[0];
       const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
       const selection = activeSelections.find((s) => s.nodeId === nodeId);
       const column = selection?.column ?? '';
@@ -421,8 +406,7 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
     },
     // Rebuilds result state from a cached task payload when the quotation tab hydrates.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    // eslint-disable-next-line @typescript-eslint/require-await
-    onHydratedResult: async (resultPayload) => {
+    onHydratedResult: (resultPayload) => {
       const res = resultPayload;
       if (!res) return;
       const selection = nodeColumnSelections[0];
@@ -433,9 +417,9 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
       updateResultState(nodeId, column, res);
       setHasLoaded(true);
     },
-    // Restores saved request settings, materialization metadata, and the analysis lock after reload.
-    // Called by: useAnalysisFeature hydration because quotation restores must reapply engine settings, selected node/column, materialized path, and context length before rendering results. Flow: unwrap request data, normalize remote engine state, restore selection/materialization, then lock the submitted node.
-    onHydratedRequest: async (requestPayload) => {
+    // Restores saved request settings, materialization metadata, and legacy tab inputs after reload.
+    // Called by: useAnalysisFeature hydration because quotation restores must reapply engine settings, selected node/column, materialized path, and context length before rendering results. Flow: unwrap request data, normalize remote engine state, restore selection/materialization, then seed inputs once when a pre-input tab is loaded.
+    onHydratedRequest: (requestPayload) => {
       const requestData = ((requestPayload as Record<string, unknown>)?.data ??
         requestPayload) as Record<string, unknown> | null;
       if (!requestData) return;
@@ -454,7 +438,9 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
       } else if (reqEngine?.type === 'local') {
         setEngineConfigStore({ type: 'local' });
       }
-      setNodeColumnSelections([{ nodeId, column }], { replace: true });
+      if (!tabInputs || tabInputs.length === 0) {
+        applyInputsFromSelections([{ nodeId, column }]);
+      }
       setSelectedMetadataColumns([]);
       const matPath = requestData.materialized_path;
       if (typeof matPath === 'string' && matPath) {
@@ -467,21 +453,6 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
           uniqueDocuments: Number(matSummary.unique_documents_with_hits) || 0,
           totalDocuments: Number(matSummary.total_source_documents) || 0,
         });
-      }
-      try {
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: {
-            node_ids: [nodeId],
-            node_columns: column ? { [nodeId]: column } : {},
-          },
-          getAuthHeaders,
-          lockWithSnapshots,
-          queryClient,
-          maxNodes: 1,
-        });
-      } catch {
-        /* ignore */
       }
     },
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
@@ -496,9 +467,8 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
         return;
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared.
+      // a task the user explicitly cleared. Inputs are intentionally preserved.
       onTabTaskChange?.(null);
-      resetAnalysisSelectionAfterClear({ unlockSelection });
     },
   });
 
@@ -522,7 +492,7 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
   // Validates and optionally persists the context-length input used by quotation text clipping.
   /**
    * Called by: QuotationFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const applyContextLengthInput = async () => {
     const trimmed = contextLengthInput.trim();
@@ -620,66 +590,51 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
   const materializeSummary = liveMaterializeSummary;
   const resultsByNode = liveResultsByNode;
 
-  const hasParamsChanged = hasLockedParameterDiff({
-    isLocked,
-    serverRequest: (serverRequest as Record<string, unknown> | null) ?? null,
-    currentParams: {
-      engine_type: resolvedEnginePayload.type,
-      engine_url:
-        resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid
-          ? resolvedEnginePayload.normalizedUrl
-          : null,
-    },
-    // Extracts comparable server-side engine parameters from the stored task request.
-    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    getServerParams: (request) => {
-      const { type: serverEngineType, url: serverEngineUrl } = getServerEngineConfig(
-        request,
-        (url) => normalizeRemoteUrl(url).normalized,
+  const lastRunRequest = (serverRequest as Record<string, unknown> | null) ?? null;
+  const currentQuotationParams = {
+    engine_type: resolvedEnginePayload.type,
+    engine_url:
+      resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid
+        ? resolvedEnginePayload.normalizedUrl
+        : null,
+  };
+  const quotationServerParams = (request: Record<string, unknown>) => {
+    const { type: serverEngineType, url: serverEngineUrl } = getServerEngineConfig(request, (url) =>
+      normalizeRemoteUrl(url).normalized,
+    );
+    return {
+      engine_type: serverEngineType,
+      engine_url: serverEngineType === 'remote' ? serverEngineUrl || null : null,
+    };
+  };
+  const serverNodeId = lastRunRequest
+    ? String(lastRunRequest.node_id || lastRunRequest.nodeId || '')
+    : '';
+  const serverColumn = lastRunRequest ? String(lastRunRequest.column || '') : '';
+  const hasLastRun = Boolean(lastRunRequest);
+  const hasParamsChanged = !lastRunRequest
+    ? true
+    : hasParameterDiff(currentQuotationParams, quotationServerParams(lastRunRequest)) ||
+      hasNodeSelectionChanged(
+        activeSelections,
+        serverNodeId ? [serverNodeId] : [],
+        serverNodeId ? { [serverNodeId]: serverColumn } : {},
       );
 
-      return {
-        engine_type: serverEngineType,
-        engine_url: serverEngineType === 'remote' ? serverEngineUrl || null : null,
-      };
-    },
-  });
-
-  const actionState = getAnalysisActionState({
+  const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
-    hasSelection: displayedNodes.length > 0,
-    isLocked,
-    hasResults: hasLoaded,
+    isRunnable: displayedNodes.length > 0 && !hasIncompleteSelections && engineReady,
+    hasLastRun,
+    hasChanges: hasParamsChanged,
     isBusy: isLoadingQuotations,
-    hasActiveTask,
-    allowRunWhenLocked: hasParamsChanged,
+    hasResults: hasLoaded,
   });
-
-  useEffect(() => {
-    if (isLocked) return;
-    if (!selectedNodes.length) {
-      if (nodeColumnSelections.length) {
-        setNodeColumnSelections([], { replace: true, persist: false });
-      }
-      return;
-    }
-    if (nodeColumnSelections.length === 0) {
-      recomputeAutoColumns();
-    }
-  }, [
-    isLocked,
-    selectedNodes,
-    nodeColumnSelections,
-    recomputeAutoColumns,
-    setNodeColumnSelections,
-  ]);
 
   // Updates the selected text column and persists it as the document column preference.
   /**
    * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleColumnChange = (nodeId: string, column: string) => {
-    if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
     void persistDocumentColumn(nodeId, column);
   };
@@ -722,9 +677,7 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
   } = useQuotationTaskFlow({
     state: {
       currentWorkspaceId,
-      isLocked,
       hasLoaded,
-      lockedNodesSnapshot: lockedNodesSnapshot as WorkspaceNodeLike[],
       displayedNodes,
       activeSelections,
       nodeState,
@@ -754,13 +707,11 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
     },
     lock: {
       getAuthHeaders,
-      lockWithSnapshots,
       resolveTaskId,
       quotationSearch,
       detachQuotation,
       materializeQuotation,
       openEngineDialog,
-      queryClient,
     },
   });
 
@@ -833,7 +784,7 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
   // Loads available detach-column options before showing the quotation detach dialog.
   /**
    * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const openDetachDialog = async (nodeId: string) => {
     const selection = activeSelections.find((item) => item.nodeId === nodeId);
@@ -888,8 +839,8 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
     // Promote pending per-tab temp colours to assigned — Run is the
     // commit trigger per the node-colour strategy doc.
     promoteTempColors(activeNodeIds);
-    await executeAnalysisRunOrUpdate({
-      hasLockedParameterChanges: hasParamsChanged,
+    await executeAnalysisRerun({
+      hasUnrunChanges: hasParamsChanged,
       clearResults,
       runFreshAnalysis: handleSearchAll,
     });
@@ -1114,23 +1065,23 @@ function QuotationFeature({ tabId, tabTaskId, onTabTaskChange }: QuotationFeatur
             },
           }}
         >
-          <NodeSelectionPanel
-            selectedNodes={displayedNodes}
-            nodeColumnSelections={activeSelections}
+          <NodeInputsPanel
+            resolvedNodes={nodeInputs.resolvedNodes}
+            availableNodes={nodeInputs.availableNodes}
+            graphSelectedIds={nodeInputs.graphSelectedIds}
+            recentPresets={nodeInputs.recentPresets}
+            canAddMore={nodeInputs.canAddMore}
+            maxNodes={1}
+            onAddNodes={nodeInputs.addNodes}
+            getAddRejection={nodeInputs.getAddRejection}
+            onRemoveNode={nodeInputs.removeNode}
+            onClear={nodeInputs.clear}
             onColumnChange={handleColumnChange}
             nodeColors={nodeColors}
             onColorChange={handleColorChange}
-            getNodeColumns={getColumnInfos}
             defaultPalette={defaultPalette}
-            maxCompare={1}
-            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-            showShape
             showColorPicker
-            disabled={!!isLocked}
-            locked={!!isLocked}
-            originalCount={displayNodeCount}
-            allowedDataTypes={['string']}
-            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
           />
         </AnalysisCardLayout>
         {quotationWaitingBanner && (

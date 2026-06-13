@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -22,6 +22,17 @@ vi.mock('@xyflow/react', () => ({
    */
   useStore: (selector: (state: { transform: [number, number, number] }) => number) =>
     selector({ transform: [0, 0, mockZoom] }),
+  /** Renders toolbar children when visible, forwarding wrapper event props. */
+  NodeToolbar: ({
+    children,
+    isVisible,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode; isVisible?: boolean }) =>
+    isVisible ? (
+      <div data-testid="node-toolbar" {...props}>
+        {children}
+      </div>
+    ) : null,
 }));
 
 /**
@@ -58,7 +69,7 @@ describe('CustomNode', () => {
         onUndo: vi.fn(),
         onRedo: vi.fn(),
       },
-      selected: false,
+      selected: true,
       dragging: false,
       zIndex: 0,
       selectable: true,
@@ -71,7 +82,8 @@ describe('CustomNode', () => {
 
     render(<CustomNode {...props} />);
 
-    await user.click(getLatestNodeSettingsButton());
+    await user.hover(screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets'));
+    fireEvent.click(getLatestNodeSettingsButton());
 
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
@@ -98,7 +110,7 @@ describe('CustomNode', () => {
         onDelete: vi.fn(),
         onRename: vi.fn(),
       },
-      selected: false,
+      selected: true,
       dragging: false,
       zIndex: 0,
       selectable: true,
@@ -111,7 +123,8 @@ describe('CustomNode', () => {
 
     render(<CustomNode {...props} />);
 
-    await user.click(getLatestNodeSettingsButton());
+    await user.hover(screen.getByTitle('sample_data/ADO/qldelection2020_samidata_tweets'));
+    fireEvent.click(getLatestNodeSettingsButton());
     await user.click(screen.getByRole('button', { name: 'Rename' }));
 
     const renameInputs = screen.getAllByDisplayValue(
@@ -151,7 +164,7 @@ describe('CustomNode', () => {
           onUndo: vi.fn(),
           onRedo: vi.fn(),
         }}
-        selected={false}
+        selected={true}
         dragging={false}
         zIndex={0}
         selectable
@@ -163,9 +176,10 @@ describe('CustomNode', () => {
       />,
     );
 
+    await user.hover(screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets'));
     expect(getLatestNodeSettingsButton()).toBeInTheDocument();
 
-    await user.click(getLatestNodeSettingsButton());
+    fireEvent.click(getLatestNodeSettingsButton());
     expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));

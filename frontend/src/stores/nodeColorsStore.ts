@@ -11,8 +11,8 @@
  *
  *   - **Temp** (``temps``, ``Record<tabKey, Record<nodeId, color>>``) is
  *     a per-tab preview rolled when a node enters an analytics tab's
- *     selection. Visible only inside that tab (its NodeSelectionPanel,
- *     the picker swatches). Cleared when the node leaves the tab's
+ *     selection. Visible only inside that tab (its input/selection panel
+ *     picker swatches). Cleared when the node leaves the tab's
  *     selection (``clearTempColors``) or promoted to assigned on
  *     successful Run (``promoteTempColors``).
  *

@@ -20,6 +20,7 @@ import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspa
 import { nodeVisualInfo } from '@/lib/nodeVisualState';
 import { useNodeColorsStore } from '@/stores/nodeColorsStore';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
+import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
 
@@ -150,6 +151,22 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const freshIds = useFreshNodesStore((state) => state.freshIds);
   const observeNodeIds = useFreshNodesStore((state) => state.observeNodeIds);
   const markInteracted = useFreshNodesStore((state) => state.markInteracted);
+  const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
+
+  /**
+   * Requests that the active view add this node to its owned input selection.
+   * Called by: CustomNode's fixed-size side controls. The graph does not own
+   * analysis inputs, so this queues an intent consumed by useTabNodeInputs in
+   * the currently mounted view instead of selecting/highlighting the graph node.
+   */
+  const handleAddToSelection = useCallback(
+    (nodeId: string) => {
+      if (!nodeId) return;
+      requestNodeInputAdd(currentWorkspaceId, currentView, nodeId);
+      markInteracted([nodeId]);
+    },
+    [requestNodeInputAdd, currentWorkspaceId, currentView, markInteracted],
+  );
   const currentGraphNodeIds = useMemo(
     () => (workspaceGraph?.nodes ?? []).map((n: GraphNode) => n.id),
     [workspaceGraph],
@@ -241,6 +258,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           onCopy: handleCopy,
           onUndo: handleUndo,
           onRedo: handleRedo,
+          onAddToSelection: handleAddToSelection,
         },
         hidden: false,
         selectable: true,
@@ -259,6 +277,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     handleCopy,
     handleUndo,
     handleRedo,
+    handleAddToSelection,
   ]);
 
   const initialEdges = useMemo(() => {

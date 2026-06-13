@@ -40,6 +40,7 @@ export interface WorkspaceSelectionTabsState {
   totalTabs: number;
   onTabChange: (nodeId: string) => void;
   onTabClose: (nodeId: string) => void;
+  onTabReorder: (orderedNodeIds: string[]) => void;
 }
 
 export interface WorkspaceDataTableViewModel {
@@ -188,6 +189,23 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     toggleNodeSelection(nodeId);
   };
 
+  /**
+   * Persists a drag-and-drop reordering of the selection tab strip.
+   * Called by: WorkspaceSelectionTabs via the shared ChromeTabs ``onReorder``.
+   * Why: the tab strip order is local presentation state, so a reorder only
+   * needs to update ``tabOrder`` (selection membership is unchanged).
+   */
+  const handleTabReorder = (orderedNodeIds: string[]) => {
+    setTabOrder((current) => {
+      const known = orderedNodeIds.filter((id) => current.includes(id));
+      const missing = current.filter((id) => !known.includes(id));
+      const next = [...known, ...missing];
+      const unchanged =
+        next.length === current.length && next.every((id, index) => id === current[index]);
+      return unchanged ? current : next;
+    });
+  };
+
   const selectedNodeCapabilities = selectedNode as {
     id?: string;
     can_undo?: boolean;
@@ -234,6 +252,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     totalTabs: multiSelectedNodes.length,
     onTabChange: handleTabChange,
     onTabClose: handleTabClose,
+    onTabReorder: handleTabReorder,
   };
 
   // ── Derive TanStack-compatible sorting / filtering state from per-node pagination ──

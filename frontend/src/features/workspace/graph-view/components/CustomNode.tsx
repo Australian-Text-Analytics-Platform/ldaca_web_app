@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import {
   type NodeProps,
   Handle,
+  NodeToolbar,
   Position,
   useStore,
   type Node as ReactFlowNode,
 } from '@xyflow/react';
-import { Settings2, Copy, Check } from 'lucide-react';
+import { Settings2, Copy, Check, Plus, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,9 +41,12 @@ interface CustomNodeData extends Record<string, unknown> {
   onCopy?: (nodeId: string) => void;
   onUndo?: (nodeId: string) => void;
   onRedo?: (nodeId: string) => void;
+  /** Requests that this node is added to the active view's node inputs. */
+  onAddToSelection?: (nodeId: string) => void;
 }
 
 const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
+const TOOLBAR_HIDE_DELAY_MS = 350;
 
 /**
  * React Flow node renderer for a workspace node. Shows a compact card when zoomed
@@ -50,7 +54,7 @@ const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
  * Rendered by: workspace/CustomNode module JSX because React Flow needs this custom node type for workspace data blocks.
  * Flow: React Flow passes node data, zoom and selection choose compact or full rendering, and actions invoke workspace mutations.
  */
-function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
+function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
   const {
     node,
     isMultiSelected = false,
@@ -61,6 +65,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     onCopy,
     onUndo,
     onRedo,
+    onAddToSelection,
   } = data;
   // Fall back to the unselected-grey treatment if no visual info was
   // attached (defensive — useWorkspaceGraph always provides one now,
@@ -73,15 +78,44 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isToolbarHovered, setIsToolbarHovered] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const toolbarHideTimeoutRef = useRef<number | null>(null);
 
   const zoom = useStore((s) => s.transform[2]);
   const isZoomedOut = zoom < COMPACT_NODE_ZOOM_THRESHOLD;
 
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;
+
+  /** Cancels any pending delayed toolbar hide. */
+  const cancelToolbarHide = () => {
+    if (toolbarHideTimeoutRef.current !== null) {
+      window.clearTimeout(toolbarHideTimeoutRef.current);
+      toolbarHideTimeoutRef.current = null;
+    }
+  };
+
+  /** Shows the toolbar immediately and keeps it stable while pointer crosses the node/toolbar gap. */
+  const showToolbar = () => {
+    cancelToolbarHide();
+    setIsHovered(true);
+  };
+
+  /** Hides the toolbar after a short grace period unless the toolbar/menu is active. */
+  const scheduleToolbarHide = () => {
+    cancelToolbarHide();
+    toolbarHideTimeoutRef.current = window.setTimeout(() => {
+      setIsHovered(false);
+      setIsToolbarHovered(false);
+      toolbarHideTimeoutRef.current = null;
+    }, TOOLBAR_HIDE_DELAY_MS);
+  };
+
+  useEffect(() => () => cancelToolbarHide(), []);
 
   // Close menu when clicking outside (capture to beat React Flow internal handlers)
   useEffect(() => {
@@ -266,12 +300,55 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     : null;
 
   const menuButtonClassName =
-    'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
+    'relative flex h-8 w-8 items-center justify-center rounded-md border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
+  const dangerButtonClassName = cn(
+    menuButtonClassName,
+    'text-red-600 hover:bg-red-50 hover:text-red-700',
+  );
 
-  const nodeActionControls = (
-    <div className="flex items-center space-x-1 shrink-0">
+  /** Stops React Flow from treating side-control pointer events as node clicks/drags. */
+  const stopGraphControlEvent = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+  };
+
+  /**
+    * Requests this node as an input for the active view without letting the
+    * click bubble into React Flow's node drag/select handlers.
+    * Called by: the fixed-size NodeToolbar "+" button.
+   */
+  const handleAddClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (node?.node_id) onAddToSelection?.(node.node_id);
+  };
+
+  /**
+   * Fixed-pixel-size action toolbar rendered by React Flow outside the scaled
+   * node transform. Best practice for zoomable canvases: keep interactive
+   * controls out of the zoomed content layer and reveal them only for the
+   * hovered item, so dense layouts are not permanently occluded. Selection
+   * state intentionally does not affect visibility.
+   */
+  const nodeToolbar = (
+    <NodeToolbar
+      nodeId={id}
+      isVisible={isHovered || isToolbarHovered || showMenu || showDeleteConfirm}
+      position={Position.Right}
+      align="center"
+      offset={8}
+      className="nodrag nopan flex items-center gap-1 rounded-lg border border-border bg-white/95 p-1 shadow-lg"
+      onMouseEnter={() => {
+        cancelToolbarHide();
+        setIsToolbarHovered(true);
+      }}
+      onMouseLeave={scheduleToolbarHide}
+      onPointerDownCapture={stopGraphControlEvent}
+      onMouseDownCapture={stopGraphControlEvent}
+    >
       <div className="relative" ref={menuRef}>
         <button
+          type="button"
+          onPointerDown={stopGraphControlEvent}
+          onMouseDown={stopGraphControlEvent}
           onClick={(e) => {
             e.stopPropagation();
             setShowMenu(!showMenu);
@@ -280,11 +357,11 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
           title="More options"
           aria-label="Node settings"
         >
-          <Settings2 className="h-3.5 w-3.5" />
+          <Settings2 className="h-4 w-4" />
         </button>
 
         {showMenu && (
-          <div className="absolute right-0 top-8 z-10 min-w-36 rounded-md border border-border bg-white shadow-lg">
+          <div className="absolute right-0 top-9 z-30 min-w-36 rounded-md border border-border bg-white shadow-lg">
             <button
               onClick={handleRenameClick}
               className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-muted/60"
@@ -324,7 +401,29 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
           </div>
         )}
       </div>
-    </div>
+      <button
+        type="button"
+        onPointerDown={stopGraphControlEvent}
+        onMouseDown={stopGraphControlEvent}
+        onClick={handleAddClick}
+        className={menuButtonClassName}
+        title="Add to selection"
+        aria-label="Add node to selection"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onPointerDown={stopGraphControlEvent}
+        onMouseDown={stopGraphControlEvent}
+        onClick={handleDeleteClick}
+        className={dangerButtonClassName}
+        title="Delete node"
+        aria-label="Delete node"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </NodeToolbar>
   );
 
   const deleteDialog = (
@@ -357,6 +456,8 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     return (
       <div
         className={compactClasses}
+        onMouseEnter={showToolbar}
+        onMouseLeave={scheduleToolbarHide}
         style={{
           minWidth: '180px',
           maxWidth: '300px',
@@ -370,7 +471,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
           ...(isFresh ? { outline: '3px solid #000', outlineOffset: '2px' } : {}),
         }}
       >
-        <div className="absolute right-2 top-2 z-10">{nodeActionControls}</div>
+        {nodeToolbar}
         {isHighlighted && (
           <div
             className="w-3 h-3 rounded-full mr-2.5 mt-2 shrink-0"
@@ -407,6 +508,8 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   return (
     <div
       className={nodeClasses}
+      onMouseEnter={showToolbar}
+      onMouseLeave={scheduleToolbarHide}
       style={{
         minWidth: '256px',
         minHeight: '120px',
@@ -475,7 +578,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
             </div>
           )}
         </div>
-        {nodeActionControls}
       </div>
 
       {/* Node Body */}
@@ -514,6 +616,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         position={Position.Right}
         className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
       />
+      {nodeToolbar}
       {deleteDialog}
     </div>
   );

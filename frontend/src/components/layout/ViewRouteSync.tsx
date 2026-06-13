@@ -52,10 +52,42 @@ export const ViewRouteSync = () => {
   // always treats the initial URL as a potential "just changed" value.
   const prevRouteViewRef = useRef<typeof routeView | null>(null);
 
+  // Remembers a URL view that is a valid target but is temporarily blocked only
+  // because the workspace has not finished loading yet (the common case on a
+  // page refresh of e.g. ``?view=token-frequency``). Keeping it here lets us
+  // preserve the URL param while loading and adopt it once the workspace is
+  // ready, instead of wiping the param back to the base URL mid-load.
+  const pendingRouteViewRef = useRef<ViewType | null>(null);
+
   useEffect(() => {
     const prevRouteView = prevRouteViewRef.current;
     prevRouteViewRef.current = routeView;
     const routeViewJustChanged = routeView !== prevRouteView;
+
+    // Refresh case: the URL names a valid view that is only blocked because the
+    // workspace is still loading. Stash it and leave the URL untouched so the
+    // intent survives until the workspace becomes available.
+    if (
+      routeView &&
+      routeView !== 'data-loader' &&
+      visibleViews.includes(routeView) &&
+      !isWorkspaceLoaded
+    ) {
+      pendingRouteViewRef.current = routeView;
+      return;
+    }
+
+    // The workspace finished loading with a pending URL view → adopt it now.
+    // This handles the refresh flow where ``routeView`` itself never changes
+    // (so the URL → store guard below would not fire), only ``isWorkspaceLoaded``.
+    const pendingRouteView = pendingRouteViewRef.current;
+    if (pendingRouteView && isWorkspaceLoaded) {
+      pendingRouteViewRef.current = null;
+      if (visibleViews.includes(pendingRouteView) && pendingRouteView !== currentView) {
+        setCurrentView(pendingRouteView);
+        return;
+      }
+    }
 
     // URL → store: the URL's view param changed to a valid, different view.
     // Apply it to the store and skip the URL update (handles back/forward and

@@ -68,7 +68,7 @@ const getDownloadExtension = (selectedFormat: string) =>
 // Renders export controls for downloading the selected workspace nodes.
 /**
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
 function ExportFeature() {
   const { selectedNodes: rawSelectedNodes } = useWorkspaceSelection();
@@ -164,7 +164,7 @@ function ExportFeature() {
   // Export all selected nodes in the requested format (zip when multiple)
   /**
    * Called by: ExportFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const handleExportAll = async () => {
     if (!currentWorkspaceId || nodeIds.length === 0) return;

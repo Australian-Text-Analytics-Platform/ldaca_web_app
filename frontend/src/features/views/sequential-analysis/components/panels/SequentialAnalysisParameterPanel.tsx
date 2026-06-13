@@ -1,8 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react';
 
 import HelpIcon from '@/components/help/HelpIcon';
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
-import { ANALYSIS_LOCKED_MESSAGE } from '@/features/views/common/components/AnalysisLockedNotice';
+import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
+import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -25,11 +25,6 @@ type SequentialCustomIntervalUnit = NonNullable<
 interface ColumnLike {
   name: string;
   dataType: string;
-}
-
-interface NodeColumnSelectionLike {
-  nodeId: string;
-  column: string;
 }
 
 const FREQUENCY_LABELS: Record<SequentialFrequency, string> = {
@@ -68,15 +63,8 @@ const CUSTOM_INTERVAL_UNIT_OPTIONS: Array<{
 
 export interface SequentialAnalysisParameterPanelProps {
   // Node selection
-  selectedNodes: Array<Record<string, unknown>>;
-  nodeColumnSelections: NodeColumnSelectionLike[];
-  timeCompatibleColumns: ColumnLike[];
-  timeCompatibleTypes: string[];
-  isLocked: boolean;
-  displayNodeCount: number;
+  nodeInputs: UseTabNodeInputsResult;
   onColumnChange: (nodeId: string, column: string) => void;
-  /** Displayed when the panel is locked. Defaults to the standard "locked while results loaded" message. */
-  lockedMessage?: string;
 
   // Configuration shared
   derivedColumnType: 'datetime' | 'numeric';
@@ -119,7 +107,7 @@ export interface SequentialAnalysisParameterPanelProps {
 }
 
 /**
- * Rendered by: SequentialAnalysisFeature. Sequential Analysis parameter panel: NodeSelectionPanel + the because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: SequentialAnalysisFeature. Sequential Analysis parameter panel: NodeInputsPanel + the configuration block because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * frequency/numeric-interval/group-by configuration block. Extracted
  * from SequentialAnalysisFeature.tsx; the surrounding AnalysisCardLayout
  * frame stays in the parent because run/clear actions belong to
@@ -127,12 +115,7 @@ export interface SequentialAnalysisParameterPanelProps {
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function SequentialAnalysisParameterPanel({
-  selectedNodes,
-  nodeColumnSelections,
-  timeCompatibleColumns,
-  timeCompatibleTypes,
-  isLocked,
-  displayNodeCount,
+  nodeInputs,
   onColumnChange,
   derivedColumnType,
   inputsDisabled,
@@ -160,36 +143,26 @@ export function SequentialAnalysisParameterPanel({
   nodeColors,
   defaultPalette,
   onColorChange,
-  lockedMessage = ANALYSIS_LOCKED_MESSAGE,
 }: SequentialAnalysisParameterPanelProps) {
   return (
     <>
-      <NodeSelectionPanel
-        selectedNodes={selectedNodes}
-        nodeColumnSelections={nodeColumnSelections}
+      <NodeInputsPanel
+        resolvedNodes={nodeInputs.resolvedNodes}
+        availableNodes={nodeInputs.availableNodes}
+        graphSelectedIds={nodeInputs.graphSelectedIds}
+        recentPresets={nodeInputs.recentPresets}
+        canAddMore={nodeInputs.canAddMore}
+        maxNodes={1}
+        onAddNodes={nodeInputs.addNodes}
+        getAddRejection={nodeInputs.getAddRejection}
+        onRemoveNode={nodeInputs.removeNode}
+        onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}
         nodeColors={nodeColors}
         onColorChange={onColorChange}
-        getNodeColumns={() => timeCompatibleColumns}
         defaultPalette={defaultPalette}
-        maxCompare={1}
-        className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-        showShape
         showColorPicker
-        disabled={!!isLocked}
-        locked={!!isLocked}
-        originalCount={displayNodeCount}
-        columnLabelFn={() => (
-          <span className="inline-flex items-center gap-1">
-            Time/Numeric Column *
-            <HelpIcon
-              targetKey="analysis.sequential-analysis.time-column"
-              label="Time column selector"
-            />
-          </span>
-        )}
-        allowedDataTypes={timeCompatibleTypes}
-        lockedMessage={lockedMessage}
+        columnLabel="Time/Numeric Column *"
       />
 
       <div className="space-y-4">

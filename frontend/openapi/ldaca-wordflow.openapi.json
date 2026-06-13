@@ -887,8 +887,15 @@
         "type": "object"
       },
       "AnalysisTab": {
-        "description": "A single thin analysis tab.\n\nCarries only identity and a pointer to the analysis result it shows. All\nparameters/node selection live on the referenced ``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
+        "description": "A single analysis tab.\n\nCarries identity (``tab_id``), a pointer to the analysis result it shows\n(``task_id``), a display ``title``, and the ``inputs`` node set it analyses.\nRemaining analysis parameters live on the referenced\n``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
         "properties": {
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisTabInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
           "tab_id": {
             "title": "Tab Id",
             "type": "string"
@@ -939,6 +946,31 @@
           }
         },
         "title": "AnalysisTabGroup",
+        "type": "object"
+      },
+      "AnalysisTabInput": {
+        "description": "One node selected as input for an analysis tab.\n\nPairs a workspace ``node_id`` with an optional ``column`` pick (the single\ntext/data column the analysis runs on; ``None`` until a column is chosen or\nfor views that need no column). The frontend ``useNodeInputs`` hook adds,\nremoves, and column-assigns these entries under the add-node-as-needed\nmodel.\n\nUsed by:\n- `AnalysisTab.inputs` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
+        "properties": {
+          "column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id"
+        ],
+        "title": "AnalysisTabInput",
         "type": "object"
       },
       "AnalysisTaskActionResponse": {
@@ -1621,17 +1653,6 @@
               }
             ],
             "title": "Sort By"
-          },
-          "tab_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tab Id"
           },
           "whole_word": {
             "default": false,
@@ -2484,23 +2505,6 @@
           "path"
         ],
         "title": "CreateFolderResponse",
-        "type": "object"
-      },
-      "CurrentAnalysisTasksResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for current analysis tasks response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "task_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Task Ids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "task_ids"
-        ],
-        "title": "CurrentAnalysisTasksResponse",
         "type": "object"
       },
       "CurrentWorkspaceResponse": {
@@ -9998,57 +10002,6 @@
         ]
       }
     },
-    "/api/workspaces/ai-annotation/tasks/current": {
-      "get": {
-        "description": "Return current task IDs for AI annotation analysis.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /ai-annotation/tasks/current route because they need this unit's \"Return current task IDs for AI annotation analysis\" behavior.",
-        "operationId": "ai_annotation_current_tasks",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Ai Annotation Current Tasks",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
-        ]
-      }
-    },
     "/api/workspaces/ai-annotation/tasks/{task_id}/request": {
       "get": {
         "description": "Return stored request payload for an AI annotation task.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /ai-annotation/tasks/{task_id}/request route because they need this unit's \"Return stored request payload for an AI annotation task\" behavior.",
@@ -10364,57 +10317,6 @@
           }
         },
         "summary": "Run Concordance",
-        "tags": [
-          "workspace_management",
-          "concordance"
-        ]
-      }
-    },
-    "/api/workspaces/concordance/tasks/current": {
-      "get": {
-        "description": "Return current task IDs for concordance analysis.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /concordance/tasks/current route because they need this unit's \"Return current task IDs for concordance analysis\" behavior.",
-        "operationId": "concordance_current_tasks",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Concordance Current Tasks",
         "tags": [
           "workspace_management",
           "concordance"
@@ -14260,7 +14162,7 @@
     },
     "/api/workspaces/nodes/{node_id}/sequential-analysis": {
       "post": {
-        "description": "Run sequential analysis for one node and persist/update task payload.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- frontend sequential-analysis run action because they need this unit's \"Run sequential analysis for one node and persist/update task payload\" behavior.\n\nWhy:\n- Produces aggregated time-series counts and stores them as current task data.",
+        "description": "Run sequential analysis for one node and persist/update task payload.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- frontend sequential-analysis run action because they need this unit's \"Run sequential analysis for one node and persist/update task payload\" behavior.\n\nWhy:\n- Produces aggregated time-series counts and stores them under an explicit task id.",
         "operationId": "run_sequential_analysis",
         "parameters": [
           {
@@ -14761,57 +14663,6 @@
         ]
       }
     },
-    "/api/workspaces/quotation/tasks/current": {
-      "get": {
-        "description": "Return current task IDs for quotation analysis.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /quotation/tasks/current route because they need this unit's \"Return current task IDs for quotation analysis\" behavior.",
-        "operationId": "quotation_current_tasks",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Quotation Current Tasks",
-        "tags": [
-          "workspace_management",
-          "quotation"
-        ]
-      }
-    },
     "/api/workspaces/quotation/tasks/{task_id}/request": {
       "get": {
         "description": "Return stored request payload for a quotation task.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /quotation/tasks/{task_id}/request route because they need this unit's \"Return stored request payload for a quotation task\" behavior.",
@@ -15131,56 +14982,6 @@
         ]
       }
     },
-    "/api/workspaces/sequential-analysis/tasks/current": {
-      "get": {
-        "description": "Return current task IDs for sequential-analysis.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /sequential-analysis/tasks/current route because they need this unit's \"Return current task IDs for sequential-analysis\" behavior.",
-        "operationId": "sequential_analysis_current_tasks",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Sequential Analysis Current Tasks",
-        "tags": [
-          "workspace_management"
-        ]
-      }
-    },
     "/api/workspaces/sequential-analysis/tasks/{task_id}/detach": {
       "post": {
         "description": "Create a filtered child node from selected sequential-analysis periods.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI POST /sequential-analysis/tasks/{task_id}/detach route because they need this unit's \"Create a filtered child node from selected sequential-analysis periods\" behavior.",
@@ -15445,7 +15246,7 @@
     },
     "/api/workspaces/token-frequencies": {
       "delete": {
-        "description": "Clear Token Frequency analysis state for a workspace.\n\nMirrors topic-modeling clear behavior by removing the currently tracked\nanalysis task link for the token frequency tab.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI DELETE /token-frequencies route because they need this unit's \"Clear Token Frequency analysis state for a workspace\" behavior.",
+        "description": "Clear Token Frequency analysis state for a workspace.\n\nLegacy broad clear endpoint: removes all token-frequency task records for\nthe active workspace. Tabbed clients should normally clear by explicit\ntask_id through `/api/tasks/clear` instead.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI DELETE /token-frequencies route because they need this unit's \"Clear Token Frequency analysis state for a workspace\" behavior.",
         "operationId": "clear_token_frequencies",
         "parameters": [
           {
@@ -15546,56 +15347,6 @@
           }
         },
         "summary": "Calculate token frequencies for selected nodes",
-        "tags": [
-          "workspace_management"
-        ]
-      }
-    },
-    "/api/workspaces/token-frequencies/tasks/current": {
-      "get": {
-        "description": "Return current task IDs for token-frequencies analysis.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /token-frequencies/tasks/current route because they need this unit's \"Return current task IDs for token-frequencies analysis\" behavior.",
-        "operationId": "token_frequencies_current_tasks",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Token Frequencies Current Tasks",
         "tags": [
           "workspace_management"
         ]
@@ -15855,7 +15606,7 @@
     },
     "/api/workspaces/topic-modeling": {
       "delete": {
-        "description": "Clear stored topic-modeling task state for a workspace.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend clear action: `DELETE /workspaces/{id}/topic-modeling` because they need this unit's \"Clear stored topic-modeling task state for a workspace\" behavior.\n\nWhy:\n- Removes stale result/task pointers before reruns and keeps UI state\n    aligned with backend task registries.",
+        "description": "Clear stored topic-modeling task state for a workspace.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend clear action: `DELETE /workspaces/{id}/topic-modeling` because they need this unit's \"Clear stored topic-modeling task state for a workspace\" behavior.\n\nWhy:\n- Removes explicit topic-modeling task records for broad legacy clear actions.",
         "operationId": "clear_topic_modeling_results",
         "parameters": [
           {
@@ -16059,57 +15810,6 @@
           }
         },
         "summary": "Get Topic Modeling Embedding Cache Size",
-        "tags": [
-          "workspace_management",
-          "topic-modeling"
-        ]
-      }
-    },
-    "/api/workspaces/topic-modeling/tasks/current": {
-      "get": {
-        "description": "Return current task IDs for topic-modeling analysis.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /topic-modeling/tasks/current route because they need this unit's \"Return current task IDs for topic-modeling analysis\" behavior.",
-        "operationId": "topic_modeling_current_tasks",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CurrentAnalysisTasksResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Topic Modeling Current Tasks",
         "tags": [
           "workspace_management",
           "topic-modeling"

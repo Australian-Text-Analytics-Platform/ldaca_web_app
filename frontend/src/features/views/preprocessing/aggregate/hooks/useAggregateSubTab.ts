@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { insertItemAt, moveItemTo, removeItemAt } from './tokenIndexMath';
 
-import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   type FilterPreviewResponse,

@@ -1,17 +1,14 @@
 import { useState } from 'react';
 
-import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
   type FilterPreviewResponse,
   type ReplaceApplyResponse,
   type ReplaceRequest,
 } from '@/api/generated/types.gen';
-import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 import { mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
-
-const SINGLE_NODE_PALETTE = ['#2563eb'];
 
 /**
  * Resolves a stable node id from workspace node shapes that may expose either
@@ -23,6 +20,7 @@ const getNodeId = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
 
 export interface ReplaceSubTabProps {
   selectedNodeId: string | null;
+  selectedColumn?: string;
   selectedNodes: WorkspaceNodeLike[];
   workspaceNodes: WorkspaceNodeLike[];
   isLoading: {
@@ -51,6 +49,7 @@ export interface ReplaceSubTabProps {
 export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const {
     selectedNodeId,
+    selectedColumn: inputSelectedColumn = '',
     selectedNodes,
     workspaceNodes,
     isLoading,
@@ -77,10 +76,9 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     : [];
   const firstStringColumn = stringColumns[0] ?? '';
 
-  const [selectedColumnDraft, setSelectedColumn] = useState('');
   const selectedColumn =
-    activeNodeId && stringColumns.includes(selectedColumnDraft)
-      ? selectedColumnDraft
+    activeNodeId && stringColumns.includes(inputSelectedColumn)
+      ? inputSelectedColumn
       : firstStringColumn;
   const [mode, setMode] = useState<'replace' | 'extract'>('replace');
   const [n, setN] = useState<number | null>(null);
@@ -176,11 +174,6 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     }
   };
 
-  const nodeColumnSelections: NodeColumnSelection[] = activeNodeId
-    ? [{ nodeId: activeNodeId, column: selectedColumn }]
-    : [];
-  const nodeColors = activeNodeId ? { [activeNodeId]: SINGLE_NODE_PALETTE[0]! } : {};
-
   const previewReadyMessage = !hasSelection
     ? 'Select a data block to configure a find operation.'
     : 'Showing original data. Configure a pattern to preview find results.';
@@ -191,7 +184,6 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     effectiveNodes,
     stringColumns,
     selectedColumn,
-    setSelectedColumn,
     mode,
     setMode,
     count,
@@ -212,10 +204,6 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     applyDisabledReason,
     applyLoading,
     handleApply,
-    nodeColumnSelections,
-    nodeColors,
-    defaultPalette: SINGLE_NODE_PALETTE,
-    selectedNodes,
     preview: {
       data: previewData,
       columns: previewColumns,

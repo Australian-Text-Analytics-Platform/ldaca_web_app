@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type * as SdkGen from '@/api/generated/sdk.gen';
 
 import DataPreprocessingFeature from '../DataPreprocessingFeature';
 
@@ -15,6 +17,7 @@ const mockPolarsExpressionApply = vi.fn();
 const mockReplacePreview = vi.fn();
 const mockReplaceText = vi.fn();
 const mockRefreshNodeSchema = vi.fn();
+const mockGetNodeData = vi.hoisted(() => vi.fn());
 
 const mockSelectedNode = {
   id: 'node-1',
@@ -25,6 +28,60 @@ const mockSelectedNode = {
     Count: 'Int64',
   },
   shape: [2, 2] as [number, number],
+};
+
+vi.mock('@/api/generated/sdk.gen', async (importOriginal) => {
+  const actual = await importOriginal<typeof SdkGen>();
+  return {
+    ...actual,
+    getNodeData: mockGetNodeData,
+  };
+});
+
+vi.mock('@/features/auth/hooks/useAuth', () => ({
+  useAuth: () => ({
+    isAuthenticated: true,
+    getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
+  }),
+}));
+
+/**
+ * Mounts preprocessing with a QueryClient because the input-node schema query
+ * now loads independently from graph selection state.
+ */
+const renderPreprocessingFeature = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <DataPreprocessingFeature />
+    </QueryClientProvider>,
+  );
+};
+
+/**
+ * Waits until the Filter tab has consumed the active preprocessing input
+ * node's schema query, then returns the filter tabpanel.
+ */
+const waitForFilterSchema = async () => {
+  await waitFor(() => {
+    expect(mockGetNodeData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { node_id: 'node-1' },
+        query: { page: 1, page_size: 1 },
+      }),
+    );
+  });
+  const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
+  await waitFor(() => {
+    expect(within(filterPanel).getAllByRole('combobox')[0]).toBeEnabled();
+  });
+  return filterPanel;
 };
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
@@ -53,6 +110,28 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
     nodes: [mockSelectedNode],
   }),
 }));
+
+vi.mock('@/stores/preprocessingInputsStore', () => {
+  const selectedInput = [{ node_id: 'node-1', column: null }];
+  const state = {
+    byKey: {
+      'ws-1::filter': selectedInput,
+      'ws-1::slice': selectedInput,
+      'ws-1::find': selectedInput,
+      'ws-1::aggregate': selectedInput,
+      'ws-1::expression': selectedInput,
+      'ws-1::join': selectedInput,
+      'ws-1::concat': selectedInput,
+    },
+    setInputs: vi.fn(),
+    clearInputs: vi.fn(),
+  };
+  return {
+    preprocessingInputsKey: (workspaceId: string | null | undefined, subtabId: string) =>
+      `${workspaceId ?? '__none__'}::${subtabId}`,
+    usePreprocessingInputsStore: (selector: (store: typeof state) => unknown) => selector(state),
+  };
+});
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   // Exposes workspace action doubles used to assert preview/apply calls from subtabs.
@@ -85,6 +164,25 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
   }),
 }));
 
+vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
+  default: () => ({
+    getColumnInfos: () => [
+      { name: 'Body', dataType: 'string' },
+      { name: 'Count', dataType: 'integer' },
+    ],
+    columnInfoCache: {},
+    isLoading: false,
+  }),
+  useNodeColumnInfos: () => ({
+    getColumnInfos: () => [
+      { name: 'Body', dataType: 'string' },
+      { name: 'Count', dataType: 'integer' },
+    ],
+    columnInfoCache: {},
+    isLoading: false,
+  }),
+}));
+
 vi.mock('@/components/help/HelpIcon', () => ({
   // Removes help chrome from assertions focused on preprocessing behavior.
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
@@ -100,6 +198,22 @@ vi.mock('@/components/help/InfoIcon', () => ({
 describe('DataPreprocessingFeature replace tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetNodeData.mockResolvedValue({
+      data: {
+        columns: ['Body', 'Count'],
+        dtypes: {
+          Body: 'Utf8',
+          Count: 'Int64',
+        },
+        data: [{ Body: 'candidate tweet', Count: 1 }],
+        pagination: {
+          page: 1,
+          page_size: 1,
+          total_rows: 1,
+          total_pages: 1,
+        },
+      },
+    });
     mockFilterPreview.mockResolvedValue({
       columns: ['Body', 'Count'],
       dtypes: {
@@ -161,7 +275,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     const user = userEvent.setup();
     const regexPattern = String.raw`\d+`;
 
-    render(<DataPreprocessingFeature />);
+    renderPreprocessingFeature();
 
     await user.click(screen.getByRole('tab', { name: 'Find' }));
 
@@ -195,10 +309,34 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
   });
 
+  it('shows one preprocessing input panel and loads filter schema for the added input node', async () => {
+    renderPreprocessingFeature();
+
+    expect(screen.getAllByText('Preprocessing Inputs (1/1)')).toHaveLength(1);
+    expect(screen.queryByText(/Selected Data Blocks/)).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockGetNodeData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: { node_id: 'node-1' },
+          query: { page: 1, page_size: 1 },
+        }),
+      );
+    });
+
+    const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
+    await waitFor(() => {
+      expect(
+        within(filterPanel).queryByText('No schema information is available for this data block yet.'),
+      ).not.toBeInTheDocument();
+    });
+    expect(within(filterPanel).getAllByRole('combobox').length).toBeGreaterThan(0);
+  });
+
   it('shows the Sample tab and submits a random sample request', async () => {
     const user = userEvent.setup();
 
-    render(<DataPreprocessingFeature />);
+    renderPreprocessingFeature();
 
     screen.getByRole('tab', { name: 'Filter' }).focus();
     await user.keyboard('{ArrowRight}');
@@ -241,7 +379,7 @@ describe('DataPreprocessingFeature replace tab', () => {
   it('fills the suggested sample name when tab is pressed on an empty name field', async () => {
     const user = userEvent.setup();
 
-    render(<DataPreprocessingFeature />);
+    renderPreprocessingFeature();
 
     const [filterTab] = screen.getAllByRole('tab', { name: 'Filter' });
     filterTab!.focus();
@@ -276,7 +414,7 @@ describe('DataPreprocessingFeature replace tab', () => {
   it('keeps focus on the name input after the first tab fill, then tabs to the next control on the second press', async () => {
     const user = userEvent.setup();
 
-    render(<DataPreprocessingFeature />);
+    renderPreprocessingFeature();
 
     const [filterTab] = screen.getAllByRole('tab', { name: 'Filter' });
     filterTab!.focus();
@@ -319,9 +457,9 @@ describe('DataPreprocessingFeature replace tab', () => {
   it('uses a smart filter placeholder name and preserves typed overrides', async () => {
     const user = userEvent.setup();
 
-    render(<DataPreprocessingFeature />);
+    renderPreprocessingFeature();
 
-    const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
+    const filterPanel = await waitForFilterSchema();
     const [columnSelect] = within(filterPanel).getAllByRole('combobox');
     columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
@@ -380,7 +518,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       },
     });
 
-    render(<DataPreprocessingFeature />);
+    renderPreprocessingFeature();
 
     // Re-query the Add-to-Workspace button on each assertion: the
     // surrounding <DisabledReasonTooltip> swaps its child whenever its
@@ -394,7 +532,7 @@ describe('DataPreprocessingFeature replace tab', () => {
         name: 'Add to Workspace',
       });
 
-    const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
+    const filterPanel = await waitForFilterSchema();
     expect(getAddButton()).toBeDisabled();
 
     const [columnSelect] = within(filterPanel).getAllByRole('combobox');

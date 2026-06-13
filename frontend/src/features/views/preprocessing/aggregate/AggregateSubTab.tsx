@@ -1,11 +1,10 @@
+import type { ReactNode } from 'react';
 import { Calculator, Loader2, X } from 'lucide-react';
 
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
@@ -17,12 +16,16 @@ import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggreg
 
 export type { AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
+type AggregateSubTabComponentProps = AggregateSubTabProps & {
+  renderNodeInputsPanel?: () => ReactNode;
+};
+
 /**
  * Entry component for the computed-column builder. It exists to key the inner
  * content by selection so builder state resets when the active source changes.
  * Rendered by: DataPreprocessingFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
-export function AggregateSubTab(props: AggregateSubTabProps) {
+export function AggregateSubTab(props: AggregateSubTabComponentProps) {
   return <AggregateSubTabContent key={getAggregateSelectionKey(props)} {...props} />;
 }
 
@@ -32,7 +35,7 @@ export function AggregateSubTab(props: AggregateSubTabProps) {
  * changes.
  * Used by: local callers in preprocessing/AggregateSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
-const getAggregateSelectionKey = (props: AggregateSubTabProps): string => {
+const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string => {
   const [selectedNode] = takeMostRecent(props.selectedNodes, 1);
   if (selectedNode) {
     return selectedNode.id || selectedNode.node_id || props.selectedNodeId || 'none';
@@ -47,8 +50,9 @@ const getAggregateSelectionKey = (props: AggregateSubTabProps): string => {
  * Flow: split hook config into selection/builder/preview/apply props, render expression and
  * visual-builder modes, and keep table/apply controls tied to hook state.
  */
-function AggregateSubTabContent(props: AggregateSubTabProps) {
+function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
   const { isLoading } = props;
+  const { renderNodeInputsPanel } = props;
   const { nodeSelection, expression, basicBuilder, preview, apply, dropZoneRef } =
     useAggregateSubTab(props);
 
@@ -72,31 +76,7 @@ function AggregateSubTabContent(props: AggregateSubTabProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <NodeSelectionPanel
-            selectedNodes={nodeSelection.effectiveNodes}
-            nodeColumnSelections={nodeSelection.nodeColumnSelections}
-            onColumnChange={() => undefined}
-            nodeColors={nodeSelection.nodeColors}
-            onColorChange={() => undefined}
-            defaultPalette={nodeSelection.defaultPalette}
-            maxCompare={1}
-            className="rounded-lg border border-border/60 bg-muted/40 pt-0"
-            showColorPicker={false}
-            showColumnPicker={false}
-            showHeaderLabel
-            originalCount={nodeSelection.originalCount}
-            disabled={isLoading.operations}
-            showShape
-            headerAddon={
-              <HelpIcon
-                targetKey="preprocessing.common.node-selection"
-                label="Selected data blocks"
-                className="h-4 w-4 text-muted-foreground"
-              />
-            }
-          />
-
-          <Separator />
+          {renderNodeInputsPanel?.()}
 
           <div className="space-y-4">
             <div className="space-y-2">

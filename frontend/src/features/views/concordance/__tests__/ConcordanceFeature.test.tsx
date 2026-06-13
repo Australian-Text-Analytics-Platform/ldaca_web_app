@@ -31,10 +31,31 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/features/views/common/components/NodeSelectionPanel', () => ({
-  /** Replaces node-selection chrome so tests focus on concordance orchestration. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-  default: () => <div data-testid="node-selection-panel" />,
+vi.mock('../../common/nodeInputs', () => ({
+  /** Provides a stable per-tab node-input fixture without the workspace provider stack. */
+  useTabNodeInputs: () => ({
+    nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
+    selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
+    resolvedNodes: [
+      {
+        id: 'node-1',
+        name: 'Node 1',
+        node: { id: 'node-1', name: 'Node 1' },
+        column: 'text',
+        columnOptions: [{ name: 'text', dataType: 'string' }],
+      },
+    ],
+    inputs: [{ node_id: 'node-1', column: 'text' }],
+    addNodes: vi.fn(() => []),
+    removeNode: vi.fn(),
+    clear: vi.fn(),
+    setColumn: vi.fn(),
+    getAddRejection: vi.fn(() => null),
+    availableNodes: [],
+    canAddMore: true,
+    graphSelectedIds: [],
+    workspaceId: 'ws-1',
+  }),
 }));
 
 vi.mock('@/components/help/HelpIcon', () => ({
@@ -269,35 +290,24 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
 vi.mock('../../common', async () => {
   const ReactModule = await import('react');
   return {
-    ANALYSIS_LOCKED_MESSAGE: 'Locked',
-    hasLockedParameterDiff: vi.fn(() => true),
-    resetAnalysisSelectionAfterClear: vi.fn(),
-    restoreAnalysisLockFromRequest: vi.fn(),
     /** Mirrors the shared node-id helper with a deterministic fallback for fixtures. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     getNodeIdentifier: (node: { id?: string }, index: number) => node.id ?? `node-${index}`,
-    /** Supplies locked concordance selection state without invoking the shared hook stack. */
-    // Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. Flow: arrange the fixture, exercise the focused analysis path, then assert the observable result.
-    useAnalysisLock: () => ({
-      isLocked: true,
-      lockWithSnapshots: vi.fn(),
-      unlockSelection: vi.fn(),
-      nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
-      setNodeColumnSelection: vi.fn(),
-      setNodeColumnSelections: vi.fn(),
-      recomputeAutoColumns: vi.fn(),
-      activeNodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
-      activeNodeIds: ['node-1'],
-      panelSelectedNodes: [{ id: 'node-1', name: 'Node 1' }],
-      displayNodeCount: 1,
+    /** Supplies the last-run request used only for Run/Re-run button diffing. */
+    useLastRunRequest: () => ({
       serverRequest: {
+        node_ids: ['node-1'],
+        node_columns: { 'node-1': 'text' },
         search_word: 'old value',
         num_left_tokens: 10,
         num_right_tokens: 10,
         regex: false,
         case_sensitive: false,
       },
+      hasServerRequest: true,
+      taskId: null,
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn(),
     }),
     /** Supplies analysis lifecycle state and mockable clear behavior for feature tests. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
@@ -334,27 +344,22 @@ vi.mock('../../common', async () => {
       return [result, ref, vi.fn(), setResult];
     },
     EXTENDED_PALETTE: ['#000000'],
-    executeAnalysisRunOrUpdate: vi.fn(
+    executeAnalysisRerun: vi.fn(
       async ({
-        hasLockedParameterChanges,
+        hasUnrunChanges,
         clearResults,
         runFreshAnalysis,
       }: {
-        hasLockedParameterChanges: boolean;
+        hasUnrunChanges: boolean;
         clearResults: () => Promise<void>;
         runFreshAnalysis: () => Promise<void>;
       }) => {
-        if (hasLockedParameterChanges) {
+        if (hasUnrunChanges) {
           await clearResults();
         }
         await runFreshAnalysis();
       },
     ),
-    getAnalysisActionState: vi.fn(({ allowRunWhenLocked }: { allowRunWhenLocked?: boolean }) => ({
-      runDisabled: false,
-      clearDisabled: false,
-      runLabel: allowRunWhenLocked ? 'Update' : 'Run',
-    })),
   };
 });
 
@@ -375,14 +380,14 @@ describe('ConcordanceFeature', () => {
     });
   });
 
-  it('clears previous results before rerunning when clicking Update', () => {
+  it('clears previous results before rerunning when clicking Re-run', () => {
     const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: /re-?run/i })[0]!);
 
     return waitFor(() => {
       expect(clearResultsMock).toHaveBeenCalledTimes(1);
@@ -390,14 +395,14 @@ describe('ConcordanceFeature', () => {
     }).finally(unmount);
   });
 
-  it('passes the locked-update flag when clicking Update', () => {
+  it('runs a fresh search when clicking Re-run after changing parameters', () => {
     const { unmount } = renderWithClient(<ConcordanceFeature />);
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: /re-?run/i })[0]!);
 
     return waitFor(() => {
       expect(handleSearchMock).toHaveBeenCalledWith(

@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   sequentialAnalysisTaskRequest,
   sequentialAnalysisTaskResult,
 } from '@/api/generated/sdk.gen';
-import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
+import type { AnalysisTabInput, SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
@@ -17,21 +16,19 @@ import { normalizeSchemaFromInfo } from '@/features/workspace/common/hooks/useSc
 import { fetchNodeInfo } from '@/lib/nodeInfo';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
-  hasLockedParameterDiff,
   normalizeStringArray,
   normalizeUnknownStringArray,
-  useAnalysisLock,
+  useLastRunRequest,
   useAnalysisFeature,
   useNodeColorManagement,
-  getAnalysisActionState,
   getNodeIdentifier,
   useSafeResult,
-  restoreAnalysisLockFromRequest,
-  resetAnalysisSelectionAfterClear,
-  executeAnalysisRunOrUpdate,
+  executeAnalysisRerun,
 } from '../common';
+import { useTabNodeInputs } from '../common/nodeInputs';
+import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { hasParameterDiff } from '../common/parameterComparison';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import {
   useSequentialAnalysisTaskFlow,
@@ -102,7 +99,7 @@ const parsePositiveIntegerInput = (value: string): number | null => {
 /** Renders the sequential-analysis workflow for live trends and result exploration. */
 /**
  * Rendered by: SequentialAnalysisTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
- * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
  * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
@@ -112,47 +109,54 @@ interface SequentialAnalysisFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
+  tabInputs?: AnalysisTabInput[];
+  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
 }
 
 const SequentialAnalysisFeature = ({
   tabId,
   tabTaskId,
   onTabTaskChange,
+  tabInputs,
+  onTabInputsChange,
 }: SequentialAnalysisFeatureProps = {}) => {
   const queryClient = useQueryClient();
-  const { selectedNodeId, selectedNode } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'analysis';
 
   const { getAuthHeaders } = useAuth();
-  const {
-    isLocked,
-    lockWithSnapshots,
-    unlockSelection,
-    activeNodeId,
-    nodeColumnSelections,
-    setNodeColumnSelections,
-    displayNodeCount,
-    serverRequest,
-    panelSelectedNodes: livePanelSelectedNodes,
-  } = useAnalysisLock({
+  const nodeInputs = useTabNodeInputs({
+    tabInputs,
+    onTabInputsChange,
+    constraints: {
+      allowedDataTypes: [...TIME_COMPATIBLE_TYPES],
+      maxNodes: 1,
+      docTypeOnly: false,
+    },
+  });
+  const nodeColumnSelections = nodeInputs.nodeColumnSelections;
+  const setNodeColumnSelection = nodeInputs.setColumn;
+  const panelSelectedNodes = nodeInputs.selectedNodes;
+  const activeNodeId = nodeInputs.resolvedNodes[0]?.id ?? '';
+  const selectedNode = nodeInputs.resolvedNodes[0]?.node ?? null;
+  const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
+  const applyInputsFromSelections = (
+    selections: Array<{ nodeId: string; column?: string | null }>,
+  ) => {
+    onTabInputsChange?.(
+      selections
+        .filter((selection) => selection.nodeId)
+        .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null })),
+    );
+  };
+  const { serverRequest } = useLastRunRequest({
     analysisType: 'sequential_analysis',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
-    // Tab-scoped locking: bind the lock to this tab's persisted task. Null for a
-    // fresh tab that has not run yet (unlocked).
     taskId: tabTaskId ?? null,
-    allowedDataTypes: ['datetime'],
-    maxNodes: 1,
-    docTypeOnly: false,
-    storageScope: 'sequential-analysis',
   });
-
-  const panelSelectedNodes = livePanelSelectedNodes;
-
-  const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
   // Lifted from the panel so promoteTempColors is accessible to the
   // Run handler below. ``tabKey`` routes picker changes through the
   // per-tab temp layer (see node-colour strategy doc).
@@ -192,7 +196,7 @@ const SequentialAnalysisFeature = ({
   const { setLockedSchema, availableColumns, lockCurrentSchema, currentSchemaRef } =
     useSchemaManagement({
       nodeId: activeNodeId,
-      isLocked,
+      isLocked: false,
       workspaceId: currentWorkspaceId || undefined,
       getAuthHeaders,
       nodeData: nodeData ?? undefined,
@@ -221,7 +225,6 @@ const SequentialAnalysisFeature = ({
     isStopping,
     setIsRunning: setIsAnalyzing,
     banner: sequentialWaitingBanner,
-    hasActiveTask,
     clearResults,
     stopTask,
   } = useAnalysisFeature<Record<string, unknown>>({
@@ -350,7 +353,9 @@ const SequentialAnalysisFeature = ({
         setNumericIntervalInput('1');
       }
       if (nodeIdStr && reqTimeColumn) {
-        setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
+        if (!tabInputs || tabInputs.length === 0) {
+          applyInputsFromSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
+        }
         setTimeColumn(reqTimeColumn);
       }
       const normalizedGroups = Array.isArray(req.group_by_columns)
@@ -411,14 +416,6 @@ const SequentialAnalysisFeature = ({
       };
       if (nodeIdStr && currentWorkspaceId) {
         try {
-          await restoreAnalysisLockFromRequest({
-            workspaceId: currentWorkspaceId,
-            requestData: { node_ids: [nodeIdStr], node_columns: { [nodeIdStr]: reqTimeColumn } },
-            getAuthHeaders,
-            lockWithSnapshots,
-            queryClient,
-            maxNodes: 1,
-          });
           const info = await fetchNodeInfo({
             queryClient,
             workspaceId: currentWorkspaceId,
@@ -449,9 +446,8 @@ const SequentialAnalysisFeature = ({
         return;
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared.
+      // a task the user explicitly cleared. Inputs are intentionally preserved.
       onTabTaskChange?.(null);
-      resetAnalysisSelectionAfterClear({ unlockSelection });
       setLockedSchema(null);
       setChartType('line');
       setCaseSensitive(true);
@@ -502,10 +498,6 @@ const SequentialAnalysisFeature = ({
 
   const timeColumnOptions = timeCompatibleColumns.map((column) => column.name);
 
-  const effectiveNodeColumnSelections = useMemo(() => {
-    return nodeColumnSelections;
-  }, [nodeColumnSelections]);
-
   const activeTimeColumn = (() => {
     if (!activeNodeId) return '';
     const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
@@ -536,111 +528,74 @@ const SequentialAnalysisFeature = ({
     ? customIntervalUnit
     : null;
 
-  const hasParamsChanged = hasLockedParameterDiff({
-    isLocked,
-    serverRequest: serverRequest as Record<string, unknown> | null,
-    currentParams: {
-      frequency,
-      group_by_columns: normalizeStringArray(groupByColumns),
-      column_type: derivedColumnType,
-      numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : null,
-      numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
-      custom_interval_value: isCustomDatetime ? customIntervalValue : null,
-      custom_interval_unit: isCustomDatetime ? customIntervalUnitValue : null,
-      case_sensitive: caseSensitive,
-    },
-    // Extracts comparable server-side parameters from the stored task request.
-    // Called by: SequentialAnalysisFeature lock diffing because request payloads store datetime and numeric bucket settings in nullable backend fields. Flow: normalize frequency, grouping, numeric/custom interval, and case flags, then return comparable sequential params.
-    getServerParams: (request) => {
-      const serverColumnType =
-        typeof request.column_type === 'string' ? request.column_type : 'datetime';
-      const serverFrequency = typeof request.frequency === 'string' ? request.frequency : 'year';
-      const serverNumericOrigin =
-        request.numeric_origin == null ? null : Number(request.numeric_origin);
-      const serverNumericInterval =
-        request.numeric_interval == null ? null : Number(request.numeric_interval);
-      const serverIsCustomDatetime =
-        serverColumnType === 'datetime' && serverFrequency === 'custom';
-      const serverCustomIntervalValue =
+  const lastRunRequest = (serverRequest as Record<string, unknown> | null) ?? null;
+  const currentSequentialParams = {
+    frequency,
+    group_by_columns: normalizeStringArray(groupByColumns),
+    column_type: derivedColumnType,
+    numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : null,
+    numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
+    custom_interval_value: isCustomDatetime ? customIntervalValue : null,
+    custom_interval_unit: isCustomDatetime ? customIntervalUnitValue : null,
+    case_sensitive: caseSensitive,
+  };
+  const sequentialServerParams = (request: Record<string, unknown>) => {
+    const serverColumnType = typeof request.column_type === 'string' ? request.column_type : 'datetime';
+    const serverFrequency = typeof request.frequency === 'string' ? request.frequency : 'year';
+    const serverIsCustomDatetime = serverColumnType === 'datetime' && serverFrequency === 'custom';
+    return {
+      frequency: serverFrequency,
+      group_by_columns: normalizeUnknownStringArray(request.group_by_columns),
+      column_type: serverColumnType,
+      numeric_origin:
+        serverColumnType === 'numeric' && request.numeric_origin != null
+          ? Number(request.numeric_origin)
+          : null,
+      numeric_interval:
+        serverColumnType === 'numeric' && request.numeric_interval != null
+          ? Number(request.numeric_interval)
+          : null,
+      custom_interval_value:
         serverIsCustomDatetime && typeof request.custom_interval_value === 'number'
           ? Number(request.custom_interval_value)
-          : null;
-      const serverCustomIntervalUnit =
+          : null,
+      custom_interval_unit:
         serverIsCustomDatetime && isCustomIntervalUnit(request.custom_interval_unit)
           ? (request.custom_interval_unit as SequentialCustomIntervalUnit)
-          : null;
+          : null,
+      case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true,
+    };
+  };
+  const serverNodeId = lastRunRequest ? String(lastRunRequest.node_id || lastRunRequest.nodeId || '') : '';
+  const serverColumn = lastRunRequest ? String(lastRunRequest.time_column || '') : '';
+  const hasLastRun = Boolean(lastRunRequest);
+  const hasParamsChanged = !lastRunRequest
+    ? true
+    : hasParameterDiff(currentSequentialParams, sequentialServerParams(lastRunRequest)) ||
+      hasNodeSelectionChanged(
+        nodeColumnSelections,
+        serverNodeId ? [serverNodeId] : [],
+        serverNodeId ? { [serverNodeId]: serverColumn } : {},
+      );
 
-      const serverCaseSensitive =
-        typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true;
-      return {
-        frequency: serverFrequency,
-        group_by_columns: normalizeUnknownStringArray(request.group_by_columns),
-        column_type: serverColumnType,
-        numeric_origin: serverColumnType === 'numeric' ? serverNumericOrigin : null,
-        numeric_interval: serverColumnType === 'numeric' ? serverNumericInterval : null,
-        custom_interval_value: serverIsCustomDatetime ? serverCustomIntervalValue : null,
-        custom_interval_unit: serverIsCustomDatetime ? serverCustomIntervalUnit : null,
-        case_sensitive: serverCaseSensitive,
-      };
-    },
-  });
-
-  const actionState = getAnalysisActionState({
+  const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
-    hasSelection: Boolean(activeNodeId),
-    isLocked,
-    hasResults: Boolean(results),
+    isRunnable: Boolean(activeNodeId),
+    hasLastRun,
+    hasChanges: hasParamsChanged,
     isBusy: isAnalyzing,
-    hasActiveTask,
-    allowRunWhenLocked: hasParamsChanged,
-    canUpdate: true,
+    hasResults: Boolean(results),
   });
 
-  /* eslint-disable react-hooks/set-state-in-effect -- Complex sync logic with guards to prevent infinite loops; refactoring to render-time would duplicate guard logic */
   useEffect(() => {
-    if (isLocked || hydratingSelection) return;
-    if (!selectedNodeId) {
-      if (nodeColumnSelections.length > 0) {
-        setNodeColumnSelections([], { replace: true });
-      }
-      if (timeColumn !== '') {
-        setTimeColumn('');
-      }
-      return;
+    if (hydratingSelection) return;
+    const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
+    const nextColumn = selection?.column || timeColumnOptions[0] || '';
+    if (nextColumn && nextColumn !== timeColumn) {
+      const id = requestAnimationFrame(() => setTimeColumn(nextColumn));
+      return () => cancelAnimationFrame(id);
     }
-
-    if (!timeColumnOptions.length) {
-      // Check current state before updating to avoid infinite loop
-      const currentSelection = nodeColumnSelections.find((s) => s.nodeId === selectedNodeId);
-      if (!currentSelection || currentSelection.column !== '') {
-        setNodeColumnSelections([{ nodeId: selectedNodeId, column: '' }]);
-      }
-      if (timeColumn !== '') {
-        setTimeColumn('');
-      }
-      return;
-    }
-
-    const desired = timeColumnOptions.includes(timeColumn) ? timeColumn : timeColumnOptions[0]!;
-    if (desired !== timeColumn) {
-      setTimeColumn(desired);
-    }
-
-    // Check current state before updating to avoid infinite loop
-    const currentSelection = nodeColumnSelections.find((s) => s.nodeId === selectedNodeId);
-    if (!currentSelection || currentSelection.column !== desired) {
-      setNodeColumnSelections([{ nodeId: selectedNodeId, column: desired }]);
-    }
-  }, [
-    isLocked,
-    hydratingSelection,
-    selectedNodeId,
-    timeColumnOptions,
-    setNodeColumnSelections,
-    nodeColumnSelections,
-    timeColumn,
-  ]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, [hydratingSelection, activeNodeId, timeColumnOptions, nodeColumnSelections, timeColumn]);
 
   // Adds a blank grouping control up to the supported three-column limit.
   /**
@@ -718,9 +673,8 @@ const SequentialAnalysisFeature = ({
       setResults,
       setChartType,
       setLocalTaskId,
-      setNodeColumnSelections,
+      setNodeColumnSelections: (selections) => applyInputsFromSelections(selections),
       setTimeColumn,
-      lockWithSnapshots,
       lockCurrentSchema,
       resolveTaskId,
       clearResults,
@@ -730,7 +684,7 @@ const SequentialAnalysisFeature = ({
         if (tabId) onTabTaskChange?.(taskId);
       },
     },
-    lock: { getAuthHeaders, queryClient },
+    lock: { getAuthHeaders },
   });
 
   const chartData = liveChartData;
@@ -785,11 +739,11 @@ const SequentialAnalysisFeature = ({
     // Promote pending per-tab temp colours to assigned (Run is the
     // commit trigger per the node-colour strategy doc).
     trendsPromoteTempColors(trendsActiveNodeIds);
-    await executeAnalysisRunOrUpdate({
-      hasLockedParameterChanges: hasParamsChanged,
+    await executeAnalysisRerun({
+      hasUnrunChanges: hasParamsChanged,
       clearResults,
       runFreshAnalysis: handleAnalyze,
-      clearOptionsOnUpdate: { preserveLocalState: true },
+      clearOptionsOnRerun: { preserveLocalState: true },
     });
   };
 
@@ -916,7 +870,7 @@ const SequentialAnalysisFeature = ({
   // Exports the rendered chart SVG with contextual title and legend metadata.
   /**
    * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive locked analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const handleDownloadChart = async (format: ChartImageFormat) => {
     if (!chartContainerRef.current) {
@@ -1007,21 +961,15 @@ const SequentialAnalysisFeature = ({
         }}
       >
         <SequentialAnalysisParameterPanel
-          selectedNodes={displayedNodes}
-          nodeColumnSelections={effectiveNodeColumnSelections}
-          timeCompatibleColumns={timeCompatibleColumns}
-          timeCompatibleTypes={Array.from(TIME_COMPATIBLE_TYPES)}
-          isLocked={Boolean(isLocked)}
-          displayNodeCount={displayNodeCount}
+          nodeInputs={nodeInputs}
           onColumnChange={(nodeId, column) => {
-            if (isLocked) return;
-            setNodeColumnSelections([{ nodeId, column }]);
+            setNodeColumnSelection(nodeId, column);
             setTimeColumn(column);
           }}
           derivedColumnType={derivedColumnType}
-          inputsDisabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
+          inputsDisabled={isAnalyzing || isLoading.operations || !activeNodeId}
           activeNodeId={activeNodeId}
-          selectedNodeId={selectedNodeId}
+          selectedNodeId={activeNodeId}
           currentWorkspaceId={currentWorkspaceId}
           frequency={frequency}
           onFrequencyChange={setFrequency}

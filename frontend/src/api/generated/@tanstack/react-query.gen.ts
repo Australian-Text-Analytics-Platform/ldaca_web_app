@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addNodeToWorkspace, adminCleanup, aiAnnotationCurrentTasks, aiAnnotationTaskRequest, aiAnnotationTaskResult, aiAnnotationTaskResultPost, authHealth, authStatus, calculateTokenFrequencies, cancelTask, castNode, cilogonCallback, cilogonLogin, clearAiAnnotation, clearFilesTasks, clearTasks, clearTokenFrequencies, clearTopicModelingEmbeddingCache, clearTopicModelingResults, cloneNode, columnOperations, concatNodes, concatNodesPreview, concordanceCurrentTasks, concordanceDetachOptions, concordanceTaskDispersionBins, concordanceTaskRequest, concordanceTaskResult, concordanceTaskResultPost, createFolder, createWorkspace, deleteFile, deleteNode, deleteNodeColumn, deleteWorkspace, describeColumn, detachAiAnnotation, detachConcordance, detachConcordanceDispersion, detachQuotation, detachSequentialAnalysisTask, detachTopicModeling, downloadFile, downloadWorkspaceArtifact, exportNodes, filterNode, filterPreview, getAiAnnotationCategories, getAiAnnotationModels, getAiAnnotationProviders, getAuthInfo, getColumnUniqueValues, getConfig, getCurrentUserInfo, getCurrentWorkspace, getFileInfo, getNodeData, getNodeInfo, getNodeQueryPlan, getNodeShape, getPreferences, getQuotation, getRawFile, getSampleDataCatalogue, getSampleDataReadme, getTokenizerModels, getTopicModelingEmbeddingCacheSize, getUserFiles, getWorkspaceGraph, getWorkspaceInfo, getWorkspaceNodes, getWorkspaceTabs, getWorkspaceUiState, googleAuth, googleAuthCallback, healthCheck, importLdacaDataset, importSampleData, joinNodes, joinNodesPreview, listFilesTasks, listLdacaFeaturedCollections, listTasks, listUsers, listWorkspaces, logout, materializeConcordance, materializeQuotation, moveFile, type Options, polarsExpressionApply, polarsExpressionPreview, previewSequentialAnalysis, putWorkspaceTabs, putWorkspaceUiState, quotationCurrentTasks, quotationDetachOptions, quotationTaskRequest, quotationTaskResult, redoNodeOperation, renameNodeColumn, renameWorkspace, replaceApply, replacePreview, root, runAiAnnotation, runConcordance, runSequentialAnalysis, runTopicModeling, saveAiAnnotation, saveWorkspace, searchLdacaCollections, sequentialAnalysisCurrentTasks, sequentialAnalysisTaskRequest, sequentialAnalysisTaskResult, setCurrentWorkspace, setNodeDocumentColumn, setNodeTokenizationPreference, sliceNode, slicePreview, startWorkspaceDownload, status, streamTasks, tokenFrequenciesCurrentTasks, tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult, topicModelingCurrentTasks, topicModelingDetachOptions, topicModelingTaskRequest, topicModelingTaskResult, undoNodeOperation, unifiedFilePreview, unloadWorkspace, updateConfig, updateNodeName, updatePreferences, updateQuotationTaskResult, updateSequentialAnalysisTaskResult, updateTokenFrequenciesTaskResult, updateWorkspaceDescription, uploadFile, uploadWorkspaceZip } from '../sdk.gen';
-import type { AddNodeToWorkspaceData, AddNodeToWorkspaceError, AddNodeToWorkspaceResponse, AdminCleanupData, AdminCleanupError, AiAnnotationCurrentTasksData, AiAnnotationCurrentTasksError, AiAnnotationCurrentTasksResponse, AiAnnotationTaskRequestData, AiAnnotationTaskRequestError, AiAnnotationTaskRequestResponse, AiAnnotationTaskResultData, AiAnnotationTaskResultError, AiAnnotationTaskResultPostData, AiAnnotationTaskResultPostError, AiAnnotationTaskResultPostResponse, AiAnnotationTaskResultResponse, AuthHealthData, AuthStatusData, AuthStatusError, CalculateTokenFrequenciesData, CalculateTokenFrequenciesError, CalculateTokenFrequenciesResponse, CancelTaskData, CancelTaskError, CancelTaskResponse, CastNodeData, CastNodeError, CastNodeResponse2, CilogonCallbackData, CilogonCallbackError, CilogonLoginData, ClearAiAnnotationData, ClearAiAnnotationError, ClearAiAnnotationResponse, ClearFilesTasksData, ClearFilesTasksError, ClearFilesTasksResponse, ClearTasksData, ClearTasksError, ClearTasksResponse, ClearTokenFrequenciesData, ClearTokenFrequenciesError, ClearTokenFrequenciesResponse, ClearTopicModelingEmbeddingCacheData, ClearTopicModelingEmbeddingCacheError, ClearTopicModelingEmbeddingCacheResponse, ClearTopicModelingResultsData, ClearTopicModelingResultsError, ClearTopicModelingResultsResponse, CloneNodeData, CloneNodeError, CloneNodeResponse, ColumnOperationsData, ColumnOperationsError, ColumnOperationsResponse2, ConcatNodesData, ConcatNodesError, ConcatNodesPreviewData, ConcatNodesPreviewError, ConcatNodesPreviewResponse, ConcatNodesResponse, ConcordanceCurrentTasksData, ConcordanceCurrentTasksError, ConcordanceCurrentTasksResponse, ConcordanceDetachOptionsData, ConcordanceDetachOptionsError, ConcordanceDetachOptionsResponse2, ConcordanceTaskDispersionBinsData, ConcordanceTaskDispersionBinsError, ConcordanceTaskDispersionBinsResponse, ConcordanceTaskRequestData, ConcordanceTaskRequestError, ConcordanceTaskRequestResponse, ConcordanceTaskResultData, ConcordanceTaskResultError, ConcordanceTaskResultPostData, ConcordanceTaskResultPostError, ConcordanceTaskResultPostResponse, ConcordanceTaskResultResponse, CreateFolderData, CreateFolderError, CreateFolderResponse2, CreateWorkspaceData, CreateWorkspaceError, CreateWorkspaceResponse, DeleteFileData, DeleteFileError, DeleteFileResponse, DeleteNodeColumnData, DeleteNodeColumnError, DeleteNodeColumnResponse, DeleteNodeData, DeleteNodeError, DeleteNodeResponse, DeleteWorkspaceData, DeleteWorkspaceError, DeleteWorkspaceResponse, DescribeColumnData, DescribeColumnError, DescribeColumnResponse, DetachAiAnnotationData, DetachAiAnnotationError, DetachAiAnnotationResponse, DetachConcordanceData, DetachConcordanceDispersionData, DetachConcordanceDispersionError, DetachConcordanceDispersionResponse, DetachConcordanceError, DetachConcordanceResponse, DetachQuotationData, DetachQuotationError, DetachQuotationResponse, DetachSequentialAnalysisTaskData, DetachSequentialAnalysisTaskError, DetachSequentialAnalysisTaskResponse, DetachTopicModelingData, DetachTopicModelingError, DetachTopicModelingResponse, DownloadFileData, DownloadFileError, DownloadWorkspaceArtifactData, DownloadWorkspaceArtifactError, ExportNodesData, ExportNodesError, FilterNodeData, FilterNodeError, FilterNodeResponse, FilterPreviewData, FilterPreviewError, FilterPreviewResponse2, GetAiAnnotationCategoriesData, GetAiAnnotationCategoriesError, GetAiAnnotationCategoriesResponse, GetAiAnnotationModelsData, GetAiAnnotationModelsError, GetAiAnnotationModelsResponse, GetAiAnnotationProvidersData, GetAiAnnotationProvidersError, GetAiAnnotationProvidersResponse, GetAuthInfoData, GetAuthInfoError, GetAuthInfoResponse, GetColumnUniqueValuesData, GetColumnUniqueValuesError, GetColumnUniqueValuesResponse, GetConfigData, GetConfigResponse, GetCurrentUserInfoData, GetCurrentUserInfoError, GetCurrentUserInfoResponse, GetCurrentWorkspaceData, GetCurrentWorkspaceError, GetCurrentWorkspaceResponse, GetFileInfoData, GetFileInfoError, GetFileInfoResponse, GetNodeDataData, GetNodeDataError, GetNodeDataResponse, GetNodeInfoData, GetNodeInfoError, GetNodeInfoResponse, GetNodeQueryPlanData, GetNodeQueryPlanError, GetNodeQueryPlanResponse, GetNodeShapeData, GetNodeShapeError, GetNodeShapeResponse, GetPreferencesData, GetPreferencesError, GetPreferencesResponse, GetQuotationData, GetQuotationError, GetQuotationResponse, GetRawFileData, GetRawFileError, GetSampleDataCatalogueData, GetSampleDataCatalogueError, GetSampleDataCatalogueResponse, GetSampleDataReadmeData, GetSampleDataReadmeError, GetTokenizerModelsData, GetTokenizerModelsError, GetTokenizerModelsResponse, GetTopicModelingEmbeddingCacheSizeData, GetTopicModelingEmbeddingCacheSizeError, GetTopicModelingEmbeddingCacheSizeResponse, GetUserFilesData, GetUserFilesError, GetUserFilesResponse, GetWorkspaceGraphData, GetWorkspaceGraphError, GetWorkspaceGraphResponse, GetWorkspaceInfoData, GetWorkspaceInfoError, GetWorkspaceInfoResponse, GetWorkspaceNodesData, GetWorkspaceNodesError, GetWorkspaceNodesResponse, GetWorkspaceTabsData, GetWorkspaceTabsError, GetWorkspaceTabsResponse, GetWorkspaceUiStateData, GetWorkspaceUiStateError, GetWorkspaceUiStateResponse, GoogleAuthCallbackData, GoogleAuthCallbackError, GoogleAuthData, GoogleAuthError, GoogleAuthResponse, HealthCheckData, ImportLdacaDatasetData, ImportLdacaDatasetError, ImportLdacaDatasetResponse, ImportSampleDataData, ImportSampleDataError, ImportSampleDataResponse2, JoinNodesData, JoinNodesError, JoinNodesPreviewData, JoinNodesPreviewError, JoinNodesPreviewResponse, JoinNodesResponse, ListFilesTasksData, ListFilesTasksError, ListFilesTasksResponse, ListLdacaFeaturedCollectionsData, ListLdacaFeaturedCollectionsError, ListLdacaFeaturedCollectionsResponse, ListTasksData, ListTasksError, ListTasksResponse, ListUsersData, ListUsersError, ListWorkspacesData, ListWorkspacesError, ListWorkspacesResponse, LogoutData, LogoutError, MaterializeConcordanceData, MaterializeConcordanceError, MaterializeConcordanceResponse, MaterializeQuotationData, MaterializeQuotationError, MaterializeQuotationResponse, MoveFileData, MoveFileError, MoveFileResponse, PolarsExpressionApplyData, PolarsExpressionApplyError, PolarsExpressionApplyResponse2, PolarsExpressionPreviewData, PolarsExpressionPreviewError, PolarsExpressionPreviewResponse, PreviewSequentialAnalysisData, PreviewSequentialAnalysisError, PreviewSequentialAnalysisResponse, PutWorkspaceTabsData, PutWorkspaceTabsError, PutWorkspaceTabsResponse, PutWorkspaceUiStateData, PutWorkspaceUiStateError, PutWorkspaceUiStateResponse, QuotationCurrentTasksData, QuotationCurrentTasksError, QuotationCurrentTasksResponse, QuotationDetachOptionsData, QuotationDetachOptionsError, QuotationDetachOptionsResponse2, QuotationTaskRequestData, QuotationTaskRequestError, QuotationTaskRequestResponse, QuotationTaskResultData, QuotationTaskResultError, QuotationTaskResultResponse, RedoNodeOperationData, RedoNodeOperationError, RedoNodeOperationResponse, RenameNodeColumnData, RenameNodeColumnError, RenameNodeColumnResponse, RenameWorkspaceData, RenameWorkspaceError, RenameWorkspaceResponse, ReplaceApplyData, ReplaceApplyError, ReplaceApplyResponse2, ReplacePreviewData, ReplacePreviewError, ReplacePreviewResponse, RootData, RunAiAnnotationData, RunAiAnnotationError, RunAiAnnotationResponse, RunConcordanceData, RunConcordanceError, RunConcordanceResponse, RunSequentialAnalysisData, RunSequentialAnalysisError, RunSequentialAnalysisResponse, RunTopicModelingData, RunTopicModelingError, RunTopicModelingResponse, SaveAiAnnotationData, SaveAiAnnotationError, SaveAiAnnotationResponse, SaveWorkspaceData, SaveWorkspaceError, SaveWorkspaceResponse, SearchLdacaCollectionsData, SearchLdacaCollectionsError, SearchLdacaCollectionsResponse, SequentialAnalysisCurrentTasksData, SequentialAnalysisCurrentTasksError, SequentialAnalysisCurrentTasksResponse, SequentialAnalysisTaskRequestData, SequentialAnalysisTaskRequestError, SequentialAnalysisTaskRequestResponse, SequentialAnalysisTaskResultData, SequentialAnalysisTaskResultError, SequentialAnalysisTaskResultResponse, SetCurrentWorkspaceData, SetCurrentWorkspaceError, SetCurrentWorkspaceResponse2, SetNodeDocumentColumnData, SetNodeDocumentColumnError, SetNodeDocumentColumnResponse, SetNodeTokenizationPreferenceData, SetNodeTokenizationPreferenceError, SetNodeTokenizationPreferenceResponse, SliceNodeData, SliceNodeError, SliceNodeResponse, SlicePreviewData, SlicePreviewError, SlicePreviewResponse, StartWorkspaceDownloadData, StartWorkspaceDownloadError, StartWorkspaceDownloadResponse, StatusData, StreamTasksData, StreamTasksError, TokenFrequenciesCurrentTasksData, TokenFrequenciesCurrentTasksError, TokenFrequenciesCurrentTasksResponse, TokenFrequenciesTaskRequestData, TokenFrequenciesTaskRequestError, TokenFrequenciesTaskRequestResponse, TokenFrequenciesTaskResultData, TokenFrequenciesTaskResultError, TokenFrequenciesTaskResultResponse, TopicModelingCurrentTasksData, TopicModelingCurrentTasksError, TopicModelingCurrentTasksResponse, TopicModelingDetachOptionsData, TopicModelingDetachOptionsError, TopicModelingDetachOptionsResponse2, TopicModelingTaskRequestData, TopicModelingTaskRequestError, TopicModelingTaskRequestResponse, TopicModelingTaskResultData, TopicModelingTaskResultError, TopicModelingTaskResultResponse, UndoNodeOperationData, UndoNodeOperationError, UndoNodeOperationResponse, UnifiedFilePreviewData, UnifiedFilePreviewError, UnifiedFilePreviewResponse, UnloadWorkspaceData, UnloadWorkspaceError, UnloadWorkspaceResponse, UpdateConfigData, UpdateConfigError, UpdateConfigResponse, UpdateNodeNameData, UpdateNodeNameError, UpdateNodeNameResponse, UpdatePreferencesData, UpdatePreferencesError, UpdatePreferencesResponse, UpdateQuotationTaskResultData, UpdateQuotationTaskResultError, UpdateQuotationTaskResultResponse, UpdateSequentialAnalysisTaskResultData, UpdateSequentialAnalysisTaskResultError, UpdateSequentialAnalysisTaskResultResponse, UpdateTokenFrequenciesTaskResultData, UpdateTokenFrequenciesTaskResultError, UpdateTokenFrequenciesTaskResultResponse, UpdateWorkspaceDescriptionData, UpdateWorkspaceDescriptionError, UpdateWorkspaceDescriptionResponse, UploadFileData, UploadFileError, UploadFileResponse, UploadWorkspaceZipData, UploadWorkspaceZipError, UploadWorkspaceZipResponse } from '../types.gen';
+import { addNodeToWorkspace, adminCleanup, aiAnnotationTaskRequest, aiAnnotationTaskResult, aiAnnotationTaskResultPost, authHealth, authStatus, calculateTokenFrequencies, cancelTask, castNode, cilogonCallback, cilogonLogin, clearAiAnnotation, clearFilesTasks, clearTasks, clearTokenFrequencies, clearTopicModelingEmbeddingCache, clearTopicModelingResults, cloneNode, columnOperations, concatNodes, concatNodesPreview, concordanceDetachOptions, concordanceTaskDispersionBins, concordanceTaskRequest, concordanceTaskResult, concordanceTaskResultPost, createFolder, createWorkspace, deleteFile, deleteNode, deleteNodeColumn, deleteWorkspace, describeColumn, detachAiAnnotation, detachConcordance, detachConcordanceDispersion, detachQuotation, detachSequentialAnalysisTask, detachTopicModeling, downloadFile, downloadWorkspaceArtifact, exportNodes, filterNode, filterPreview, getAiAnnotationCategories, getAiAnnotationModels, getAiAnnotationProviders, getAuthInfo, getColumnUniqueValues, getConfig, getCurrentUserInfo, getCurrentWorkspace, getFileInfo, getNodeData, getNodeInfo, getNodeQueryPlan, getNodeShape, getPreferences, getQuotation, getRawFile, getSampleDataCatalogue, getSampleDataReadme, getTokenizerModels, getTopicModelingEmbeddingCacheSize, getUserFiles, getWorkspaceGraph, getWorkspaceInfo, getWorkspaceNodes, getWorkspaceTabs, getWorkspaceUiState, googleAuth, googleAuthCallback, healthCheck, importLdacaDataset, importSampleData, joinNodes, joinNodesPreview, listFilesTasks, listLdacaFeaturedCollections, listTasks, listUsers, listWorkspaces, logout, materializeConcordance, materializeQuotation, moveFile, type Options, polarsExpressionApply, polarsExpressionPreview, previewSequentialAnalysis, putWorkspaceTabs, putWorkspaceUiState, quotationDetachOptions, quotationTaskRequest, quotationTaskResult, redoNodeOperation, renameNodeColumn, renameWorkspace, replaceApply, replacePreview, root, runAiAnnotation, runConcordance, runSequentialAnalysis, runTopicModeling, saveAiAnnotation, saveWorkspace, searchLdacaCollections, sequentialAnalysisTaskRequest, sequentialAnalysisTaskResult, setCurrentWorkspace, setNodeDocumentColumn, setNodeTokenizationPreference, sliceNode, slicePreview, startWorkspaceDownload, status, streamTasks, tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult, topicModelingDetachOptions, topicModelingTaskRequest, topicModelingTaskResult, undoNodeOperation, unifiedFilePreview, unloadWorkspace, updateConfig, updateNodeName, updatePreferences, updateQuotationTaskResult, updateSequentialAnalysisTaskResult, updateTokenFrequenciesTaskResult, updateWorkspaceDescription, uploadFile, uploadWorkspaceZip } from '../sdk.gen';
+import type { AddNodeToWorkspaceData, AddNodeToWorkspaceError, AddNodeToWorkspaceResponse, AdminCleanupData, AdminCleanupError, AiAnnotationTaskRequestData, AiAnnotationTaskRequestError, AiAnnotationTaskRequestResponse, AiAnnotationTaskResultData, AiAnnotationTaskResultError, AiAnnotationTaskResultPostData, AiAnnotationTaskResultPostError, AiAnnotationTaskResultPostResponse, AiAnnotationTaskResultResponse, AuthHealthData, AuthStatusData, AuthStatusError, CalculateTokenFrequenciesData, CalculateTokenFrequenciesError, CalculateTokenFrequenciesResponse, CancelTaskData, CancelTaskError, CancelTaskResponse, CastNodeData, CastNodeError, CastNodeResponse2, CilogonCallbackData, CilogonCallbackError, CilogonLoginData, ClearAiAnnotationData, ClearAiAnnotationError, ClearAiAnnotationResponse, ClearFilesTasksData, ClearFilesTasksError, ClearFilesTasksResponse, ClearTasksData, ClearTasksError, ClearTasksResponse, ClearTokenFrequenciesData, ClearTokenFrequenciesError, ClearTokenFrequenciesResponse, ClearTopicModelingEmbeddingCacheData, ClearTopicModelingEmbeddingCacheError, ClearTopicModelingEmbeddingCacheResponse, ClearTopicModelingResultsData, ClearTopicModelingResultsError, ClearTopicModelingResultsResponse, CloneNodeData, CloneNodeError, CloneNodeResponse, ColumnOperationsData, ColumnOperationsError, ColumnOperationsResponse2, ConcatNodesData, ConcatNodesError, ConcatNodesPreviewData, ConcatNodesPreviewError, ConcatNodesPreviewResponse, ConcatNodesResponse, ConcordanceDetachOptionsData, ConcordanceDetachOptionsError, ConcordanceDetachOptionsResponse2, ConcordanceTaskDispersionBinsData, ConcordanceTaskDispersionBinsError, ConcordanceTaskDispersionBinsResponse, ConcordanceTaskRequestData, ConcordanceTaskRequestError, ConcordanceTaskRequestResponse, ConcordanceTaskResultData, ConcordanceTaskResultError, ConcordanceTaskResultPostData, ConcordanceTaskResultPostError, ConcordanceTaskResultPostResponse, ConcordanceTaskResultResponse, CreateFolderData, CreateFolderError, CreateFolderResponse2, CreateWorkspaceData, CreateWorkspaceError, CreateWorkspaceResponse, DeleteFileData, DeleteFileError, DeleteFileResponse, DeleteNodeColumnData, DeleteNodeColumnError, DeleteNodeColumnResponse, DeleteNodeData, DeleteNodeError, DeleteNodeResponse, DeleteWorkspaceData, DeleteWorkspaceError, DeleteWorkspaceResponse, DescribeColumnData, DescribeColumnError, DescribeColumnResponse, DetachAiAnnotationData, DetachAiAnnotationError, DetachAiAnnotationResponse, DetachConcordanceData, DetachConcordanceDispersionData, DetachConcordanceDispersionError, DetachConcordanceDispersionResponse, DetachConcordanceError, DetachConcordanceResponse, DetachQuotationData, DetachQuotationError, DetachQuotationResponse, DetachSequentialAnalysisTaskData, DetachSequentialAnalysisTaskError, DetachSequentialAnalysisTaskResponse, DetachTopicModelingData, DetachTopicModelingError, DetachTopicModelingResponse, DownloadFileData, DownloadFileError, DownloadWorkspaceArtifactData, DownloadWorkspaceArtifactError, ExportNodesData, ExportNodesError, FilterNodeData, FilterNodeError, FilterNodeResponse, FilterPreviewData, FilterPreviewError, FilterPreviewResponse2, GetAiAnnotationCategoriesData, GetAiAnnotationCategoriesError, GetAiAnnotationCategoriesResponse, GetAiAnnotationModelsData, GetAiAnnotationModelsError, GetAiAnnotationModelsResponse, GetAiAnnotationProvidersData, GetAiAnnotationProvidersError, GetAiAnnotationProvidersResponse, GetAuthInfoData, GetAuthInfoError, GetAuthInfoResponse, GetColumnUniqueValuesData, GetColumnUniqueValuesError, GetColumnUniqueValuesResponse, GetConfigData, GetConfigResponse, GetCurrentUserInfoData, GetCurrentUserInfoError, GetCurrentUserInfoResponse, GetCurrentWorkspaceData, GetCurrentWorkspaceError, GetCurrentWorkspaceResponse, GetFileInfoData, GetFileInfoError, GetFileInfoResponse, GetNodeDataData, GetNodeDataError, GetNodeDataResponse, GetNodeInfoData, GetNodeInfoError, GetNodeInfoResponse, GetNodeQueryPlanData, GetNodeQueryPlanError, GetNodeQueryPlanResponse, GetNodeShapeData, GetNodeShapeError, GetNodeShapeResponse, GetPreferencesData, GetPreferencesError, GetPreferencesResponse, GetQuotationData, GetQuotationError, GetQuotationResponse, GetRawFileData, GetRawFileError, GetSampleDataCatalogueData, GetSampleDataCatalogueError, GetSampleDataCatalogueResponse, GetSampleDataReadmeData, GetSampleDataReadmeError, GetTokenizerModelsData, GetTokenizerModelsError, GetTokenizerModelsResponse, GetTopicModelingEmbeddingCacheSizeData, GetTopicModelingEmbeddingCacheSizeError, GetTopicModelingEmbeddingCacheSizeResponse, GetUserFilesData, GetUserFilesError, GetUserFilesResponse, GetWorkspaceGraphData, GetWorkspaceGraphError, GetWorkspaceGraphResponse, GetWorkspaceInfoData, GetWorkspaceInfoError, GetWorkspaceInfoResponse, GetWorkspaceNodesData, GetWorkspaceNodesError, GetWorkspaceNodesResponse, GetWorkspaceTabsData, GetWorkspaceTabsError, GetWorkspaceTabsResponse, GetWorkspaceUiStateData, GetWorkspaceUiStateError, GetWorkspaceUiStateResponse, GoogleAuthCallbackData, GoogleAuthCallbackError, GoogleAuthData, GoogleAuthError, GoogleAuthResponse, HealthCheckData, ImportLdacaDatasetData, ImportLdacaDatasetError, ImportLdacaDatasetResponse, ImportSampleDataData, ImportSampleDataError, ImportSampleDataResponse2, JoinNodesData, JoinNodesError, JoinNodesPreviewData, JoinNodesPreviewError, JoinNodesPreviewResponse, JoinNodesResponse, ListFilesTasksData, ListFilesTasksError, ListFilesTasksResponse, ListLdacaFeaturedCollectionsData, ListLdacaFeaturedCollectionsError, ListLdacaFeaturedCollectionsResponse, ListTasksData, ListTasksError, ListTasksResponse, ListUsersData, ListUsersError, ListWorkspacesData, ListWorkspacesError, ListWorkspacesResponse, LogoutData, LogoutError, MaterializeConcordanceData, MaterializeConcordanceError, MaterializeConcordanceResponse, MaterializeQuotationData, MaterializeQuotationError, MaterializeQuotationResponse, MoveFileData, MoveFileError, MoveFileResponse, PolarsExpressionApplyData, PolarsExpressionApplyError, PolarsExpressionApplyResponse2, PolarsExpressionPreviewData, PolarsExpressionPreviewError, PolarsExpressionPreviewResponse, PreviewSequentialAnalysisData, PreviewSequentialAnalysisError, PreviewSequentialAnalysisResponse, PutWorkspaceTabsData, PutWorkspaceTabsError, PutWorkspaceTabsResponse, PutWorkspaceUiStateData, PutWorkspaceUiStateError, PutWorkspaceUiStateResponse, QuotationDetachOptionsData, QuotationDetachOptionsError, QuotationDetachOptionsResponse2, QuotationTaskRequestData, QuotationTaskRequestError, QuotationTaskRequestResponse, QuotationTaskResultData, QuotationTaskResultError, QuotationTaskResultResponse, RedoNodeOperationData, RedoNodeOperationError, RedoNodeOperationResponse, RenameNodeColumnData, RenameNodeColumnError, RenameNodeColumnResponse, RenameWorkspaceData, RenameWorkspaceError, RenameWorkspaceResponse, ReplaceApplyData, ReplaceApplyError, ReplaceApplyResponse2, ReplacePreviewData, ReplacePreviewError, ReplacePreviewResponse, RootData, RunAiAnnotationData, RunAiAnnotationError, RunAiAnnotationResponse, RunConcordanceData, RunConcordanceError, RunConcordanceResponse, RunSequentialAnalysisData, RunSequentialAnalysisError, RunSequentialAnalysisResponse, RunTopicModelingData, RunTopicModelingError, RunTopicModelingResponse, SaveAiAnnotationData, SaveAiAnnotationError, SaveAiAnnotationResponse, SaveWorkspaceData, SaveWorkspaceError, SaveWorkspaceResponse, SearchLdacaCollectionsData, SearchLdacaCollectionsError, SearchLdacaCollectionsResponse, SequentialAnalysisTaskRequestData, SequentialAnalysisTaskRequestError, SequentialAnalysisTaskRequestResponse, SequentialAnalysisTaskResultData, SequentialAnalysisTaskResultError, SequentialAnalysisTaskResultResponse, SetCurrentWorkspaceData, SetCurrentWorkspaceError, SetCurrentWorkspaceResponse2, SetNodeDocumentColumnData, SetNodeDocumentColumnError, SetNodeDocumentColumnResponse, SetNodeTokenizationPreferenceData, SetNodeTokenizationPreferenceError, SetNodeTokenizationPreferenceResponse, SliceNodeData, SliceNodeError, SliceNodeResponse, SlicePreviewData, SlicePreviewError, SlicePreviewResponse, StartWorkspaceDownloadData, StartWorkspaceDownloadError, StartWorkspaceDownloadResponse, StatusData, StreamTasksData, StreamTasksError, TokenFrequenciesTaskRequestData, TokenFrequenciesTaskRequestError, TokenFrequenciesTaskRequestResponse, TokenFrequenciesTaskResultData, TokenFrequenciesTaskResultError, TokenFrequenciesTaskResultResponse, TopicModelingDetachOptionsData, TopicModelingDetachOptionsError, TopicModelingDetachOptionsResponse2, TopicModelingTaskRequestData, TopicModelingTaskRequestError, TopicModelingTaskRequestResponse, TopicModelingTaskResultData, TopicModelingTaskResultError, TopicModelingTaskResultResponse, UndoNodeOperationData, UndoNodeOperationError, UndoNodeOperationResponse, UnifiedFilePreviewData, UnifiedFilePreviewError, UnifiedFilePreviewResponse, UnloadWorkspaceData, UnloadWorkspaceError, UnloadWorkspaceResponse, UpdateConfigData, UpdateConfigError, UpdateConfigResponse, UpdateNodeNameData, UpdateNodeNameError, UpdateNodeNameResponse, UpdatePreferencesData, UpdatePreferencesError, UpdatePreferencesResponse, UpdateQuotationTaskResultData, UpdateQuotationTaskResultError, UpdateQuotationTaskResultResponse, UpdateSequentialAnalysisTaskResultData, UpdateSequentialAnalysisTaskResultError, UpdateSequentialAnalysisTaskResultResponse, UpdateTokenFrequenciesTaskResultData, UpdateTokenFrequenciesTaskResultError, UpdateTokenFrequenciesTaskResultResponse, UpdateWorkspaceDescriptionData, UpdateWorkspaceDescriptionError, UpdateWorkspaceDescriptionResponse, UploadFileData, UploadFileError, UploadFileResponse, UploadWorkspaceZipData, UploadWorkspaceZipError, UploadWorkspaceZipResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -1328,34 +1328,6 @@ export const getAiAnnotationModelsMutation = (options?: Partial<Options<GetAiAnn
     return mutationOptions;
 };
 
-export const aiAnnotationCurrentTasksQueryKey = (options?: Options<AiAnnotationCurrentTasksData>) => createQueryKey('aiAnnotationCurrentTasks', options, false, ['workspace_management', 'ai-annotation']);
-
-/**
- * Ai Annotation Current Tasks
- *
- * Return current task IDs for AI annotation analysis.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /ai-annotation/tasks/current route because they need this unit's "Return current task IDs for AI annotation analysis" behavior.
- */
-export const aiAnnotationCurrentTasksOptions = (options?: Options<AiAnnotationCurrentTasksData>) => queryOptions<AiAnnotationCurrentTasksResponse, AiAnnotationCurrentTasksError, AiAnnotationCurrentTasksResponse, ReturnType<typeof aiAnnotationCurrentTasksQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await aiAnnotationCurrentTasks({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: aiAnnotationCurrentTasksQueryKey(options)
-});
-
 export const aiAnnotationTaskRequestQueryKey = (options: Options<AiAnnotationTaskRequestData>) => createQueryKey('aiAnnotationTaskRequest', options, false, ['workspace_management', 'ai-annotation']);
 
 /**
@@ -1535,34 +1507,6 @@ export const runConcordanceMutation = (options?: Partial<Options<RunConcordanceD
     };
     return mutationOptions;
 };
-
-export const concordanceCurrentTasksQueryKey = (options?: Options<ConcordanceCurrentTasksData>) => createQueryKey('concordanceCurrentTasks', options, false, ['workspace_management', 'concordance']);
-
-/**
- * Concordance Current Tasks
- *
- * Return current task IDs for concordance analysis.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /concordance/tasks/current route because they need this unit's "Return current task IDs for concordance analysis" behavior.
- */
-export const concordanceCurrentTasksOptions = (options?: Options<ConcordanceCurrentTasksData>) => queryOptions<ConcordanceCurrentTasksResponse, ConcordanceCurrentTasksError, ConcordanceCurrentTasksResponse, ReturnType<typeof concordanceCurrentTasksQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await concordanceCurrentTasks({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: concordanceCurrentTasksQueryKey(options)
-});
 
 export const concordanceTaskDispersionBinsQueryKey = (options: Options<ConcordanceTaskDispersionBinsData>) => createQueryKey('concordanceTaskDispersionBins', options, false, ['workspace_management', 'concordance']);
 
@@ -2993,7 +2937,7 @@ export const replacePreviewMutation = (options?: Partial<Options<ReplacePreviewD
  * - frontend sequential-analysis run action because they need this unit's "Run sequential analysis for one node and persist/update task payload" behavior.
  *
  * Why:
- * - Produces aggregated time-series counts and stores them as current task data.
+ * - Produces aggregated time-series counts and stores them under an explicit task id.
  */
 export const runSequentialAnalysisMutation = (options?: Partial<Options<RunSequentialAnalysisData>>): UseMutationOptions<RunSequentialAnalysisResponse, RunSequentialAnalysisError, Options<RunSequentialAnalysisData>> => {
     const mutationOptions: UseMutationOptions<RunSequentialAnalysisResponse, RunSequentialAnalysisError, Options<RunSequentialAnalysisData>> = {
@@ -3148,34 +3092,6 @@ export const undoNodeOperationMutation = (options?: Partial<Options<UndoNodeOper
     };
     return mutationOptions;
 };
-
-export const quotationCurrentTasksQueryKey = (options?: Options<QuotationCurrentTasksData>) => createQueryKey('quotationCurrentTasks', options, false, ['workspace_management', 'quotation']);
-
-/**
- * Quotation Current Tasks
- *
- * Return current task IDs for quotation analysis.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /quotation/tasks/current route because they need this unit's "Return current task IDs for quotation analysis" behavior.
- */
-export const quotationCurrentTasksOptions = (options?: Options<QuotationCurrentTasksData>) => queryOptions<QuotationCurrentTasksResponse, QuotationCurrentTasksError, QuotationCurrentTasksResponse, ReturnType<typeof quotationCurrentTasksQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await quotationCurrentTasks({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: quotationCurrentTasksQueryKey(options)
-});
 
 export const quotationTaskRequestQueryKey = (options: Options<QuotationTaskRequestData>) => createQueryKey('quotationTaskRequest', options, false, ['workspace_management', 'quotation']);
 
@@ -3337,34 +3253,6 @@ export const saveWorkspaceMutation = (options?: Partial<Options<SaveWorkspaceDat
     return mutationOptions;
 };
 
-export const sequentialAnalysisCurrentTasksQueryKey = (options?: Options<SequentialAnalysisCurrentTasksData>) => createQueryKey('sequentialAnalysisCurrentTasks', options, false, ['workspace_management']);
-
-/**
- * Sequential Analysis Current Tasks
- *
- * Return current task IDs for sequential-analysis.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /sequential-analysis/tasks/current route because they need this unit's "Return current task IDs for sequential-analysis" behavior.
- */
-export const sequentialAnalysisCurrentTasksOptions = (options?: Options<SequentialAnalysisCurrentTasksData>) => queryOptions<SequentialAnalysisCurrentTasksResponse, SequentialAnalysisCurrentTasksError, SequentialAnalysisCurrentTasksResponse, ReturnType<typeof sequentialAnalysisCurrentTasksQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await sequentialAnalysisCurrentTasks({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: sequentialAnalysisCurrentTasksQueryKey(options)
-});
-
 /**
  * Detach Sequential Analysis Task
  *
@@ -3487,8 +3375,9 @@ export const updateSequentialAnalysisTaskResultMutation = (options?: Partial<Opt
  *
  * Clear Token Frequency analysis state for a workspace.
  *
- * Mirrors topic-modeling clear behavior by removing the currently tracked
- * analysis task link for the token frequency tab.
+ * Legacy broad clear endpoint: removes all token-frequency task records for
+ * the active workspace. Tabbed clients should normally clear by explicit
+ * task_id through `/api/tasks/clear` instead.
  *
  * Flow:
  * - Resolve authentication and request parameters from FastAPI dependencies.
@@ -3530,34 +3419,6 @@ export const calculateTokenFrequenciesMutation = (options?: Partial<Options<Calc
     };
     return mutationOptions;
 };
-
-export const tokenFrequenciesCurrentTasksQueryKey = (options?: Options<TokenFrequenciesCurrentTasksData>) => createQueryKey('tokenFrequenciesCurrentTasks', options, false, ['workspace_management']);
-
-/**
- * Token Frequencies Current Tasks
- *
- * Return current task IDs for token-frequencies analysis.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /token-frequencies/tasks/current route because they need this unit's "Return current task IDs for token-frequencies analysis" behavior.
- */
-export const tokenFrequenciesCurrentTasksOptions = (options?: Options<TokenFrequenciesCurrentTasksData>) => queryOptions<TokenFrequenciesCurrentTasksResponse, TokenFrequenciesCurrentTasksError, TokenFrequenciesCurrentTasksResponse, ReturnType<typeof tokenFrequenciesCurrentTasksQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await tokenFrequenciesCurrentTasks({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: tokenFrequenciesCurrentTasksQueryKey(options)
-});
 
 export const tokenFrequenciesTaskRequestQueryKey = (options: Options<TokenFrequenciesTaskRequestData>) => createQueryKey('tokenFrequenciesTaskRequest', options, false, ['workspace_management']);
 
@@ -3676,8 +3537,7 @@ export const getTokenizerModelsOptions = (options?: Options<GetTokenizerModelsDa
  * - Frontend clear action: `DELETE /workspaces/{id}/topic-modeling` because they need this unit's "Clear stored topic-modeling task state for a workspace" behavior.
  *
  * Why:
- * - Removes stale result/task pointers before reruns and keeps UI state
- * aligned with backend task registries.
+ * - Removes explicit topic-modeling task records for broad legacy clear actions.
  */
 export const clearTopicModelingResultsMutation = (options?: Partial<Options<ClearTopicModelingResultsData>>): UseMutationOptions<ClearTopicModelingResultsResponse, ClearTopicModelingResultsError, Options<ClearTopicModelingResultsData>> => {
     const mutationOptions: UseMutationOptions<ClearTopicModelingResultsResponse, ClearTopicModelingResultsError, Options<ClearTopicModelingResultsData>> = {
@@ -3785,34 +3645,6 @@ export const getTopicModelingEmbeddingCacheSizeOptions = (options?: Options<GetT
         return data;
     },
     queryKey: getTopicModelingEmbeddingCacheSizeQueryKey(options)
-});
-
-export const topicModelingCurrentTasksQueryKey = (options?: Options<TopicModelingCurrentTasksData>) => createQueryKey('topicModelingCurrentTasks', options, false, ['workspace_management', 'topic-modeling']);
-
-/**
- * Topic Modeling Current Tasks
- *
- * Return current task IDs for topic-modeling analysis.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /topic-modeling/tasks/current route because they need this unit's "Return current task IDs for topic-modeling analysis" behavior.
- */
-export const topicModelingCurrentTasksOptions = (options?: Options<TopicModelingCurrentTasksData>) => queryOptions<TopicModelingCurrentTasksResponse, TopicModelingCurrentTasksError, TopicModelingCurrentTasksResponse, ReturnType<typeof topicModelingCurrentTasksQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await topicModelingCurrentTasks({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: topicModelingCurrentTasksQueryKey(options)
 });
 
 /**

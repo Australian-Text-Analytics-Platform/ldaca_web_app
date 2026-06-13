@@ -1,4 +1,4 @@
-import type { WorkspaceNodeLike } from '@/features/views/common/components/NodeSelectionPanel';
+import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 
 /**
  * Safely treats loose workspace-node metadata as an object.

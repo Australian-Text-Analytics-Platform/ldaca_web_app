@@ -1,6 +1,6 @@
+import type { ReactNode } from 'react';
 import { AlertCircle, Loader2, Plus, Shuffle } from 'lucide-react';
 
-import NodeSelectionPanel from '@/features/views/common/components/NodeSelectionPanel';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
@@ -17,12 +17,16 @@ import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 
 export type { SliceSubTabProps } from './hooks/useSliceSubTab';
 
+type SliceSubTabComponentProps = SliceSubTabProps & {
+  renderNodeInputsPanel?: () => ReactNode;
+};
+
 /**
  * Re-keys the Sample Rows tab when the selected node changes. This lets the
  * inner form reset naturally for each source data block.
  * Rendered by: DataPreprocessingFeature module, PreviewTable component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
-export function SliceSubTab(props: SliceSubTabProps) {
+export function SliceSubTab(props: SliceSubTabComponentProps) {
   const selectedNodeLabel = deriveNodeLabel(props.selectedNode) || props.selectedNodeId || '';
   const selectedNodeKey = `${props.selectedNodeId ?? ''}:${selectedNodeLabel}`;
 
@@ -36,9 +40,9 @@ export function SliceSubTab(props: SliceSubTabProps) {
  * Flow: render slice/random-sample controls from hook state, show mode-specific fields and
  * preview table, then expose apply actions.
  */
-function SliceSubTabContent(props: SliceSubTabProps) {
+function SliceSubTabContent(props: SliceSubTabComponentProps) {
+  const { renderNodeInputsPanel } = props;
   const {
-    selectionPanel,
     form,
     inlineError,
     hasSelection,
@@ -70,29 +74,7 @@ function SliceSubTabContent(props: SliceSubTabProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-          <NodeSelectionPanel
-            selectedNodes={selectionPanel.selectedNodes}
-            nodeColumnSelections={selectionPanel.nodeColumnSelections}
-            onColumnChange={selectionPanel.onColumnChange}
-            nodeColors={selectionPanel.nodeColors}
-            onColorChange={selectionPanel.onColorChange}
-            defaultPalette={selectionPanel.defaultPalette}
-            maxCompare={1}
-            className="rounded-lg border border-border/60 bg-muted/40"
-            showColorPicker={false}
-            showColumnPicker={false}
-            showHeaderLabel
-            showShape
-            disabled={selectionPanel.disabled}
-            originalCount={selectionPanel.originalCount}
-            headerAddon={
-              <HelpIcon
-                targetKey="preprocessing.common.node-selection"
-                label="Selected data blocks"
-                className="h-4 w-4 text-muted-foreground"
-              />
-            }
-          />
+          {renderNodeInputsPanel?.()}
 
           <Tabs
             value={form.mode}

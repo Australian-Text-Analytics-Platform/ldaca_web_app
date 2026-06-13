@@ -90,9 +90,9 @@ export const queryKeys = {
     ['workspaces', workspaceId, 'nodes', nodeId, 'columns', columnName, 'unique-values'] as const,
 
   /**
-   * Per-(analysisType, workspace) server-request-lock used by useAnalysisServerRequestLock.
+   * Per-(analysisType, workspace) last-run request used by Run/Re-run diffing.
    * Why: importers need one shared normalization boundary to keep behavior consistent.
    */
-  analysisServerRequestLock: (analysisType: string, workspaceId: string | null) =>
-    ['analysis', analysisType, 'server-request-lock', workspaceId] as const,
+  analysisLastRunRequest: (analysisType: string, workspaceId: string | null) =>
+    ['analysis', analysisType, 'last-run-request', workspaceId] as const,
 };

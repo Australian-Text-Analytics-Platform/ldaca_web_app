@@ -12,6 +12,7 @@
 import type {
   AnalysisTab,
   AnalysisTabGroup,
+  AnalysisTabInput,
   WorkspaceTabsState,
 } from '@/api/generated/types.gen';
 
@@ -106,7 +107,7 @@ export function createTabInState(
   tabId: string = newTabId(),
 ): { state: WorkspaceTabsState; tabId: string } {
   const group = getGroup(state, analysisType);
-  const tab: AnalysisTab = { tab_id: tabId, task_id: null, title };
+  const tab: AnalysisTab = { tab_id: tabId, task_id: null, title, inputs: [] };
   const nextGroup: AnalysisTabGroup = {
     tabs: [...(group.tabs ?? []), tab],
     active_tab_id: tabId,
@@ -193,5 +194,64 @@ export function setTabTaskInState(
   const nextTabs = (group.tabs ?? []).map((t) =>
     t.tab_id === tabId ? { ...t, task_id: taskId } : t,
   );
+  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
+}
+
+/**
+ * Replaces a tab's input node set (the add-node-as-needed selection).
+ * Called by: useWorkspaceTabs.setTabInputs whenever the user adds, removes,
+ * clears, or re-columns a node in an analysis tab, and during one-time
+ * hydration migration when a run-tab's inputs are derived from its task
+ * request. This is the only place a tab's ``inputs`` array changes; each tab
+ * owns its selection so switching tabs never reconfigures another tab.
+ */
+export function setTabInputsInState(
+  state: WorkspaceTabsState | null | undefined,
+  analysisType: string,
+  tabId: string,
+  inputs: AnalysisTabInput[],
+): WorkspaceTabsState {
+  const group = getGroup(state, analysisType);
+  const nextTabs = (group.tabs ?? []).map((t) =>
+    t.tab_id === tabId ? { ...t, inputs } : t,
+  );
+  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
+}
+
+/**
+ * Reorders a group's tabs to match ``orderedTabIds`` (a permutation of the
+ * current tab ids produced by a drag-and-drop gesture).
+ * Called by: useWorkspaceTabs.reorderTabs once a drag drops, persisting the
+ * live-preview order the user already saw the strip squeeze into. The active tab
+ * pointer is untouched — dragging only changes order, never focus.
+ * Flow: index the current tabs by id, rebuild the list in ``orderedTabIds``
+ * order, then append any tab the caller omitted so a stale/partial order can
+ * never silently drop a tab. A no-op order returns the group unchanged.
+ */
+export function reorderTabsInState(
+  state: WorkspaceTabsState | null | undefined,
+  analysisType: string,
+  orderedTabIds: string[],
+): WorkspaceTabsState {
+  const group = getGroup(state, analysisType);
+  const tabs = group.tabs ?? [];
+  const byId = new Map(tabs.map((t) => [t.tab_id, t]));
+  const nextTabs: AnalysisTab[] = [];
+  const seen = new Set<string>();
+  for (const id of orderedTabIds) {
+    const tab = byId.get(id);
+    if (tab && !seen.has(id)) {
+      nextTabs.push(tab);
+      seen.add(id);
+    }
+  }
+  // Safety net: keep any tab the caller did not mention (e.g. created mid-drag).
+  for (const tab of tabs) {
+    if (!seen.has(tab.tab_id)) nextTabs.push(tab);
+  }
+  const unchanged =
+    nextTabs.length === tabs.length &&
+    nextTabs.every((tab, index) => tab.tab_id === tabs[index]!.tab_id);
+  if (unchanged) return withGroup(state, analysisType, group);
   return withGroup(state, analysisType, { ...group, tabs: nextTabs });
 }

@@ -16,7 +16,7 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getWorkspaceTabs, putWorkspaceTabs } from '@/api/generated/sdk.gen';
-import type { AnalysisTab, WorkspaceTabsState } from '@/api/generated/types.gen';
+import type { AnalysisTab, AnalysisTabInput, WorkspaceTabsState } from '@/api/generated/types.gen';
 import {
   EMPTY_TABS_STATE,
   closeTabInState,
@@ -24,7 +24,9 @@ import {
   getActiveTabId,
   getTabs,
   renameTabInState,
+  reorderTabsInState,
   setActiveTabInState,
+  setTabInputsInState,
   setTabTaskInState,
 } from './tabStateOps';
 
@@ -48,8 +50,12 @@ export interface UseWorkspaceTabsResult {
   renameTab: (tabId: string, title: string) => void;
   /** Focuses a tab. */
   setActiveTab: (tabId: string) => void;
+  /** Persists a drag-and-drop tab order (full list of tab ids). */
+  reorderTabs: (orderedTabIds: string[]) => void;
   /** Wires a tab to a task id (or clears it with null). */
   setTabTask: (tabId: string, taskId: string | null) => void;
+  /** Replaces a tab's input node set (add-node-as-needed selection). */
+  setTabInputs: (tabId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 /**
@@ -71,6 +77,7 @@ export function useWorkspaceTabs(
   const { data, isLoading } = useQuery({
     queryKey: workspaceTabsQueryKey(workspaceId ?? '__none__'),
     enabled: !!workspaceId,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const { data: payload } = await getWorkspaceTabs({
         headers: getAuthHeaders(),
@@ -150,9 +157,21 @@ export function useWorkspaceTabs(
     [analysisType, readState, commit],
   );
 
+  const reorderTabs = useCallback(
+    (orderedTabIds: string[]) =>
+      commit(reorderTabsInState(readState(), analysisType, orderedTabIds)),
+    [analysisType, readState, commit],
+  );
+
   const setTabTask = useCallback(
     (tabId: string, taskId: string | null) =>
       commit(setTabTaskInState(readState(), analysisType, tabId, taskId)),
+    [analysisType, readState, commit],
+  );
+
+  const setTabInputs = useCallback(
+    (tabId: string, inputs: AnalysisTabInput[]) =>
+      commit(setTabInputsInState(readState(), analysisType, tabId, inputs)),
     [analysisType, readState, commit],
   );
 
@@ -164,6 +183,8 @@ export function useWorkspaceTabs(
     closeTab,
     renameTab,
     setActiveTab,
+    reorderTabs,
     setTabTask,
+    setTabInputs,
   };
 }

@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
 import { clampDisplayTokenLimit } from './utils';
-import { getCurrentAnalysisTask } from './analysisTasksApi';
 import { isNetworkError } from '@/lib/apiError';
 
 /**
@@ -42,8 +41,6 @@ const toHydrationState = ({
 
 export interface UseAnalysisHydrationConfig<TRequest, TResult, TPreferences> {
   workspaceId?: string | null;
-  analysisKey?: string;
-  getAuthHeaders?: () => Record<string, string>;
   resolveTaskId?: () => MaybePromise<string | null>;
   onTaskIdResolved?: (taskId: string | null) => void;
   fetchRequest?: (taskId?: string | null) => MaybePromise<Nullable<TRequest>>;
@@ -88,7 +85,7 @@ const normalizePreferencePayload = <TPreferences extends Record<string, unknown>
 };
 
 /**
- * Restores the current task's request/result pair for an analysis tab and offers
+ * Restores an explicit task's request/result pair for an analysis tab and offers
  * a safe preference persistence wrapper for panels that hydrate from the server.
  * Used by: useAnalysisFeature and analysis hydration tests because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
@@ -102,8 +99,6 @@ export function useAnalysisHydration<
 ): UseAnalysisHydrationReturn<TPreferences> {
   const {
     workspaceId,
-    analysisKey,
-    getAuthHeaders,
     resolveTaskId,
     onTaskIdResolved,
     fetchRequest,
@@ -146,20 +141,6 @@ export function useAnalysisHydration<
         let taskId: string | null = null;
         if (resolveTaskId) {
           taskId = await resolveTaskId();
-        } else if (analysisKey && getAuthHeaders) {
-          try {
-            const current = (await getCurrentAnalysisTask(analysisKey, getAuthHeaders())) as Record<
-              string,
-              unknown
-            >;
-            const currentTaskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-            taskId =
-              typeof currentTaskId === 'string' && currentTaskId.trim().length > 0
-                ? currentTaskId
-                : null;
-          } catch {
-            taskId = null;
-          }
         }
 
         onTaskIdResolved?.(taskId ?? null);
@@ -220,8 +201,6 @@ export function useAnalysisHydration<
   }, [
     workspaceId,
     resolveTaskId,
-    analysisKey,
-    getAuthHeaders,
     onTaskIdResolved,
     fetchRequest,
     fetchResult,

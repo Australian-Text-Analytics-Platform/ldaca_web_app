@@ -1,5 +1,4 @@
 import { act, renderHook } from '@testing-library/react';
-import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { QuotationAnalysisResponse } from '@/api/generated/types.gen';
@@ -41,9 +40,7 @@ describe('useQuotationTaskFlow', () => {
       useQuotationTaskFlow({
         state: {
           currentWorkspaceId: 'workspace-1',
-          isLocked: false,
           hasLoaded: false,
-          lockedNodesSnapshot: [],
           displayedNodes: [{ id: 'node-1', name: 'Node 1' }],
           activeSelections: [{ nodeId: 'node-1', column: 'text' }],
           nodeState: {},
@@ -70,7 +67,6 @@ describe('useQuotationTaskFlow', () => {
           // Supplies empty auth headers because these tests assert request payload shaping only.
           // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
           getAuthHeaders: () => ({}),
-          lockWithSnapshots: vi.fn(),
           resolveTaskId: vi.fn(() => Promise.resolve(null)),
           quotationSearch,
           detachQuotation: vi.fn(() => Promise.resolve({
@@ -81,7 +77,6 @@ describe('useQuotationTaskFlow', () => {
           })),
           materializeQuotation: vi.fn(() => Promise.resolve(undefined)),
           openEngineDialog: vi.fn(),
-          queryClient: new QueryClient(),
         },
       }),
     );
@@ -113,9 +108,7 @@ describe('useQuotationTaskFlow', () => {
       useQuotationTaskFlow({
         state: {
           currentWorkspaceId: 'workspace-1',
-          isLocked: false,
           hasLoaded: true,
-          lockedNodesSnapshot: [],
           displayedNodes: [{ id: 'node-1', name: 'Node 1' }],
           activeSelections: [{ nodeId: 'node-1', column: 'text' }],
           nodeState: {
@@ -149,7 +142,6 @@ describe('useQuotationTaskFlow', () => {
           // Supplies empty auth headers because these tests assert pagination payload shaping only.
           // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
           getAuthHeaders: () => ({}),
-          lockWithSnapshots: vi.fn(),
           resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
           quotationSearch,
           detachQuotation: vi.fn(() => Promise.resolve({
@@ -160,7 +152,6 @@ describe('useQuotationTaskFlow', () => {
           })),
           materializeQuotation: vi.fn(() => Promise.resolve(undefined)),
           openEngineDialog: vi.fn(),
-          queryClient: new QueryClient(),
         },
       }),
     );

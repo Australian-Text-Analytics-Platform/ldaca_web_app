@@ -12,11 +12,10 @@ import {
   type TopicModelingDetachRequest,
 } from '@/api/generated/types.gen';
 import { queryKeys } from '@/lib/queryKeys';
-import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
+import { extractAndSetTaskId } from '../../common';
 import { useDetachColumnsState } from '@/features/views/common/hooks/useDetachColumnsState';
 import type { DetachDialogNodeOption } from '@/features/views/common/components/DetachColumnsDialog';
 import { buildSamplingAutoNodeName } from '@/features/views/preprocessing/utils/autoNodeNames';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 10;
@@ -56,7 +55,6 @@ interface TopicModelingActions {
 
 interface TopicModelingLock {
   getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   queryClient: QueryClient;
 }
 
@@ -117,7 +115,7 @@ export function useTopicModelingTaskFlow({
     setLocalTaskId,
     onTaskIdAssigned,
   },
-  lock: { getAuthHeaders, lockWithSnapshots, queryClient },
+  lock: { getAuthHeaders, queryClient },
 }: Params) {
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
@@ -144,7 +142,7 @@ export function useTopicModelingTaskFlow({
       return;
     }
 
-    const requestNodeIds = takeMostRecent(panelNodeIds, 2);
+    const requestNodeIds = panelNodeIds.slice(0, 2);
     lastFetchedRef.current = { taskId: null, state: null };
     setIsRunning(true);
     runningRef.current = true;
@@ -167,21 +165,6 @@ export function useTopicModelingTaskFlow({
         min_topic_size: minTopicSize ?? DEFAULT_TOPIC_SIZE_VALUE,
         ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
       };
-
-      try {
-        if (req.node_ids.length) {
-          await restoreAnalysisLockFromRequest({
-            workspaceId: currentWorkspaceId,
-            requestData: req,
-            getAuthHeaders,
-            lockWithSnapshots,
-            queryClient,
-            maxNodes: 2,
-          });
-        }
-      } catch {
-        /* best effort lock */
-      }
 
       const { data: res } = await runTopicModeling({
         body: req,
