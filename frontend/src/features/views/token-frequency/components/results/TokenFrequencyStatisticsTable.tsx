@@ -40,6 +40,12 @@ interface Props {
   statistics: TokenFrequencyStatisticsEntry[];
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
   /**
+   * Optional concordance handoff. When provided, each token in the table
+   * becomes a button that opens a concordance search for that token across
+   * both compared corpora (no per-node scoping).
+   */
+  onTokenClick?: (token: string) => void;
+  /**
    * Optional controlled wildcard filter. When provided, the table is
    * filtered by this value and the internal search box is not rendered
    * (the filter UI lives in the parent panel for the list view).
@@ -101,13 +107,30 @@ const columnHelper = createColumnHelper<EnhancedStatisticsRow>();
 
 /**
  * Called by: TokenFrequencyStatisticsTable because it needs TanStack Table column definitions for the keyness grid. Flow: build accessors, attach renderers and filters, then return the column list consumed by the table instance.
+ * ``onTokenClick`` (when provided) makes the token cell a button that hands the
+ * token to a fresh concordance tab across both compared corpora.
  */
-const buildColumns = () => [
+const buildColumns = (onTokenClick?: (token: string) => void) => [
   columnHelper.accessor('sort_token', {
     id: 'token',
     header: 'Token',
-    /** Used by: TanStack Table token column to render the original backend token label because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    cell: (info) => <span className="font-medium">{info.row.original.token}</span>,
+    /** Used by: TanStack Table token column to render the original backend token label, optionally as a concordance-launching button, because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    cell: (info) => {
+      const token = info.row.original.token;
+      if (!onTokenClick) {
+        return <span className="font-medium">{token}</span>;
+      }
+      return (
+        <button
+          type="button"
+          className="cursor-pointer font-medium text-left underline-offset-2 hover:underline focus-visible:underline"
+          onClick={() => { onTokenClick(token); }}
+          title="Click to inspect in concordance across both corpora."
+        >
+          {token}
+        </button>
+      );
+    },
     filterFn: tokenWildcardFilter,
   }),
   columnHelper.accessor('sort_freq_reference', {
@@ -261,6 +284,7 @@ const enhanceRows = (statistics: TokenFrequencyStatisticsEntry[]): EnhancedStati
 export const TokenFrequencyStatisticsTable = ({
   statistics,
   onDownloadFrequencyCsv,
+  onTokenClick,
   tokenFilter: tokenFilterProp,
   referenceNodeName,
   referenceColor,
@@ -268,7 +292,7 @@ export const TokenFrequencyStatisticsTable = ({
   studyColor,
 }: Props) => {
   const data = useMemo(() => enhanceRows(statistics), [statistics]);
-  const columns = useMemo(() => buildColumns(), []);
+  const columns = useMemo(() => buildColumns(onTokenClick), [onTokenClick]);
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'log_likelihood_llv', desc: true }]);
   const tokenFilter = tokenFilterProp ?? '';

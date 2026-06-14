@@ -26,6 +26,7 @@ import {
   renameWorkspace,
   redoNodeOperation,
   renameNodeColumn,
+  reorderWorkspaceNodes,
   replaceApply,
   replacePreview,
   saveWorkspace,
@@ -1482,6 +1483,81 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
+  const reorderNodesMutation = useMutation<
+    WorkspaceGraphResponse | undefined,
+    Error,
+    { orderedIds: string[] },
+    { previousGraph: WorkspaceGraphResponse | undefined }
+  >({
+    /**
+     * Persists a new node order to the backend workspace node list.
+     * Called by: useMutation option object inside useWorkspaceNodeMutations.
+     * Why: because drag-to-reorder in the list view mutates the durable, persisted node ordering, which the backend owns as the source of truth.
+     */
+    mutationFn: ({ orderedIds }: { orderedIds: string[] }) =>
+      reorderWorkspaceNodes({
+        body: { ordered_ids: orderedIds },
+        headers: authHeaders,
+        throwOnError: true,
+      }).then(({ data }) => data),
+    /**
+     * Optimistically reorders the cached graph so the list view stays in sync on drop.
+     * Called by: useMutation option object inside useWorkspaceNodeMutations.
+     * Why: because the drop commit should feel instant; we reshape the workspace-graph cache to the dropped order and keep a snapshot for rollback.
+     * Flow: open the operation, snapshot the current graph, cancel in-flight graph fetches, sort nodes by the requested order, then write it back.
+     */
+    onMutate: async ({ orderedIds }) => {
+      startOperation('reorderNodes');
+      if (!currentWorkspaceId) {
+        return { previousGraph: undefined };
+      }
+      const graphKey = queryKeys.workspaceGraph(currentWorkspaceId);
+      await queryClient.cancelQueries({ queryKey: graphKey });
+      const previousGraph = queryClient.getQueryData<WorkspaceGraphResponse>(graphKey);
+      if (previousGraph?.nodes) {
+        const rankById = new Map(orderedIds.map((id, index) => [id, index]));
+        const reordered = [...previousGraph.nodes].sort((a, b) => {
+          // Nodes absent from the payload keep their relative position at the tail,
+          // mirroring the backend's reorder_nodes fallback behavior.
+          const aRank = rankById.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+          const bRank = rankById.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+          return aRank - bRank;
+        });
+        queryClient.setQueryData<WorkspaceGraphResponse>(graphKey, {
+          ...previousGraph,
+          nodes: reordered,
+        });
+      }
+      return { previousGraph };
+    },
+    /**
+     * Confirms the persisted order by revalidating the workspace graph.
+     * Called by: useMutation option object inside useWorkspaceNodeMutations.
+     * Why: because the backend returns the canonical order; invalidating reconciles the optimistic cache with the saved source of truth.
+     */
+    onSuccess: () => {
+      if (currentWorkspaceId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      }
+      endOperation('reorderNodes');
+    },
+    /**
+     * Rolls back the optimistic order and surfaces the failure.
+     * Called by: useMutation option object inside useWorkspaceNodeMutations.
+     * Why: because a rejected reorder must restore the prior list so the UI never shows an order the backend did not accept.
+     */
+    onError: (error: Error, _vars, context) => {
+      if (currentWorkspaceId && context?.previousGraph) {
+        queryClient.setQueryData(
+          queryKeys.workspaceGraph(currentWorkspaceId),
+          context.previousGraph,
+        );
+      }
+      setOperationError('reorderNodes', error.message);
+      endOperation('reorderNodes');
+    },
+  });
+
   // Memoize the action surface so consumers (the WorkspaceProvider context
   // value, every component that destructures useWorkspaceActions, every
   // mutation-fn closure that captures a specific action) keep a stable
@@ -1567,6 +1643,13 @@ export const useWorkspaceNodeMutations = ({
        * Why: because feature components need one stable action facade for generated API mutations, cache refreshes, and operation state.
        */
       deleteNode: (nodeId: string) => deleteNodeMutation.mutateAsync({ nodeId }),
+      /**
+       * Lets the list view persist a drag-to-reorder of the workspace node list.
+       * Consumed by: useWorkspaceNodeMutations return object for feature components.
+       * Why: because feature components need one stable action facade for generated API mutations, cache refreshes, and operation state.
+       */
+      reorderNodes: (orderedIds: string[]) =>
+        reorderNodesMutation.mutateAsync({ orderedIds }),
       /**
        * Lets file-loading UI add a workspace node from a selected file or sheet.
        * Consumed by: useWorkspaceNodeMutations return object for feature components.

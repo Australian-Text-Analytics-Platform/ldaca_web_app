@@ -221,7 +221,25 @@ const TokenFrequencyFeature = ({
     },
     /** Pushes fetched task results into guarded component state. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    onResultFetched: (result) => { setResultSafely(result); },
+    onResultFetched: (result) => {
+      // Restore the compared node ids from the authoritative result, not just
+      // the raw result blob. onResultFetched and onHydratedResult race on a
+      // fresh tab mount (both share the hook's fetch-dedup refs); whichever
+      // wins marks the task fetched and short-circuits the other. If the
+      // task-flow refresh path won and we only set results here, the unified
+      // word cloud + comparative statistics table would vanish on tab return
+      // because they gate on lastCompareNodeIds.length === 2. Re-deriving the
+      // ids from result.analysis_params keeps that gate satisfied regardless
+      // of which path applies the result. During a live run these ids match
+      // what the submit handler already set, so this is a no-op overwrite.
+      const requestData = result.analysis_params ?? {};
+      const { nodeIds } = parseAnalysisNodeRequest(requestData, 2);
+      if (nodeIds.length > 0) {
+        setLastCompareNodeIds(nodeIds);
+        setStudyNodeId(nodeIds[1] ?? null);
+      }
+      setResultSafely(result);
+    },
     /** Rehydrates controls from a persisted result when the feature reconnects to a task. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedResult: (result) => {

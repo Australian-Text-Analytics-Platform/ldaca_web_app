@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -25,8 +26,17 @@ const MIN_BATCH_DELETE_COUNT = 1;
  * node rendering and selection state.
  * Rendered by: WorkspaceView above the graph canvas because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
  * Flow: read workspace and selection state, prepare selected-delete metadata, manage rename/delete dialogs, then render toolbar controls.
+ *
+ * ``onToggleCollapse`` (optional): renders the collapse/expand button in the
+ * header. ``collapsed`` switches the panel between the full "Workspace Graph
+ * View" header (rename/help/delete) and a minimal "Workspace List View" header
+ * (just the toggle + title) used when the right panel is collapsed to the
+ * compact list + schema view. Supplied by WorkspaceView from WorkspaceShell.
  */
-export function WorkspaceControls() {
+export function WorkspaceControls({
+  collapsed = false,
+  onToggleCollapse,
+}: { collapsed?: boolean; onToggleCollapse?: () => void } = {}) {
   const { currentWorkspace, workspaceGraph } = useWorkspaceData();
   const { renameWorkspace, deleteNode, clearSelection } = useWorkspaceActions();
   const { selectedNodeIds } = useWorkspaceSelection();
@@ -104,16 +114,37 @@ export function WorkspaceControls() {
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <h3 className="text-sm font-medium text-gray-700">Workspace Graph View</h3>
-      <HelpIcon
-        targetKey="ui.workspace-graph-view"
-        label="Workspace Graph View"
-        className="h-5 w-5 text-muted-foreground"
-      />
-      <span className="text-gray-300">|</span>
+      {onToggleCollapse && (
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white/80 text-gray-700 shadow-sm hover:bg-gray-50"
+          aria-label={collapsed ? 'Expand to graph view' : 'Collapse to list view'}
+          title={collapsed ? 'Expand' : 'Collapse'}
+        >
+          {collapsed ? (
+            <PanelRightOpen className="h-4 w-4" />
+          ) : (
+            <PanelRightClose className="h-4 w-4" />
+          )}
+        </button>
+      )}
+      {collapsed ? (
+        // Collapsed/list view: keep the header minimal — just the toggle and
+        // the title. Rename/help/delete are dropped to fit the narrow panel.
+        <h3 className="text-sm font-medium text-gray-700">Workspace List View</h3>
+      ) : (
+        <>
+          <h3 className="text-sm font-medium text-gray-700">Workspace Graph View</h3>
+          <HelpIcon
+            targetKey="ui.workspace-graph-view"
+            label="Workspace Graph View"
+            className="h-5 w-5 text-muted-foreground"
+          />
+          <span className="text-gray-300">|</span>
 
-      {isEditing ? (
-        <input
+          {isEditing ? (
+            <input
           className="px-2 py-1 border rounded text-sm"
           value={renameDraft.value}
           onChange={(e) =>
@@ -176,6 +207,8 @@ export function WorkspaceControls() {
           >
             Delete ({selectedCount})
           </button>
+        </>
+      )}
         </>
       )}
 

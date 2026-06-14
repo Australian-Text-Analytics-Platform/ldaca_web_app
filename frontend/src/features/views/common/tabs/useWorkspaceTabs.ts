@@ -74,10 +74,21 @@ export function useWorkspaceTabs(
 
   // Single source of truth for the whole workspace's tabs. Disabled until a
   // workspace is selected so we don't fire an unscoped request.
+  //
+  // The client is the sole author of tab state (every mutation is an optimistic
+  // read-modify-write + PUT), so the cache stays authoritative within a session.
+  // A short staleTime lets cross-view navigation reuse that cache instead of
+  // refetching on every mount. This is deliberate, not just an optimization:
+  // a mount-time GET (the old ``refetchOnMount: 'always'``) could resolve
+  // mid-flight and overwrite a tab that was just created optimistically right
+  // before navigating — exactly the token-click → concordance handoff, where
+  // ``createTab`` runs and then ``setCurrentView('concordance')`` immediately
+  // mounts this hook again under the concordance group. The per-workspace query
+  // key still forces a fresh GET whenever the user switches workspaces.
   const { data, isLoading } = useQuery({
     queryKey: workspaceTabsQueryKey(workspaceId ?? '__none__'),
     enabled: !!workspaceId,
-    refetchOnMount: 'always',
+    staleTime: 30_000,
     queryFn: async () => {
       const { data: payload } = await getWorkspaceTabs({
         headers: getAuthHeaders(),
@@ -105,6 +116,14 @@ export function useWorkspaceTabs(
       });
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- API response may be undefined at runtime
       return saved ?? next;
+    },
+    // Write the server's authoritative response back into the cache. Without
+    // this, a concurrent mount-time GET that resolved with stale data (one that
+    // raced the PUT) could leave the cache permanently behind the persisted
+    // state — silently dropping a tab that was just created.
+    onSuccess: (saved) => {
+      if (!workspaceId) return;
+      queryClient.setQueryData(workspaceTabsQueryKey(workspaceId), saved);
     },
   });
 

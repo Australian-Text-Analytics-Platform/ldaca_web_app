@@ -31,6 +31,10 @@ export interface SidebarWorkspaceNode {
   label?: string;
   type?: string;
   operation?: string;
+  /** Backend undo/redo availability, present on workspace-graph nodes. Used by
+   * the right-panel list-view row toolbar to enable/disable undo/redo. */
+  can_undo?: boolean;
+  can_redo?: boolean;
   data?: {
     nodeName?: string;
     label?: string;

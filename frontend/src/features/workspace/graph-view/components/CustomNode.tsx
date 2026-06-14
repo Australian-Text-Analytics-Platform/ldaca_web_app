@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   type NodeProps,
   Handle,
@@ -42,6 +42,39 @@ const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
 const TOOLBAR_HIDE_DELAY_MS = 350;
 
 /**
+ * Module-level singleton tracking which node currently owns the visible hover
+ * toolbar. Because each ``CustomNode`` keeps its own hover state, this shared
+ * owner is what guarantees only ONE hover toolbar is shown across the whole
+ * graph: when a node claims ownership (on hover), every other node re-renders
+ * and immediately hides its hover toolbar.
+ *
+ * Used by: CustomNode via ``useSyncExternalStore`` (read) and the
+ * show/hide handlers (write).
+ */
+let activeToolbarNodeId: string | null = null;
+const toolbarOwnerListeners = new Set<() => void>();
+
+/** Sets the active toolbar owner and notifies subscribed nodes. No-op when unchanged. */
+function setActiveToolbarOwner(nodeId: string | null): void {
+  if (activeToolbarNodeId === nodeId) return;
+  activeToolbarNodeId = nodeId;
+  for (const listener of toolbarOwnerListeners) listener();
+}
+
+/** Subscribes a node to owner changes; used by ``useSyncExternalStore``. */
+function subscribeToolbarOwner(listener: () => void): () => void {
+  toolbarOwnerListeners.add(listener);
+  return () => {
+    toolbarOwnerListeners.delete(listener);
+  };
+}
+
+/** Returns the current owner id; used by ``useSyncExternalStore``. */
+function getToolbarOwnerSnapshot(): string | null {
+  return activeToolbarNodeId;
+}
+
+/**
  * React Flow node renderer for a workspace node. Shows a compact card when zoomed
  * out, and a full card with metadata + action menu when zoomed in.
  * Rendered by: workspace/CustomNode module JSX because React Flow needs this custom node type for workspace data blocks.
@@ -75,6 +108,15 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const zoom = useStore((s) => s.transform[2]);
   const isZoomedOut = zoom < COMPACT_NODE_ZOOM_THRESHOLD;
 
+  // Which node currently owns the visible hover toolbar (singleton across the
+  // whole graph). When another node claims ownership, this re-renders and our
+  // hover toolbar hides immediately.
+  const activeToolbarId = useSyncExternalStore(
+    subscribeToolbarOwner,
+    getToolbarOwnerSnapshot,
+    getToolbarOwnerSnapshot,
+  );
+
   const nodeName = node.name || 'Loading...';
   const nodeShape = node.shape;
 
@@ -86,23 +128,46 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     }
   };
 
-  /** Shows the toolbar immediately and keeps it stable while pointer crosses the node/toolbar gap. */
+  /** Shows this node's toolbar immediately and claims singleton ownership so any
+   * other node's hover toolbar hides at once. Called on node mouse-enter. */
   const showToolbar = () => {
     cancelToolbarHide();
     setIsHovered(true);
+    setActiveToolbarOwner(id);
   };
 
-  /** Hides the toolbar after a short grace period unless the toolbar/menu is active. */
+  /** Hides this node's toolbar with no delay and releases ownership. Called when
+   * the pointer leaves the toolbar itself — there's no node/toolbar gap to
+   * bridge in that direction, so the toolbar should vanish at once. */
+  const hideToolbarImmediately = () => {
+    cancelToolbarHide();
+    setIsHovered(false);
+    setIsToolbarHovered(false);
+    if (activeToolbarNodeId === id) setActiveToolbarOwner(null);
+  };
+
+  /** Hides the toolbar after a short grace period. Used when the pointer leaves
+   * the NODE so the small gap to the offset toolbar can be crossed without the
+   * toolbar flickering away. Skips releasing ownership if another node has
+   * already claimed it. */
   const scheduleToolbarHide = () => {
     cancelToolbarHide();
     toolbarHideTimeoutRef.current = window.setTimeout(() => {
       setIsHovered(false);
       setIsToolbarHovered(false);
+      if (activeToolbarNodeId === id) setActiveToolbarOwner(null);
       toolbarHideTimeoutRef.current = null;
     }, TOOLBAR_HIDE_DELAY_MS);
   };
 
-  useEffect(() => () => { cancelToolbarHide(); }, []);
+  useEffect(
+    () => () => {
+      cancelToolbarHide();
+      if (activeToolbarNodeId === id) setActiveToolbarOwner(null);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run only on unmount
+    [],
+  );
 
   // Close menu when clicking outside (capture to beat React Flow internal handlers)
   useEffect(() => {
@@ -298,16 +363,24 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const nodeToolbar = (
     <NodeToolbar
       nodeId={id}
-      isVisible={isHovered || isToolbarHovered || showMenu || showDeleteConfirm}
-      position={Position.Right}
+      isVisible={
+        // A menu/dialog keeps the toolbar open regardless of the singleton
+        // owner; a plain hover only shows while this node owns the toolbar so
+        // exactly one hover toolbar is ever visible.
+        showMenu ||
+        showDeleteConfirm ||
+        ((isHovered || isToolbarHovered) && activeToolbarId === id)
+      }
+      position={Position.Bottom}
       align="center"
       offset={8}
       className="nodrag nopan flex items-center gap-1 rounded-lg border border-border bg-white/95 p-1 shadow-lg"
       onMouseEnter={() => {
         cancelToolbarHide();
         setIsToolbarHovered(true);
+        setActiveToolbarOwner(id);
       }}
-      onMouseLeave={scheduleToolbarHide}
+      onMouseLeave={hideToolbarImmediately}
       onPointerDownCapture={stopGraphControlEvent}
       onMouseDownCapture={stopGraphControlEvent}
     >
@@ -319,6 +392,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
           onClick={(e) => {
             e.stopPropagation();
             setShowMenu(!showMenu);
+            setActiveToolbarOwner(id);
           }}
           className={menuButtonClassName}
           title="More options"

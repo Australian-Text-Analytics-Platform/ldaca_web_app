@@ -1,9 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { WorkspaceControls } from './WorkspaceControls';
 import { InsetCard } from './InsetCard';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
 import { WorkspaceDataTableFeature } from '@/features/workspace/data-view';
 import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
+import { WorkspaceListView } from './WorkspaceListView';
+import { WorkspaceSchemaView } from './WorkspaceSchemaView';
 
 /**
  * Stacked workspace view used by the main app shell: graph above, data table
@@ -11,8 +13,18 @@ import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
  * and TanStack Table panes avoid per-frame React rerenders during resizing.
  * Why: graph and table panes need resize feedback without rerendering expensive children on every pointer move.
  * Flow: connect split refs to graph/table panes, imperatively resize during drag, then render controls, graph, splitter, and data table.
+ *
+ * ``collapsed`` (from WorkspaceShell): when true, the panel is in its compact
+ * mode — the graph becomes a node list view and the data table becomes a
+ * schema-only view. ``onToggleCollapse`` toggles that mode (passed to the
+ * header). The chosen schema node is held locally so the list view's magnifier
+ * drives the schema pane below it.
  */
-function WorkspaceView() {
+function WorkspaceView({
+  collapsed = false,
+  onToggleCollapse,
+}: { collapsed?: boolean; onToggleCollapse?: () => void } = {}) {
+  const [schemaNodeId, setSchemaNodeId] = useState<string | null>(null);
   const topRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -43,10 +55,14 @@ function WorkspaceView() {
         style={{ height: `calc(${String(ratio * 100)}% - 0.25rem)` }}
       >
         <div className="p-2 bg-muted border-b border-border shrink-0">
-          <WorkspaceControls />
+          <WorkspaceControls collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
         </div>
         <div className="flex-1 min-h-0">
-          <WorkspaceGraphFeature />
+          {collapsed ? (
+            <WorkspaceListView onShowSchema={setSchemaNodeId} />
+          ) : (
+            <WorkspaceGraphFeature />
+          )}
         </div>
       </InsetCard>
 
@@ -68,7 +84,11 @@ function WorkspaceView() {
         style={{ height: `calc(${String((1 - ratio) * 100)}% - 0.25rem)` }}
       >
         <div className="flex-1 min-h-0">
-          <WorkspaceDataTableFeature />
+          {collapsed ? (
+            <WorkspaceSchemaView nodeId={schemaNodeId} />
+          ) : (
+            <WorkspaceDataTableFeature />
+          )}
         </div>
       </InsetCard>
     </div>

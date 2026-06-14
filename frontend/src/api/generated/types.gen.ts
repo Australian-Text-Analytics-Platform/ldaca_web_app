@@ -5456,6 +5456,25 @@ export type WorkspaceNodeInfo = {
 };
 
 /**
+ * WorkspaceNodeReorderRequest
+ *
+ * Request body for persisting a new workspace node order.
+ *
+ * Used by:
+ * - backend ``reorder_workspace_nodes`` route and the generated client because the
+ * list-view drag-to-reorder gesture commits the full node id sequence.
+ *
+ * Flow: the route validates the active workspace, applies ``ordered_ids`` via
+ * ``Workspace.reorder_nodes``, persists, and returns the rebuilt graph.
+ */
+export type WorkspaceNodeReorderRequest = {
+    /**
+     * Ordered Ids
+     */
+    ordered_ids: Array<string>;
+};
+
+/**
  * WorkspaceNodesResponse
  *
  * Response schema returned by API routes and consumed by generated clients for workspace nodes response.
@@ -7875,6 +7894,37 @@ export type JoinNodesPreviewResponses = {
 };
 
 export type JoinNodesPreviewResponse = JoinNodesPreviewResponses[keyof JoinNodesPreviewResponses];
+
+export type ReorderWorkspaceNodesData = {
+    body: WorkspaceNodeReorderRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/nodes/order';
+};
+
+export type ReorderWorkspaceNodesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReorderWorkspaceNodesError = ReorderWorkspaceNodesErrors[keyof ReorderWorkspaceNodesErrors];
+
+export type ReorderWorkspaceNodesResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceGraphResponse;
+};
+
+export type ReorderWorkspaceNodesResponse = ReorderWorkspaceNodesResponses[keyof ReorderWorkspaceNodesResponses];
 
 export type DeleteNodeData = {
     body?: never;

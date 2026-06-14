@@ -208,7 +208,12 @@ export const useTokenFrequencyTaskFlow = ({
   }, [stopWords]);
 
   const handleTokenClick = useCallback(
-    (token: string) => {
+    // ``sourceNodeId`` is supplied when the click originates from an
+    // individual per-node word cloud or frequency bar; it scopes the
+    // concordance handoff to that single data block. The unified word cloud
+    // and the comparative statistics table omit it, so the handoff keeps both
+    // compared nodes (the prior behaviour).
+    (token: string, sourceNodeId?: string) => {
       const trimmedToken = token;
       const analysisParams = (results?.analysis_params ??
         null) as TokenFrequencyAnalysisParams | null;
@@ -235,13 +240,32 @@ export const useTokenFrequencyTaskFlow = ({
               (selection) => fallbackNodeIds.includes(selection.nodeId) && selection.column,
             );
 
-      const uniqueNodeIds: string[] = fallbackNodeIds.filter(
+      const resolvedNodeIds: string[] = fallbackNodeIds.filter(
         (id, index, all) => all.indexOf(id) === index,
       );
 
-      const effectiveSelections = fallbackSelections.filter((selection) =>
-        uniqueNodeIds.includes(selection.nodeId),
+      const resolvedSelections = fallbackSelections.filter((selection) =>
+        resolvedNodeIds.includes(selection.nodeId),
       );
+
+      // Narrow to just the clicked node when a per-node source is given and we
+      // can resolve a column for it (so the concordance arrives ready to run).
+      // Fall back to the full comparison set if the node can't be resolved.
+      const scopedNodeId = sourceNodeId?.trim() ?? '';
+      const scopedSelection =
+        scopedNodeId.length > 0
+          ? (resolvedSelections.find((selection) => selection.nodeId === scopedNodeId) ??
+            effectiveNodeColumnSelections.find(
+              (selection) => selection.nodeId === scopedNodeId && selection.column,
+            ))
+          : undefined;
+
+      const uniqueNodeIds: string[] = scopedSelection
+        ? [scopedNodeId]
+        : resolvedNodeIds;
+      const effectiveSelections: NodeColumnSelection[] = scopedSelection
+        ? [scopedSelection]
+        : resolvedSelections;
 
       if (uniqueNodeIds.length > 0) {
         try {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
@@ -9,6 +9,10 @@ interface SidebarNodesSectionProps {
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
   onClearSelection?: () => void;
+  /** Optional trailing actions rendered at the end of each node row (e.g. the
+   * right-panel list view's per-node action toolbar + schema magnifier). When
+   * omitted (the historical sidebar usage), rows render without a toolbar. */
+  renderRowActions?: (node: SidebarWorkspaceNode) => React.ReactNode;
 }
 
 /**
@@ -28,6 +32,57 @@ function NodeCheckIcon({ checked }: { checked: boolean }) {
       aria-hidden="true"
     >
       {checked && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+    </span>
+  );
+}
+
+/**
+ * Renders a data-block name with a ChromeTabs-style right-edge fade instead of an
+ * ellipsis, mirroring the analysis multi-tab strip.
+ * Called by: SidebarNodesSection row rendering because each row needs its own
+ * overflow measurement to decide whether the fade stays on permanently.
+ * Flow: measure the clipped text against its wrapper via ResizeObserver, then
+ * keep the gradient overlay visible when the name overflows and otherwise reveal
+ * it only while the row (the `group`) is hovered/focused — where the trailing
+ * actions overlay the text.
+ */
+function NodeRowName({ name }: { name: string }) {
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const text = textRef.current;
+    if (!wrap || !text) return;
+    const measure = () => {
+      setOverflowing(text.offsetWidth > wrap.clientWidth + 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    observer.observe(text);
+    return () => { observer.disconnect(); };
+  }, [name]);
+
+  return (
+    <span ref={wrapRef} className="relative block min-w-0 flex-1 overflow-hidden">
+      <span
+        ref={textRef}
+        className="block w-max whitespace-nowrap text-sm font-medium text-foreground"
+      >
+        {name}
+      </span>
+      {/* Right-edge fade: always visible while the name is clipped, otherwise
+          revealed only on hover/focus (when the trailing actions overlay the
+          text). Widens on hover so the text fades before reaching the actions. */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-background via-background/90 to-transparent transition-all duration-150 group-hover:w-36',
+          overflowing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+        )}
+      />
     </span>
   );
 }
@@ -69,6 +124,7 @@ function SidebarNodesSection({
   selectedNodeIds,
   onToggleNodeSelection,
   onClearSelection,
+  renderRowActions,
 }: SidebarNodesSectionProps) {
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
@@ -156,15 +212,28 @@ function SidebarNodesSection({
                 )}
               >
                 <NodeCheckIcon checked={checked} />
-                <span className="flex-1 min-w-0 truncate text-sm font-medium text-foreground">
-                  {displayName}
-                </span>
+                <NodeRowName name={displayName} />
                 {isFresh && (
                   <span
-                    className="pointer-events-none ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-red-500"
+                    className="pointer-events-none h-2.5 w-2.5 shrink-0 rounded-full bg-red-500 transition-opacity duration-150 group-hover:opacity-0"
                     title="New data block"
                     aria-label="New data block"
                   />
+                )}
+                {renderRowActions && (
+                  // Hover-revealed trailing actions, absolutely positioned so they
+                  // overlay the faded name edge instead of reserving row space.
+                  // Stop row-toggle when interacting with the actions.
+                  <div
+                    className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 pointer-events-none"
+                    onClick={(event) => { event.stopPropagation(); }}
+                    onKeyDown={(event) => { event.stopPropagation(); }}
+                    role="toolbar"
+                    tabIndex={-1}
+                    aria-label={`Actions for ${displayName}`}
+                  >
+                    {renderRowActions(node)}
+                  </div>
                 )}
               </div>
             );

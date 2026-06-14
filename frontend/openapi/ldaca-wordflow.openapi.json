@@ -7473,6 +7473,23 @@
         "title": "WorkspaceNodeInfo",
         "type": "object"
       },
+      "WorkspaceNodeReorderRequest": {
+        "description": "Request body for persisting a new workspace node order.\n\nUsed by:\n- backend ``reorder_workspace_nodes`` route and the generated client because the\n  list-view drag-to-reorder gesture commits the full node id sequence.\n\nFlow: the route validates the active workspace, applies ``ordered_ids`` via\n    ``Workspace.reorder_nodes``, persists, and returns the rebuilt graph.",
+        "properties": {
+          "ordered_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ordered Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ordered_ids"
+        ],
+        "title": "WorkspaceNodeReorderRequest",
+        "type": "object"
+      },
       "WorkspaceNodesResponse": {
         "description": "Response schema returned by API routes and consumed by generated clients for workspace nodes response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: resolve the user workspace directory, refresh cached path indexes, coordinate task\n    cleanup, and return stable workspace metadata to callers.",
         "properties": {
@@ -11808,6 +11825,67 @@
         "tags": [
           "workspace_management",
           "nodes"
+        ]
+      }
+    },
+    "/api/workspaces/nodes/order": {
+      "put": {
+        "description": "Persist a new node order for the current workspace and return the graph.\n\nFlow:\n- Resolve the authenticated user's active workspace id and workspace object.\n- Apply ``ordered_ids`` through ``Workspace.reorder_nodes`` (unknown ids are\n  ignored and any omitted node keeps its tail position, so a stale client\n  payload can never drop nodes).\n- Persist the workspace and return the rebuilt graph in the new order.\n\nUsed by:\n- Frontend workspace list-view drag-to-reorder gesture because dropping a row\n  commits the full node sequence as the durable source of truth.",
+        "operationId": "reorder_workspace_nodes",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceNodeReorderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceGraphResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Workspace Nodes",
+        "tags": [
+          "workspace_management",
+          "lifecycle"
         ]
       }
     },

@@ -118,11 +118,11 @@ export function WorkspaceShell() {
                     <InsetCard
                       ref={mainRef}
                       role="main"
-                      className={`relative h-full p-2 pl-1 ${
-                        isRightCollapsed ? 'pr-2' : 'pr-1'
-                      } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
+                      className={`relative h-full p-2 pl-1 pr-1 ${
+                        isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'
+                      }`}
                       style={{
-                        width: isRightCollapsed ? '100%' : `${String((1 - asidePanelRatio) * 100)}%`,
+                        width: `${String((1 - asidePanelRatio) * 100)}%`,
                         minWidth: 280,
                       }}
                       innerClassName={
@@ -138,68 +138,40 @@ export function WorkspaceShell() {
                       </div>
                     </InsetCard>
 
-                    {!isRightCollapsed && (
+                    <div
+                      className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex"
+                      aria-label="Resize right panel"
+                      {...rightPanelSplitterProps}
+                    >
                       <div
-                        className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex"
-                        aria-label="Resize right panel"
-                        {...rightPanelSplitterProps}
-                      >
-                        <div
-                          className={`pointer-events-none h-10 w-1 rounded-full transition-colors ${
-                            isResizing ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
-                          }`}
-                        />
-                      </div>
-                    )}
+                        className={`pointer-events-none h-10 w-1 rounded-full transition-colors ${
+                          isResizing ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
+                        }`}
+                      />
+                    </div>
 
                     <aside
                       ref={asideRef}
                       className={`relative flex h-full flex-col overflow-hidden bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
-                        isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
+                        isRightCollapsed ? 'min-w-60' : 'min-w-[320px]'
                       }`}
-                      style={{ width: isRightCollapsed ? 0 : `${String(asidePanelRatio * 100)}%` }}
+                      style={{ width: `${String(asidePanelRatio * 100)}%` }}
                     >
-                      {!isRightCollapsed && (
-                        <button
-                          onClick={toggleRightPanel}
-                          className="group absolute top-2 right-2 z-20 flex items-center rounded-md border border-gray-300 bg-white/80 px-2 py-1 text-gray-700 shadow-sm backdrop-blur hover:bg-gray-50"
-                          aria-label="Collapse right panel"
-                          title="Collapse"
-                        >
-                          <span className="mr-1 max-w-0 overflow-hidden whitespace-nowrap transition-all duration-200 group-hover:max-w-30">
-                            Collapse
-                          </span>
-                          <span aria-hidden>❯</span>
-                        </button>
-                      )}
                       <ErrorBoundary>
-                        {!isRightCollapsed && (
-                          <Suspense
-                            fallback={
-                              <div className="text-muted-foreground flex h-full items-center justify-center bg-white text-sm">
-                                Loading workspace view…
-                              </div>
-                            }
-                          >
-                            <WorkspaceView />
-                          </Suspense>
-                        )}
+                        <Suspense
+                          fallback={
+                            <div className="text-muted-foreground flex h-full items-center justify-center bg-white text-sm">
+                              Loading workspace view…
+                            </div>
+                          }
+                        >
+                          <WorkspaceView
+                            collapsed={isRightCollapsed}
+                            onToggleCollapse={toggleRightPanel}
+                          />
+                        </Suspense>
                       </ErrorBoundary>
                     </aside>
-
-                    {isRightCollapsed && (
-                      <button
-                        onClick={toggleRightPanel}
-                        className="group absolute top-2 right-2 z-30 flex items-center rounded-md border border-gray-300 bg-white/90 px-2 py-1 text-gray-700 shadow backdrop-blur hover:bg-gray-50"
-                        aria-label="Expand right panel"
-                        title="Expand"
-                      >
-                        <span className="mr-1 max-w-0 overflow-hidden whitespace-nowrap transition-all duration-200 group-hover:max-w-24">
-                          Show
-                        </span>
-                        <span aria-hidden>❮</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               </SidebarInset>

@@ -5,11 +5,16 @@ import {
   ASIDE_PANEL_MIN_RATIO,
   ASIDE_PANEL_MAX_RATIO,
   ASIDE_PANEL_MAX_PIXELS,
+  ASIDE_PANEL_COLLAPSED_RATIO,
 } from '@/config/layout';
 
 /**
  * Percent-based right panel resize + collapse toggle.
- * Collapsing remembers the last ratio so re-expanding restores it.
+ *
+ * "Collapse" no longer hides the panel — it switches the panel content to the
+ * compact list + schema view (handled by the consumer) and snaps the panel to a
+ * narrower default ratio. The panel stays resizable in both states; expanding
+ * restores the ratio the user had before collapsing.
  */
 export const useRightPanelResize = () => {
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
@@ -33,12 +38,14 @@ export const useRightPanelResize = () => {
     maxPixels: ASIDE_PANEL_MAX_PIXELS,
     persistKey: 'ldaca.layout.asidePanelRatio',
     onLiveUpdate: (next) => {
-      if (isRightCollapsed) return;
       if (mainRef.current) mainRef.current.style.width = `${String((1 - next) * 100)}%`;
       if (asideRef.current) asideRef.current.style.width = `${String(next * 100)}%`;
     },
   });
 
+  /** Toggles between the full graph/table view and the compact list/schema view.
+   * On collapse, remembers the current ratio and snaps to the narrower collapsed
+   * ratio; on expand, restores the remembered ratio. */
   const toggleRightPanel = useCallback(() => {
     setIsRightCollapsed((prev) => {
       if (prev) {
@@ -46,6 +53,7 @@ export const useRightPanelResize = () => {
         return false;
       }
       setLastAsidePanelRatio(asidePanelRatio);
+      setAsidePanelRatio(ASIDE_PANEL_COLLAPSED_RATIO);
       return true;
     });
   }, [asidePanelRatio, lastAsidePanelRatio, setAsidePanelRatio]);

@@ -68,6 +68,15 @@ import {
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];
 const ALL_CONC_COLS_SET = new Set<string>([...CORE_COLS, ...FREQ_COLS]);
+// Generated CONC_* output columns that the per-hit detach dialog ticks by
+// default — the concordance result columns plus the raw-window extraction.
+// Source metadata columns stay unchecked so "Add to Workspace" carries the
+// concordance output out of the box without manual selection.
+const CONC_DEFAULT_DETACH_COLS = new Set<string>([
+  ...CORE_COLS,
+  ...FREQ_COLS,
+  CONCORDANCE_COLUMN_KEYS.extraction,
+]);
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
 /** Orchestrates the full concordance analysis UI, task lifecycle, and detach flows. */
@@ -1239,9 +1248,15 @@ function ConcordanceFeature({
         ),
       );
       const options = responses.flatMap((response) => response.data?.nodes ?? []);
+      // Default-select the generated CONC_* output columns so "Add to
+      // Workspace" carries the concordance result columns without manual
+      // ticking. Source metadata columns (and the opt-in document column)
+      // stay unchecked.
       const initial: Record<string, string[]> = {};
       options.forEach((node) => {
-        initial[node.node_id] = [];
+        initial[node.node_id] = node.available_columns.filter((col) =>
+          CONC_DEFAULT_DETACH_COLS.has(col),
+        );
       });
       setSelectedDetachColumns(initial);
       setDetachDialogNodeOptions(options);

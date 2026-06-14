@@ -138,9 +138,10 @@ export function validateAdd(
     const types = constraints.allowedDataTypes.join(', ');
     return `No compatible column (needs ${types})`;
   }
-  if (constraints.docTypeOnly && !defaultColumnForNode(node, constraints, getColumnInfos)) {
-    return 'No document column available';
-  }
+  // Note: we intentionally do NOT reject nodes that lack a backend-declared
+  // document column even when ``docTypeOnly`` is set. Any node may be added;
+  // the user assigns its document column afterwards via the column picker
+  // (that pick is what makes the document column exist in the first place).
   return null;
 }
 

@@ -24,8 +24,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorkspaceTaskInbox';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
@@ -36,13 +34,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { toast } from 'sonner';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
 import { ClearEmbeddingCacheMenuItem } from '@/features/views/topic-modeling/components/ClearEmbeddingCacheMenuItem';
-import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
-import type { SidebarWorkspaceNode } from '@/components/layout/sidebar/types';
 import {
   BookOpen,
   Bot,
@@ -71,20 +67,18 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-type SectionKey = 'views' | 'nodes' | 'tasks';
+type SectionKey = 'views' | 'tasks';
 
 /** Ordered sidebar section ids consumed by `useStackedSplits` and rendering loops. */
-const SECTION_KEYS: SectionKey[] = ['views', 'nodes', 'tasks'];
+const SECTION_KEYS: SectionKey[] = ['views', 'tasks'];
 /** Human labels for collapsible sidebar sections shown in the section headers. */
 const SECTION_TITLES: Record<SectionKey, string> = {
   views: 'Views',
-  nodes: 'Data Blocks',
   tasks: 'Tasks',
 };
 /** Help target ids paired with sidebar section headers for contextual docs. */
 const SECTION_HELP_KEYS: Record<SectionKey, string> = {
   views: 'ui.tool-choice',
-  nodes: 'ui.data-selection',
   tasks: 'ui.task-centre',
 };
 /** Minimum sidebar section height passed to the stacked split resize hook. */
@@ -138,9 +132,7 @@ function Sidebar() {
     ),
   );
   const resetHints = useHintsStore((state) => state.resetHints);
-  const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
-  const { selectedNodeIds } = useWorkspaceSelection();
-  const { toggleNodeSelection, clearSelection } = useWorkspaceActions();
+  const { currentWorkspaceId } = useWorkspaceData();
   const { user, logout, dataFolder, isMultiUserMode } = useAuth();
   const queryClient = useQueryClient();
   /** Called by: the Sidebar footer/header Logout button onClick prop because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
@@ -156,9 +148,6 @@ function Sidebar() {
     error: taskStreamError,
     reconnect: reconnectTaskStream,
   } = useWorkspaceTaskInbox(currentWorkspaceId ?? null);
-
-  const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
-  const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
 
   /** Called by: the quotation view SidebarMenuAction settings button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const openQuotationEngineDialog = () => {
@@ -180,7 +169,6 @@ function Sidebar() {
     setIsDataFolderDialogOpen(true);
   };
 
-  const nodeCount = nodes.length;
   const isConnected = taskStreamStatus === 'open';
   const isConnecting = taskStreamStatus === 'connecting';
   const connectionError = taskStreamStatus === 'error' ? taskStreamError : null;
@@ -194,7 +182,7 @@ function Sidebar() {
     handleResizeStart,
   } = useStackedSplits<SectionKey>(SECTION_KEYS, {
     minSectionPx: MIN_SECTION_HEIGHT,
-    initialRatios: { views: 0.34, nodes: 0.33, tasks: 0.33 },
+    initialRatios: { views: 0.5, tasks: 0.5 },
   });
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
@@ -337,9 +325,6 @@ function Sidebar() {
                     >
                       <span className="flex items-center gap-1">{title}</span>
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                        {key === 'nodes' && (
-                          <span className="font-medium text-foreground/80">{nodeCount}</span>
-                        )}
                         {key === 'tasks' && (
                           <Circle
                             data-testid="tasks-connection-indicator"
@@ -432,14 +417,6 @@ function Sidebar() {
                         className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-sm"
                       >
                         {key === 'views' && renderViewsBody()}
-                        {key === 'nodes' && (
-                          <SidebarNodesSection
-                            nodes={nodes}
-                            selectedNodeIds={selectedNodeIds}
-                            onToggleNodeSelection={toggleNodeSelection}
-                            onClearSelection={clearSelection}
-                          />
-                        )}
                         {key === 'tasks' && (
                           <SidebarTasksSection
                             tasks={tasks}
