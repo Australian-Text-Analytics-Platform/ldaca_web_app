@@ -15,7 +15,7 @@
  */
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getWorkspaceTabs, putWorkspaceTabs } from '@/api/generated/sdk.gen';
+import { clearTasks, getWorkspaceTabs, putWorkspaceTabs } from '@/api/generated/sdk.gen';
 import type { AnalysisTab, AnalysisTabInput, WorkspaceTabsState } from '@/api/generated/types.gen';
 import {
   EMPTY_TABS_STATE,
@@ -164,8 +164,30 @@ export function useWorkspaceTabs(
   );
 
   const closeTab = useCallback(
-    (tabId: string) => { commit(closeTabInState(readState(), analysisType, tabId)); },
-    [analysisType, readState, commit],
+    (tabId: string) => {
+      const current = readState();
+      // Capture the task id this tab owns BEFORE dropping it from state. A tab
+      // is the sole owner of its backend task (tab_id -> task_id), so closing it
+      // abandons that task; we must tell the backend to clear its records —
+      // identical to the explicit "Clear results" action — or the server-side
+      // task cache (request/result/materialized artifacts) would leak.
+      const closingTab = getTabs(current, analysisType).find((t) => t.tab_id === tabId);
+      const taskId = closingTab?.task_id ?? null;
+      commit(closeTabInState(current, analysisType, tabId));
+      if (taskId) {
+        // Fire-and-forget: the tab is already removed optimistically, so a
+        // failed cleanup must not block the UI. A miss just leaves a harmless
+        // orphan task for later garbage collection; log it for diagnosis.
+        void clearTasks({
+          headers: getAuthHeaders(),
+          query: { task_id: taskId },
+          throwOnError: true,
+        }).catch((error: unknown) => {
+          console.warn(`[${analysisType}] Failed to clear task ${taskId} on tab close:`, error);
+        });
+      }
+    },
+    [analysisType, readState, commit, getAuthHeaders],
   );
 
   const renameTab = useCallback(
