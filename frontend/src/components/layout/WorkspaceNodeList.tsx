@@ -1,9 +1,19 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import type { SidebarWorkspaceNode } from './sidebar/types';
 import { computeConnectorLayout, type NodeListEdge } from './nodeListConnectors';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface WorkspaceNodeListProps {
   nodes: SidebarWorkspaceNode[];
@@ -12,6 +22,8 @@ interface WorkspaceNodeListProps {
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
   onClearSelection?: () => void;
+  /** Deletes the selected visible rows after the header confirmation dialog. */
+  onDeleteSelected?: (nodeIds: string[]) => Promise<void> | void;
   /** Commits a new node order after a drag-to-reorder gesture. When omitted, rows
    * are not draggable. The array is the full node id list in its new order and
    * maps directly to the backend-persisted workspace node list. */
@@ -331,7 +343,7 @@ function NodeListConnectorOverlay({
  * Rendered by: WorkspaceListView (the collapsed list-view top pane) because
  * graph selection and fresh-node acknowledgement must stay aligned.
  * Flow: read fresh state, measure row anchor points, then render counts, the
- * clear action, the connector gutter overlay, and the toggleable node rows.
+ * selected-delete action, the connector gutter overlay, and the toggleable node rows.
  */
 function WorkspaceNodeList({
   nodes,
@@ -339,11 +351,14 @@ function WorkspaceNodeList({
   selectedNodeIds,
   onToggleNodeSelection,
   onClearSelection,
+  onDeleteSelected,
   onReorder,
   renderRowActions,
 }: WorkspaceNodeListProps) {
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const freshIds = useFreshNodesStore((state) => state.freshIds);
   const markInteracted = useFreshNodesStore((state) =>
@@ -385,6 +400,29 @@ function WorkspaceNodeList({
   const orderedNodes = effectiveOrder
     .map((id) => nodeById.get(id))
     .filter((node): node is SidebarWorkspaceNode => node !== undefined);
+
+  const selectedIdSet = new Set(selectedNodeIds ?? []);
+  const selectedForDelete = nodes
+    .filter((node) => selectedIdSet.has(node.id))
+    .map((node) => ({
+      id: node.id,
+      name: getNodeDisplayName(node) || 'Untitled data block',
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const canBatchDelete = selectedForDelete.length > 0;
+
+  /** Deletes the currently selected visible rows, then clears stale selection ids. */
+  const handleBatchDelete = async () => {
+    if (!onDeleteSelected || !canBatchDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteSelected(selectedForDelete.map((item) => item.id));
+      onClearSelection?.();
+      setDeleteConfirmOpen(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Single source of truth for order: render nodes in the effective (live) order.
   const orderedIds = orderedNodes.map((node) => node.id);
@@ -613,22 +651,60 @@ function WorkspaceNodeList({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>Total: {nodeCount}</span>
-        <div className="flex items-center gap-1">
-          <span>Selected: {selectedCount}</span>
-          {selectedCount > 0 && onClearSelection && (
-            <button
-              type="button"
-              onClick={onClearSelection}
-              title="Clear selection"
-              className="rounded p-0.5 hover:bg-accent hover:text-foreground"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="rounded border border-border bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm">
+          {selectedCount}/{nodeCount} selected
+        </span>
+        {onDeleteSelected && (
+          <button
+            type="button"
+            onClick={() => { setDeleteConfirmOpen(true); }}
+            disabled={isDeleting}
+            title="Delete the selected data blocks"
+            aria-label="Delete selected data blocks"
+            className={cn(
+              'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+              canBatchDelete && !isDeleting
+                ? 'border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:border-destructive/90'
+                : 'border-border bg-white text-gray-600 hover:bg-muted hover:text-gray-900',
+            )}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Delete ({selectedCount})</span>
+          </button>
+        )}
       </div>
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedForDelete.length} data block
+              {selectedForDelete.length === 1 ? '' : 's'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. The following data blocks will be removed:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="max-h-60 overflow-y-auto rounded border bg-muted/40 p-2 text-sm">
+            {selectedForDelete.map((item) => (
+              <li key={item.id}>{item.name}</li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleBatchDelete();
+              }}
+              disabled={isDeleting || !canBatchDelete}
+              className="bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50"
+            >
+              {isDeleting ? 'Deleting…' : `Delete ${String(selectedForDelete.length)}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div ref={rowsRef} className="relative">
         {nodes.length ? (
           <>

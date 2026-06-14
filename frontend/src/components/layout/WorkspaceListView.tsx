@@ -23,7 +23,7 @@ export interface WorkspaceListViewProps {
  * Rendered by: WorkspaceView when ``collapsed`` is true.
  * Flow: read nodes + selection + workspace actions, then render the shared node
  * list with a trailing action toolbar wired to delete/rename/clone/undo/redo,
- * the node-input add request, and the schema-view selector.
+ * a header batch-delete action, the node-input add request, and the schema-view selector.
  */
 export function WorkspaceListView({ onShowSchema }: WorkspaceListViewProps) {
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
@@ -65,6 +65,9 @@ export function WorkspaceListView({ onShowSchema }: WorkspaceListViewProps) {
         selectedNodeIds={selectedNodeIds}
         onToggleNodeSelection={toggleNodeSelection}
         onClearSelection={clearSelection}
+        onDeleteSelected={async (nodeIds) => {
+          await Promise.allSettled(nodeIds.map((id) => deleteNode(id)));
+        }}
         onReorder={(orderedIds) => { void reorderNodes(orderedIds); }}
         renderRowActions={(node) => (
           <NodeActionsToolbar

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -96,6 +96,34 @@ describe('WorkspaceNodeList', () => {
       'draggable',
       'true',
     );
+  });
+
+  it('shows a graph-style selection header and batch-deletes selected rows', async () => {
+    const user = userEvent.setup();
+    const onDeleteSelected = vi.fn().mockResolvedValue(undefined);
+    const onClearSelection = vi.fn();
+
+    render(
+      <WorkspaceNodeList
+        nodes={orderedNodes}
+        selectedNodeIds={['node-2']}
+        onToggleNodeSelection={vi.fn()}
+        onClearSelection={onClearSelection}
+        onDeleteSelected={onDeleteSelected}
+      />,
+    );
+
+    expect(screen.getByText('1/3 selected')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Delete selected data blocks' }));
+    expect(screen.getByRole('heading', { name: 'Delete 1 data block?' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Delete 1' }));
+
+    await waitFor(() => {
+      expect(onDeleteSelected).toHaveBeenCalledWith(['node-2']);
+    });
+    expect(onClearSelection).toHaveBeenCalledOnce();
   });
 });
 
