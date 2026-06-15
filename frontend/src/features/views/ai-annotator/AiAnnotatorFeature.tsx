@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import useNodeColumnInfos from '@/features/workspace/common/hooks/useNodeColumnInfos';
+import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import {
   aiAnnotationTaskRequest,

@@ -74,5 +74,3 @@ export function WorkspaceSchemaView({ nodeId }: WorkspaceSchemaViewProps) {
     </div>
   );
 }
-
-export default WorkspaceSchemaView;

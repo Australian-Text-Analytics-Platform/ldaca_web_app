@@ -17,9 +17,9 @@ import { DocumentModalHost } from '@/components/dialogs/DocumentModalHost';
 import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
 import { ViewRouter } from '@/components/layout/ViewRouter';
 
-const FeedbackPanel = lazy(() => import('@/features/feedback/components/FeedbackPanel'));
+const FeedbackPanel = lazy(() => import('@/features/feedback/components/FeedbackPanel').then(m => ({ default: m.FeedbackPanel })));
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
-const HintsController = lazy(() => import('@/features/hints/HintsController'));
+const HintsController = lazy(() => import('@/features/hints/HintsController').then(m => ({ default: m.HintsController })));
 
 /**
  * Views that render their own tabbed card (AnalysisTabbedPanel via

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import TokensColumnMismatchNotice from '../TokensColumnMismatchNotice';
+import { TokensColumnMismatchNotice } from '../TokensColumnMismatchNotice';
 
 describe('TokensColumnMismatchNotice', () => {
   it('reads persisted tokenizer model source columns from node.tokenizer_models', () => {

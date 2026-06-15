@@ -12,7 +12,7 @@ import { DocsEolBanner } from '@/tutorials/DocsEolBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
 
-const FeedbackPanel = lazy(() => import('@/features/feedback/components/FeedbackPanel'));
+const FeedbackPanel = lazy(() => import('@/features/feedback/components/FeedbackPanel').then(m => ({ default: m.FeedbackPanel })));
 
 function App() {
   useEffect(() => {

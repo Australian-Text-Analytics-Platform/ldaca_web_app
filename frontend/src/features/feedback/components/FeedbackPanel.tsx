@@ -48,5 +48,3 @@ export const FeedbackPanel: FC<FeedbackPanelProps> = ({ open, onClose }) => {
     </Dialog>
   );
 };
-
-export default FeedbackPanel;

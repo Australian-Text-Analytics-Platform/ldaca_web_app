@@ -403,5 +403,3 @@ export function NodeInputsPanel({
     </div>
   );
 }
-
-export default NodeInputsPanel;

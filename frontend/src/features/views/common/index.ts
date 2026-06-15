@@ -3,7 +3,6 @@ export * from './hooks/useLastRunRequest';
 export * from './hooks/useAnalysisFeature';
 export * from './hooks/useMaterializeLifecycle';
 export * from './parameterComparison';
-export * from './useNodeColumnOptions';
 export * from './nodeSelectionTypes';
 export * from './components';
 export * from './tasks/types';

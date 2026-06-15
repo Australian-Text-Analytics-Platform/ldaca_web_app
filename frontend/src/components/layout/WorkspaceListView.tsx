@@ -91,5 +91,3 @@ export function WorkspaceListView({ onShowSchema }: WorkspaceListViewProps) {
     </div>
   );
 }
-
-export default WorkspaceListView;

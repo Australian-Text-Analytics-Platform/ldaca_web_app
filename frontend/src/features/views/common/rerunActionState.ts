@@ -77,7 +77,7 @@ export interface NodeSelectionSignature {
  * Called by: hasNodeSelectionChanged so adding/removing/re-columning a node
  * flips the button to "Re-run" without false positives from ordering.
  */
-export const nodeSelectionSignature = (
+const nodeSelectionSignature = (
   selections: NodeColumnSelection[],
 ): NodeSelectionSignature => {
   const nodeIds = normalizeStringArray(selections.map((s) => s.nodeId));

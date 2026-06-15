@@ -214,10 +214,10 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useNodeColumnInfos', () => ({
+vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   /** Supplies the text column needed for auto-selection and parameter rendering. */
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-  default: () => ({
+  useNodeColumnInfos: () => ({
     /** Reports a single string column so concordance has a valid target. */
     // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     getColumnInfos: () => [{ name: 'text' }],

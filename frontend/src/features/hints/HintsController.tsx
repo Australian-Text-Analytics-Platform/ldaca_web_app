@@ -203,5 +203,3 @@ export function HintsController() {
     </>
   );
 }
-
-export default HintsController;

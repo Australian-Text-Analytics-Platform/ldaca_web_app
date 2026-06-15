@@ -97,5 +97,3 @@ export const useNodeColumnInfos = (params: {
 
   return { columnInfoCache, getColumnInfos, isLoading };
 };
-
-export default useNodeColumnInfos;

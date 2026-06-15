@@ -81,7 +81,7 @@ export function buildNodeMap(allNodes: WorkspaceNodeLike[]): Map<string, Workspa
  * filter would empty an otherwise non-empty list is NOT desired — an empty
  * filtered set means "no compatible column").
  */
-export function allowedColumnsForNode(
+function allowedColumnsForNode(
   node: WorkspaceNodeLike,
   constraints: NodeInputConstraints,
   getColumnInfos?: ColumnInfoGetter,

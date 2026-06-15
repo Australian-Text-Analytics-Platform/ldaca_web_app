@@ -81,5 +81,3 @@ export function TokensColumnMismatchNotice({
     </div>
   );
 }
-
-export default TokensColumnMismatchNotice;
