@@ -13,7 +13,7 @@ export function cn(...inputs: ClassValue[]) {
  * above the bytes range.
  */
 /**
- * Used by: src/features/views/topic-modeling/components/ClearEmbeddingCacheMenuItem.tsx, src/features/views/data-loader/components/ActiveWorkspaceCard.tsx, src/features/views/data-loader/components/FileTree.tsx and 2 other importers because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Used by: src/features/views/data-loader/components/ActiveWorkspaceCard.tsx, src/features/views/data-loader/components/FileTree.tsx and other importers because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 export function formatBytes(bytes: number): string {

@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useTokenFrequencyTaskFlow } from '../useTokenFrequencyTaskFlow';
+import type { PendingConcordance } from '@/stores/analysisStore';
+import type { ViewType } from '@/stores/uiStore';
 
 const { calculateTokenFrequenciesMock } = vi.hoisted(() => ({
   calculateTokenFrequenciesMock: vi.fn(),
@@ -86,12 +88,14 @@ describe('useTokenFrequencyTaskFlow', () => {
   });
 
   // Two-node comparison fixture shared by the token-click handoff tests below.
+  interface TwoNodeNavigation {
+    selectNodes: (nodeIds: string[]) => void;
+    setPendingConcordance: (payload: PendingConcordance) => void;
+    setCurrentView: (view: ViewType) => void;
+  }
+
   const renderTwoNodeFlow = (
-    navigation: {
-      selectNodes: ReturnType<typeof vi.fn>;
-      setPendingConcordance: ReturnType<typeof vi.fn>;
-      setCurrentView: ReturnType<typeof vi.fn>;
-    },
+    navigation: TwoNodeNavigation,
   ) =>
     renderHook(() =>
       useTokenFrequencyTaskFlow({
@@ -136,9 +140,9 @@ describe('useTokenFrequencyTaskFlow', () => {
     );
 
   it('scopes the concordance handoff to the clicked node when a source id is given', () => {
-    const selectNodes = vi.fn();
-    const setPendingConcordance = vi.fn();
-    const setCurrentView = vi.fn();
+    const selectNodes = vi.fn<(nodeIds: string[]) => void>();
+    const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
+    const setCurrentView = vi.fn<(view: ViewType) => void>();
 
     const { result } = renderTwoNodeFlow({ selectNodes, setPendingConcordance, setCurrentView });
 
@@ -159,9 +163,9 @@ describe('useTokenFrequencyTaskFlow', () => {
   });
 
   it('keeps both compared nodes when no source id is given', () => {
-    const selectNodes = vi.fn();
-    const setPendingConcordance = vi.fn();
-    const setCurrentView = vi.fn();
+    const selectNodes = vi.fn<(nodeIds: string[]) => void>();
+    const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
+    const setCurrentView = vi.fn<(view: ViewType) => void>();
 
     const { result } = renderTwoNodeFlow({ selectNodes, setPendingConcordance, setCurrentView });
 

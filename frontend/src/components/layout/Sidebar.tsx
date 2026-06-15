@@ -33,7 +33,6 @@ import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
-import { ClearEmbeddingCacheMenuItem } from '@/features/views/topic-modeling/components/ClearEmbeddingCacheMenuItem';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
@@ -397,7 +396,6 @@ function Sidebar() {
                               <RotateCcw className="mr-2 h-3.5 w-3.5" />
                               Reset all hints
                             </DropdownMenuItem>
-                            <ClearEmbeddingCacheMenuItem />
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

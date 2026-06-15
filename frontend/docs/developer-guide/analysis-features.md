@@ -121,8 +121,7 @@ columns, result materialization, and detach.
 
 Topic modeling submits BERTopic/embedding work through backend workers. The UI
 handles exact/min topic size modes, sampling per corpus, random seed,
-representative words, stop-word display filtering, embedding cache state, and
-chart interactions.
+representative words, stop-word display filtering, and chart interactions.
 
 ## Sequential Analysis
 
