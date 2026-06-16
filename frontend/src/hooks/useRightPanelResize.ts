@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
 import {
   ASIDE_PANEL_DEFAULT_RATIO,
@@ -46,7 +46,7 @@ export const useRightPanelResize = () => {
   /** Toggles between the full graph/table view and the compact list/schema view.
    * On collapse, remembers the current ratio and snaps to the narrower collapsed
    * ratio; on expand, restores the remembered ratio. */
-  const toggleRightPanel = useCallback(() => {
+  const toggleRightPanel = () => {
     setIsRightCollapsed((prev) => {
       if (prev) {
         setAsidePanelRatio(lastAsidePanelRatio);
@@ -56,7 +56,7 @@ export const useRightPanelResize = () => {
       setAsidePanelRatio(ASIDE_PANEL_COLLAPSED_RATIO);
       return true;
     });
-  }, [asidePanelRatio, lastAsidePanelRatio, setAsidePanelRatio]);
+  };
 
   return {
     layoutRef,

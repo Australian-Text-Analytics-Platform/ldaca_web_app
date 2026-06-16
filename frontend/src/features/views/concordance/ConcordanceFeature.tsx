@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   concordanceDetachOptions,
@@ -215,7 +215,7 @@ function ConcordanceFeature({
   const [dispersionChartType, setDispersionChartType] = useState<MultiSeriesChartType>('line');
   const [selectedBinIndices, setSelectedBinIndices] = useState<Record<string, Set<number>>>({});
   const lastSelectedBinRef = useRef<Record<string, number | null>>({});
-  const handleBinSelect = useCallback((blockKey: string, index: number, shiftHeld: boolean) => {
+  const handleBinSelect = (blockKey: string, index: number, shiftHeld: boolean) => {
     setSelectedBinIndices((prev) => {
       const prevSet = prev[blockKey] ?? new Set<number>();
       const next = new Set(prevSet);
@@ -231,8 +231,8 @@ function ConcordanceFeature({
       return { ...prev, [blockKey]: next };
     });
     lastSelectedBinRef.current[blockKey] = index;
-  }, []);
-  const handleClearBinSelection = useCallback((blockKey: string) => {
+  };
+  const handleClearBinSelection = (blockKey: string) => {
     setSelectedBinIndices((prev) => {
       if (!prev[blockKey]) return prev;
       const next: Record<string, Set<number>> = {};
@@ -242,15 +242,15 @@ function ConcordanceFeature({
       return next;
     });
     lastSelectedBinRef.current[blockKey] = null;
-  }, []);
+  };
   // Bin indices identify ranges (e.g. index 7 = 70–80 % in a 10-bin chart but
   // 7–8 % in a 100-bin chart). Selections are not portable across bin counts,
   // so clear every block's selection whenever the bin count changes.
-  const handleBinCountChange = useCallback((value: DispersionDisplayBinCount) => {
+  const handleBinCountChange = (value: DispersionDisplayBinCount) => {
     setBinCount(value);
     setSelectedBinIndices((prev) => (Object.keys(prev).length === 0 ? prev : {}));
     lastSelectedBinRef.current = {};
-  }, []);
+  };
   const [liveMaterializedBins, setMaterializedBins] = useState<
     Record<string, ConcordanceDispersionBinRow[]>
   >({});
@@ -265,7 +265,7 @@ function ConcordanceFeature({
   const results = liveResults;
   const materializedPaths = liveMaterializedPaths;
   const materializedBins = liveMaterializedBins;
-  const labelToNodeId = useMemo<Record<string, string> | null>(() => {
+  const labelToNodeId = (() => {
     const params = liveResults?.analysis_params;
     const mapping = params?.label_to_node_map;
     if (mapping && typeof mapping === 'object') {
@@ -278,7 +278,7 @@ function ConcordanceFeature({
       return normalized;
     }
     return null;
-  }, [liveResults]);
+  })();
 
   // Per-source visualisation colours. Each selected node gets a stable
   // colour by its position in the panel selection, used to tint the
@@ -286,7 +286,7 @@ function ConcordanceFeature({
   // purely local, in-result viz mapping — there is no node-colour store,
   // persistence, or user picker anymore.
   const defaultPalette = VIZ_PALETTE;
-  const nodeColors = useMemo<Record<string, string>>(() => {
+  const nodeColors = (() => {
     const map: Record<string, string> = {};
     panelSelectedNodes.forEach((node, idx) => {
       const colour = VIZ_PALETTE[idx % VIZ_PALETTE.length] ?? '';
@@ -295,35 +295,32 @@ function ConcordanceFeature({
       }
     });
     return map;
-  }, [panelSelectedNodes]);
+  })();
 
-  const concordanceTaskId = useMemo(() => {
+  const concordanceTaskId = (() => {
     const md = (liveResults)?.metadata as
       | Record<string, unknown>
       | undefined;
     const value = md?.task_id ?? md?.taskId;
     return typeof value === 'string' ? value : '';
-  }, [liveResults]);
+  })();
   const concordanceTaskIdFallbackRef = useRef('');
   useEffect(() => {
     if (concordanceTaskId) concordanceTaskIdFallbackRef.current = concordanceTaskId;
   }, [concordanceTaskId]);
 
-  const resolveNodeIdForKey = useCallback(
-    (nodeKey: string): string | null => {
-      if (nodeKey === '__COMBINED__') return null;
-      const direct = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
-        const d = n.data as Record<string, unknown> | undefined;
-        const dataName = d && typeof d === 'object' ? (d.name as string | undefined) : undefined;
-        return n.id === nodeKey || n.name === nodeKey || dataName === nodeKey;
-      });
-      if (direct?.id) return direct.id;
-      const mapped = labelToNodeId?.[nodeKey];
-      if (mapped) return mapped;
-      return null;
-    },
-    [panelSelectedNodes, labelToNodeId],
-  );
+  const resolveNodeIdForKey = (nodeKey: string): string | null => {
+    if (nodeKey === '__COMBINED__') return null;
+    const direct = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
+      const d = n.data as Record<string, unknown> | undefined;
+      const dataName = d && typeof d === 'object' ? (d.name as string | undefined) : undefined;
+      return n.id === nodeKey || n.name === nodeKey || dataName === nodeKey;
+    });
+    if (direct?.id) return direct.id;
+    const mapped = labelToNodeId?.[nodeKey];
+    if (mapped) return mapped;
+    return null;
+  };
 
   /** Resolves a displayed result block key to the source node ids needed for materialized bins. */
   /**
@@ -427,7 +424,7 @@ function ConcordanceFeature({
     return tagged;
   };
 
-  const allMatchedTexts = useMemo((): string[] => {
+  const allMatchedTexts = (() => {
     if (!showDispersion || !colourMatches || !results?.data) return [];
     const seen = new Set<string>();
     for (const [nodeKey, nodeData] of Object.entries(results.data)) {
@@ -447,24 +444,11 @@ function ConcordanceFeature({
       }
     }
     return [...seen].sort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    showDispersion,
-    colourMatches,
-    lowercaseMatches,
-    results?.data,
-    materializedBins,
-    materializedPaths,
-    panelSelectedNodes,
-  ]);
+  })();
 
-  const matchedTextColorMap = useMemo(
-    (): Record<string, string> =>
-      Object.fromEntries(
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- i % length is always a valid index of the non-empty palette
-        allMatchedTexts.map((t, i) => [t, VIZ_PALETTE[i % VIZ_PALETTE.length]!]),
-      ),
-    [allMatchedTexts],
+  const matchedTextColorMap = Object.fromEntries(
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- i % length is always a valid index of the non-empty palette
+    allMatchedTexts.map((t, i) => [t, VIZ_PALETTE[i % VIZ_PALETTE.length]!]),
   );
 
   const [viewMode, setViewMode] = useState<'separated' | 'combined'>('separated');
@@ -517,7 +501,7 @@ function ConcordanceFeature({
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
   // Map any node's id/name variants to its assigned color (used in combined table).
-  const sourceColorMap = useMemo<Record<string, string>>(() => {
+  const sourceColorMap = (() => {
     const map: Record<string, string> = {};
     panelSelectedNodes.forEach((node, idx) => {
       const candidateIds = [node.id, node.node_id]
@@ -536,12 +520,12 @@ function ConcordanceFeature({
       });
     });
     return map;
-  }, [panelSelectedNodes, nodeColors, defaultPalette]);
+  })();
 
   // Tokens mode is available when every selected node that has a column also
   // has a tokenizer model selected — either chosen in this session or
   // previously persisted to the backend (read back via node.tokenizer_models).
-  const effectiveTokenizerModelsByNode = useMemo(() => {
+  const effectiveTokenizerModelsByNode = (() => {
     // Seed with models persisted to the backend from previous sessions,
     // then apply any live overrides the user has made in this session.
     const fromNodes: Record<string, string> = {};
@@ -555,13 +539,13 @@ function ConcordanceFeature({
       if (stored) fromNodes[sel.nodeId] = stored;
     }
     return { ...fromNodes, ...tokenizerModelsByNode };
-  }, [effectiveNodeColumnSelections, panelSelectedNodes, tokenizerModelsByNode]);
+  })();
 
-  const tokensModeAvailable = useMemo(() => {
+  const tokensModeAvailable = (() => {
     const selectionsWithColumn = effectiveNodeColumnSelections.filter((s) => s.column);
     if (selectionsWithColumn.length === 0) return false;
     return selectionsWithColumn.every((s) => Boolean(effectiveTokenizerModelsByNode[s.nodeId]));
-  }, [effectiveNodeColumnSelections, effectiveTokenizerModelsByNode]);
+  })();
 
   // Auto-pick tokens-mode when it becomes available AND the user hasn't
   // manually overridden. When tokens stop being available (e.g. user
