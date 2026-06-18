@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Settings2, Plus } from 'lucide-react';
+import { Pin, Settings2, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,13 +30,50 @@ export interface NodeActionsToolbarNode {
 
 export interface NodeActionsToolbarProps {
   node: NodeActionsToolbarNode;
+  isPinned: boolean;
   onShowSchema?: (nodeId: string) => void;
+  onTogglePin: (nodeId: string) => void;
   onAddToSelection: (nodeId: string) => void;
   onRename: (nodeId: string, newName: string) => void;
   onClone: (nodeId: string) => void;
   onUndo: (nodeId: string) => void;
   onRedo: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
+}
+
+const iconButtonClass =
+  'inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
+
+interface NodePinButtonProps {
+  node: NodeActionsToolbarNode;
+  isPinned: boolean;
+  onTogglePin: (nodeId: string) => void;
+}
+
+/**
+ * Single pin action shared by the full row toolbar and the pinned row's resting
+ * affordance.
+ * Rendered by: NodeActionsToolbar for hovered rows and WorkspaceListView for
+ * pinned rows at rest because only the pin icon should remain visible when the
+ * full toolbar is hidden.
+ */
+export function NodePinButton({ node, isPinned, onTogglePin }: NodePinButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={() => { onTogglePin(node.id); }}
+      className={cn(
+        iconButtonClass,
+        isPinned && 'border-primary/70 bg-primary/10 text-primary shadow-md hover:bg-primary/15 hover:text-primary',
+      )}
+      title={isPinned ? 'Unpin data block' : 'Pin data block'}
+      aria-label={`${isPinned ? 'Unpin' : 'Pin'} ${node.name}`}
+      data-pin-action
+      data-pinned={isPinned ? 'true' : 'false'}
+    >
+      <Pin className={cn('h-3.5 w-3.5 transition-transform', isPinned && '-rotate-45 translate-y-0.5 fill-current')} />
+    </button>
+  );
 }
 
 /**
@@ -54,7 +92,9 @@ export interface NodeActionsToolbarProps {
  */
 export function NodeActionsToolbar({
   node,
+  isPinned,
   onShowSchema: _onShowSchema,
+  onTogglePin,
   onAddToSelection,
   onRename,
   onClone,
@@ -79,11 +119,10 @@ export function NodeActionsToolbar({
     setRenameOpen(false);
   };
 
-  const iconButtonClass =
-    'inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
-
   return (
     <div className="flex items-center gap-1">
+      <NodePinButton node={node} isPinned={isPinned} onTogglePin={onTogglePin} />
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -92,7 +131,7 @@ export function NodeActionsToolbar({
             title="More options"
             aria-label={`Actions for ${node.name}`}
           >
-            <Settings2 className="h-4 w-4" />
+            <Settings2 className="h-3.5 w-3.5" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-36">
@@ -130,7 +169,7 @@ export function NodeActionsToolbar({
         title="Add to selection"
         aria-label={`Add ${node.name} to selection`}
       >
-        <Plus className="h-4 w-4" />
+        <Plus className="h-3.5 w-3.5" />
       </button>
 
       <AlertDialog open={renameOpen} onOpenChange={setRenameOpen}>

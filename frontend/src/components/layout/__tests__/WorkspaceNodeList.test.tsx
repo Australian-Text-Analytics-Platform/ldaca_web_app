@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import WorkspaceNodeList from '../WorkspaceNodeList';
+import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 
 /** Minimal node fixture used to verify row activation and display-name behavior. */
 const nodes = [
@@ -15,24 +16,22 @@ const nodes = [
   },
 ];
 
-/** Three-node fixture used to exercise drag-to-reorder, which needs more than one row. */
+/** Three-node fixture used to exercise client-side pin and selection grouping. */
 const orderedNodes = [
   { id: 'node-1', data: { nodeName: 'Alpha' } },
   { id: 'node-2', data: { nodeName: 'Beta' } },
   { id: 'node-3', data: { nodeName: 'Gamma' } },
 ];
 
-// WorkspaceNodeList uses pointer capture for ChromeTabs-style drag handling;
-// jsdom does not implement it, so tests provide the minimal browser surface.
-beforeAll(() => {
-  Element.prototype.setPointerCapture = vi.fn();
-  Element.prototype.releasePointerCapture = vi.fn();
-  Element.prototype.hasPointerCapture = vi.fn(() => true);
+afterEach(() => {
+  usePinnedNodesStore.getState().reset();
 });
 
-afterAll(() => {
-  vi.restoreAllMocks();
-});
+/** Reads row labels in the DOM order seen by users. */
+const getRenderedRowNames = () =>
+  screen
+    .getAllByRole('button', { name: /^(Select|Deselect) /u })
+    .map((row) => row.getAttribute('aria-label')?.replace(/^(Select|Deselect) /u, ''));
 
 describe('WorkspaceNodeList', () => {
   it('uses a non-button row wrapper and supports click and keyboard toggling', async () => {
@@ -61,41 +60,71 @@ describe('WorkspaceNodeList', () => {
     expect(onToggleNodeSelection).toHaveBeenCalledTimes(3);
   });
 
-  it('commits a reordered id list when a row is dragged onto another row', () => {
-    const onReorder = vi.fn();
-
+  it('groups pinned nodes before selected non-pinned nodes and regular nodes', () => {
+    usePinnedNodesStore.getState().togglePinnedNode('node-3');
     render(
       <WorkspaceNodeList
         nodes={orderedNodes}
-        selectedNodeIds={[]}
+        selectedNodeIds={['node-2', 'node-3']}
         onToggleNodeSelection={vi.fn()}
-        onReorder={onReorder}
       />,
     );
 
-    const first = screen.getByRole('button', { name: 'Select Alpha' });
-
-    fireEvent.pointerDown(first, { button: 0, pointerId: 1, clientY: 0 });
-    fireEvent.pointerMove(first, { pointerId: 1, clientY: 48 });
-    fireEvent.pointerUp(first, { pointerId: 1, clientY: 48 });
-
-    // Alpha moves into Beta's slot, squeezing Beta up.
-    expect(onReorder).toHaveBeenCalledWith(['node-2', 'node-1', 'node-3']);
+    expect(getRenderedRowNames()).toEqual(['Gamma', 'Beta', 'Alpha']);
   });
 
-  it('does not make rows draggable without an onReorder handler', () => {
+  it('pins nodes through the row toolbar and appends them to the pinned group', async () => {
+    const user = userEvent.setup();
     render(
       <WorkspaceNodeList
         nodes={orderedNodes}
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}
+        renderRowActions={(node) => (
+          <button
+            type="button"
+            data-pin-action
+            data-pinned={usePinnedNodesStore.getState().isPinned(node.id)}
+            onClick={() => { usePinnedNodesStore.getState().togglePinnedNode(node.id); }}
+            aria-label={`${usePinnedNodesStore.getState().isPinned(node.id) ? 'Unpin' : 'Pin'} ${node.data?.nodeName ?? node.id}`}
+          >
+            Pin
+          </button>
+        )}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Select Alpha' })).not.toHaveAttribute(
-      'draggable',
-      'true',
+    await user.click(screen.getByRole('button', { name: 'Pin Beta' }));
+
+    expect(usePinnedNodesStore.getState().pinnedNodeIds).toEqual(['node-2']);
+    expect(getRenderedRowNames()).toEqual(['Beta', 'Alpha', 'Gamma']);
+  });
+
+  it('keeps only the pinned pin action visible at rest', () => {
+    usePinnedNodesStore.getState().togglePinnedNode('node-2');
+    render(
+      <WorkspaceNodeList
+        nodes={orderedNodes}
+        selectedNodeIds={[]}
+        onToggleNodeSelection={vi.fn()}
+        renderPinnedRowAction={(node) => (
+          <button type="button" data-pin-action aria-label={`Unpin ${node.data?.nodeName ?? node.id}`}>Pin</button>
+        )}
+        renderRowActions={(node) => (
+          <>
+            <button type="button" data-pin-action aria-label={`Unpin ${node.data?.nodeName ?? node.id}`}>Pin</button>
+            <button type="button" aria-label={`More actions for ${node.data?.nodeName ?? node.id}`}>More</button>
+          </>
+        )}
+      />,
     );
+
+    const betaRow = screen.getByRole('button', { name: 'Select Beta' });
+    const pinVisibility = within(betaRow).getByTestId('pinned-row-pin-action');
+    const hoverToolbar = within(betaRow).getByRole('toolbar', { name: 'Actions for Beta' });
+
+    expect(within(pinVisibility).getByRole('button', { name: 'Unpin Beta' })).toBeInTheDocument();
+    expect(hoverToolbar).toHaveClass('opacity-0');
   });
 
   it('shows a graph-style selection header and batch-deletes selected rows', async () => {

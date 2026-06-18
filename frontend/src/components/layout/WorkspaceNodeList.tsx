@@ -1,7 +1,8 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
+import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import type { SidebarWorkspaceNode } from './sidebar/types';
 import {
   AlertDialog,
@@ -21,10 +22,8 @@ interface WorkspaceNodeListProps {
   onClearSelection?: () => void;
   /** Deletes the selected visible rows after the header confirmation dialog. */
   onDeleteSelected?: (nodeIds: string[]) => Promise<void> | void;
-  /** Commits a new node order after a drag-to-reorder gesture. When omitted, rows
-   * are not draggable. The array is the full node id list in its new order and
-   * maps directly to the backend-persisted workspace node list. */
-  onReorder?: (orderedIds: string[]) => void;
+  /** Optional action rendered for a pinned row while the row is not hovered. */
+  renderPinnedRowAction?: (node: SidebarWorkspaceNode) => React.ReactNode;
   /** Optional actions rendered for each node row (e.g. the
    * right-panel list view's per-node action toolbar + schema magnifier). When
    * omitted, rows render without a toolbar. */
@@ -64,12 +63,15 @@ function NodeRowName({ name }: { name: string }) {
     <span
       ref={wrapRef}
       dir={overflowing ? 'rtl' : 'ltr'}
-      className="relative block min-w-0 flex-1 overflow-hidden"
+      className={cn(
+        'relative min-w-0 flex-1 overflow-hidden',
+        overflowing ? 'block' : 'flex justify-end text-right',
+      )}
     >
       <span
         ref={textRef}
         dir="ltr"
-        className="block w-max whitespace-nowrap text-xs font-medium text-foreground"
+        className="block w-max whitespace-nowrap text-right text-xs font-medium text-foreground"
       >
         {name}
       </span>
@@ -79,8 +81,8 @@ function NodeRowName({ name }: { name: string }) {
       <span
         aria-hidden="true"
         className={cn(
-          'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background via-background/90 to-transparent transition-all duration-150 group-hover/row:w-36',
-          overflowing ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100',
+          'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background via-background/90 to-transparent group-hover/row:w-32',
+          overflowing ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
         )}
       />
     </span>
@@ -112,59 +114,6 @@ const getNodeDisplayName = (node: SidebarWorkspaceNode): string =>
 const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
   event.key === 'Enter' || event.key === ' ';
 
-/** Matches Tailwind's space-y-1.5 gap used between list rows. */
-const ROW_GAP = 6;
-/** Pointer travel before a press becomes a drag instead of a row click. */
-const DRAG_THRESHOLD = 4;
-/** Fallback used in tests and the first frame before row metrics are measured. */
-const ROW_FALLBACK_HEIGHT = 30;
-
-interface DragGesture {
-  id: string;
-  pointerId: number;
-  startY: number;
-  homeTop: number;
-  order: string[];
-  moved: boolean;
-}
-
-/** Returns the closest visual slot to a pointer coordinate. */
-function closestRowIndex(value: number, slotCenters: number[]): number {
-  let best = Number.POSITIVE_INFINITY;
-  let bestIndex = 0;
-  slotCenters.forEach((center, index) => {
-    const distance = Math.abs(value - center);
-    if (distance < best) {
-      best = distance;
-      bestIndex = index;
-    }
-  });
-  return bestIndex;
-}
-
-/** Immutably moves the item at ``fromIndex`` to ``toIndex`` within ``order``. */
-function moveInOrder(order: string[], fromIndex: number, toIndex: number): string[] {
-  if (
-    fromIndex === toIndex ||
-    fromIndex < 0 ||
-    toIndex < 0 ||
-    fromIndex >= order.length ||
-    toIndex >= order.length
-  ) {
-    return order;
-  }
-  const next = [...order];
-  const [moved] = next.splice(fromIndex, 1);
-  if (moved === undefined) return order;
-  next.splice(toIndex, 0, moved);
-  return next;
-}
-
-/** Called by: WorkspaceNodeList to clear a held drag preview once props catch up. */
-function sameOrder(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((id, index) => id === right[index]);
-}
-
 /**
  * Selectable node list shown in the collapsed right panel's list view. It
  * presents nodes in their original workspace order and bridges row clicks back
@@ -180,12 +129,13 @@ function WorkspaceNodeList({
   onToggleNodeSelection,
   onClearSelection,
   onDeleteSelected,
-  onReorder,
+  renderPinnedRowAction,
   renderRowActions,
 }: WorkspaceNodeListProps) {
   const selectedCount = selectedNodeIds?.length ?? 0;
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
 
   const freshIds = useFreshNodesStore((state) => state.freshIds);
   const markInteracted = useFreshNodesStore((state) =>
@@ -199,33 +149,16 @@ function WorkspaceNodeList({
     onToggleNodeSelection(nodeId);
   };
 
-  // ChromeTabs-style drag state. While a row is being dragged, the DOM keeps the
-  // persisted prop order and rows move with translateY instead of being removed
-  // and reinserted on every hover. This avoids the native drag ghost + FLIP
-  // feedback loop that made the previous implementation jiggle.
-  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
-  const [dragNodeId, setDragNodeId] = useState<string | null>(null);
-  const [dragDeltaY, setDragDeltaY] = useState(0);
-  const [dragHomeTop, setDragHomeTop] = useState(0);
-  const dragRef = useRef<DragGesture | null>(null);
-  const suppressClickRef = useRef(false);
-  const reorderable = Boolean(onReorder) && nodes.length > 1;
-
-  const baseOrder = nodes.map((node) => node.id);
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const activeDragOrder = dragOrder && !sameOrder(dragOrder, baseOrder) ? dragOrder : null;
-  // Effective visual order: drag preview while dragging, else the prop order.
-  // Unknown ids are dropped and newly-added ids are appended so a node is never lost.
-  const effectiveOrder = (() => {
-    if (!activeDragOrder) return baseOrder;
-    const ordered = activeDragOrder.filter((id) => nodeById.has(id));
-    for (const id of baseOrder) {
-      if (!ordered.includes(id)) ordered.push(id);
-    }
-    return ordered;
-  })();
-
   const selectedIdSet = new Set(selectedNodeIds ?? []);
+  const pinnedIdSet = new Set(pinnedNodeIds.filter((id) => nodeById.has(id)));
+  const pinnedNodes = pinnedNodeIds
+    .map((id) => nodeById.get(id))
+    .filter((node): node is SidebarWorkspaceNode => node !== undefined);
+  const selectedNodes = nodes.filter((node) => selectedIdSet.has(node.id) && !pinnedIdSet.has(node.id));
+  const regularNodes = nodes.filter((node) => !selectedIdSet.has(node.id) && !pinnedIdSet.has(node.id));
+  const orderedNodes = [...pinnedNodes, ...selectedNodes, ...regularNodes];
+
   const selectedForDelete = nodes
     .filter((node) => selectedIdSet.has(node.id))
     .map((node) => ({
@@ -247,190 +180,6 @@ function WorkspaceNodeList({
       setIsDeleting(false);
     }
   };
-
-  // Row heights drive the analytic vertical layout for active drag-to-reorder transitions.
-  const rowsRef = useRef<HTMLDivElement | null>(null);
-  const rowEls = useRef(new Map<string, HTMLDivElement>());
-  const [rowBoxes, setRowBoxes] = useState<Map<string, { top: number; height: number }>>(new Map());
-
-  const rowSetKey = baseOrder.join('|');
-
-  /** Measured row height, or the fallback before the first measurement. */
-  const getRowHeight = (id: string): number => rowBoxes.get(id)?.height ?? ROW_FALLBACK_HEIGHT;
-
-  /**
-   * Accumulates each row's top offset for a given order. Used only for the live
-   * drag preview, where rows are mid-reorder and have no stable measured top.
-   */
-  const slotTopsForOrder = (order: string[]): number[] => {
-    const tops: number[] = [];
-    let top = 0;
-    for (const id of order) {
-      tops.push(top);
-      top += getRowHeight(id) + ROW_GAP;
-    }
-    return tops;
-  };
-
-  // Natural (prop-order) tops: the real measured offsetTop once available, with
-  // an analytic fallback for the first paint before measurement runs.
-  const baseSlotTops = slotTopsForOrder(baseOrder);
-  const baseTopById = new Map<string, number>();
-  baseOrder.forEach((id, index) => {
-    baseTopById.set(id, rowBoxes.get(id)?.top ?? baseSlotTops[index] ?? 0);
-  });
-
-  // Effective (live drag preview) tops, used to position rows while a drag is in progress.
-  const effectiveSlotTops = slotTopsForOrder(effectiveOrder);
-  const visualTopById = new Map<string, number>();
-  effectiveOrder.forEach((id, index) => {
-    visualTopById.set(id, effectiveSlotTops[index] ?? 0);
-  });
-
-  const isDragActive = dragNodeId !== null;
-
-  const clearDrag = () => {
-    dragRef.current = null;
-    setDragNodeId(null);
-    setDragDeltaY(0);
-    setDragHomeTop(0);
-    setDragOrder(null);
-  };
-
-  /**
-   * Starts tracking a possible reorder gesture without committing to drag until
-   * the pointer crosses the threshold. Called by: each reorderable row.
-   */
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>, id: string) => {
-    if (!reorderable || event.button !== 0) return;
-    const homeTop = rowBoxes.get(id)?.top ?? baseTopById.get(id) ?? 0;
-    dragRef.current = {
-      id,
-      pointerId: event.pointerId,
-      startY: event.clientY,
-      homeTop,
-      order: baseOrder,
-      moved: false,
-    };
-    if (typeof event.currentTarget.setPointerCapture === 'function') {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    }
-  };
-
-  /**
-   * Moves the dragged row with the pointer and slides siblings into their
-   * preview slots. Called by: pointer capture on the pressed row.
-   */
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (drag?.pointerId !== event.pointerId) return;
-    const delta = event.clientY - drag.startY;
-
-    if (!drag.moved) {
-      if (Math.abs(delta) < DRAG_THRESHOLD || !onReorder) return;
-      drag.moved = true;
-      setDragNodeId(drag.id);
-      setDragHomeTop(drag.homeTop);
-      setDragOrder(baseOrder);
-    }
-
-    event.preventDefault();
-    setDragDeltaY(delta);
-    setDragOrder((current) => {
-      const order = current ?? baseOrder;
-      const fromIndex = order.indexOf(drag.id);
-      const slotTops = slotTopsForOrder(order);
-      const slotCenters = order.map((id, index) => (slotTops[index] ?? 0) + getRowHeight(id) / 2);
-      const rowHeight = getRowHeight(drag.id);
-      const pointerCenter = drag.homeTop + delta + rowHeight / 2;
-      const toIndex = closestRowIndex(pointerCenter, slotCenters);
-      const nextOrder = moveInOrder(order, fromIndex, toIndex);
-      drag.order = nextOrder;
-      return nextOrder;
-    });
-  };
-
-  /**
-   * Commits the preview order on release, or lets an ordinary click flow through
-   * when the pointer never crossed the drag threshold. Called by: each row.
-   */
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (drag?.pointerId !== event.pointerId) return;
-    if (
-      typeof event.currentTarget.hasPointerCapture === 'function' &&
-      event.currentTarget.hasPointerCapture(event.pointerId) &&
-      typeof event.currentTarget.releasePointerCapture === 'function'
-    ) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    if (!drag.moved) {
-      dragRef.current = null;
-      return;
-    }
-
-    event.preventDefault();
-    suppressClickRef.current = true;
-    const finalOrder = drag.order;
-    const changed = finalOrder.length !== baseOrder.length || finalOrder.some((id, index) => id !== baseOrder[index]);
-    if (changed) onReorder?.(finalOrder);
-    dragRef.current = null;
-    setDragNodeId(null);
-    setDragDeltaY(0);
-    setDragHomeTop(0);
-    setDragOrder(changed ? finalOrder : null);
-  };
-
-  const handlePointerCancel = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (drag?.pointerId !== event.pointerId) return;
-    suppressClickRef.current = true;
-    clearDrag();
-  };
-
-  // Measure each row's integer offsetTop + offsetHeight and only commit when a
-  // value actually changes. Both are layout (pre-transform) metrics that stay
-  // constant when only the panel width changes, so this never fires during a
-  // width drag and the connectors cannot jiggle. offsetTop is measured against
-  // the rows container (the SVG's origin), giving anchors that match the cards.
-  useLayoutEffect(() => {
-    const measure = () => {
-      setRowBoxes((prev) => {
-        const next = new Map<string, { top: number; height: number }>();
-        for (const [id, el] of rowEls.current) {
-          next.set(id, {
-            top: el.offsetTop,
-            height: el.offsetHeight || ROW_FALLBACK_HEIGHT,
-          });
-        }
-        let changed = next.size !== prev.size;
-        if (!changed) {
-          for (const [id, value] of next) {
-            const before = prev.get(id);
-            if (!before) {
-              changed = true;
-              break;
-            }
-            if (before.top !== value.top || before.height !== value.height) {
-              changed = true;
-              break;
-            }
-          }
-        }
-        return changed ? next : prev;
-      });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    for (const el of rowEls.current.values()) {
-      observer.observe(el);
-    }
-    return () => {
-      observer.disconnect();
-    };
-    // rowSetKey captures additions/removals; heights are stable across width changes.
-  }, [rowSetKey]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -483,47 +232,23 @@ function WorkspaceNodeList({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <div ref={rowsRef} className="relative">
+      <div className="relative">
         {nodes.length ? (
           <div className="space-y-1.5 pr-1">
-            {nodes.map((node) => {
+            {orderedNodes.map((node) => {
               const displayName = getNodeDisplayName(node) || 'Untitled data block';
               const shape = formatShapeLabel(node);
               const checked = selectedNodeIds?.includes(node.id) ?? false;
               const tooltip = `${displayName}\nShape: ${shape}`;
               const isFresh = freshIds.has(node.id);
-              const isDragging = dragNodeId === node.id;
-              const naturalTop = baseTopById.get(node.id) ?? 0;
-              const targetTop = visualTopById.get(node.id) ?? naturalTop;
-              // Static rows render at their real CSS slot (no transform); only an
-              // active drag shifts rows into preview slots.
-              const translateY = !isDragActive
-                ? 0
-                : isDragging
-                  ? dragHomeTop + dragDeltaY - naturalTop
-                  : targetTop - naturalTop;
-              const rowStyle: React.CSSProperties = {
-                transform: translateY === 0 ? undefined : `translateY(${String(translateY)}px)`,
-                zIndex: isDragging ? 20 : undefined,
-              };
+              const isPinned = pinnedIdSet.has(node.id);
+              const pinnedRowAction = isPinned ? renderPinnedRowAction?.(node) : null;
+              const rowActions = renderRowActions?.(node);
 
               return (
                 <div
                   key={node.id}
-                  ref={(el) => {
-                    if (el) rowEls.current.set(node.id, el);
-                    else rowEls.current.delete(node.id);
-                  }}
-                  style={rowStyle}
-                  onPointerDown={reorderable ? (event) => { handlePointerDown(event, node.id); } : undefined}
-                  onPointerMove={reorderable ? handlePointerMove : undefined}
-                  onPointerUp={reorderable ? handlePointerUp : undefined}
-                  onPointerCancel={reorderable ? handlePointerCancel : undefined}
                   onClick={() => {
-                    if (suppressClickRef.current) {
-                      suppressClickRef.current = false;
-                      return;
-                    }
                     handleToggle(node.id);
                   }}
                   onKeyDown={(event) => {
@@ -538,22 +263,29 @@ function WorkspaceNodeList({
                   tabIndex={0}
                   aria-pressed={checked}
                   aria-label={`${checked ? 'Deselect' : 'Select'} ${displayName}`}
-                  className={cn(
-                    'group/row relative block w-full rounded-md text-left focus-visible:outline-hidden',
-                    reorderable && 'cursor-grab touch-none select-none active:cursor-grabbing',
-                    activeDragOrder && !isDragging && 'transition-transform duration-150 ease-out motion-reduce:transition-none',
-                    isDragging && 'cursor-grabbing shadow-lg',
-                  )}
+                  className="group/row relative block w-full rounded-md text-left focus-visible:outline-hidden"
                 >
                   {/* Inner box carries the border/background. */}
                   <div
                     className={cn(
                       'relative flex items-center gap-2 overflow-visible rounded-md border bg-background/70 px-2 py-1 text-xs transition-colors duration-150 ease-out group-focus-visible/row:ring-1 group-focus-visible/row:ring-ring',
+                      isPinned && pinnedRowAction && 'pl-8',
                       checked
                         ? 'border-primary/70 bg-primary/10 ring-1 ring-primary/20'
                         : 'border-border/60 group-hover/row:border-border group-hover/row:bg-accent/60',
                     )}
                   >
+                    {pinnedRowAction && (
+                      <div
+                        data-testid="pinned-row-pin-action"
+                        className="absolute top-1/2 left-1 z-10 flex -translate-y-1/2 items-center opacity-100 group-hover/row:pointer-events-none group-hover/row:opacity-0"
+                        onPointerDown={(event) => { event.stopPropagation(); }}
+                        onClick={(event) => { event.stopPropagation(); }}
+                        onKeyDown={(event) => { event.stopPropagation(); }}
+                      >
+                        {pinnedRowAction}
+                      </div>
+                    )}
                     <NodeRowName name={displayName} />
                     {isFresh && (
                       <span
@@ -562,11 +294,11 @@ function WorkspaceNodeList({
                         aria-label="New data block"
                       />
                     )}
-                    {renderRowActions && (
+                    {rowActions && (
                       // Hover-revealed leading actions, absolutely positioned on the left.
                       // Stop row-toggle when interacting with the actions.
                       <div
-                        className="absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 transition-opacity duration-150 group-hover/row:pointer-events-auto group-hover/row:opacity-100 group-focus-within/row:pointer-events-auto group-focus-within/row:opacity-100 pointer-events-none"
+                        className="absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 pointer-events-none"
                         onPointerDown={(event) => { event.stopPropagation(); }}
                         onClick={(event) => { event.stopPropagation(); }}
                         onKeyDown={(event) => { event.stopPropagation(); }}
@@ -574,7 +306,7 @@ function WorkspaceNodeList({
                         tabIndex={-1}
                         aria-label={`Actions for ${displayName}`}
                       >
-                        {renderRowActions(node)}
+                        {rowActions}
                       </div>
                     )}
                   </div>

@@ -30,11 +30,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import WorkspaceNodeList from '@/components/layout/WorkspaceNodeList';
-import { NodeActionsToolbar } from '@/components/layout/NodeActionsToolbar';
+import { NodeActionsToolbar, NodePinButton } from '@/components/layout/NodeActionsToolbar';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
+import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import type { SidebarWorkspaceNode } from '@/components/layout/sidebar/types';
 import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
@@ -158,9 +159,10 @@ function Sidebar() {
     renameNode,
     undoNode,
     redoNode,
-    reorderNodes,
   } = useWorkspaceActions();
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
+  const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
+  const togglePinnedNode = usePinnedNodesStore((state) => state.togglePinnedNode);
 
   // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
   const markInteracted = useFreshNodesStore((state) => state.markInteracted);
@@ -169,6 +171,14 @@ function Sidebar() {
   const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds.length;
+  const pinnedIdSet = new Set(pinnedNodeIds);
+
+  const getToolbarNode = (node: SidebarWorkspaceNode) => ({
+    id: node.id,
+    name: node.name ?? node.label ?? node.id,
+    canUndo: node.can_undo,
+    canRedo: node.can_redo,
+  });
 
   const handleAddToSelection = (nodeId: string) => {
     requestNodeInputAdd(currentWorkspaceId, currentView, nodeId);
@@ -418,15 +428,18 @@ function Sidebar() {
                             selectedNodeIds={selectedNodeIds}
                             onToggleNodeSelection={toggleNodeSelection}
                             onClearSelection={clearSelection}
-                            onReorder={(orderedIds) => { void reorderNodes(orderedIds); }}
-                            renderRowActions={(node) => (
+                            renderPinnedRowAction={(node: SidebarWorkspaceNode) => (
+                              <NodePinButton
+                                node={getToolbarNode(node)}
+                                isPinned={pinnedIdSet.has(node.id)}
+                                onTogglePin={togglePinnedNode}
+                              />
+                            )}
+                            renderRowActions={(node: SidebarWorkspaceNode) => (
                               <NodeActionsToolbar
-                                node={{
-                                  id: node.id,
-                                  name: node.name ?? node.label ?? node.id,
-                                  canUndo: node.can_undo,
-                                  canRedo: node.can_redo,
-                                }}
+                                node={getToolbarNode(node)}
+                                isPinned={pinnedIdSet.has(node.id)}
+                                onTogglePin={togglePinnedNode}
                                 onAddToSelection={handleAddToSelection}
                                 onRename={(id, newName) => { void renameNode(id, newName); }}
                                 onClone={(id) => { void copyNode(id); }}

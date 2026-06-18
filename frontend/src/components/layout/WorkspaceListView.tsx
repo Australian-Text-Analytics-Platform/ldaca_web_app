@@ -3,10 +3,11 @@ import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWork
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
+import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import { useUIStore } from '@/stores';
 import WorkspaceNodeList from '@/components/layout/WorkspaceNodeList';
 import type { SidebarWorkspaceNode } from '@/components/layout/sidebar/types';
-import { NodeActionsToolbar } from './NodeActionsToolbar';
+import { NodeActionsToolbar, NodePinButton } from './NodeActionsToolbar';
 
 export interface WorkspaceListViewProps {
   /** Opens the schema view for a node (drives the collapsed data pane). */
@@ -22,8 +23,9 @@ export interface WorkspaceListViewProps {
  *
  * Rendered by: WorkspaceView when ``collapsed`` is true.
  * Flow: read nodes + selection + workspace actions, then render the shared node
- * list with a trailing action toolbar wired to delete/rename/clone/undo/redo,
- * a header batch-delete action, the node-input add request, and the schema-view selector.
+ * list with pinned/selected grouping, a leading pin action, the row toolbar
+ * wired to rename/clone/undo/redo, a header batch-delete action, and the
+ * node-input add request.
  */
 export function WorkspaceListView({ onShowSchema }: WorkspaceListViewProps) {
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
@@ -36,15 +38,25 @@ export function WorkspaceListView({ onShowSchema }: WorkspaceListViewProps) {
     renameNode,
     undoNode,
     redoNode,
-    reorderNodes,
   } = useWorkspaceActions();
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
   const currentView = useUIStore((state) => state.currentView);
+  const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
+  const togglePinnedNode = usePinnedNodesStore((state) => state.togglePinnedNode);
   // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
   const markInteracted = useFreshNodesStore((state) => state.markInteracted);
 
   const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
   const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
+  const pinnedIdSet = new Set(pinnedNodeIds);
+
+  const getToolbarNode = (node: SidebarWorkspaceNode) => ({
+    id: node.id,
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall through empty names to id
+    name: node.name || node.label || node.id,
+    canUndo: node.can_undo,
+    canRedo: node.can_redo,
+  });
 
   /** Queues this node as an input for the active analysis view (matches the
    * graph node "+" affordance) and clears its fresh highlight. */
@@ -63,17 +75,19 @@ export function WorkspaceListView({ onShowSchema }: WorkspaceListViewProps) {
         onDeleteSelected={async (nodeIds) => {
           await Promise.allSettled(nodeIds.map((id) => deleteNode(id)));
         }}
-        onReorder={(orderedIds) => { void reorderNodes(orderedIds); }}
-        renderRowActions={(node) => (
+        renderPinnedRowAction={(node: SidebarWorkspaceNode) => (
+          <NodePinButton
+            node={getToolbarNode(node)}
+            isPinned={pinnedIdSet.has(node.id)}
+            onTogglePin={togglePinnedNode}
+          />
+        )}
+        renderRowActions={(node: SidebarWorkspaceNode) => (
           <NodeActionsToolbar
-            node={{
-              id: node.id,
-              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall through empty names to id
-              name: node.name || node.label || node.id,
-              canUndo: node.can_undo,
-              canRedo: node.can_redo,
-            }}
+            node={getToolbarNode(node)}
+            isPinned={pinnedIdSet.has(node.id)}
             onShowSchema={onShowSchema}
+            onTogglePin={togglePinnedNode}
             onAddToSelection={handleAddToSelection}
             onRename={(id, newName) => { void renameNode(id, newName); }}
             onClone={(id) => { void copyNode(id); }}
