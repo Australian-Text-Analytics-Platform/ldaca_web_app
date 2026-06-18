@@ -183,7 +183,6 @@ function WorkspaceNodeList({
   onReorder,
   renderRowActions,
 }: WorkspaceNodeListProps) {
-  const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -435,11 +434,8 @@ function WorkspaceNodeList({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="rounded border border-border bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm">
-          {selectedCount}/{nodeCount} selected
-        </span>
-        {onDeleteSelected && (
+      {onDeleteSelected && canBatchDelete && (
+        <div className="flex items-center justify-end gap-2 pb-1">
           <button
             type="button"
             onClick={() => { setDeleteConfirmOpen(true); }}
@@ -448,16 +444,14 @@ function WorkspaceNodeList({
             aria-label="Delete selected data blocks"
             className={cn(
               'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-              canBatchDelete && !isDeleting
-                ? 'border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:border-destructive/90'
-                : 'border-border bg-white text-gray-600 hover:bg-muted hover:text-gray-900',
+              'border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:border-destructive/90'
             )}
           >
             <Trash2 className="h-3.5 w-3.5" />
             <span>Delete ({selectedCount})</span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

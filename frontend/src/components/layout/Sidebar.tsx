@@ -145,7 +145,7 @@ function Sidebar() {
     status: taskStreamStatus,
     error: taskStreamError,
     reconnect: reconnectTaskStream,
-  } = useWorkspaceTaskInbox(currentWorkspaceId ?? null);
+  } = useWorkspaceTaskInbox(currentWorkspaceId);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = React.useState(false);
 
   const { workspaceGraph } = useWorkspaceData();
@@ -165,9 +165,10 @@ function Sidebar() {
   // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
   const markInteracted = useFreshNodesStore((state) => state.markInteracted);
 
-  const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
+  const rawNodes = workspaceGraph?.nodes;
   const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
   const nodeCount = nodes.length;
+  const selectedCount = selectedNodeIds.length;
 
   const handleAddToSelection = (nodeId: string) => {
     requestNodeInputAdd(currentWorkspaceId, currentView, nodeId);
@@ -324,7 +325,9 @@ function Sidebar() {
                       <span className="flex items-center gap-1">{title}</span>
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                         {key === 'nodes' && (
-                          <span className="font-semibold text-foreground/80">{nodeCount}</span>
+                          <span className="font-semibold text-foreground/80">
+                            {selectedCount > 0 ? `${selectedCount.toString()}/${nodeCount.toString()}` : nodeCount.toString()}
+                          </span>
                         )}
                         {key === 'tasks' && (
                           <Circle

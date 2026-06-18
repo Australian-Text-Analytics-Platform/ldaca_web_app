@@ -113,8 +113,6 @@ describe('WorkspaceNodeList', () => {
       />,
     );
 
-    expect(screen.getByText('1/3 selected')).toBeInTheDocument();
-
     await user.click(screen.getByRole('button', { name: 'Delete selected data blocks' }));
     expect(screen.getByRole('heading', { name: 'Delete 1 data block?' })).toBeInTheDocument();
 

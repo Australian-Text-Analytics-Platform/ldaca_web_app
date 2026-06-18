@@ -113,7 +113,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[80dvh] w-[80vw] max-w-none flex-col overflow-hidden p-0">
+      <DialogContent className="flex h-[80dvh] w-[80vw] max-w-none flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-4">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="space-y-1">
