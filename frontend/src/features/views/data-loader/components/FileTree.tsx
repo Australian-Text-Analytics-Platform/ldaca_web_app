@@ -69,6 +69,32 @@ export function FileTree({
   const [draggingFilePath, setDraggingFilePath] = useState<string | null>(null);
   const [fileMoveTarget, setFileMoveTarget] = useState<FileMoveTarget | null>(null);
 
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(() => {
+    try {
+      const persisted = localStorage.getItem('ldaca_wordflow_collapsed_folders');
+      return persisted ? new Set<string>(JSON.parse(persisted) as string[]) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
+
+  const handleToggleCollapse = (path: string, isOpen: boolean) => {
+    setCollapsedPaths((prev) => {
+      const next = new Set(prev);
+      if (isOpen) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      try {
+        localStorage.setItem('ldaca_wordflow_collapsed_folders', JSON.stringify(Array.from(next)));
+      } catch (e) {
+        console.error('Failed to persist collapsed folders:', e);
+      }
+      return next;
+    });
+  };
+
   /**
    * Recovers the dragged file path from custom drag metadata with a local state
    * fallback for browsers that clear dataTransfer during nested drag events.
@@ -282,8 +308,13 @@ export function FileTree({
     const fileCount = countFilesInNode(node);
     const citationFile = getCitationFile(node);
     const visibleChildren = getVisibleDirectoryChildren(node);
+    const isCollapsed = collapsedPaths.has(node.path);
     return (
-      <Collapsible key={node.path} defaultOpen>
+      <Collapsible
+        key={node.path}
+        open={!isCollapsed}
+        onOpenChange={(isOpen) => { handleToggleCollapse(node.path, isOpen); }}
+      >
         <div
           className={`flex items-center gap-1 rounded-md pr-1 hover:bg-accent/50 ${
             isFileMoveTargetActive(`folder:${node.path}`, node.path)

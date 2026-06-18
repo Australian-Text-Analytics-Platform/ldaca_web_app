@@ -335,6 +335,32 @@ describe('DataLoaderFeature citation UI', () => {
     expect(mockHandleDeleteFile).toHaveBeenCalledWith('sample_data/ADO');
   });
 
+  it('persists folder collapsed state in localStorage', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    localStorage.setItem('ldaca_wordflow_collapsed_folders', JSON.stringify(['sample_data/Other']));
+
+    renderWithProviders(<DataLoaderFeature />);
+
+    // Target folder ADO trigger click
+    const toggleFolderAdo = screen.getByRole('button', { name: /^ADO$/i });
+    fireEvent.click(toggleFolderAdo);
+
+    expect(setItemSpy).toHaveBeenCalledWith(
+      'ldaca_wordflow_collapsed_folders',
+      expect.stringContaining('sample_data/ADO'),
+    );
+
+    // Toggle back to open
+    fireEvent.click(toggleFolderAdo);
+    expect(setItemSpy).toHaveBeenLastCalledWith(
+      'ldaca_wordflow_collapsed_folders',
+      JSON.stringify(['sample_data/Other']),
+    );
+
+    setItemSpy.mockRestore();
+    localStorage.clear();
+  });
+
   it('moves a dragged file when dropped on a folder row', async () => {
     renderWithProviders(<DataLoaderFeature />);
 
