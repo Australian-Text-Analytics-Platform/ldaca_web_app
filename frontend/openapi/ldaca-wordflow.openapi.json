@@ -2526,7 +2526,7 @@
         "type": "object"
       },
       "DetachNodeOption": {
-        "description": "Shared base for detach-node-option responses across analysis tools.\n\nConcordanceDetachNodeOption, QuotationDetachNodeOption, and\nTopicModelingDetachNodeOption are kept as backwards-compatible aliases.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Shared base for detach-node-option responses across analysis tools.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
           "available_columns": {
             "items": {
@@ -4061,6 +4061,51 @@
         "title": "QuotationEngineConfig",
         "type": "object"
       },
+      "QuotationEngineConfig-Output": {
+        "description": "Configuration schema for quotation extraction engines.\n\nUsed by:\n- `QuotationRequest` because callers need the shared shared backend behavior rule in one\n  place instead of duplicating it.\nWhy:\n- Supports local and remote engine selection with optional model/auth fields.\n\nFlow: normalize inputs, delegate to the owning backend state or service boundary, and\n    return serialized values or existing domain errors to callers.",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "type": {
+            "default": "local",
+            "title": "Type",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "title": "QuotationEngineConfig",
+        "type": "object"
+      },
       "QuotationEngineType": {
         "description": "Enum used by API schema contracts to constrain quotation engine type values.\n\nUsed by:\n- backend API routes, backend request/response models, backend tests, core workspace and\n  worker services because they need a stable JSON contract shared by route handlers,\n  generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "enum": [
@@ -4181,38 +4226,6 @@
         "title": "QuotationPreferenceUpdateResponse",
         "type": "object"
       },
-      "QuotationPreferences-Input": {
-        "additionalProperties": false,
-        "description": "Preference schema persisted by preference routes for quotation preferences.\n\nUsed by:\n- backend request/response models, backend tests because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "engine": {
-            "$ref": "#/components/schemas/QuotationEngineConfig-Input"
-          },
-          "last_remote_url": {
-            "default": "",
-            "title": "Last Remote Url",
-            "type": "string"
-          }
-        },
-        "title": "QuotationPreferences",
-        "type": "object"
-      },
-      "QuotationPreferences-Output": {
-        "additionalProperties": false,
-        "description": "Preference schema persisted by preference routes for quotation preferences.\n\nUsed by:\n- backend request/response models, backend tests because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "engine": {
-            "$ref": "#/components/schemas/ldaca_wordflow__models__quotation__QuotationEngineConfig"
-          },
-          "last_remote_url": {
-            "default": "",
-            "title": "Last Remote Url",
-            "type": "string"
-          }
-        },
-        "title": "QuotationPreferences",
-        "type": "object"
-      },
       "QuotationRequest-Input": {
         "additionalProperties": false,
         "description": "Request schema used by API routes and generated clients for quotation request.\n\nUsed by:\n- analysis task helpers, backend API routes, backend request/response models, backend\n  tests because they need a stable JSON contract shared by route handlers, generated\n  clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
@@ -4304,7 +4317,7 @@
           "engine": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ldaca_wordflow__analysis__implementations__quotation__QuotationEngineConfig"
+                "$ref": "#/components/schemas/QuotationEngineConfig-Output"
               },
               {
                 "type": "null"
@@ -6883,9 +6896,6 @@
               }
             ],
             "title": "Ldaca Oni Api Token"
-          },
-          "quotation": {
-            "$ref": "#/components/schemas/QuotationPreferences-Output"
           }
         },
         "title": "UserPreferences",
@@ -6944,16 +6954,6 @@
               }
             ],
             "title": "Ldaca Oni Api Token"
-          },
-          "quotation": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/QuotationPreferences-Input"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "title": "UserPreferencesUpdate",
@@ -7542,76 +7542,6 @@
           "workspace"
         ],
         "title": "WorkspaceUploadResponse",
-        "type": "object"
-      },
-      "ldaca_wordflow__analysis__implementations__quotation__QuotationEngineConfig": {
-        "description": "Configuration schema for quotation extraction engines.\n\nUsed by:\n- `QuotationRequest` because callers need the shared shared backend behavior rule in one\n  place instead of duplicating it.\nWhy:\n- Supports local and remote engine selection with optional model/auth fields.\n\nFlow: normalize inputs, delegate to the owning backend state or service boundary, and\n    return serialized values or existing domain errors to callers.",
-        "properties": {
-          "api_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Key"
-          },
-          "model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model"
-          },
-          "type": {
-            "default": "local",
-            "title": "Type",
-            "type": "string"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url"
-          }
-        },
-        "title": "QuotationEngineConfig",
-        "type": "object"
-      },
-      "ldaca_wordflow__models__quotation__QuotationEngineConfig": {
-        "additionalProperties": false,
-        "description": "API schema used by routes and generated clients for quotation engine config.\n\nUsed by:\n- analysis task helpers, backend API routes, backend request/response models, backend\n  tests, core workspace and worker services because they need a stable JSON contract\n  shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "type": {
-            "$ref": "#/components/schemas/QuotationEngineType",
-            "default": "local"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "format": "uri",
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url"
-          }
-        },
-        "title": "QuotationEngineConfig",
         "type": "object"
       }
     }

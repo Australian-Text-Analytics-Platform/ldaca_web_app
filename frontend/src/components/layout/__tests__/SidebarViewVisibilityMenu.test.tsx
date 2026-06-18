@@ -34,6 +34,7 @@ const authState = {
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   /** Used by: Sidebar tests to provide an empty workspace graph fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceData: () => ({
+    workspaces: [],
     workspaceGraph: { nodes: [] },
     currentWorkspaceId: 'ws-1',
   }),
@@ -50,6 +51,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Used by: Sidebar tests to stub child component workspace actions because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
   useWorkspaceActions: () => ({
     toggleNodeSelection: vi.fn(),
+    setCurrentWorkspace: vi.fn(),
   }),
 }));
 
@@ -75,11 +77,6 @@ vi.mock('@/stores/analysisStore', () => ({
   useAnalysisStore: (
     selector: (state: { tasks: []; setTasks: ReturnType<typeof vi.fn> }) => unknown,
   ) => selector({ tasks: [], setTasks: vi.fn() }),
-}));
-
-vi.mock('@/components/dialogs/DataFolderDialog', () => ({
-  /** Used by: Sidebar layout tests that do not exercise the folder dialog because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-  DataFolderDialog: () => null,
 }));
 
 /** Called by: Sidebar view-visibility tests before querying menu behavior because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
@@ -124,10 +121,19 @@ describe('Sidebar view visibility menu', () => {
       loadingOperations: new Set(),
       operationErrors: new Map(),
       modals: {
-        feedbackModal: false,
-        tutorialModal: false,
+        feedback: false,
+        tutorial: false,
+        warning: false,
+        info: false,
+        reference: false,
       },
-      tutorialTarget: null,
+      modalTargets: {
+        feedback: null,
+        tutorial: null,
+        warning: null,
+        info: null,
+        reference: null,
+      },
       visibleViews: [...DEFAULT_VISIBLE_VIEWS],
       sessionDismissedHints: new Set(),
     }));
@@ -169,7 +175,7 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.getAllByRole('button', { name: 'Data Loader' }).length).toBeGreaterThan(0);
   });
 
-  it('resets dismissed hints from the views editor', async () => {
+  it('opens Settings from the header cog and resets dismissed hints there', async () => {
     const user = userEvent.setup();
 
     useHintsStore.setState({
@@ -183,8 +189,12 @@ describe('Sidebar view visibility menu', () => {
 
     renderSidebar();
 
-    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
-    await user.click(screen.getByRole('menuitem', { name: 'Reset all hints' }));
+    await user.click(screen.getByRole('button', { name: /open settings/i }));
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /quotation/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /hints/i }));
+    await user.click(screen.getByRole('button', { name: /reset all hints/i }));
 
     expect(useHintsStore.getState().dismissedHints).toEqual([]);
     expect(Array.from(useUIStore.getState().sessionDismissedHints)).toEqual([]);
@@ -193,7 +203,16 @@ describe('Sidebar view visibility menu', () => {
     );
   });
 
-  it('hides the working directory card in multi-user mode', () => {
+  it('keeps reset hints out of the views editor', async () => {
+    const user = userEvent.setup();
+
+    renderSidebar();
+
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
+    expect(screen.queryByRole('menuitem', { name: 'Reset all hints' })).not.toBeInTheDocument();
+  });
+
+  it('does not show the old working directory card in multi-user mode', () => {
     authState.isMultiUserMode = true;
 
     renderSidebar();
@@ -202,10 +221,22 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.queryByLabelText('Change working directory')).not.toBeInTheDocument();
   });
 
-  it('shows the working directory card in single-user mode', () => {
+  it('moves the working directory card out of the sidebar in single-user mode', () => {
     renderSidebar();
 
-    expect(screen.getByTestId('sidebar-data-directory')).toBeInTheDocument();
-    expect(screen.getByText('/tmp/workdir')).toBeInTheDocument();
+    expect(screen.queryByTestId('sidebar-data-directory')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Change working directory')).not.toBeInTheDocument();
+  });
+
+  it('removes the quotation engine shortcut from the quotation nav row', async () => {
+    const user = userEvent.setup();
+
+    renderSidebar();
+
+    expect(screen.getByRole('button', { name: 'Quotation' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /configure quotation engine/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Quotation' }));
+    expect(screen.queryByRole('button', { name: /configure quotation engine/i })).not.toBeInTheDocument();
   });
 });

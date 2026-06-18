@@ -13,8 +13,6 @@ const SYNC_DEBOUNCE_MS = 800;
 interface PersistedSnapshot {
   hiddenViews: readonly string[];
   favoriteWorkspaces: readonly string[];
-  quotationEngineKey: string;
-  quotationLastRemoteUrl: string;
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
 }
@@ -30,8 +28,6 @@ const snapshotPersisted = (
 ): PersistedSnapshot => ({
   hiddenViews: state.hiddenViews,
   favoriteWorkspaces: state.favoriteWorkspaces,
-  quotationEngineKey: JSON.stringify(state.quotationEngine),
-  quotationLastRemoteUrl: state.quotationLastRemoteUrl,
   defaultTokenizerModel: state.defaultTokenizerModel,
   ldacaOniApiToken: state.ldacaOniApiToken,
 });
@@ -42,8 +38,6 @@ const snapshotPersisted = (
  * Flow: compare scalar preferences first, then hidden-view and favorite arrays in order, returning true only for identical persisted snapshots.
  */
 const snapshotsEqual = (a: PersistedSnapshot, b: PersistedSnapshot) => {
-  if (a.quotationEngineKey !== b.quotationEngineKey) return false;
-  if (a.quotationLastRemoteUrl !== b.quotationLastRemoteUrl) return false;
   if (a.defaultTokenizerModel !== b.defaultTokenizerModel) return false;
   if (a.ldacaOniApiToken !== b.ldacaOniApiToken) return false;
   if (a.hiddenViews.length !== b.hiddenViews.length) return false;

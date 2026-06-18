@@ -1839,9 +1839,6 @@ export type CurrentWorkspaceResponse = {
  *
  * Shared base for detach-node-option responses across analysis tools.
  *
- * ConcordanceDetachNodeOption, QuotationDetachNodeOption, and
- * TopicModelingDetachNodeOption are kept as backwards-compatible aliases.
- *
  * Used by:
  * - backend request/response models because they need a stable JSON contract shared by
  * route handlers, generated clients, and tests.
@@ -3083,6 +3080,39 @@ export type QuotationEngineConfigInput = {
 };
 
 /**
+ * QuotationEngineConfig
+ *
+ * Configuration schema for quotation extraction engines.
+ *
+ * Used by:
+ * - `QuotationRequest` because callers need the shared shared backend behavior rule in one
+ * place instead of duplicating it.
+ * Why:
+ * - Supports local and remote engine selection with optional model/auth fields.
+ *
+ * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
+ * return serialized values or existing domain errors to callers.
+ */
+export type QuotationEngineConfigOutput = {
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Model
+     */
+    model?: string | null;
+    /**
+     * Type
+     */
+    type?: string;
+    /**
+     * Url
+     */
+    url?: string | null;
+};
+
+/**
  * QuotationEngineType
  *
  * Enum used by API schema contracts to constrain quotation engine type values.
@@ -3193,46 +3223,6 @@ export type QuotationPreferenceUpdateResponse = {
 };
 
 /**
- * QuotationPreferences
- *
- * Preference schema persisted by preference routes for quotation preferences.
- *
- * Used by:
- * - backend request/response models, backend tests because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationPreferencesInput = {
-    engine?: QuotationEngineConfigInput;
-    /**
-     * Last Remote Url
-     */
-    last_remote_url?: string;
-};
-
-/**
- * QuotationPreferences
- *
- * Preference schema persisted by preference routes for quotation preferences.
- *
- * Used by:
- * - backend request/response models, backend tests because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationPreferencesOutput = {
-    engine?: LdacaWordflowModelsQuotationQuotationEngineConfig;
-    /**
-     * Last Remote Url
-     */
-    last_remote_url?: string;
-};
-
-/**
  * QuotationRequest
  *
  * Request schema used by API routes and generated clients for quotation request.
@@ -3296,7 +3286,7 @@ export type QuotationRequestOutput = {
      * Descending
      */
     descending?: boolean | null;
-    engine?: LdacaWordflowAnalysisImplementationsQuotationQuotationEngineConfig | null;
+    engine?: QuotationEngineConfigOutput | null;
     /**
      * Materialized Path
      */
@@ -5010,7 +5000,6 @@ export type UserPreferences = {
      * Ldaca Oni Api Token
      */
     ldaca_oni_api_token?: string | null;
-    quotation?: QuotationPreferencesOutput;
 };
 
 /**
@@ -5043,7 +5032,6 @@ export type UserPreferencesUpdate = {
      * Ldaca Oni Api Token
      */
     ldaca_oni_api_token?: string | null;
-    quotation?: QuotationPreferencesInput | null;
 };
 
 /**
@@ -5518,60 +5506,6 @@ export type WorkspaceUploadResponse = {
      */
     state: 'successful';
     workspace: WorkspaceSummary;
-};
-
-/**
- * QuotationEngineConfig
- *
- * Configuration schema for quotation extraction engines.
- *
- * Used by:
- * - `QuotationRequest` because callers need the shared shared backend behavior rule in one
- * place instead of duplicating it.
- * Why:
- * - Supports local and remote engine selection with optional model/auth fields.
- *
- * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
- * return serialized values or existing domain errors to callers.
- */
-export type LdacaWordflowAnalysisImplementationsQuotationQuotationEngineConfig = {
-    /**
-     * Api Key
-     */
-    api_key?: string | null;
-    /**
-     * Model
-     */
-    model?: string | null;
-    /**
-     * Type
-     */
-    type?: string;
-    /**
-     * Url
-     */
-    url?: string | null;
-};
-
-/**
- * QuotationEngineConfig
- *
- * API schema used by routes and generated clients for quotation engine config.
- *
- * Used by:
- * - analysis task helpers, backend API routes, backend request/response models, backend
- * tests, core workspace and worker services because they need a stable JSON contract
- * shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type LdacaWordflowModelsQuotationQuotationEngineConfig = {
-    type?: QuotationEngineType;
-    /**
-     * Url
-     */
-    url?: string | null;
 };
 
 export type RootData = {

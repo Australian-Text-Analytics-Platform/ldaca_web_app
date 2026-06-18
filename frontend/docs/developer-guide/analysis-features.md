@@ -113,9 +113,10 @@ result paging. It can receive a pending handoff from token frequency.
 
 ## Quotation
 
-Quotation runs local or remote quote extraction depending on the user's
-preference. The tab manages engine configuration, grouped quote rows, metadata
-columns, result materialization, and detach.
+Quotation runs built-in or remote quote extraction depending on the user's
+preference. The parameter panel owns the engine radio controls and conditional
+remote endpoint input; the tab also manages grouped quote rows, metadata columns,
+result materialization, and detach.
 
 ## Topic Modeling
 

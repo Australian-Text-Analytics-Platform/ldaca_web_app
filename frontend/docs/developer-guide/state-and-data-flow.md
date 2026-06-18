@@ -69,10 +69,12 @@ auth probes during startup.
 
 ## Preferences
 
-`preferencesStore` holds local preferences such as hidden views, favorites,
-quotation engine, and default language/tokenizer.
+`preferencesStore` holds backend-synced preferences such as hidden views,
+favorites, LDaCA token, and default tokenizer model.
 `usePreferences` initializes the store from `/api/preferences` and debounces
-backend sync. View visibility is mirrored into `uiStore`.
+backend sync. `SettingsDialog` is the unified preference surface: it edits
+backend preferences, working-directory config, and browser-local settings such
+as hint enablement/dismissals. View visibility is mirrored into `uiStore`.
 
 ## Task Stream
 

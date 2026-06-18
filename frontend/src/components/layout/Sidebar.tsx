@@ -9,7 +9,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuAction,
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
@@ -18,8 +17,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -28,11 +25,9 @@ import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorks
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
-import { useHintsStore } from '@/stores/hintsStore';
 import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { toast } from 'sonner';
-import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
+import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
@@ -55,7 +50,6 @@ import {
   Upload,
   ChevronDown,
   Pencil,
-  RotateCcw,
 } from 'lucide-react';
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
@@ -110,7 +104,6 @@ function Sidebar() {
     setCurrentView,
     setViewVisibility,
     openModal,
-    resetSessionDismissedHints,
   } = useUIStore(
     useShallow(
       ({
@@ -119,20 +112,17 @@ function Sidebar() {
         setCurrentView,
         setViewVisibility,
         openModal,
-        resetSessionDismissedHints,
       }) => ({
         currentView,
         visibleViews,
         setCurrentView,
         setViewVisibility,
         openModal,
-        resetSessionDismissedHints,
       }),
     ),
   );
-  const resetHints = useHintsStore((state) => state.resetHints);
   const { currentWorkspaceId } = useWorkspaceData();
-  const { user, logout, dataFolder, isMultiUserMode } = useAuth();
+  const { user, logout, isMultiUserMode } = useAuth();
   const queryClient = useQueryClient();
   /** Called by: the Sidebar footer/header Logout button onClick prop because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
   const handleLogout = async () => {
@@ -147,26 +137,7 @@ function Sidebar() {
     error: taskStreamError,
     reconnect: reconnectTaskStream,
   } = useWorkspaceTaskInbox(currentWorkspaceId ?? null);
-
-  /** Called by: the quotation view SidebarMenuAction settings button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
-  const openQuotationEngineDialog = () => {
-    setCurrentView('quotation');
-    openModal('quotationEngine');
-  };
-
-  /** Called by: the Sidebar view menu Reset all hints item because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-  const handleResetHints = () => {
-    resetHints();
-    resetSessionDismissedHints();
-    toast('All hints have been reset. Dismissed hints can appear again.');
-  };
-
-  const [isDataFolderDialogOpen, setIsDataFolderDialogOpen] = React.useState(false);
-
-  /** Called by: the Sidebar footer Change working directory button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
-  const handleEditDataFolder = () => {
-    setIsDataFolderDialogOpen(true);
-  };
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = React.useState(false);
 
   const isConnected = taskStreamStatus === 'open';
   const isConnecting = taskStreamStatus === 'connecting';
@@ -202,12 +173,11 @@ function Sidebar() {
 
   /**
    * Called by: Sidebar's Views section body renderer because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
-   * Flow: map visible views to sidebar buttons, disable workspace-only views until a workspace loads, and attach the quotation settings action.
+   * Flow: map visible views to sidebar buttons and disable workspace-only views until a workspace loads.
    */
   const renderViewsBody = () => (
     <SidebarMenu>
       {visibleNavItems.map(({ id, label, icon: Icon }) => {
-        const isQuotation = id === 'quotation';
         const isDisabled = !isWorkspaceLoaded && id !== 'data-loader';
         return (
           <SidebarMenuItem key={id}>
@@ -225,27 +195,6 @@ function Sidebar() {
               <Icon />
               <span>{label}</span>
             </SidebarMenuButton>
-            {isQuotation ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <SidebarMenuAction
-                    aria-label="Configure quotation engine"
-                    showOnHover
-                    disabled={isDisabled}
-                    aria-disabled={isDisabled}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (isDisabled) return;
-                      openQuotationEngineDialog();
-                    }}
-                  >
-                    <Cog className="h-4 w-4" />
-                  </SidebarMenuAction>
-                </TooltipTrigger>
-                <TooltipContent side="right">Settings</TooltipContent>
-              </Tooltip>
-            ) : null}
           </SidebarMenuItem>
         );
       })}
@@ -271,6 +220,21 @@ function Sidebar() {
               label="Cite LDaCA Wordflow"
               className="h-5 w-5 text-emerald-600"
             />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground"
+                  aria-label="Open settings"
+                  onClick={() => { setIsSettingsDialogOpen(true); }}
+                >
+                  <Cog className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Settings</TooltipContent>
+            </Tooltip>
           </div>
           {isMultiUserMode && (
             <div className="flex items-center justify-between w-full">
@@ -388,14 +352,6 @@ function Sidebar() {
                                 );
                               },
                             )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onSelect={handleResetHints}
-                              className="text-xs text-muted-foreground focus:text-foreground"
-                            >
-                              <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                              Reset all hints
-                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -435,43 +391,6 @@ function Sidebar() {
       </SidebarContent>
 
       <SidebarFooter className="space-y-2 px-3 py-2">
-        {!isMultiUserMode && (
-          <div
-            className="rounded-md border border-border/60 bg-muted/30 px-3 py-2"
-            data-testid="sidebar-data-directory"
-          >
-            <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
-                  Working directory
-                  <HelpIcon
-                    targetKey="ui.working-directory"
-                    label="Working Directory"
-                    className="h-4 w-4 text-muted-foreground"
-                  />
-                </p>
-                <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
-                  {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- treat an empty path as unconfigured, not only null/undefined */}
-                  {dataFolder || 'Not configured'}
-                </p>
-              </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground"
-                    aria-label="Change working directory"
-                    onClick={handleEditDataFolder}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Change working directory</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        )}
         <div className="flex items-center gap-2">
           <div className="flex flex-1 gap-2">
             <Button
@@ -494,10 +413,8 @@ function Sidebar() {
         </div>
       </SidebarFooter>
 
+      <SettingsDialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen} />
       <SidebarRail />
-      {!isMultiUserMode && (
-        <DataFolderDialog open={isDataFolderDialogOpen} onOpenChange={setIsDataFolderDialogOpen} />
-      )}
     </SidebarRoot>
   );
 }

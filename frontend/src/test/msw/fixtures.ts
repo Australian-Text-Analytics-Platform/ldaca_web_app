@@ -15,10 +15,6 @@ export const configResponse = (overrides: Partial<ConfigResponse> = {}): ConfigR
 export const preferencesResponse = (overrides: Partial<UserPreferences> = {}): UserPreferences => ({
   hidden_views: [],
   favorite_workspaces: [],
-  quotation: {
-    engine: { type: 'local' },
-    last_remote_url: '',
-  },
   default_tokenizer_model: null,
   ldaca_oni_api_token: null,
   ...overrides,

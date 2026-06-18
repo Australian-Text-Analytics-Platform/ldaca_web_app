@@ -20,21 +20,16 @@ import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { getPreferences, updatePreferences } from '@/api/generated/sdk.gen';
 import type {
-  LdacaWordflowModelsQuotationQuotationEngineConfig,
-  QuotationPreferencesOutput,
   UserPreferences,
   UserPreferencesUpdate,
 } from '@/api/generated/types.gen';
 import type { ViewType } from '@/stores/uiStore';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = ['ai-annotator'];
-type QuotationEngineConfig = LdacaWordflowModelsQuotationQuotationEngineConfig;
 
 interface PreferencesState {
   hiddenViews: string[];
   favoriteWorkspaces: string[];
-  quotationEngine: QuotationEngineConfig;
-  quotationLastRemoteUrl: string;
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
   /** True once the first backend fetch completes */
@@ -49,13 +44,6 @@ interface PreferencesActions {
   setViewHidden: (view: ViewType, hidden: boolean) => void;
   toggleFavorite: (workspaceId: string) => void;
   isFavorite: (workspaceId: string) => boolean;
-  setQuotationEngine: (config: QuotationEngineConfig) => void;
-  /**
-   * Trim and write the remote URL. If the engine is currently in remote mode,
-   * the engine config's `url` field is updated alongside `lastRemoteUrl` so a
-   * single call keeps the two in sync.
-   */
-  updateQuotationRemoteUrl: (url: string) => void;
   setDefaultTokenizerModel: (model: string | null) => void;
   setLdacaOniApiToken: (token: string | null) => void;
   /** Fetch preferences from backend and hydrate the store */
@@ -66,25 +54,15 @@ interface PreferencesActions {
 
 type PreferencesStore = PreferencesState & PreferencesActions;
 
-type ResolvedQuotationPreferences = Omit<
-  QuotationPreferencesOutput,
-  'engine' | 'last_remote_url'
-> & {
-  engine: QuotationEngineConfig;
-  last_remote_url: string;
-};
-
 type ResolvedUserPreferences = Omit<
   UserPreferences,
   | 'default_tokenizer_model'
   | 'favorite_workspaces'
   | 'hidden_views'
   | 'ldaca_oni_api_token'
-  | 'quotation'
 > & {
   hidden_views: string[];
   favorite_workspaces: string[];
-  quotation: ResolvedQuotationPreferences;
   default_tokenizer_model: string | null;
   ldaca_oni_api_token: string | null;
 };
@@ -106,10 +84,6 @@ const getAuthorizationHeaders = (
 const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences => ({
   hidden_views: data.hidden_views ?? [],
   favorite_workspaces: data.favorite_workspaces ?? [],
-  quotation: {
-    engine: (data.quotation?.engine ?? { type: 'local' }),
-    last_remote_url: data.quotation?.last_remote_url ?? '',
-  },
   default_tokenizer_model: data.default_tokenizer_model ?? null,
   ldaca_oni_api_token: data.ldaca_oni_api_token ?? null,
 });
@@ -122,8 +96,6 @@ const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences =>
 function applyServerState(state: PreferencesState, data: ResolvedUserPreferences) {
   state.hiddenViews = data.hidden_views;
   state.favoriteWorkspaces = data.favorite_workspaces;
-  state.quotationEngine = data.quotation.engine;
-  state.quotationLastRemoteUrl = data.quotation.last_remote_url;
   state.defaultTokenizerModel = data.default_tokenizer_model;
   state.ldacaOniApiToken = data.ldaca_oni_api_token;
   state.hydrated = true;
@@ -135,8 +107,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
       immer((set, get) => ({
         hiddenViews: [...DEFAULT_HIDDEN_VIEWS],
         favoriteWorkspaces: [],
-        quotationEngine: { type: 'local' },
-        quotationLastRemoteUrl: '',
         defaultTokenizerModel: null,
         ldacaOniApiToken: null,
         hydrated: false,
@@ -173,29 +143,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
         /** Checks favorite status for sidebar/workspace picker rendering. */
         /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         isFavorite: (workspaceId) => get().favoriteWorkspaces.includes(workspaceId),
-
-        /** Stores the active quotation extraction engine configuration from the settings dialog. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-        setQuotationEngine: (config) => {
-          set((state) => {
-            state.quotationEngine = config;
-            if (config.type === 'remote' && config.url) {
-              state.quotationLastRemoteUrl = config.url;
-            }
-          });
-        },
-
-        /** Updates the remembered remote quotation URL and active remote engine together. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-        updateQuotationRemoteUrl: (url) => {
-          const trimmed = url.trim();
-          set((state) => {
-            state.quotationLastRemoteUrl = trimmed;
-            if (state.quotationEngine.type === 'remote') {
-              state.quotationEngine = { type: 'remote', url: trimmed };
-            }
-          });
-        },
 
         /**
          * Stores the preferred tokenizer model used by tokenization-aware tools.
@@ -252,10 +199,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
           const body: UserPreferencesUpdate = {
             hidden_views: state.hiddenViews,
             favorite_workspaces: state.favoriteWorkspaces,
-            quotation: {
-              engine: state.quotationEngine,
-              last_remote_url: state.quotationLastRemoteUrl,
-            },
             ...(state.defaultTokenizerModel !== null
               ? { default_tokenizer_model: state.defaultTokenizerModel }
               : {}),
@@ -285,8 +228,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
         partialize: (state) => ({
           hiddenViews: state.hiddenViews,
           favoriteWorkspaces: state.favoriteWorkspaces,
-          quotationEngine: state.quotationEngine,
-          quotationLastRemoteUrl: state.quotationLastRemoteUrl,
           defaultTokenizerModel: state.defaultTokenizerModel,
           ldacaOniApiToken: state.ldacaOniApiToken,
         }),

@@ -8,7 +8,6 @@ import type {
   QuotationAnalysisResponse,
   AnalysisTabInput,
   QuotationEngineConfigInput,
-  QuotationEngineType,
   QuotationMetadata,
 } from '@/api/generated/types.gen';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
@@ -20,26 +19,9 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import { usePreferencesStore } from '@/stores/preferencesStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import HelpIcon from '@/components/help/HelpIcon';
 import {
   AlertDialog,
@@ -74,6 +56,7 @@ import {
 } from './quotationTextClip';
 import { normalizeRemoteUrl } from './quotationRemoteUrl';
 import { QuotationDetachDialog } from './components/QuotationDetachDialog';
+import { QuotationEngineSettingsFields } from './components/QuotationEngineSettingsFields';
 import { type QuotationHoverState } from './components/QuotationHighlightedCell';
 import { QuotationNodeBlock } from './components/QuotationNodeBlock';
 import type { DetachDialogNodeOption } from '../common/components/DetachColumnsDialog';
@@ -245,17 +228,9 @@ function QuotationFeature({
     getAuthHeaders,
   });
 
-  const engineConfig = usePreferencesStore((state) => state.quotationEngine);
-  const lastRemoteUrl = usePreferencesStore((state) => state.quotationLastRemoteUrl);
-  const setEngineConfigStore = usePreferencesStore((state) => state.setQuotationEngine);
-  const updateRemoteUrl = usePreferencesStore((state) => state.updateQuotationRemoteUrl);
+  const [engineConfig, setEngineConfig] = useState<QuotationEngineConfig>({ type: 'local' });
+  const [lastRemoteUrl, setLastRemoteUrl] = useState('');
   const [engineError, setEngineError] = useState<string | null>(null);
-  const engineDialogOpen = useUIStore((state) => state.modals.quotationEngine);
-  const setEngineDialogOpen = useUIStore((state) => state.setModalOpen);
-  const openModal = useUIStore((state) => state.openModal);
-  const closeModal = useUIStore((state) => state.closeModal);
-  const openEngineDialog = () => { openModal('quotationEngine'); };
-  const closeEngineDialog = () => { closeModal('quotationEngine'); };
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   // Metadata visibility derives from the selected columns: any selection
   // shows the corresponding metadata columns in the results table.
@@ -284,6 +259,22 @@ function QuotationFeature({
     return map;
   })();
 
+  /** Called by: quotation task parameter controls and task hydration because engine choice belongs to this analysis run, not global user preferences. */
+  const setTaskEngineConfig = (config: QuotationEngineConfig) => {
+    setEngineConfig(config);
+    if (config.type === 'remote' && config.url) {
+      setLastRemoteUrl(config.url);
+    }
+  };
+
+  /** Called by: remote endpoint input and request normalization because the per-task engine form needs to preserve the endpoint while the Remote radio is selected. */
+  const updateRemoteUrl = (url: string) => {
+    setLastRemoteUrl(url);
+    setEngineConfig((current) => (
+      current.type === 'remote' ? { type: 'remote', url } : current
+    ));
+  };
+
   const resolvedEnginePayload = (() => {
     if (engineConfig.type === 'remote') {
       const rawUrl = (engineConfig.url ?? '').trim();
@@ -300,27 +291,6 @@ function QuotationFeature({
   })();
 
   const engineReady = resolvedEnginePayload.type === 'local' ? true : resolvedEnginePayload.isValid;
-
-  const engineBadgeLabel =
-    resolvedEnginePayload.type === 'remote'
-      ? resolvedEnginePayload.isValid
-        ? 'Remote Engine'
-        : 'Remote Engine • Not configured'
-      : 'Local Engine';
-
-  const engineBadgeTitle =
-    resolvedEnginePayload.type === 'remote'
-      ? resolvedEnginePayload.isValid && resolvedEnginePayload.normalizedUrl.length
-        ? `Remote Engine • ${resolvedEnginePayload.normalizedUrl}`
-        : 'Remote Engine • Not configured'
-      : 'Local Engine';
-
-  const engineDisplayUrl =
-    resolvedEnginePayload.type === 'remote'
-      ? resolvedEnginePayload.isValid && resolvedEnginePayload.normalizedUrl.length
-        ? resolvedEnginePayload.normalizedUrl
-        : resolvedEnginePayload.rawUrl
-      : '';
 
   // Opens the shared error dialog with a fallback message for unexpected quotation failures.
   /**
@@ -423,10 +393,10 @@ function QuotationFeature({
           const { normalized, valid } = normalizeRemoteUrl(trimmed);
           const appliedUrl = valid ? normalized : trimmed;
           updateRemoteUrl(appliedUrl);
-          setEngineConfigStore({ type: 'remote', url: appliedUrl });
+          setTaskEngineConfig({ type: 'remote', url: appliedUrl });
         }
       } else if (reqEngine?.type === 'local') {
-        setEngineConfigStore({ type: 'local' });
+        setTaskEngineConfig({ type: 'local' });
       }
       if (!tabInputs || tabInputs.length === 0) {
         applyInputsFromSelections([{ nodeId, column }]);
@@ -661,7 +631,6 @@ function QuotationFeature({
   };
 
   const {
-    buildEngineRequest,
     persistContextLengthPreference,
     handleSearchAll,
     handlePageChange,
@@ -706,7 +675,6 @@ function QuotationFeature({
       quotationSearch,
       detachQuotation,
       materializeQuotation,
-      openEngineDialog,
     },
   });
 
@@ -765,18 +733,6 @@ function QuotationFeature({
     setMaterializeTaskIds,
     onTerminalSuccess: handleQuotationMaterializeSuccess,
   });
-
-  // Saves a validated engine configuration from the dialog before closing it.
-  /**
-   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleEngineDialogSave = () => {
-    const payload = buildEngineRequest();
-    if (!payload) {
-      return;
-    }
-    closeEngineDialog();
-  };
 
   // Loads available detach-column options before showing the quotation detach dialog.
   /**
@@ -906,90 +862,6 @@ function QuotationFeature({
 
   return (
     <>
-      <Dialog
-        open={engineDialogOpen}
-        onOpenChange={(open) => { setEngineDialogOpen('quotationEngine', open); }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Quotation Engine</DialogTitle>
-            <DialogDescription>
-              Select which engine to use when extracting quotations.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="quotation-engine-type" className="text-sm font-medium">
-                Engine Source
-              </label>
-              <Select
-                value={engineConfig.type}
-                onValueChange={(value) => {
-                  const next = value as QuotationEngineType;
-                  if (next === 'remote') {
-                    // empty URLs should fall through to the next source
-                    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-                    const url = lastRemoteUrl || engineConfig.url || '';
-                    setEngineConfigStore({ type: 'remote', url });
-                  } else {
-                    setEngineConfigStore({ type: 'local' });
-                  }
-                }}
-              >
-                <SelectTrigger id="quotation-engine-type">
-                  <SelectValue placeholder="Choose engine" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="local">Local (built-in)</SelectItem>
-                  <SelectItem value="remote">Remote service</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {engineConfig.type === 'remote' ? (
-              <div className="space-y-2">
-                <label htmlFor="quotation-engine-url" className="text-sm font-medium">
-                  Service URL
-                </label>
-                <Input
-                  id="quotation-engine-url"
-                  value={engineConfig.url ?? ''}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    updateRemoteUrl(value);
-                    if (engineConfig.type !== 'remote') {
-                      setEngineConfigStore({ type: 'remote', url: value });
-                    }
-                  }}
-                  placeholder="https://example.com/api/v1/quotation"
-                  autoComplete="off"
-                />
-                {engineError ? (
-                  <p className="text-sm text-destructive">{engineError}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Include protocol and point to the remote quotation extractor base URL.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                The local extractor runs inside this workspace; no extra configuration required.
-              </p>
-            )}
-          </div>
-          <DialogFooter className="sm:justify-end">
-            <Button variant="outline" onClick={closeEngineDialog}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleEngineDialogSave}
-              disabled={engineConfig.type === 'remote' && !(engineConfig.url ?? '').trim().length}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       <div className="space-y-4">
         <AnalysisCardLayout
           title="Quotation Extraction"
@@ -1003,25 +875,6 @@ function QuotationFeature({
             label: 'Quotation parameters',
             tooltip: 'Select a data block, choose a text column, and configure quotation settings.',
           }}
-          headerActions={
-            <div className="flex flex-col items-start gap-1 md:items-end md:text-right">
-              <Badge
-                variant="outline"
-                className="max-w-full break-all text-xs"
-                title={engineBadgeTitle}
-              >
-                {engineBadgeLabel}
-              </Badge>
-              {engineDisplayUrl.length ? (
-                <span
-                  className="text-xs text-muted-foreground break-all max-w-xs md:max-w-sm"
-                  title={engineDisplayUrl}
-                >
-                  {engineDisplayUrl}
-                </span>
-              ) : null}
-            </div>
-          }
           actions={{
             // Routes the Run button through live quotation execution.
             // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -1073,7 +926,14 @@ function QuotationFeature({
             onRemoveNode={nodeInputs.removeNode}
             onClear={nodeInputs.clear}
             onColumnChange={handleColumnChange}
-            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
+          />
+          <QuotationEngineSettingsFields
+            idPrefix="quotation-parameter-engine"
+            engineConfig={engineConfig}
+            lastRemoteUrl={lastRemoteUrl}
+            error={engineError}
+            onEngineConfigChange={setTaskEngineConfig}
+            onRemoteUrlChange={updateRemoteUrl}
           />
         </AnalysisCardLayout>
         {quotationWaitingBanner && (

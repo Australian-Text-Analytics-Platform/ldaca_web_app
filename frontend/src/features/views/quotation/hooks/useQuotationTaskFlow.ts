@@ -98,7 +98,6 @@ interface QuotationLock {
     nodeId: string,
     request: QuotationMaterializeRequest,
   ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
-  openEngineDialog: () => void;
 }
 
 interface Params {
@@ -145,7 +144,6 @@ export function useQuotationTaskFlow({
     quotationSearch,
     detachQuotation,
     materializeQuotation,
-    openEngineDialog,
   },
 }: Params) {
   // Builds deterministic output names for detach operations from display labels.
@@ -266,7 +264,6 @@ export function useQuotationTaskFlow({
 
     const enginePayload = buildEngineRequest();
     if (!enginePayload) {
-      openEngineDialog();
       return null;
     }
 
@@ -463,7 +460,6 @@ export function useQuotationTaskFlow({
     try {
       const enginePayload = buildEngineRequest();
       if (!enginePayload) {
-        openEngineDialog();
         return;
       }
       await detachQuotation(nodeId, {
@@ -506,7 +502,6 @@ export function useQuotationTaskFlow({
     try {
       const enginePayload = buildEngineRequest();
       if (!enginePayload) {
-        openEngineDialog();
         setNodeMaterializing?.((prev) => {
           if (!prev[nodeId]) return prev;
           const { [nodeId]: _removed, ...next } = prev;

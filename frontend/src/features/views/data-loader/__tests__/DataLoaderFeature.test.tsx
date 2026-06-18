@@ -11,6 +11,7 @@ const {
   mockSetCurrentWorkspace,
   mockUpdateWorkspaceDescription,
   mockHandleUploadFile,
+  mockHandleDeleteFile,
   mockRawFile,
   mockCreateFolder,
   mockMoveFile,
@@ -19,6 +20,7 @@ const {
   mockSetCurrentWorkspace: vi.fn(),
   mockUpdateWorkspaceDescription: vi.fn(),
   mockHandleUploadFile: vi.fn(),
+  mockHandleDeleteFile: vi.fn(),
   mockRawFile: vi.fn(),
   mockCreateFolder: vi.fn(),
   mockMoveFile: vi.fn(),
@@ -171,7 +173,7 @@ vi.mock('@/features/views/data-loader/hooks/useFiles', () => ({
     loading: false,
     uploading: false,
     handleUploadFile: mockHandleUploadFile,
-    handleDeleteFile: vi.fn(),
+    handleDeleteFile: mockHandleDeleteFile,
     handleDownloadFile: vi.fn(),
     refetchFiles: vi.fn(),
   }),
@@ -321,6 +323,16 @@ describe('DataLoaderFeature citation UI', () => {
         throwOnError: true,
       });
     });
+  });
+
+  it('deletes a folder when clicking its trash button', () => {
+    renderWithProviders(<DataLoaderFeature />);
+
+    fireEvent.click(
+      getVisibleMatch(screen.getAllByRole('button', { name: /delete folder ado/i })),
+    );
+
+    expect(mockHandleDeleteFile).toHaveBeenCalledWith('sample_data/ADO');
   });
 
   it('moves a dragged file when dropped on a folder row', async () => {

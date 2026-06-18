@@ -48,8 +48,7 @@ export type ModalKind =
   | 'tutorial'
   | 'warning'
   | 'info'
-  | 'reference'
-  | 'quotationEngine';
+  | 'reference';
 
 export interface ModalTarget {
   file: string;
@@ -124,7 +123,6 @@ export const useUIStore = create<UIStore>()(
           warning: false,
           info: false,
           reference: false,
-          quotationEngine: false,
         },
         modalTargets: {
           feedback: null,
@@ -132,7 +130,6 @@ export const useUIStore = create<UIStore>()(
           warning: null,
           info: null,
           reference: null,
-          quotationEngine: null,
         },
         lastUploadedFilePath: null,
         sessionDismissedHints: new Set<string>(),

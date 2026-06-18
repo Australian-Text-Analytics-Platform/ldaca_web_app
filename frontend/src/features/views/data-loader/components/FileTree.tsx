@@ -273,7 +273,7 @@ export function FileTree({
    * from the main list while exposing their citation button on the folder row.
    * Rendered by: FileTree JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
    * Flow: split directory and file branches, render visible children recursively, and keep
-   * folder/citation affordances beside the relevant tree row.
+   * folder/citation/delete affordances beside the relevant tree row.
    */
   const renderNode = (node: FileTreeNode): React.ReactNode => {
     if (node.type === 'file') {
@@ -331,6 +331,17 @@ export function FileTree({
             onClick={() => { onCreateFolderInside(node.path, node.name); }}
           >
             <FolderPlus className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            aria-label={`Delete folder ${node.name}`}
+            title={`Delete folder ${node.name}`}
+            onClick={() => { onDeleteFile(node.path); }}
+            disabled={loadingFiles}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
           <Badge variant="secondary" className="text-[10px]">
             {fileCount}

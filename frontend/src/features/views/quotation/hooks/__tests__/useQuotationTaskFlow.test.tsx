@@ -76,7 +76,6 @@ describe('useQuotationTaskFlow', () => {
             metadata: { task_id: 'quotation-detach-task' },
           })),
           materializeQuotation: vi.fn(() => Promise.resolve(undefined)),
-          openEngineDialog: vi.fn(),
         },
       }),
     );
@@ -151,7 +150,6 @@ describe('useQuotationTaskFlow', () => {
             metadata: { task_id: 'quotation-detach-task' },
           })),
           materializeQuotation: vi.fn(() => Promise.resolve(undefined)),
-          openEngineDialog: vi.fn(),
         },
       }),
     );

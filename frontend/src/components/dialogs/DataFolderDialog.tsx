@@ -25,6 +25,11 @@ interface DataFolderDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface DataFolderSettingsPanelProps {
+  onSaved?: () => void;
+  onCancel?: () => void;
+}
+
 /**
  * Working-directory modal shell used by the sidebar in single-user desktop/web
  * mode. It mounts the content only while open so auth/query state is refreshed
@@ -47,6 +52,30 @@ export function DataFolderDialog({ open, onOpenChange }: DataFolderDialogProps) 
  * Flow: seed the path from auth state, handle desktop folder picking, submit config changes, refresh auth/cache, and close on success.
  */
 function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, 'onOpenChange'>) {
+  return (
+    <DialogContent className="sm:max-w-106.25">
+      <DialogHeader>
+        <DialogTitle>Set Working Directory</DialogTitle>
+        <DialogDescription>
+          Choose the folder where your data is stored. This setting applies globally.
+        </DialogDescription>
+      </DialogHeader>
+      <DataFolderSettingsPanel
+        onSaved={() => { onOpenChange(false); }}
+        onCancel={() => { onOpenChange(false); }}
+      />
+    </DialogContent>
+  );
+}
+
+/**
+ * Reusable working-directory settings form shared by the standalone dialog and
+ * the unified Settings dialog. It keeps the existing backend config update,
+ * auth refresh, workspace unload, and query refetch behavior in one place.
+ * Used by: DataFolderDialog and SettingsDialog because both surfaces need the same single-user data-root update flow.
+ * Flow: seed the path from auth state, handle desktop folder picking, submit config changes, refresh auth/cache, and notify the owning shell on success.
+ */
+export function DataFolderSettingsPanel({ onSaved, onCancel }: DataFolderSettingsPanelProps) {
   const queryClient = useQueryClient();
   const { dataFolder, refreshAuth } = useAuth();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -108,7 +137,7 @@ function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, '
           queryKey: queryKeys.files,
         }),
       ]);
-      onOpenChange(false);
+      onSaved?.();
     } catch (error: unknown) {
       console.error('Failed to update config:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update working directory');
@@ -118,52 +147,46 @@ function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, '
   };
 
   return (
-    <DialogContent className="sm:max-w-106.25">
-      <DialogHeader>
-        <DialogTitle>Set Working Directory</DialogTitle>
-        <DialogDescription>
-          Choose the folder where your data is stored. This setting applies globally.
-        </DialogDescription>
-      </DialogHeader>
-      <form onSubmit={(e) => {
-        void handleSubmit(e);
-      }}>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="path" className="text-right">
-              Path
-            </Label>
-            <div className="col-span-3 flex gap-2">
-              <Input
-                id="path"
-                value={path}
-                onChange={(e) => { setPath(e.target.value); }}
-                className="flex-1"
-                placeholder="/path/to/data"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  void handleBrowse();
-                }}
-                title="Browse..."
-              >
-                <FolderOpen className="h-4 w-4" />
-              </Button>
-            </div>
+    <form onSubmit={(e) => {
+      void handleSubmit(e);
+    }}>
+      <div className="grid gap-4 py-4">
+        <div className="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+          <Label htmlFor="path" className="sm:text-right">
+            Path
+          </Label>
+          <div className="flex gap-2 sm:col-span-3">
+            <Input
+              id="path"
+              value={path}
+              onChange={(e) => { setPath(e.target.value); }}
+              className="flex-1"
+              placeholder="/path/to/data"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                void handleBrowse();
+              }}
+              title="Browse..."
+            >
+              <FolderOpen className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => { onOpenChange(false); }}>
+      </div>
+      <DialogFooter>
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading || !path.trim()}>
-            {isLoading ? 'Saving...' : 'Save changes'}
-          </Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
+        ) : null}
+        <Button type="submit" disabled={isLoading || !path.trim()}>
+          {isLoading ? 'Saving...' : 'Save changes'}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
