@@ -45,10 +45,6 @@ export function WorkspaceListView({ onShowSchema }: WorkspaceListViewProps) {
 
   const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
   const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
-  const rawEdges = (workspaceGraph as { edges?: unknown } | undefined)?.edges;
-  const edges = Array.isArray(rawEdges)
-    ? (rawEdges as { source: string; target: string }[])
-    : [];
 
   /** Queues this node as an input for the active analysis view (matches the
    * graph node "+" affordance) and clears its fresh highlight. */
@@ -61,7 +57,6 @@ export function WorkspaceListView({ onShowSchema }: WorkspaceListViewProps) {
     <div className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2">
       <WorkspaceNodeList
         nodes={nodes}
-        edges={edges}
         selectedNodeIds={selectedNodeIds}
         onToggleNodeSelection={toggleNodeSelection}
         onClearSelection={clearSelection}

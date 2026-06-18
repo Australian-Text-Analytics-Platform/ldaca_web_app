@@ -7,7 +7,6 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { getApiBase } from '@/lib/backend/env';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -263,18 +262,6 @@ function ExportFeature() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="border-border/50 bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
-            <div className="text-muted-foreground text-sm">
-              Workspace:{' '}
-              <span className="text-foreground font-medium">{currentWorkspace?.name ?? '—'}</span>
-            </div>
-            <Badge variant={selectedNodes.length ? 'default' : 'outline'}>
-              {selectedNodes.length
-                ? `${String(selectedNodes.length)} data block${selectedNodes.length > 1 ? 's' : ''} selected`
-                : 'No data blocks selected'}
-            </Badge>
-          </div>
-
           <div className="space-y-3">
             <Label className="text-sm font-medium">Selected Data Blocks</Label>
             <div className="border-border/60 bg-background max-h-104 space-y-2 overflow-y-auto rounded-lg border p-2 shadow-sm">

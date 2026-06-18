@@ -7,7 +7,7 @@ import {
   useStore,
   type Node as ReactFlowNode,
 } from '@xyflow/react';
-import { Settings2, Copy, Check, Plus, Trash2 } from 'lucide-react';
+import { Settings2, Copy, Check, Plus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -333,10 +333,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   const menuButtonClassName =
     'relative flex h-8 w-8 items-center justify-center rounded-md border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
-  const dangerButtonClassName = cn(
-    menuButtonClassName,
-    'text-red-600 hover:bg-red-50 hover:text-red-700',
-  );
 
   /** Stops React Flow from treating side-control pointer events as node clicks/drags. */
   const stopGraphControlEvent = (e: React.SyntheticEvent) => {
@@ -373,7 +369,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       }
       position={Position.Bottom}
       align="center"
-      offset={8}
+      offset={0}
       className="nodrag nopan flex items-center gap-1 rounded-lg border border-border bg-white/95 p-1 shadow-lg"
       onMouseEnter={() => {
         cancelToolbarHide();
@@ -453,17 +449,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       >
         <Plus className="h-4 w-4" />
       </button>
-      <button
-        type="button"
-        onPointerDown={stopGraphControlEvent}
-        onMouseDown={stopGraphControlEvent}
-        onClick={handleDeleteClick}
-        className={dangerButtonClassName}
-        title="Delete node"
-        aria-label="Delete node"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
     </NodeToolbar>
   );
 
@@ -471,7 +456,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
+          <AlertDialogTitle className="break-all">Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
             This will permanently delete this node and its data. This action cannot be undone.
           </AlertDialogDescription>

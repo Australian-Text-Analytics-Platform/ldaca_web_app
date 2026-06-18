@@ -3,7 +3,6 @@ import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import type { SidebarWorkspaceNode } from './sidebar/types';
-import { computeConnectorLayout, type NodeListEdge } from './nodeListConnectors';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,8 +16,6 @@ import {
 
 interface WorkspaceNodeListProps {
   nodes: SidebarWorkspaceNode[];
-  /** Parent -> child relationships drawn as connectors in the left gutter. */
-  edges?: NodeListEdge[];
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
   onClearSelection?: () => void;
@@ -28,20 +25,20 @@ interface WorkspaceNodeListProps {
    * are not draggable. The array is the full node id list in its new order and
    * maps directly to the backend-persisted workspace node list. */
   onReorder?: (orderedIds: string[]) => void;
-  /** Optional trailing actions rendered at the end of each node row (e.g. the
+  /** Optional actions rendered for each node row (e.g. the
    * right-panel list view's per-node action toolbar + schema magnifier). When
    * omitted, rows render without a toolbar. */
   renderRowActions?: (node: SidebarWorkspaceNode) => React.ReactNode;
 }
 
 /**
- * Renders a data-block name with a ChromeTabs-style right-edge fade instead of an
+ * Renders a data-block name with a ChromeTabs-style left-edge fade instead of an
  * ellipsis, mirroring the analysis multi-tab strip.
  * Called by: WorkspaceNodeList row rendering because each row needs its own
  * overflow measurement to decide whether the fade stays on permanently.
  * Flow: measure the clipped text against its wrapper via ResizeObserver, then
  * keep the gradient overlay visible when the name overflows and otherwise reveal
- * it only while the row (the `group`) is hovered/focused — where the trailing
+ * it only while the row (the `group`) is hovered/focused — where the leading
  * actions overlay the text.
  */
 function NodeRowName({ name }: { name: string }) {
@@ -64,21 +61,26 @@ function NodeRowName({ name }: { name: string }) {
   }, [name]);
 
   return (
-    <span ref={wrapRef} className="relative block min-w-0 flex-1 overflow-hidden">
+    <span
+      ref={wrapRef}
+      dir={overflowing ? 'rtl' : 'ltr'}
+      className="relative block min-w-0 flex-1 overflow-hidden"
+    >
       <span
         ref={textRef}
-        className="block w-max whitespace-nowrap text-sm font-medium text-foreground"
+        dir="ltr"
+        className="block w-max whitespace-nowrap text-xs font-medium text-foreground"
       >
         {name}
       </span>
-      {/* Right-edge fade: always visible while the name is clipped, otherwise
-          revealed only on hover/focus (when the trailing actions overlay the
-          text). Widens on hover so the text fades before reaching the actions. */}
+      {/* Left-edge fade: always visible while the name is clipped, otherwise
+          revealed only on hover/focus (when the leading actions overlay the text).
+          Widens on hover so the text fades before reaching the actions. */}
       <span
         aria-hidden="true"
         className={cn(
-          'pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-background via-background/90 to-transparent transition-all duration-150 group-hover:w-36',
-          overflowing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+          'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background via-background/90 to-transparent transition-all duration-150 group-hover/row:w-36',
+          overflowing ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100',
         )}
       />
     </span>
@@ -110,89 +112,12 @@ const getNodeDisplayName = (node: SidebarWorkspaceNode): string =>
 const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
   event.key === 'Enter' || event.key === ' ';
 
-/** Connector gutter geometry (px). The gutter is a left strip where parent ->
- * child relationships are drawn as routed lines. Following the React Flow model,
- * each edge leaves a parent's left-centre point (marked with a small circle),
- * routes down its assigned lane, and arrives at a child's left-centre point
- * (marked with an arrowhead). Point coordinates are derived analytically from
- * the card's fixed left edge and the row layout, never measured per frame, so
- * resizing the panel width cannot make the connectors jiggle. */
-const LANE_GAP = 8;
-/** Horizontal gap between a card's anchor column and the first (rightmost) lane.
- * Kept larger than LANE_GAP so edges clearly break away from the card before
- * the lanes pack together. */
-const FIRST_LANE_GAP = 14;
-const GUTTER_BASE = 12;
-const CORNER_R = 8;
-/** Radius of the small open circle that marks each connector's start point. */
-const START_R = 3;
-/** Horizontal gap between the anchor points and the card's left edge, so the
- * arrow stops just short of the border instead of touching it. */
-const EDGE_GAP = 5;
-/** Fraction of row height between the top edge and the upper anchor. The two
- * anchors sit at this fraction and its mirror (1 - fraction), evenly spread
- * about the row centre: the "out" (start circle) at 0.25, the "in" (end arrow)
- * at 0.75. */
-const POINT_SPREAD = 1 / 4;
-/** Matches Tailwind's space-y-2 gap used between list rows. */
-const ROW_GAP = 8;
+/** Matches Tailwind's space-y-1.5 gap used between list rows. */
+const ROW_GAP = 6;
 /** Pointer travel before a press becomes a drag instead of a row click. */
 const DRAG_THRESHOLD = 4;
 /** Fallback used in tests and the first frame before row metrics are measured. */
-const ROW_FALLBACK_HEIGHT = 40;
-
-/** Total gutter width for a given lane count; collapses to nothing when there
- * are no drawable edges. Called by: WorkspaceNodeList render. */
-const gutterWidthFor = (laneCount: number) =>
-  laneCount > 0
-    ? EDGE_GAP + FIRST_LANE_GAP + (laneCount - 1) * LANE_GAP + GUTTER_BASE
-    : 0;
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-/** Formats a coordinate for an SVG path string (rounded to avoid float noise). */
-const fmt = (value: number): string => (Math.round(value * 100) / 100).toString();
-
-/**
- * Builds an SVG path for an orthogonal polyline with rounded corners so the
- * connectors read as one smooth, coherent line instead of segmented right
- * angles. Each interior corner is replaced by a quadratic curve whose radius is
- * clamped to half the shorter adjoining segment.
- * Called by: NodeListConnectorOverlay for every edge path.
- */
-function roundedOrthPath(points: Point[], radius: number): string {
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (!first || !last) return '';
-  let d = `M ${fmt(first.x)} ${fmt(first.y)}`;
-  for (let i = 1; i < points.length - 1; i++) {
-    const prev = points[i - 1];
-    const cur = points[i];
-    const next = points[i + 1];
-    if (!prev || !cur || !next) continue;
-    const inLen = Math.hypot(cur.x - prev.x, cur.y - prev.y) || 1;
-    const outLen = Math.hypot(next.x - cur.x, next.y - cur.y) || 1;
-    const r = Math.min(radius, inLen / 2, outLen / 2);
-    const enter = { x: cur.x + ((prev.x - cur.x) / inLen) * r, y: cur.y + ((prev.y - cur.y) / inLen) * r };
-    const exit = { x: cur.x + ((next.x - cur.x) / outLen) * r, y: cur.y + ((next.y - cur.y) / outLen) * r };
-    d += ` L ${fmt(enter.x)} ${fmt(enter.y)} Q ${fmt(cur.x)} ${fmt(cur.y)} ${fmt(exit.x)} ${fmt(exit.y)}`;
-  }
-  d += ` L ${fmt(last.x)} ${fmt(last.y)}`;
-  return d;
-}
-
-/** Analytic connector points for a node card, relative to the rows container.
- * x is a fixed column just left of the card edge. The two anchors are evenly
- * spread about the row centre: outY (outgoing start circle) at 0.75 of the row
- * height, inY (incoming end arrow) at 0.25. */
-interface RowPoint {
-  x: number;
-  inY: number;
-  outY: number;
-}
+const ROW_FALLBACK_HEIGHT = 30;
 
 interface DragGesture {
   id: string;
@@ -241,113 +166,16 @@ function sameOrder(left: string[], right: string[]): boolean {
 }
 
 /**
- * SVG overlay that draws the relationship connectors inside the row gutter. It
- * is purely decorative (aria-hidden) and never intercepts pointer events so row
- * clicks still toggle selection.
- * Rendered by: WorkspaceNodeList from analytic point coordinates.
- * Flow: route each edge from its parent's left-centre point, left into the
- * edge's assigned lane, down/up to the child's point, drawing a smooth rounded
- * (React Flow smoothstep-style) path that ends in an arrow. Edges sharing a
- * child share a lane, so their vertical lines overlap and their arrows merge.
- * A small open circle marks each unique source point so the start of every
- * relationship is visible without cluttering non-source nodes.
- */
-function NodeListConnectorOverlay({
-  layout,
-  points,
-  height,
-  gutterWidth,
-}: {
-  layout: ReturnType<typeof computeConnectorLayout>;
-  points: Map<string, RowPoint>;
-  height: number;
-  gutterWidth: number;
-}) {
-  // Lane 0 is the rightmost lane, set FIRST_LANE_GAP left of the anchor column;
-  // each further lane steps left by the smaller LANE_GAP.
-  const laneX = (lane: number) => gutterWidth - EDGE_GAP - FIRST_LANE_GAP - lane * LANE_GAP;
-
-  // Unique source points get one start circle each, even when a parent fans out
-  // to several children.
-  const sourcePoints = new Map<string, RowPoint>();
-  for (const segment of layout.segments) {
-    const from = points.get(segment.source);
-    if (from) sourcePoints.set(segment.source, from);
-  }
-
-  return (
-    <svg
-      aria-hidden="true"
-      width={gutterWidth}
-      height={height}
-      className="pointer-events-none absolute top-0 left-0 overflow-visible text-muted-foreground/70"
-    >
-      <defs>
-        <marker
-          id="nodeListArrow"
-          viewBox="0 0 8 8"
-          refX="6.5"
-          refY="4"
-          markerWidth="6"
-          markerHeight="6"
-          orient="auto"
-        >
-          <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
-        </marker>
-      </defs>
-      {layout.segments.map((segment) => {
-        const from = points.get(segment.source);
-        const to = points.get(segment.target);
-        if (!from || !to) return null;
-        const x = laneX(segment.lane);
-        const path = roundedOrthPath(
-          [
-            { x: from.x - START_R, y: from.outY },
-            { x, y: from.outY },
-            { x, y: to.inY },
-            { x: to.x, y: to.inY },
-          ],
-          CORNER_R,
-        );
-        return (
-          <path
-            key={`${segment.source}->${segment.target}`}
-            d={path}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.25}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            markerEnd="url(#nodeListArrow)"
-          />
-        );
-      })}
-      {Array.from(sourcePoints.entries()).map(([id, point]) => (
-        <circle
-          key={`start-${id}`}
-          cx={point.x}
-          cy={point.outY}
-          r={START_R}
-          className="fill-background stroke-current"
-          strokeWidth={1.25}
-        />
-      ))}
-    </svg>
-  );
-}
-
-/**
  * Selectable node list shown in the collapsed right panel's list view. It
  * presents nodes in their original workspace order and bridges row clicks back
  * to workspace selection and fresh-node acknowledgement stores.
  * Rendered by: WorkspaceListView (the collapsed list-view top pane) because
  * graph selection and fresh-node acknowledgement must stay aligned.
  * Flow: read fresh state, measure row anchor points, then render counts, the
- * selected-delete action, the connector gutter overlay, and the toggleable node rows.
+ * selected-delete action, and the toggleable node rows.
  */
 function WorkspaceNodeList({
   nodes,
-  edges,
   selectedNodeIds,
   onToggleNodeSelection,
   onClearSelection,
@@ -397,9 +225,6 @@ function WorkspaceNodeList({
     }
     return ordered;
   })();
-  const orderedNodes = effectiveOrder
-    .map((id) => nodeById.get(id))
-    .filter((node): node is SidebarWorkspaceNode => node !== undefined);
 
   const selectedIdSet = new Set(selectedNodeIds ?? []);
   const selectedForDelete = nodes
@@ -424,23 +249,9 @@ function WorkspaceNodeList({
     }
   };
 
-  // Single source of truth for order: render nodes in the effective (live) order.
-  const orderedIds = orderedNodes.map((node) => node.id);
-  const visibleEdges = edges ?? [];
-  const layout = computeConnectorLayout(orderedIds, visibleEdges);
-  const gutterWidth = gutterWidthFor(layout.laneCount);
-
-  // Row heights drive the analytic vertical layout that anchors the connectors.
-  // Following the React Flow model, handle positions come from layout maths, not
-  // per-frame DOM rects: offsetHeight is an integer that only changes when a row
-  // actually grows/shrinks, so dragging the panel width never re-runs layout and
-  // the connectors stay rock steady.
+  // Row heights drive the analytic vertical layout for active drag-to-reorder transitions.
   const rowsRef = useRef<HTMLDivElement | null>(null);
   const rowEls = useRef(new Map<string, HTMLDivElement>());
-  // Measured per-row geometry (offsetTop + offsetHeight) relative to the rows
-  // container, which is also the connector SVG's coordinate origin. Anchors are
-  // read straight from these boxes so they land exactly on each card instead of
-  // accumulating per-row height errors down the list.
   const [rowBoxes, setRowBoxes] = useState<Map<string, { top: number; height: number }>>(new Map());
 
   const rowSetKey = baseOrder.join('|');
@@ -470,8 +281,7 @@ function WorkspaceNodeList({
     baseTopById.set(id, rowBoxes.get(id)?.top ?? baseSlotTops[index] ?? 0);
   });
 
-  // Effective (live drag preview) tops, used to position rows + connectors
-  // while a drag is in progress.
+  // Effective (live drag preview) tops, used to position rows while a drag is in progress.
   const effectiveSlotTops = slotTopsForOrder(effectiveOrder);
   const visualTopById = new Map<string, number>();
   effectiveOrder.forEach((id, index) => {
@@ -479,32 +289,6 @@ function WorkspaceNodeList({
   });
 
   const isDragActive = dragNodeId !== null;
-
-  // Handle coordinates: x is the card's fixed left edge (just inside gutterWidth);
-  // y comes straight from the measured card box so anchors sit exactly at the
-  // card's quarter points. During a drag the dragged row follows the pointer and
-  // the rest fall back to analytic preview slots.
-  const connectorHeight = effectiveOrder.reduce(
-    (sum, id) => sum + getRowHeight(id) + ROW_GAP,
-    0,
-  );
-  const visualPoints = new Map<string, RowPoint>();
-  for (const id of effectiveOrder) {
-    let top: number;
-    if (dragNodeId === id) {
-      top = dragHomeTop + dragDeltaY;
-    } else if (isDragActive) {
-      top = visualTopById.get(id) ?? 0;
-    } else {
-      top = rowBoxes.get(id)?.top ?? visualTopById.get(id) ?? 0;
-    }
-    const height = getRowHeight(id);
-    visualPoints.set(id, {
-      x: gutterWidth - EDGE_GAP,
-      outY: top + height * (1 - POINT_SPREAD),
-      inY: top + height * POINT_SPREAD,
-    });
-  }
 
   const clearDrag = () => {
     dragRef.current = null;
@@ -707,20 +491,8 @@ function WorkspaceNodeList({
       </AlertDialog>
       <div ref={rowsRef} className="relative">
         {nodes.length ? (
-          <>
-            {connectorHeight > 0 && gutterWidth > 0 && (
-              <NodeListConnectorOverlay
-                layout={layout}
-                points={visualPoints}
-                height={connectorHeight}
-                gutterWidth={gutterWidth}
-              />
-            )}
-            {/* Rows live in their own in-flow wrapper so the absolutely
-                positioned overlay above does not perturb the space-y gaps the
-                analytic layout assumes. */}
-            <div className="space-y-2 pr-1">
-              {nodes.map((node) => {
+          <div className="space-y-1.5 pr-1">
+            {nodes.map((node) => {
               const displayName = getNodeDisplayName(node) || 'Untitled data block';
               const shape = formatShapeLabel(node);
               const checked = selectedNodeIds?.includes(node.id) ?? false;
@@ -773,38 +545,34 @@ function WorkspaceNodeList({
                   aria-pressed={checked}
                   aria-label={`${checked ? 'Deselect' : 'Select'} ${displayName}`}
                   className={cn(
-                    'group relative block w-full rounded-md text-left focus-visible:outline-hidden',
+                    'group/row relative block w-full rounded-md text-left focus-visible:outline-hidden',
                     reorderable && 'cursor-grab touch-none select-none active:cursor-grabbing',
                     activeDragOrder && !isDragging && 'transition-transform duration-150 ease-out motion-reduce:transition-none',
                     isDragging && 'cursor-grabbing shadow-lg',
                   )}
                 >
-                  {/* Inner box carries the border/background so it wraps only the
-                      node content, leaving the connector gutter to its left
-                      transparent (lines never run under the box). */}
+                  {/* Inner box carries the border/background. */}
                   <div
-                    style={{ marginLeft: gutterWidth }}
                     className={cn(
-                      'relative flex items-center gap-3 overflow-visible rounded-md border bg-background/70 px-2 py-2 text-sm transition-colors duration-150 ease-out group-focus-visible:ring-1 group-focus-visible:ring-ring',
+                      'relative flex items-center gap-2 overflow-visible rounded-md border bg-background/70 px-2 py-1 text-xs transition-colors duration-150 ease-out group-focus-visible/row:ring-1 group-focus-visible/row:ring-ring',
                       checked
                         ? 'border-primary/70 bg-primary/10 ring-1 ring-primary/20'
-                        : 'border-border/60 group-hover:border-border group-hover:bg-accent/60',
+                        : 'border-border/60 group-hover/row:border-border group-hover/row:bg-accent/60',
                     )}
                   >
                     <NodeRowName name={displayName} />
                     {isFresh && (
                       <span
-                        className="pointer-events-none h-2.5 w-2.5 shrink-0 rounded-full bg-red-500 transition-opacity duration-150 group-hover:opacity-0"
+                        className="pointer-events-none h-2 w-2 shrink-0 rounded-full bg-red-500 transition-opacity duration-150 group-hover/row:opacity-0"
                         title="New data block"
                         aria-label="New data block"
                       />
                     )}
                     {renderRowActions && (
-                      // Hover-revealed trailing actions, absolutely positioned so they
-                      // overlay the faded name edge instead of reserving row space.
+                      // Hover-revealed leading actions, absolutely positioned on the left.
                       // Stop row-toggle when interacting with the actions.
                       <div
-                        className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 pointer-events-none"
+                        className="absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 transition-opacity duration-150 group-hover/row:pointer-events-auto group-hover/row:opacity-100 group-focus-within/row:pointer-events-auto group-focus-within/row:opacity-100 pointer-events-none"
                         onPointerDown={(event) => { event.stopPropagation(); }}
                         onClick={(event) => { event.stopPropagation(); }}
                         onKeyDown={(event) => { event.stopPropagation(); }}
@@ -819,8 +587,7 @@ function WorkspaceNodeList({
                 </div>
               );
             })}
-            </div>
-          </>
+          </div>
         ) : (
           <div className="rounded-md bg-accent/40 px-2 py-2 text-xs text-muted-foreground">
             No data blocks

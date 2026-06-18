@@ -130,7 +130,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               <TabsTrigger
                 key={value}
                 value={value}
-                className="h-9 w-full justify-start gap-2 px-3 text-left"
+                className="h-9 w-full justify-start gap-2 px-3 text-left flex-none"
               >
                 <Icon className="h-4 w-4" />
                 {label}

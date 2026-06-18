@@ -29,6 +29,13 @@ import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
+import WorkspaceNodeList from '@/components/layout/WorkspaceNodeList';
+import { NodeActionsToolbar } from '@/components/layout/NodeActionsToolbar';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
+import type { SidebarWorkspaceNode } from '@/components/layout/sidebar/types';
 import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
@@ -60,18 +67,20 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-type SectionKey = 'views' | 'tasks';
+type SectionKey = 'views' | 'nodes' | 'tasks';
 
 /** Ordered sidebar section ids consumed by `useStackedSplits` and rendering loops. */
-const SECTION_KEYS: SectionKey[] = ['views', 'tasks'];
+const SECTION_KEYS: SectionKey[] = ['views', 'nodes', 'tasks'];
 /** Human labels for collapsible sidebar sections shown in the section headers. */
 const SECTION_TITLES: Record<SectionKey, string> = {
   views: 'Views',
+  nodes: 'Data Blocks',
   tasks: 'Tasks',
 };
 /** Help target ids paired with sidebar section headers for contextual docs. */
 const SECTION_HELP_KEYS: Record<SectionKey, string> = {
   views: 'ui.tool-choice',
+  nodes: 'ui.data-selection',
   tasks: 'ui.task-centre',
 };
 /** Minimum sidebar section height passed to the stacked split resize hook. */
@@ -139,6 +148,32 @@ function Sidebar() {
   } = useWorkspaceTaskInbox(currentWorkspaceId ?? null);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = React.useState(false);
 
+  const { workspaceGraph } = useWorkspaceData();
+  const { selectedNodeIds } = useWorkspaceSelection();
+  const {
+    toggleNodeSelection,
+    clearSelection,
+    deleteNode,
+    copyNode,
+    renameNode,
+    undoNode,
+    redoNode,
+    reorderNodes,
+  } = useWorkspaceActions();
+  const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
+
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
+  const markInteracted = useFreshNodesStore((state) => state.markInteracted);
+
+  const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
+  const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
+  const nodeCount = nodes.length;
+
+  const handleAddToSelection = (nodeId: string) => {
+    requestNodeInputAdd(currentWorkspaceId, currentView, nodeId);
+    markInteracted([nodeId]);
+  };
+
   const isConnected = taskStreamStatus === 'open';
   const isConnecting = taskStreamStatus === 'connecting';
   const connectionError = taskStreamStatus === 'error' ? taskStreamError : null;
@@ -152,7 +187,7 @@ function Sidebar() {
     handleResizeStart,
   } = useStackedSplits<SectionKey>(SECTION_KEYS, {
     minSectionPx: MIN_SECTION_HEIGHT,
-    initialRatios: { views: 0.5, tasks: 0.5 },
+    initialRatios: { views: 0.34, nodes: 0.33, tasks: 0.33 },
   });
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
@@ -202,7 +237,7 @@ function Sidebar() {
   );
   return (
     <SidebarRoot className="md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden">
-      <SidebarHeader className="border-b border-border/40 px-3 py-2">
+      <SidebarHeader className="px-3 py-2">
         <div className="flex min-w-0 flex-col gap-2 w-full">
           <div className="flex items-center gap-2 w-full">
             <SidebarTrigger className="md:hidden" />
@@ -288,6 +323,9 @@ function Sidebar() {
                     >
                       <span className="flex items-center gap-1">{title}</span>
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        {key === 'nodes' && (
+                          <span className="font-semibold text-foreground/80">{nodeCount}</span>
+                        )}
                         {key === 'tasks' && (
                           <Circle
                             data-testid="tasks-connection-indicator"
@@ -371,6 +409,31 @@ function Sidebar() {
                         className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-sm"
                       >
                         {key === 'views' && renderViewsBody()}
+                        {key === 'nodes' && (
+                          <WorkspaceNodeList
+                            nodes={nodes}
+                            selectedNodeIds={selectedNodeIds}
+                            onToggleNodeSelection={toggleNodeSelection}
+                            onClearSelection={clearSelection}
+                            onReorder={(orderedIds) => { void reorderNodes(orderedIds); }}
+                            renderRowActions={(node) => (
+                              <NodeActionsToolbar
+                                node={{
+                                  id: node.id,
+                                  name: node.name ?? node.label ?? node.id,
+                                  canUndo: node.can_undo,
+                                  canRedo: node.can_redo,
+                                }}
+                                onAddToSelection={handleAddToSelection}
+                                onRename={(id, newName) => { void renameNode(id, newName); }}
+                                onClone={(id) => { void copyNode(id); }}
+                                onUndo={(id) => { void undoNode(id); }}
+                                onRedo={(id) => { void redoNode(id); }}
+                                onDelete={(id) => { void deleteNode(id); }}
+                              />
+                            )}
+                          />
+                        )}
                         {key === 'tasks' && (
                           <SidebarTasksSection
                             tasks={tasks}

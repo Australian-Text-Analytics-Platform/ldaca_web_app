@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings2, Plus, Trash2, Search } from 'lucide-react';
+import { Settings2, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +29,7 @@ export interface NodeActionsToolbarNode {
 
 export interface NodeActionsToolbarProps {
   node: NodeActionsToolbarNode;
-  onShowSchema: (nodeId: string) => void;
+  onShowSchema?: (nodeId: string) => void;
   onAddToSelection: (nodeId: string) => void;
   onRename: (nodeId: string, newName: string) => void;
   onClone: (nodeId: string) => void;
@@ -41,13 +41,12 @@ export interface NodeActionsToolbarProps {
 /**
  * Compact per-node action toolbar rendered at the end of each row in the
  * right-panel Workspace List View. Mirrors the graph node's hover toolbar
- * (settings menu with Rename / Clone / Undo / Redo / Delete, an add-to-inputs
- * button, and a delete button) and adds a schema magnifier so the user can open
- * a node's schema in the collapsed data view.
+ * (settings menu with Rename / Clone / Undo / Redo / Delete, and an add-to-inputs
+ * button) with hover action overlay.
  *
  * Rendered by: WorkspaceListView via WorkspaceNodeList's ``renderRowActions``
  * slot. Wired to the same workspace actions the graph uses (delete/rename/clone/
- * undo/redo) plus the node-input add request and the schema-view selector.
+ * undo/redo) plus the node-input add request.
  *
  * Flow: render icon buttons; the settings menu and the inline rename/delete
  * dialogs own their open state locally and call back into the workspace actions
@@ -55,7 +54,7 @@ export interface NodeActionsToolbarProps {
  */
 export function NodeActionsToolbar({
   node,
-  onShowSchema,
+  onShowSchema: _onShowSchema,
   onAddToSelection,
   onRename,
   onClone,
@@ -85,16 +84,6 @@ export function NodeActionsToolbar({
 
   return (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={() => { onShowSchema(node.id); }}
-        className={iconButtonClass}
-        title="View schema"
-        aria-label={`View schema for ${node.name}`}
-      >
-        <Search className="h-4 w-4" />
-      </button>
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -142,16 +131,6 @@ export function NodeActionsToolbar({
         aria-label={`Add ${node.name} to selection`}
       >
         <Plus className="h-4 w-4" />
-      </button>
-
-      <button
-        type="button"
-        onClick={() => { setDeleteOpen(true); }}
-        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-white text-red-600 shadow-sm transition-colors hover:bg-red-50 hover:text-red-700"
-        title="Delete data block"
-        aria-label={`Delete ${node.name}`}
-      >
-        <Trash2 className="h-4 w-4" />
       </button>
 
       <AlertDialog open={renameOpen} onOpenChange={setRenameOpen}>
