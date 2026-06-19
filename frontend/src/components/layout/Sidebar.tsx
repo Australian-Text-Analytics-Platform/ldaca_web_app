@@ -86,6 +86,20 @@ const SECTION_HELP_KEYS: Record<SectionKey, string> = {
 };
 /** Minimum sidebar section height passed to the stacked split resize hook. */
 const MIN_SECTION_HEIGHT = 120;
+/** Initial task section share sized for roughly two compact task rows. */
+const TASKS_SECTION_DEFAULT_RATIO = 0.18;
+/** Task section minimum sized for one compact task row plus its section header. */
+const TASKS_SECTION_MIN_HEIGHT = 76;
+/** Initial section ratios keep Tasks compact while preserving space for navigation and data blocks. */
+const INITIAL_SECTION_RATIOS: Record<SectionKey, number> = {
+  views: (1 - TASKS_SECTION_DEFAULT_RATIO) / 2,
+  nodes: (1 - TASKS_SECTION_DEFAULT_RATIO) / 2,
+  tasks: TASKS_SECTION_DEFAULT_RATIO,
+};
+/** Per-section minimum heights let the compact task stream shrink independently of larger sections. */
+const SECTION_MIN_HEIGHTS: Partial<Record<SectionKey, number>> = {
+  tasks: TASKS_SECTION_MIN_HEIGHT,
+};
 
 /** Navigation items rendered in the Views sidebar section and routed by `ViewRouter`. */
 const NAV_ITEMS: NavItem[] = [
@@ -198,7 +212,8 @@ function Sidebar() {
     handleResizeStart,
   } = useStackedSplits<SectionKey>(SECTION_KEYS, {
     minSectionPx: MIN_SECTION_HEIGHT,
-    initialRatios: { views: 0.34, nodes: 0.33, tasks: 0.33 },
+    sectionMinPx: SECTION_MIN_HEIGHTS,
+    initialRatios: INITIAL_SECTION_RATIOS,
   });
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);

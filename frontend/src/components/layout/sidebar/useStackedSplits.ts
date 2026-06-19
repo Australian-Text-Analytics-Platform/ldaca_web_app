@@ -11,6 +11,8 @@ import {
 interface UseStackedSplitsOptions {
   /** Minimum pixel height a non-collapsed section can shrink to. Default 120. */
   minSectionPx?: number;
+  /** Per-section minimum pixel overrides for compact sections such as Tasks. */
+  sectionMinPx?: Partial<Record<string, number>>;
   /** Initial split ratios (must sum to ~1). Defaults to even distribution. */
   initialRatios?: Record<string, number>;
   /** Initial collapsed map. Defaults to all-expanded. */
@@ -52,13 +54,15 @@ export interface StackedSplitsApi<KeyT extends string> {
  * overflow scrolling so the sidebar component can stay focused on rendering
  * views, nodes, and tasks.
  * Why: the sidebar needs collapsible, resizable vertical sections without mixing layout math into rendering code.
- * Flow: seed collapse and ratio state, observe container height, compute flex styles, and expose collapse, ref, and drag-resize handlers.
+ * Flow: seed collapse and ratio state, observe container height, compute flex
+ * styles, apply section-specific resize minimums, and expose collapse, ref, and
+ * drag-resize handlers.
  */
 export const useStackedSplits = <KeyT extends string>(
   keys: readonly KeyT[],
   options: UseStackedSplitsOptions = {},
 ): StackedSplitsApi<KeyT> => {
-  const { minSectionPx = 120, initialRatios, initialCollapsed } = options;
+  const { minSectionPx = 120, sectionMinPx, initialRatios, initialCollapsed } = options;
 
   const defaultRatio = keys.length > 0 ? 1 / keys.length : 0;
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -139,7 +143,8 @@ export const useStackedSplits = <KeyT extends string>(
     (upperKey: KeyT, lowerKey: KeyT, event: ReactMouseEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
       if (collapsedSections[upperKey] || collapsedSections[lowerKey]) return;
-      const height = containerHeight || 1;
+      const measuredHeight = containerRef.current?.getBoundingClientRect().height;
+      const height = containerHeight > 0 ? containerHeight : measuredHeight && measuredHeight > 0 ? measuredHeight : 1;
       if (height <= 0) return;
 
       event.preventDefault();
@@ -149,18 +154,23 @@ export const useStackedSplits = <KeyT extends string>(
       const pairTotal = startUpper + startLower;
       if (pairTotal <= 0) return;
 
-      const rawMinRatio = minSectionPx / height;
-      const safeMinCandidate = Math.min(Math.max(rawMinRatio, 0.02), pairTotal / 2 - 0.01);
-      if (
-        !Number.isFinite(safeMinCandidate) ||
-        safeMinCandidate <= 0 ||
-        pairTotal - safeMinCandidate <= safeMinCandidate
-      ) {
+      const minRatioFor = (key: KeyT) => Math.max((sectionMinPx?.[key] ?? minSectionPx) / height, 0.02);
+      let minUpper = minRatioFor(upperKey);
+      let minLower = minRatioFor(lowerKey);
+      const minTotal = minUpper + minLower;
+      if (!Number.isFinite(minTotal) || minTotal <= 0) {
         return;
       }
-
-      const minUpper = safeMinCandidate;
-      const maxUpper = pairTotal - safeMinCandidate;
+      if (minTotal >= pairTotal) {
+        const scale = (pairTotal - 0.02) / minTotal;
+        if (!Number.isFinite(scale) || scale <= 0) return;
+        minUpper *= scale;
+        minLower *= scale;
+      }
+      const maxUpper = pairTotal - minLower;
+      if (maxUpper <= minUpper) {
+        return;
+      }
 
       /**
        * Called by: the window mousemove listener installed by handleResizeStart because the interaction needs a single handler that validates state, runs the action, and updates feedback.
@@ -205,7 +215,7 @@ export const useStackedSplits = <KeyT extends string>(
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [collapsedSections, containerHeight, sectionHeights, minSectionPx, scrollSection],
+    [collapsedSections, containerHeight, sectionHeights, minSectionPx, sectionMinPx, scrollSection],
   );
 
   return {
