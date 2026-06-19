@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Info, Redo2, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -8,6 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import HelpIcon from '@/components/help/HelpIcon';
+import { cn } from '@/lib/utils';
 
 import type { WorkspaceDataTableHeaderInfo } from '../hooks/useWorkspaceDataTable';
 
@@ -22,10 +24,67 @@ interface WorkspaceDataHeaderProps {
 }
 
 /**
+ * Keeps the selected data-node label on the header row while preserving the
+ * useful trailing filename when space is tight.
+ * Rendered by: WorkspaceDataHeader because its title row must not wrap under
+ * the action buttons.
+ * Flow: measure the label against its wrapper, switch to RTL clipping when it
+ * overflows, and draw a muted left-edge fade over the hidden prefix.
+ */
+function HeaderNodeLabel({ label }: { label: string }) {
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const text = textRef.current;
+    if (!wrap || !text) return;
+    const measure = () => {
+      setOverflowing(text.offsetWidth > wrap.clientWidth + 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    observer.observe(text);
+    return () => { observer.disconnect(); };
+  }, [label]);
+
+  return (
+    <span
+      ref={wrapRef}
+      dir={overflowing ? 'rtl' : 'ltr'}
+      className="relative min-w-0 flex-1 overflow-hidden"
+      data-testid="workspace-data-node-label"
+      title={label}
+    >
+      <span
+        ref={textRef}
+        dir="ltr"
+        className="block w-max whitespace-nowrap text-sm font-semibold text-gray-800"
+      >
+        {label}
+      </span>
+      <span
+        aria-hidden="true"
+        data-testid="workspace-data-node-label-fade"
+        className={cn(
+          'pointer-events-none absolute inset-y-0 left-0 w-14 bg-linear-to-r from-muted via-muted/90 to-transparent',
+          overflowing ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+    </span>
+  );
+}
+
+/**
  * Renders selected-node title, rename, query-plan, undo, and redo controls.
  * Rendered by: WorkspaceDataTableFeature component, WorkspaceDataHeader tests (rg call sites/imports).
- * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
- * Flow: derive editable header state from node info, run inline rename, and expose node-level actions beside the table.
+ * Why: the data table feature needs the active node label and node-level actions
+ * grouped in one compact line above the table state.
+ * Flow: derive editable header state from node info, keep long labels clipped
+ * with a leading fade, run inline rename, and expose icon-only actions beside
+ * the table.
  */
 export const WorkspaceDataHeader = ({
   info,
@@ -91,19 +150,19 @@ export const WorkspaceDataHeader = ({
 
   return (
     <div className="shrink-0 border-b border-border bg-muted p-2">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-          <h3 className="text-sm font-medium text-gray-700">Data View</h3>
-          <HelpIcon
-            targetKey="ui.data-viewer"
-            label="Data Viewer"
-            className="h-5 w-5 text-muted-foreground"
-          />
-          <span className="text-gray-300">|</span>
+      <div className="flex min-w-0 items-center gap-2">
+        <h3 className="shrink-0 text-sm font-medium text-gray-700">Data View</h3>
+        <HelpIcon
+          targetKey="ui.data-viewer"
+          label="Data Viewer"
+          className="h-5 w-5 shrink-0 text-muted-foreground"
+        />
+        <span className="shrink-0 text-gray-300">|</span>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {isRenaming ? (
             <input
               ref={inputRef}
-              className="px-2 py-0.5 border rounded text-sm font-semibold text-gray-800"
+              className="min-w-0 flex-1 rounded border px-2 py-0.5 text-sm font-semibold text-gray-800"
               value={renameDraft.value}
               onChange={(e) => { setRenameDraft({ baseLabel: info.nodeLabel, value: e.target.value }); }}
               onBlur={handleRenameCommit}
@@ -114,11 +173,11 @@ export const WorkspaceDataHeader = ({
               aria-label="Node name"
             />
           ) : (
-            <span className="text-sm font-semibold text-gray-800">{info.nodeLabel}</span>
+            <HeaderNodeLabel label={info.nodeLabel} />
           )}
           {onRename && !isRenaming && (
             <button
-              className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-1.5 py-0.5 border rounded"
+              className="inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs text-gray-600 hover:text-gray-800"
               onClick={startRename}
               title="Rename"
               aria-label="Rename node"
@@ -127,7 +186,7 @@ export const WorkspaceDataHeader = ({
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                className="w-3 h-3"
+                className="h-3 w-3"
               >
                 <path d="M16.862 3.487a1.5 1.5 0 0 1 2.121 0l1.53 1.53a1.5 1.5 0 0 1 0 2.122l-9.9 9.9a1.5 1.5 0 0 1-.53.352l-4.18 1.393a.75.75 0 0 1-.948-.948l1.392-4.18a1.5 1.5 0 0 1 .352-.53l9.9-9.9Z" />
                 <path d="M18.26 2.08a3 3 0 0 1 4.243 0l.53.53a3 3 0 0 1 0 4.243l-1.06 1.06-4.773-4.773 1.06-1.06Z" />
@@ -136,29 +195,50 @@ export const WorkspaceDataHeader = ({
             </button>
           )}
           {info.isEmptyTable && (
-            <span className="text-xs italic text-gray-500" aria-live="polite">
+            <span className="shrink-0 text-xs italic text-gray-500" aria-live="polite">
               (empty table)
             </span>
           )}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon"
+            className="h-7 w-7 rounded-full"
             onClick={() => {
               void handleOpenQueryPlan();
             }}
             disabled={!onQueryPlan}
+            aria-label="Info"
+            title="Info"
           >
-            Info
+            <Info className="h-3.5 w-3.5" />
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onUndo} disabled={!canUndo}>
-            Undo
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 rounded-full"
+            onClick={onUndo}
+            disabled={!canUndo}
+            aria-label="Undo"
+            title="Undo"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onRedo} disabled={!canRedo}>
-            Redo
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 rounded-full"
+            onClick={onRedo}
+            disabled={!canRedo}
+            aria-label="Redo"
+            title="Redo"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>

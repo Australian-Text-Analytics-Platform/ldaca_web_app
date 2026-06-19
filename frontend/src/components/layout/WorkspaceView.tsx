@@ -1,11 +1,10 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
+import { PanelRightOpen } from 'lucide-react';
 import { WorkspaceControls } from './WorkspaceControls';
 import { InsetCard } from './InsetCard';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
 import { WorkspaceDataTableFeature } from '@/features/workspace/data-view';
 import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
-import { WorkspaceListView } from './WorkspaceListView';
-import { WorkspaceSchemaView } from './WorkspaceSchemaView';
 
 /**
  * Stacked workspace view used by the main app shell: graph above, data table
@@ -14,17 +13,14 @@ import { WorkspaceSchemaView } from './WorkspaceSchemaView';
  * Why: graph and table panes need resize feedback without rerendering expensive children on every pointer move.
  * Flow: connect split refs to graph/table panes, imperatively resize during drag, then render controls, graph, splitter, and data table.
  *
- * ``collapsed`` (from WorkspaceShell): when true, the panel is in its compact
- * mode — the graph becomes a node list view and the data table becomes a
- * schema-only view. ``onToggleCollapse`` toggles that mode (passed to the
- * header). The chosen schema node is held locally so the list view's magnifier
- * drives the schema pane below it.
+ * ``collapsed`` (from WorkspaceShell): when true, the panel is completely
+ * collapsed into a slim vertical handle with an expand button on the right.
+ * ``onToggleCollapse`` toggles that mode.
  */
 function WorkspaceView({
   collapsed = false,
   onToggleCollapse,
 }: { collapsed?: boolean; onToggleCollapse?: () => void } = {}) {
-  const [schemaNodeId, setSchemaNodeId] = useState<string | null>(null);
   const topRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -47,6 +43,20 @@ function WorkspaceView({
     },
   });
 
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="absolute top-4.5 right-0 z-30 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-l-full rounded-r-none border border-border bg-white text-gray-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95"
+        aria-label="Expand right panel"
+        title="Expand right panel"
+      >
+        <PanelRightOpen className="h-4 w-4" />
+      </button>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-transparent" ref={containerRef}>
       <InsetCard
@@ -58,11 +68,7 @@ function WorkspaceView({
           <WorkspaceControls collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
         </div>
         <div className="flex-1 min-h-0">
-          {collapsed ? (
-            <WorkspaceListView onShowSchema={setSchemaNodeId} />
-          ) : (
-            <WorkspaceGraphFeature />
-          )}
+          <WorkspaceGraphFeature />
         </div>
       </InsetCard>
 
@@ -84,11 +90,7 @@ function WorkspaceView({
         style={{ height: `calc(${String((1 - ratio) * 100)}% - 0.25rem)` }}
       >
         <div className="flex-1 min-h-0">
-          {collapsed ? (
-            <WorkspaceSchemaView nodeId={schemaNodeId} />
-          ) : (
-            <WorkspaceDataTableFeature />
-          )}
+          <WorkspaceDataTableFeature />
         </div>
       </InsetCard>
     </div>

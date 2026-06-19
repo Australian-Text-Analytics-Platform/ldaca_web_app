@@ -122,7 +122,7 @@ export function WorkspaceShell() {
                         isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'
                       }`}
                       style={{
-                        width: `${String((1 - asidePanelRatio) * 100)}%`,
+                        width: isRightCollapsed ? '100%' : `${String((1 - asidePanelRatio) * 100)}%`,
                         minWidth: 280,
                       }}
                       innerClassName={
@@ -138,24 +138,26 @@ export function WorkspaceShell() {
                       </div>
                     </InsetCard>
 
-                    <div
-                      className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex"
-                      aria-label="Resize right panel"
-                      {...rightPanelSplitterProps}
-                    >
+                    {!isRightCollapsed && (
                       <div
-                        className={`pointer-events-none h-10 w-1 rounded-full transition-colors ${
-                          isResizing ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
-                        }`}
-                      />
-                    </div>
+                        className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex"
+                        aria-label="Resize right panel"
+                        {...rightPanelSplitterProps}
+                      >
+                        <div
+                          className={`pointer-events-none h-10 w-1 rounded-full transition-colors ${
+                            isResizing ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
+                          }`}
+                        />
+                      </div>
+                    )}
 
                     <aside
                       ref={asideRef}
-                      className={`relative flex h-full flex-col overflow-hidden bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
-                        isRightCollapsed ? 'min-w-60' : 'min-w-[320px]'
+                      className={`relative flex h-full flex-col bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
+                        isRightCollapsed ? 'min-w-0 w-0 overflow-visible flex-none' : 'min-w-[320px] overflow-hidden'
                       }`}
-                      style={{ width: `${String(asidePanelRatio * 100)}%` }}
+                      style={isRightCollapsed ? { width: '0px' } : { width: `${String(asidePanelRatio * 100)}%` }}
                     >
                       <ErrorBoundary>
                         <Suspense

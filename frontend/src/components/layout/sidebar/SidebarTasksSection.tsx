@@ -120,25 +120,27 @@ function SidebarTasksSection({
     : isConnecting
       ? 'Connecting...'
       : isConnected
-        ? 'Live updates'
+        ? ''
         : 'Idle';
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{connectionLabel}</span>
-        {connectionError && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-[11px] text-red-600"
-            onClick={onReconnect}
-            title="Retry connection"
-          >
-            Retry
-          </Button>
-        )}
-      </div>
+      {connectionLabel && (
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>{connectionLabel}</span>
+          {connectionError && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[11px] text-red-600"
+              onClick={onReconnect}
+              title="Retry connection"
+            >
+              Retry
+            </Button>
+          )}
+        </div>
+      )}
       <div className="space-y-1">
         {sortedTasks.length ? (
           sortedTasks.map((task) => {
