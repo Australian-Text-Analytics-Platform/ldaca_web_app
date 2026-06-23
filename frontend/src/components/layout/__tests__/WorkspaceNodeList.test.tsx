@@ -23,6 +23,8 @@ const orderedNodes = [
   { id: 'node-3', data: { nodeName: 'Gamma' } },
 ];
 
+const longNodeName = 'full_filtered_by_username_in_AnnastaciaMP_topic_topic_meanings';
+
 afterEach(() => {
   usePinnedNodesStore.getState().reset();
 });
@@ -85,7 +87,9 @@ describe('WorkspaceNodeList', () => {
             type="button"
             data-pin-action
             data-pinned={usePinnedNodesStore.getState().isPinned(node.id)}
-            onClick={() => { usePinnedNodesStore.getState().togglePinnedNode(node.id); }}
+            onClick={() => {
+              usePinnedNodesStore.getState().togglePinnedNode(node.id);
+            }}
             aria-label={`${usePinnedNodesStore.getState().isPinned(node.id) ? 'Unpin' : 'Pin'} ${node.data?.nodeName ?? node.id}`}
           >
             Pin
@@ -108,12 +112,26 @@ describe('WorkspaceNodeList', () => {
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}
         renderPinnedRowAction={(node) => (
-          <button type="button" data-pin-action aria-label={`Unpin ${node.data?.nodeName ?? node.id}`}>Pin</button>
+          <button
+            type="button"
+            data-pin-action
+            aria-label={`Unpin ${node.data?.nodeName ?? node.id}`}
+          >
+            Pin
+          </button>
         )}
         renderRowActions={(node) => (
           <>
-            <button type="button" data-pin-action aria-label={`Unpin ${node.data?.nodeName ?? node.id}`}>Pin</button>
-            <button type="button" aria-label={`More actions for ${node.data?.nodeName ?? node.id}`}>More</button>
+            <button
+              type="button"
+              data-pin-action
+              aria-label={`Unpin ${node.data?.nodeName ?? node.id}`}
+            >
+              Pin
+            </button>
+            <button type="button" aria-label={`More actions for ${node.data?.nodeName ?? node.id}`}>
+              More
+            </button>
           </>
         )}
       />,
@@ -125,6 +143,30 @@ describe('WorkspaceNodeList', () => {
 
     expect(within(pinVisibility).getByRole('button', { name: 'Unpin Beta' })).toBeInTheDocument();
     expect(hoverToolbar).toHaveClass('opacity-0');
+    expect(hoverToolbar).toHaveClass('right-1');
+    expect(hoverToolbar).not.toHaveClass('left-1');
+  });
+
+  it('keeps long data-block names left-to-right instead of reversing clipped text', () => {
+    render(
+      <WorkspaceNodeList
+        nodes={[{ id: 'node-long', data: { nodeName: longNodeName } }]}
+        selectedNodeIds={[]}
+        onToggleNodeSelection={vi.fn()}
+        renderRowActions={() => (
+          <button type="button" aria-label="Inspect data block">
+            Inspect
+          </button>
+        )}
+      />,
+    );
+
+    const row = screen.getByRole('button', { name: `Select ${longNodeName}` });
+    const label = within(row).getByText(longNodeName);
+
+    expect(label).toHaveClass('truncate');
+    expect(label).toHaveClass('text-left');
+    expect(label).not.toHaveAttribute('dir', 'rtl');
   });
 
   it('shows a graph-style selection header and batch-deletes selected rows', async () => {
@@ -153,4 +195,3 @@ describe('WorkspaceNodeList', () => {
     expect(onClearSelection).toHaveBeenCalledOnce();
   });
 });
-

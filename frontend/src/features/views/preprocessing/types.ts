@@ -5,9 +5,9 @@
 import type {
   FilterCondition as GeneratedFilterCondition,
   FilterRequest as GeneratedFilterRequest,
-} from '@/api/generated/types.gen';
+} from '@/api';
 
-export type FilterOperator =
+type FilterOperator =
   | 'eq'
   | 'gt'
   | 'gte'
@@ -39,10 +39,16 @@ export type FilterRequest = Omit<
  * `filter/utils/serializers.ts` widens this into the `value: unknown`
  * the API accepts.
  */
-export interface ConditionRange { start: string | Date | null; end: string | Date | null }
+export interface ConditionRange {
+  start: string | Date | null;
+  end: string | Date | null;
+}
 /** Value shape for a TMDist (topic-distribution) filter condition: keep rows
  * where one topic's proportion (0..1) compares against the threshold. */
-export interface TmdistConditionValue { topic_id: number; threshold: number }
+interface TmdistConditionValue {
+  topic_id: number;
+  threshold: number;
+}
 export type ConditionValue =
   | string
   | number
@@ -91,16 +97,6 @@ export interface JoinPreviewRequestPayload {
   joinType: JoinType;
 }
 
-export interface JoinPreviewRequestSignature {
-  leftNodeId: string;
-  rightNodeId: string;
-  leftOn?: string;
-  rightOn?: string;
-  joinType: JoinType;
-  page: number;
-  pageSize: number;
-}
-
 export interface ConcatPreviewRequestPayload {
   nodeIds: string[];
   deduplicate: boolean;
@@ -116,7 +112,7 @@ export interface ConcatNodeSummary {
   columnCount: number;
 }
 
-export interface ConcatSchemaMismatch {
+interface ConcatSchemaMismatch {
   nodeId: string;
   nodeName: string;
   details: string[];

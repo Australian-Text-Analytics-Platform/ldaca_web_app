@@ -12,13 +12,13 @@ import {
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { normalizeMetadataColumns } from './metadataColumnSelection';
 
-export interface MetadataColumnSection {
+interface MetadataColumnSection {
   columns: string[];
   /**
    * Optional foreground colour applied to the items in this section. When
    * provided, the dropdown skips section headers and relies on colour alone
-  * to differentiate which data block each column came from — the same
-  * colour is used for that block in the input panel above.
+   * to differentiate which data block each column came from — the same
+   * colour is used for that block in the input panel above.
    */
   color?: string;
   /**
@@ -134,7 +134,9 @@ export function MetadataColumnSelector({
                 );
               }
             }}
-            onSelect={(event) => { event.preventDefault(); }}
+            onSelect={(event) => {
+              event.preventDefault();
+            }}
             disabled={selectableColumns.length === 0}
           >
             Select all
@@ -155,8 +157,12 @@ export function MetadataColumnSelector({
                     <DropdownMenuCheckboxItem
                       key={`${String(sectionIdx)}-${column}`}
                       checked={normalizedSelectedColumns.includes(column)}
-                      onCheckedChange={(checked) => { toggleColumn(column, checked); }}
-                      onSelect={(event) => { event.preventDefault(); }}
+                      onCheckedChange={(checked) => {
+                        toggleColumn(column, checked);
+                      }}
+                      onSelect={(event) => {
+                        event.preventDefault();
+                      }}
                       disabled={section.disabled}
                       style={section.color ? { color: section.color } : undefined}
                     >
@@ -170,8 +176,12 @@ export function MetadataColumnSelector({
                 <DropdownMenuCheckboxItem
                   key={column}
                   checked={normalizedSelectedColumns.includes(column)}
-                  onCheckedChange={(checked) => { toggleColumn(column, checked); }}
-                  onSelect={(event) => { event.preventDefault(); }}
+                  onCheckedChange={(checked) => {
+                    toggleColumn(column, checked);
+                  }}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                  }}
                 >
                   {column}
                 </DropdownMenuCheckboxItem>

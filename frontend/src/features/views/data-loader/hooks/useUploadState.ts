@@ -93,7 +93,9 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
         notify(
           'error',
           `Failed to upload ${
-            failedFiles.length === 1 ? (failedFiles[0] ?? '') : `${String(failedFiles.length)} files`
+            failedFiles.length === 1
+              ? (failedFiles[0] ?? '')
+              : `${String(failedFiles.length)} files`
           }.`,
         );
         return;

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
-import { joinNodesPreview } from '@/api/generated/sdk.gen';
+import { joinNodesPreview } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import type {
   NodeColumnSelection,
@@ -551,5 +551,3 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     showActivityTag: isJoining || isLoading.operations,
   };
 };
-
-export type { JoinSelectionPanelConfig };

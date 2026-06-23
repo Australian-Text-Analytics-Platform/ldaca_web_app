@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { detachSequentialAnalysisTask } from '@/api/generated/sdk.gen';
+import { detachSequentialAnalysisTask } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import type { SequentialAnalysisDatum } from './useSequentialAnalysisTaskFlow';
 
@@ -43,9 +43,7 @@ export function useSequentialAnalysisDetach({
 }: SequentialAnalysisDetachParams) {
   const [isDetaching, setIsDetaching] = useState(false);
 
-  const rawRows = Array.isArray(results?.data)
-    ? (results.data as Record<string, unknown>[])
-    : [];
+  const rawRows = Array.isArray(results?.data) ? (results.data as Record<string, unknown>[]) : [];
   const groupByColumns = Array.isArray(
     (results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns,
   )
@@ -57,7 +55,9 @@ export function useSequentialAnalysisDetach({
 
     const dedupedVisibleGroups = new Map<string, Record<string, unknown>>();
     rawRows.forEach((row) => {
-      const groupKey = groupByColumns.map((column) => String((row[column] as string | number | undefined) ?? '')).join(' - ');
+      const groupKey = groupByColumns
+        .map((column) => String((row[column] as string | number | undefined) ?? ''))
+        .join(' - ');
       if (excludedGroupKeys.has(groupKey)) {
         return;
       }

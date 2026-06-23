@@ -2,21 +2,10 @@ export type DataRow = Record<string, unknown>;
 
 export type { PaginationInfo, PaginationInfo as NodeDataPagination } from '@/api';
 
-export interface ServerSortingInfo {
-  sort_by: string | null;
-  descending: boolean;
-}
-
-export interface ServerFilteringInfo {
-  column: string | null;
-  value: string | null;
-  op: string;
-}
-
 export type FilterOperator = 'contains' | 'eq' | 'startswith' | 'endswith';
 
 /** Backend node shape tuple, with nulls when size is unknown. */
-export type NodeShape = [number | null, number | null];
+type NodeShape = [number | null, number | null];
 
 /** Rich node shape used by the workspace graph/table view. */
 export interface WorkspaceNode {

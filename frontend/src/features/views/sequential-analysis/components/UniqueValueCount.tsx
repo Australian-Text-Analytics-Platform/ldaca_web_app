@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { getColumnUniqueValues } from '@/api/generated/sdk.gen';
+import { getColumnUniqueValues } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 
 interface UniqueValueCountProps {

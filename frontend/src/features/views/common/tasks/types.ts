@@ -33,7 +33,7 @@ export interface AnalysisTaskBannerFallback {
   message?: string;
 }
 
-export type AnalysisTaskBannerFallbackInput =
+type AnalysisTaskBannerFallbackInput =
   | AnalysisTaskBannerFallback
   | null
   | ((status: AnalysisTaskStatus) => AnalysisTaskBannerFallback | null);

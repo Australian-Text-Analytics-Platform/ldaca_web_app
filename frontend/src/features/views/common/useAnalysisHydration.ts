@@ -14,7 +14,7 @@ const logHydrationFailure = (label: string, error: unknown) => {
   fn(`[analysis-hydration] ${label}:`, error);
 };
 
-export type HydrationStatus = 'idle' | 'loading' | 'error';
+type HydrationStatus = 'idle' | 'loading' | 'error';
 
 export interface HydrationState {
   status: HydrationStatus;

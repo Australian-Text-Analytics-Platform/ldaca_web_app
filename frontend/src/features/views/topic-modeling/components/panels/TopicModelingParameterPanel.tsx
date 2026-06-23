@@ -131,10 +131,9 @@ export function TopicModelingParameterPanel({
   // 2× the originally-fitted count, so post-fit we can let the user scale
   // up without rerunning. Pre-fit cap stays at 50 since there's no fitted
   // count to double yet.
-  const representativeWordsCountCap =
-    representativeWordsCountServerMax
-      ? Math.max(50, 2 * representativeWordsCountServerMax)
-      : 50;
+  const representativeWordsCountCap = representativeWordsCountServerMax
+    ? Math.max(50, 2 * representativeWordsCountServerMax)
+    : 50;
 
   // Called by: words-per-topic input blur handler to commit within the backend-supported cap because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
   const handleRepresentativeWordsCountBlur = (event: FocusEvent<HTMLInputElement>) => {
@@ -195,9 +194,7 @@ export function TopicModelingParameterPanel({
             const node = selectedNodes[idx];
             const sample = corpusSamples[idx] ?? { percent: '100', enabled: false };
             const nodeId = node?.id ?? '';
-            const color = nodeId
-              ? (VIZ_PALETTE[idx % VIZ_PALETTE.length] ?? '#6b7280')
-              : '#9ca3af';
+            const color = nodeId ? (VIZ_PALETTE[idx % VIZ_PALETTE.length] ?? '#6b7280') : '#9ca3af';
             const nDocs = nodeDocCounts[idx] ?? 0;
 
             // When unchecked: display 100 and show full doc count
@@ -233,7 +230,9 @@ export function TopicModelingParameterPanel({
                 {/* Coloured circle radio toggle */}
                 <button
                   type="button"
-                  onClick={() => { onCorpusSampleChange(idx, { enabled: !sample.enabled }); }}
+                  onClick={() => {
+                    onCorpusSampleChange(idx, { enabled: !sample.enabled });
+                  }}
                   aria-label={sample.enabled ? 'Disable sampling' : 'Enable sampling'}
                   className="h-5 w-5 shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
@@ -258,7 +257,9 @@ export function TopicModelingParameterPanel({
                   value={displayPercent}
                   disabled={!sample.enabled}
                   className="h-8 w-14 shrink-0 px-1.5 text-center text-sm"
-                  onChange={(e) => { onCorpusSampleChange(idx, { percent: e.target.value }); }}
+                  onChange={(e) => {
+                    onCorpusSampleChange(idx, { percent: e.target.value });
+                  }}
                   onBlur={(e) => {
                     const raw = Number(e.target.value);
                     const clamped = Math.min(100, Math.max(1, isNaN(raw) ? 1 : Math.round(raw)));
@@ -331,7 +332,9 @@ export function TopicModelingParameterPanel({
                       ? ' text-muted-foreground'
                       : ''
               }`}
-              onChange={(e) => { setTopicSizeValueDraft(e.target.value); }}
+              onChange={(e) => {
+                setTopicSizeValueDraft(e.target.value);
+              }}
               onBlur={handleTopicSizeValueBlur}
             />
           </div>
@@ -348,7 +351,9 @@ export function TopicModelingParameterPanel({
               step={1}
               value={randomSeed}
               className={`h-8 w-24 text-right text-sm${!randomSeedUserSet ? ' text-muted-foreground' : ''}`}
-              onChange={(e) => { onRandomSeedChange(Math.max(0, Number(e.target.value) || 0)); }}
+              onChange={(e) => {
+                onRandomSeedChange(Math.max(0, Number(e.target.value) || 0));
+              }}
             />
           </div>
 
@@ -373,7 +378,9 @@ export function TopicModelingParameterPanel({
                 step={1}
                 value={representativeWordsCountDraft}
                 className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
-                onChange={(e) => { setRepresentativeWordsCountDraft(e.target.value); }}
+                onChange={(e) => {
+                  setRepresentativeWordsCountDraft(e.target.value);
+                }}
                 onBlur={handleRepresentativeWordsCountBlur}
               />
             </DisabledReasonTooltip>

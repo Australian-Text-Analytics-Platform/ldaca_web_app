@@ -20,8 +20,6 @@ import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
-export type { ReplaceSubTabProps } from './hooks/useReplaceSubTab';
-
 type ReplaceSubTabComponentProps = ReplaceSubTabProps & {
   renderNodeInputsPanel?: () => ReactNode;
 };
@@ -93,7 +91,9 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
               <Label htmlFor="find-mode">Mode</Label>
               <Select
                 value={mode}
-                onValueChange={(value: 'replace' | 'extract') => { setMode(value); }}
+                onValueChange={(value: 'replace' | 'extract') => {
+                  setMode(value);
+                }}
                 disabled={controlsDisabled || !selectedColumn}
               >
                 <SelectTrigger id="find-mode">
@@ -113,7 +113,9 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
                 type="number"
                 min={1}
                 value={n ?? ''}
-                onChange={(event) => { setN(event.target.value ? Number(event.target.value) : null); }}
+                onChange={(event) => {
+                  setN(event.target.value ? Number(event.target.value) : null);
+                }}
                 placeholder="All if left blank"
                 disabled={controlsDisabled || !selectedColumn}
               />
@@ -124,7 +126,9 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
               <Input
                 id="find-pattern"
                 value={pattern}
-                onChange={(event) => { setPattern(event.target.value); }}
+                onChange={(event) => {
+                  setPattern(event.target.value);
+                }}
                 placeholder="\\d+"
                 disabled={controlsDisabled || !selectedColumn}
               />
@@ -138,7 +142,9 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
                   <Input
                     id="find-replacement"
                     value={replacement}
-                    onChange={(event) => { setReplacement(event.target.value); }}
+                    onChange={(event) => {
+                      setReplacement(event.target.value);
+                    }}
                     placeholder="#"
                     disabled={controlsDisabled || !selectedColumn}
                   />
@@ -152,7 +158,9 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
                   <Input
                     id="find-connector"
                     value={connector}
-                    onChange={(event) => { setConnector(event.target.value); }}
+                    onChange={(event) => {
+                      setConnector(event.target.value);
+                    }}
                     placeholder={'" " will be used by default'}
                     disabled={controlsDisabled || !selectedColumn}
                   />
@@ -169,14 +177,16 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
             <Input
               id="replace-output-column"
               value={outputColumnName}
-              onChange={(event) => { setOutputColumnName(event.target.value); }}
-              onKeyDown={(event) =>
-                { acceptPlaceholderOnTab({
+              onChange={(event) => {
+                setOutputColumnName(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                acceptPlaceholderOnTab({
                   event,
                   value: outputColumnName,
                   setValue: setOutputColumnName,
-                }); }
-              }
+                });
+              }}
               placeholder={selectedColumn || 'Leave blank to overwrite the selected column'}
               disabled={controlsDisabled || !selectedColumn}
               className="min-w-0 flex-1"

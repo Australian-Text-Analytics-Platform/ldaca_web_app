@@ -1,4 +1,4 @@
-import { getNodeData } from '@/api/generated/sdk.gen';
+import { getNodeData } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { PreviewPagination, PreviewRow } from '../types';
 import {

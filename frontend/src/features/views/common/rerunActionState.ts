@@ -50,8 +50,7 @@ export const getRerunActionState = ({
 }: RerunActionStateInput): RerunActionState => {
   const runLabel: 'Run' | 'Re-run' = hasLastRun ? 'Re-run' : 'Run';
 
-  const runDisabled =
-    !hasWorkspace || !isRunnable || isBusy || (hasLastRun && !hasChanges);
+  const runDisabled = !hasWorkspace || !isRunnable || isBusy || (hasLastRun && !hasChanges);
 
   const clearDisabled = !hasWorkspace || !hasResults;
 
@@ -67,7 +66,7 @@ export const getRerunActionState = ({
 };
 
 /** A request's node selection, normalized for order-independent comparison. */
-export interface NodeSelectionSignature {
+interface NodeSelectionSignature {
   nodeIds: string[];
   nodeColumns: Record<string, string>;
 }
@@ -77,9 +76,7 @@ export interface NodeSelectionSignature {
  * Called by: hasNodeSelectionChanged so adding/removing/re-columning a node
  * flips the button to "Re-run" without false positives from ordering.
  */
-const nodeSelectionSignature = (
-  selections: NodeColumnSelection[],
-): NodeSelectionSignature => {
+const nodeSelectionSignature = (selections: NodeColumnSelection[]): NodeSelectionSignature => {
   const nodeIds = normalizeStringArray(selections.map((s) => s.nodeId));
   const nodeColumns: Record<string, string> = {};
   selections.forEach((s) => {

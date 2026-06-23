@@ -26,8 +26,9 @@ slice they need.
 - `useWorkspaceNodeMutations()` owns workspace creation/opening, node creation,
   transforms, detach/materialize operations, and cache invalidation.
 
-`useWorkspaceUiStateSync()` hydrates and persists workspace UI state such as
-node colors through backend `ui_state.json`.
+`useWorkspaceUiStateSync()` hydrates and persists backend-owned workspace UI
+state through `ui_state.json`; source-node visualization colours are now derived
+locally from deterministic palettes inside the analysis views.
 
 ## Query Keys And Invalidations
 
@@ -41,8 +42,8 @@ manually reloading the whole app state.
 ## Graph Hooks
 
 `graph-view/hooks/useWorkspaceGraph.ts` converts backend graph payloads to
-React Flow state. It handles dagre layout, tokenization metadata, selection/active
-visual state, fresh-node highlighting, color pruning, and React Flow state
+React Flow state. It handles dagre layout, tokenization metadata,
+selection/active visual state, fresh-node highlighting, and React Flow state
 updates.
 
 The graph hook uses signatures and `requestAnimationFrame` to avoid rewriting

@@ -14,7 +14,9 @@ describe('preprocessing type utils', () => {
   });
 
   it('offers checklist operator set for list_string', () => {
-    expect(getOperatorsForType('list[string]')).toEqual([{ value: 'in', label: 'contains any of' }]);
+    expect(getOperatorsForType('list[string]')).toEqual([
+      { value: 'in', label: 'contains any of' },
+    ]);
   });
 });
 

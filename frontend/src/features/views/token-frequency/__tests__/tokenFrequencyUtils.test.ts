@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
+import type { TokenFrequencyResponse } from '@/api';
 import {
   buildSelectionNameKey,
   buildSelectionNameById,

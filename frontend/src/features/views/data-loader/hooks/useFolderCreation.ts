@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createFolder } from '@/api/generated/sdk.gen';
+import { createFolder } from '@/api';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -67,8 +67,11 @@ export function useFolderCreation({ authHeaders, refetchFiles, notify }: UseFold
       setNewFolderName('');
     } catch (error) {
       // read message off any thrown value; an empty message should fall through to the fallback
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      const message = (error as { message?: string } | undefined)?.message || 'Failed to create folder.';
+      const errorMessage = (error as { message?: string } | undefined)?.message;
+      const message =
+        typeof errorMessage === 'string' && errorMessage.length > 0
+          ? errorMessage
+          : 'Failed to create folder.';
       if (message.toLowerCase().includes('invalid folder name')) {
         setFolderNameAlert(message);
         return;
@@ -92,7 +95,9 @@ export function useFolderCreation({ authHeaders, refetchFiles, notify }: UseFold
      * Consumed by: DataLoaderDialogs because it needs to dismiss validation alerts
      * while leaving folder mutation state inside this hook.
      */
-    closeFolderNameAlert: () => { setFolderNameAlert(null); },
+    closeFolderNameAlert: () => {
+      setFolderNameAlert(null);
+    },
     openCreateFolderDialog,
     handleCreateFolder,
   };

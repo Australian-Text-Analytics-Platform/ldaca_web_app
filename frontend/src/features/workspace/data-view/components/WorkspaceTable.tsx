@@ -249,14 +249,15 @@ export function WorkspaceTable({
      * Called by: WorkspaceTable internal event, effect, or helper flow.
      * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
      */
-    const onToggleExpand = () =>
-      { setExpandedColumns((prev) => {
+    const onToggleExpand = () => {
+      setExpandedColumns((prev) => {
         if (prev[column]) {
           const { [column]: _, ...rest } = prev;
           return rest;
         }
         return { ...prev, [column]: true };
-      }); };
+      });
+    };
 
     return {
       id: column,
@@ -289,17 +290,25 @@ export function WorkspaceTable({
           isCollapsedColumn={isCollapsedColumn}
           onToggleExpand={onToggleExpand}
           sortState={sortState ? { id: sortState.id, desc: sortState.desc } : undefined}
-          onSort={() => { handleSort(column); }}
+          onSort={() => {
+            handleSort(column);
+          }}
           isFiltered={isFiltered}
           currentFilterOp={isFiltered && activeFilterParts ? activeFilterParts.op : 'contains'}
           currentFilterValue={isFiltered && activeFilterParts ? activeFilterParts.value : ''}
           onApplyFilter={applyFilter}
           onClearFilter={clearFilter}
-          onStartRename={() => { startRename(column); }}
+          onStartRename={() => {
+            startRename(column);
+          }}
           onSubmitRename={submitRename}
           onCancelRename={cancelRename}
-          onTypeChange={(newType) => { handleTypeChange(column, newType); }}
-          onRequestDelete={() => { requestDeleteColumn(column); }}
+          onTypeChange={(newType) => {
+            handleTypeChange(column, newType);
+          }}
+          onRequestDelete={() => {
+            requestDeleteColumn(column);
+          }}
         />
       ),
       /**
@@ -459,7 +468,9 @@ export function WorkspaceTable({
                           header.column.getIsPinned() ? 'bg-muted shadow-sm' : 'bg-muted',
                         )}
                         style={{
-                          ...(meta?.headerMinWidth ? { minWidth: `${String(meta.headerMinWidth)}px` } : {}),
+                          ...(meta?.headerMinWidth
+                            ? { minWidth: `${String(meta.headerMinWidth)}px` }
+                            : {}),
                           ...(meta?.headerMaxWidth !== undefined
                             ? {
                                 maxWidth: `${String(meta.headerMaxWidth)}px`,
@@ -510,7 +521,9 @@ export function WorkspaceTable({
                           cell.column.getIsPinned() ? 'bg-white' : undefined,
                         )}
                         style={{
-                          ...(meta?.cellMinWidth ? { minWidth: `${String(meta.cellMinWidth)}px` } : {}),
+                          ...(meta?.cellMinWidth
+                            ? { minWidth: `${String(meta.cellMinWidth)}px` }
+                            : {}),
                           ...(meta?.cellMaxWidth !== undefined
                             ? {
                                 maxWidth: `${String(meta.cellMaxWidth)}px`,

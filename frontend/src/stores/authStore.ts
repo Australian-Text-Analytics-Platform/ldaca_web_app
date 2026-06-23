@@ -15,19 +15,14 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
-import {
-  getAuthInfo,
-  getConfig,
-  googleAuth,
-  logout as logoutSession,
-} from '@/api/generated/sdk.gen';
-import type { AuthInfoResponse, ConfigResponse } from '@/api/generated/types.gen';
+import { getAuthInfo, getConfig, googleAuth, logout as logoutSession } from '@/api';
+import type { AuthInfoResponse, ConfigResponse } from '@/api';
 
 const AUTH_INFO_TIMEOUT_MS = 7000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 export const REFRESH_FAILURE_THRESHOLD = 3;
 
-export type FetchReason = 'bootstrap' | 'refresh' | 'manual';
+type FetchReason = 'bootstrap' | 'refresh' | 'manual';
 
 export type AuthPhase =
   | { status: 'bootstrapping'; attempts: number; error?: string }

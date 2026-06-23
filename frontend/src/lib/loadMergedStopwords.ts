@@ -24,10 +24,9 @@
  *   (post-trim, preserving original case so e.g. ``Inc`` and ``inc``
  *   stay distinct — matching how the existing textarea treats words).
  */
-import { iso6393 } from 'iso-639-3';
 import * as stopwordLists from 'stopword';
 
-export interface MergedStopwordsLanguageGroup {
+interface MergedStopwordsLanguageGroup {
   /** Normalised ISO 639-1 language code resolved from node metadata. */
   language: string;
   /** The words returned for this language, trimmed but otherwise verbatim. */
@@ -47,30 +46,104 @@ type StopwordExports = Record<string, unknown>;
 
 const stopwordExports = stopwordLists as StopwordExports;
 
+interface StopwordLanguageMetadata {
+  /** Export key used by the third-party stopword package. */
+  stopwordCode: string;
+  /** Two-letter language code accepted by this app's UI and detector flows. */
+  iso6391: string;
+  /** Label shown in the default stop-word picker. */
+  name: string;
+}
+
+// Generated from the stopword package's array exports plus ISO language names.
+// Keeping the small supported-language table here avoids shipping the full
+// iso-639-3 dataset in the token-frequency route chunk.
+const STOPWORD_LANGUAGE_METADATA = [
+  { stopwordCode: 'afr', iso6391: 'af', name: 'Afrikaans' },
+  { stopwordCode: 'ara', iso6391: 'ar', name: 'Arabic' },
+  { stopwordCode: 'hye', iso6391: 'hy', name: 'Armenian' },
+  { stopwordCode: 'eus', iso6391: 'eu', name: 'Basque' },
+  { stopwordCode: 'ben', iso6391: 'bn', name: 'Bengali' },
+  { stopwordCode: 'bre', iso6391: 'br', name: 'Breton' },
+  { stopwordCode: 'bul', iso6391: 'bg', name: 'Bulgarian' },
+  { stopwordCode: 'mya', iso6391: 'my', name: 'Burmese' },
+  { stopwordCode: 'cat', iso6391: 'ca', name: 'Catalan' },
+  { stopwordCode: 'zho', iso6391: 'zh', name: 'Chinese' },
+  { stopwordCode: 'hrv', iso6391: 'hr', name: 'Croatian' },
+  { stopwordCode: 'ces', iso6391: 'cs', name: 'Czech' },
+  { stopwordCode: 'dan', iso6391: 'da', name: 'Danish' },
+  { stopwordCode: 'nld', iso6391: 'nl', name: 'Dutch' },
+  { stopwordCode: 'eng', iso6391: 'en', name: 'English' },
+  { stopwordCode: 'epo', iso6391: 'eo', name: 'Esperanto' },
+  { stopwordCode: 'est', iso6391: 'et', name: 'Estonian' },
+  { stopwordCode: 'fin', iso6391: 'fi', name: 'Finnish' },
+  { stopwordCode: 'fra', iso6391: 'fr', name: 'French' },
+  { stopwordCode: 'glg', iso6391: 'gl', name: 'Galician' },
+  { stopwordCode: 'deu', iso6391: 'de', name: 'German' },
+  { stopwordCode: 'guj', iso6391: 'gu', name: 'Gujarati' },
+  { stopwordCode: 'hau', iso6391: 'ha', name: 'Hausa' },
+  { stopwordCode: 'heb', iso6391: 'he', name: 'Hebrew' },
+  { stopwordCode: 'hin', iso6391: 'hi', name: 'Hindi' },
+  { stopwordCode: 'hun', iso6391: 'hu', name: 'Hungarian' },
+  { stopwordCode: 'ind', iso6391: 'id', name: 'Indonesian' },
+  { stopwordCode: 'gle', iso6391: 'ga', name: 'Irish' },
+  { stopwordCode: 'ita', iso6391: 'it', name: 'Italian' },
+  { stopwordCode: 'jpn', iso6391: 'ja', name: 'Japanese' },
+  { stopwordCode: 'kor', iso6391: 'ko', name: 'Korean' },
+  { stopwordCode: 'kur', iso6391: 'ku', name: 'Kurdish' },
+  { stopwordCode: 'lat', iso6391: 'la', name: 'Latin' },
+  { stopwordCode: 'lav', iso6391: 'lv', name: 'Latvian' },
+  { stopwordCode: 'lit', iso6391: 'lt', name: 'Lithuanian' },
+  { stopwordCode: 'msa', iso6391: 'ms', name: 'Malay (macrolanguage)' },
+  { stopwordCode: 'mar', iso6391: 'mr', name: 'Marathi' },
+  { stopwordCode: 'ell', iso6391: 'el', name: 'Modern Greek (1453-)' },
+  { stopwordCode: 'nob', iso6391: 'nb', name: 'Norwegian Bokmål' },
+  { stopwordCode: 'fas', iso6391: 'fa', name: 'Persian' },
+  { stopwordCode: 'pol', iso6391: 'pl', name: 'Polish' },
+  { stopwordCode: 'por', iso6391: 'pt', name: 'Portuguese' },
+  { stopwordCode: 'ron', iso6391: 'ro', name: 'Romanian' },
+  { stopwordCode: 'rus', iso6391: 'ru', name: 'Russian' },
+  { stopwordCode: 'slk', iso6391: 'sk', name: 'Slovak' },
+  { stopwordCode: 'slv', iso6391: 'sl', name: 'Slovenian' },
+  { stopwordCode: 'som', iso6391: 'so', name: 'Somali' },
+  { stopwordCode: 'sot', iso6391: 'st', name: 'Southern Sotho' },
+  { stopwordCode: 'spa', iso6391: 'es', name: 'Spanish' },
+  { stopwordCode: 'swa', iso6391: 'sw', name: 'Swahili (macrolanguage)' },
+  { stopwordCode: 'swe', iso6391: 'sv', name: 'Swedish' },
+  { stopwordCode: 'tgl', iso6391: 'tl', name: 'Tagalog' },
+  { stopwordCode: 'tha', iso6391: 'th', name: 'Thai' },
+  { stopwordCode: 'tur', iso6391: 'tr', name: 'Turkish' },
+  { stopwordCode: 'ukr', iso6391: 'uk', name: 'Ukrainian' },
+  { stopwordCode: 'urd', iso6391: 'ur', name: 'Urdu' },
+  { stopwordCode: 'vie', iso6391: 'vi', name: 'Vietnamese' },
+  { stopwordCode: 'yor', iso6391: 'yo', name: 'Yoruba' },
+  { stopwordCode: 'zul', iso6391: 'zu', name: 'Zulu' },
+] as const satisfies readonly StopwordLanguageMetadata[];
+
 /** Converts UI/user language strings to the primary code used for stopword lookup. */
 /** Called by: resolveMergedStopwords and loadMergedStopwords in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const normaliseLanguageCode = (raw: string): string =>
   raw.trim().toLowerCase().split(/[-_]/)[0] ?? '';
 
-const iso6393ByIso6391 = new Map(
-  iso6393
-    .filter((language) => language.iso6391 && language.iso6393)
-    .map((language) => [language.iso6391, language.iso6393] as const),
+const stopwordCodeByIso6391 = new Map<string, string>(
+  STOPWORD_LANGUAGE_METADATA.map(({ iso6391, stopwordCode }) => [iso6391, stopwordCode]),
 );
+
+const hasStopwordExport = (code: string): boolean => Array.isArray(stopwordExports[code]);
 
 /** Maps ISO 639-1/639-3 inputs to the third-party stopword package's export keys. */
 /** Called by: resolveMergedStopwords and loadMergedStopwords in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const resolveStopwordLanguageCode = (language: string): string | null => {
   const normalised = normaliseLanguageCode(language);
   if (!normalised) return null;
-  if (normalised.length === 3) return normalised;
-  return iso6393ByIso6391.get(normalised) ?? null;
+  if (normalised.length === 3 && hasStopwordExport(normalised)) return normalised;
+  return stopwordCodeByIso6391.get(normalised) ?? null;
 };
 
 /** Reads one stopword export while treating unsupported package keys as an empty list. */
 /** Called by: resolveMergedStopwords and loadMergedStopwords in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-const getStopwordList = (iso6393Code: string): string[] => {
-  const list = stopwordExports[iso6393Code];
+const getStopwordList = (stopwordCode: string): string[] => {
+  const list = stopwordExports[stopwordCode];
   if (!Array.isArray(list)) return [];
   return list.map((word) => String(word).trim()).filter(Boolean);
 };
@@ -135,35 +208,18 @@ export interface SupportedStopwordLanguage {
   name: string;
 }
 
-// Index iso-639-3 records by both their 639-3 and 639-1 codes so a stopword
-// export key (always a 639-3 code, see resolveStopwordLanguageCode) resolves to
-// a displayable name and the 639-1 code the loader expects.
-const iso639EntryByCode = new Map<string, { name: string; iso6391: string | null }>();
-for (const language of iso6393) {
-  const record = { name: language.name, iso6391: language.iso6391 ?? null };
-  if (language.iso6393) iso639EntryByCode.set(language.iso6393, record);
-  if (language.iso6391) iso639EntryByCode.set(language.iso6391, record);
-}
-
 /**
  * Lists every language the bundled stopword package can supply, as
  * {iso6391, name} sorted by name. Used by: FillDefaultStopWordsDialog to
  * populate its language dropdown so users pick a stoplist case-by-case instead
  * of relying on a stored per-column language.
- * Flow: scan the stopword exports, keep array values with words, resolve each
- * 639-3 key to a 639-1 code + display name, dedupe by 639-1, then sort by name.
+ * Flow: read the curated metadata for supported stopword exports, verify the
+ * current package still has the export, then return display-ready labels.
  */
 export function listSupportedStopwordLanguages(): SupportedStopwordLanguage[] {
-  const result: SupportedStopwordLanguage[] = [];
-  const seen = new Set<string>();
-  for (const [code, value] of Object.entries(stopwordExports)) {
-    if (!Array.isArray(value) || value.length === 0) continue;
-    const entry = iso639EntryByCode.get(code);
-    const iso6391 = entry?.iso6391;
-    if (!iso6391 || seen.has(iso6391)) continue;
-    seen.add(iso6391);
-    result.push({ iso6391, name: entry.name });
-  }
-  result.sort((a, b) => a.name.localeCompare(b.name));
-  return result;
+  return STOPWORD_LANGUAGE_METADATA.filter(
+    ({ stopwordCode }) => getStopwordList(stopwordCode).length > 0,
+  )
+    .map(({ iso6391, name }) => ({ iso6391, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

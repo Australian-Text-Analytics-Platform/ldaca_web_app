@@ -15,7 +15,7 @@ import { immer } from 'zustand/middleware/immer';
  * This store is intentionally not persisted: button clicks are transient UI
  * intents, not canonical selection state.
  */
-export interface NodeInputAddRequest {
+interface NodeInputAddRequest {
   id: number;
   workspaceId: string;
   view: string;
@@ -28,7 +28,11 @@ interface NodeInputRequestsState {
 }
 
 interface NodeInputRequestsActions {
-  requestAdd: (workspaceId: string | null | undefined, view: string | null | undefined, nodeId: string) => void;
+  requestAdd: (
+    workspaceId: string | null | undefined,
+    view: string | null | undefined,
+    nodeId: string,
+  ) => void;
   consume: (id: number) => void;
 }
 
@@ -41,8 +45,8 @@ export const useNodeInputRequestsStore = create<NodeInputRequestsStore>()(
       requests: [],
 
       /** Queues a graph-button add intent for the currently active view. */
-      requestAdd: (workspaceId, view, nodeId) =>
-        { set((state) => {
+      requestAdd: (workspaceId, view, nodeId) => {
+        set((state) => {
           if (!workspaceId || !view || !nodeId) return;
           state.requests.push({
             id: state.nextId,
@@ -51,13 +55,15 @@ export const useNodeInputRequestsStore = create<NodeInputRequestsStore>()(
             nodeIds: [nodeId],
           });
           state.nextId += 1;
-        }); },
+        });
+      },
 
       /** Removes a consumed request after the active view has handled it. */
-      consume: (id) =>
-        { set((state) => {
+      consume: (id) => {
+        set((state) => {
           state.requests = state.requests.filter((request) => request.id !== id);
-        }); },
+        });
+      },
     })),
     { name: 'node-input-requests-store' },
   ),

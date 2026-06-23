@@ -4,7 +4,7 @@
  * focused on rendering and orchestration.
  */
 
-export type NormalizationFailureReason = 'empty' | 'scheme' | 'format' | 'protocol';
+type NormalizationFailureReason = 'empty' | 'scheme' | 'format' | 'protocol';
 
 export interface NormalizedRemoteUrl {
   normalized: string;

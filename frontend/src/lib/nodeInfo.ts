@@ -15,8 +15,8 @@
  */
 import type { QueryClient } from '@tanstack/react-query';
 
-import { getNodeInfo } from '@/api/generated/sdk.gen';
-import type { WorkspaceNodeInfo as NodeInfoResponse } from '@/api/generated/types.gen';
+import { getNodeInfo } from '@/api';
+import type { WorkspaceNodeInfo as NodeInfoResponse } from '@/api';
 import { queryKeys } from './queryKeys';
 
 export type NodeInfo = NodeInfoResponse;

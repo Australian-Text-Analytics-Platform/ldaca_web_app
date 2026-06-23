@@ -99,7 +99,9 @@ const TokenFrequencyDownloadDialogContent = ({
           <Checkbox
             id="include-stop-words"
             checked={includeStopWords}
-            onCheckedChange={(checked) => { setIncludeStopWords(checked === true); }}
+            onCheckedChange={(checked) => {
+              setIncludeStopWords(checked === true);
+            }}
           />
           <Label htmlFor="include-stop-words" className="text-sm cursor-pointer">
             Download stop words as well

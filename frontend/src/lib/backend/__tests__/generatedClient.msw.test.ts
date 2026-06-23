@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getConfig } from '@/api/generated/sdk.gen';
+import { getConfig } from '@/api';
 import { API_MOCK_ORIGIN } from '@/test/msw/handlers';
 
 describe('generated client with MSW', () => {

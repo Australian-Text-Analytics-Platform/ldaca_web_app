@@ -96,7 +96,9 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
           {conditions.length > 1 && (
             <Select
               value={logic}
-              onValueChange={(value) => { onLogicChange(value as 'and' | 'or'); }}
+              onValueChange={(value) => {
+                onLogicChange(value as 'and' | 'or');
+              }}
               disabled={disabled}
             >
               <SelectTrigger className="w-20">
@@ -161,13 +163,13 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                   <div className="flex flex-1 flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2">
                     <Select
                       value={condition.column}
-                      onValueChange={(value) =>
-                        { onConditionChange(
+                      onValueChange={(value) => {
+                        onConditionChange(
                           condition.id,
                           'column',
                           value as Condition[keyof Condition],
-                        ); }
-                      }
+                        );
+                      }}
                       disabled={disabled}
                     >
                       <SelectTrigger
@@ -189,13 +191,13 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                     {!hideOperator && (
                       <Select
                         value={condition.operator}
-                        onValueChange={(value) =>
-                          { onConditionChange(
+                        onValueChange={(value) => {
+                          onConditionChange(
                             condition.id,
                             'operator',
                             value as Condition[keyof Condition],
-                          ); }
-                        }
+                          );
+                        }}
                         disabled={rowDisabled}
                       >
                         <SelectTrigger className="w-36 flex-none">
@@ -225,7 +227,9 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
 
                 {conditions.length > 1 && (
                   <Button
-                    onClick={() => { onRemoveCondition(condition.id); }}
+                    onClick={() => {
+                      onRemoveCondition(condition.id);
+                    }}
                     variant="ghost"
                     size="sm"
                     type="button"

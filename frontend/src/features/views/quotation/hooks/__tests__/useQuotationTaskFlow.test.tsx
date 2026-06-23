@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { QuotationAnalysisResponse } from '@/api/generated/types.gen';
+import type { QuotationAnalysisResponse } from '@/api';
 import { useQuotationTaskFlow } from '../useQuotationTaskFlow';
 
 // Builds the minimal successful quotation response shape consumed by task-flow assertions.
@@ -69,12 +69,14 @@ describe('useQuotationTaskFlow', () => {
           getAuthHeaders: () => ({}),
           resolveTaskId: vi.fn(() => Promise.resolve(null)),
           quotationSearch,
-          detachQuotation: vi.fn(() => Promise.resolve({
-            state: 'running' as const,
-            message: 'Quotation detach started',
-            data: null,
-            metadata: { task_id: 'quotation-detach-task' },
-          })),
+          detachQuotation: vi.fn(() =>
+            Promise.resolve({
+              state: 'running' as const,
+              message: 'Quotation detach started',
+              data: null,
+              metadata: { task_id: 'quotation-detach-task' },
+            }),
+          ),
           materializeQuotation: vi.fn(() => Promise.resolve(undefined)),
         },
       }),
@@ -143,12 +145,14 @@ describe('useQuotationTaskFlow', () => {
           getAuthHeaders: () => ({}),
           resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
           quotationSearch,
-          detachQuotation: vi.fn(() => Promise.resolve({
-            state: 'running' as const,
-            message: 'Quotation detach started',
-            data: null,
-            metadata: { task_id: 'quotation-detach-task' },
-          })),
+          detachQuotation: vi.fn(() =>
+            Promise.resolve({
+              state: 'running' as const,
+              message: 'Quotation detach started',
+              data: null,
+              metadata: { task_id: 'quotation-detach-task' },
+            }),
+          ),
           materializeQuotation: vi.fn(() => Promise.resolve(undefined)),
         },
       }),

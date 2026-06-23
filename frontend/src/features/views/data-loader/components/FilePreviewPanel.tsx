@@ -2,7 +2,13 @@ import { useFilePreview } from '../hooks/useFilePreview';
 import { FilePreviewContent } from './FilePreviewContent';
 import { CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface FilePreviewPanelProps {
   filename: string | null;
@@ -70,7 +76,12 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
           <Button onClick={handleNext} disabled={!canNext || loading} variant="outline" size="sm">
             Next
           </Button>
-          <Select value={String(pageSize)} onValueChange={(value) => { setPageSize(Number(value)); }}>
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => {
+              setPageSize(Number(value));
+            }}
+          >
             <SelectTrigger className="w-20">
               <SelectValue />
             </SelectTrigger>

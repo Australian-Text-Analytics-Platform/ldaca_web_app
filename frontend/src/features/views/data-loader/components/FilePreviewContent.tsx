@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export interface FilePreviewData {
+interface FilePreviewData {
   previewData: Record<string, unknown>[];
   columns: string[];
   loading: boolean;

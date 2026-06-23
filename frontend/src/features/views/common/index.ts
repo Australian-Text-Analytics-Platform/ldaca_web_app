@@ -4,7 +4,6 @@ export * from './hooks/useAnalysisFeature';
 export * from './hooks/useMaterializeLifecycle';
 export * from './parameterComparison';
 export * from './nodeSelectionTypes';
-export * from './components';
 export * from './tasks/types';
 export * from './tasks/policies';
 export * from './useSafeResult';

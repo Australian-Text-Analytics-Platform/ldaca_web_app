@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { cancelTask } from '@/api/generated/sdk.gen';
+import { cancelTask } from '@/api';
 import { collectTaskIds, resolveAnalysisTaskId } from '@/features/views/common/analysisTaskUtils';
 import { useAnalysisHydration, type HydrationState } from '../useAnalysisHydration';
 import { clearAnalysis } from '../clearAnalysis';
@@ -10,10 +10,7 @@ import type {
   AnalysisTaskFlowRefreshContext,
   CanonicalAnalysisTaskType,
 } from '../tasks/types';
-import {
-  lastRunRequestQueryKey,
-  type LastRunAnalysisType,
-} from './useLastRunRequest';
+import { lastRunRequestQueryKey, type LastRunAnalysisType } from './useLastRunRequest';
 import type { AnalysisTaskStatus } from '@/features/views/common/useAnalysisTaskStatus';
 
 interface CachedLastRunRequest {
@@ -172,23 +169,28 @@ export function useAnalysisFeature<TResult = unknown>(
   // ---- Workspace change cleanup ----
   useEffect(() => {
     lastFetchedRef.current = { taskId: null, state: null };
-    void Promise.resolve().then(() => { setLocalTaskId(null); });
+    void Promise.resolve().then(() => {
+      setLocalTaskId(null);
+    });
   }, [config.workspaceId]);
 
   // Returns the cached last-run request data (fetched once by useLastRunRequest).
   // Used to avoid refetching /current and /request during hydration.
-  const readLastRunRequestCache = useCallback((taskId?: string | null): CachedLastRunRequest | null => {
-    if (!configRef.current.workspaceId) return null;
-    return (
-      queryClient.getQueryData<CachedLastRunRequest>(
-        lastRunRequestQueryKey(
-          configRef.current.analysisType,
-          configRef.current.workspaceId,
-          taskId,
-        ),
-      ) ?? null
-    );
-  }, [queryClient]);
+  const readLastRunRequestCache = useCallback(
+    (taskId?: string | null): CachedLastRunRequest | null => {
+      if (!configRef.current.workspaceId) return null;
+      return (
+        queryClient.getQueryData<CachedLastRunRequest>(
+          lastRunRequestQueryKey(
+            configRef.current.analysisType,
+            configRef.current.workspaceId,
+            taskId,
+          ),
+        ) ?? null
+      );
+    },
+    [queryClient],
+  );
 
   // Invalidate the last-run request query only when the local task id truly diverges
   // from the cached taskId. Previously this fired on every localTaskId
@@ -211,8 +213,8 @@ export function useAnalysisFeature<TResult = unknown>(
   // last-run request taskId (populated by useLastRunRequest) →
   // in-memory task-flow status → caller-supplied extras.
   /**
-  * Resolves the task id from explicit local/tab-owned sources, then records
-  * the winning id for future clears.
+   * Resolves the task id from explicit local/tab-owned sources, then records
+   * the winning id for future clears.
    * Called by: hydration, terminal result refresh, clear, and stop workflows because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
    * Flow: collect task-id candidates from refs, result metadata, last-run request cache, task status, and caller extras; then cache the resolved id.
    */

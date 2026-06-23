@@ -173,7 +173,9 @@ export function NodeInputsPanel({
         label={label}
         disabled={disabled}
         noColumnsMessage="No compatible column for this node"
-        onChange={(next) => { onColumnChange(nodeId, next === CLEAR_COLUMN_VALUE ? '' : next); }}
+        onChange={(next) => {
+          onColumnChange(nodeId, next === CLEAR_COLUMN_VALUE ? '' : next);
+        }}
       />
     );
     const addon = renderColumnAddon?.({ ...args, column: resolved?.column ?? '', columns });
@@ -219,143 +221,145 @@ export function NodeInputsPanel({
               </Button>
             )}
 
-          {/* Add preset: current graph selection + recently-used groups. */}
-          <Popover open={presetOpen} onOpenChange={setPresetOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                disabled={disabled || !canAddMore || !hasPresets}
-              >
-                <Bookmark className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                Add preset
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 p-0">
-              <div className="max-h-72 overflow-y-auto py-1">
-                {addableGraphIds.length > 0 && (
-                  <>
-                    <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Current graph selection
-                    </div>
-                    <button
-                      type="button"
-                      className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60"
-                      onClick={() => {
-                        handleAdd(addableGraphIds);
-                        setPresetOpen(false);
-                      }}
-                    >
-                      <span className="truncate font-medium">
-                        Current selection ({addableGraphIds.length})
-                      </span>
-                      <span className="truncate text-[11px] text-muted-foreground">
-                        {graphSelectionLabels.join(', ')}
-                      </span>
-                    </button>
-                  </>
-                )}
-                {recentPresets.length > 0 && (
-                  <>
-                    <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Recent
-                    </div>
-                    {recentPresets.map((preset, idx) => (
+            {/* Add preset: current graph selection + recently-used groups. */}
+            <Popover open={presetOpen} onOpenChange={setPresetOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={disabled || !canAddMore || !hasPresets}
+                >
+                  <Bookmark className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                  Add preset
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-0">
+                <div className="max-h-72 overflow-y-auto py-1">
+                  {addableGraphIds.length > 0 && (
+                    <>
+                      <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Current graph selection
+                      </div>
                       <button
-                        key={`${preset.ids.join('|')}-${String(idx)}`}
                         type="button"
-                        disabled={preset.addableIds.length === 0}
-                        title={
-                          preset.addableIds.length === 0
-                            ? 'All of these are already added or unavailable'
-                            : undefined
-                        }
-                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60"
                         onClick={() => {
-                          handleAdd(preset.addableIds);
+                          handleAdd(addableGraphIds);
                           setPresetOpen(false);
                         }}
                       >
-                        <span className="truncate">{preset.labels.join(', ')}</span>
+                        <span className="truncate font-medium">
+                          Current selection ({addableGraphIds.length})
+                        </span>
+                        <span className="truncate text-[11px] text-muted-foreground">
+                          {graphSelectionLabels.join(', ')}
+                        </span>
                       </button>
-                    ))}
-                  </>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {/* Add data block: searchable list of addable workspace nodes. */}
-          <Popover
-            open={blockOpen}
-            onOpenChange={(open) => {
-              setBlockOpen(open);
-              if (!open) setBlockSearch('');
-            }}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                disabled={disabled || !canAddMore || availableNodes.length === 0}
-              >
-                <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                Add data block
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 p-0">
-              <div className="border-b p-2">
-                <div className="relative">
-                  <Search
-                    className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    autoFocus
-                    value={blockSearch}
-                    onChange={(e) => { setBlockSearch(e.target.value); }}
-                    placeholder="Search data blocks…"
-                    className="h-8 pl-7 text-sm"
-                  />
+                    </>
+                  )}
+                  {recentPresets.length > 0 && (
+                    <>
+                      <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Recent
+                      </div>
+                      {recentPresets.map((preset, idx) => (
+                        <button
+                          key={`${preset.ids.join('|')}-${String(idx)}`}
+                          type="button"
+                          disabled={preset.addableIds.length === 0}
+                          title={
+                            preset.addableIds.length === 0
+                              ? 'All of these are already added or unavailable'
+                              : undefined
+                          }
+                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => {
+                            handleAdd(preset.addableIds);
+                            setPresetOpen(false);
+                          }}
+                        >
+                          <span className="truncate">{preset.labels.join(', ')}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </div>
-              </div>
-              <div className="max-h-64 overflow-y-auto py-1">
-                {filteredAvailableNodes.length === 0 ? (
-                  <div className="px-3 py-3 text-center text-xs text-muted-foreground">
-                    No matching data blocks
+              </PopoverContent>
+            </Popover>
+
+            {/* Add data block: searchable list of addable workspace nodes. */}
+            <Popover
+              open={blockOpen}
+              onOpenChange={(open) => {
+                setBlockOpen(open);
+                if (!open) setBlockSearch('');
+              }}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={disabled || !canAddMore || availableNodes.length === 0}
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                  Add data block
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-0">
+                <div className="border-b p-2">
+                  <div className="relative">
+                    <Search
+                      className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <Input
+                      autoFocus
+                      value={blockSearch}
+                      onChange={(e) => {
+                        setBlockSearch(e.target.value);
+                      }}
+                      placeholder="Search data blocks…"
+                      className="h-8 pl-7 text-sm"
+                    />
                   </div>
-                ) : (
-                  filteredAvailableNodes.map((node, idx) => {
-                    const id = getNodeIdentifier(node, idx);
-                    const reason = getAddRejection(id);
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        disabled={Boolean(reason)}
-                        title={reason ?? undefined}
-                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
-                        onClick={() => {
-                          handleAdd([id]);
-                          setBlockOpen(false);
-                          setBlockSearch('');
-                        }}
-                      >
-                        <span className="truncate">{getNodeDisplayName(node, id)}</span>
-                        {reason && (
-                          <span className="text-[10px] text-muted-foreground">{reason}</span>
-                        )}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
+                </div>
+                <div className="max-h-64 overflow-y-auto py-1">
+                  {filteredAvailableNodes.length === 0 ? (
+                    <div className="px-3 py-3 text-center text-xs text-muted-foreground">
+                      No matching data blocks
+                    </div>
+                  ) : (
+                    filteredAvailableNodes.map((node, idx) => {
+                      const id = getNodeIdentifier(node, idx);
+                      const reason = getAddRejection(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          disabled={Boolean(reason)}
+                          title={reason ?? undefined}
+                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => {
+                            handleAdd([id]);
+                            setBlockOpen(false);
+                            setBlockSearch('');
+                          }}
+                        >
+                          <span className="truncate">{getNodeDisplayName(node, id)}</span>
+                          {reason && (
+                            <span className="text-[10px] text-muted-foreground">{reason}</span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         )}
       </div>

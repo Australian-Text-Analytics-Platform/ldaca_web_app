@@ -1,11 +1,15 @@
 import type {
   ConcordanceAnalysisResponse,
   ConcordanceNodeResult as ConcordanceResultEntry,
-} from '@/api/generated/types.gen';
+} from '@/api';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 
-interface Section { columns: string[]; color?: string; disabled?: boolean }
+interface Section {
+  columns: string[];
+  color?: string;
+  disabled?: boolean;
+}
 
 export interface ConcordanceMetadataColumnSet {
   availableMetadataColumns: string[];
@@ -60,9 +64,7 @@ export function useConcordanceMetadataColumns({
       const rawName = (node as { name?: string }).name;
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string name/id should fall back to the next identifier
       const nodeKey = rawName || rawId || `node-${String(idx)}`;
-      const sel = rawId
-        ? effectiveNodeColumnSelections.find((s) => s.nodeId === rawId)
-        : undefined;
+      const sel = rawId ? effectiveNodeColumnSelections.find((s) => s.nodeId === rawId) : undefined;
       const textColumn = sel?.column;
       const cols = getColumnInfos(node, idx)
         .map((info) => info.name)

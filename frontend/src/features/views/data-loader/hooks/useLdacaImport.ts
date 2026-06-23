@@ -1,13 +1,6 @@
 import { useState } from 'react';
-import {
-  importLdacaDataset,
-  listLdacaFeaturedCollections,
-  searchLdacaCollections,
-} from '@/api/generated/sdk.gen';
-import type {
-  OniSearchRequest,
-  OniSearchResult as LdacaSearchResult,
-} from '@/api/generated/types.gen';
+import { importLdacaDataset, listLdacaFeaturedCollections, searchLdacaCollections } from '@/api';
+import type { OniSearchRequest, OniSearchResult as LdacaSearchResult } from '@/api';
 
 const LDACA_API_TOKEN_HEADER = 'X-LDACA-API-Token';
 

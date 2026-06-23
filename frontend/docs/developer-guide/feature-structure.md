@@ -87,7 +87,7 @@ Shared code used by multiple views lives in `views/common/`:
   `runOrUpdate`, `palette`, etc.).
 
 New views should start their shared code in `views/common/` before introducing
-view-local task, color, or result hydration logic.
+view-local task, visualization-colour, or result hydration logic.
 
 ### Preprocessing Tab
 
@@ -105,6 +105,11 @@ the top of its parameter card so preprocessing follows the same layout as the
 functional analysis tabs. The selected input node's schema is fetched by node id
 from `GET /workspaces/nodes/{node_id}/data`, so preprocessing does not depend
 on graph selection to populate column controls.
+
+The Polars expression subtab is the only preprocessing path that needs
+CodeMirror. Keep it behind the lazy `PolarsExpressionSubTab` boundary in
+`DataPreprocessingFeature.tsx` so the common filter/sample/join/stack/find/create
+paths do not pay for the editor bundle until users open the expression tab.
 
 ## Workspace Features
 

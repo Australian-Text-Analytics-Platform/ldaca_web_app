@@ -10,7 +10,5 @@ This guide documents how the React/Tauri frontend is implemented.
   mutations, graph, and table hooks.
 - [Analysis features](analysis-features.md): shared task/result patterns and
   per-analysis responsibilities.
-- [Node-colour strategy](node-colour-strategy.md): node color assignment,
-  temp colors, promotion, and workspace persistence.
 - [Tauri desktop](tauri-desktop.md): Rust shell, backend runtime, downloads,
   and shutdown.

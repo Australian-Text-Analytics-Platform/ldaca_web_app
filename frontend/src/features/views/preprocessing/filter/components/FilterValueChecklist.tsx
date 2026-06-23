@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { matchChecklistOption } from '../utils/checklistSearch';
 
-export type FilterChecklistValue = string | number | boolean | null;
+type FilterChecklistValue = string | number | boolean | null;
 
 export interface FilterChecklistOption {
   key: string;
@@ -63,9 +63,9 @@ export function FilterValueChecklist({
       <Input
         type="text"
         value={searchQuery}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-          { onSearchQueryChange(event.target.value); }
-        }
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+          onSearchQueryChange(event.target.value);
+        }}
         disabled={disabled}
         placeholder="Search values (supports * and ?)"
         className="h-8 text-sm"
@@ -78,7 +78,9 @@ export function FilterValueChecklist({
           variant="secondary"
           size="sm"
           disabled={disabled || loading || filteredOptions.length === 0}
-          onClick={() => { onSelectAll(filteredOptions); }}
+          onClick={() => {
+            onSelectAll(filteredOptions);
+          }}
         >
           {selectLabel}
         </Button>
@@ -125,9 +127,9 @@ export function FilterValueChecklist({
                 >
                   <Checkbox
                     checked={checked}
-                    onCheckedChange={(next: boolean | 'indeterminate') =>
-                      { onToggleOption(option, next === true); }
-                    }
+                    onCheckedChange={(next: boolean | 'indeterminate') => {
+                      onToggleOption(option, next === true);
+                    }}
                     disabled={disabled}
                     id={`${idPrefix}-${option.key}`}
                   />

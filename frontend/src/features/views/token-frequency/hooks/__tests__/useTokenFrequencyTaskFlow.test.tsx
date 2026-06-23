@@ -94,9 +94,7 @@ describe('useTokenFrequencyTaskFlow', () => {
     setCurrentView: (view: ViewType) => void;
   }
 
-  const renderTwoNodeFlow = (
-    navigation: TwoNodeNavigation,
-  ) =>
+  const renderTwoNodeFlow = (navigation: TwoNodeNavigation) =>
     renderHook(() =>
       useTokenFrequencyTaskFlow({
         state: {

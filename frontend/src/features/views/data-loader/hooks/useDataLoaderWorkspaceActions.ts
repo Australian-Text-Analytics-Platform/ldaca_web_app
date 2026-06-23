@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { uploadWorkspaceZip } from '@/api/generated/sdk.gen';
+import { uploadWorkspaceZip } from '@/api';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUIStore } from '@/stores/uiStore';
-import type { WorkspaceSummary } from '@/api/generated/types.gen';
+import type { WorkspaceSummary } from '@/api';
 import { getWorkspaceId } from '../utils/format';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
@@ -218,12 +218,16 @@ export function useDataLoaderWorkspaceActions({
     // Dialog close handlers are returned with the state they clear because
     // `DataLoaderDialogs` owns only presentation, not workspace state.
     // Consumed by: useDataLoaderWorkspaceActions return object for feature components because consumers need this returned value or action without owning the hook internals.
-    closeWorkspaceNameAlert: () => { setWorkspaceNameAlert(null); },
+    closeWorkspaceNameAlert: () => {
+      setWorkspaceNameAlert(null);
+    },
     /**
      * Clears the workspace pending deletion target after cancel or success.
      * Consumed by: useDataLoaderWorkspaceActions return object for feature components because consumers need this returned value or action without owning the hook internals.
      */
-    closeDeleteWorkspaceDialog: () => { setWorkspaceToDelete(null); },
+    closeDeleteWorkspaceDialog: () => {
+      setWorkspaceToDelete(null);
+    },
     handleCreateWorkspace,
     handleRenameWorkspace,
     handleSaveWorkspace,

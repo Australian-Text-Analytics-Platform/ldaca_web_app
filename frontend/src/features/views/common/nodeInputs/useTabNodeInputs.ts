@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import type { AnalysisTabInput } from '@/api/generated/types.gen';
+import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
@@ -110,9 +110,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   );
 
   useEffect(() => {
-    const matching = inputRequests.filter(
-      (request) => request.workspaceId === currentWorkspaceId,
-    );
+    const matching = inputRequests.filter((request) => request.workspaceId === currentWorkspaceId);
     if (matching.length === 0) return;
     matching.forEach((request) => {
       addNodes(request.nodeIds);
@@ -131,17 +129,22 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
 
   const recentPresets = useMemo<ResolvedPreset[]>(() => {
     const currentIds = new Set(value.map((i) => i.node_id));
-    return (recentGroups ?? [])
-      .map((ids) => {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ids are pre-filtered by nodeNameById.has(id)
-        const labels = ids.filter((id) => nodeNameById.has(id)).map((id) => nodeNameById.get(id)!);
-        const addableIds = ids.filter(
-          (id) => nodeNameById.has(id) && !currentIds.has(id) && result.getAddRejection(id) === null,
-        );
-        return { ids, labels, addableIds };
-      })
-      // Hide groups whose nodes have all vanished or are all already added.
-      .filter((preset) => preset.labels.length > 0);
+    return (
+      (recentGroups ?? [])
+        .map((ids) => {
+          const labels = ids.flatMap((id) => {
+            const label = nodeNameById.get(id);
+            return label === undefined ? [] : [label];
+          });
+          const addableIds = ids.filter(
+            (id) =>
+              nodeNameById.has(id) && !currentIds.has(id) && result.getAddRejection(id) === null,
+          );
+          return { ids, labels, addableIds };
+        })
+        // Hide groups whose nodes have all vanished or are all already added.
+        .filter((preset) => preset.labels.length > 0)
+    );
   }, [recentGroups, nodeNameById, value, result]);
 
   return {

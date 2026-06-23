@@ -144,9 +144,9 @@ export function AnalysisCardLayout({
 
           <div className="flex items-center gap-2">
             <Button
-                onClick={() => {
-                  void actions.onClear();
-                }}
+              onClick={() => {
+                void actions.onClear();
+              }}
               variant="destructive"
               disabled={actions.clearDisabled}
             >

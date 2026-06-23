@@ -5,11 +5,8 @@ import {
   concordanceTaskDispersionBins,
   concordanceTaskRequest,
   concordanceTaskResult,
-} from '@/api/generated/sdk.gen';
-import type {
-  ConcordanceAnalysisResponse,
-  ConcordanceDispersionBinRow,
-} from '@/api/generated/types.gen';
+} from '@/api';
+import type { ConcordanceAnalysisResponse, ConcordanceDispersionBinRow } from '@/api';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -31,7 +28,7 @@ import {
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
-import type { AnalysisTabInput } from '@/api/generated/types.gen';
+import type { AnalysisTabInput } from '@/api';
 import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
@@ -90,7 +87,7 @@ type ConcordanceGroupedRow = Record<string, unknown>[];
  * lets the feature report task id assignment/clear back to the tab record. All
  * are absent in the legacy non-tabbed mounting, where behaviour is unchanged.
  */
-export interface ConcordanceFeatureProps {
+interface ConcordanceFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
@@ -173,13 +170,9 @@ function ConcordanceFeature({
     taskId: tabTaskId ?? null,
   });
   /** Replaces this tab's inputs from a node/column selection list (hydration + handoff). */
-  const applyInputsFromSelections = (
-    sels: { nodeId: string; column?: string | null }[],
-  ) => {
+  const applyInputsFromSelections = (sels: { nodeId: string; column?: string | null }[]) => {
     onTabInputsChange?.(
-      sels
-        .filter((s) => s.nodeId)
-        .map((s) => ({ node_id: s.nodeId, column: s.column ?? null })),
+      sels.filter((s) => s.nodeId).map((s) => ({ node_id: s.nodeId, column: s.column ?? null })),
     );
   };
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
@@ -298,9 +291,7 @@ function ConcordanceFeature({
   })();
 
   const concordanceTaskId = (() => {
-    const md = (liveResults)?.metadata as
-      | Record<string, unknown>
-      | undefined;
+    const md = liveResults?.metadata as Record<string, unknown> | undefined;
     const value = md?.task_id ?? md?.taskId;
     return typeof value === 'string' ? value : '';
   })();
@@ -874,7 +865,7 @@ function ConcordanceFeature({
 
   // Run vs Re-run: with no locking, the primary button is gated purely by
   // whether the current params or node inputs differ from the last run.
-  const lastRunRequest = (serverRequest) ?? null;
+  const lastRunRequest = serverRequest ?? null;
   /** Normalizes a saved concordance request's params for diffing against live form values. */
   const concordanceServerParams = (request: Record<string, unknown>) => ({
     search_word: typeof request.search_word === 'string' ? request.search_word : '',
@@ -980,7 +971,9 @@ function ConcordanceFeature({
           return updated;
         });
       });
-      return () => { cancelAnimationFrame(id); };
+      return () => {
+        cancelAnimationFrame(id);
+      };
     }
   }, [results, globalPageSize, setNodePagination]);
 
@@ -1019,16 +1012,15 @@ function ConcordanceFeature({
     }
   }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
 
-  const {
-    shouldAutoSearch,
-    setShouldAutoSearch,
-  } = useConcordancePendingHandoff({
+  const { shouldAutoSearch, setShouldAutoSearch } = useConcordancePendingHandoff({
     pendingConcordance,
     clearPendingConcordance,
     hydrationState,
     selectedNodes,
     setSearchWord,
-    setNodeColumnSelections: (sels) => { applyInputsFromSelections(sels); },
+    setNodeColumnSelections: (sels) => {
+      applyInputsFromSelections(sels);
+    },
     selectNodes,
   });
 
@@ -1078,7 +1070,9 @@ function ConcordanceFeature({
       setShouldAutoSearch(false);
       void handleSearch(true);
     });
-    return () => { cancelAnimationFrame(id); };
+    return () => {
+      cancelAnimationFrame(id);
+    };
   }, [shouldAutoSearch, handleSearch, setShouldAutoSearch]);
 
   /** Delegates clearing to the shared analysis lifecycle only when a workspace is active. */
@@ -1100,8 +1094,7 @@ function ConcordanceFeature({
       clearResults: handleClearResults,
       /** Starts the feature-specific concordance search after shared update checks pass. */
       // Called by: handleRunOrUpdate through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-      runFreshAnalysis: () =>
-        handleSearch(true, undefined, undefined, undefined, undefined, true),
+      runFreshAnalysis: () => handleSearch(true, undefined, undefined, undefined, undefined, true),
     });
   };
 
@@ -1427,9 +1420,9 @@ function ConcordanceFeature({
             nodeId={nodeId}
             column={column}
             value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
-            onChange={(model, detectedLanguage) =>
-              { handleTokenizerModelChange(nodeId, column, model, detectedLanguage); }
-            }
+            onChange={(model, detectedLanguage) => {
+              handleTokenizerModelChange(nodeId, column, model, detectedLanguage);
+            }}
             getAuthHeaders={getAuthHeaders}
             disabled={false}
             disabledReason="Clear results first to change tokenizer models"

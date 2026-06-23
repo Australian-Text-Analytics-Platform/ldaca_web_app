@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { getTaskTypeCandidates, normalizeTaskDedupeKey } from '@/features/views/common/analysisTaskUtils';
+import {
+  getTaskTypeCandidates,
+  normalizeTaskDedupeKey,
+} from '@/features/views/common/analysisTaskUtils';
 import { useAnalysisTaskStatus } from '@/features/views/common/useAnalysisTaskStatus';
 import { shouldRefreshOnCompletion } from './policies';
 import type {

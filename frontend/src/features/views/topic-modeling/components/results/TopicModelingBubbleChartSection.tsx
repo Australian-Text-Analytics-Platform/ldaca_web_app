@@ -222,7 +222,9 @@ export function TopicModelingBubbleChartSection({
             <button
               type="button"
               className={OVERLAY_BTN}
-              onClick={() => { setDownloadDialogOpen(true); }}
+              onClick={() => {
+                setDownloadDialogOpen(true);
+              }}
               title="Download chart"
               aria-label="Download chart"
             >

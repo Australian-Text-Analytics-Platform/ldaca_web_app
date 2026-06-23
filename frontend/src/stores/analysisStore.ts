@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
-import type { ConcordanceAnalysisResponse } from '@/api/generated/types.gen';
+import type { ConcordanceAnalysisResponse } from '@/api';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
 /** Canonical task lifecycle states. */
-export type TaskState =
+type TaskState =
   | 'pending'
   | 'queued'
   | 'submitted'
@@ -111,26 +111,29 @@ export const useAnalysisStore = create<AnalysisState>()(
     materializedEvents: [],
     /** Replaces or updates task summaries received from polling/SSE task streams. */
     /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-    setTasks: (tasks) =>
-      { set((state) => {
+    setTasks: (tasks) => {
+      set((state) => {
         state.tasks = typeof tasks === 'function' ? tasks(state.tasks) : tasks;
-      }); },
+      });
+    },
     /** Stores the concordance payload that should be consumed after an auto-run handoff. */
     /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-    setPendingConcordance: (payload) =>
-      { set((state) => {
+    setPendingConcordance: (payload) => {
+      set((state) => {
         state.pendingConcordance = { ...payload, timestamp: payload.timestamp ?? Date.now() };
-      }); },
+      });
+    },
     /** Clears the concordance handoff once the destination feature consumes it. */
     /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-    clearPendingConcordance: () =>
-      { set((state) => {
+    clearPendingConcordance: () => {
+      set((state) => {
         state.pendingConcordance = null;
-      }); },
+      });
+    },
     /** Records worker materialization events so feature tabs can react without refetch races. */
     /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-    pushMaterializedEvent: (event) =>
-      { set((state) => {
+    pushMaterializedEvent: (event) => {
+      set((state) => {
         materializedEventSequence += 1;
         state.materializedEvents.unshift({
           ...event,
@@ -139,6 +142,7 @@ export const useAnalysisStore = create<AnalysisState>()(
         if (state.materializedEvents.length > MATERIALIZED_EVENT_HISTORY_LIMIT) {
           state.materializedEvents.length = MATERIALIZED_EVENT_HISTORY_LIMIT;
         }
-      }); },
+      });
+    },
   })),
 );

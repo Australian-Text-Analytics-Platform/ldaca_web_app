@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadMergedStopwords } from '../loadMergedStopwords';
+import { listSupportedStopwordLanguages, loadMergedStopwords } from '../loadMergedStopwords';
 
 describe('loadMergedStopwords', () => {
   it('returns an empty result when no languages are supplied', async () => {
@@ -31,5 +31,16 @@ describe('loadMergedStopwords', () => {
     const result = await loadMergedStopwords({ languages: ['xx'] });
 
     expect(result).toEqual({ byLanguage: [], merged: [] });
+  });
+
+  it('lists supported picker languages from the compact stopword metadata table', () => {
+    const languages = listSupportedStopwordLanguages();
+
+    expect(languages.length).toBeGreaterThan(50);
+    expect(languages).toContainEqual({ iso6391: 'en', name: 'English' });
+    expect(languages).toContainEqual({ iso6391: 'zh', name: 'Chinese' });
+    expect(languages.map((language) => language.name)).toEqual(
+      [...languages.map((language) => language.name)].sort((a, b) => a.localeCompare(b)),
+    );
   });
 });

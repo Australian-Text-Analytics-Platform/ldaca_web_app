@@ -14,12 +14,8 @@ import {
   getNodeData,
   runAiAnnotation,
   saveAiAnnotation,
-} from '@/api/generated/sdk.gen';
-import type {
-  AiAnnotationNodeResult,
-  AiAnnotationResponse,
-  AnalysisTabInput,
-} from '@/api/generated/types.gen';
+} from '@/api';
+import type { AiAnnotationNodeResult, AiAnnotationResponse, AnalysisTabInput } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,11 +29,7 @@ import {
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import { useUIStore } from '@/stores/uiStore';
-import {
-  getNodeIdentifier,
-  useAnalysisFeature,
-  extractAndSetTaskId,
-} from '../common';
+import { getNodeIdentifier, useAnalysisFeature, extractAndSetTaskId } from '../common';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -593,7 +585,6 @@ function AiAnnotatorFeature() {
       aiAnnotationResultRef.current = response;
       applyResponseResult(response);
       setStatusMessage(response.message);
-
     } catch (error) {
       setStatusMessage(
         `Failed to run AI annotation: ${error instanceof Error ? error.message : String(error)}`,
@@ -667,7 +658,8 @@ function AiAnnotatorFeature() {
   /**
    * Called by: AiAnnotatorFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
    */
-  const buildEditKey = (rowIndex: number, providerName: string) => `${String(rowIndex)}::${providerName}`;
+  const buildEditKey = (rowIndex: number, providerName: string) =>
+    `${String(rowIndex)}::${providerName}`;
 
   // Reads the saved annotation value from the row payload for comparison during auto-save.
   /**
@@ -1054,7 +1046,9 @@ function AiAnnotatorFeature() {
     isReviewLoading;
 
   useEffect(() => {
-    void Promise.resolve().then(() => { setReviewEdits({}); });
+    void Promise.resolve().then(() => {
+      setReviewEdits({});
+    });
   }, [resultNodeId, page, pageSize]);
 
   // Footer-only TanStack instance for the annotate results table (the bespoke
@@ -1195,7 +1189,9 @@ function AiAnnotatorFeature() {
         </p>
         <Tabs
           value={panelTab}
-          onValueChange={(value) => { setPanelTab(value as 'ai-annotation' | 'review'); }}
+          onValueChange={(value) => {
+            setPanelTab(value as 'ai-annotation' | 'review');
+          }}
         >
           <TabsList className="mb-4">
             <TabsTrigger value="ai-annotation">AI Annotation</TabsTrigger>
@@ -1230,7 +1226,10 @@ function AiAnnotatorFeature() {
                 />
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="space-y-1">
-                    <Label className="text-xs font-medium text-muted-foreground" htmlFor="ai-text-column">
+                    <Label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor="ai-text-column"
+                    >
                       Text Column
                     </Label>
                     <Select
@@ -1244,18 +1243,25 @@ function AiAnnotatorFeature() {
                       </SelectTrigger>
                       <SelectContent>
                         {aiStringColumns.map((ci) => (
-                          <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                          <SelectItem key={ci.name} value={ci.name}>
+                            {ci.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs font-medium text-muted-foreground" htmlFor="ai-annotation-column">
+                    <Label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor="ai-annotation-column"
+                    >
                       Annotation Column
                     </Label>
                     <Select
                       value={aiAnnotationColumn || '__none__'}
-                      onValueChange={(value) => { setAiAnnotationColumn(value === '__none__' ? '' : value); }}
+                      onValueChange={(value) => {
+                        setAiAnnotationColumn(value === '__none__' ? '' : value);
+                      }}
                     >
                       <SelectTrigger id="ai-annotation-column" className="w-full text-sm">
                         <SelectValue placeholder="Select annotation column" />
@@ -1263,7 +1269,9 @@ function AiAnnotatorFeature() {
                       <SelectContent>
                         <SelectItem value="__none__">Create new annotation column</SelectItem>
                         {aiAnnotationColumns.map((ci) => (
-                          <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                          <SelectItem key={ci.name} value={ci.name}>
+                            {ci.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1275,7 +1283,9 @@ function AiAnnotatorFeature() {
                     <Label htmlFor="ai-annotator-endpoint-preset">Endpoint</Label>
                     <Select
                       value={endpointPreset}
-                      onValueChange={(value) => { setEndpointPreset(value as EndpointPreset); }}
+                      onValueChange={(value) => {
+                        setEndpointPreset(value as EndpointPreset);
+                      }}
                     >
                       <SelectTrigger id="ai-annotator-endpoint-preset">
                         <SelectValue placeholder="Select endpoint" />
@@ -1316,7 +1326,9 @@ function AiAnnotatorFeature() {
                       <Input
                         id="ai-annotator-custom-url"
                         value={customBaseUrl}
-                        onChange={(event) => { setCustomBaseUrl(event.target.value); }}
+                        onChange={(event) => {
+                          setCustomBaseUrl(event.target.value);
+                        }}
                         placeholder="e.g. http://localhost:11434/v1"
                       />
                     </div>
@@ -1329,7 +1341,9 @@ function AiAnnotatorFeature() {
                     id="ai-annotator-api-key"
                     type="password"
                     value={apiKey}
-                    onChange={(event) => { setApiKey(event.target.value); }}
+                    onChange={(event) => {
+                      setApiKey(event.target.value);
+                    }}
                     placeholder={
                       endpointPreset === 'openai'
                         ? 'Required for OpenAI'
@@ -1345,7 +1359,9 @@ function AiAnnotatorFeature() {
                   <textarea
                     id="ai-annotator-classes"
                     value={classesText}
-                    onChange={(event) => { setClassesText(event.target.value); }}
+                    onChange={(event) => {
+                      setClassesText(event.target.value);
+                    }}
                     className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     placeholder="support: Supportive stance"
                   />
@@ -1357,7 +1373,9 @@ function AiAnnotatorFeature() {
                   type="button"
                   variant="ghost"
                   className="h-auto px-0 text-sm"
-                  onClick={() => { setShowAdvanced((value) => !value); }}
+                  onClick={() => {
+                    setShowAdvanced((value) => !value);
+                  }}
                 >
                   <Wrench className="mr-2 h-4 w-4" />
                   Advanced Parameters
@@ -1379,7 +1397,9 @@ function AiAnnotatorFeature() {
                           step="0.1"
                           min="0"
                           value={temperature}
-                          onChange={(event) => { setTemperature(event.target.value); }}
+                          onChange={(event) => {
+                            setTemperature(event.target.value);
+                          }}
                         />
                       </div>
 
@@ -1392,7 +1412,9 @@ function AiAnnotatorFeature() {
                           min="0"
                           max="1"
                           value={topP}
-                          onChange={(event) => { setTopP(event.target.value); }}
+                          onChange={(event) => {
+                            setTopP(event.target.value);
+                          }}
                         />
                       </div>
 
@@ -1402,7 +1424,9 @@ function AiAnnotatorFeature() {
                           id="ai-annotator-seed"
                           type="number"
                           value={seed}
-                          onChange={(event) => { setSeed(event.target.value); }}
+                          onChange={(event) => {
+                            setSeed(event.target.value);
+                          }}
                         />
                       </div>
 
@@ -1413,7 +1437,9 @@ function AiAnnotatorFeature() {
                           type="number"
                           min="1"
                           value={batchSize}
-                          onChange={(event) => { setBatchSize(event.target.value); }}
+                          onChange={(event) => {
+                            setBatchSize(event.target.value);
+                          }}
                         />
                       </div>
                     </div>
@@ -1425,7 +1451,9 @@ function AiAnnotatorFeature() {
                       <textarea
                         id="ai-annotator-examples"
                         value={examplesText}
-                        onChange={(event) => { setExamplesText(event.target.value); }}
+                        onChange={(event) => {
+                          setExamplesText(event.target.value);
+                        }}
                         className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         placeholder="This policy is fair => support"
                       />
@@ -1461,7 +1489,10 @@ function AiAnnotatorFeature() {
               />
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium text-muted-foreground" htmlFor="review-text-column">
+                  <Label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="review-text-column"
+                  >
                     Text Column
                   </Label>
                   <Select value={reviewTextColumn} onValueChange={setReviewTextColumn}>
@@ -1470,13 +1501,18 @@ function AiAnnotatorFeature() {
                     </SelectTrigger>
                     <SelectContent>
                       {reviewStringColumns.map((ci) => (
-                        <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                        <SelectItem key={ci.name} value={ci.name}>
+                          {ci.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium text-muted-foreground" htmlFor="review-annotation-column">
+                  <Label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="review-annotation-column"
+                  >
                     Annotation Column
                   </Label>
                   <Select value={reviewAnnotationColumn} onValueChange={setReviewAnnotationColumn}>
@@ -1485,7 +1521,9 @@ function AiAnnotatorFeature() {
                     </SelectTrigger>
                     <SelectContent>
                       {reviewAnnotationColumns.map((ci) => (
-                        <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                        <SelectItem key={ci.name} value={ci.name}>
+                          {ci.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1711,7 +1749,9 @@ function AiAnnotatorFeature() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7 rounded-full border border-border/60 hover:border-border"
-                                  onClick={() => { setIsAddAnnotatorDialogOpen(true); }}
+                                  onClick={() => {
+                                    setIsAddAnnotatorDialogOpen(true);
+                                  }}
                                   aria-label="Add annotator"
                                   title="Add annotator"
                                 >
@@ -1815,7 +1855,9 @@ function AiAnnotatorFeature() {
                       </AlertDialogHeader>
                       <Input
                         value={newProviderName}
-                        onChange={(event) => { setNewProviderName(event.target.value); }}
+                        onChange={(event) => {
+                          setNewProviderName(event.target.value);
+                        }}
                         placeholder="e.g. userA"
                         autoFocus
                       />
@@ -1845,7 +1887,9 @@ function AiAnnotatorFeature() {
                       </AlertDialogHeader>
                       <Input
                         value={newCategoryName}
-                        onChange={(event) => { setNewCategoryName(event.target.value); }}
+                        onChange={(event) => {
+                          setNewCategoryName(event.target.value);
+                        }}
                         placeholder="e.g. mixed"
                         autoFocus
                       />

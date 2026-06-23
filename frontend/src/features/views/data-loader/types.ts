@@ -1,4 +1,4 @@
-import type { FileTreeNodeResponse } from '@/api/generated/types.gen';
+import type { FileTreeNodeResponse } from '@/api';
 
 /** File-tree leaf used by upload/browser panels after generated API nodes are normalized. */
 export type FileTreeFile = Omit<FileTreeNodeResponse, 'children' | 'size' | 'type'> & {

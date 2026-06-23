@@ -208,12 +208,12 @@ describe('useSchemaManagement', () => {
         }),
       );
 
-      await waitFor(() =>
-        { expect(result.current.availableColumns).toEqual([
+      await waitFor(() => {
+        expect(result.current.availableColumns).toEqual([
           { name: 'col_a', dataType: 'integer' },
           { name: 'col_b', dataType: 'string' },
-        ]); },
-      );
+        ]);
+      });
     });
 
     it('falls back to nodeData.columns + dtypes when no schema query is available', () => {
@@ -280,7 +280,9 @@ describe('useSchemaManagement', () => {
         }),
       );
 
-      await waitFor(() => { expect(result.current.currentSchema).toEqual({ col_a: 'integer' }); });
+      await waitFor(() => {
+        expect(result.current.currentSchema).toEqual({ col_a: 'integer' });
+      });
 
       act(() => {
         result.current.lockCurrentSchema();

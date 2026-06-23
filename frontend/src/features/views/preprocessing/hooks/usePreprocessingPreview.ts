@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PreviewPagination, PreviewRow } from '../types';
 
-export interface PreviewFetcherResult<Row = PreviewRow> {
+interface PreviewFetcherResult<Row = PreviewRow> {
   data: Row[];
   columns: string[];
   pagination: PreviewPagination | null;

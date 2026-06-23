@@ -47,18 +47,10 @@ const normalizeTimestamp = (value: unknown): number => {
 const sortTasksByTime = (tasks: TaskItem[] = []) =>
   tasks.toSorted((a, b) => {
     const tb = normalizeTimestamp(
-      (b as InternalTask).__event_timestamp ??
-        b.finished_at ??
-        b.started_at ??
-        b.created_at ??
-        0,
+      (b as InternalTask).__event_timestamp ?? b.finished_at ?? b.started_at ?? b.created_at ?? 0,
     );
     const ta = normalizeTimestamp(
-      (a as InternalTask).__event_timestamp ??
-        a.finished_at ??
-        a.started_at ??
-        a.created_at ??
-        0,
+      (a as InternalTask).__event_timestamp ?? a.finished_at ?? a.started_at ?? a.created_at ?? 0,
     );
     return tb - ta;
   });
@@ -103,7 +95,7 @@ const normalizeState = (value: unknown): string =>
  * Flow: extract the client-only timestamp marker from merged task rows and normalize it through the same timestamp parser.
  */
 const getEventTimestamp = (task: TaskItem | undefined): number =>
-  normalizeTimestamp((task)?.__event_timestamp ?? 0);
+  normalizeTimestamp(task?.__event_timestamp ?? 0);
 
 /**
  * Reads the synthetic event sequence used to break same-timestamp ties.
@@ -111,7 +103,7 @@ const getEventTimestamp = (task: TaskItem | undefined): number =>
  * Flow: read the client-only sequence marker, accept only finite numbers, and default missing metadata to zero.
  */
 const getEventSequence = (task: TaskItem | undefined): number => {
-  const value = (task)?.__event_sequence;
+  const value = task?.__event_sequence;
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 };
 

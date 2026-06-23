@@ -9,13 +9,6 @@ const CANONICAL_TASK_TYPE_MAP = {
   quotation: 'quotation',
 } as const;
 
-export type CanonicalTaskType =
-  | 'topic_modeling'
-  | 'token_frequencies'
-  | 'sequential_analysis'
-  | 'concordance'
-  | 'quotation';
-
 /** Called by: getTaskTypeCandidates when expanding legacy task labels because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 const normalizeTaskTypeKey = (taskType: string): string => {
   const normalized = taskType.trim();

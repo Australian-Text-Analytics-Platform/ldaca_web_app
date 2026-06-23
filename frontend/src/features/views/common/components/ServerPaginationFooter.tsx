@@ -133,7 +133,9 @@ export function ServerPaginationFooter<TData>({
             <span>{pageSizeLabel}</span>
             <select
               value={pageSize}
-              onChange={(e) => { table.setPageSize(Number(e.target.value)); }}
+              onChange={(e) => {
+                table.setPageSize(Number(e.target.value));
+              }}
               className="h-7 rounded-md border border-input bg-background px-2 py-0.5 text-xs text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
             >
               {normalizedOptions.map((size) => (
@@ -222,7 +224,9 @@ export function ServerPaginationFooter<TData>({
             </Label>
             <Select
               value={String(pageSize)}
-              onValueChange={(val) => { table.setPageSize(Number(val)); }}
+              onValueChange={(val) => {
+                table.setPageSize(Number(val));
+              }}
             >
               <SelectTrigger className="h-9 w-20" id="server-rows-per-page">
                 <SelectValue />

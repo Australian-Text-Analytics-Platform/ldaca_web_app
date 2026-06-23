@@ -158,7 +158,12 @@ vi.mock('@/components/ui/confirm-dialog', () => ({
       <div>
         <div>{title}</div>
         <div>{description}</div>
-        <button type="button" onClick={() => { onOpenChange(false); }}>
+        <button
+          type="button"
+          onClick={() => {
+            onOpenChange(false);
+          }}
+        >
           {cancelText}
         </button>
         <button

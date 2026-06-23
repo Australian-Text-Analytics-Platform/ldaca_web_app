@@ -37,7 +37,9 @@ export function useElementWidth(ref: React.RefObject<HTMLElement | null>): numbe
       measure();
     });
     observer.observe(element);
-    return () => { observer.disconnect(); };
+    return () => {
+      observer.disconnect();
+    };
   }, [ref]);
 
   return width;

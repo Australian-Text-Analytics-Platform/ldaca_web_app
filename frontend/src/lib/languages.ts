@@ -1,4 +1,4 @@
-import type { TokenizerModelInfo } from '@/api/generated/types.gen';
+import type { TokenizerModelInfo } from '@/api';
 
 /** Curated language list for UI selectors. */
 export type LanguageModelOption = TokenizerModelInfo;

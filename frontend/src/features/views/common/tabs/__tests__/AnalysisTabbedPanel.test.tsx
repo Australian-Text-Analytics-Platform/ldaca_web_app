@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { AnalysisTab } from '@/api/generated/types.gen';
+import type { AnalysisTab } from '@/api';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { AnalysisTabbedPanel } from '../AnalysisTabbedPanel';

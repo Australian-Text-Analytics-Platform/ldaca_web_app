@@ -77,9 +77,13 @@ function AddFilePanelBody({
         <Button variant="outline" onClick={onClose} type="button">
           Cancel
         </Button>
-        <Button size="sm" onClick={() => {
-          void handleConfirm();
-        }} disabled={submitting}>
+        <Button
+          size="sm"
+          onClick={() => {
+            void handleConfirm();
+          }}
+          disabled={submitting}
+        >
           {submitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -1,6 +1,4 @@
-import { useMemo } from 'react';
-
-import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
+import type { SequentialAnalysisRequestInput } from '@/api';
 
 type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<
@@ -21,7 +19,7 @@ const isCustomIntervalUnit = (value: unknown): value is SequentialCustomInterval
   typeof value === 'string' &&
   VALID_CUSTOM_INTERVAL_UNITS.includes(value as SequentialCustomIntervalUnit);
 
-export interface SequentialResultSummary {
+interface SequentialResultSummary {
   /** Active time/numeric column for the displayed result. */
   timeColumn: string;
   /** Group-by columns the chart is faceted on. */
@@ -46,7 +44,7 @@ interface ResultLike {
   analysis_params?: Record<string, unknown>;
 }
 
-interface Fallbacks {
+export interface SequentialResultSummaryFallbacks {
   timeColumn: string;
   groupBy: string[];
   columnType: 'datetime' | 'numeric';
@@ -58,77 +56,72 @@ interface Fallbacks {
 }
 
 /**
- * Derive a "what does this displayed result represent" summary from the
- * server-side `analysis_params` payload, falling back to the live form
- * values when no result has been computed yet.
- *
- * Replaces ~30 lines of `((results?.analysis_params as Record<…>)?.X)
- * ?? localValue` plumbing previously inlined in SequentialAnalysisFeature.
- */
-/**
  * Used by: SequentialAnalysisResultsPanel.tsx, SequentialAnalysisFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Flow: read the task result's analysis_params, fall back to live form values
+ * when no result exists, normalize numeric-only fields, and format the
+ * frequency label shown by the results panel.
+ */
+export const deriveSequentialResultSummary = (
+  results: ResultLike | null | undefined,
+  fallbacks: SequentialResultSummaryFallbacks,
+): SequentialResultSummary => {
+  const params = results?.analysis_params ?? {};
+
+  const timeColumn = (params.time_column as string | undefined) ?? fallbacks.timeColumn;
+  const groupBy = (params.group_by_columns as string[] | undefined) ?? fallbacks.groupBy;
+  const columnType =
+    (params.column_type as 'datetime' | 'numeric' | undefined) ?? fallbacks.columnType;
+
+  const numericOrigin =
+    columnType === 'numeric'
+      ? ((params.numeric_origin as number | null | undefined) ?? fallbacks.numericOrigin)
+      : null;
+  const numericInterval =
+    columnType === 'numeric'
+      ? ((params.numeric_interval as number | null | undefined) ?? fallbacks.numericInterval)
+      : null;
+
+  const rawFrequency = (params.frequency as SequentialFrequency | undefined) ?? fallbacks.frequency;
+  const customIntervalValue =
+    (params.custom_interval_value as number | null | undefined) ?? fallbacks.customIntervalValue;
+  const rawCustomIntervalUnit = params.custom_interval_unit ?? fallbacks.customIntervalUnit;
+  const customIntervalUnit: SequentialCustomIntervalUnit | null = isCustomIntervalUnit(
+    rawCustomIntervalUnit,
+  )
+    ? rawCustomIntervalUnit
+    : null;
+
+  const frequencyDisplay =
+    columnType === 'numeric'
+      ? 'Numeric bins'
+      : rawFrequency === 'custom'
+        ? customIntervalValue && customIntervalUnit
+          ? `Every ${String(customIntervalValue)} ${customIntervalUnit}`
+          : 'Custom interval'
+        : rawFrequency;
+
+  return {
+    timeColumn,
+    groupBy,
+    columnType,
+    numericOrigin,
+    numericInterval,
+    rawFrequency,
+    customIntervalValue,
+    customIntervalUnit,
+    frequencyDisplay,
+  };
+};
+
+/**
+ * Derives the displayed sequential-result summary for the active analysis tab.
+ * Used by: SequentialAnalysisFeature.tsx because the results panel needs a
+ * compact description of the result's saved request without re-deriving
+ * `analysis_params` fallbacks inline.
+ * Flow: delegate to the pure derivation helper; React Compiler handles routine
+ * render memoization, so this hook does not carry manual `useMemo` state.
  */
 export const useSequentialResultSummary = (
   results: ResultLike | null | undefined,
-  fallbacks: Fallbacks,
-): SequentialResultSummary =>
-  useMemo(() => {
-    const params = (results?.analysis_params ?? {});
-
-    const timeColumn = (params.time_column as string | undefined) ?? fallbacks.timeColumn;
-    const groupBy = (params.group_by_columns as string[] | undefined) ?? fallbacks.groupBy;
-    const columnType =
-      (params.column_type as 'datetime' | 'numeric' | undefined) ?? fallbacks.columnType;
-
-    const numericOrigin =
-      columnType === 'numeric'
-        ? ((params.numeric_origin as number | null | undefined) ?? fallbacks.numericOrigin)
-        : null;
-    const numericInterval =
-      columnType === 'numeric'
-        ? ((params.numeric_interval as number | null | undefined) ?? fallbacks.numericInterval)
-        : null;
-
-    const rawFrequency =
-      (params.frequency as SequentialFrequency | undefined) ?? fallbacks.frequency;
-    const customIntervalValue =
-      (params.custom_interval_value as number | null | undefined) ?? fallbacks.customIntervalValue;
-    const rawCustomIntervalUnit = params.custom_interval_unit ?? fallbacks.customIntervalUnit;
-    const customIntervalUnit: SequentialCustomIntervalUnit | null = isCustomIntervalUnit(
-      rawCustomIntervalUnit,
-    )
-      ? rawCustomIntervalUnit
-      : null;
-
-    const frequencyDisplay =
-      columnType === 'numeric'
-        ? 'Numeric bins'
-        : rawFrequency === 'custom'
-          ? customIntervalValue && customIntervalUnit
-            ? `Every ${String(customIntervalValue)} ${customIntervalUnit}`
-            : 'Custom interval'
-          : rawFrequency;
-
-    return {
-      timeColumn,
-      groupBy,
-      columnType,
-      numericOrigin,
-      numericInterval,
-      rawFrequency,
-      customIntervalValue,
-      customIntervalUnit,
-      frequencyDisplay,
-    };
-  }, [
-    results?.analysis_params,
-    fallbacks.timeColumn,
-    fallbacks.groupBy,
-    fallbacks.columnType,
-    fallbacks.numericOrigin,
-    fallbacks.numericInterval,
-    fallbacks.frequency,
-    fallbacks.customIntervalValue,
-    fallbacks.customIntervalUnit,
-  ]);
+  fallbacks: SequentialResultSummaryFallbacks,
+): SequentialResultSummary => deriveSequentialResultSummary(results, fallbacks);

@@ -93,10 +93,11 @@ export const useFreshNodesStore = create<FreshNodesState>()(
 
     /** Resets session-only freshness state for tests and workspace-session resets. */
     /** Consumed by: useFreshNodesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-    reset: () =>
-      { set((state) => {
+    reset: () => {
+      set((state) => {
         state.seenIds = new Set();
         state.freshIds = new Set();
-      }); },
+      });
+    },
   })),
 );

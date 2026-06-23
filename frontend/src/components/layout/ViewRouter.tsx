@@ -36,9 +36,7 @@ const TokenFrequencyFeature = lazy(
   () => import('@/features/views/token-frequency/TokenFrequencyTabbedFeature'),
 );
 /** Lazy AI annotator chunk consumed by `VIEW_COMPONENTS` when the optional annotator view is visible. */
-const AiAnnotatorFeature = lazy(
-  () => import('@/features/views/ai-annotator/AiAnnotatorFeature'),
-);
+const AiAnnotatorFeature = lazy(() => import('@/features/views/ai-annotator/AiAnnotatorFeature'));
 
 /**
  * Each feature renders only when the matching `currentView` value is set.

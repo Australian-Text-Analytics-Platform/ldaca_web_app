@@ -149,9 +149,9 @@ export function DetachColumnsDialog({
                       >
                         <Checkbox
                           checked={checked}
-                          onCheckedChange={(value: boolean | 'indeterminate') =>
-                            { toggleDetachColumn(node.node_id, column, value === true); }
-                          }
+                          onCheckedChange={(value: boolean | 'indeterminate') => {
+                            toggleDetachColumn(node.node_id, column, value === true);
+                          }}
                           disabled={isDetaching}
                         />
                         <span className={isAnalysisColumn ? 'font-semibold' : undefined}>

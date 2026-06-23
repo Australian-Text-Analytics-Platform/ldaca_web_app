@@ -28,9 +28,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *   Flow, TanStack tables, etc.).
  */
 
-export type ResizableSplitOrientation = 'horizontal' | 'vertical';
-export type ResizableSplitMode = 'percent' | 'pixel';
-export type ResizableSplitAnchor = 'start' | 'end';
+type ResizableSplitOrientation = 'horizontal' | 'vertical';
+type ResizableSplitMode = 'percent' | 'pixel';
+type ResizableSplitAnchor = 'start' | 'end';
 
 interface UseResizableSplitOptions {
   /** Default 'horizontal' (top/bottom panes). */

@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/generated/types.gen';
+import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
@@ -28,7 +28,11 @@ import {
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_FREQ_COLUMNS,
 } from '../../common/generatedColumns';
-import { batchProcessedCount, flattenConcordanceGroups, toCellText } from '../concordanceViewModels';
+import {
+  batchProcessedCount,
+  flattenConcordanceGroups,
+  toCellText,
+} from '../concordanceViewModels';
 
 type ConcordanceRow = Record<string, unknown>;
 type ConcordanceGroupedRow = ConcordanceRow[];
@@ -405,7 +409,10 @@ function CombinedConcordanceTable({
                       }}
                     >
                       {tableRow.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className={alignmentClassForColumn(cell.column.id)}>
+                        <TableCell
+                          key={cell.id}
+                          className={alignmentClassForColumn(cell.column.id)}
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       ))}
@@ -643,7 +650,10 @@ function PerNodeConcordanceTable({
                       }}
                     >
                       {tableRow.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className={alignmentClassForColumn(cell.column.id)}>
+                        <TableCell
+                          key={cell.id}
+                          className={alignmentClassForColumn(cell.column.id)}
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       ))}

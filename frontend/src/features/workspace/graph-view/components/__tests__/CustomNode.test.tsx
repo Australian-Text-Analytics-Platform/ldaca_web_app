@@ -26,8 +26,13 @@ vi.mock('@xyflow/react', () => ({
   NodeToolbar: ({
     children,
     isVisible,
+    nodeId: _nodeId,
     ...props
-  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode; isVisible?: boolean }) =>
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    children: React.ReactNode;
+    isVisible?: boolean;
+    nodeId?: string;
+  }) =>
     isVisible ? (
       <div data-testid="node-toolbar" {...props}>
         {children}

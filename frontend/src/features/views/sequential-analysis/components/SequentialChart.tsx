@@ -142,14 +142,16 @@ export function SequentialChart({
               <Input
                 id="sequential-new-node-name"
                 value={detachNodeName}
-                onChange={(event) => { onDetachNodeNameChange(event.target.value); }}
-                onKeyDown={(event) =>
-                  { acceptPlaceholderOnTab({
+                onChange={(event) => {
+                  onDetachNodeNameChange(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  acceptPlaceholderOnTab({
                     event,
                     value: detachNodeName,
                     setValue: onDetachNodeNameChange,
-                  }); }
-                }
+                  });
+                }}
                 placeholder={detachNodeNamePlaceholder}
                 disabled={isDetaching || readOnly}
                 aria-label="New data block name"
@@ -190,7 +192,7 @@ export function SequentialChart({
 
   const series: MultiSeriesChartSeries[] = visibleKeys.map((key, idx) => {
     const color = String(chartConfig[key]?.color ?? getPaletteColor(idx));
-    const label = (chartConfig[key]?.label) ?? key;
+    const label = chartConfig[key]?.label ?? key;
     return {
       key,
       color,
@@ -252,7 +254,9 @@ export function SequentialChart({
               type="button"
               className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 transition-opacity hover:bg-muted/60"
               style={{ opacity: isHidden ? 0.4 : 1 }}
-              onClick={() => { toggleKey(key); }}
+              onClick={() => {
+                toggleKey(key);
+              }}
               aria-pressed={!isHidden}
               aria-label={isHidden ? `Show ${label}` : `Hide ${label}`}
             >
@@ -300,14 +304,16 @@ export function SequentialChart({
               <Input
                 id="sequential-new-node-name"
                 value={detachNodeName}
-                onChange={(event) => { onDetachNodeNameChange(event.target.value); }}
-                onKeyDown={(event) =>
-                  { acceptPlaceholderOnTab({
+                onChange={(event) => {
+                  onDetachNodeNameChange(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  acceptPlaceholderOnTab({
                     event,
                     value: detachNodeName,
                     setValue: onDetachNodeNameChange,
-                  }); }
-                }
+                  });
+                }}
                 placeholder={detachNodeNamePlaceholder}
                 disabled={isDetaching || readOnly}
                 aria-label="New data block name"

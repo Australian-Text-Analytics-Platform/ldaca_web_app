@@ -2,15 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import {
-  topicModelingTaskRequest,
-  topicModelingTaskResult,
-} from '@/api/generated/sdk.gen';
-import type {
-  AnalysisTabInput,
-  TopicModelingResponse,
-  TopicModelingTopic,
-} from '@/api/generated/types.gen';
+import { topicModelingTaskRequest, topicModelingTaskResult } from '@/api';
+import type { AnalysisTabInput, TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
@@ -47,7 +40,7 @@ const DEFAULT_TOPIC_SIZE_VALUE = 10;
  * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
  * task id assignment/clear back to the tab record.
  */
-export interface TopicModelingFeatureProps {
+interface TopicModelingFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
@@ -78,9 +71,7 @@ function TopicModelingFeature({
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeIds = nodeInputs.resolvedNodes.map((node) => node.id);
-  const applyInputsFromSelections = (
-    selections: { nodeId: string; column?: string | null }[],
-  ) => {
+  const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputsChange?.(
       selections
         .filter((selection) => selection.nodeId)
@@ -240,18 +231,15 @@ function TopicModelingFeature({
     },
     // Removes completed topic tasks from the global task list after clear/delete operations.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    pruneGlobalTasks: (taskIds) =>
-      { setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)); },
+    pruneGlobalTasks: (taskIds) => {
+      setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
+    },
     // Finds task ids embedded in result metadata for status recovery.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    getExtraTaskIdCandidates: () => [
-      (resultRef.current)?.metadata?.task_id,
-    ],
+    getExtraTaskIdCandidates: () => [resultRef.current?.metadata?.task_id],
     // Finds task ids embedded in result metadata for clear operations.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    getClearTaskIdSources: () => [
-      (resultRef.current)?.metadata?.task_id,
-    ],
+    getClearTaskIdSources: () => [resultRef.current?.metadata?.task_id],
     // Treats hydrated running results as active tasks for shared banner/action state.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     isResultRunning: (r) => r?.state === 'running',
@@ -324,7 +312,8 @@ function TopicModelingFeature({
   };
 
   const topicRunningTask = taskStatus.runningTask;
-  const panelNodeIds = panelSelectedNodes.slice(0, 2)
+  const panelNodeIds = panelSelectedNodes
+    .slice(0, 2)
     .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
@@ -484,8 +473,7 @@ function TopicModelingFeature({
     return null;
   }, [topicSizeValue, combinedEffective]);
 
-  const showSamplingWarning =
-    combinedEffective > 0 && combinedEffective < 5 * topicSizeValue;
+  const showSamplingWarning = combinedEffective > 0 && combinedEffective < 5 * topicSizeValue;
 
   const sampleFractionsForRequest = useMemo(
     () =>
@@ -709,11 +697,7 @@ function TopicModelingFeature({
           topicSearchQuery={topicSearchQuery}
           onTopicSearchQueryChange={setTopicSearchQuery}
           activeDomain={activeDomain}
-          nodeNames={
-            panelSelectedNodes
-              .map((n) => (n.name) ?? (n.id) ?? '')
-              .filter(Boolean)
-          }
+          nodeNames={panelSelectedNodes.map((n) => n.name ?? n.id ?? '').filter(Boolean)}
           randomSeed={randomSeed}
           detachDialogOpen={detachDialogOpen}
           setDetachDialogOpen={setDetachDialogOpen}

@@ -7,8 +7,8 @@ import {
   type RefObject,
 } from 'react';
 import { toast } from 'sonner';
-import { concordanceTaskRequest } from '@/api/generated/sdk.gen';
-import type { ConcordanceDispersionBinRow } from '@/api/generated/types.gen';
+import { concordanceTaskRequest } from '@/api';
+import type { ConcordanceDispersionBinRow } from '@/api';
 import type { AnalysisMaterializedEvent } from '@/stores/analysisStore';
 import { useMaterializeLifecycle } from '../../common/hooks/useMaterializeLifecycle';
 import type { PaginationState } from './useConcordanceTaskFlow';

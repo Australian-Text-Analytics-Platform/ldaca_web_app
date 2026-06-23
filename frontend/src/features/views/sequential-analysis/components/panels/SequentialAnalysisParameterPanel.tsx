@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
+import type { SequentialAnalysisRequestInput } from '@/api';
 import { UniqueValueCount } from '../UniqueValueCount';
 
 type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
@@ -165,7 +165,9 @@ export function SequentialAnalysisParameterPanel({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Select
                   value={frequency}
-                  onValueChange={(value) => { onFrequencyChange(value as SequentialFrequency); }}
+                  onValueChange={(value) => {
+                    onFrequencyChange(value as SequentialFrequency);
+                  }}
                   disabled={inputsDisabled}
                 >
                   <SelectTrigger className={frequency === 'custom' ? 'w-full sm:w-44' : 'w-full'}>
@@ -187,16 +189,18 @@ export function SequentialAnalysisParameterPanel({
                       min="1"
                       step="1"
                       value={customIntervalValueInput}
-                      onChange={(event) => { onCustomIntervalValueChange(event.target.value); }}
+                      onChange={(event) => {
+                        onCustomIntervalValueChange(event.target.value);
+                      }}
                       placeholder="e.g. 30"
                       className="w-24"
                       disabled={inputsDisabled}
                     />
                     <Select
                       value={customIntervalUnit}
-                      onValueChange={(value) =>
-                        { onCustomIntervalUnitChange(value as SequentialCustomIntervalUnit); }
-                      }
+                      onValueChange={(value) => {
+                        onCustomIntervalUnitChange(value as SequentialCustomIntervalUnit);
+                      }}
                       disabled={inputsDisabled}
                     >
                       <SelectTrigger className="w-32">
@@ -228,7 +232,9 @@ export function SequentialAnalysisParameterPanel({
                 <Input
                   type="number"
                   value={numericOriginInput}
-                  onChange={(event) => { onNumericOriginChange(event.target.value); }}
+                  onChange={(event) => {
+                    onNumericOriginChange(event.target.value);
+                  }}
                   placeholder="Auto-detect"
                   disabled={inputsDisabled}
                 />
@@ -245,7 +251,9 @@ export function SequentialAnalysisParameterPanel({
                   min="0"
                   step="any"
                   value={numericIntervalInput}
-                  onChange={(event) => { onNumericIntervalChange(event.target.value); }}
+                  onChange={(event) => {
+                    onNumericIntervalChange(event.target.value);
+                  }}
                   placeholder="e.g. 10"
                   disabled={inputsDisabled}
                 />
@@ -277,7 +285,9 @@ export function SequentialAnalysisParameterPanel({
             <div key={index} className="flex items-center space-x-2 mb-2">
               <Select
                 value={column}
-                onValueChange={(value) => { onGroupByColumnChange(index, value); }}
+                onValueChange={(value) => {
+                  onGroupByColumnChange(index, value);
+                }}
                 disabled={inputsDisabled}
               >
                 <SelectTrigger className="flex-1">
@@ -302,7 +312,9 @@ export function SequentialAnalysisParameterPanel({
                 />
               )}
               <Button
-                onClick={() => { onRemoveGroupByColumn(index); }}
+                onClick={() => {
+                  onRemoveGroupByColumn(index);
+                }}
                 variant="destructive"
                 size="sm"
                 disabled={inputsDisabled}
@@ -318,7 +330,9 @@ export function SequentialAnalysisParameterPanel({
               <Checkbox
                 id="case-sensitive"
                 checked={caseSensitive}
-                onCheckedChange={(checked) => { onCaseSensitiveChange(checked === true); }}
+                onCheckedChange={(checked) => {
+                  onCaseSensitiveChange(checked === true);
+                }}
                 disabled={inputsDisabled}
               />
               <label

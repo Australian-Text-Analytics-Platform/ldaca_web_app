@@ -22,7 +22,11 @@ describe('tabStateOps', () => {
     const { state, tabId } = createTabInState(null, TYPE, 'Analysis 1', 'a');
     expect(tabId).toBe('a');
     expect(getTabs(state, TYPE)).toHaveLength(1);
-    expect(getTabs(state, TYPE)[0]).toMatchObject({ tab_id: 'a', task_id: null, title: 'Analysis 1' });
+    expect(getTabs(state, TYPE)[0]).toMatchObject({
+      tab_id: 'a',
+      task_id: null,
+      title: 'Analysis 1',
+    });
     expect(getActiveTabId(state, TYPE)).toBe('a');
   });
 
@@ -145,9 +149,8 @@ describe('tabStateOps', () => {
       'b',
     ]);
     // Same order leaves the tab sequence unchanged.
-    expect(getTabs(reorderTabsInState(state, TYPE, ['a', 'b']), TYPE).map((t) => t.tab_id)).toEqual([
-      'a',
-      'b',
-    ]);
+    expect(getTabs(reorderTabsInState(state, TYPE, ['a', 'b']), TYPE).map((t) => t.tab_id)).toEqual(
+      ['a', 'b'],
+    );
   });
 });

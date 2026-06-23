@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
-import { concordanceTaskResultPost, runConcordance } from '@/api/generated/sdk.gen';
+import { concordanceTaskResultPost, runConcordance } from '@/api';
 import {
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
@@ -9,7 +9,7 @@ import {
   type ConcordanceMaterializeRequest,
   type ConcordanceResultQuery,
   type AnalysisTaskActionResponse,
-} from '@/api/generated/types.gen';
+} from '@/api';
 import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
 import { extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
@@ -159,10 +159,10 @@ export function useConcordanceTaskFlow({
       if (options?.mergeNodeData) {
         setResults((prev) =>
           prev?.data
-            ? ({
+            ? {
                 ...response,
                 data: { ...prev.data, ...response.data },
-              })
+              }
             : response,
         );
       } else {

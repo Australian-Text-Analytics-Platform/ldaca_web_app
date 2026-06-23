@@ -112,7 +112,9 @@ const SingleNodeWordCloud = memo(
     return (
       <div ref={containerRef} className="w-full">
         <svg
-          ref={(element) => { registerWordCloudRef(nodeKey, element); }}
+          ref={(element) => {
+            registerWordCloudRef(nodeKey, element);
+          }}
           width={cloudWidth}
           height={cloudHeight}
           className="overflow-visible"
@@ -288,7 +290,9 @@ const TokenFrequencySingleTokenSectionInner = ({
                       size="sm"
                       aria-label="Download word cloud"
                       title="Download word cloud"
-                      onClick={() => { onDownloadWordCloud(nodeKey, result.displayName); }}
+                      onClick={() => {
+                        onDownloadWordCloud(nodeKey, result.displayName);
+                      }}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -299,12 +303,12 @@ const TokenFrequencySingleTokenSectionInner = ({
                       size="sm"
                       aria-label="Download frequencies"
                       title="Download frequencies"
-                      onClick={() =>
-                        { onDownloadFrequencyCsv(
+                      onClick={() => {
+                        onDownloadFrequencyCsv(
                           result.displayName,
                           Array.isArray(result.filteredRows) ? result.filteredRows : result.rows,
-                        ); }
-                      }
+                        );
+                      }}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -336,7 +340,11 @@ const TokenFrequencySingleTokenSectionInner = ({
                 }}
                 onScroll={handleListScroll(index)}
                 className={view === 'list' ? 'space-y-2 overflow-y-auto pr-1' : 'hidden'}
-                style={view === 'list' ? { maxHeight: `${String(BAR_LIST_MAX_HEIGHT_REM)}rem` } : undefined}
+                style={
+                  view === 'list'
+                    ? { maxHeight: `${String(BAR_LIST_MAX_HEIGHT_REM)}rem` }
+                    : undefined
+                }
               >
                 {filteredListRows.map(({ row, rank }) => {
                   const frequency = row.frequency || 0;
@@ -353,7 +361,9 @@ const TokenFrequencySingleTokenSectionInner = ({
                       <button
                         type="button"
                         className="group relative h-8 overflow-hidden rounded border text-left"
-                        onClick={() => { onTokenClick(row.token, result.nodeId); }}
+                        onClick={() => {
+                          onTokenClick(row.token, result.nodeId);
+                        }}
                         onContextMenu={(event) => {
                           event.preventDefault();
                           onTokenRightClick(row.token, event);

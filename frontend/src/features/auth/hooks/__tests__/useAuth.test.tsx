@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-import type { AuthInfoResponse, ConfigResponse } from '@/api/generated/types.gen';
+import type { AuthInfoResponse, ConfigResponse } from '@/api';
 
 // ---------- API mocks (hoisted so they're in place before the auth store
 // imports the generated SDK; `runAuthFetch` would otherwise hit the network
@@ -132,7 +132,9 @@ describe('useAuth', () => {
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
 
-      await waitFor(() => { expect(result.current.phase.status).toBe('ready'); });
+      await waitFor(() => {
+        expect(result.current.phase.status).toBe('ready');
+      });
 
       expect(result.current.getAuthHeaders()).toEqual({ Authorization: 'Bearer tok-123' });
     });
@@ -146,7 +148,9 @@ describe('useAuth', () => {
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
 
-      await waitFor(() => { expect(result.current.phase.status).toBe('ready'); });
+      await waitFor(() => {
+        expect(result.current.phase.status).toBe('ready');
+      });
       expect(result.current.getAuthHeaders()).toEqual({});
     });
 
@@ -160,7 +164,9 @@ describe('useAuth', () => {
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
 
-      await waitFor(() => { expect(result.current.phase.status).toBe('ready'); });
+      await waitFor(() => {
+        expect(result.current.phase.status).toBe('ready');
+      });
       expect(result.current.getAuthHeaders()).toEqual({});
     });
   });
@@ -176,7 +182,9 @@ describe('useAuth', () => {
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
-      await waitFor(() => { expect(result.current.phase.status).toBe('ready'); });
+      await waitFor(() => {
+        expect(result.current.phase.status).toBe('ready');
+      });
 
       // The getAuthInfo call after logout returns an unauthenticated payload.
       generatedApiMock.getAuthInfo.mockResolvedValueOnce({
@@ -205,7 +213,9 @@ describe('useAuth', () => {
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
-      await waitFor(() => { expect(result.current.phase.status).toBe('ready'); });
+      await waitFor(() => {
+        expect(result.current.phase.status).toBe('ready');
+      });
 
       await act(async () => {
         await result.current.logout();
@@ -226,7 +236,9 @@ describe('useAuth', () => {
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
-      await waitFor(() => { expect(result.current.phase.status).toBe('ready'); });
+      await waitFor(() => {
+        expect(result.current.phase.status).toBe('ready');
+      });
 
       await expect(result.current.loginWithGoogle('id-token')).rejects.toThrow(
         /Google login not available/,
@@ -247,7 +259,9 @@ describe('useAuth', () => {
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
-      await waitFor(() => { expect(generatedApiMock.getAuthInfo).toHaveBeenCalledTimes(1); });
+      await waitFor(() => {
+        expect(generatedApiMock.getAuthInfo).toHaveBeenCalledTimes(1);
+      });
 
       // Post-login the second info call returns an authenticated payload.
       generatedApiMock.getAuthInfo.mockResolvedValueOnce({

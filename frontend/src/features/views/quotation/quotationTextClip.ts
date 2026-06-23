@@ -16,7 +16,11 @@ export const clampContextLength = (value: number): number => {
   return Math.max(0, Math.min(MAX_CONTEXT_LENGTH, Math.floor(value)));
 };
 
-export interface HighlightSpan { start: number; end: number; types: string[] }
+export interface HighlightSpan {
+  start: number;
+  end: number;
+  types: string[];
+}
 
 export interface ContextClipResult {
   text: string;

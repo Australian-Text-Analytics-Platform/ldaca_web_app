@@ -99,7 +99,9 @@ export function NodeSelectionList({
                 type="button"
                 aria-label={`Remove ${title}`}
                 title={`Remove ${title}`}
-                onClick={() => { onRemoveNode(nodeId); }}
+                onClick={() => {
+                  onRemoveNode(nodeId);
+                }}
                 className={cn(
                   'pointer-events-auto absolute top-2 right-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-muted/80 text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground',
                 )}
@@ -107,9 +109,7 @@ export function NodeSelectionList({
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
             )}
-            <CardHeader
-              className={cn('space-y-1 px-3 pb-1.5 pt-2.5')}
-            >
+            <CardHeader className={cn('space-y-1 px-3 pb-1.5 pt-2.5')}>
               <div
                 className="max-w-full wrap-break-word pr-2 text-sm font-semibold leading-snug text-foreground"
                 title={title}

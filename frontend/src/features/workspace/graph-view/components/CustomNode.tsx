@@ -183,7 +183,9 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       }
     };
     document.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    return () => { document.removeEventListener('pointerdown', handlePointerDown, { capture: true }); };
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+    };
   }, [showMenu]);
 
   /**
@@ -310,7 +312,9 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     if (node.node_id) {
       void navigator.clipboard.writeText(node.node_id);
       setCopied(true);
-      setTimeout(() => { setCopied(false); }, 2000);
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     }
   };
 
@@ -340,9 +344,9 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   };
 
   /**
-    * Requests this node as an input for the active view without letting the
-    * click bubble into React Flow's node drag/select handlers.
-    * Called by: the fixed-size NodeToolbar "+" button.
+   * Requests this node as an input for the active view without letting the
+   * click bubble into React Flow's node drag/select handlers.
+   * Called by: the fixed-size NodeToolbar "+" button.
    */
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -363,9 +367,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         // A menu/dialog keeps the toolbar open regardless of the singleton
         // owner; a plain hover only shows while this node owns the toolbar so
         // exactly one hover toolbar is ever visible.
-        showMenu ||
-        showDeleteConfirm ||
-        ((isHovered || isToolbarHovered) && activeToolbarId === id)
+        showMenu || showDeleteConfirm || ((isHovered || isToolbarHovered) && activeToolbarId === id)
       }
       position={Position.Bottom}
       align="center"
@@ -456,7 +458,9 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="break-all">Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
+          <AlertDialogTitle className="break-all">
+            Delete &ldquo;{nodeName}&rdquo;?
+          </AlertDialogTitle>
           <AlertDialogDescription>
             This will permanently delete this node and its data. This action cannot be undone.
           </AlertDialogDescription>
@@ -558,12 +562,20 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
                 ref={renameInputRef}
                 type="text"
                 value={newName}
-                onChange={(e) => { setNewName(e.target.value); }}
+                onChange={(e) => {
+                  setNewName(e.target.value);
+                }}
                 onBlur={handleRenameCancel}
                 onKeyDown={handleRenameKeyDown}
-                onMouseDown={(e) => { e.stopPropagation(); }}
-                onClick={(e) => { e.stopPropagation(); }}
-                onPointerDown={(e) => { e.stopPropagation(); }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                }}
                 className="nodrag nopan relative z-50 w-full rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-bold focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                 style={{
                   fontSize: '14px',

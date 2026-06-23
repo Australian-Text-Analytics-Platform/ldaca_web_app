@@ -28,7 +28,9 @@ export function HighlightRing({ target, tick, className }: HighlightRingProps) {
      * Called by: HighlightRing internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
      */
     const measure = () => {
-      raf = requestAnimationFrame(() => { setRect(target.getBoundingClientRect()); });
+      raf = requestAnimationFrame(() => {
+        setRect(target.getBoundingClientRect());
+      });
     };
     measure();
     window.addEventListener('scroll', measure, true);

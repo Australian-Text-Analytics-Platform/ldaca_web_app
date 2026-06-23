@@ -124,7 +124,9 @@ const buildColumns = (onTokenClick?: (token: string) => void) => [
         <button
           type="button"
           className="cursor-pointer font-medium text-left underline-offset-2 hover:underline focus-visible:underline"
-          onClick={() => { onTokenClick(token); }}
+          onClick={() => {
+            onTokenClick(token);
+          }}
           title="Click to inspect in concordance across both corpora."
         >
           {token}
@@ -313,7 +315,11 @@ export const TokenFrequencyStatisticsTable = ({
     columns,
     state: { sorting, pagination, columnFilters },
     /** Used by: TanStack Table sorting state to keep large tables responsive during header clicks because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    onSortingChange: (updater) => { startTransition(() => { setSorting(updater); }); },
+    onSortingChange: (updater) => {
+      startTransition(() => {
+        setSorting(updater);
+      });
+    },
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -467,7 +473,9 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="outline"
                   size="sm"
                   disabled={!table.getCanPreviousPage()}
-                  onClick={() => { table.setPageIndex(0); }}
+                  onClick={() => {
+                    table.setPageIndex(0);
+                  }}
                 >
                   First
                 </Button>
@@ -475,7 +483,9 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="outline"
                   size="sm"
                   disabled={!table.getCanPreviousPage()}
-                  onClick={() => { table.previousPage(); }}
+                  onClick={() => {
+                    table.previousPage();
+                  }}
                 >
                   Previous
                 </Button>
@@ -486,7 +496,9 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="outline"
                   size="sm"
                   disabled={!table.getCanNextPage()}
-                  onClick={() => { table.nextPage(); }}
+                  onClick={() => {
+                    table.nextPage();
+                  }}
                 >
                   Next
                 </Button>
@@ -494,7 +506,9 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="outline"
                   size="sm"
                   disabled={!table.getCanNextPage()}
-                  onClick={() => { table.setPageIndex(pageCount - 1); }}
+                  onClick={() => {
+                    table.setPageIndex(pageCount - 1);
+                  }}
                 >
                   Last
                 </Button>

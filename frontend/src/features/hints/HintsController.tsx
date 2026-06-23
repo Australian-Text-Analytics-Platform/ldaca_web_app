@@ -137,7 +137,9 @@ export function HintsController() {
 
     syncActiveHint();
     const id = window.setInterval(syncActiveHint, POLL_INTERVAL_MS);
-    return () => { window.clearInterval(id); };
+    return () => {
+      window.clearInterval(id);
+    };
   }, [hintsEnabled, dismissedHints, sessionDismissedHints, conditions, context]);
 
   if (!hintsEnabled) return null;

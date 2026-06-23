@@ -11,7 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { updateConfig } from '@/api/generated/sdk.gen';
+import { updateConfig } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -61,8 +61,12 @@ function DataFolderDialogContent({ onOpenChange }: Pick<DataFolderDialogProps, '
         </DialogDescription>
       </DialogHeader>
       <DataFolderSettingsPanel
-        onSaved={() => { onOpenChange(false); }}
-        onCancel={() => { onOpenChange(false); }}
+        onSaved={() => {
+          onOpenChange(false);
+        }}
+        onCancel={() => {
+          onOpenChange(false);
+        }}
       />
     </DialogContent>
   );
@@ -147,9 +151,11 @@ export function DataFolderSettingsPanel({ onSaved, onCancel }: DataFolderSetting
   };
 
   return (
-    <form onSubmit={(e) => {
-      void handleSubmit(e);
-    }}>
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+    >
       <div className="grid gap-4 py-4">
         <div className="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
           <Label htmlFor="path" className="sm:text-right">
@@ -159,7 +165,9 @@ export function DataFolderSettingsPanel({ onSaved, onCancel }: DataFolderSetting
             <Input
               id="path"
               value={path}
-              onChange={(e) => { setPath(e.target.value); }}
+              onChange={(e) => {
+                setPath(e.target.value);
+              }}
               className="flex-1"
               placeholder="/path/to/data"
             />

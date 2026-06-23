@@ -15,7 +15,7 @@
  */
 import { type ReactNode } from 'react';
 import { ChromeTabs, type ChromeTabItem } from '@/components/tabs';
-import type { AnalysisTab } from '@/api/generated/types.gen';
+import type { AnalysisTab } from '@/api';
 import { cn } from '@/lib/utils';
 
 export interface AnalysisTabbedPanelProps {

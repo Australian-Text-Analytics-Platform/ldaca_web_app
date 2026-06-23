@@ -71,9 +71,9 @@ export function QuotationHighlightedCell({
   };
 
   if (Array.isArray(row.__spans) && row.__spans.length > 0) {
-    (row.__spans as Record<string, unknown>[]).forEach((s) =>
-      { addSpan(s.start, s.end, s.type as string | undefined); },
-    );
+    (row.__spans as Record<string, unknown>[]).forEach((s) => {
+      addSpan(s.start, s.end, s.type as string | undefined);
+    });
   } else {
     addSpan(
       row[QUOTATION_COLUMN_KEYS.speakerStartIdx],
@@ -85,11 +85,7 @@ export function QuotationHighlightedCell({
       row[QUOTATION_COLUMN_KEYS.quoteEndIdx],
       'quote',
     );
-    addSpan(
-      row[QUOTATION_COLUMN_KEYS.verbStartIdx],
-      row[QUOTATION_COLUMN_KEYS.verbEndIdx],
-      'verb',
-    );
+    addSpan(row[QUOTATION_COLUMN_KEYS.verbStartIdx], row[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
   }
 
   if (!spans.length) return <>{text}</>;
@@ -138,16 +134,16 @@ export function QuotationHighlightedCell({
           color: '#0f172a',
           borderColor: TYPE_COLORS[t] ?? '#334155',
           backgroundColor:
-            hoverState?.key === cellKey &&
-            hoverState.segIndex === segIndex &&
-            hoverState.type === t
+            hoverState?.key === cellKey && hoverState.segIndex === segIndex && hoverState.type === t
               ? hexToRgba(TYPE_COLORS[t] ?? '#cbd5e1', 0.28)
               : '#f1f5f9',
         }}
-        onMouseEnter={() =>
-          { onHoverChange({ key: cellKey, segIndex, type: t as QuotationHighlightType }); }
-        }
-        onMouseLeave={() => { onHoverChange(null); }}
+        onMouseEnter={() => {
+          onHoverChange({ key: cellKey, segIndex, type: t as QuotationHighlightType });
+        }}
+        onMouseLeave={() => {
+          onHoverChange(null);
+        }}
       >
         {t.toUpperCase()}
       </span>
@@ -180,8 +176,12 @@ export function QuotationHighlightedCell({
             {renderLabels(seg.types, i)}
             <span
               style={{ ...style, ...bgStyle }}
-              onMouseEnter={() => { onHoverChange({ key: cellKey, segIndex: i, type: segHoverType }); }}
-              onMouseLeave={() => { onHoverChange(null); }}
+              onMouseEnter={() => {
+                onHoverChange({ key: cellKey, segIndex: i, type: segHoverType });
+              }}
+              onMouseLeave={() => {
+                onHoverChange(null);
+              }}
             >
               {str}
             </span>

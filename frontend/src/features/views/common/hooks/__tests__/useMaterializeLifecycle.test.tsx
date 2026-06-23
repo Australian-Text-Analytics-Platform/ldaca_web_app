@@ -68,16 +68,16 @@ describe('useMaterializeLifecycle', () => {
     const setMaterializeTaskIds = mkMatTaskIds();
     const onTerminalSuccess = mkSuccess();
 
-    renderHook(() =>
-      { useMaterializeLifecycle(
+    renderHook(() => {
+      useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: {},
           setNodeMaterializing,
           setMaterializeTaskIds,
           onTerminalSuccess,
         }),
-      ); },
-    );
+      );
+    });
 
     expect(setNodeMaterializing).not.toHaveBeenCalled();
     expect(setMaterializeTaskIds).not.toHaveBeenCalled();
@@ -91,15 +91,15 @@ describe('useMaterializeLifecycle', () => {
     const setNodeMaterializing = mkMatBool();
     const onTerminalSuccess = mkSuccess();
 
-    renderHook(() =>
-      { useMaterializeLifecycle(
+    renderHook(() => {
+      useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           setNodeMaterializing,
           onTerminalSuccess,
         }),
-      ); },
-    );
+      );
+    });
 
     expect(setNodeMaterializing).not.toHaveBeenCalled();
     expect(onTerminalSuccess).not.toHaveBeenCalled();
@@ -113,16 +113,16 @@ describe('useMaterializeLifecycle', () => {
     const setMaterializeTaskIds = mkMatTaskIds();
     const onTerminalSuccess = mkSuccess();
 
-    renderHook(() =>
-      { useMaterializeLifecycle(
+    renderHook(() => {
+      useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           setNodeMaterializing,
           setMaterializeTaskIds,
           onTerminalSuccess,
         }),
-      ); },
-    );
+      );
+    });
 
     expect(onTerminalSuccess).toHaveBeenCalledWith('node-1', 't-1');
 
@@ -145,15 +145,15 @@ describe('useMaterializeLifecycle', () => {
     const onTerminalSuccess = mkSuccess();
     const onTerminalFailure = mkFailure();
 
-    renderHook(() =>
-      { useMaterializeLifecycle(
+    renderHook(() => {
+      useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           onTerminalSuccess,
           onTerminalFailure,
         }),
-      ); },
-    );
+      );
+    });
 
     expect(onTerminalSuccess).not.toHaveBeenCalled();
     expect(onTerminalFailure).toHaveBeenCalledWith('node-1', 'failed');
@@ -166,15 +166,15 @@ describe('useMaterializeLifecycle', () => {
     const onTerminalSuccess = mkSuccess();
     const setNodeMaterializing = mkMatBool();
 
-    const { rerender } = renderHook(() =>
-      { useMaterializeLifecycle(
+    const { rerender } = renderHook(() => {
+      useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           onTerminalSuccess,
           setNodeMaterializing,
         }),
-      ); },
-    );
+      );
+    });
 
     expect(onTerminalSuccess).toHaveBeenCalledTimes(1);
 
@@ -193,14 +193,14 @@ describe('useMaterializeLifecycle', () => {
     });
     const onTerminalSuccess = mkSuccess();
 
-    renderHook(() =>
-      { useMaterializeLifecycle(
+    renderHook(() => {
+      useMaterializeLifecycle(
         buildArgs({
           materializeTaskIds: { 'node-1': 't-1' },
           onTerminalSuccess,
         }),
-      ); },
-    );
+      );
+    });
 
     expect(onTerminalSuccess).toHaveBeenCalledTimes(1);
     expect(onTerminalSuccess).toHaveBeenCalledWith('node-1', 't-1');

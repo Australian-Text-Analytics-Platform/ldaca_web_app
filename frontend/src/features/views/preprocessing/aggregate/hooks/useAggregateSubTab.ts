@@ -7,8 +7,11 @@ import {
   type FilterPreviewResponse,
   type PolarsExpressionRequest,
   type PolarsExpressionApplyResponse,
-} from '@/api/generated/types.gen';
-import { mapColumnsToInfo, type ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
+} from '@/api';
+import {
+  mapColumnsToInfo,
+  type ColumnInfo,
+} from '@/features/workspace/data-view/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import type { PreviewPagination, PreviewRow } from '../../types';
 
@@ -37,13 +40,16 @@ const normalizeSmartCharacters = (input: string): string =>
     (char) => SMART_CHAR_MAP[char] ?? char,
   );
 
-export type BasicToken =
+type BasicToken =
   | { id: string; kind: 'column'; column: string; dtype: string; operations: string[] }
   | { id: string; kind: 'custom'; value: string };
 
-export interface DropIndicator { tokenId: string; position: 'before' | 'after' }
+interface DropIndicator {
+  tokenId: string;
+  position: 'before' | 'after';
+}
 
-export type DragPayload =
+type DragPayload =
   | { source: 'palette'; kind: 'column'; column: string; dtype: string }
   | { source: 'palette'; kind: 'custom' }
   | { source: 'existing'; id: string };
@@ -71,7 +77,7 @@ export interface AggregateSubTabProps {
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
 
-export interface NodeSelectionConfig {
+interface NodeSelectionConfig {
   effectiveNodes: WorkspaceNodeLike[];
   nodeColumnSelections: { nodeId: string; column: string }[];
   nodeColors: Record<string, string>;
@@ -79,7 +85,7 @@ export interface NodeSelectionConfig {
   originalCount: number;
 }
 
-export interface ExpressionConfig {
+interface ExpressionConfig {
   expression: string;
   columnName: string;
   onColumnNameBlur: () => void;
@@ -88,7 +94,7 @@ export interface ExpressionConfig {
   };
 }
 
-export interface BasicBuilderConfig {
+interface BasicBuilderConfig {
   tokens: BasicToken[];
   disabled: boolean;
   dragActive: boolean;
@@ -125,7 +131,7 @@ export interface BasicBuilderConfig {
   };
 }
 
-export interface PreviewConfig {
+interface PreviewConfig {
   data: PreviewRow[];
   columns: string[];
   pagination: PreviewPagination | null;
@@ -139,7 +145,7 @@ export interface PreviewConfig {
   onPageChange: (page: number) => void;
 }
 
-export interface ApplyConfig {
+interface ApplyConfig {
   loading: boolean;
   canApply: boolean;
   disabledReason: string | undefined;
@@ -939,11 +945,13 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const nodeColumnSelections = limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : [];
 
-  const nodeColors = (limitedNodeId
-    ? // SINGLE_NODE_PALETTE is a non-empty module constant, so index 0 exists.
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      { [limitedNodeId]: SINGLE_NODE_PALETTE[0]! }
-    : {}) as Record<string, string>;
+  const nodeColors = (
+    limitedNodeId
+      ? // SINGLE_NODE_PALETTE is a non-empty module constant, so index 0 exists.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        { [limitedNodeId]: SINGLE_NODE_PALETTE[0]! }
+      : {}
+  ) as Record<string, string>;
 
   return {
     activeNodeId,

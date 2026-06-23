@@ -254,7 +254,9 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
               size="sm"
               aria-label="Download word cloud"
               title="Download word cloud"
-              onClick={() => { onDownloadWordCloud('unified', 'Unified Word Cloud'); }}
+              onClick={() => {
+                onDownloadWordCloud('unified', 'Unified Word Cloud');
+              }}
             >
               <Download className="h-4 w-4" />
             </Button>
@@ -298,7 +300,9 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
 
                 <div className="flex w-full justify-center overflow-visible">
                   <svg
-                    ref={(element) => { registerWordCloudRef('unified', element); }}
+                    ref={(element) => {
+                      registerWordCloudRef('unified', element);
+                    }}
                     width={effectiveCloudWidth}
                     height={effectiveCloudHeight}
                     xmlns="http://www.w3.org/2000/svg"

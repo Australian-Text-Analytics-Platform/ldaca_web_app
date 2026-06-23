@@ -235,8 +235,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             document_column: documentColumn,
             column_schema: columnSchema,
           },
-          isMultiSelected:
-            selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
+          isMultiSelected: selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
           isFresh: freshIds.has(node.id),
           onDelete: handleDelete,
           onRename: handleRename,
@@ -372,8 +371,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         selected: selectedNodeIds.includes(node.id),
         data: {
           ...node.data,
-          isMultiSelected:
-            selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
+          isMultiSelected: selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
         },
       })),
     );

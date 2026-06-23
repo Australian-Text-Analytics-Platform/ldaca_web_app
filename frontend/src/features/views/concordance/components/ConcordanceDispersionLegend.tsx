@@ -55,7 +55,9 @@ export function ConcordanceDispersionLegend({
             type="button"
             className="flex cursor-pointer items-center gap-2 rounded px-2 py-0.5 transition-opacity hover:bg-muted/60"
             style={{ opacity: isHidden ? 0.4 : 1 }}
-            onClick={() => { onToggle(text); }}
+            onClick={() => {
+              onToggle(text);
+            }}
             aria-pressed={!isHidden}
             aria-label={isHidden ? `Show ${text}` : `Hide ${text}`}
           >

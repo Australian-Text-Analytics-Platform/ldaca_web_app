@@ -47,7 +47,9 @@ function HeaderNodeLabel({ label }: { label: string }) {
     const observer = new ResizeObserver(measure);
     observer.observe(wrap);
     observer.observe(text);
-    return () => { observer.disconnect(); };
+    return () => {
+      observer.disconnect();
+    };
   }, [label]);
 
   return (
@@ -164,7 +166,9 @@ export const WorkspaceDataHeader = ({
               ref={inputRef}
               className="min-w-0 flex-1 rounded border px-2 py-0.5 text-sm font-semibold text-gray-800"
               value={renameDraft.value}
-              onChange={(e) => { setRenameDraft({ baseLabel: info.nodeLabel, value: e.target.value }); }}
+              onChange={(e) => {
+                setRenameDraft({ baseLabel: info.nodeLabel, value: e.target.value });
+              }}
               onBlur={handleRenameCommit}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleRenameCommit();

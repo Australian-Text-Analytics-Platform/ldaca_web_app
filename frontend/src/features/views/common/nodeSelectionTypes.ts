@@ -1,5 +1,3 @@
-import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
-
 export type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
 export interface WorkspaceNodeLike extends Record<string, unknown> {
@@ -14,8 +12,6 @@ export interface WorkspaceNodeLike extends Record<string, unknown> {
   column_schema?: Record<string, unknown>;
   tokenizer_models?: Record<string, string>;
 }
-
-export type NodeColumnSource = string[] | ColumnInfo[];
 
 /**
  * Gives shared analysis selection UIs a stable id even when backend previews use
@@ -33,4 +29,4 @@ export const getNodeIdentifier = (node: WorkspaceNodeLike, fallbackIndex: number
  */
 export const getNodeDisplayName = (node: WorkspaceNodeLike, fallbackId: string): string =>
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty name/label should fall through to the next display option
-  (node.name) || (node.label) || fallbackId;
+  node.name || node.label || fallbackId;

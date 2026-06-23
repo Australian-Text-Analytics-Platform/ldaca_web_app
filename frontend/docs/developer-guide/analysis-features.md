@@ -68,7 +68,7 @@ Use the shared analysis card Stop and Clear Results actions for task lifecycle
 controls. The sidebar Task Center should not own cancellation or clearing;
 feature tabs know which task ids and descendants the backend should resolve.
 
-## Node Inputs And Colors
+## Node Inputs And Visualization Colours
 
 Analysis tabs use the add-node-as-needed model. `NodeInputsPanel` is the shared
 UI for selecting data blocks, selecting the per-node column when a feature needs
@@ -87,8 +87,10 @@ Feature-specific caps are enforced through `NodeInputConstraints`:
 - export remains graph-selection based because it acts on workspace nodes rather
   than an analysis tab.
 
-`useNodeColorManagement` coordinates per-tab temp colors and committed node
-colors. A successful run promotes participating temp colors to assigned colors.
+Analysis visualizations derive source colours locally from
+`views/common/vizPalette.ts`. There is no shared node-colour store or picker:
+selected source nodes receive deterministic palette colours by position for
+charts, tables, legends, and metadata selectors.
 
 ## Token Frequency
 

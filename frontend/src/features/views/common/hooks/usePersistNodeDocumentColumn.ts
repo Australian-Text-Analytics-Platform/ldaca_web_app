@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { setNodeDocumentColumn, setNodeTokenizationPreference } from '@/api/generated/sdk.gen';
-import type { WorkspaceGraphResponse, WorkspaceNodeInfo } from '@/api/generated/types.gen';
+import { setNodeDocumentColumn, setNodeTokenizationPreference } from '@/api';
+import type { WorkspaceGraphResponse, WorkspaceNodeInfo } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 
 /**

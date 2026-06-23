@@ -122,28 +122,14 @@ const NAV_ITEMS: NavItem[] = [
  * Flow: select global/workspace/task state, wire logout/settings/dialog handlers, compute split sections and visible nav items, then render sidebar chrome.
  */
 function Sidebar() {
-  const {
-    currentView,
-    visibleViews,
-    setCurrentView,
-    setViewVisibility,
-    openModal,
-  } = useUIStore(
-    useShallow(
-      ({
-        currentView,
-        visibleViews,
-        setCurrentView,
-        setViewVisibility,
-        openModal,
-      }) => ({
-        currentView,
-        visibleViews,
-        setCurrentView,
-        setViewVisibility,
-        openModal,
-      }),
-    ),
+  const { currentView, visibleViews, setCurrentView, setViewVisibility, openModal } = useUIStore(
+    useShallow(({ currentView, visibleViews, setCurrentView, setViewVisibility, openModal }) => ({
+      currentView,
+      visibleViews,
+      setCurrentView,
+      setViewVisibility,
+      openModal,
+    })),
   );
   const { currentWorkspaceId } = useWorkspaceData();
   const { user, logout, isMultiUserMode } = useAuth();
@@ -289,7 +275,9 @@ function Sidebar() {
                   size="icon"
                   className="h-7 w-7 text-muted-foreground"
                   aria-label="Open settings"
-                  onClick={() => { setIsSettingsDialogOpen(true); }}
+                  onClick={() => {
+                    setIsSettingsDialogOpen(true);
+                  }}
                 >
                   <Cog className="h-4 w-4" />
                 </Button>
@@ -337,21 +325,27 @@ function Sidebar() {
                       className="absolute -top-1 left-0 right-0 h-2 cursor-row-resize"
                       role="separator"
                       aria-label={`Resize ${title}`}
-                      onMouseDown={(event) => { handleResizeStart(previousKey, key, event); }}
+                      onMouseDown={(event) => {
+                        handleResizeStart(previousKey, key, event);
+                      }}
                     />
                   ) : null}
                   <div className="flex items-center border-b border-border/40 bg-muted/40">
                     <button
                       type="button"
                       className="flex min-w-0 flex-1 items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                      onClick={() => { toggleSection(key); }}
+                      onClick={() => {
+                        toggleSection(key);
+                      }}
                       aria-expanded={!collapsed}
                     >
                       <span className="flex items-center gap-1">{title}</span>
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                         {key === 'nodes' && (
                           <span className="font-semibold text-foreground/80">
-                            {selectedCount > 0 ? `${selectedCount.toString()}/${nodeCount.toString()}` : nodeCount.toString()}
+                            {selectedCount > 0
+                              ? `${selectedCount.toString()}/${nodeCount.toString()}`
+                              : nodeCount.toString()}
                           </span>
                         )}
                         {key === 'tasks' && (
@@ -433,7 +427,9 @@ function Sidebar() {
                   {!collapsed && (
                     <div className="flex h-full flex-col overflow-hidden">
                       <div
-                        ref={(node) => { assignSectionScrollRef(key, node); }}
+                        ref={(node) => {
+                          assignSectionScrollRef(key, node);
+                        }}
                         className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-sm"
                       >
                         {key === 'views' && renderViewsBody()}
@@ -456,11 +452,21 @@ function Sidebar() {
                                 isPinned={pinnedIdSet.has(node.id)}
                                 onTogglePin={togglePinnedNode}
                                 onAddToSelection={handleAddToSelection}
-                                onRename={(id, newName) => { void renameNode(id, newName); }}
-                                onClone={(id) => { void copyNode(id); }}
-                                onUndo={(id) => { void undoNode(id); }}
-                                onRedo={(id) => { void redoNode(id); }}
-                                onDelete={(id) => { void deleteNode(id); }}
+                                onRename={(id, newName) => {
+                                  void renameNode(id, newName);
+                                }}
+                                onClone={(id) => {
+                                  void copyNode(id);
+                                }}
+                                onUndo={(id) => {
+                                  void undoNode(id);
+                                }}
+                                onRedo={(id) => {
+                                  void redoNode(id);
+                                }}
+                                onDelete={(id) => {
+                                  void deleteNode(id);
+                                }}
                               />
                             )}
                           />
@@ -490,7 +496,9 @@ function Sidebar() {
             <Button
               variant="ghost"
               className="flex-1 justify-center"
-              onClick={() => { openModal('tutorial', tutorialIndexTarget); }}
+              onClick={() => {
+                openModal('tutorial', tutorialIndexTarget);
+              }}
             >
               <BookOpen className="h-4 w-4" />
               <span>Tutorial</span>
@@ -498,7 +506,9 @@ function Sidebar() {
             <Button
               variant="ghost"
               className="flex-1 justify-center"
-              onClick={() => { openModal('feedback'); }}
+              onClick={() => {
+                openModal('feedback');
+              }}
             >
               <MessageSquare className="h-4 w-4" />
               <span>Feedback</span>

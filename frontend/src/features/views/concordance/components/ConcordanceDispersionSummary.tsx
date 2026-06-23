@@ -399,7 +399,9 @@ export function ConcordanceDispersionSummary({
             <span>Chart</span>
             <select
               value={chartType}
-              onChange={(e) => { onChartTypeChange(e.target.value as MultiSeriesChartType); }}
+              onChange={(e) => {
+                onChartTypeChange(e.target.value as MultiSeriesChartType);
+              }}
               className="h-7 rounded border border-input bg-background px-2 text-sm"
             >
               <option value="line">Line</option>
@@ -412,7 +414,9 @@ export function ConcordanceDispersionSummary({
           variant="outline"
           size="icon"
           aria-label="Download dispersion summary"
-          onClick={() => { setDownloadDialogOpen(true); }}
+          onClick={() => {
+            setDownloadDialogOpen(true);
+          }}
           disabled={series.length === 0}
         >
           <Download className="h-4 w-4" />
@@ -459,7 +463,9 @@ export function ConcordanceDispersionSummary({
         <select
           value={showAllProcessed ? 'whole' : 'page'}
           disabled={!materialisedBinsReady}
-          onChange={(e) => { setShowAllProcessed(e.target.value === 'whole'); }}
+          onChange={(e) => {
+            setShowAllProcessed(e.target.value === 'whole');
+          }}
           className="h-7 rounded border border-input bg-background px-2 text-sm font-medium"
           aria-label="Aggregation scope"
         >

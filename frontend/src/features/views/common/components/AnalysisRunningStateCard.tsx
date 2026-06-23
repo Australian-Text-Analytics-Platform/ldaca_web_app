@@ -32,10 +32,14 @@ function useElapsedSeconds(startedAt: string | number | null | undefined): numbe
     const start = typeof startedAt === 'number' ? toMs(startedAt) : Date.parse(startedAt);
     if (isNaN(start)) return;
     /** Called by: the interval timer and initial effect pass because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    const tick = () => { setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000))); };
+    const tick = () => {
+      setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    };
     tick();
     const id = setInterval(tick, 1000);
-    return () => { clearInterval(id); };
+    return () => {
+      clearInterval(id);
+    };
   }, [startedAt]);
 
   return elapsed;

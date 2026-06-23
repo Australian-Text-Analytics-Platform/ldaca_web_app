@@ -8,7 +8,11 @@ const TYPE_COLORS: Record<string, string> = {
   verb: '#7c3aed',
 };
 
-interface HighlightSpan { start: number; end: number; types: string[] }
+interface HighlightSpan {
+  start: number;
+  end: number;
+  types: string[];
+}
 
 // Used by: renderQuotationDetailText to build stacked underline decorations for the full-text detail view because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
 const buildUnderlineStyle = (types: string[]): React.CSSProperties => {
@@ -53,9 +57,9 @@ export const renderQuotationDetailText = (
   };
 
   if (Array.isArray(row.__spans) && row.__spans.length > 0) {
-    (row.__spans as Record<string, unknown>[]).forEach((s) =>
-      { addSpan(s.start, s.end, s.type as string | undefined); },
-    );
+    (row.__spans as Record<string, unknown>[]).forEach((s) => {
+      addSpan(s.start, s.end, s.type as string | undefined);
+    });
   } else {
     addSpan(
       row[QUOTATION_COLUMN_KEYS.speakerStartIdx],
@@ -67,11 +71,7 @@ export const renderQuotationDetailText = (
       row[QUOTATION_COLUMN_KEYS.quoteEndIdx],
       'quote',
     );
-    addSpan(
-      row[QUOTATION_COLUMN_KEYS.verbStartIdx],
-      row[QUOTATION_COLUMN_KEYS.verbEndIdx],
-      'verb',
-    );
+    addSpan(row[QUOTATION_COLUMN_KEYS.verbStartIdx], row[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
   }
 
   if (!spans.length) return text;

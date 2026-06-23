@@ -23,112 +23,107 @@ interface IsoDateInputProps extends React.InputHTMLAttributes<HTMLInputElement> 
  * ISO text input used by datetime filter controls. It normalizes typed values
  * before committing them to the owning condition row.
  */
-const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>(
-  (props, externalRef) => {
-    const {
-      committedValue,
-      onCommit,
-      onBlur: parentOnBlur,
-      onFocus: parentOnFocus,
-      onClick: parentOnClick,
-      onChange: parentOnChange,
-      onKeyDown: parentOnKeyDown,
-      onPaste: parentOnPaste,
-      readOnly: parentReadOnly,
-      className: parentClassName,
-      placeholder = ISO_PLACEHOLDER,
-      ...restProps
-    } = props;
+const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((props, externalRef) => {
+  const {
+    committedValue,
+    onCommit,
+    onBlur: parentOnBlur,
+    onFocus: parentOnFocus,
+    onClick: parentOnClick,
+    onChange: parentOnChange,
+    onKeyDown: parentOnKeyDown,
+    onPaste: parentOnPaste,
+    readOnly: parentReadOnly,
+    className: parentClassName,
+    placeholder = ISO_PLACEHOLDER,
+    ...restProps
+  } = props;
 
-    const [draft, setDraft] = React.useState(committedValue);
-    const [focused, setFocused] = React.useState(false);
-    const displayedValue = focused ? draft : committedValue;
+  const [draft, setDraft] = React.useState(committedValue);
+  const [focused, setFocused] = React.useState(false);
+  const displayedValue = focused ? draft : committedValue;
 
-    const innerRef = React.useRef<HTMLInputElement | null>(null);
-    /**
-     * Keeps the internal input ref and forwarded ref aligned for callers.
-     * Called by: dateTimeUtils internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
-    const setRefs = (el: HTMLInputElement | null) => {
-      innerRef.current = el;
-      if (typeof externalRef === 'function') {
-        externalRef(el);
-      } else if (externalRef) {
-        (externalRef).current = el;
-      }
-    };
+  const innerRef = React.useRef<HTMLInputElement | null>(null);
+  /**
+   * Keeps the internal input ref and forwarded ref aligned for callers.
+   * Called by: dateTimeUtils internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
+  const setRefs = (el: HTMLInputElement | null) => {
+    innerRef.current = el;
+    if (typeof externalRef === 'function') {
+      externalRef(el);
+    } else if (externalRef) {
+      externalRef.current = el;
+    }
+  };
 
-    /**
-     * Normalizes and validates draft text before notifying the parent field.
-     * Called by: dateTimeUtils internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
-    const commitNormalized = (
-      text: string,
-      { syncDraft = false }: { syncDraft?: boolean } = {},
-    ) => {
-      const trimmed = text.trim();
-      if (!trimmed) {
-        onCommit('');
-        if (syncDraft) setDraft('');
-        return;
-      }
-      const normalized = normalizeIsoDraft(trimmed);
-      if (!normalized) return;
-      if (!parseIsoToLocalDate(normalized)) return;
-      onCommit(normalized);
-      if (syncDraft) setDraft(normalized);
-    };
+  /**
+   * Normalizes and validates draft text before notifying the parent field.
+   * Called by: dateTimeUtils internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   */
+  const commitNormalized = (text: string, { syncDraft = false }: { syncDraft?: boolean } = {}) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      onCommit('');
+      if (syncDraft) setDraft('');
+      return;
+    }
+    const normalized = normalizeIsoDraft(trimmed);
+    if (!normalized) return;
+    if (!parseIsoToLocalDate(normalized)) return;
+    onCommit(normalized);
+    if (syncDraft) setDraft(normalized);
+  };
 
-    return (
-      <input
-        {...restProps}
-        ref={setRefs}
-        type="text"
-        readOnly={parentReadOnly ?? false}
-        value={displayedValue}
-        onClick={(e) => {
-          parentOnClick?.(e);
-        }}
-        onFocus={(e) => {
-          setDraft(committedValue);
-          setFocused(true);
-          parentOnFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
+  return (
+    <input
+      {...restProps}
+      ref={setRefs}
+      type="text"
+      readOnly={parentReadOnly ?? false}
+      value={displayedValue}
+      onClick={(e) => {
+        parentOnClick?.(e);
+      }}
+      onFocus={(e) => {
+        setDraft(committedValue);
+        setFocused(true);
+        parentOnFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocused(false);
+        commitNormalized(draft, { syncDraft: true });
+        parentOnBlur?.(e);
+      }}
+      onChange={(e) => {
+        parentOnChange?.(e);
+        const next = e.target.value;
+        setDraft(next);
+        commitNormalized(next);
+      }}
+      onPaste={(e) => {
+        parentOnPaste?.(e);
+        if (typeof window === 'undefined') return;
+        requestAnimationFrame(() => {
+          const input = e.target as HTMLInputElement;
+          setDraft(input.value);
+          commitNormalized(input.value);
+        });
+      }}
+      onKeyDown={(e) => {
+        parentOnKeyDown?.(e);
+        if (e.key === 'Enter') {
           commitNormalized(draft, { syncDraft: true });
-          parentOnBlur?.(e);
-        }}
-        onChange={(e) => {
-          parentOnChange?.(e);
-          const next = e.target.value;
-          setDraft(next);
-          commitNormalized(next);
-        }}
-        onPaste={(e) => {
-          parentOnPaste?.(e);
-          if (typeof window === 'undefined') return;
-          requestAnimationFrame(() => {
-            const input = e.target as HTMLInputElement;
-            setDraft(input.value);
-            commitNormalized(input.value);
-          });
-        }}
-        onKeyDown={(e) => {
-          parentOnKeyDown?.(e);
-          if (e.key === 'Enter') {
-            commitNormalized(draft, { syncDraft: true });
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-        placeholder={placeholder}
-        className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 rounded-md border border-border text-sm font-mono text-foreground`}
-        size={28}
-        style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
-      />
-    );
-  },
-);
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      placeholder={placeholder}
+      className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 rounded-md border border-border text-sm font-mono text-foreground`}
+      size={28}
+      style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
+    />
+  );
+});
 
 IsoDateInput.displayName = 'IsoDateInput';
 
@@ -315,7 +310,9 @@ export function DateTimePickerField({
                     type="time"
                     step={1}
                     value={timeValue}
-                    onChange={(event) => { handleTimeChange(event.target.value); }}
+                    onChange={(event) => {
+                      handleTimeChange(event.target.value);
+                    }}
                     className="appearance-none pl-8 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                   />
                 </div>

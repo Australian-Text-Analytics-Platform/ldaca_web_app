@@ -1,7 +1,10 @@
 import { useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { type ColumnInfo, mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
+import {
+  type ColumnInfo,
+  mapColumnsToInfo,
+} from '@/features/workspace/data-view/utils/columnTypes';
 import { nodeInfoQueryOptions } from '@/lib/nodeInfo';
 
 export type NodeLike = Record<string, unknown> & {

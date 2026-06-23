@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import type React from 'react';
 import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
@@ -31,65 +32,6 @@ interface WorkspaceNodeListProps {
 }
 
 /**
- * Renders a data-block name with a ChromeTabs-style left-edge fade instead of an
- * ellipsis, mirroring the analysis multi-tab strip.
- * Called by: WorkspaceNodeList row rendering because each row needs its own
- * overflow measurement to decide whether the fade stays on permanently.
- * Flow: measure the clipped text against its wrapper via ResizeObserver, then
- * keep the gradient overlay visible when the name overflows and otherwise reveal
- * it only while the row (the `group`) is hovered/focused — where the leading
- * actions overlay the text.
- */
-function NodeRowName({ name }: { name: string }) {
-  const wrapRef = useRef<HTMLSpanElement>(null);
-  const textRef = useRef<HTMLSpanElement>(null);
-  const [overflowing, setOverflowing] = useState(false);
-
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    const text = textRef.current;
-    if (!wrap || !text) return;
-    const measure = () => {
-      setOverflowing(text.offsetWidth > wrap.clientWidth + 1);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(wrap);
-    observer.observe(text);
-    return () => { observer.disconnect(); };
-  }, [name]);
-
-  return (
-    <span
-      ref={wrapRef}
-      dir={overflowing ? 'rtl' : 'ltr'}
-      className={cn(
-        'relative min-w-0 flex-1 overflow-hidden',
-        overflowing ? 'block' : 'flex justify-end text-right',
-      )}
-    >
-      <span
-        ref={textRef}
-        dir="ltr"
-        className="block w-max whitespace-nowrap text-right text-xs font-medium text-foreground"
-      >
-        {name}
-      </span>
-      {/* Left-edge fade: always visible while the name is clipped, otherwise
-          revealed only on hover/focus (when the leading actions overlay the text).
-          Widens on hover so the text fades before reaching the actions. */}
-      <span
-        aria-hidden="true"
-        className={cn(
-          'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background via-background/90 to-transparent group-hover/row:w-32',
-          overflowing ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
-        )}
-      />
-    </span>
-  );
-}
-
-/**
  * Called by: WorkspaceNodeList row rendering to build data-block tooltips because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
  * Flow: read shape from node data or top-level payload, format numeric row/column parts, then fall back to unknown markers.
  */
@@ -118,10 +60,10 @@ const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
  * Selectable node list shown in the collapsed right panel's list view. It
  * presents nodes in their original workspace order and bridges row clicks back
  * to workspace selection and fresh-node acknowledgement stores.
- * Rendered by: WorkspaceListView (the collapsed list-view top pane) because
- * graph selection and fresh-node acknowledgement must stay aligned.
- * Flow: read fresh state, measure row anchor points, then render counts, the
- * selected-delete action, and the toggleable node rows.
+ * Rendered by: the sidebar Data Blocks section because graph selection and
+ * fresh-node acknowledgement must stay aligned with visible rows.
+ * Flow: read fresh state and pinned ids, order pinned/selected/regular nodes,
+ * then render the batch-delete affordance and toggleable node rows.
  */
 function WorkspaceNodeList({
   nodes,
@@ -138,9 +80,10 @@ function WorkspaceNodeList({
   const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
 
   const freshIds = useFreshNodesStore((state) => state.freshIds);
-  const markInteracted = useFreshNodesStore((state) =>
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
-    state.markInteracted,
+  const markInteracted = useFreshNodesStore(
+    (state) =>
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
+      state.markInteracted,
   );
 
   /** Called by: WorkspaceNodeList row click and keyboard activation handlers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
@@ -155,8 +98,12 @@ function WorkspaceNodeList({
   const pinnedNodes = pinnedNodeIds
     .map((id) => nodeById.get(id))
     .filter((node): node is SidebarWorkspaceNode => node !== undefined);
-  const selectedNodes = nodes.filter((node) => selectedIdSet.has(node.id) && !pinnedIdSet.has(node.id));
-  const regularNodes = nodes.filter((node) => !selectedIdSet.has(node.id) && !pinnedIdSet.has(node.id));
+  const selectedNodes = nodes.filter(
+    (node) => selectedIdSet.has(node.id) && !pinnedIdSet.has(node.id),
+  );
+  const regularNodes = nodes.filter(
+    (node) => !selectedIdSet.has(node.id) && !pinnedIdSet.has(node.id),
+  );
   const orderedNodes = [...pinnedNodes, ...selectedNodes, ...regularNodes];
 
   const selectedForDelete = nodes
@@ -187,13 +134,15 @@ function WorkspaceNodeList({
         <div className="flex items-center justify-end gap-2 pb-1">
           <button
             type="button"
-            onClick={() => { setDeleteConfirmOpen(true); }}
+            onClick={() => {
+              setDeleteConfirmOpen(true);
+            }}
             disabled={isDeleting}
             title="Delete the selected data blocks"
             aria-label="Delete selected data blocks"
             className={cn(
               'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-              'border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:border-destructive/90'
+              'border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:border-destructive/90',
             )}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -270,6 +219,7 @@ function WorkspaceNodeList({
                     className={cn(
                       'relative flex items-center gap-2 overflow-visible rounded-md border bg-background/70 px-2 py-1 text-xs transition-colors duration-150 ease-out group-focus-visible/row:ring-1 group-focus-visible/row:ring-ring',
                       isPinned && pinnedRowAction && 'pl-8',
+                      rowActions && 'pr-20',
                       checked
                         ? 'border-primary/70 bg-primary/10 ring-1 ring-primary/20'
                         : 'border-border/60 group-hover/row:border-border group-hover/row:bg-accent/60',
@@ -279,14 +229,22 @@ function WorkspaceNodeList({
                       <div
                         data-testid="pinned-row-pin-action"
                         className="absolute top-1/2 left-1 z-10 flex -translate-y-1/2 items-center opacity-100 group-hover/row:pointer-events-none group-hover/row:opacity-0"
-                        onPointerDown={(event) => { event.stopPropagation(); }}
-                        onClick={(event) => { event.stopPropagation(); }}
-                        onKeyDown={(event) => { event.stopPropagation(); }}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                        }}
                       >
                         {pinnedRowAction}
                       </div>
                     )}
-                    <NodeRowName name={displayName} />
+                    <span className="min-w-0 flex-1 truncate text-left text-xs font-medium text-foreground">
+                      {displayName}
+                    </span>
                     {isFresh && (
                       <span
                         className="pointer-events-none h-2 w-2 shrink-0 rounded-full bg-red-500 transition-opacity duration-150 group-hover/row:opacity-0"
@@ -295,13 +253,20 @@ function WorkspaceNodeList({
                       />
                     )}
                     {rowActions && (
-                      // Hover-revealed leading actions, absolutely positioned on the left.
+                      // Hover-revealed trailing actions, absolutely positioned
+                      // so the row keeps one stable height while names truncate.
                       // Stop row-toggle when interacting with the actions.
                       <div
-                        className="absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 pointer-events-none"
-                        onPointerDown={(event) => { event.stopPropagation(); }}
-                        onClick={(event) => { event.stopPropagation(); }}
-                        onKeyDown={(event) => { event.stopPropagation(); }}
+                        className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 pointer-events-none"
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                        }}
                         role="toolbar"
                         tabIndex={-1}
                         aria-label={`Actions for ${displayName}`}

@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { getNodeQueryPlan } from '@/api/generated/sdk.gen';
+import { getNodeQueryPlan } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 import type { FilterOperator } from '../types';
@@ -17,7 +17,7 @@ export interface WorkspaceDataTableHeaderInfo {
   isEmptyTable: boolean;
 }
 
-export interface WorkspaceDataTableNodeActions {
+interface WorkspaceDataTableNodeActions {
   onUndo?: () => void;
   onRedo?: () => void;
   onDelete?: () => void;
@@ -27,7 +27,7 @@ export interface WorkspaceDataTableNodeActions {
   canRedo: boolean;
 }
 
-export interface WorkspaceSelectionTab {
+interface WorkspaceSelectionTab {
   id: string;
   label: string;
   isActive: boolean;
@@ -225,10 +225,9 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onUndo: selectedNode?.id ? () => void undoNode(selectedNode.id) : undefined,
     onRedo: selectedNode?.id ? () => void redoNode(selectedNode.id) : undefined,
     onDelete: selectedNode?.id ? () => void deleteNode(selectedNode.id) : undefined,
-    onRename:
-      selectedNode?.id
-        ? (newName: string) => void renameNode(selectedNode.id, newName)
-        : undefined,
+    onRename: selectedNode?.id
+      ? (newName: string) => void renameNode(selectedNode.id, newName)
+      : undefined,
     onQueryPlan: selectedNode?.id
       ? async () => {
           const { data: resp } = await getNodeQueryPlan({

@@ -2,11 +2,7 @@ import { useState } from 'react';
 
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
-import {
-  type FilterPreviewResponse,
-  type ReplaceApplyResponse,
-  type ReplaceRequest,
-} from '@/api/generated/types.gen';
+import { type FilterPreviewResponse, type ReplaceApplyResponse, type ReplaceRequest } from '@/api';
 import { mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 

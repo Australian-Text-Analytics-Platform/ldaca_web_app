@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
-import { listLdacaFeaturedCollections } from '@/api/generated/sdk.gen';
+import { listLdacaFeaturedCollections } from '@/api';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 
 const {
@@ -328,9 +328,7 @@ describe('DataLoaderFeature citation UI', () => {
   it('deletes a folder when clicking its trash button', () => {
     renderWithProviders(<DataLoaderFeature />);
 
-    fireEvent.click(
-      getVisibleMatch(screen.getAllByRole('button', { name: /delete folder ado/i })),
-    );
+    fireEvent.click(getVisibleMatch(screen.getAllByRole('button', { name: /delete folder ado/i })));
 
     expect(mockHandleDeleteFile).toHaveBeenCalledWith('sample_data/ADO');
   });
@@ -609,7 +607,9 @@ describe('DataLoaderFeature citation UI', () => {
 
     await user.upload(uploadInput!, [firstFile, secondFile]);
 
-    await waitFor(() => { expect(mockHandleUploadFile).toHaveBeenCalledTimes(2); });
+    await waitFor(() => {
+      expect(mockHandleUploadFile).toHaveBeenCalledTimes(2);
+    });
     expect(mockHandleUploadFile).toHaveBeenNthCalledWith(1, firstFile);
     expect(mockHandleUploadFile).toHaveBeenNthCalledWith(2, secondFile);
   });
@@ -636,7 +636,9 @@ describe('DataLoaderFeature citation UI', () => {
       },
     });
 
-    await waitFor(() => { expect(mockHandleUploadFile).toHaveBeenCalledTimes(2); });
+    await waitFor(() => {
+      expect(mockHandleUploadFile).toHaveBeenCalledTimes(2);
+    });
     expect(mockHandleUploadFile).toHaveBeenNthCalledWith(1, firstFile);
     expect(mockHandleUploadFile).toHaveBeenNthCalledWith(2, secondFile);
   });

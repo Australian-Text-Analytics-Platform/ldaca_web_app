@@ -4,12 +4,9 @@ import { toast } from 'sonner';
 import { FolderPlus, Quote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { importSampleData } from '@/api/generated/sdk.gen';
-import type { SampleDataCollection } from '@/api/generated/types.gen';
-import {
-  getSampleDataCatalogueOptions,
-  getSampleDataReadmeOptions,
-} from '@/api/generated/@tanstack/react-query.gen';
+import { importSampleData } from '@/api';
+import type { SampleDataCollection } from '@/api';
+import { getSampleDataCatalogueOptions, getSampleDataReadmeOptions } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -181,7 +178,9 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
    * Toggles optional remote collections in the dataset import dialog.
    * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const toggle = (id: string) => { setChecked((prev) => ({ ...prev, [id]: !prev[id] })); };
+  const toggle = (id: string) => {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   /**
    * Imports selected sample datasets and refreshes the parent file browser once
@@ -227,7 +226,12 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
 
   return (
     <>
-      <Button variant="outline" onClick={() => { setOpen(true); }}>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setOpen(true);
+        }}
+      >
         <FolderPlus className="mr-2 h-4 w-4" /> Import sample data
       </Button>
 
@@ -240,75 +244,82 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-              {isLoading && (
-                <div className="space-y-2">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              )}
+            {isLoading && (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            )}
 
-              {!isLoading && catalogue && (
-                <div className="rounded-md border divide-y">
-                  {catalogue.collections.map((col) => {
-                    const readme = readmePath(col);
-                    return (
-                      <div key={col.id} className="flex flex-col gap-1.5 px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id={`sdc-${col.id}`}
-                            checked={getChecked(col)}
-                            disabled={col.bundled}
-                            onCheckedChange={() => { toggle(col.id); }}
-                          />
-                          <label
-                            htmlFor={`sdc-${col.id}`}
-                            className="flex-1 text-sm font-medium leading-none cursor-pointer select-none"
+            {!isLoading && catalogue && (
+              <div className="rounded-md border divide-y">
+                {catalogue.collections.map((col) => {
+                  const readme = readmePath(col);
+                  return (
+                    <div key={col.id} className="flex flex-col gap-1.5 px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`sdc-${col.id}`}
+                          checked={getChecked(col)}
+                          disabled={col.bundled}
+                          onCheckedChange={() => {
+                            toggle(col.id);
+                          }}
+                        />
+                        <label
+                          htmlFor={`sdc-${col.id}`}
+                          className="flex-1 text-sm font-medium leading-none cursor-pointer select-none"
+                        >
+                          {col.name}
+                        </label>
+                        {readme && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                            aria-label={`View README for ${col.name}`}
+                            title="View README"
+                            onClick={() => {
+                              setViewingReadme({ path: readme, name: col.name });
+                            }}
                           >
-                            {col.name}
-                          </label>
-                          {readme && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
-                              aria-label={`View README for ${col.name}`}
-                              title="View README"
-                              onClick={() => { setViewingReadme({ path: readme, name: col.name }); }}
-                            >
-                              <Quote className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {formatBytes(col.total_size_bytes)}
-                          </span>
-                          <StatusChip status={col.status} />
-                        </div>
-                        {col.recommended_for.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pl-6">
-                            {col.recommended_for.map((tool) => (
-                              <Badge key={tool} variant="secondary" className="text-xs">
-                                {TOOL_LABELS[tool] ?? tool}
-                              </Badge>
-                            ))}
-                          </div>
+                            <Quote className="h-3.5 w-3.5" />
+                          </Button>
                         )}
+                        <span className="text-xs text-muted-foreground">
+                          {formatBytes(col.total_size_bytes)}
+                        </span>
+                        <StatusChip status={col.status} />
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      {col.recommended_for.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pl-6">
+                          {col.recommended_for.map((tool) => (
+                            <Badge key={tool} variant="secondary" className="text-xs">
+                              {TOOL_LABELS[tool] ?? tool}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-              {!isLoading && isError && (
-                <p className="text-sm text-muted-foreground">
-                  Could not load catalogue. All bundled datasets will be imported.
-                </p>
-              )}
+            {!isLoading && isError && (
+              <p className="text-sm text-muted-foreground">
+                Could not load catalogue. All bundled datasets will be imported.
+              </p>
+            )}
 
             <div className="flex justify-end">
-              <Button onClick={() => {
+              <Button
+                onClick={() => {
                   void handleImport();
-                }} disabled={importing || (!isError && !anyChecked)}>
+                }}
+                disabled={importing || (!isError && !anyChecked)}
+              >
                 <FolderPlus className="mr-2 h-4 w-4" />
                 {importing ? 'Importing…' : 'Import selected'}
               </Button>
@@ -316,7 +327,13 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setOpen(false); }} disabled={importing}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOpen(false);
+              }}
+              disabled={importing}
+            >
               Close
             </Button>
           </DialogFooter>
@@ -327,7 +344,9 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
       <ReadmeViewer
         path={viewingReadme?.path ?? null}
         collectionName={viewingReadme?.name ?? ''}
-        onClose={() => { setViewingReadme(null); }}
+        onClose={() => {
+          setViewingReadme(null);
+        }}
       />
     </>
   );

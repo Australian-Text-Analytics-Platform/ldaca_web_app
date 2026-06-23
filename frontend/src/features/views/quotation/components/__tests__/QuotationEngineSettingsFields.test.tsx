@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { QuotationEngineConfigInput } from '@/api/generated/types.gen';
+import type { QuotationEngineConfigInput } from '@/api';
 import { QuotationEngineSettingsFields } from '../QuotationEngineSettingsFields';
 
 describe('QuotationEngineSettingsFields', () => {

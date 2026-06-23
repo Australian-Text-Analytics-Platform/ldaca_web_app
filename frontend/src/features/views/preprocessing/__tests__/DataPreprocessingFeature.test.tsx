@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type * as SdkGen from '@/api/generated/sdk.gen';
+import type * as SdkGen from '@/api';
 
 import DataPreprocessingFeature from '../DataPreprocessingFeature';
 
@@ -327,7 +327,9 @@ describe('DataPreprocessingFeature replace tab', () => {
     const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
     await waitFor(() => {
       expect(
-        within(filterPanel).queryByText('No schema information is available for this data block yet.'),
+        within(filterPanel).queryByText(
+          'No schema information is available for this data block yet.',
+        ),
       ).not.toBeInTheDocument();
     });
     expect(within(filterPanel).getAllByRole('combobox').length).toBeGreaterThan(0);
@@ -434,7 +436,9 @@ describe('DataPreprocessingFeature replace tab', () => {
     );
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
 
-    const sampleNameInput = await screen.findByPlaceholderText<HTMLInputElement>('Corpus_sampled_fr_0_4_rs_7');
+    const sampleNameInput = await screen.findByPlaceholderText<HTMLInputElement>(
+      'Corpus_sampled_fr_0_4_rs_7',
+    );
     const addButton = within(samplePanel).getByRole('button', { name: 'Add to Workspace' });
 
     sampleNameInput.focus();

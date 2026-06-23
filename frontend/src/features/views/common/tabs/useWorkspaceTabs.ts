@@ -15,8 +15,8 @@
  */
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { clearTasks, getWorkspaceTabs, putWorkspaceTabs } from '@/api/generated/sdk.gen';
-import type { AnalysisTab, AnalysisTabInput, WorkspaceTabsState } from '@/api/generated/types.gen';
+import { clearTasks, getWorkspaceTabs, putWorkspaceTabs } from '@/api';
+import type { AnalysisTab, AnalysisTabInput, WorkspaceTabsState } from '@/api';
 import {
   EMPTY_TABS_STATE,
   closeTabInState,
@@ -195,31 +195,37 @@ export function useWorkspaceTabs(
   );
 
   const renameTab = useCallback(
-    (tabId: string, title: string) =>
-      { commit(renameTabInState(readState(), analysisType, tabId, title)); },
+    (tabId: string, title: string) => {
+      commit(renameTabInState(readState(), analysisType, tabId, title));
+    },
     [analysisType, readState, commit],
   );
 
   const setActiveTab = useCallback(
-    (tabId: string) => { commit(setActiveTabInState(readState(), analysisType, tabId)); },
+    (tabId: string) => {
+      commit(setActiveTabInState(readState(), analysisType, tabId));
+    },
     [analysisType, readState, commit],
   );
 
   const reorderTabs = useCallback(
-    (orderedTabIds: string[]) =>
-      { commit(reorderTabsInState(readState(), analysisType, orderedTabIds)); },
+    (orderedTabIds: string[]) => {
+      commit(reorderTabsInState(readState(), analysisType, orderedTabIds));
+    },
     [analysisType, readState, commit],
   );
 
   const setTabTask = useCallback(
-    (tabId: string, taskId: string | null) =>
-      { commit(setTabTaskInState(readState(), analysisType, tabId, taskId)); },
+    (tabId: string, taskId: string | null) => {
+      commit(setTabTaskInState(readState(), analysisType, tabId, taskId));
+    },
     [analysisType, readState, commit],
   );
 
   const setTabInputs = useCallback(
-    (tabId: string, inputs: AnalysisTabInput[]) =>
-      { commit(setTabInputsInState(readState(), analysisType, tabId, inputs)); },
+    (tabId: string, inputs: AnalysisTabInput[]) => {
+      commit(setTabInputsInState(readState(), analysisType, tabId, inputs));
+    },
     [analysisType, readState, commit],
   );
 

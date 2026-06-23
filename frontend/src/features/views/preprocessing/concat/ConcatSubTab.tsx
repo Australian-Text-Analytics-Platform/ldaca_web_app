@@ -13,8 +13,6 @@ import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useConcatSubTab, type ConcatSubTabProps } from './hooks/useConcatSubTab';
 
-export type { ConcatSubTabProps } from './hooks/useConcatSubTab';
-
 type ConcatSubTabComponentProps = ConcatSubTabProps & {
   renderNodeInputsPanel?: () => ReactNode;
 };
@@ -102,7 +100,9 @@ export function ConcatSubTab(props: ConcatSubTabComponentProps) {
             <Checkbox
               id="concat-deduplicate"
               checked={form.deduplicate}
-              onCheckedChange={(checked) => { form.setDeduplicate(checked === true); }}
+              onCheckedChange={(checked) => {
+                form.setDeduplicate(checked === true);
+              }}
             />
             <span>Drop duplicate rows after stacking</span>
             <HelpIcon
@@ -122,10 +122,12 @@ export function ConcatSubTab(props: ConcatSubTabComponentProps) {
               id="concat-new-node-name"
               value={form.value}
               placeholder={form.placeholder}
-              onChange={(event) => { form.setValue(event.target.value); }}
-              onKeyDown={(event) =>
-                { acceptPlaceholderOnTab({ event, value: form.value, setValue: form.setValue }); }
-              }
+              onChange={(event) => {
+                form.setValue(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                acceptPlaceholderOnTab({ event, value: form.value, setValue: form.setValue });
+              }}
               className="min-w-0 flex-1"
             />
           </div>

@@ -1,11 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  importLdacaDataset,
-  listLdacaFeaturedCollections,
-  searchLdacaCollections,
-} from '@/api/generated/sdk.gen';
-import type { OniSearchResult as LdacaSearchResult } from '@/api/generated/types.gen';
+import { importLdacaDataset, listLdacaFeaturedCollections, searchLdacaCollections } from '@/api';
+import type { OniSearchResult as LdacaSearchResult } from '@/api';
 import { useLdacaImport } from '../useLdacaImport';
 
 vi.mock('@/api/generated/sdk.gen', () => ({
@@ -66,9 +62,13 @@ describe('useLdacaImport', () => {
       useLdacaImport({ authHeaders, ldacaApiToken, refetchFiles, notify }),
     );
 
-    act(() => { result.current.setLdacaImportOpen(true); });
+    act(() => {
+      result.current.setLdacaImportOpen(true);
+    });
 
-    await waitFor(() => { expect(result.current.featuredRecords).toEqual([cooeeRecord]); });
+    await waitFor(() => {
+      expect(result.current.featuredRecords).toEqual([cooeeRecord]);
+    });
     expect(listLdacaFeaturedCollections).toHaveBeenCalledWith({
       headers: { ...authHeaders, 'X-LDACA-API-Token': ldacaApiToken },
       throwOnError: true,
@@ -109,7 +109,9 @@ describe('useLdacaImport', () => {
       useLdacaImport({ authHeaders, ldacaApiToken, refetchFiles, notify }),
     );
 
-    act(() => { result.current.setLdacaImportOpen(true); });
+    act(() => {
+      result.current.setLdacaImportOpen(true);
+    });
     await act(async () => {
       await result.current.handleLdacaImport(cooeeRecord.id);
     });

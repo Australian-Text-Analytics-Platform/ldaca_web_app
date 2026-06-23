@@ -2,13 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import '@xyflow/react/dist/style.css';
 
-import {
-  Background,
-  BackgroundVariant,
-  Controls,
-  MiniMap,
-  ReactFlow,
-} from '@xyflow/react';
+import { Background, BackgroundVariant, Controls, MiniMap, ReactFlow } from '@xyflow/react';
 import { CircleOff, Loader2, Map, Network } from 'lucide-react';
 
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -159,7 +153,9 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         <Controls position="top-right">
           <OverviewToggle
             active={showOverview}
-            onToggle={() => { setShowOverview((value) => !value); }}
+            onToggle={() => {
+              setShowOverview((value) => !value);
+            }}
           />
           <DeselectButton
             disabled={!graph.canClearSelection}

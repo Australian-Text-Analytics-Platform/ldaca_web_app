@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AnalysisTab } from '@/api/generated/types.gen';
+import type { AnalysisTab } from '@/api';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisTabsHost } from '../AnalysisTabsHost';
 import type { UseWorkspaceTabsResult } from '../useWorkspaceTabs';
@@ -38,9 +38,7 @@ const secondTab: AnalysisTab = {
   inputs: [],
 };
 
-function makeTabsResult(
-  overrides: Partial<UseWorkspaceTabsResult>,
-): UseWorkspaceTabsResult {
+function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspaceTabsResult {
   return {
     tabs: [],
     activeTabId: null,
@@ -90,7 +88,9 @@ describe('AnalysisTabsHost', () => {
       <AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />,
     );
 
-    await waitFor(() => { expect(createTab).toHaveBeenCalledWith('Analysis 1'); });
+    await waitFor(() => {
+      expect(createTab).toHaveBeenCalledWith('Analysis 1');
+    });
     expect(createTab).toHaveBeenCalledTimes(1);
 
     rerender(<AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />);
@@ -120,10 +120,12 @@ describe('AnalysisTabsHost', () => {
   });
 
   it('hides multi-tab chrome by default while still rendering the active feature', () => {
-    mocks.useWorkspaceTabs.mockReturnValue(makeTabsResult({
-      tabs: [tab],
-      activeTabId: tab.tab_id,
-    }));
+    mocks.useWorkspaceTabs.mockReturnValue(
+      makeTabsResult({
+        tabs: [tab],
+        activeTabId: tab.tab_id,
+      }),
+    );
 
     render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />);
 
@@ -133,10 +135,12 @@ describe('AnalysisTabsHost', () => {
 
   it('shows multi-tab chrome when the preference is enabled', () => {
     setMultiTabPreference(true);
-    mocks.useWorkspaceTabs.mockReturnValue(makeTabsResult({
-      tabs: [tab],
-      activeTabId: tab.tab_id,
-    }));
+    mocks.useWorkspaceTabs.mockReturnValue(
+      makeTabsResult({
+        tabs: [tab],
+        activeTabId: tab.tab_id,
+      }),
+    );
 
     render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />);
 
@@ -145,10 +149,12 @@ describe('AnalysisTabsHost', () => {
   });
 
   it('renders the first tab while single-tab cleanup is pending', () => {
-    mocks.useWorkspaceTabs.mockReturnValue(makeTabsResult({
-      tabs: [tab, secondTab],
-      activeTabId: secondTab.tab_id,
-    }));
+    mocks.useWorkspaceTabs.mockReturnValue(
+      makeTabsResult({
+        tabs: [tab, secondTab],
+        activeTabId: secondTab.tab_id,
+      }),
+    );
 
     render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={FeatureWithTabId} />);
 

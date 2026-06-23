@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { HydrationState } from '../../common/useAnalysisHydration';
 import type { NodeColumnSelection } from '../../common';
@@ -75,7 +69,9 @@ export function useConcordancePendingHandoff({
       setQueuedPendingConcordance(pendingConcordance);
       clearPendingConcordance();
     });
-    return () => { cancelAnimationFrame(id); };
+    return () => {
+      cancelAnimationFrame(id);
+    };
   }, [pendingConcordance, clearPendingConcordance]);
 
   useEffect(() => {
@@ -93,7 +89,11 @@ export function useConcordancePendingHandoff({
     const rafIds: number[] = [];
     const word = queuedPendingConcordance.searchWord;
     if (word) {
-      rafIds.push(requestAnimationFrame(() => { setSearchWord(word); }));
+      rafIds.push(
+        requestAnimationFrame(() => {
+          setSearchWord(word);
+        }),
+      );
     }
 
     if (

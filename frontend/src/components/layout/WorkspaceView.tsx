@@ -20,7 +20,10 @@ import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
 function WorkspaceView({
   collapsed = false,
   onToggleCollapse,
-}: { collapsed?: boolean; onToggleCollapse?: () => void } = {}) {
+}: {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+} = {}) {
   const topRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const {

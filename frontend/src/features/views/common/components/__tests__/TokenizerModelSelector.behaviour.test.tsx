@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { getNodeData, getTokenizerModels } from '@/api/generated/sdk.gen';
+import { getNodeData, getTokenizerModels } from '@/api';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
 import TokenizerModelSelector from '../TokenizerModelSelector';
 
@@ -92,7 +92,9 @@ describe('TokenizerModelSelector', () => {
 
     await user.click(screen.getByRole('combobox', { name: /tokenizer model/i }));
 
-    await waitFor(() => { expect(getTokenizerModels).toHaveBeenCalledTimes(1); });
+    await waitFor(() => {
+      expect(getTokenizerModels).toHaveBeenCalledTimes(1);
+    });
     expect(await screen.findByText('Recommended')).toBeInTheDocument();
     expect(screen.getByTestId('tokenizer-model-recommendations')).toHaveClass('rounded-lg');
     expect(screen.getByText('Plain words (English)')).toBeInTheDocument();

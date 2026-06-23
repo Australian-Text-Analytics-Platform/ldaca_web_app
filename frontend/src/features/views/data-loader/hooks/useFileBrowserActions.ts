@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getRawFile, moveFile } from '@/api/generated/sdk.gen';
+import { getRawFile, moveFile } from '@/api';
 import type { FileTreeDirectory } from '@/features/views/data-loader/types';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;

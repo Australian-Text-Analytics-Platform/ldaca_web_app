@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { describeColumn, getColumnUniqueValues } from '@/api/generated/sdk.gen';
+import { describeColumn, getColumnUniqueValues } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
   Select,
@@ -306,9 +306,7 @@ export const useFilterSubTabSections = (
   const workspaceNodeMap = (() => {
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node: WorkspaceNodeLike) => {
-      const key =
-        (node.id) ??
-        ((node as Record<string, unknown>).node_id as string | undefined);
+      const key = node.id ?? ((node as Record<string, unknown>).node_id as string | undefined);
       if (key) {
         map.set(key, node);
       }
@@ -613,7 +611,7 @@ export const useFilterSubTabSections = (
             currentWorkspaceId &&
             (value === 'gte' || value === 'lte')
           ) {
-              void prefillNumericValue(id, updated.column, value);
+            void prefillNumericValue(id, updated.column, value);
           }
         }
 
@@ -636,9 +634,7 @@ export const useFilterSubTabSections = (
           : targetCondition?.dataType;
       void ensureCategoricalOptions(
         nextCategoricalColumnToLoad,
-        targetType === 'categorical' ||
-          targetType === 'list[string]' ||
-          targetType === 'tmdist'
+        targetType === 'categorical' || targetType === 'list[string]' || targetType === 'tmdist'
           ? targetType
           : 'categorical',
       );
@@ -657,9 +653,9 @@ export const useFilterSubTabSections = (
         <Checkbox
           id={`negate-${condition.id}`}
           checked={Boolean(condition.negate)}
-          onCheckedChange={(checked) =>
-            { handleConditionChange(condition.id, 'negate', checked === true); }
-          }
+          onCheckedChange={(checked) => {
+            handleConditionChange(condition.id, 'negate', checked === true);
+          }}
           disabled={rowDisabled}
         />
         <span>negate</span>
@@ -671,9 +667,9 @@ export const useFilterSubTabSections = (
             <Checkbox
               id={`regex-${condition.id}`}
               checked={Boolean(condition.regex)}
-              onCheckedChange={(checked) =>
-                { handleConditionChange(condition.id, 'regex', checked === true); }
-              }
+              onCheckedChange={(checked) => {
+                handleConditionChange(condition.id, 'regex', checked === true);
+              }}
               disabled={rowDisabled}
             />
             <span>regex</span>
@@ -682,9 +678,9 @@ export const useFilterSubTabSections = (
             <Checkbox
               id={`case-sensitive-${condition.id}`}
               checked={Boolean(condition.caseSensitive)}
-              onCheckedChange={(checked) =>
-                { handleConditionChange(condition.id, 'caseSensitive', checked === true); }
-              }
+              onCheckedChange={(checked) => {
+                handleConditionChange(condition.id, 'caseSensitive', checked === true);
+              }}
               disabled={rowDisabled}
             />
             <span>case sensitive</span>
@@ -796,7 +792,7 @@ export const useFilterSubTabSections = (
         prev.map((c) => {
           if (c.id !== conditionId) return c;
 
-          let newValue: ConditionValue = (c.value) ?? '';
+          let newValue: ConditionValue = c.value ?? '';
 
           switch (operator) {
             case 'gte':
@@ -855,10 +851,11 @@ export const useFilterSubTabSections = (
       // categorical options); threshold is stored as a 0..1 fraction.
       const current =
         condition.value && typeof condition.value === 'object' && 'topic_id' in condition.value
-          ? (condition.value)
+          ? condition.value
           : { topic_id: 0, threshold: 0.05 };
-      const patch = (next: Partial<{ topic_id: number; threshold: number }>) =>
-        { handleConditionChange(condition.id, 'value', { ...current, ...next }); };
+      const patch = (next: Partial<{ topic_id: number; threshold: number }>) => {
+        handleConditionChange(condition.id, 'value', { ...current, ...next });
+      };
 
       const key = condition.column ? getCategoricalKey(condition.column) : null;
       const optionState = key ? categoricalOptions[key] : undefined;
@@ -872,7 +869,9 @@ export const useFilterSubTabSections = (
         <div className="flex flex-1 flex-wrap items-center gap-1.5">
           <Select
             value={String(current.topic_id)}
-            onValueChange={(v) => { patch({ topic_id: Number(v) }); }}
+            onValueChange={(v) => {
+              patch({ topic_id: Number(v) });
+            }}
             disabled={topicIds.length === 0}
           >
             <SelectTrigger className="w-32" aria-label="Topic">
@@ -888,13 +887,13 @@ export const useFilterSubTabSections = (
           </Select>
           <Select
             value={condition.operator}
-            onValueChange={(v) =>
-              { handleConditionChange(
+            onValueChange={(v) => {
+              handleConditionChange(
                 condition.id,
                 'operator',
                 v as FilterConditionWithId['operator'],
-              ); }
-            }
+              );
+            }}
             disabled={disabled}
           >
             <SelectTrigger className="w-20" aria-label="Comparison operator">
@@ -996,7 +995,11 @@ export const useFilterSubTabSections = (
       };
 
       const onSelectAllForMode =
-        searchQuery.trim().length > 0 ? handleSelectVisible : () => { handleSelectAll(); };
+        searchQuery.trim().length > 0
+          ? handleSelectVisible
+          : () => {
+              handleSelectAll();
+            };
 
       return (
         <FilterValueChecklist
@@ -1007,15 +1010,19 @@ export const useFilterSubTabSections = (
           loading={isLoadingOptions}
           error={optionError}
           searchQuery={searchQuery}
-          onSearchQueryChange={(query) =>
-            { setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query })); }
-          }
+          onSearchQueryChange={(query) => {
+            setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query }));
+          }}
           onToggleOption={toggleValue}
           onSelectAll={onSelectAllForMode}
           onClearAll={handleClearAll}
-          onRetry={column ? () => {
-            void ensureCategoricalOptions(column, dataType);
-          } : undefined}
+          onRetry={
+            column
+              ? () => {
+                  void ensureCategoricalOptions(column, dataType);
+                }
+              : undefined
+          }
         />
       );
     }
@@ -1026,7 +1033,9 @@ export const useFilterSubTabSections = (
           // condition.value is a boolean in this branch; String() coerces it.
           // eslint-disable-next-line @typescript-eslint/no-base-to-string
           value={String(condition.value)}
-          onValueChange={(value) => { handleConditionChange(condition.id, 'value', value === 'true'); }}
+          onValueChange={(value) => {
+            handleConditionChange(condition.id, 'value', value === 'true');
+          }}
           disabled={disabled}
         >
           <SelectTrigger className="flex-1">
@@ -1043,10 +1052,8 @@ export const useFilterSubTabSections = (
     if (dataType === 'datetime') {
       if (condition.operator === 'between') {
         const rangeValue: ConditionRange =
-          condition.value &&
-          typeof condition.value === 'object' &&
-          'start' in condition.value
-            ? (condition.value)
+          condition.value && typeof condition.value === 'object' && 'start' in condition.value
+            ? condition.value
             : { start: null, end: null };
         const startStr =
           typeof rangeValue.start === 'string'
@@ -1065,24 +1072,24 @@ export const useFilterSubTabSections = (
             <div className="flex-none">
               <DateTimePickerField
                 value={startStr}
-                onChange={(v) =>
-                  { handleConditionChange(condition.id, 'value', {
+                onChange={(v) => {
+                  handleConditionChange(condition.id, 'value', {
                     start: v,
                     end: rangeValue.end ?? null,
-                  }); }
-                }
+                  });
+                }}
                 placeholder={ISO_PLACEHOLDER}
               />
             </div>
             <div className="flex-none">
               <DateTimePickerField
                 value={endStr}
-                onChange={(v) =>
-                  { handleConditionChange(condition.id, 'value', {
+                onChange={(v) => {
+                  handleConditionChange(condition.id, 'value', {
                     start: rangeValue.start ?? null,
                     end: v,
-                  }); }
-                }
+                  });
+                }}
                 placeholder={ISO_PLACEHOLDER}
               />
             </div>
@@ -1098,7 +1105,9 @@ export const useFilterSubTabSections = (
       return (
         <DateTimePickerField
           value={singleVal}
-          onChange={(v) => { handleConditionChange(condition.id, 'value', v); }}
+          onChange={(v) => {
+            handleConditionChange(condition.id, 'value', v);
+          }}
           placeholder={ISO_PLACEHOLDER}
         />
       );
@@ -1134,7 +1143,9 @@ export const useFilterSubTabSections = (
         // condition.value is a primitive in this branch; String() coerces it.
         // eslint-disable-next-line @typescript-eslint/no-base-to-string
         value={String(condition.value)}
-        onChange={(e) => { handleConditionChange(condition.id, 'value', e.target.value); }}
+        onChange={(e) => {
+          handleConditionChange(condition.id, 'value', e.target.value);
+        }}
         placeholder="Enter value"
         className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
         disabled={disabled}

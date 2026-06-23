@@ -18,7 +18,7 @@ import {
 import { useDetectedColumnLanguage } from '@/features/views/common/hooks/useDetectedColumnLanguage';
 import { listSupportedStopwordLanguages } from '@/lib/loadMergedStopwords';
 
-export interface FillDefaultStopWordsDialogProps {
+interface FillDefaultStopWordsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Workspace + node + column used to guess the language from sampled text. */
@@ -95,7 +95,9 @@ function FillDefaultStopWordsDialog({
         <div className="space-y-2">
           <Select value={selected} onValueChange={setPicked} disabled={isLoading}>
             <SelectTrigger className="w-full" aria-label="Stop words language">
-              <SelectValue placeholder={isDetecting ? 'Detecting language…' : 'Select a language'} />
+              <SelectValue
+                placeholder={isDetecting ? 'Detecting language…' : 'Select a language'}
+              />
             </SelectTrigger>
             <SelectContent>
               {languages.map((language) => (
@@ -110,7 +112,9 @@ function FillDefaultStopWordsDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={() => { onOpenChange(false); }}
+            onClick={() => {
+              onOpenChange(false);
+            }}
             disabled={isLoading}
           >
             Cancel

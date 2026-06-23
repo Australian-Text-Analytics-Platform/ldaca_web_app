@@ -6,7 +6,7 @@ import type {
   PolarsExpressionRequest,
   PolarsExpressionApplyResponse,
   PolarsExpressionContext,
-} from '@/api/generated/types.gen';
+} from '@/api';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';

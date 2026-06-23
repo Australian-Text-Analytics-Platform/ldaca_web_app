@@ -1,7 +1,4 @@
-import type {
-  ConcordanceDispersionBinRow,
-  ConcordanceNodeResult,
-} from '@/api/generated/types.gen';
+import type { ConcordanceDispersionBinRow, ConcordanceNodeResult } from '@/api';
 import { CONCORDANCE_COLUMN_KEYS, CONCORDANCE_CORE_COLUMNS } from '../common/generatedColumns';
 
 type ConcordanceHitRow = Record<string, unknown>;
@@ -131,8 +128,7 @@ export function buildCombinedSlice(
   const rightPag = rightSlice.pagination;
   const totalSourceRows = Math.max(leftPag.total_source_rows, rightPag.total_source_rows);
   const totalSourcePages = Math.max(leftPag.total_source_pages, rightPag.total_source_pages);
-  const resolvedPageSize =
-    leftPag.page_size || rightPag.page_size || pageSize;
+  const resolvedPageSize = leftPag.page_size || rightPag.page_size || pageSize;
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string sort_by means "unsorted" and must fall back to the other node, then null
   const effectiveSortBy = leftSlice.sorting.sort_by || rightSlice.sorting.sort_by || null;
 
@@ -235,7 +231,7 @@ export function getDispersionBarWidthPercent(
  */
 export const DISPERSION_SOURCE_DELIMITER = '\0';
 
-export type DispersionBinDatum = {
+type DispersionBinDatum = {
   binCenter: number;
 } & Record<string, number>;
 

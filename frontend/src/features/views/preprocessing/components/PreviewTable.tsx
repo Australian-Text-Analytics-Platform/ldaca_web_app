@@ -150,7 +150,9 @@ export function PreviewTable({
               </label>
               <Select
                 value={String(pageSize)}
-                onValueChange={(value) => { onPageSizeChange(Number(value)); }}
+                onValueChange={(value) => {
+                  onPageSizeChange(Number(value));
+                }}
                 disabled={loading}
               >
                 <SelectTrigger className="w-24">
@@ -279,7 +281,9 @@ export function PreviewTable({
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              onClick={() => { table.setPageIndex(currentPage - 2); }}
+              onClick={() => {
+                table.setPageIndex(currentPage - 2);
+              }}
               disabled={currentPage <= 1 || loading}
               variant="outline"
               size="sm"
@@ -289,7 +293,9 @@ export function PreviewTable({
             <span className="text-sm text-muted-foreground">Page {currentPage}</span>
             <Button
               type="button"
-              onClick={() => { table.setPageIndex(currentPage); }}
+              onClick={() => {
+                table.setPageIndex(currentPage);
+              }}
               disabled={currentPage >= displayTotalPages || loading}
               variant="outline"
               size="sm"

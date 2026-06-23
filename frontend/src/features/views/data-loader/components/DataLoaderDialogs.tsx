@@ -31,10 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type {
-  OniSearchRequest,
-  OniSearchResult as LdacaSearchResult,
-} from '@/api/generated/types.gen';
+import type { OniSearchRequest, OniSearchResult as LdacaSearchResult } from '@/api';
 import type { FileTreeDirectory } from '@/features/views/data-loader/types';
 
 type LdacaSearchMethod = Extract<NonNullable<OniSearchRequest['method']>, 'keyword' | 'identifier'>;
@@ -206,7 +203,9 @@ function LdacaRecordCard({
           type="button"
           size="sm"
           className="shrink-0"
-          onClick={() => { onImport(record.id); }}
+          onClick={() => {
+            onImport(record.id);
+          }}
           disabled={!record.importable || Boolean(importingId)}
         >
           {isImporting ? (
@@ -487,9 +486,9 @@ export function DataLoaderDialogs({
                 <Label htmlFor="ldaca-search-method">Search by</Label>
                 <Select
                   value={ldacaImport.searchMethod}
-                  onValueChange={(value) =>
-                    { ldacaImport.onSearchMethodChange(value as LdacaSearchMethod); }
-                  }
+                  onValueChange={(value) => {
+                    ldacaImport.onSearchMethodChange(value as LdacaSearchMethod);
+                  }}
                 >
                   <SelectTrigger id="ldaca-search-method">
                     <SelectValue />
@@ -508,7 +507,9 @@ export function DataLoaderDialogs({
                 <Input
                   id="ldaca-search-query"
                   value={ldacaImport.query}
-                  onChange={(event) => { ldacaImport.onQueryChange(event.target.value); }}
+                  onChange={(event) => {
+                    ldacaImport.onQueryChange(event.target.value);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' && canSearch && !ldacaImport.searching) {
                       event.preventDefault();
@@ -619,7 +620,9 @@ export function DataLoaderDialogs({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => { ldacaImport.onOpenChange(false); }}
+              onClick={() => {
+                ldacaImport.onOpenChange(false);
+              }}
               disabled={ldacaImport.importing}
             >
               Close
@@ -662,7 +665,9 @@ export function DataLoaderDialogs({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => { handleTokenDialogOpenChange(false); }}
+                onClick={() => {
+                  handleTokenDialogOpenChange(false);
+                }}
               >
                 Cancel
               </Button>
@@ -694,13 +699,20 @@ export function DataLoaderDialogs({
               <Input
                 id="new-folder-name"
                 value={createFolder.name}
-                onChange={(event) => { createFolder.onNameChange(event.target.value); }}
+                onChange={(event) => {
+                  createFolder.onNameChange(event.target.value);
+                }}
                 placeholder="Enter folder name"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { createFolder.onOpenChange(false); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                createFolder.onOpenChange(false);
+              }}
+            >
               Cancel
             </Button>
             <Button

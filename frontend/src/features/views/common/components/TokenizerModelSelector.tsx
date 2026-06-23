@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { getTokenizerModels } from '@/api/generated/sdk.gen';
+import { getTokenizerModels } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { partitionTokenizerModelsForLanguage } from '@/lib/languages';
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ const TOKENIZER_MODELS_ERROR_VALUE = '__ldaca__tokenizer_models_error__';
 const TOKENIZER_MODELS_EMPTY_VALUE = '__ldaca__tokenizer_models_empty__';
 const TOKENIZER_MODEL_CLEAR_VALUE = '__ldaca__select_tokenizer_model__';
 
-export interface TokenizerModelSelectorProps {
+interface TokenizerModelSelectorProps {
   workspaceId: string | null;
   nodeId: string;
   column: string;

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getNodeData } from '@/api/generated/sdk.gen';
+import { getNodeData } from '@/api';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
 import { queryKeys } from '@/lib/queryKeys';
 import { collectDocumentColumnText } from '../components/tokenizerModelSelectorUtils';
@@ -63,13 +63,16 @@ export function useDetectedColumnLanguage({
     },
   });
 
-  const sampleText = collectDocumentColumnText(
-    sampleQuery.data?.data,
-    column ?? '',
-  );
+  const sampleText = collectDocumentColumnText(sampleQuery.data?.data, column ?? '');
 
   const detectionQuery = useQuery({
-    queryKey: ['tokenizer-language-detection', workspaceId, nodeId, column, sampleText.slice(0, 512)],
+    queryKey: [
+      'tokenizer-language-detection',
+      workspaceId,
+      nodeId,
+      column,
+      sampleText.slice(0, 512),
+    ],
     enabled: enabled && sampleText.length > 0,
     staleTime: 5 * 60_000,
     retry: false,

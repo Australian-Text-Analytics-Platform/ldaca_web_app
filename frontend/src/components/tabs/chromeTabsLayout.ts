@@ -31,10 +31,7 @@ export const TAB_MAX_WIDTH = 192;
  * give every tab the smaller of its own clamped natural width and that share, so
  * tabs hug their content when there is room and shrink together when there isn't.
  */
-export function computeContentTabWidths(
-  naturalWidths: number[],
-  containerWidth: number,
-): number[] {
+export function computeContentTabWidths(naturalWidths: number[], containerWidth: number): number[] {
   const count = naturalWidths.length;
   if (count <= 0) return [];
   const totalGap = TAB_GAP * (count - 1);

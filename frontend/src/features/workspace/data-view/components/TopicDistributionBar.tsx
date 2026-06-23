@@ -1,7 +1,10 @@
 import { useMemo } from 'react';
 
 /** One {topic_id, proportion} entry as delivered by the backend TMDist column. */
-interface DistributionEntry { topic_id: number; proportion: number }
+interface DistributionEntry {
+  topic_id: number;
+  proportion: number;
+}
 
 interface Props {
   /** Raw cell value from a TMDist column: a list of {topic_id, proportion}. */

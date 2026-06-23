@@ -1,4 +1,4 @@
-import type { ConfigResponse, UserPreferences } from '@/api/generated/types.gen';
+import type { ConfigResponse, NodeDataResponse, UserPreferences } from '@/api';
 
 /** Builds backend config responses for MSW handlers while letting tests override fields. */
 /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
@@ -18,5 +18,29 @@ export const preferencesResponse = (overrides: Partial<UserPreferences> = {}): U
   default_tokenizer_model: null,
   ldaca_oni_api_token: null,
   analysis_multi_tab_enabled: false,
+  ...overrides,
+});
+
+/**
+ * Builds a minimal paginated node-data response for shared component tests.
+ * Used by: MSW handlers for generated `getNodeData` calls because language
+ * detection, table, and selector tests need a normal backend-shaped page.
+ * Flow: return one text row plus pagination/sorting metadata, then let tests
+ * override fields for feature-specific fixtures.
+ */
+export const nodeDataResponse = (overrides: Partial<NodeDataResponse> = {}): NodeDataResponse => ({
+  columns: ['text'],
+  data: [{ text: 'This is an English sample document for language detection.' }],
+  dtypes: { text: 'string' },
+  filtering: { op: 'none' },
+  pagination: {
+    page: 1,
+    page_size: 100,
+    total_rows: 1,
+    total_pages: 1,
+    has_next: false,
+    has_prev: false,
+  },
+  sorting: { descending: false, sort_by: null },
   ...overrides,
 });

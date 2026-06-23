@@ -13,7 +13,7 @@ import {
 import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
-import type { SourceRowPagination } from '@/api/generated/types.gen';
+import type { SourceRowPagination } from '@/api';
 import { QUOTATION_DOCUMENT_COLUMN } from '../../common/generatedColumns';
 import { toCellText } from '../quotationCellText';
 import { QuotationHighlightedCell, type QuotationHoverState } from './QuotationHighlightedCell';
@@ -106,7 +106,9 @@ export function QuotationNodeBlock({
         <button
           type="button"
           className="flex items-center gap-1.5 select-none"
-          onClick={() => { onSort(nodeId, columnName); }}
+          onClick={() => {
+            onSort(nodeId, columnName);
+          }}
         >
           <span>{columnName}</span>
           <ArrowUpDown className={`h-3 w-3 ${active ? 'text-foreground' : 'opacity-60'}`} />
@@ -156,8 +158,7 @@ export function QuotationNodeBlock({
     <section className="space-y-4">
       <div className="border-b border-border/60 pb-4">
         <p className="text-sm text-muted-foreground">
-          Text column:{' '}
-          {textCol || 'Select a text column to view highlighted quotations.'}
+          Text column: {textCol || 'Select a text column to view highlighted quotations.'}
         </p>
       </div>
 
@@ -195,7 +196,9 @@ export function QuotationNodeBlock({
                   <TableRow
                     key={row.id}
                     className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer"
-                    onClick={() => { onRowClick(row.original); }}
+                    onClick={() => {
+                      onRowClick(row.original);
+                    }}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell

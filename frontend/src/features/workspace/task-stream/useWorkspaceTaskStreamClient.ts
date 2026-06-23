@@ -20,7 +20,7 @@ export type TaskEventPayload =
   | { type: 'heartbeat' }
   | { type: 'workspace_updated' };
 
-export interface TaskStreamState {
+interface TaskStreamState {
   status: 'idle' | 'connecting' | 'open' | 'error';
   error: string | null;
   reconnectAttempt: number;
@@ -97,7 +97,9 @@ export const useWorkspaceTaskStreamClient = (
      * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
      * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
      */
-    const fn = () => { reconnectRef.current(); };
+    const fn = () => {
+      reconnectRef.current();
+    };
     return fn;
   })();
 

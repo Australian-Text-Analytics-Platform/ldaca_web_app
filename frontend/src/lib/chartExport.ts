@@ -8,7 +8,10 @@ export const CHART_IMAGE_FORMATS: { value: ChartImageFormat; label: string }[] =
   { value: 'jpeg', label: 'JPEG' },
 ];
 
-export interface ChartExportHeaderItem { label: string; value: string }
+export interface ChartExportHeaderItem {
+  label: string;
+  value: string;
+}
 export interface ChartExportLegendItem {
   label: string;
   color: string;
@@ -47,11 +50,7 @@ const toChartFilename = (
 /** Escapes user/content labels before embedding them into composed SVG downloads. */
 /** Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const escSvg = (s: string): string =>
-  s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Clones the chart SVG at its rendered size so export code does not mutate the live chart. */
 /**

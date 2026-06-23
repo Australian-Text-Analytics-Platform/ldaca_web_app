@@ -7,8 +7,4 @@
  */
 
 export { useUIStore } from './uiStore';
-export type { ViewType, ModalKind, ModalTarget } from './uiStore';
-
-export type { TaskItem, PendingConcordance } from './analysisStore';
-
-export type { AuthPhase, FetchReason } from './authStore';
+export type { ViewType } from './uiStore';

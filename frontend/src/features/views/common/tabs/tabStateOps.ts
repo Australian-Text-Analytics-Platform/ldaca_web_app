@@ -9,12 +9,7 @@
  * to ``/workspaces/{id}/tabs``. Keeping the logic here (not inside the hook)
  * lets the reducers be covered by fast pure tests without mounting React.
  */
-import type {
-  AnalysisTab,
-  AnalysisTabGroup,
-  AnalysisTabInput,
-  WorkspaceTabsState,
-} from '@/api/generated/types.gen';
+import type { AnalysisTab, AnalysisTabGroup, AnalysisTabInput, WorkspaceTabsState } from '@/api';
 
 /** Empty default returned when a workspace has no tabs sidecar yet. */
 export const EMPTY_TABS_STATE: WorkspaceTabsState = { groups: {} };
@@ -195,9 +190,7 @@ export function renameTabInState(
   title: string,
 ): WorkspaceTabsState {
   const group = getGroup(state, analysisType);
-  const nextTabs = (group.tabs ?? []).map((t) =>
-    t.tab_id === tabId ? { ...t, title } : t,
-  );
+  const nextTabs = (group.tabs ?? []).map((t) => (t.tab_id === tabId ? { ...t, title } : t));
   return withGroup(state, analysisType, { ...group, tabs: nextTabs });
 }
 
@@ -252,9 +245,7 @@ export function setTabInputsInState(
   inputs: AnalysisTabInput[],
 ): WorkspaceTabsState {
   const group = getGroup(state, analysisType);
-  const nextTabs = (group.tabs ?? []).map((t) =>
-    t.tab_id === tabId ? { ...t, inputs } : t,
-  );
+  const nextTabs = (group.tabs ?? []).map((t) => (t.tab_id === tabId ? { ...t, inputs } : t));
   return withGroup(state, analysisType, { ...group, tabs: nextTabs });
 }
 

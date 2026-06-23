@@ -30,12 +30,7 @@ interface Args {
  * keyed by the tab's task id so sibling tabs can compare against independent
  * last-run requests.
  */
-export function useLastRunRequest({
-  analysisType,
-  workspaceId,
-  getAuthHeaders,
-  taskId,
-}: Args) {
+export function useLastRunRequest({ analysisType, workspaceId, getAuthHeaders, taskId }: Args) {
   const queryKey = lastRunRequestQueryKey(analysisType, workspaceId, taskId ?? null);
 
   const query = useQuery({

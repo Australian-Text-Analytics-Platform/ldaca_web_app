@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucide-react';
-import { getNodeData } from '@/api/generated/sdk.gen';
+import { getNodeData } from '@/api';
 import type { NodeDataResponse } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -32,16 +32,30 @@ import { SliceSubTab } from './slice/SliceSubTab';
 import { AggregateSubTab } from './aggregate/AggregateSubTab';
 import { ReplaceSubTab } from './replace/ReplaceSubTab';
 import InfoIcon from '@/components/help/InfoIcon';
-import { PolarsExpressionSubTab } from './expression/PolarsExpressionSubTab';
 
 type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
 
 const EMPTY_PREPROCESSING_INPUTS: [] = [];
 
+const PolarsExpressionSubTab = lazy(() =>
+  import('./expression/PolarsExpressionSubTab').then((module) => ({
+    default: module.PolarsExpressionSubTab,
+  })),
+);
+
+/** Shown only while the CodeMirror-backed expression subtab chunk is loading. */
+const PolarsExpressionFallback = () => (
+  <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+    Loading expression editor...
+  </div>
+);
+
 // Hosts preprocessing subtabs and passes the active input node context into each tool.
 /**
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/auth state, derive inputs and analysis parameters,
+ * render the active preprocessing subtab, and lazy-load the CodeMirror-backed
+ * expression editor only when users open that subtab.
  */
 function DataPreprocessingFeature() {
   const { currentWorkspaceId, nodes: workspaceNodes } = useWorkspaceData();
@@ -183,7 +197,9 @@ function DataPreprocessingFeature() {
 
       <Tabs
         value={activeSubtab}
-        onValueChange={(value) => { setActiveSubtab(value as DataPrepSubtab); }}
+        onValueChange={(value) => {
+          setActiveSubtab(value as DataPrepSubtab);
+        }}
         className="space-y-4"
       >
         <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
@@ -303,17 +319,19 @@ function DataPreprocessingFeature() {
         </TabsContent>
 
         <TabsContent value="expression" className="space-y-4">
-          <PolarsExpressionSubTab
-            renderNodeInputsPanel={renderNodeInputsPanel}
-            selectedNodeId={selectedNodeId}
-            selectedNodes={selectedNodes}
-            workspaceNodes={workspaceNodes}
-            isLoading={preprocessingLoading}
-            onAlert={handleAlert}
-            polarsExpressionPreview={polarsExpressionPreview}
-            polarsExpressionApply={polarsExpressionApply}
-            refreshNodeSchema={refreshNodeSchema}
-          />
+          <Suspense fallback={<PolarsExpressionFallback />}>
+            <PolarsExpressionSubTab
+              renderNodeInputsPanel={renderNodeInputsPanel}
+              selectedNodeId={selectedNodeId}
+              selectedNodes={selectedNodes}
+              workspaceNodes={workspaceNodes}
+              isLoading={preprocessingLoading}
+              onAlert={handleAlert}
+              polarsExpressionPreview={polarsExpressionPreview}
+              polarsExpressionApply={polarsExpressionApply}
+              refreshNodeSchema={refreshNodeSchema}
+            />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
@@ -325,7 +343,13 @@ function DataPreprocessingFeature() {
             <AlertDialogDescription>{alertMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => { setAlertOpen(false); }}>OK</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                setAlertOpen(false);
+              }}
+            >
+              OK
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

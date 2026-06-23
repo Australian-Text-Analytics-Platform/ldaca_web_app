@@ -1,6 +1,19 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { inferDatetimeFormat } from '../utils/datetimeFormatInfer';
 
@@ -114,7 +127,9 @@ function DatetimeFormatPanelContent({
               type="text"
               placeholder="e.g., %Y-%m-%d %H:%M:%S"
               value={customFormat}
-              onChange={(event) => { setCustomFormat(event.target.value); }}
+              onChange={(event) => {
+                setCustomFormat(event.target.value);
+              }}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
             />
             <div className="mt-1 text-xs text-muted-foreground">

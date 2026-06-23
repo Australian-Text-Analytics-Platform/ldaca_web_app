@@ -7,10 +7,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from 'react';
-import type {
-  ConcordanceAnalysisResponse,
-  ConcordanceResultQuery,
-} from '@/api/generated/types.gen';
+import type { ConcordanceAnalysisResponse, ConcordanceResultQuery } from '@/api';
 import { buildCombinedSlice } from '../concordanceViewModels';
 
 interface Params {
@@ -122,9 +119,7 @@ export function useConcordanceViewModeSwap({
 
         const combined = buildCombinedSlice(leftSlice, rightSlice, page, globalPageSize);
         setResults((prev) =>
-          prev?.data
-            ? ({ ...prev, data: { ...prev.data, __COMBINED__: combined } })
-            : prev,
+          prev?.data ? { ...prev, data: { ...prev.data, __COMBINED__: combined } } : prev,
         );
       } finally {
         setCombinedLoading(false);
@@ -136,8 +131,12 @@ export function useConcordanceViewModeSwap({
   useEffect(() => {
     if (viewMode === 'combined' && results?.combinable === false) {
       // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
-      const id = requestAnimationFrame(() => { setViewMode('separated'); });
-      return () => { cancelAnimationFrame(id); };
+      const id = requestAnimationFrame(() => {
+        setViewMode('separated');
+      });
+      return () => {
+        cancelAnimationFrame(id);
+      };
     }
   }, [viewMode, results, setViewMode]);
 

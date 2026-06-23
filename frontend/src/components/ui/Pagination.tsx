@@ -111,7 +111,9 @@ export function PaginationJump({
       setError(null);
       inputRef.current?.focus();
     });
-    return () => { cancelAnimationFrame(id); };
+    return () => {
+      cancelAnimationFrame(id);
+    };
   }, [open]);
 
   /**
@@ -122,14 +124,18 @@ export function PaginationJump({
     event.preventDefault();
     const trimmed = value.trim();
     if (!/^\d+$/.test(trimmed)) {
-      setError(totalPages ? `Enter a number between 1 and ${String(totalPages)}` : 'Enter a page number');
+      setError(
+        totalPages ? `Enter a number between 1 and ${String(totalPages)}` : 'Enter a page number',
+      );
       return;
     }
 
     const target = Number.parseInt(trimmed, 10);
     if (Number.isNaN(target) || target < 1 || (totalPages && target > totalPages)) {
       setError(
-        totalPages ? `Enter a value between 1 and ${String(totalPages)}` : 'Enter a valid page number',
+        totalPages
+          ? `Enter a value between 1 and ${String(totalPages)}`
+          : 'Enter a valid page number',
       );
       return;
     }
@@ -146,7 +152,9 @@ export function PaginationJump({
         size="icon"
         aria-expanded={open}
         aria-haspopup="dialog"
-        onClick={() => { setOpen((prev) => !prev); }}
+        onClick={() => {
+          setOpen((prev) => !prev);
+        }}
         className={cn('size-9 text-muted-foreground hover:text-foreground', triggerClassName)}
       >
         <MoreHorizontal className="h-4 w-4" />

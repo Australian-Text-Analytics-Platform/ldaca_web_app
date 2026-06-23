@@ -63,7 +63,7 @@ export interface MultiSeriesChartXAxisConfig {
   minTickGap?: number;
 }
 
-export interface MultiSeriesChartTooltipConfig {
+interface MultiSeriesChartTooltipConfig {
   /** If set, used as Recharts <Tooltip> content; overrides every other field. */
   content?: React.ReactElement;
   labelFormatter?: (label: never, payload?: never) => React.ReactNode;
@@ -77,7 +77,7 @@ export interface MultiSeriesChartTooltipConfig {
   className?: string;
 }
 
-export interface MultiSeriesChartSelectionConfig {
+interface MultiSeriesChartSelectionConfig {
   selectedIndices: ReadonlySet<number>;
   onSelect: (index: number, shiftHeld: boolean) => void;
 }
@@ -117,6 +117,7 @@ export interface MultiSeriesChartProps {
 const DEFAULT_MARGIN = { top: 20, right: 30, left: 20, bottom: 20 } as const;
 /** Active-dot radius shared by selectable line and area chart variants. */
 const ACTIVE_DOT_RADIUS = 5;
+const RESPONSIVE_CHART_INITIAL_WIDTH = 800;
 
 /**
  * Wraps the project's Recharts usage for analysis trend/result charts so line,
@@ -161,11 +162,15 @@ export function MultiSeriesChart({
     const el = plotMeasureRef.current;
     if (!el) return;
     /** Called by: ResizeObserver and initial chart mount for overflow warnings because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-    const update = () => { setChartPixelWidth(el.clientWidth); };
+    const update = () => {
+      setChartPixelWidth(el.clientWidth);
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => { ro.disconnect(); };
+    return () => {
+      ro.disconnect();
+    };
   }, []);
   const showOverflowWarning =
     !suppressOverflowWarning && chartPixelWidth > 0 && data.length > chartPixelWidth;
@@ -192,7 +197,11 @@ export function MultiSeriesChart({
       }
     : undefined;
 
-  interface DotProps { cx?: number; cy?: number; index?: number }
+  interface DotProps {
+    cx?: number;
+    cy?: number;
+    index?: number;
+  }
 
   /**
    * Called by: dotFor when line/area series need custom point rendering because selection state must alter point visibility without duplicating Recharts dot branches.
@@ -260,6 +269,7 @@ export function MultiSeriesChart({
   const yAxisElement = <YAxis allowDecimals={yAxis?.allowDecimals} />;
 
   const heightStyle = typeof height === 'number' ? { height: `${String(height)}px` } : { height };
+  const initialChartHeight = typeof height === 'number' ? height : 240;
   const containerClass = ['w-full', interactive ? 'cursor-pointer' : null, className]
     .filter(Boolean)
     .join(' ');
@@ -281,7 +291,15 @@ export function MultiSeriesChart({
           </div>
         )}
         <div ref={plotMeasureRef} className="w-full" style={heightStyle}>
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            minWidth={0}
+            initialDimension={{
+              width: RESPONSIVE_CHART_INITIAL_WIDTH,
+              height: initialChartHeight,
+            }}
+          >
             {chartType === 'bar' ? (
               <BarChart data={data as never} margin={margin} onClick={handleChartClick as never}>
                 <CartesianGrid strokeDasharray="3 3" />

@@ -120,8 +120,7 @@ export function ActiveWorkspaceCard({
                 </Badge>
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                Updated{' '}
-                {/* an empty modified_at timestamp should fall through to updated_at */}
+                Updated {/* an empty modified_at timestamp should fall through to updated_at */}
                 {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
                 {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} |
                 Size {formatBytes(currentWorkspace.workspace_size_Byte ?? 0)} | Created{' '}
@@ -141,7 +140,9 @@ export function ActiveWorkspaceCard({
                 <Input
                   id="rename-workspace"
                   value={renameValue}
-                  onChange={(event) => { setRenameValue(event.target.value); }}
+                  onChange={(event) => {
+                    setRenameValue(event.target.value);
+                  }}
                   placeholder="Enter new name"
                   disabled={!hasWorkspaceSelected || busy}
                 />
@@ -163,7 +164,9 @@ export function ActiveWorkspaceCard({
                   id="workspace-description"
                   aria-label="Workspace description"
                   value={descriptionValue}
-                  onChange={(event) => { setDescriptionValue(event.target.value); }}
+                  onChange={(event) => {
+                    setDescriptionValue(event.target.value);
+                  }}
                   placeholder="Enter workspace description"
                   disabled={!hasWorkspaceSelected || busy}
                 />
@@ -213,12 +216,16 @@ export function ActiveWorkspaceCard({
             <Input
               id="new-workspace-name"
               value={newWorkspaceName}
-              onChange={(event) => { setNewWorkspaceName(event.target.value); }}
+              onChange={(event) => {
+                setNewWorkspaceName(event.target.value);
+              }}
               placeholder="Workspace name"
             />
             <Input
               value={newWorkspaceDescription}
-              onChange={(event) => { setNewWorkspaceDescription(event.target.value); }}
+              onChange={(event) => {
+                setNewWorkspaceDescription(event.target.value);
+              }}
               placeholder="Optional description"
             />
             <div className="flex items-center gap-2">

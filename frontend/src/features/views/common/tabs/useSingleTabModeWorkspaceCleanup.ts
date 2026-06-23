@@ -11,8 +11,8 @@
  */
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { clearTasks, getWorkspaceTabs, putWorkspaceTabs } from '@/api/generated/sdk.gen';
-import type { WorkspaceTabsState } from '@/api/generated/types.gen';
+import { clearTasks, getWorkspaceTabs, putWorkspaceTabs } from '@/api';
+import type { WorkspaceTabsState } from '@/api';
 import { EMPTY_TABS_STATE, getTabs, keepFirstTabInState } from './tabStateOps';
 import { workspaceTabsQueryKey } from './useWorkspaceTabs';
 
@@ -100,7 +100,10 @@ export function useSingleTabModeWorkspaceCleanup(
       })
       .catch((error: unknown) => {
         cleanedWorkspaceRef.current = null;
-        console.warn('[analysis-tabs] Failed to collapse workspace tabs for single-tab mode:', error);
+        console.warn(
+          '[analysis-tabs] Failed to collapse workspace tabs for single-tab mode:',
+          error,
+        );
       });
   }, [analysisMultiTabEnabled, getAuthHeaders, queryClient, workspaceId]);
 }

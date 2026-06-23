@@ -81,7 +81,10 @@ function ExportFeature() {
     const data = n.data as Record<string, unknown> | undefined;
     // Id aliases come from WorkspaceNodeInfo's `unknown` index signature; the
     // chain always resolves to a string id at runtime, so assert string.
-    return n.id || ((n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? `node-${String(idx)}`) as string);
+    return (
+      n.id ||
+      ((n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? `node-${String(idx)}`) as string)
+    );
   });
 
   // Best-effort helpers for node display
@@ -173,13 +176,13 @@ function ExportFeature() {
       const multiple = nodeIds.length > 1;
       const ext = multiple ? 'zip' : getDownloadExtension(format);
       const filename = multiple
-        // Empty workspace name/id should fall back to the next label, so keep `||`.
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
-        // selectedNodes[0] exists here: handleExportAll returns early when nodeIds
-        // is empty, and this branch only runs for a single selected node.
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        : `${(toDisplay(selectedNodes[0]!).name || nodeIds[0]) ?? ''}.${ext}`;
+        ? // Empty workspace name/id should fall back to the next label, so keep `||`.
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+          `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
+        : // selectedNodes[0] exists here: handleExportAll returns early when nodeIds
+          // is empty, and this branch only runs for a single selected node.
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          `${(toDisplay(selectedNodes[0]!).name || nodeIds[0]) ?? ''}.${ext}`;
 
       if (isDesktopApp) {
         const fullPath = await tauriDownloadToDisk(url, headers, filename);
@@ -280,11 +283,7 @@ function ExportFeature() {
                     className="border-border/40 bg-card/60 hover:bg-card/80 flex flex-col gap-3 rounded-md border p-3 transition md:flex-row md:items-center md:justify-between"
                   >
                     <div className="space-y-1">
-                      <p
-                        className="text-sm font-semibold text-foreground"
-                      >
-                        {info.name}
-                      </p>
+                      <p className="text-sm font-semibold text-foreground">{info.name}</p>
                       {info.shape && (
                         <p className="text-muted-foreground text-xs">Shape: {info.shape}</p>
                       )}
@@ -313,7 +312,12 @@ function ExportFeature() {
                 <Label className="text-foreground block text-sm font-medium">Format</Label>
                 <HelpIcon targetKey="analysis.export.format" label="Export format selector" />
               </div>
-              <Select value={format} onValueChange={(value) => { setFormat(value); }}>
+              <Select
+                value={format}
+                onValueChange={(value) => {
+                  setFormat(value);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a format" />
                 </SelectTrigger>

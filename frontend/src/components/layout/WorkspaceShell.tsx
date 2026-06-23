@@ -20,9 +20,15 @@ import { DocumentModalHost } from '@/components/dialogs/DocumentModalHost';
 import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
 import { ViewRouter } from '@/components/layout/ViewRouter';
 
-const FeedbackPanel = lazy(() => import('@/features/feedback/components/FeedbackPanel').then(m => ({ default: m.FeedbackPanel })));
+const FeedbackPanel = lazy(() =>
+  import('@/features/feedback/components/FeedbackPanel').then((m) => ({
+    default: m.FeedbackPanel,
+  })),
+);
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
-const HintsController = lazy(() => import('@/features/hints/HintsController').then(m => ({ default: m.HintsController })));
+const HintsController = lazy(() =>
+  import('@/features/hints/HintsController').then((m) => ({ default: m.HintsController })),
+);
 
 /**
  * Views that render their own tabbed card (AnalysisTabbedPanel via
@@ -122,7 +128,12 @@ export function WorkspaceShell() {
 
               <SidebarInset className="flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
                 <Suspense fallback={null}>
-                  <FeedbackPanel open={feedbackOpen} onClose={() => { closeModal('feedback'); }} />
+                  <FeedbackPanel
+                    open={feedbackOpen}
+                    onClose={() => {
+                      closeModal('feedback');
+                    }}
+                  />
                 </Suspense>
 
                 <header className="border-border/40 border-b bg-white px-4 py-3 md:hidden">
@@ -140,7 +151,9 @@ export function WorkspaceShell() {
                         isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'
                       }`}
                       style={{
-                        width: isRightCollapsed ? '100%' : `${String((1 - asidePanelRatio) * 100)}%`,
+                        width: isRightCollapsed
+                          ? '100%'
+                          : `${String((1 - asidePanelRatio) * 100)}%`,
                         minWidth: 280,
                       }}
                       innerClassName={
@@ -173,9 +186,15 @@ export function WorkspaceShell() {
                     <aside
                       ref={asideRef}
                       className={`relative flex h-full flex-col bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
-                        isRightCollapsed ? 'min-w-0 w-0 overflow-visible flex-none' : 'min-w-[320px] overflow-hidden'
+                        isRightCollapsed
+                          ? 'min-w-0 w-0 overflow-visible flex-none'
+                          : 'min-w-[320px] overflow-hidden'
                       }`}
-                      style={isRightCollapsed ? { width: '0px' } : { width: `${String(asidePanelRatio * 100)}%` }}
+                      style={
+                        isRightCollapsed
+                          ? { width: '0px' }
+                          : { width: `${String(asidePanelRatio * 100)}%` }
+                      }
                     >
                       <ErrorBoundary>
                         <Suspense

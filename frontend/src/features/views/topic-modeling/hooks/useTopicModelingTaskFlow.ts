@@ -1,16 +1,12 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
-import {
-  detachTopicModeling,
-  runTopicModeling,
-  topicModelingDetachOptions,
-} from '@/api/generated/sdk.gen';
+import { detachTopicModeling, runTopicModeling, topicModelingDetachOptions } from '@/api';
 import {
   type TopicModelingRequestInput,
   type TopicModelingResponse,
   type TopicModelingDetachRequest,
-} from '@/api/generated/types.gen';
+} from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { extractAndSetTaskId } from '../../common';
 import { useDetachColumnsState } from '@/features/views/common/hooks/useDetachColumnsState';
@@ -253,11 +249,7 @@ export function useTopicModelingTaskFlow({
           const sampleFraction = sampleFractions?.[index];
           return [
             node.node_id,
-            buildTopicDetachNodeName(
-              node.node_name || node.node_id,
-              sampleFraction,
-              randomSeed,
-            ),
+            buildTopicDetachNodeName(node.node_name || node.node_id, sampleFraction, randomSeed),
           ];
         }),
       );

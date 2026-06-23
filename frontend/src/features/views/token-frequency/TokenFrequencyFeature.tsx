@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
-import type { AnalysisTabInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
+import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api';
+import type { AnalysisTabInput, TokenFrequencyResponse } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
@@ -46,12 +46,7 @@ import {
 import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
-import {
-  useAnalysisFeature,
-  useSafeResult,
-  VIZ_PALETTE,
-  vizColorMapForNodes,
-} from '../common';
+import { useAnalysisFeature, useSafeResult, VIZ_PALETTE, vizColorMapForNodes } from '../common';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
@@ -76,7 +71,7 @@ const UNIFIED_WORDCLOUD_HEIGHT = 340;
  * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
  * task id assignment/clear back to the tab record.
  */
-export interface TokenFrequencyFeatureProps {
+interface TokenFrequencyFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
@@ -113,9 +108,7 @@ const TokenFrequencyFeature = ({
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeIds = nodeInputs.resolvedNodes.map((r) => r.id);
-  const applyInputsFromSelections = (
-    selections: { nodeId: string; column?: string | null }[],
-  ) => {
+  const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputsChange?.(
       selections
         .filter((selection) => selection.nodeId)
@@ -297,8 +290,9 @@ const TokenFrequencyFeature = ({
     },
     /** Removes token-frequency tasks from the shared analysis store after local cleanup. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-    pruneGlobalTasks: (taskIds) =>
-      { setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev)); },
+    pruneGlobalTasks: (taskIds) => {
+      setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
+    },
   });
 
   const effectiveNodeColumnSelections = nodeColumnSelections;
@@ -317,11 +311,7 @@ const TokenFrequencyFeature = ({
       if (stored) fromNodes[sel.nodeId] = stored;
     }
     return { ...fromNodes, ...liveTokenizerModelsByNode };
-  }, [
-    effectiveNodeColumnSelections,
-    panelSelectedNodes,
-    liveTokenizerModelsByNode,
-  ]);
+  }, [effectiveNodeColumnSelections, panelSelectedNodes, liveTokenizerModelsByNode]);
 
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,
@@ -376,7 +366,11 @@ const TokenFrequencyFeature = ({
   });
 
   const lockedNodeNameMap = useMemo(
-    () => buildSelectionNameById(panelSelectedNodes as NodeNameEntry[], panelSelectedNodes as NodeNameEntry[]),
+    () =>
+      buildSelectionNameById(
+        panelSelectedNodes as NodeNameEntry[],
+        panelSelectedNodes as NodeNameEntry[],
+      ),
     [panelSelectedNodes],
   );
 
@@ -386,7 +380,7 @@ const TokenFrequencyFeature = ({
       const nodeId = typeof node.id === 'string' ? node.id : '';
       if (!nodeId) return;
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty name/label should fall back to the next display source, not render blank
-      map[nodeId] = (node.name || node.label || nodeId);
+      map[nodeId] = node.name || node.label || nodeId;
     });
     return map;
   }, [panelSelectedNodes]);
@@ -458,7 +452,7 @@ const TokenFrequencyFeature = ({
   const analysisNodeIds = useMemo(
     () =>
       computeAnalysisNodeIds(
-        (results?.analysis_params)?.node_ids,
+        results?.analysis_params?.node_ids,
         lastCompareNodeIds,
         effectiveNodeColumnSelections,
       ),
@@ -642,7 +636,7 @@ const TokenFrequencyFeature = ({
     (nodeId) => !(effectiveTokenizerModelsByNode[nodeId] ?? '').trim(),
   );
 
-  const lastRunRequest = (serverRequest) ?? null;
+  const lastRunRequest = serverRequest ?? null;
   const currentTokenFrequencyParams = {};
   const serverTokenFrequencyParams = (_request: Record<string, unknown>) => ({});
   const hasLastRun = Boolean(lastRunRequest);
@@ -740,9 +734,9 @@ const TokenFrequencyFeature = ({
             nodeId={nodeId}
             column={column}
             value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
-            onChange={(model, detectedLanguage) =>
-              { handleTokenizerModelChange(nodeId, column, model, detectedLanguage); }
-            }
+            onChange={(model, detectedLanguage) => {
+              handleTokenizerModelChange(nodeId, column, model, detectedLanguage);
+            }}
             getAuthHeaders={getAuthHeaders}
             disabled={false}
             disabledReason={undefined}

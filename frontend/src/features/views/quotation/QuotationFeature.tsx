@@ -1,15 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  quotationDetachOptions,
-  quotationTaskRequest,
-  quotationTaskResult,
-} from '@/api/generated/sdk.gen';
+import { quotationDetachOptions, quotationTaskRequest, quotationTaskResult } from '@/api';
 import type {
   QuotationAnalysisResponse,
   AnalysisTabInput,
   QuotationEngineConfigInput,
   QuotationMetadata,
-} from '@/api/generated/types.gen';
+} from '@/api';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
@@ -171,7 +167,7 @@ function buildQuotationResultState(
  * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
  * task id assignment/clear back to the tab record.
  */
-export interface QuotationFeatureProps {
+interface QuotationFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
@@ -186,10 +182,8 @@ function QuotationFeature({
   tabInputs,
   onTabInputsChange,
 }: QuotationFeatureProps = {}) {
-  const {
-    handlePageChange: baseHandlePageChange,
-    handlePageSizeChange: baseHandlePageSizeChange,
-  } = useWorkspaceSelection();
+  const { handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } =
+    useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
@@ -208,9 +202,7 @@ function QuotationFeature({
   const setNodeColumnSelection = nodeInputs.setColumn;
   const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
   const activeSelections = nodeColumnSelections;
-  const applyInputsFromSelections = (
-    selections: { nodeId: string; column?: string | null }[],
-  ) => {
+  const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputsChange?.(
       selections
         .filter((selection) => selection.nodeId)
@@ -270,9 +262,7 @@ function QuotationFeature({
   /** Called by: remote endpoint input and request normalization because the per-task engine form needs to preserve the endpoint while the Remote radio is selected. */
   const updateRemoteUrl = (url: string) => {
     setLastRemoteUrl(url);
-    setEngineConfig((current) => (
-      current.type === 'remote' ? { type: 'remote', url } : current
-    ));
+    setEngineConfig((current) => (current.type === 'remote' ? { type: 'remote', url } : current));
   };
 
   const resolvedEnginePayload = (() => {
@@ -303,7 +293,9 @@ function QuotationFeature({
   };
 
   useEffect(() => {
-    void Promise.resolve().then(() => { setEngineError(null); });
+    void Promise.resolve().then(() => {
+      setEngineError(null);
+    });
   }, [engineConfig.type, engineConfig.url]);
 
   const quotationResultRef = useRef<QuotationAnalysisResponse | null>(null);
@@ -559,8 +551,9 @@ function QuotationFeature({
         : null,
   };
   const quotationServerParams = (request: Record<string, unknown>) => {
-    const { type: serverEngineType, url: serverEngineUrl } = getServerEngineConfig(request, (url) =>
-      normalizeRemoteUrl(url).normalized,
+    const { type: serverEngineType, url: serverEngineUrl } = getServerEngineConfig(
+      request,
+      (url) => normalizeRemoteUrl(url).normalized,
     );
     return {
       engine_type: serverEngineType,
@@ -698,9 +691,7 @@ function QuotationFeature({
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           const reqObj = (req as Record<string, unknown>) ?? {};
           const path =
-            typeof reqObj.materialized_path === 'string'
-              ? reqObj.materialized_path
-              : null;
+            typeof reqObj.materialized_path === 'string' ? reqObj.materialized_path : null;
           if (path) {
             setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
           }
@@ -1062,87 +1053,87 @@ function QuotationFeature({
                     }}
                     pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
                     pageSizeSummary={
-                        materializedPaths[nodeId] ? (
-                          materializeSummary ? (
-                            <GroupedResultsPageSizeSummary
-                              groups={[]}
-                              totalInstances={materializeSummary.recordCount}
-                              totalDocuments={materializeSummary.uniqueDocuments}
-                              totalProcessed={materializeSummary.totalDocuments}
-                            />
-                          ) : (
-                            // Materialise summary not yet hydrated (e.g. the
-                            // task-request fetch is mid-flight after Process All).
-                            // Fall back to the pagination total — it's the same
-                            // total hit count the summary's ``recordCount`` would
-                            // report, so the line is correct, just missing the
-                            // document breakdown until the summary lands.
-                            <>
-                              (Found{' '}
-                              {(resultState?.pagination.total_source_rows ?? 0).toLocaleString()}{' '}
-                              {(resultState?.pagination.total_source_rows ?? 0) === 1
-                                ? 'quotation'
-                                : 'quotations'}{' '}
-                              across the materialised corpus.)
-                            </>
-                          )
-                        ) : (
+                      materializedPaths[nodeId] ? (
+                        materializeSummary ? (
                           <GroupedResultsPageSizeSummary
-                            groups={resultState?.groupedRows ?? []}
-                            totalProcessed={resultState?.pagination.page_size}
+                            groups={[]}
+                            totalInstances={materializeSummary.recordCount}
+                            totalDocuments={materializeSummary.uniqueDocuments}
+                            totalProcessed={materializeSummary.totalDocuments}
                           />
+                        ) : (
+                          // Materialise summary not yet hydrated (e.g. the
+                          // task-request fetch is mid-flight after Process All).
+                          // Fall back to the pagination total — it's the same
+                          // total hit count the summary's ``recordCount`` would
+                          // report, so the line is correct, just missing the
+                          // document breakdown until the summary lands.
+                          <>
+                            (Found{' '}
+                            {(resultState?.pagination.total_source_rows ?? 0).toLocaleString()}{' '}
+                            {(resultState?.pagination.total_source_rows ?? 0) === 1
+                              ? 'quotation'
+                              : 'quotations'}{' '}
+                            across the materialised corpus.)
+                          </>
                         )
-                      }
-                    >
-                      <DisabledReasonTooltip reason={undefined}>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void handleMaterialize(nodeId)}
-                          disabled={
-                            Boolean(nodeMaterializing[nodeId]) ||
-                            Boolean(materializedPaths[nodeId]) ||
-                            Boolean(nodeDetaching[nodeId])
-                          }
-                          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                          title={
-                            'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
-                          }
-                        >
-                          {nodeMaterializing[nodeId] ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Processing…
-                            </>
-                          ) : materializedPaths[nodeId] ? (
-                            <>Processed</>
-                          ) : (
-                            <>Process All</>
-                          )}
-                        </Button>
-                      </DisabledReasonTooltip>
-                      <DisabledReasonTooltip reason={undefined}>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => void openDetachDialog(nodeId)}
-                          disabled={Boolean(nodeDetaching[nodeId])}
-                          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                        >
-                          {nodeDetaching[nodeId] ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Adding to Workspace…
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="mr-2 h-4 w-4" />
-                              Add to Workspace
-                            </>
-                          )}
-                        </Button>
-                      </DisabledReasonTooltip>
+                      ) : (
+                        <GroupedResultsPageSizeSummary
+                          groups={resultState?.groupedRows ?? []}
+                          totalProcessed={resultState?.pagination.page_size}
+                        />
+                      )
+                    }
+                  >
+                    <DisabledReasonTooltip reason={undefined}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleMaterialize(nodeId)}
+                        disabled={
+                          Boolean(nodeMaterializing[nodeId]) ||
+                          Boolean(materializedPaths[nodeId]) ||
+                          Boolean(nodeDetaching[nodeId])
+                        }
+                        className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                        title={
+                          'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
+                        }
+                      >
+                        {nodeMaterializing[nodeId] ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Processing…
+                          </>
+                        ) : materializedPaths[nodeId] ? (
+                          <>Processed</>
+                        ) : (
+                          <>Process All</>
+                        )}
+                      </Button>
+                    </DisabledReasonTooltip>
+                    <DisabledReasonTooltip reason={undefined}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => void openDetachDialog(nodeId)}
+                        disabled={Boolean(nodeDetaching[nodeId])}
+                        className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                      >
+                        {nodeDetaching[nodeId] ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Adding to Workspace…
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add to Workspace
+                          </>
+                        )}
+                      </Button>
+                    </DisabledReasonTooltip>
                   </QuotationNodeBlock>
                 );
               })}
@@ -1160,7 +1151,13 @@ function QuotationFeature({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => { setErrorDialogOpen(false); }}>OK</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                setErrorDialogOpen(false);
+              }}
+            >
+              OK
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

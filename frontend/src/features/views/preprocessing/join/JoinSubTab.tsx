@@ -20,8 +20,6 @@ import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { JOIN_TYPE_OPTIONS, type JoinType } from '../types';
 import { useJoinSubTab, type JoinSubTabProps } from './hooks/useJoinSubTab';
 
-export type { JoinSubTabProps } from './hooks/useJoinSubTab';
-
 type JoinSubTabComponentProps = JoinSubTabProps & {
   renderNodeInputsPanel?: () => ReactNode;
 };
@@ -81,7 +79,12 @@ export function JoinSubTab(props: JoinSubTabComponentProps) {
                 <Label htmlFor="join-type">Join type</Label>
                 <HelpIcon targetKey="preprocessing.join.join-type" label="Join type selector" />
               </div>
-              <Select value={joinType} onValueChange={(value) => { setJoinType(value as JoinType); }}>
+              <Select
+                value={joinType}
+                onValueChange={(value) => {
+                  setJoinType(value as JoinType);
+                }}
+              >
                 <SelectTrigger id="join-type">
                   <SelectValue placeholder="Select join type" />
                 </SelectTrigger>
@@ -109,14 +112,16 @@ export function JoinSubTab(props: JoinSubTabComponentProps) {
               id="join-new-node-name"
               value={joinNewNodeName}
               placeholder={joinNamePlaceholder}
-              onChange={(event) => { setJoinNewNodeName(event.target.value); }}
-              onKeyDown={(event) =>
-                { acceptPlaceholderOnTab({
+              onChange={(event) => {
+                setJoinNewNodeName(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                acceptPlaceholderOnTab({
                   event,
                   value: joinNewNodeName,
                   setValue: setJoinNewNodeName,
-                }); }
-              }
+                });
+              }}
               autoComplete="off"
               className="min-w-0 flex-1"
             />

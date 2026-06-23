@@ -20,7 +20,7 @@ import HelpIcon from '@/components/help/HelpIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useShallow } from 'zustand/react/shallow';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import type { WorkspaceSummary } from '@/api/generated/types.gen';
+import type { WorkspaceSummary } from '@/api';
 import { formatBytes, formatTimestamp, getWorkspaceId } from '../utils/format';
 import type { PendingWorkspaceDownloadsHandle } from '../hooks/usePendingWorkspaceDownloads';
 
@@ -170,7 +170,9 @@ export function WorkspaceManagerCard({
                         aria-label={
                           isFavorite(workspaceId) ? 'Remove from favorites' : 'Add to favorites'
                         }
-                        onClick={() => { toggleFavorite(workspaceId); }}
+                        onClick={() => {
+                          toggleFavorite(workspaceId);
+                        }}
                       >
                         <Star
                           className={`h-4 w-4 ${
@@ -225,7 +227,9 @@ export function WorkspaceManagerCard({
                       <Button
                         size="sm"
                         variant={isActive ? 'outline' : 'secondary'}
-                        onClick={() => { onLoadWorkspace(isActive ? null : workspaceId); }}
+                        onClick={() => {
+                          onLoadWorkspace(isActive ? null : workspaceId);
+                        }}
                         disabled={hasActiveTask}
                       >
                         {isActive ? 'Unload' : 'Load'}
@@ -253,7 +257,9 @@ export function WorkspaceManagerCard({
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => { onDeleteWorkspace(workspaceId); }}
+                      onClick={() => {
+                        onDeleteWorkspace(workspaceId);
+                      }}
                     >
                       <Trash2 className="mr-1.5 h-4 w-4" /> Delete
                     </Button>

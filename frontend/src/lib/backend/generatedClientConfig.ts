@@ -1,7 +1,7 @@
 import { getApiBase } from '@/lib/backend/env';
 import { ApiError, formatErrorDetail } from '@/lib/apiError';
 
-import type { CreateClientConfig } from '@/api/generated/client.gen';
+import type { CreateClientConfig } from '@/api';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -39,10 +39,14 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
  */
 const createTimeout = (sourceSignal?: AbortSignal) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => { controller.abort(); }, DEFAULT_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, DEFAULT_TIMEOUT_MS);
   /** Preserves the caller's abort reason when we chain their signal. */
   /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-  const abortFromSource = () => { controller.abort(sourceSignal?.reason); };
+  const abortFromSource = () => {
+    controller.abort(sourceSignal?.reason);
+  };
 
   if (sourceSignal?.aborted) {
     abortFromSource();

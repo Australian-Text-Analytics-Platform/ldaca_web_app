@@ -110,13 +110,7 @@ describe('ChromeTabs', () => {
   });
 
   it('omits create, close, and reorder affordances when their callbacks are absent', () => {
-    render(
-      <ChromeTabs
-        tabs={tabs}
-        activeTabId="tab-1"
-        onActivate={vi.fn()}
-      />,
-    );
+    render(<ChromeTabs tabs={tabs} activeTabId="tab-1" onActivate={vi.fn()} />);
 
     expect(screen.queryByRole('button', { name: /new tab/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /close tab/i })).toBeNull();

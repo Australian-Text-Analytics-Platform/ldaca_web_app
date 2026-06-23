@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { downloadWorkspaceArtifact, startWorkspaceDownload } from '@/api/generated/sdk.gen';
+import { downloadWorkspaceArtifact, startWorkspaceDownload } from '@/api';
 import { saveBlob } from '@/lib/download';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 
@@ -137,7 +137,9 @@ export function usePendingWorkspaceDownloads({
           completePendingDownload(workspaceId, taskId, workspaceName),
         );
       } else if (task.state === 'failed' || task.state === 'cancelled') {
-        void Promise.resolve().then(() => { failPendingDownload(workspaceId, task.message); });
+        void Promise.resolve().then(() => {
+          failPendingDownload(workspaceId, task.message);
+        });
       }
     }
   }, [tasks, pendingDownloads, completePendingDownload, failPendingDownload]);

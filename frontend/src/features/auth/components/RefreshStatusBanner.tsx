@@ -17,7 +17,9 @@ export function RefreshStatusBanner() {
 
   useEffect(() => {
     if (phase.status !== 'refreshing') return;
-    const timeoutId = window.setTimeout(() => { setRefreshChipReady(true); }, REFRESH_CHIP_DELAY_MS);
+    const timeoutId = window.setTimeout(() => {
+      setRefreshChipReady(true);
+    }, REFRESH_CHIP_DELAY_MS);
     return () => {
       window.clearTimeout(timeoutId);
       setRefreshChipReady(false);

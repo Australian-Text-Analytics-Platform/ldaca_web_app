@@ -88,7 +88,9 @@ const ChartImageDownloadDialogContent = ({
               <label key={opt.id} className="flex cursor-pointer items-center gap-2">
                 <Checkbox
                   checked={extraStates[opt.id] ?? false}
-                  onCheckedChange={(checked) => { toggleExtra(opt.id, checked === true); }}
+                  onCheckedChange={(checked) => {
+                    toggleExtra(opt.id, checked === true);
+                  }}
                 />
                 <span className="text-sm">{opt.label}</span>
               </label>

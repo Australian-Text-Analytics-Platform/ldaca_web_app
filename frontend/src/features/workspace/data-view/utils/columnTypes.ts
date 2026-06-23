@@ -142,9 +142,9 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
 
   const schema = (n.data as Record<string, unknown> | undefined)?.schema ?? n.schema;
   if (Array.isArray(schema)) {
-    schema.forEach((entry: Record<string, unknown>) =>
-      { register(entry.name, entry.js_type ?? entry.type ?? entry.dtype); },
-    );
+    schema.forEach((entry: Record<string, unknown>) => {
+      register(entry.name, entry.js_type ?? entry.type ?? entry.dtype);
+    });
   } else if (schema && typeof schema === 'object') {
     Object.entries(schema as Record<string, unknown>).forEach(([name, entry]) => {
       register(name, extractTypeFromSchemaEntry(entry));
@@ -153,12 +153,16 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
 
   const dtypes = (n.data as Record<string, unknown> | undefined)?.dtypes ?? n.dtypes;
   if (dtypes && typeof dtypes === 'object') {
-    Object.entries(dtypes).forEach(([name, dtype]) => { register(name, dtype); });
+    Object.entries(dtypes).forEach(([name, dtype]) => {
+      register(name, dtype);
+    });
   }
 
   const columns = (n.data as Record<string, unknown> | undefined)?.columns ?? n.columns;
   if (Array.isArray(columns)) {
-    columns.forEach((name: unknown) => { register(name); });
+    columns.forEach((name: unknown) => {
+      register(name);
+    });
   }
 
   return columnOrder.map((name) => ({ name, dataType: typeMap.get(name) ?? 'string' }));

@@ -42,4 +42,3 @@ export function vizColorMapForNodes(nodeIds: readonly string[]): Record<string, 
   });
   return map;
 }
-

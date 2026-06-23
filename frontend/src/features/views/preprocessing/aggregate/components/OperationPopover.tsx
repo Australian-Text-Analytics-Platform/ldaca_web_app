@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
-import { columnOperations } from '@/api/generated/sdk.gen';
-import type { ColumnOperationsResponse } from '@/api/generated/types.gen';
+import { columnOperations } from '@/api';
+import type { ColumnOperationsResponse } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -101,7 +101,9 @@ export function OperationPopover({
                   <button
                     key={op}
                     type="button"
-                    onClick={() => { handleSelect(op); }}
+                    onClick={() => {
+                      handleSelect(op);
+                    }}
                     className={cn(
                       'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
                       'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden',
@@ -121,7 +123,9 @@ export function OperationPopover({
                     <button
                       key={qualifiedMethod}
                       type="button"
-                      onClick={() => { handleSelect(qualifiedMethod); }}
+                      onClick={() => {
+                        handleSelect(qualifiedMethod);
+                      }}
                       className={cn(
                         'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
                         'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden',

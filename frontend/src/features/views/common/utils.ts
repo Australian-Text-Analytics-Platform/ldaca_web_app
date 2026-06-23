@@ -52,7 +52,10 @@ export const toFiniteNumber = (value: unknown): number | null => {
 export const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
-export interface AnalysisNodeColumnSelection { nodeId: string; column: string }
+interface AnalysisNodeColumnSelection {
+  nodeId: string;
+  column: string;
+}
 
 export interface ParsedAnalysisNodeRequest {
   nodeIds: string[];

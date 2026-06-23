@@ -63,13 +63,14 @@ export const useRegistryStore = create<State & Actions>((set) => ({
    * Applies remote docs data once per load attempt so modal consumers can repaint if needed.
    * Why: documentation consumers need one registry path for bundled, cached, and remote content.
    */
-  applyRemote: (payload) =>
-    { set(() => ({
+  applyRemote: (payload) => {
+    set(() => ({
       registry: mergeBundledWithRemote(payload),
       meta: payload?.meta ?? null,
       lastFetchedAt: payload ? Date.now() : null,
       remoteAttempted: true,
-    })); },
+    }));
+  },
 }));
 
 export { REGISTRY_SCHEMA_VERSION };

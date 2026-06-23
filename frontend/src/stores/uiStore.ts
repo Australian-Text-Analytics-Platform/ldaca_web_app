@@ -43,14 +43,9 @@ export const DEFAULT_VISIBLE_VIEWS: ViewType[] = ALL_VIEWS.filter(
   (view) => view !== 'ai-annotator',
 );
 
-export type ModalKind =
-  | 'feedback'
-  | 'tutorial'
-  | 'warning'
-  | 'info'
-  | 'reference';
+type ModalKind = 'feedback' | 'tutorial' | 'warning' | 'info' | 'reference';
 
-export interface ModalTarget {
+interface ModalTarget {
   file: string;
   anchor: string;
   label?: string;

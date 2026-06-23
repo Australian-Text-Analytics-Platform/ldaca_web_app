@@ -1,11 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  getCurrentWorkspace,
-  getNodeData,
-  getWorkspaceGraph,
-  listWorkspaces,
-} from '@/api/generated/sdk.gen';
+import { getCurrentWorkspace, getNodeData, getWorkspaceGraph, listWorkspaces } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import type { WorkspaceNodeInfo as GraphNode, NodeDataResponse } from '@/api';
 import { type PaginationState } from './types';

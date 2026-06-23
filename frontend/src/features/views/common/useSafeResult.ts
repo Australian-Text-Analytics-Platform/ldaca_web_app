@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 
-interface ResultLike { state?: string | null }
+interface ResultLike {
+  state?: string | null;
+}
 
 /**
  * Orders backend task states by freshness so polling consumers can ignore older

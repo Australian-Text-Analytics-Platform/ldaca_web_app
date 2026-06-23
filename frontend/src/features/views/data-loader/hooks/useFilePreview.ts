@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { unifiedFilePreview } from '@/api/generated/sdk.gen';
+import { unifiedFilePreview } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 

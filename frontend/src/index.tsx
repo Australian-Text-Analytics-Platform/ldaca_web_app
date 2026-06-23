@@ -36,7 +36,7 @@ const INJECTED_GOOGLE_CLIENT_ID =
   typeof window !== 'undefined' ? window.__GOOGLE_CLIENT_ID__ : undefined;
 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty/whitespace client IDs should fall through to the next fallback, not only null/undefined */
 const GOOGLE_CLIENT_ID =
-  (INJECTED_GOOGLE_CLIENT_ID?.trim()) ||
+  INJECTED_GOOGLE_CLIENT_ID?.trim() ||
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   '460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com';
 /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */

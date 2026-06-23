@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
+import type { TokenFrequencyResponse } from '@/api';
 import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
@@ -251,7 +251,9 @@ export const TokenFrequencyResultsPanel = ({
                 id="stop-words"
                 rows={4}
                 value={stopWords}
-                onChange={(event) => { onStopWordsChange(event.target.value); }}
+                onChange={(event) => {
+                  onStopWordsChange(event.target.value);
+                }}
                 onBlur={onStopWordsApply}
                 placeholder="the, and, of"
                 disabled={isLoadingStopWords}
@@ -375,7 +377,9 @@ export const TokenFrequencyResultsPanel = ({
 
           <Tabs
             value={resultsView}
-            onValueChange={(value) => { setResultsView(value as ResultsView); }}
+            onValueChange={(value) => {
+              setResultsView(value as ResultsView);
+            }}
             data-testid="token-frequency-results-view-tabs"
           >
             <TabsList>
@@ -413,7 +417,9 @@ export const TokenFrequencyResultsPanel = ({
                   <Input
                     placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
                     value={listTokenFilter}
-                    onChange={(event) => { setListTokenFilter(event.target.value); }}
+                    onChange={(event) => {
+                      setListTokenFilter(event.target.value);
+                    }}
                     className="h-8"
                   />
                   {listTokenFilter ? (
@@ -421,7 +427,9 @@ export const TokenFrequencyResultsPanel = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setListTokenFilter(''); }}
+                      onClick={() => {
+                        setListTokenFilter('');
+                      }}
                     >
                       Clear
                     </Button>

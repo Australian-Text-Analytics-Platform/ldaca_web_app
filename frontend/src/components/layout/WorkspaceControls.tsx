@@ -36,7 +36,10 @@ const MIN_BATCH_DELETE_COUNT = 1;
 export function WorkspaceControls({
   collapsed = false,
   onToggleCollapse,
-}: { collapsed?: boolean; onToggleCollapse?: () => void } = {}) {
+}: {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+} = {}) {
   const { currentWorkspace, workspaceGraph } = useWorkspaceData();
   const { renameWorkspace, deleteNode, clearSelection } = useWorkspaceActions();
   const { selectedNodeIds } = useWorkspaceSelection();
@@ -145,70 +148,72 @@ export function WorkspaceControls({
 
           {isEditing ? (
             <input
-          className="px-2 py-1 border rounded text-sm"
-          value={renameDraft.value}
-          onChange={(e) =>
-            { setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value }); }
-          }
-          onBlur={() => {
-            void handleRenameCommit();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void handleRenameCommit();
-            if (e.key === 'Escape') setRenameDraft(undefined);
-          }}
-          autoFocus
-          aria-label="Workspace name"
-        />
-      ) : (
-        <span className="text-sm font-semibold text-gray-800">
-          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- show placeholder for an empty name, not only null/undefined */}
-          {currentWorkspace?.name || 'No Workspace'}
-        </span>
-      )}
+              className="px-2 py-1 border rounded text-sm"
+              value={renameDraft.value}
+              onChange={(e) => {
+                setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value });
+              }}
+              onBlur={() => {
+                void handleRenameCommit();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleRenameCommit();
+                if (e.key === 'Escape') setRenameDraft(undefined);
+              }}
+              autoFocus
+              aria-label="Workspace name"
+            />
+          ) : (
+            <span className="text-sm font-semibold text-gray-800">
+              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- show placeholder for an empty name, not only null/undefined */}
+              {currentWorkspace?.name || 'No Workspace'}
+            </span>
+          )}
 
-      {currentWorkspace && (
-        <>
-          {/* Edit name button with pencil icon */}
-          <button
-            className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
-            onClick={startRename}
-            title="Rename"
-            aria-label="Rename workspace"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-3 h-3"
-            >
-              <path d="M16.862 3.487a1.5 1.5 0 0 1 2.121 0l1.53 1.53a1.5 1.5 0 0 1 0 2.122l-9.9 9.9a1.5 1.5 0 0 1-.53.352l-4.18 1.393a.75.75 0 0 1-.948-.948l1.392-4.18a1.5 1.5 0 0 1 .352-.53l9.9-9.9Z" />
-              <path d="M18.26 2.08a3 3 0 0 1 4.243 0l.53.53a3 3 0 0 1 0 4.243l-1.06 1.06-4.773-4.773 1.06-1.06Z" />
-            </svg>
-            Rename
-          </button>
+          {currentWorkspace && (
+            <>
+              {/* Edit name button with pencil icon */}
+              <button
+                className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
+                onClick={startRename}
+                title="Rename"
+                aria-label="Rename workspace"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-3 h-3"
+                >
+                  <path d="M16.862 3.487a1.5 1.5 0 0 1 2.121 0l1.53 1.53a1.5 1.5 0 0 1 0 2.122l-9.9 9.9a1.5 1.5 0 0 1-.53.352l-4.18 1.393a.75.75 0 0 1-.948-.948l1.392-4.18a1.5 1.5 0 0 1 .352-.53l9.9-9.9Z" />
+                  <path d="M18.26 2.08a3 3 0 0 1 4.243 0l.53.53a3 3 0 0 1 0 4.243l-1.06 1.06-4.773-4.773 1.06-1.06Z" />
+                </svg>
+                Rename
+              </button>
 
-          {/* Delete — always enabled so there are no surprises about why
+              {/* Delete — always enabled so there are no surprises about why
               it's greyed out. The confirmation dialog gates the actual
               removal, and the disabled state only kicks in mid-delete.
               Per-node delete is still available from each node's context
               menu in the graph. Same size + shape in both states so the
               layout stays stable; only colours swap — destructive (red)
               when actionable, the existing muted/bordered look when not. */}
-          <button
-            className={`text-xs px-2 py-1 border rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              canBatchDelete && !isDeleting
-                ? 'bg-destructive text-destructive-foreground border-destructive shadow-sm hover:bg-destructive/90 hover:border-destructive/90'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-            onClick={() => { setDeleteConfirmOpen(true); }}
-            disabled={isDeleting}
-            title="Delete the selected data blocks"
-          >
-            Delete ({selectedCount})
-          </button>
-        </>
-      )}
+              <button
+                className={`text-xs px-2 py-1 border rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  canBatchDelete && !isDeleting
+                    ? 'bg-destructive text-destructive-foreground border-destructive shadow-sm hover:bg-destructive/90 hover:border-destructive/90'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+                onClick={() => {
+                  setDeleteConfirmOpen(true);
+                }}
+                disabled={isDeleting}
+                title="Delete the selected data blocks"
+              >
+                Delete ({selectedCount})
+              </button>
+            </>
+          )}
         </>
       )}
 
@@ -255,7 +260,13 @@ export function WorkspaceControls({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => { setNameAlertOpen(false); }}>Got it</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                setNameAlertOpen(false);
+              }}
+            >
+              Got it
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

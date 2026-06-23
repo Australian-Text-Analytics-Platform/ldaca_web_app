@@ -21,7 +21,7 @@
  * the preference is off.
  */
 import { useEffect, useRef, type ComponentType } from 'react';
-import type { AnalysisTabInput } from '@/api/generated/types.gen';
+import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -32,7 +32,7 @@ import { useWorkspaceTabs } from './useWorkspaceTabs';
  * Tab props every analysis feature accepts so a tab can drive it. All optional
  * so a feature can still render standalone (e.g. in unit tests) without a tab.
  */
-export interface AnalysisTabFeatureProps {
+interface AnalysisTabFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
@@ -116,9 +116,13 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
           key={activeTab.tab_id}
           tabId={activeTab.tab_id}
           tabTaskId={activeTab.task_id ?? null}
-          onTabTaskChange={(taskId) => { setTabTask(activeTab.tab_id, taskId); }}
+          onTabTaskChange={(taskId) => {
+            setTabTask(activeTab.tab_id, taskId);
+          }}
           tabInputs={activeTab.inputs ?? []}
-          onTabInputsChange={(inputs) => { setTabInputs(activeTab.tab_id, inputs); }}
+          onTabInputsChange={(inputs) => {
+            setTabInputs(activeTab.tab_id, inputs);
+          }}
         />
       ) : null}
     </AnalysisTabbedPanel>

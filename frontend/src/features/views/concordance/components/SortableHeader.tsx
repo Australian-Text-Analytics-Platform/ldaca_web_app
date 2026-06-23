@@ -29,7 +29,9 @@ export function SortableHeader({
   return (
     <TableHead
       className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${isSorted ? 'text-blue-600' : 'text-gray-500'}`}
-      onClick={() => { onSort(columnKey, paginationKey, requestNodeId); }}
+      onClick={() => {
+        onSort(columnKey, paginationKey, requestNodeId);
+      }}
     >
       <div className="flex items-center space-x-1">
         <span>{label}</span>

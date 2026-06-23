@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import { useForm, useStore } from '@tanstack/react-form';
-import type {
-  SliceRequest as SliceRequestPayload,
-  FilterPreviewResponse,
-} from '@/api/generated/types.gen';
+import type { SliceRequest as SliceRequestPayload, FilterPreviewResponse } from '@/api';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
@@ -13,7 +10,7 @@ import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRaw
 import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';
 import { buildWorkspaceNodeMap, deriveNodeLabel } from '../../utils/nodeMetadata';
 
-export interface SliceOperationResult {
+interface SliceOperationResult {
   success?: boolean;
   message?: string;
   node_id?: string;
@@ -24,7 +21,7 @@ export interface SliceOperationResult {
   };
 }
 
-export type SamplingMode = 'slice' | 'random_sample';
+type SamplingMode = 'slice' | 'random_sample';
 
 export interface SliceSubTabProps {
   selectedNodeId: string | null;
@@ -236,37 +233,51 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
    * Adapts the segmented mode control to the form store used by slice consumers.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setMode = (value: SamplingMode) => { sliceForm.setFieldValue('mode', value); };
+  const setMode = (value: SamplingMode) => {
+    sliceForm.setFieldValue('mode', value);
+  };
   /**
    * Updates the zero-based offset input for preview and apply payload construction.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setOffsetInput = (value: string) => { sliceForm.setFieldValue('offsetInput', value); };
+  const setOffsetInput = (value: string) => {
+    sliceForm.setFieldValue('offsetInput', value);
+  };
   /**
    * Updates the row-count input consumed by range validation and preview payloads.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setLengthInput = (value: string) => { sliceForm.setFieldValue('lengthInput', value); };
+  const setLengthInput = (value: string) => {
+    sliceForm.setFieldValue('lengthInput', value);
+  };
   /**
    * Updates the sample-size input used by random sampling validation.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setSampleSizeInput = (value: string) => { sliceForm.setFieldValue('sampleSizeInput', value); };
+  const setSampleSizeInput = (value: string) => {
+    sliceForm.setFieldValue('sampleSizeInput', value);
+  };
   /**
    * Updates the optional random seed field passed to sampling requests.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setRandomSeedInput = (value: string) => { sliceForm.setFieldValue('randomSeedInput', value); };
+  const setRandomSeedInput = (value: string) => {
+    sliceForm.setFieldValue('randomSeedInput', value);
+  };
   /**
    * Toggles seed omission so random samples can remain intentionally unseeded.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setNoRandomSeed = (value: boolean) => { sliceForm.setFieldValue('noRandomSeed', value); };
+  const setNoRandomSeed = (value: boolean) => {
+    sliceForm.setFieldValue('noRandomSeed', value);
+  };
   /**
    * Updates the optional node name consumed when adding the sampled node.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const setNewNodeName = (value: string) => { sliceForm.setFieldValue('newNodeName', value); };
+  const setNewNodeName = (value: string) => {
+    sliceForm.setFieldValue('newNodeName', value);
+  };
 
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 

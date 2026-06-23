@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { WorkspaceTabsState } from '@/api/generated/types.gen';
+import type { WorkspaceTabsState } from '@/api';
 import { useSingleTabModeWorkspaceCleanup } from '../useSingleTabModeWorkspaceCleanup';
 import { workspaceTabsQueryKey } from '../useWorkspaceTabs';
 
@@ -40,7 +40,9 @@ const workspaceTabsState: WorkspaceTabsState = {
 };
 
 /** Fresh QueryClient wrapper so cleanup cache writes can be asserted in isolation. */
-function makeWrapper(queryClient: QueryClient): ({ children }: { children: ReactNode }) => ReactNode {
+function makeWrapper(
+  queryClient: QueryClient,
+): ({ children }: { children: ReactNode }) => ReactNode {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
@@ -65,11 +67,9 @@ describe('useSingleTabModeWorkspaceCleanup', () => {
 
     renderHook(
       () => {
-        useSingleTabModeWorkspaceCleanup(
-          'workspace-1',
-          false,
-          () => ({ Authorization: 'Bearer t' }),
-        );
+        useSingleTabModeWorkspaceCleanup('workspace-1', false, () => ({
+          Authorization: 'Bearer t',
+        }));
       },
       { wrapper: makeWrapper(queryClient) },
     );
@@ -78,15 +78,11 @@ describe('useSingleTabModeWorkspaceCleanup', () => {
       groups: {
         concordance_analysis: {
           active_tab_id: 'concordance-first',
-          tabs: [
-            { tab_id: 'concordance-first', task_id: 'task-keep-a', title: 'A1', inputs: [] },
-          ],
+          tabs: [{ tab_id: 'concordance-first', task_id: 'task-keep-a', title: 'A1', inputs: [] }],
         },
         token_frequencies: {
           active_tab_id: 'frequency-first',
-          tabs: [
-            { tab_id: 'frequency-first', task_id: null, title: 'B1', inputs: [] },
-          ],
+          tabs: [{ tab_id: 'frequency-first', task_id: null, title: 'B1', inputs: [] }],
         },
       },
     };

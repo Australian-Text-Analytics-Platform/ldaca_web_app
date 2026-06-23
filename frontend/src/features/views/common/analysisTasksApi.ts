@@ -5,7 +5,7 @@ import {
   sequentialAnalysisTaskRequest,
   tokenFrequenciesTaskRequest,
   topicModelingTaskRequest,
-} from '@/api/generated/sdk.gen';
+} from '@/api';
 
 export type LastRunAnalysisType =
   | 'token_frequencies'

@@ -174,7 +174,9 @@ function SidebarTasksSection({
                   aria-expanded={expanded}
                   aria-label={`Task: ${label}. ${expanded ? 'Collapse details' : 'Expand details'}`}
                   className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => { toggleExpanded(task.task_id); }}
+                  onClick={() => {
+                    toggleExpanded(task.task_id);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key !== 'Enter' && event.key !== ' ') return;
                     event.preventDefault();

@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 /** Minimal node shape the row toolbar needs. */
-export interface NodeActionsToolbarNode {
+interface NodeActionsToolbarNode {
   id: string;
   name: string;
   canUndo?: boolean;
@@ -61,17 +61,25 @@ export function NodePinButton({ node, isPinned, onTogglePin }: NodePinButtonProp
   return (
     <button
       type="button"
-      onClick={() => { onTogglePin(node.id); }}
+      onClick={() => {
+        onTogglePin(node.id);
+      }}
       className={cn(
         iconButtonClass,
-        isPinned && 'border-primary/70 bg-primary/10 text-primary shadow-md hover:bg-primary/15 hover:text-primary',
+        isPinned &&
+          'border-primary/70 bg-primary/10 text-primary shadow-md hover:bg-primary/15 hover:text-primary',
       )}
       title={isPinned ? 'Unpin data block' : 'Pin data block'}
       aria-label={`${isPinned ? 'Unpin' : 'Pin'} ${node.name}`}
       data-pin-action
       data-pinned={isPinned ? 'true' : 'false'}
     >
-      <Pin className={cn('h-3.5 w-3.5 transition-transform', isPinned && '-rotate-45 translate-y-0.5 fill-current')} />
+      <Pin
+        className={cn(
+          'h-3.5 w-3.5 transition-transform',
+          isPinned && '-rotate-45 translate-y-0.5 fill-current',
+        )}
+      />
     </button>
   );
 }
@@ -136,7 +144,13 @@ export function NodeActionsToolbar({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-36">
           <DropdownMenuItem onSelect={openRename}>Rename</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => { onClone(node.id); }}>Clone</DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              onClone(node.id);
+            }}
+          >
+            Clone
+          </DropdownMenuItem>
           <DropdownMenuItem
             disabled={!node.canUndo}
             onSelect={() => {
@@ -155,7 +169,9 @@ export function NodeActionsToolbar({
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-red-600 focus:text-red-700"
-            onSelect={() => { setDeleteOpen(true); }}
+            onSelect={() => {
+              setDeleteOpen(true);
+            }}
           >
             Delete
           </DropdownMenuItem>
@@ -164,7 +180,9 @@ export function NodeActionsToolbar({
 
       <button
         type="button"
-        onClick={() => { onAddToSelection(node.id); }}
+        onClick={() => {
+          onAddToSelection(node.id);
+        }}
         className={iconButtonClass}
         title="Add to selection"
         aria-label={`Add ${node.name} to selection`}
@@ -182,7 +200,9 @@ export function NodeActionsToolbar({
           </AlertDialogHeader>
           <Input
             value={renameValue}
-            onChange={(event) => { setRenameValue(event.target.value); }}
+            onChange={(event) => {
+              setRenameValue(event.target.value);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
@@ -214,7 +234,9 @@ export function NodeActionsToolbar({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
-              onClick={() => { onDelete(node.id); }}
+              onClick={() => {
+                onDelete(node.id);
+              }}
             >
               Delete
             </AlertDialogAction>

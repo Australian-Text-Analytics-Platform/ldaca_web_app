@@ -234,9 +234,13 @@ describe('Sidebar view visibility menu', () => {
     renderSidebar();
 
     expect(screen.getByRole('button', { name: 'Quotation' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /configure quotation engine/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /configure quotation engine/i }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Quotation' }));
-    expect(screen.queryByRole('button', { name: /configure quotation engine/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /configure quotation engine/i }),
+    ).not.toBeInTheDocument();
   });
 });

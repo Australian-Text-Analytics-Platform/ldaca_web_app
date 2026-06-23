@@ -18,7 +18,7 @@ import {
 
 // ---- Public types ----
 
-export interface RowDetailCustomization {
+interface RowDetailCustomization {
   /** Label shown in the dialog title parentheses, e.g. "Concordance" */
   label?: string;
   /** Key-value pairs shown in the metadata grid below the title */

@@ -144,14 +144,13 @@ export function ConcordanceParameterPanel({
                   label="Concordance search term"
                 />
               </div>
-              <DisabledReasonTooltip
-                reason={readOnlyReason}
-                className="w-full"
-              >
+              <DisabledReasonTooltip reason={readOnlyReason} className="w-full">
                 <input
                   type="text"
                   value={searchWord}
-                  onChange={(e) => { setSearchWord(e.target.value); }}
+                  onChange={(e) => {
+                    setSearchWord(e.target.value);
+                  }}
                   disabled={readOnly}
                   placeholder={
                     searchMode === 'tokens'
@@ -167,14 +166,13 @@ export function ConcordanceParameterPanel({
                 <label className="block text-sm font-medium text-foreground">
                   Left context (tokens)
                 </label>
-                <DisabledReasonTooltip
-                  reason={readOnlyReason}
-                  className="w-full"
-                >
+                <DisabledReasonTooltip reason={readOnlyReason} className="w-full">
                   <input
                     type="number"
                     value={numLeftTokens}
-                    onChange={(e) => { setNumLeftTokens(parseInt(e.target.value) || 0); }}
+                    onChange={(e) => {
+                      setNumLeftTokens(parseInt(e.target.value) || 0);
+                    }}
                     disabled={readOnly}
                     min="0"
                     max="50"
@@ -186,14 +184,13 @@ export function ConcordanceParameterPanel({
                 <label className="block text-sm font-medium text-foreground">
                   Right context (tokens)
                 </label>
-                <DisabledReasonTooltip
-                  reason={readOnlyReason}
-                  className="w-full"
-                >
+                <DisabledReasonTooltip reason={readOnlyReason} className="w-full">
                   <input
                     type="number"
                     value={numRightTokens}
-                    onChange={(e) => { setNumRightTokens(parseInt(e.target.value) || 0); }}
+                    onChange={(e) => {
+                      setNumRightTokens(parseInt(e.target.value) || 0);
+                    }}
                     disabled={readOnly}
                     min="0"
                     max="50"
@@ -255,7 +252,9 @@ export function ConcordanceParameterPanel({
                       <input
                         type="checkbox"
                         checked={wholeWord}
-                        onChange={(e) => { setWholeWord(e.target.checked); }}
+                        onChange={(e) => {
+                          setWholeWord(e.target.checked);
+                        }}
                         disabled={regex || readOnly}
                         className="h-4 w-4"
                       />
@@ -292,7 +291,9 @@ export function ConcordanceParameterPanel({
                     <input
                       type="checkbox"
                       checked={caseSensitive}
-                      onChange={(e) => { setCaseSensitive(e.target.checked); }}
+                      onChange={(e) => {
+                        setCaseSensitive(e.target.checked);
+                      }}
                       disabled={readOnly}
                       className="h-4 w-4"
                     />

@@ -6,7 +6,7 @@ import {
   flattenConcordanceGroups,
   getDispersionBarWidthPercent,
 } from '../concordanceViewModels';
-import type { ConcordanceNodeResult } from '@/api/generated/types.gen';
+import type { ConcordanceNodeResult } from '@/api';
 
 describe('concordanceViewModels', () => {
   const grouped = [

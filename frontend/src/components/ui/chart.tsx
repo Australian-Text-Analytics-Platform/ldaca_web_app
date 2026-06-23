@@ -31,10 +31,7 @@ const useChartContext = () => {
 };
 
 /** Called by: ChartContainer and ChartTooltipContent when deriving series CSS variables because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-const slug = (key: string) =>
-  key
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-');
+const slug = (key: string) => key.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 interface ChartContainerProps extends React.HTMLAttributes<HTMLDivElement> {
   config: ChartConfig;

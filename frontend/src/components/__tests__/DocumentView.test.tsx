@@ -31,8 +31,12 @@ describe('DocumentView (docType="tutorial")', () => {
       />,
     );
 
-    await waitFor(() => { expect(global.fetch).toHaveBeenCalled(); });
-    await waitFor(() => { expect(global.fetch).toHaveBeenCalledTimes(1); });
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
 
     rerender(
       <DocumentView
@@ -41,6 +45,8 @@ describe('DocumentView (docType="tutorial")', () => {
       />,
     );
 
-    await waitFor(() => { expect(global.fetch).toHaveBeenCalledTimes(1); });
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 });

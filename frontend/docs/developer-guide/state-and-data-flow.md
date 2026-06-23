@@ -18,9 +18,14 @@ with `pnpm -C frontend openapi:generate` after backend API shape changes. The
 generated fetch client uses `src/lib/backend/generatedClientConfig.ts`, which
 preserves the existing API base discovery, credentials, auth headers, timeout
 behavior, and `ApiError` normalization. Keep `src/api/generated/**` generated
-only. `src/lib/backend/**` is reserved for runtime infrastructure such as
-environment resolution and generated client configuration; backend request and
-response contracts should come from `src/api/generated/types.gen.ts`.
+only and excluded from Biome formatting. Handwritten frontend code imports
+generated SDK functions, generated TanStack Query helpers, and generated types
+through the public `@/api` barrel, not from generated file names directly. When
+generated types or SDK functions look wrong, fix the backend route model,
+operation name, or OpenAPI export and rerun generation; do not hand-edit
+generated files. `src/lib/backend/**` is reserved for runtime infrastructure
+such as environment resolution and generated client configuration; backend
+request and response contracts should come through `@/api`.
 
 MSW test infrastructure lives under `src/test/msw/` and is enabled from
 `src/test/setup.ts`. Add endpoint handlers or per-test `server.use(...)`
@@ -46,7 +51,9 @@ The main stores are:
 - `analysisStore`: task list, terminal-state helpers, pending handoffs, and
   materialization events.
 - `preferencesStore`: user preferences persisted locally and synced to backend.
-- `nodeColorsStore`: committed node colors and per-tab temp colors.
+- `pinnedNodesStore`: local pin state used by the workspace node list.
+- `preprocessingInputsStore`: per-workspace preprocessing subtab inputs.
+- `recentSelectionsStore`: recently-used node groups for analysis input presets.
 
 Stores are used for cross-feature UI state, not as a replacement for query
 cache.

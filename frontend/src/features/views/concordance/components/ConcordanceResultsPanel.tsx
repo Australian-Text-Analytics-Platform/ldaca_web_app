@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
-import type { ConcordanceAnalysisResponse } from '@/api/generated/types.gen';
+import type { ConcordanceAnalysisResponse } from '@/api';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
@@ -13,7 +13,11 @@ import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 import { ConcordanceDispersionNodeBlock } from './ConcordanceDispersionNodeBlock';
 
-interface Section { columns: string[]; color?: string; disabled?: boolean }
+interface Section {
+  columns: string[];
+  color?: string;
+  disabled?: boolean;
+}
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
 export interface ConcordanceResultsPanelProps {
@@ -206,7 +210,9 @@ export function ConcordanceResultsPanel({
           {panelSelectedNodes.length > 1 && (
             <Tabs
               value={viewMode}
-              onValueChange={(mode) => { handleViewModeChange(mode as 'separated' | 'combined'); }}
+              onValueChange={(mode) => {
+                handleViewModeChange(mode as 'separated' | 'combined');
+              }}
               className="w-full md:w-auto"
             >
               <TabsList aria-label="Concordance view mode">
@@ -263,7 +269,9 @@ export function ConcordanceResultsPanel({
                 <input
                   type="checkbox"
                   checked={proportionalDispersionBars}
-                  onChange={(e) => { setProportionalDispersionBars(e.target.checked); }}
+                  onChange={(e) => {
+                    setProportionalDispersionBars(e.target.checked);
+                  }}
                   className="h-4 w-4"
                 />
                 <span>Bar length proportional to text length</span>
@@ -273,7 +281,9 @@ export function ConcordanceResultsPanel({
                   <span>Sources:</span>
                   <select
                     value={combinedSourceMode}
-                    onChange={(e) => { setCombinedSourceMode(e.target.value as 'aggregate' | 'split'); }}
+                    onChange={(e) => {
+                      setCombinedSourceMode(e.target.value as 'aggregate' | 'split');
+                    }}
                     className="h-7 rounded border border-input bg-background px-2 text-sm"
                   >
                     <option value="aggregate">Aggregate</option>

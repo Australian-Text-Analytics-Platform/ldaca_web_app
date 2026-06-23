@@ -18,8 +18,12 @@ function PlaceholderHarness() {
         aria-label="Generated name"
         value={value}
         placeholder="Suggested_output_name"
-        onChange={(event) => { setValue(event.target.value); }}
-        onKeyDown={(event) => { acceptPlaceholderOnTab({ event, value, setValue }); }}
+        onChange={(event) => {
+          setValue(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          acceptPlaceholderOnTab({ event, value, setValue });
+        }}
       />
       <button type="button">Next</button>
     </div>

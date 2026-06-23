@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type * as GeneratedSdk from '@/api/generated/sdk.gen';
-import type { WorkspaceTabsState } from '@/api/generated/types.gen';
+import type * as GeneratedSdk from '@/api';
+import type { WorkspaceTabsState } from '@/api';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { SettingsDialog } from '../SettingsDialog';
 
@@ -157,9 +157,7 @@ describe('SettingsDialog', () => {
       groups: {
         concordance_analysis: {
           active_tab_id: 'tab-1',
-          tabs: [
-            { tab_id: 'tab-1', task_id: null, title: 'Analysis 1', inputs: [] },
-          ],
+          tabs: [{ tab_id: 'tab-1', task_id: null, title: 'Analysis 1', inputs: [] }],
         },
       },
     };

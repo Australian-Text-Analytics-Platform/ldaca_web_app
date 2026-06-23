@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { updateTokenFrequenciesTaskResult } from '@/api/generated/sdk.gen';
-import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
+import { updateTokenFrequenciesTaskResult } from '@/api';
+import type { TokenFrequencyResponse } from '@/api';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
 
@@ -79,7 +79,9 @@ export const useTokenFrequencyPreferences = ({
     }
 
     if (nextLimit !== null) {
-      void Promise.resolve().then(() => { applyTokenLimitState(nextLimit); });
+      void Promise.resolve().then(() => {
+        applyTokenLimitState(nextLimit);
+      });
     }
   }, [applyTokenLimitState, backendTokenLimit, tokenLimitOverride]);
 

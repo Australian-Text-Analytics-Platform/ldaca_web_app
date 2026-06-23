@@ -127,7 +127,9 @@ export const TokenFrequencyParameterPanel = ({
                             name="study-node"
                             value={option.id}
                             checked={isActive}
-                            onChange={() => { onStudyNodeChange(option.id); }}
+                            onChange={() => {
+                              onStudyNodeChange(option.id);
+                            }}
                             className="sr-only"
                           />
                           <span

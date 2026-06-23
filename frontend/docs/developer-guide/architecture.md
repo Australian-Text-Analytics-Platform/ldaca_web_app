@@ -23,10 +23,11 @@ and auth bootstrap before mounting the workspace shell.
 
 ## Main Layers
 
-- `src/api/`: typed HTTP wrappers and generated backend SDK helpers.
+- `src/api/`: public barrel for generated backend SDK functions, generated
+  TanStack Query helpers, and generated backend types.
 - `src/providers/`: app-level providers such as the singleton QueryClient.
 - `src/stores/`: Zustand stores for auth, UI, selection, preferences, tasks,
-  and node colors.
+  pinned nodes, recent selections, and preprocessing inputs.
 - `src/features/`: feature-first UI modules — `auth`, `feedback`, `hints`,
   `workspace`, and `views` (sidebar-tab features).
 - `src/features/views/`: all left-sidebar view tabs (data-loader,

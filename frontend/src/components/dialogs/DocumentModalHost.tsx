@@ -30,7 +30,12 @@ interface ModalSlotProps {
  */
 function ModalSlot({ open, onClose, target, docType, title, spinnerColor }: ModalSlotProps) {
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
       <DialogContent className={DIALOG_CONTENT_CLASS}>
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <div className="flex-1 overflow-y-auto">
@@ -65,10 +70,18 @@ export function DocumentModalHost() {
   const warningTarget = useUIStore((s) => s.modalTargets.warning);
   const infoTarget = useUIStore((s) => s.modalTargets.info);
   const referenceTarget = useUIStore((s) => s.modalTargets.reference);
-  const closeTutorial = () => { useUIStore.getState().closeModal('tutorial'); };
-  const closeWarning = () => { useUIStore.getState().closeModal('warning'); };
-  const closeInfo = () => { useUIStore.getState().closeModal('info'); };
-  const closeReference = () => { useUIStore.getState().closeModal('reference'); };
+  const closeTutorial = () => {
+    useUIStore.getState().closeModal('tutorial');
+  };
+  const closeWarning = () => {
+    useUIStore.getState().closeModal('warning');
+  };
+  const closeInfo = () => {
+    useUIStore.getState().closeModal('info');
+  };
+  const closeReference = () => {
+    useUIStore.getState().closeModal('reference');
+  };
 
   return (
     <>

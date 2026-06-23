@@ -97,7 +97,9 @@ export const useStackedSplits = <KeyT extends string>(
       if (entry) setContainerHeight(entry.contentRect.height);
     });
     observer.observe(container);
-    return () => { observer.disconnect(); };
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   const activeSectionTotal = useMemo(() => {
@@ -144,7 +146,12 @@ export const useStackedSplits = <KeyT extends string>(
       if (event.button !== 0) return;
       if (collapsedSections[upperKey] || collapsedSections[lowerKey]) return;
       const measuredHeight = containerRef.current?.getBoundingClientRect().height;
-      const height = containerHeight > 0 ? containerHeight : measuredHeight && measuredHeight > 0 ? measuredHeight : 1;
+      const height =
+        containerHeight > 0
+          ? containerHeight
+          : measuredHeight && measuredHeight > 0
+            ? measuredHeight
+            : 1;
       if (height <= 0) return;
 
       event.preventDefault();
@@ -154,7 +161,8 @@ export const useStackedSplits = <KeyT extends string>(
       const pairTotal = startUpper + startLower;
       if (pairTotal <= 0) return;
 
-      const minRatioFor = (key: KeyT) => Math.max((sectionMinPx?.[key] ?? minSectionPx) / height, 0.02);
+      const minRatioFor = (key: KeyT) =>
+        Math.max((sectionMinPx?.[key] ?? minSectionPx) / height, 0.02);
       let minUpper = minRatioFor(upperKey);
       let minLower = minRatioFor(lowerKey);
       const minTotal = minUpper + minLower;

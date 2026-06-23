@@ -114,7 +114,9 @@ export function SequentialAnalysisResultsPanel({
           <span className="text-sm text-muted-foreground">Chart Type</span>
           <Select
             value={chartType}
-            onValueChange={(value) => { onChartTypeChange(value as ChartTypeOption); }}
+            onValueChange={(value) => {
+              onChartTypeChange(value as ChartTypeOption);
+            }}
           >
             <SelectTrigger className="w-35 text-sm">
               <SelectValue placeholder="Select chart" />
@@ -131,7 +133,9 @@ export function SequentialAnalysisResultsPanel({
           </span>
           <Select
             value={xAxisType}
-            onValueChange={(value) => { onXAxisTypeChange(value as SequentialXAxisType); }}
+            onValueChange={(value) => {
+              onXAxisTypeChange(value as SequentialXAxisType);
+            }}
           >
             <SelectTrigger
               className="w-35 text-sm"

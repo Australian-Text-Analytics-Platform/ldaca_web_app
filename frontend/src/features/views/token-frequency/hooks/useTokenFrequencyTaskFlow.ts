@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { calculateTokenFrequencies } from '@/api/generated/sdk.gen';
-import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api/generated/types.gen';
+import { calculateTokenFrequencies } from '@/api';
+import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 import {
   resolveTokenFrequencyNodeContext,
@@ -89,12 +89,7 @@ export const useTokenFrequencyTaskFlow = ({
     onTaskIdAssigned,
   },
   lock: { getAuthHeaders },
-  navigation: {
-    selectNodes,
-    setPendingConcordance,
-    setCurrentView,
-    applyStopSetFromText,
-  },
+  navigation: { selectNodes, setPendingConcordance, setCurrentView, applyStopSetFromText },
 }: UseTokenFrequencyTaskFlowParams) => {
   // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
   // concordance tab for every token click. Sharing the workspace-tabs query
@@ -260,9 +255,7 @@ export const useTokenFrequencyTaskFlow = ({
             ))
           : undefined;
 
-      const uniqueNodeIds: string[] = scopedSelection
-        ? [scopedNodeId]
-        : resolvedNodeIds;
+      const uniqueNodeIds: string[] = scopedSelection ? [scopedNodeId] : resolvedNodeIds;
       const effectiveSelections: NodeColumnSelection[] = scopedSelection
         ? [scopedSelection]
         : resolvedSelections;

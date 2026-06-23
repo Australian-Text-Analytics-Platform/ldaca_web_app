@@ -1,4 +1,4 @@
-import type { QuotationEngineConfigInput, QuotationEngineType } from '@/api/generated/types.gen';
+import type { QuotationEngineConfigInput, QuotationEngineType } from '@/api';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -43,12 +43,12 @@ export function QuotationEngineSettingsFields({
   className,
 }: QuotationEngineSettingsFieldsProps) {
   const selectedType = engineConfig.type ?? 'local';
-  const endpointValue = engineConfig.type === 'remote' ? engineConfig.url ?? '' : lastRemoteUrl;
+  const endpointValue = engineConfig.type === 'remote' ? (engineConfig.url ?? '') : lastRemoteUrl;
 
   /** Called by: quotation engine radio inputs because the parameter panel needs one local update path for task engine changes. */
   const handleTypeChange = (nextType: QuotationEngineType) => {
     if (nextType === 'remote') {
-      const restoredUrl = lastRemoteUrl.length > 0 ? lastRemoteUrl : engineConfig.url ?? '';
+      const restoredUrl = lastRemoteUrl.length > 0 ? lastRemoteUrl : (engineConfig.url ?? '');
       onEngineConfigChange({ type: 'remote', url: restoredUrl });
       return;
     }
@@ -85,7 +85,9 @@ export function QuotationEngineSettingsFields({
                 name={`${idPrefix}-quotation-engine`}
                 value={option.value}
                 checked={checked}
-                onChange={() => { handleTypeChange(option.value); }}
+                onChange={() => {
+                  handleTypeChange(option.value);
+                }}
                 className="h-4 w-4 accent-primary"
               />
               <span>{option.label}</span>
@@ -100,7 +102,9 @@ export function QuotationEngineSettingsFields({
             id={`${idPrefix}-endpoint`}
             type="url"
             value={endpointValue}
-            onChange={(event) => { handleEndpointChange(event.target.value); }}
+            onChange={(event) => {
+              handleEndpointChange(event.target.value);
+            }}
             placeholder="https://quotation.example/api"
             aria-invalid={error ? true : undefined}
           />

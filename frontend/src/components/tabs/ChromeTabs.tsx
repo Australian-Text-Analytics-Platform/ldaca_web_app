@@ -125,10 +125,11 @@ export function ChromeTabs({
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return undefined;
-    const update = () => { setContainerWidth(element.clientWidth); };
+    const update = () => {
+      setContainerWidth(element.clientWidth);
+    };
     update();
-    const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
     observer?.observe(element);
     window.addEventListener('resize', update);
     return () => {
@@ -214,15 +215,14 @@ export function ChromeTabs({
     });
   }, [draftTitle, onRename]);
 
-  const cancelRename = useCallback(() => { setRenamingId(null); }, []);
+  const cancelRename = useCallback(() => {
+    setRenamingId(null);
+  }, []);
 
-  const beginRename = useCallback(
-    (tab: ChromeTabItem) => {
-      setRenamingId(tab.id);
-      setDraftTitle(tab.title);
-    },
-    [],
-  );
+  const beginRename = useCallback((tab: ChromeTabItem) => {
+    setRenamingId(tab.id);
+    setDraftTitle(tab.title);
+  }, []);
 
   const clearDrag = useCallback(() => {
     dragRef.current = null;
@@ -300,7 +300,10 @@ export function ChromeTabs({
       role="tablist"
       aria-label={ariaLabel}
     >
-      <div className="relative" style={{ height: TAB_HEIGHT, width: totalWidth + (onCreate ? CREATE_BUTTON_WIDTH : 0) }}>
+      <div
+        className="relative"
+        style={{ height: TAB_HEIGHT, width: totalWidth + (onCreate ? CREATE_BUTTON_WIDTH : 0) }}
+      >
         {orderIds.map((id, index) => {
           const tab = tabsById.get(id);
           if (!tab) return null;
@@ -316,9 +319,13 @@ export function ChromeTabs({
               role="tab"
               aria-selected={isActive}
               data-chrome-tab
-              onPointerDown={(event) => { handlePointerDown(tab, event); }}
+              onPointerDown={(event) => {
+                handlePointerDown(tab, event);
+              }}
               onPointerMove={handlePointerMove}
-              onPointerUp={(event) => { handlePointerUp(tab, event); }}
+              onPointerUp={(event) => {
+                handlePointerUp(tab, event);
+              }}
               style={{ width: widths[index], transform: `translateX(${String(translateX)}px)` }}
               className={cn(
                 'group absolute top-0 left-0 flex h-full items-center rounded-t-lg text-sm select-none',
@@ -342,10 +349,14 @@ export function ChromeTabs({
                 <input
                   ref={renameInputRef}
                   value={draftTitle}
-                  onChange={(event) => { setDraftTitle(event.target.value); }}
+                  onChange={(event) => {
+                    setDraftTitle(event.target.value);
+                  }}
                   onBlur={finishRename}
                   onKeyDown={handleRenameKeyDown}
-                  onPointerDown={(event) => { event.stopPropagation(); }}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
                   className="mx-2 w-full min-w-0 bg-transparent text-sm outline-none"
                   aria-label="Rename tab"
                 />
@@ -390,7 +401,9 @@ export function ChromeTabs({
                 <button
                   type="button"
                   aria-label="Close tab"
-                  onPointerDown={(event) => { event.stopPropagation(); }}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
                   onClick={(event) => {
                     event.stopPropagation();
                     onClose(id);

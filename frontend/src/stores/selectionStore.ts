@@ -51,34 +51,37 @@ export const useSelectionStore = create<SelectionStore>()(
 
       /** Updates the active workspace pointer while leaving node selection reset to callers. */
       /** Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-      setCurrentWorkspaceId: (workspaceId) =>
-        { set((state) => {
+      setCurrentWorkspaceId: (workspaceId) => {
+        set((state) => {
           state.currentWorkspaceId = workspaceId;
-        }); },
+        });
+      },
 
       /** Focuses one node and collapses the tab strip to that node. */
       /** Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-      selectNode: (nodeId) =>
-        { set((state) => {
+      selectNode: (nodeId) => {
+        set((state) => {
           state.selectedNodeId = nodeId;
           state.selectedNodeIds = nodeId ? [nodeId] : [];
-        }); },
+        });
+      },
 
       /** Replaces the selected-node tab strip after multi-select or reordering flows. */
       /** Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-      setSelectedNodes: (nodeIds) =>
-        { set((state) => {
+      setSelectedNodes: (nodeIds) => {
+        set((state) => {
           state.selectedNodeIds = nodeIds;
           state.selectedNodeId = nodeIds.at(-1) ?? null;
-        }); },
+        });
+      },
 
       /** Toggles a node into/out of the tab strip while keeping focus on the newest visible node. */
       /**
        * Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
        * Flow: add unseen node ids and focus them, or remove existing ids and move focus to the rightmost remaining selection.
        */
-      toggleNodeSelection: (nodeId) =>
-        { set((state) => {
+      toggleNodeSelection: (nodeId) => {
+        set((state) => {
           const idx = state.selectedNodeIds.indexOf(nodeId);
           if (idx === -1) {
             state.selectedNodeIds.push(nodeId);
@@ -89,15 +92,17 @@ export const useSelectionStore = create<SelectionStore>()(
           if (state.selectedNodeId === nodeId) {
             state.selectedNodeId = state.selectedNodeIds[state.selectedNodeIds.length - 1] ?? null;
           }
-        }); },
+        });
+      },
 
       /** Clears focus and multi-node selection when the workspace or graph context resets. */
       /** Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-      clearAllSelections: () =>
-        { set((state) => {
+      clearAllSelections: () => {
+        set((state) => {
           state.selectedNodeId = null;
           state.selectedNodeIds = [];
-        }); },
+        });
+      },
     })),
     { name: 'selection-store' },
   ),

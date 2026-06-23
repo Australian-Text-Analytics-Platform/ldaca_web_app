@@ -6,9 +6,9 @@
  * a workspace writes/reads one small blob per scope.
  */
 
-export type ColumnPersistenceStorage = 'session' | 'local';
+type ColumnPersistenceStorage = 'session' | 'local';
 
-export interface ColumnPersistenceContext {
+interface ColumnPersistenceContext {
   workspaceId?: string | null;
   scope?: string;
   storage?: ColumnPersistenceStorage;

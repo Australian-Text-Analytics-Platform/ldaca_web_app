@@ -18,11 +18,8 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import { getPreferences, updatePreferences } from '@/api/generated/sdk.gen';
-import type {
-  UserPreferences,
-  UserPreferencesUpdate,
-} from '@/api/generated/types.gen';
+import { getPreferences, updatePreferences } from '@/api';
+import type { UserPreferences, UserPreferencesUpdate } from '@/api';
 import type { ViewType } from '@/stores/uiStore';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = ['ai-annotator'];

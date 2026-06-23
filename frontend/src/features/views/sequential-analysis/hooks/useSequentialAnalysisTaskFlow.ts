@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
-import { runSequentialAnalysis, updateSequentialAnalysisTaskResult } from '@/api/generated/sdk.gen';
-import type { SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
+import { runSequentialAnalysis, updateSequentialAnalysisTaskResult } from '@/api';
+import type { SequentialAnalysisRequestInput } from '@/api';
 import { type ChartConfig } from '@/components/ui/chart';
 import { extractAndSetTaskId } from '../../common';
 
@@ -253,8 +253,7 @@ export function useSequentialAnalysisTaskFlow({
     try {
       setIsAnalyzing(true);
       const authHeaders = getAuthHeaders();
-      const headers =
-        Object.keys(authHeaders).length > 0 ? (authHeaders) : {};
+      const headers = Object.keys(authHeaders).length > 0 ? authHeaders : {};
       const { data: result } = await runSequentialAnalysis({
         body: request,
         headers,
@@ -319,8 +318,7 @@ export function useSequentialAnalysisTaskFlow({
 
     if (!currentWorkspaceId) return;
     const authHeaders = getAuthHeaders();
-    const headers =
-      Object.keys(authHeaders).length > 0 ? (authHeaders) : {};
+    const headers = Object.keys(authHeaders).length > 0 ? authHeaders : {};
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return;

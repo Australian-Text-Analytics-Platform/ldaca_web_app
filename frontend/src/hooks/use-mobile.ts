@@ -14,7 +14,7 @@ const getIsMobile = (): boolean => {
 /** Tracks the app's mobile breakpoint for components that change interaction affordances. */
 /**
  * Used by: src/components/ui/sidebar.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
- * Flow: seed state from matchMedia, subscribe with modern or legacy listeners, then update the sidebar-responsive boolean on breakpoint changes.
+ * Flow: seed state from matchMedia, subscribe with modern MediaQueryList change events, then update the sidebar-responsive boolean on breakpoint changes.
  */
 export const useIsMobile = (): boolean => {
   const [isMobile, setIsMobile] = useState<boolean>(() => getIsMobile());
@@ -31,16 +31,10 @@ export const useIsMobile = (): boolean => {
 
     handleChange();
 
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', handleChange);
-      return () => { mediaQuery.removeEventListener('change', handleChange); };
-    }
-
-    // Legacy MediaQueryList fallback for browsers without addEventListener.
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional fallback for older browsers lacking addEventListener
-    mediaQuery.addListener(handleChange);
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional fallback for older browsers lacking removeEventListener
-    return () => { mediaQuery.removeListener(handleChange); };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
   }, []);
 
   return isMobile;

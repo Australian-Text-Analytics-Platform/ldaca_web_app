@@ -1,9 +1,6 @@
-import { clearTasks } from '@/api/generated/sdk.gen';
+import { clearTasks } from '@/api';
 import { collectTaskIds } from '@/features/views/common/analysisTaskUtils';
-import {
-  lastRunRequestQueryKey,
-  type LastRunAnalysisType,
-} from './hooks/useLastRunRequest';
+import { lastRunRequestQueryKey, type LastRunAnalysisType } from './hooks/useLastRunRequest';
 
 interface QueryClientLike {
   invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown>;

@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api/generated/types.gen';
+import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
@@ -649,9 +649,13 @@ export function ConcordanceDispersionNodeBlock({
                       (selectedBinIndices.__COMBINED__ as ReadonlySet<number> | undefined) ??
                       EMPTY_BIN_SELECTION,
                     /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-                    onSelect: (index, shiftHeld) => { onBinSelect('__COMBINED__', index, shiftHeld); },
+                    onSelect: (index, shiftHeld) => {
+                      onBinSelect('__COMBINED__', index, shiftHeld);
+                    },
                     /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-                    onClear: () => { onClearBinSelection('__COMBINED__'); },
+                    onClear: () => {
+                      onClearBinSelection('__COMBINED__');
+                    },
                   }}
                   onLegendCountsChange={handleLegendCountsChange}
                 />
@@ -1012,9 +1016,13 @@ export function ConcordanceDispersionNodeBlock({
                   (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
                   EMPTY_BIN_SELECTION,
                 /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-                onSelect: (index, shiftHeld) => { onBinSelect(nodeKey, index, shiftHeld); },
+                onSelect: (index, shiftHeld) => {
+                  onBinSelect(nodeKey, index, shiftHeld);
+                },
                 /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-                onClear: () => { onClearBinSelection(nodeKey); },
+                onClear: () => {
+                  onClearBinSelection(nodeKey);
+                },
               }}
               onLegendCountsChange={handleLegendCountsChange}
             />

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { updateQuotationTaskResult } from '@/api/generated/sdk.gen';
+import { updateQuotationTaskResult } from '@/api';
 import type {
   QuotationAnalysisResponse,
   QuotationRequestInput,
@@ -8,7 +8,7 @@ import type {
   QuotationDetachRequest,
   QuotationMaterializeRequest,
   AnalysisTaskActionResponse,
-} from '@/api/generated/types.gen';
+} from '@/api';
 import { getNodeIdentifier, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 
@@ -138,13 +138,7 @@ export function useQuotationTaskFlow({
     setLocalTaskId,
     onTaskIdAssigned,
   },
-  lock: {
-    getAuthHeaders,
-    resolveTaskId,
-    quotationSearch,
-    detachQuotation,
-    materializeQuotation,
-  },
+  lock: { getAuthHeaders, resolveTaskId, quotationSearch, detachQuotation, materializeQuotation },
 }: Params) {
   // Builds deterministic output names for detach operations from display labels.
   /**

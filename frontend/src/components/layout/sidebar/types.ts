@@ -1,4 +1,4 @@
-export type SidebarTaskStatus =
+type SidebarTaskStatus =
   | 'pending'
   | 'running'
   | 'successful'
@@ -23,7 +23,7 @@ export interface SidebarTaskRecord {
   progress_message?: string;
 }
 
-export type SidebarNodeShape = [number | null, number | null];
+type SidebarNodeShape = [number | null, number | null];
 
 export interface SidebarWorkspaceNode {
   id: string;

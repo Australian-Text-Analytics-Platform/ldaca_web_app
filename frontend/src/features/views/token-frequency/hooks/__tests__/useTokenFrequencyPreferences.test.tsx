@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTokenFrequencyPreferences } from '../useTokenFrequencyPreferences';
 
 const { updateTokenFrequenciesTaskResultMock } = vi.hoisted(() => ({
@@ -34,6 +34,10 @@ describe('useTokenFrequencyPreferences', () => {
     updateTokenFrequenciesTaskResultMock.mockReset();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('adds default stop words for the chosen language', async () => {
     const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
@@ -41,10 +45,13 @@ describe('useTokenFrequencyPreferences', () => {
       await result.current.handleAddDefaultStopWords('zh');
     });
 
-    await waitFor(() => { expect(result.current.stopWords).toContain('的'); });
+    await waitFor(() => {
+      expect(result.current.stopWords).toContain('的');
+    });
   });
 
   it('does not add default stop words when no language is chosen', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
     await act(async () => {
@@ -52,6 +59,7 @@ describe('useTokenFrequencyPreferences', () => {
     });
 
     expect(result.current.stopWords).toBe('');
+    expect(consoleError).toHaveBeenCalledWith('Default stop words require a language selection');
   });
 
   it('appends a second language without dropping the first', async () => {
@@ -60,13 +68,17 @@ describe('useTokenFrequencyPreferences', () => {
     await act(async () => {
       await result.current.handleAddDefaultStopWords('en');
     });
-    await waitFor(() => { expect(result.current.stopWords).toContain('about'); });
+    await waitFor(() => {
+      expect(result.current.stopWords).toContain('about');
+    });
 
     await act(async () => {
       await result.current.handleAddDefaultStopWords('zh');
     });
 
-    await waitFor(() => { expect(result.current.stopWords).toContain('的'); });
+    await waitFor(() => {
+      expect(result.current.stopWords).toContain('的');
+    });
     expect(result.current.stopWords).toContain('about');
   });
 });

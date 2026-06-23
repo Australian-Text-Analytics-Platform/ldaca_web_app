@@ -58,8 +58,7 @@ const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
 
     if (condition.negate !== undefined) payload.negate = condition.negate;
     if (condition.regex !== undefined) payload.regex = condition.regex;
-    if (condition.caseSensitive !== undefined)
-      payload.case_sensitive = condition.caseSensitive;
+    if (condition.caseSensitive !== undefined) payload.case_sensitive = condition.caseSensitive;
 
     return payload;
   });

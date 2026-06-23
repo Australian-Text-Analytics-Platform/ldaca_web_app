@@ -1,7 +1,7 @@
 import { DocLinkIcon } from './DocLinkIcon';
 import type { InfoTargetKey } from '@/tutorials/infoRegistry';
 
-export interface InfoIconProps {
+interface InfoIconProps {
   targetKey: InfoTargetKey | (string & {});
   label?: string;
   tooltip?: string;

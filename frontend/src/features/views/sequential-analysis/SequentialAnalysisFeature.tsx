@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  sequentialAnalysisTaskRequest,
-  sequentialAnalysisTaskResult,
-} from '@/api/generated/sdk.gen';
-import type { AnalysisTabInput, SequentialAnalysisRequestInput } from '@/api/generated/types.gen';
+import { sequentialAnalysisTaskRequest, sequentialAnalysisTaskResult } from '@/api';
+import type { AnalysisTabInput, SequentialAnalysisRequestInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -139,9 +136,7 @@ const SequentialAnalysisFeature = ({
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeId = nodeInputs.resolvedNodes[0]?.id ?? '';
   const selectedNode = nodeInputs.resolvedNodes[0]?.node ?? null;
-  const applyInputsFromSelections = (
-    selections: { nodeId: string; column?: string | null }[],
-  ) => {
+  const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputsChange?.(
       selections
         .filter((selection) => selection.nodeId)
@@ -244,16 +239,14 @@ const SequentialAnalysisFeature = ({
       setDetachNodeName('');
       setSelectedPeriodIndices(new Set());
       lastClickedIndexRef.current = null;
-      const resolvedChartType = isChartTypeOption(
-        (resultData).chart_type,
-      )
-        ? ((resultData).chart_type)
+      const resolvedChartType = isChartTypeOption(resultData.chart_type)
+        ? resultData.chart_type
         : chartType;
       setResultSafely({
-        ...(resultData),
+        ...resultData,
         analysis_params: {
-          ...(((results)?.analysis_params) ?? {}),
-          ...(((resultData).analysis_params) ?? {}),
+          ...(results?.analysis_params ?? {}),
+          ...(resultData.analysis_params ?? {}),
         },
         chart_type: resolvedChartType,
       });
@@ -268,12 +261,9 @@ const SequentialAnalysisFeature = ({
       lastClickedIndexRef.current = null;
       const hydratedParams = hydratedParamsRef.current;
       const enriched = {
-        ...(resultPayload),
+        ...resultPayload,
         analysis_params: {
-          ...((resultPayload).analysis_params as Record<
-            string,
-            unknown
-          >),
+          ...(resultPayload.analysis_params as Record<string, unknown>),
           ...(hydratedParams
             ? {
                 group_by_columns: hydratedParams.groupByColumns,
@@ -289,10 +279,8 @@ const SequentialAnalysisFeature = ({
             : {}),
         },
       };
-      const resolvedChartType = isChartTypeOption(
-        (resultPayload).chart_type,
-      )
-        ? ((resultPayload).chart_type)
+      const resolvedChartType = isChartTypeOption(resultPayload.chart_type)
+        ? resultPayload.chart_type
         : chartType;
       setResults({ ...enriched, chart_type: resolvedChartType });
       setChartType(resolvedChartType);
@@ -358,13 +346,13 @@ const SequentialAnalysisFeature = ({
         typeof req.custom_interval_value === 'number' &&
         Number.isInteger(req.custom_interval_value) &&
         req.custom_interval_value > 0
-          ? (req.custom_interval_value)
+          ? req.custom_interval_value
           : null;
       const lockedCustomIntervalUnit =
         reqColumnType === 'datetime' &&
         lockedFrequency === 'custom' &&
         isCustomIntervalUnit(req.custom_interval_unit)
-          ? (req.custom_interval_unit)
+          ? req.custom_interval_unit
           : null;
       if (lockedFrequency === 'custom' && reqColumnType === 'datetime') {
         setCustomIntervalValueInput(
@@ -433,19 +421,15 @@ const SequentialAnalysisFeature = ({
     // Finds task ids embedded in result metadata for status recovery.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getExtraTaskIdCandidates: () =>
-      [
-        (resultRef.current)?.metadata as
-          | Record<string, unknown>
-          | undefined,
-      ].map((m) => m?.task_id as string | undefined),
+      [resultRef.current?.metadata as Record<string, unknown> | undefined].map(
+        (m) => m?.task_id as string | undefined,
+      ),
     // Finds task ids embedded in result metadata for clear operations.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     getClearTaskIdSources: () =>
-      [
-        (resultRef.current)?.metadata as
-          | Record<string, unknown>
-          | undefined,
-      ].map((m) => m?.task_id as string | undefined),
+      [resultRef.current?.metadata as Record<string, unknown> | undefined].map(
+        (m) => m?.task_id as string | undefined,
+      ),
     // Treats hydrated running results as active tasks for the shared banner/action state.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     isResultRunning: (r: Record<string, unknown> | null) => Boolean(r) && r?.state === 'running',
@@ -486,10 +470,11 @@ const SequentialAnalysisFeature = ({
 
   const activeColumnInfo = timeCompatibleColumns.find((column) => column.name === activeTimeColumn);
   const activeColumnType = normalizeTypeName(
-    activeColumnInfo?.dataType ?? (timeCompatibleColumns[0]?.dataType ?? 'datetime'),
+    activeColumnInfo?.dataType ?? timeCompatibleColumns[0]?.dataType ?? 'datetime',
   );
-  const derivedColumnType: 'datetime' | 'numeric' =
-    NUMERIC_TYPE_SET.has(activeColumnType) ? 'numeric' : 'datetime';
+  const derivedColumnType: 'datetime' | 'numeric' = NUMERIC_TYPE_SET.has(activeColumnType)
+    ? 'numeric'
+    : 'datetime';
   const numericOriginValue =
     derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null;
   const numericIntervalValue =
@@ -502,7 +487,7 @@ const SequentialAnalysisFeature = ({
     ? customIntervalUnit
     : null;
 
-  const lastRunRequest = (serverRequest) ?? null;
+  const lastRunRequest = serverRequest ?? null;
   const currentSequentialParams = {
     frequency,
     group_by_columns: normalizeStringArray(groupByColumns),
@@ -514,7 +499,8 @@ const SequentialAnalysisFeature = ({
     case_sensitive: caseSensitive,
   };
   const sequentialServerParams = (request: Record<string, unknown>) => {
-    const serverColumnType = typeof request.column_type === 'string' ? request.column_type : 'datetime';
+    const serverColumnType =
+      typeof request.column_type === 'string' ? request.column_type : 'datetime';
     const serverFrequency = typeof request.frequency === 'string' ? request.frequency : 'year';
     const serverIsCustomDatetime = serverColumnType === 'datetime' && serverFrequency === 'custom';
     return {
@@ -535,7 +521,7 @@ const SequentialAnalysisFeature = ({
           : null,
       custom_interval_unit:
         serverIsCustomDatetime && isCustomIntervalUnit(request.custom_interval_unit)
-          ? (request.custom_interval_unit)
+          ? request.custom_interval_unit
           : null,
       case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true,
     };
@@ -571,8 +557,12 @@ const SequentialAnalysisFeature = ({
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const nextColumn = selection?.column || timeColumnOptions[0] || '';
     if (nextColumn && nextColumn !== timeColumn) {
-      const id = requestAnimationFrame(() => { setTimeColumn(nextColumn); });
-      return () => { cancelAnimationFrame(id); };
+      const id = requestAnimationFrame(() => {
+        setTimeColumn(nextColumn);
+      });
+      return () => {
+        cancelAnimationFrame(id);
+      };
     }
   }, [hydratingSelection, activeNodeId, timeColumnOptions, nodeColumnSelections, timeColumn]);
 
@@ -652,7 +642,9 @@ const SequentialAnalysisFeature = ({
       setResults,
       setChartType,
       setLocalTaskId,
-      setNodeColumnSelections: (selections) => { applyInputsFromSelections(selections); },
+      setNodeColumnSelections: (selections) => {
+        applyInputsFromSelections(selections);
+      },
       setTimeColumn,
       lockCurrentSchema,
       resolveTaskId,
@@ -869,7 +861,7 @@ const SequentialAnalysisFeature = ({
       { label: 'Groups', value: summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None' },
     ];
     const legend: ChartExportLegendItem[] = groupKeys.map((key, idx) => ({
-      label: (chartConfig[key]?.label) ?? key,
+      label: chartConfig[key]?.label ?? key,
       color: chartConfig[key]?.color ?? getPaletteColor(idx) ?? '#888888',
       type: chartType === 'line' ? 'line' : chartType === 'bar' ? 'bar' : 'area',
       hidden: hiddenKeys.has(key),
@@ -1002,7 +994,9 @@ const SequentialAnalysisFeature = ({
           }}
           xAxisType={xAxisType}
           onXAxisTypeChange={setXAxisType}
-          onDownloadClick={() => { setDownloadDialogOpen(true); }}
+          onDownloadClick={() => {
+            setDownloadDialogOpen(true);
+          }}
           chartData={chartData}
           chartConfig={chartConfig}
           groupKeys={groupKeys}

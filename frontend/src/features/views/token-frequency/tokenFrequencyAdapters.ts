@@ -1,7 +1,10 @@
-import type { TokenFrequencyResponse } from '@/api/generated/types.gen';
+import type { TokenFrequencyResponse } from '@/api';
 import { isNonEmptyString } from '../common';
 
-export interface TokenFrequencyRow { token: string; frequency: number }
+interface TokenFrequencyRow {
+  token: string;
+  frequency: number;
+}
 
 export type TokenFrequencyStatisticsEntry = NonNullable<
   TokenFrequencyResponse['statistics']
@@ -82,8 +85,10 @@ export const buildResponseDisplayNameHints = (
   results?: TokenFrequencyResponse | null,
 ): Record<string, string> => {
   const mapping: Record<string, string> = {};
-  const metadataNodeNames = ((results?.metadata)
-    ?.node_display_names ?? {}) as Record<string, unknown>;
+  const metadataNodeNames = (results?.metadata?.node_display_names ?? {}) as Record<
+    string,
+    unknown
+  >;
   if (typeof metadataNodeNames === 'object') {
     Object.entries(metadataNodeNames).forEach(([id, name]) => {
       if (isNonEmptyString(name)) {
@@ -244,8 +249,7 @@ export const deriveNodeDisplayResults = (
       displayRows = limitedRows;
     }
 
-    const maxFrequencyRaw =
-      rawRows.length > 0 ? maxBy(rawRows, (r) => r.frequency || 0, 0) : 0;
+    const maxFrequencyRaw = rawRows.length > 0 ? maxBy(rawRows, (r) => r.frequency || 0, 0) : 0;
     const maxFrequency = maxFrequencyRaw > 0 ? maxFrequencyRaw : 1;
 
     return {
