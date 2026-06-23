@@ -14,14 +14,17 @@
  * which ViewRouter lazy-loads. Each wrapper passes its own ``tabGroup`` and
  * ``Feature``.
  * Flow: resolve workspace + auth, load this workspace's tab group, auto-create
- * one empty tab only when entering an empty group, render the shared tab bar, then mount
- * ``Feature`` keyed by the active tab id so switching tabs gives each tab a
- * fresh, independently-hydrated panel instance.
+ * one empty tab only when entering an empty group, render the shared tab bar
+ * only when the user preference enables it, then mount ``Feature`` keyed by the
+ * active tab id so switching tabs gives each tab a fresh, independently-hydrated
+ * panel instance. WorkspaceShell owns the global single-tab cleanup pass when
+ * the preference is off.
  */
 import { useEffect, useRef, type ComponentType } from 'react';
 import type { AnalysisTabInput } from '@/api/generated/types.gen';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisTabbedPanel } from './AnalysisTabbedPanel';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 
@@ -50,11 +53,12 @@ export interface AnalysisTabsHostProps {
  * Hosts one analysis view's tab strip and the active tab's panel.
  * Used by: the five ``*TabbedFeature`` wrappers because the tab bar and the
  * keyed feature panel both need the same live tab list, active id, and mutators.
- * Flow: read tab group → ensure a tab exists → render bar + keyed panel.
+ * Flow: read tab group → ensure a tab exists → render optional bar + keyed panel.
  */
 export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
+  const analysisMultiTabEnabled = usePreferencesStore((state) => state.analysisMultiTabEnabled);
   const autoCreateKeyRef = useRef<string | null>(null);
 
   const {
@@ -87,7 +91,12 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     }
   }, [currentWorkspaceId, tabGroup, isLoading, tabs.length, createTab]);
 
-  const activeTab = tabs.find((t) => t.tab_id === activeTabId) ?? null;
+  // The workspace-level cleanup removes extra persisted tabs. Until that async
+  // pass reconciles this group, single-tab mode displays the first tab instead
+  // of an arbitrary previously-active tab.
+  const singleTabModeActiveId =
+    !analysisMultiTabEnabled && tabs.length > 0 ? (tabs[0]?.tab_id ?? null) : activeTabId;
+  const activeTab = tabs.find((t) => t.tab_id === singleTabModeActiveId) ?? null;
 
   return (
     <AnalysisTabbedPanel
@@ -98,6 +107,7 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
       onCreate={() => createTab()}
       onRename={renameTab}
       onReorder={reorderTabs}
+      multiTabEnabled={analysisMultiTabEnabled}
     >
       {activeTab ? (
         // key forces a fresh mount per tab so each tab hydrates its own task

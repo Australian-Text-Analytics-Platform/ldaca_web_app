@@ -6861,6 +6861,11 @@
         "additionalProperties": false,
         "description": "Preference schema persisted by preference routes for user preferences.\n\nUsed by:\n- backend API routes, backend request/response models, backend tests, core workspace and\n  worker services because they need a stable JSON contract shared by route handlers,\n  generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
+          "analysis_multi_tab_enabled": {
+            "default": false,
+            "title": "Analysis Multi Tab Enabled",
+            "type": "boolean"
+          },
           "default_tokenizer_model": {
             "anyOf": [
               {
@@ -6905,6 +6910,17 @@
         "additionalProperties": false,
         "description": "Partial update payload \u2014 only provided fields are merged.\n\nUsed by:\n- backend API routes, backend request/response models, backend tests, core workspace and\n  worker services because they need a stable JSON contract shared by route handlers,\n  generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
+          "analysis_multi_tab_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Multi Tab Enabled"
+          },
           "default_tokenizer_model": {
             "anyOf": [
               {

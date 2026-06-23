@@ -147,6 +147,44 @@ export function closeTabInState(
 }
 
 /**
+ * Collapses one analysis group to its first tab.
+ * Called by: useSingleTabModeWorkspaceCleanup when the user disables the
+ * multi-tab UI after creating several tabs. The first tab becomes the single
+ * surviving tab and active tab; callers are responsible for clearing backend
+ * tasks owned by the removed tabs.
+ */
+export function keepFirstTabInState(
+  state: WorkspaceTabsState | null | undefined,
+  analysisType: string,
+): WorkspaceTabsState {
+  const group = getGroup(state, analysisType);
+  const tabs = group.tabs ?? [];
+  if (tabs.length <= 1) return withGroup(state, analysisType, group);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- tabs length is greater than 1
+  const firstTab = tabs[0]!;
+  return withGroup(state, analysisType, {
+    tabs: [firstTab],
+    active_tab_id: firstTab.tab_id,
+  });
+}
+
+/**
+ * Counts tabs that would be dropped by single-tab mode across all groups.
+ * Called by: SettingsDialog before disabling multi-tab so it can warn only
+ * when the preference change has destructive tab/task cleanup consequences.
+ */
+export function countTabsRemovedBySingleTabMode(
+  state: WorkspaceTabsState | null | undefined,
+): number {
+  let count = 0;
+  for (const analysisType of Object.keys(state?.groups ?? {})) {
+    const tabs = getTabs(state, analysisType);
+    count += Math.max(0, tabs.length - 1);
+  }
+  return count;
+}
+
+/**
  * Renames a tab's title.
  * Called by: useWorkspaceTabs.renameTab (inline title edit in AnalysisTabbedPanel).
  */

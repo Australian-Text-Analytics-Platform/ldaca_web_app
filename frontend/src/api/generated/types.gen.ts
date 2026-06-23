@@ -4985,6 +4985,10 @@ export type User = {
  */
 export type UserPreferences = {
     /**
+     * Analysis Multi Tab Enabled
+     */
+    analysis_multi_tab_enabled?: boolean;
+    /**
      * Default Tokenizer Model
      */
     default_tokenizer_model?: string | null;
@@ -5016,6 +5020,10 @@ export type UserPreferences = {
  * responses in the shape expected by frontend clients and tests.
  */
 export type UserPreferencesUpdate = {
+    /**
+     * Analysis Multi Tab Enabled
+     */
+    analysis_multi_tab_enabled?: boolean | null;
     /**
      * Default Tokenizer Model
      */

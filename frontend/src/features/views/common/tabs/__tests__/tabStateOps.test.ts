@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   closeTabInState,
+  countTabsRemovedBySingleTabMode,
   createTabInState,
   getActiveTabId,
   getTabs,
+  keepFirstTabInState,
   renameTabInState,
   reorderTabsInState,
   setActiveTabInState,
@@ -53,6 +55,25 @@ describe('tabStateOps', () => {
     state = createTabInState(state, TYPE, 'B', 'b').state; // active = b
     state = closeTabInState(state, TYPE, 'a');
     expect(getActiveTabId(state, TYPE)).toBe('b');
+  });
+
+  it('keeps only the first tab and makes it active', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, TYPE, 'B', 'b').state;
+    state = createTabInState(state, TYPE, 'C', 'c').state; // active = c
+    state = keepFirstTabInState(state, TYPE);
+    expect(getTabs(state, TYPE).map((t) => t.tab_id)).toEqual(['a']);
+    expect(getActiveTabId(state, TYPE)).toBe('a');
+  });
+
+  it('counts tabs that single-tab mode would remove across groups', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = createTabInState(state, TYPE, 'B', 'b').state;
+    state = createTabInState(state, OTHER, 'C', 'c').state;
+    state = createTabInState(state, OTHER, 'D', 'd').state;
+    state = createTabInState(state, OTHER, 'E', 'e').state;
+
+    expect(countTabsRemovedBySingleTabMode(state)).toBe(3);
   });
 
   it('renames a tab title', () => {

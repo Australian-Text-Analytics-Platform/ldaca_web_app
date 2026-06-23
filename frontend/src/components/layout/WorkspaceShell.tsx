@@ -12,6 +12,9 @@ import { useUIStore } from '@/stores';
 import type { ViewType } from '@/stores';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useShallow } from 'zustand/react/shallow';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useSingleTabModeWorkspaceCleanup } from '@/features/views/common/tabs/useSingleTabModeWorkspaceCleanup';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DocumentModalHost } from '@/components/dialogs/DocumentModalHost';
 import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
@@ -35,6 +38,20 @@ const TABBED_MAIN_VIEWS = new Set<ViewType>([
   'topic-modeling',
   'quotation',
 ]);
+
+/**
+ * Headless bridge between the global multi-tab preference and workspace tab
+ * persistence.
+ * Rendered by: WorkspaceShell under WorkspaceProvider so it can see the current
+ * workspace even when no analysis view is mounted.
+ */
+function SingleTabModeWorkspaceCleanup() {
+  const analysisMultiTabEnabled = usePreferencesStore((state) => state.analysisMultiTabEnabled);
+  const { currentWorkspaceId } = useWorkspaceData();
+  const { getAuthHeaders } = useAuth();
+  useSingleTabModeWorkspaceCleanup(currentWorkspaceId, analysisMultiTabEnabled, getAuthHeaders);
+  return null;
+}
 
 export function WorkspaceShell() {
   const { feedbackOpen, closeModal } = useUIStore(
@@ -74,6 +91,7 @@ export function WorkspaceShell() {
   return (
     <QueryProvider>
       <WorkspaceProvider>
+        <SingleTabModeWorkspaceCleanup />
         <ViewRouteSync />
         <ErrorBoundary>
           <SidebarProvider

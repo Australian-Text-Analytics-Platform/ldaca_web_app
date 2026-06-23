@@ -15,6 +15,7 @@ interface PersistedSnapshot {
   favoriteWorkspaces: readonly string[];
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
+  analysisMultiTabEnabled: boolean;
 }
 
 /**
@@ -30,6 +31,7 @@ const snapshotPersisted = (
   favoriteWorkspaces: state.favoriteWorkspaces,
   defaultTokenizerModel: state.defaultTokenizerModel,
   ldacaOniApiToken: state.ldacaOniApiToken,
+  analysisMultiTabEnabled: state.analysisMultiTabEnabled,
 });
 
 /** Compares the persisted preference subset so cosmetic store changes do not sync to the backend. */
@@ -40,6 +42,7 @@ const snapshotPersisted = (
 const snapshotsEqual = (a: PersistedSnapshot, b: PersistedSnapshot) => {
   if (a.defaultTokenizerModel !== b.defaultTokenizerModel) return false;
   if (a.ldacaOniApiToken !== b.ldacaOniApiToken) return false;
+  if (a.analysisMultiTabEnabled !== b.analysisMultiTabEnabled) return false;
   if (a.hiddenViews.length !== b.hiddenViews.length) return false;
   if (a.favoriteWorkspaces.length !== b.favoriteWorkspaces.length) return false;
   for (let i = 0; i < a.hiddenViews.length; i++) {

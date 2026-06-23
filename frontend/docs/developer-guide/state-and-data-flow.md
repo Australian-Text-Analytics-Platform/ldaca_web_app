@@ -70,11 +70,17 @@ auth probes during startup.
 ## Preferences
 
 `preferencesStore` holds backend-synced preferences such as hidden views,
-favorites, LDaCA token, and default tokenizer model.
+favorites, LDaCA token, default tokenizer model, and whether analysis views
+show the multi-tab controls.
 `usePreferences` initializes the store from `/api/preferences` and debounces
 backend sync. `SettingsDialog` is the unified preference surface: it edits
 backend preferences, working-directory config, and browser-local settings such
 as hint enablement/dismissals. View visibility is mirrored into `uiStore`.
+When the multi-tab preference is off, a workspace-level cleanup collapses every
+persisted analysis tab group in the current workspace to the first tab and
+clears tasks owned by removed tabs. `SettingsDialog` checks the current
+workspace sidecar before disabling the preference and opens a destructive
+confirmation only when that cleanup would remove extra tabs.
 
 ## Task Stream
 

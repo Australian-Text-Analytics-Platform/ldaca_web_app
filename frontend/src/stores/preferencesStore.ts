@@ -32,6 +32,7 @@ interface PreferencesState {
   favoriteWorkspaces: string[];
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
+  analysisMultiTabEnabled: boolean;
   /** True once the first backend fetch completes */
   hydrated: boolean;
   /** True while a backend sync is in-flight */
@@ -46,6 +47,7 @@ interface PreferencesActions {
   isFavorite: (workspaceId: string) => boolean;
   setDefaultTokenizerModel: (model: string | null) => void;
   setLdacaOniApiToken: (token: string | null) => void;
+  setAnalysisMultiTabEnabled: (enabled: boolean) => void;
   /** Fetch preferences from backend and hydrate the store */
   loadFromBackend: (headers?: Record<string, string>) => Promise<void>;
   /** Push current state to backend */
@@ -60,11 +62,13 @@ type ResolvedUserPreferences = Omit<
   | 'favorite_workspaces'
   | 'hidden_views'
   | 'ldaca_oni_api_token'
+  | 'analysis_multi_tab_enabled'
 > & {
   hidden_views: string[];
   favorite_workspaces: string[];
   default_tokenizer_model: string | null;
   ldaca_oni_api_token: string | null;
+  analysis_multi_tab_enabled: boolean;
 };
 
 /** Converts frontend auth header casing to the generated preferences client contract. */
@@ -79,13 +83,15 @@ const getAuthorizationHeaders = (
 /** Applies backend defaults so the store always works with concrete preference fields. */
 /**
  * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
- * Flow: fill missing backend arrays, quotation fields, language/tokenizer choices, and token with concrete frontend defaults.
+ * Flow: fill missing backend arrays, tokenizer/token choices, and analysis UI
+ * flags with concrete frontend defaults.
  */
 const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences => ({
   hidden_views: data.hidden_views ?? [],
   favorite_workspaces: data.favorite_workspaces ?? [],
   default_tokenizer_model: data.default_tokenizer_model ?? null,
   ldaca_oni_api_token: data.ldaca_oni_api_token ?? null,
+  analysis_multi_tab_enabled: data.analysis_multi_tab_enabled ?? false,
 });
 
 /** Hydrates persisted preference fields into the immer draft after a successful backend load. */
@@ -98,6 +104,7 @@ function applyServerState(state: PreferencesState, data: ResolvedUserPreferences
   state.favoriteWorkspaces = data.favorite_workspaces;
   state.defaultTokenizerModel = data.default_tokenizer_model;
   state.ldacaOniApiToken = data.ldaca_oni_api_token;
+  state.analysisMultiTabEnabled = data.analysis_multi_tab_enabled;
   state.hydrated = true;
 }
 
@@ -109,6 +116,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
         favoriteWorkspaces: [],
         defaultTokenizerModel: null,
         ldacaOniApiToken: null,
+        analysisMultiTabEnabled: false,
         hydrated: false,
         syncing: false,
         lastSyncError: null,
@@ -164,6 +172,18 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /**
+         * Shows or hides the analysis tab-strip controls without changing the
+         * tab ids and sidecar state used underneath.
+         * Used by: SettingsDialog and AnalysisTabsHost because the preference
+         * belongs to user-visible analysis presentation, not tab persistence.
+         */
+        setAnalysisMultiTabEnabled: (enabled) => {
+          set((state) => {
+            state.analysisMultiTabEnabled = enabled;
+          });
+        },
+
         /** Loads preferences from the backend once auth is available, falling back to local state. */
         /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         loadFromBackend: async (headers) => {
@@ -203,6 +223,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
               ? { default_tokenizer_model: state.defaultTokenizerModel }
               : {}),
             ldaca_oni_api_token: state.ldacaOniApiToken,
+            analysis_multi_tab_enabled: state.analysisMultiTabEnabled,
           };
           try {
             await updatePreferences({
@@ -230,6 +251,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
           favoriteWorkspaces: state.favoriteWorkspaces,
           defaultTokenizerModel: state.defaultTokenizerModel,
           ldacaOniApiToken: state.ldacaOniApiToken,
+          analysisMultiTabEnabled: state.analysisMultiTabEnabled,
         }),
       },
     ),

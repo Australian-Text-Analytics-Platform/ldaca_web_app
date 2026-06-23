@@ -38,6 +38,15 @@ overwrite, delete, or hide the first tab's task; each tab stores the task id it
 owns. Submit endpoints do not accept frontend `tab_id`; tab identity is UI
 sidecar state and backend analysis data is stored under the returned task id.
 
+The user preference `analysisMultiTabEnabled` controls whether the Chrome-style
+tab strip is visible. When it is disabled, a workspace-level cleanup collapses
+every persisted analysis group in the current workspace to its first tab,
+persists the updated sidecar, and clears backend tasks owned by the removed
+tabs. `SettingsDialog` checks the current workspace sidecar first and shows a
+destructive confirmation only when extra tabs would actually be removed. The
+host still loads or creates one tab, passes that `tab_id` to the feature, and
+persists tab-owned task and input state when the controls are hidden.
+
 ## Shared Lifecycle
 
 `features/views/common/hooks/useAnalysisFeature.ts` is the generic analysis

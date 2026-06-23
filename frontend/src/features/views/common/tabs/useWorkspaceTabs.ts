@@ -9,9 +9,9 @@
  * sees and mutates its own tabs. The pure reducers in ``tabStateOps`` do the
  * actual state math; this hook owns caching, auth headers, and persistence.
  *
- * Used by: ConcordanceTabbedFeature (the pilot wrapper) to list/create/close/
- * rename/activate tabs and to wire a tab to its task id after a run or clear.
- * Other analysis features can reuse it by passing their own analysis type.
+ * Used by: AnalysisTabsHost to list/create/close/rename/activate tabs and to
+ * wire a tab to its task id after a run or clear. Each analysis feature passes
+ * its own analysis type.
  */
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,8 +30,12 @@ import {
   setTabTaskInState,
 } from './tabStateOps';
 
-/** Query key for the whole-workspace tab state (shared across analysis types). */
-function workspaceTabsQueryKey(workspaceId: string): string[] {
+/**
+ * Query key for the whole-workspace tab state (shared across analysis types).
+ * Used by: useWorkspaceTabs and workspace-level cleanup hooks so all tab
+ * sidecar mutations reconcile the same React Query cache entry.
+ */
+export function workspaceTabsQueryKey(workspaceId: string): string[] {
   return ['workspace-tabs', workspaceId];
 }
 
@@ -60,8 +64,8 @@ export interface UseWorkspaceTabsResult {
 
 /**
  * Manages the analysis tab group for one workspace + analysis type.
- * Used by: ConcordanceTabbedFeature wrapper because the tab bar and the keyed
- * feature panel both need the same live tab list, active id, and mutators.
+ * Used by: AnalysisTabsHost because the tab bar and the keyed feature panel
+ * both need the same live tab list, active id, and mutators.
  * Flow: query the full sidecar, derive this type's tabs/active id, then expose
  * mutators that optimistically patch the cache and PUT the whole state back.
  */

@@ -1,7 +1,8 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AnalysisTab } from '@/api/generated/types.gen';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisTabsHost } from '../AnalysisTabsHost';
 import type { UseWorkspaceTabsResult } from '../useWorkspaceTabs';
 
@@ -30,6 +31,13 @@ const tab: AnalysisTab = {
   inputs: [],
 };
 
+const secondTab: AnalysisTab = {
+  tab_id: 'tab-2',
+  task_id: 'task-2',
+  title: 'Analysis 2',
+  inputs: [],
+};
+
 function makeTabsResult(
   overrides: Partial<UseWorkspaceTabsResult>,
 ): UseWorkspaceTabsResult {
@@ -52,11 +60,26 @@ function Feature() {
   return <div>Feature panel</div>;
 }
 
+function FeatureWithTabId({ tabId }: { tabId?: string }) {
+  return <div>Active tab {tabId}</div>;
+}
+
+type PreferenceTestState = Partial<ReturnType<typeof usePreferencesStore.getState>> & {
+  analysisMultiTabEnabled: boolean;
+};
+
+function setMultiTabPreference(enabled: boolean) {
+  usePreferencesStore.setState({
+    analysisMultiTabEnabled: enabled,
+  } as PreferenceTestState);
+}
+
 describe('AnalysisTabsHost', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1' });
     mocks.useAuth.mockReturnValue({ getAuthHeaders: () => ({}) });
+    setMultiTabPreference(false);
   });
 
   it('auto-creates one tab when entering an empty functional tab group', async () => {
@@ -94,5 +117,41 @@ describe('AnalysisTabsHost', () => {
     rerender(<AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />);
 
     expect(createTab).not.toHaveBeenCalled();
+  });
+
+  it('hides multi-tab chrome by default while still rendering the active feature', () => {
+    mocks.useWorkspaceTabs.mockReturnValue(makeTabsResult({
+      tabs: [tab],
+      activeTabId: tab.tab_id,
+    }));
+
+    render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />);
+
+    expect(screen.queryByRole('tablist', { name: /analysis tabs/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Feature panel')).toBeInTheDocument();
+  });
+
+  it('shows multi-tab chrome when the preference is enabled', () => {
+    setMultiTabPreference(true);
+    mocks.useWorkspaceTabs.mockReturnValue(makeTabsResult({
+      tabs: [tab],
+      activeTabId: tab.tab_id,
+    }));
+
+    render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={Feature} />);
+
+    expect(screen.getByRole('tablist', { name: /analysis tabs/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab')).toHaveTextContent('Analysis 1');
+  });
+
+  it('renders the first tab while single-tab cleanup is pending', () => {
+    mocks.useWorkspaceTabs.mockReturnValue(makeTabsResult({
+      tabs: [tab, secondTab],
+      activeTabId: secondTab.tab_id,
+    }));
+
+    render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={FeatureWithTabId} />);
+
+    expect(screen.getByText('Active tab tab-1')).toBeInTheDocument();
   });
 });

@@ -1,7 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { getWorkspaceTabs } from '@/api/generated/sdk.gen';
+import type { WorkspaceTabsState } from '@/api/generated/types.gen';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -11,10 +15,16 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DataFolderSettingsPanel } from '@/components/dialogs/DataFolderDialog';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import {
+  EMPTY_TABS_STATE,
+  countTabsRemovedBySingleTabMode,
+} from '@/features/views/common/tabs/tabStateOps';
+import { workspaceTabsQueryKey } from '@/features/views/common/tabs/useWorkspaceTabs';
 import { ALL_VIEWS, type ViewType, useUIStore } from '@/stores/uiStore';
 import { useHintsStore } from '@/stores/hintsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -54,8 +64,9 @@ const SETTINGS_TABS = [
  * Flow: hydrate draft inputs from stores when opened, route tab controls to the existing preference/UI/hints stores, and reuse the working-directory backend config panel in single-user mode.
  */
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const { dataFolder, isMultiUserMode } = useAuth();
-  const { workspaces } = useWorkspaceData();
+  const { dataFolder, getAuthHeaders, isMultiUserMode } = useAuth();
+  const { currentWorkspaceId, workspaces } = useWorkspaceData();
+  const queryClient = useQueryClient();
   const visibleViews = useUIStore((state) => state.visibleViews);
   const setViewVisibility = useUIStore((state) => state.setViewVisibility);
   const resetSessionDismissedHints = useUIStore((state) => state.resetSessionDismissedHints);
@@ -70,11 +81,65 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const setDefaultTokenizerModel = usePreferencesStore((state) => state.setDefaultTokenizerModel);
   const ldacaOniApiToken = usePreferencesStore((state) => state.ldacaOniApiToken);
   const setLdacaOniApiToken = usePreferencesStore((state) => state.setLdacaOniApiToken);
+  const analysisMultiTabEnabled = usePreferencesStore((state) => state.analysisMultiTabEnabled);
+  const setAnalysisMultiTabEnabled = usePreferencesStore((state) => state.setAnalysisMultiTabEnabled);
   const hydrated = usePreferencesStore((state) => state.hydrated);
   const syncing = usePreferencesStore((state) => state.syncing);
   const lastSyncError = usePreferencesStore((state) => state.lastSyncError);
   const tokenInputRef = useRef<HTMLInputElement>(null);
   const tokenizerInputRef = useRef<HTMLInputElement>(null);
+  const [pendingMultiTabDeleteCount, setPendingMultiTabDeleteCount] = useState(0);
+  const [checkingMultiTabDisable, setCheckingMultiTabDisable] = useState(false);
+
+  /** Called by: the multi-tab warning check because Settings must inspect the fresh current workspace sidecar before allowing destructive cleanup. */
+  const loadWorkspaceTabsForWarning = async (): Promise<WorkspaceTabsState> => {
+    if (!currentWorkspaceId) return EMPTY_TABS_STATE;
+    const queryKey = workspaceTabsQueryKey(currentWorkspaceId);
+    const { data: payload } = await getWorkspaceTabs({
+      headers: getAuthHeaders(),
+      path: { workspace_id: currentWorkspaceId },
+      throwOnError: true,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- API payload may be undefined at runtime
+    const tabsState = payload ?? EMPTY_TABS_STATE;
+    queryClient.setQueryData(queryKey, tabsState);
+    return tabsState;
+  };
+
+  /**
+   * Called by: the shadcn Switch for the analysis multi-tab preference.
+   * Flow: enabling writes immediately; disabling first checks whether any
+   * existing tabs would be pruned, then either opens the warning dialog or
+   * commits the preference directly when there is nothing to delete.
+   */
+  const handleAnalysisMultiTabChange = async (enabled: boolean) => {
+    if (enabled) {
+      setPendingMultiTabDeleteCount(0);
+      setAnalysisMultiTabEnabled(true);
+      return;
+    }
+    setCheckingMultiTabDisable(true);
+    try {
+      const tabsState = await loadWorkspaceTabsForWarning();
+      const tabsToDelete = countTabsRemovedBySingleTabMode(tabsState);
+      if (tabsToDelete > 0) {
+        setPendingMultiTabDeleteCount(tabsToDelete);
+      } else {
+        setAnalysisMultiTabEnabled(false);
+      }
+    } catch (error) {
+      console.warn('[settings] Failed to inspect analysis tabs before disabling multi-tab:', error);
+      toast.error('Unable to check existing analysis tabs. Multi-tab remains enabled.');
+    } finally {
+      setCheckingMultiTabDisable(false);
+    }
+  };
+
+  /** Called by: the alert dialog confirm button after the user accepts deleting extra analysis tabs. */
+  const confirmDisableMultiTab = () => {
+    setPendingMultiTabDeleteCount(0);
+    setAnalysisMultiTabEnabled(false);
+  };
 
   /** Called by: Settings hint reset button because browser-local permanent and session hint dismissals need one reset action. */
   const handleResetHints = () => {
@@ -111,9 +176,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         ? { label: 'Synced', variant: 'outline' as const }
         : { label: 'Loading', variant: 'secondary' as const };
 
+  const pendingMultiTabDeleteText =
+    pendingMultiTabDeleteCount === 1
+      ? '1 extra tab will be deleted.'
+      : `${String(pendingMultiTabDeleteCount)} extra tabs will be deleted.`;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[80dvh] w-[80vw] max-w-none flex-col gap-0 overflow-hidden p-0">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex h-[80dvh] w-[80vw] max-w-none flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-4">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="space-y-1">
@@ -150,6 +221,21 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <Badge variant={syncBadge.variant}>{syncBadge.label}</Badge>
                   <Badge variant="outline">{favoriteWorkspaces.length} favorites</Badge>
                   <Badge variant="outline">{visibleViews.length} visible views</Badge>
+                </div>
+              </section>
+              <section className="border-t border-border/60 pt-4">
+                <div className="flex items-center justify-between gap-4 rounded-md border border-border/70 px-3 py-2">
+                  <Label htmlFor="settings-analysis-multi-tab" className="text-sm font-medium">
+                    Enable multi-tab
+                  </Label>
+                  <Switch
+                    id="settings-analysis-multi-tab"
+                    checked={analysisMultiTabEnabled}
+                    disabled={checkingMultiTabDisable}
+                    onCheckedChange={(enabled) => {
+                      void handleAnalysisMultiTabChange(enabled);
+                    }}
+                  />
                 </div>
               </section>
               <section className="space-y-3 border-t border-border/60 pt-4">
@@ -305,7 +391,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </TabsContent>
           </div>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={pendingMultiTabDeleteCount > 0}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPendingMultiTabDeleteCount(0);
+        }}
+        title="Disable multi-tab?"
+        description={`${pendingMultiTabDeleteText} Wordflow will keep the first tab in each analysis and clear backend tasks owned by deleted tabs.`}
+        confirmText="Disable multi-tab"
+        cancelText="Keep multi-tab"
+        onConfirm={confirmDisableMultiTab}
+        variant="destructive"
+      />
+    </>
   );
 }

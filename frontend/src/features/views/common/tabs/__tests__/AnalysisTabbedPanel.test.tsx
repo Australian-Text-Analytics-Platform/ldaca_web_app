@@ -43,21 +43,29 @@ function renderPanel(
 
 describe('AnalysisTabbedPanel', () => {
   it('renders the active tab title and its panel children', () => {
-    renderPanel();
+    renderPanel(undefined, { multiTabEnabled: true });
 
     expect(screen.getByRole('tab')).toHaveTextContent('Analysis 1');
     expect(screen.getByText('Analysis panel')).toBeInTheDocument();
   });
 
+  it('hides the tab controls when multi-tab UI is disabled', () => {
+    renderPanel(undefined, { multiTabEnabled: false });
+
+    expect(screen.queryByRole('tablist', { name: /analysis tabs/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /new tab/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Analysis panel')).toBeInTheDocument();
+  });
+
   it('falls back to "Untitled" for an empty tab title', () => {
-    renderPanel([{ ...baseTab, title: '' }]);
+    renderPanel([{ ...baseTab, title: '' }], { multiTabEnabled: true });
 
     expect(screen.getByRole('tab')).toHaveTextContent('Untitled');
   });
 
   it('lets the user close the final tab', async () => {
     const user = userEvent.setup();
-    const { onClose } = renderPanel();
+    const { onClose } = renderPanel(undefined, { multiTabEnabled: true });
 
     await user.click(screen.getByRole('button', { name: /close tab/i }));
 
@@ -66,7 +74,7 @@ describe('AnalysisTabbedPanel', () => {
 
   it('creates a new tab via the add button', async () => {
     const user = userEvent.setup();
-    const { onCreate } = renderPanel();
+    const { onCreate } = renderPanel(undefined, { multiTabEnabled: true });
 
     await user.click(screen.getByRole('button', { name: /new tab/i }));
 
@@ -78,7 +86,7 @@ describe('AnalysisTabbedPanel', () => {
       { tab_id: 'tab-1', task_id: null, title: 'Analysis 1', inputs: [] },
       { tab_id: 'tab-2', task_id: null, title: 'Analysis 2', inputs: [] },
     ];
-    const { onReorder } = renderPanel(tabs);
+    const { onReorder } = renderPanel(tabs, { multiTabEnabled: true });
     const first = screen.getAllByRole('tab')[0]!;
 
     fireEvent.pointerDown(first, { button: 0, pointerId: 1, clientX: 0 });
