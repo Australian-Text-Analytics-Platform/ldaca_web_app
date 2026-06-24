@@ -23,8 +23,20 @@ slice they need.
   pagination state, and UI operation tracking.
 - `useWorkspaceQueries()` owns TanStack Query calls for workspace list, current
   workspace, graph, and selected node data.
-- `useWorkspaceNodeMutations()` owns workspace creation/opening, node creation,
-  transforms, detach/materialize operations, and cache invalidation.
+- `useWorkspaceNodeMutations()` is the action facade. It composes focused
+  mutation groups while preserving one `useWorkspaceActions()` surface for
+  consumers:
+  - `useWorkspaceManagementMutations()` owns current-workspace sync, workspace
+    creation/deletion/save, and workspace metadata edits.
+  - `useWorkspaceGraphMutations()` owns node rename/copy/delete/history,
+    file-backed node creation, join/concat/reorder, and created-node selection.
+  - `useWorkspaceTransformMutations()` owns preprocessing apply/preview actions
+    and column cast/rename/delete invalidation.
+  - `useWorkspaceAnalysisMutations()` owns concordance/quotation search,
+    detach, and materialize actions.
+  - `workspaceMutationCache.ts`, `workspaceCreatedNodeSelection.ts`, and
+    `workspaceSchemaRefresh.ts` hold shared cache, selection, and schema-refresh
+    helpers used by those groups.
 
 `useWorkspaceUiStateSync()` hydrates and persists backend-owned workspace UI
 state through `ui_state.json`; source-node visualization colours are now derived
@@ -55,6 +67,12 @@ React Flow state on every render.
 state. Sorting and filters feed back into the selected node data query key.
 Column cast, rename, delete, refresh, and query-plan actions all route through
 workspace actions.
+
+`data-view/hooks/useColumnMutations.ts` owns the reducer-backed UI state for
+WorkspaceTable column headers: dtype casting, datetime-format confirmation,
+inline rename, delete confirmation, sparse per-column busy maps, and schema
+refresh after mutations. The delete dialog open state is derived from the
+selected column instead of being tracked as a second boolean.
 
 ## Manual Memoization Boundary
 

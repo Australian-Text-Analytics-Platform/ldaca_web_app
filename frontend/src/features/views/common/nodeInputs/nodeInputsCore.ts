@@ -31,6 +31,11 @@ export interface NodeInput {
   column?: string | null;
 }
 
+export interface NodeSelectionInput {
+  nodeId: string;
+  column?: string | null;
+}
+
 /** Per-view constraints that gate which nodes/columns are valid inputs. */
 export interface NodeInputConstraints {
   /** Canonical column types the view accepts (e.g. ``['string']``). Empty = any. */
@@ -58,6 +63,18 @@ export interface NodeAddRejection {
 
 /** Optional typed-column getter (from ``useNodeColumnInfos``); falls back to node snapshot. */
 export type ColumnInfoGetter = (node: WorkspaceNodeLike) => ColumnInfo[] | undefined;
+
+/**
+ * Converts feature-local node/column selections into the persisted tab input shape.
+ * Called by: analysis feature hydration and handoff paths that receive
+ * `{nodeId, column}` selections from task requests, token-frequency handoff,
+ * or generated node lists before committing them through `onTabInputsChange`.
+ */
+export function nodeInputsFromSelections(selections: NodeSelectionInput[]): NodeInput[] {
+  return selections
+    .filter((selection) => selection.nodeId)
+    .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null }));
+}
 
 /**
  * Builds a node-id → live-node lookup from the workspace node list.

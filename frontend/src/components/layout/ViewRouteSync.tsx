@@ -74,6 +74,9 @@ export const ViewRouteSync = () => {
       !isWorkspaceLoaded
     ) {
       pendingRouteViewRef.current = routeView;
+      if (currentView !== 'data-loader') {
+        setCurrentView('data-loader');
+      }
       return;
     }
 
@@ -94,6 +97,19 @@ export const ViewRouteSync = () => {
     // direct URL entry). Without this guard the two directions would race.
     if (routeViewAllowed && routeViewJustChanged && routeView && routeView !== currentView) {
       setCurrentView(routeView);
+      return;
+    }
+
+    // Centralize view fallback here instead of letting the sidebar reset
+    // currentView during workspace boot. That keeps direct URLs like
+    // ``?view=filter`` pending until the workspace is available, then adopts
+    // them without a sidebar/store race back to Data Loader.
+    if (!visibleViews.includes(currentView)) {
+      setCurrentView(visibleViews[0] ?? 'data-loader');
+      return;
+    }
+    if (!isWorkspaceLoaded && currentView !== 'data-loader') {
+      setCurrentView('data-loader');
       return;
     }
 

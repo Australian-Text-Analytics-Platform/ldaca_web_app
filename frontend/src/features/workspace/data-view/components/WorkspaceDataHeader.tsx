@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Info, Redo2, Undo2 } from 'lucide-react';
+import { Info, Pencil, Redo2, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -186,15 +186,7 @@ export const WorkspaceDataHeader = ({
               title="Rename"
               aria-label="Rename node"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-3 w-3"
-              >
-                <path d="M16.862 3.487a1.5 1.5 0 0 1 2.121 0l1.53 1.53a1.5 1.5 0 0 1 0 2.122l-9.9 9.9a1.5 1.5 0 0 1-.53.352l-4.18 1.393a.75.75 0 0 1-.948-.948l1.392-4.18a1.5 1.5 0 0 1 .352-.53l9.9-9.9Z" />
-                <path d="M18.26 2.08a3 3 0 0 1 4.243 0l.53.53a3 3 0 0 1 0 4.243l-1.06 1.06-4.773-4.773 1.06-1.06Z" />
-              </svg>
+              <Pencil className="h-3 w-3" />
               Rename
             </button>
           )}

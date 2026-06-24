@@ -22,6 +22,36 @@ export interface ActiveWorkspaceCardProps {
   onUnload: () => Promise<void> | void;
 }
 
+interface ActiveWorkspaceControlsProps {
+  currentWorkspace: WorkspaceListItem;
+  nodeCount: number;
+  busy: boolean;
+  hasActiveTask: boolean;
+  onRename: (value: string) => Promise<void> | void;
+  onUpdateDescription: (value: string) => Promise<void> | void;
+  onSave: () => Promise<void> | void;
+  onUnload: () => Promise<void> | void;
+}
+
+interface CreateWorkspaceFormProps {
+  onCreate: (name: string, description: string) => Promise<boolean>;
+}
+
+/**
+ * Builds the React key used for editable active-workspace drafts. The card
+ * remounts the active controls when the selected workspace or persisted
+ * name/description changes, which replaces the previous render-time sync state.
+ * Used by: ActiveWorkspaceCard because the shell owns mode selection while the
+ * active controls own only their local draft inputs.
+ */
+function getActiveWorkspaceDraftKey(workspace: WorkspaceListItem) {
+  return [
+    workspace.id ?? workspace.unique_id ?? '',
+    workspace.name ?? '',
+    workspace.description ?? '',
+  ].join('\n');
+}
+
 /**
  * Renders the active-workspace/create-workspace panel. `DataLoaderFeature`
  * uses it to keep workspace creation and currently loaded workspace controls
@@ -42,49 +72,6 @@ export function ActiveWorkspaceCard({
   onSave,
   onUnload,
 }: ActiveWorkspaceCardProps) {
-  const hasWorkspaceSelected = Boolean(currentWorkspace);
-  const workspaceKey = currentWorkspace?.id ?? currentWorkspace?.unique_id ?? null;
-
-  const [renameValue, setRenameValue] = useState(currentWorkspace?.name ?? '');
-  const [descriptionValue, setDescriptionValue] = useState(currentWorkspace?.description ?? '');
-  const [newWorkspaceName, setNewWorkspaceName] = useState('');
-  const [newWorkspaceDescription, setNewWorkspaceDescription] = useState('');
-
-  // Reset rename/description inputs when the active workspace switches (or
-  // when its persisted name/description change underneath us). React-blessed
-  // pattern: derive state during render, not in an effect.
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-  const [syncedKey, setSyncedKey] = useState(workspaceKey);
-  const [syncedName, setSyncedName] = useState(currentWorkspace?.name ?? '');
-  const [syncedDescription, setSyncedDescription] = useState(currentWorkspace?.description ?? '');
-  if (
-    workspaceKey !== syncedKey ||
-    (currentWorkspace?.name ?? '') !== syncedName ||
-    (currentWorkspace?.description ?? '') !== syncedDescription
-  ) {
-    setSyncedKey(workspaceKey);
-    setSyncedName(currentWorkspace?.name ?? '');
-    setSyncedDescription(currentWorkspace?.description ?? '');
-    setRenameValue(currentWorkspace?.name ?? '');
-    setDescriptionValue(currentWorkspace?.description ?? '');
-  }
-
-  const normalizedCurrentDescription = (currentWorkspace?.description ?? '').trim();
-  const normalizedDescriptionValue = descriptionValue.trim();
-
-  /**
-   * Submits the create form and clears local inputs only after the parent
-   * workspace action reports success.
-   * Called by: ActiveWorkspaceCard internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const handleCreate = async () => {
-    const ok = await onCreate(newWorkspaceName.trim(), newWorkspaceDescription.trim());
-    if (ok) {
-      setNewWorkspaceName('');
-      setNewWorkspaceDescription('');
-    }
-  };
-
   return (
     <Card
       data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}
@@ -111,136 +98,192 @@ export function ActiveWorkspaceCard({
       </CardHeader>
       <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4">
         {currentWorkspace ? (
-          <>
-            <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
-                {currentWorkspace.name}
-                <Badge>
-                  {nodeCount} data block{nodeCount === 1 ? '' : 's'}
-                </Badge>
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Updated {/* an empty modified_at timestamp should fall through to updated_at */}
-                {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
-                {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} |
-                Size {formatBytes(currentWorkspace.workspace_size_Byte ?? 0)} | Created{' '}
-                {formatTimestamp(currentWorkspace.created_at)}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="rename-workspace">Rename workspace</Label>
-                <HelpIcon
-                  targetKey="data-loader.rename-workspace.input"
-                  label="Rename workspace input"
-                />
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="rename-workspace"
-                  value={renameValue}
-                  onChange={(event) => {
-                    setRenameValue(event.target.value);
-                  }}
-                  placeholder="Enter new name"
-                  disabled={!hasWorkspaceSelected || busy}
-                />
-                <Button
-                  onClick={() => void onRename(renameValue.trim())}
-                  disabled={!hasWorkspaceSelected || !renameValue.trim()}
-                >
-                  Rename
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="workspace-description">Workspace description</Label>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="workspace-description"
-                  aria-label="Workspace description"
-                  value={descriptionValue}
-                  onChange={(event) => {
-                    setDescriptionValue(event.target.value);
-                  }}
-                  placeholder="Enter workspace description"
-                  disabled={!hasWorkspaceSelected || busy}
-                />
-                <Button
-                  onClick={() => void onUpdateDescription(descriptionValue.trim())}
-                  disabled={
-                    !hasWorkspaceSelected ||
-                    busy ||
-                    normalizedDescriptionValue === normalizedCurrentDescription
-                  }
-                >
-                  Update description
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => void onSave()}
-                disabled={!hasWorkspaceSelected}
-              >
-                <RefreshCcw className="mr-2 h-4 w-4" /> Save
-              </Button>
-              <div className="flex items-center gap-1">
-                <DisabledReasonTooltip
-                  reason={
-                    hasActiveTask
-                      ? 'A task is still running on this workspace. Wait for it to finish, or cancel it from the task list, before unloading.'
-                      : undefined
-                  }
-                >
-                  <Button
-                    variant="outline"
-                    onClick={() => void onUnload()}
-                    disabled={!hasWorkspaceSelected || busy || hasActiveTask}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" /> Unload
-                  </Button>
-                </DisabledReasonTooltip>
-                <HelpIcon targetKey="data-loader.unload.button" label="Unload workspace" />
-              </div>
-            </div>
-          </>
+          <ActiveWorkspaceControls
+            key={getActiveWorkspaceDraftKey(currentWorkspace)}
+            currentWorkspace={currentWorkspace}
+            nodeCount={nodeCount}
+            busy={busy}
+            hasActiveTask={hasActiveTask}
+            onRename={onRename}
+            onUpdateDescription={onUpdateDescription}
+            onSave={onSave}
+            onUnload={onUnload}
+          />
         ) : (
-          <div className="space-y-2">
-            <Input
-              id="new-workspace-name"
-              value={newWorkspaceName}
-              onChange={(event) => {
-                setNewWorkspaceName(event.target.value);
-              }}
-              placeholder="Workspace name"
-            />
-            <Input
-              value={newWorkspaceDescription}
-              onChange={(event) => {
-                setNewWorkspaceDescription(event.target.value);
-              }}
-              placeholder="Optional description"
-            />
-            <div className="flex items-center gap-2">
-              <DisabledReasonTooltip
-                reason={!newWorkspaceName.trim() ? 'Enter a workspace name first' : undefined}
-              >
-                <Button onClick={() => void handleCreate()} disabled={!newWorkspaceName.trim()}>
-                  <Plus className="mr-2 h-4 w-4" /> Create workspace
-                </Button>
-              </DisabledReasonTooltip>
-              <HelpIcon targetKey="data-loader.create-workspace.button" label="Create workspace" />
-            </div>
-          </div>
+          <CreateWorkspaceForm onCreate={onCreate} />
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Owns editable controls for the loaded workspace. The parent remounts this
+ * component when persisted workspace details change, so its local drafts stay
+ * simple and do not need cross-prop synchronization state.
+ * Used by: ActiveWorkspaceCard because active controls are mutually exclusive
+ * from the create form but share the same card shell.
+ * Flow: initialize drafts from the persisted workspace, forward rename and
+ * description updates, and gate unload while workspace mutations or analysis
+ * tasks are still active.
+ */
+function ActiveWorkspaceControls({
+  currentWorkspace,
+  nodeCount,
+  busy,
+  hasActiveTask,
+  onRename,
+  onUpdateDescription,
+  onSave,
+  onUnload,
+}: ActiveWorkspaceControlsProps) {
+  const [renameValue, setRenameValue] = useState(currentWorkspace.name ?? '');
+  const [descriptionValue, setDescriptionValue] = useState(currentWorkspace.description ?? '');
+  const normalizedCurrentDescription = (currentWorkspace.description ?? '').trim();
+  const normalizedDescriptionValue = descriptionValue.trim();
+
+  return (
+    <>
+      <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
+          {currentWorkspace.name}
+          <Badge>
+            {nodeCount} data block{nodeCount === 1 ? '' : 's'}
+          </Badge>
+        </div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          Updated {/* an empty modified_at timestamp should fall through to updated_at */}
+          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
+          {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} | Size{' '}
+          {formatBytes(currentWorkspace.workspace_size_Byte ?? 0)} | Created{' '}
+          {formatTimestamp(currentWorkspace.created_at)}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="rename-workspace">Rename workspace</Label>
+          <HelpIcon targetKey="data-loader.rename-workspace.input" label="Rename workspace input" />
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            id="rename-workspace"
+            value={renameValue}
+            onChange={(event) => {
+              setRenameValue(event.target.value);
+            }}
+            placeholder="Enter new name"
+            disabled={busy}
+          />
+          <Button onClick={() => void onRename(renameValue.trim())} disabled={!renameValue.trim()}>
+            Rename
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="workspace-description">Workspace description</Label>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            id="workspace-description"
+            aria-label="Workspace description"
+            value={descriptionValue}
+            onChange={(event) => {
+              setDescriptionValue(event.target.value);
+            }}
+            placeholder="Enter workspace description"
+            disabled={busy}
+          />
+          <Button
+            onClick={() => void onUpdateDescription(descriptionValue.trim())}
+            disabled={busy || normalizedDescriptionValue === normalizedCurrentDescription}
+          >
+            Update description
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" onClick={() => void onSave()}>
+          <RefreshCcw className="mr-2 h-4 w-4" /> Save
+        </Button>
+        <div className="flex items-center gap-1">
+          <DisabledReasonTooltip
+            reason={
+              hasActiveTask
+                ? 'A task is still running on this workspace. Wait for it to finish, or cancel it from the task list, before unloading.'
+                : undefined
+            }
+          >
+            <Button
+              variant="outline"
+              onClick={() => void onUnload()}
+              disabled={busy || hasActiveTask}
+            >
+              <LogOut className="mr-2 h-4 w-4" /> Unload
+            </Button>
+          </DisabledReasonTooltip>
+          <HelpIcon targetKey="data-loader.unload.button" label="Unload workspace" />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Owns the new-workspace draft fields. It lives outside ActiveWorkspaceCard so
+ * create-mode state cannot mix with active-workspace rename/description state.
+ * Used by: ActiveWorkspaceCard when no workspace is selected.
+ * Flow: collect and trim the draft name/description, call the parent create
+ * action, then clear drafts only when that action reports success.
+ */
+function CreateWorkspaceForm({ onCreate }: CreateWorkspaceFormProps) {
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
+  const [newWorkspaceDescription, setNewWorkspaceDescription] = useState('');
+
+  /**
+   * Submits the create form and clears local inputs only after the parent
+   * workspace action reports success.
+   * Called by: CreateWorkspaceForm button clicks because the form owns draft
+   * cleanup but DataLoaderFeature owns the actual workspace mutation.
+   */
+  const handleCreate = async () => {
+    const ok = await onCreate(newWorkspaceName.trim(), newWorkspaceDescription.trim());
+    if (ok) {
+      setNewWorkspaceName('');
+      setNewWorkspaceDescription('');
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Input
+        id="new-workspace-name"
+        value={newWorkspaceName}
+        onChange={(event) => {
+          setNewWorkspaceName(event.target.value);
+        }}
+        placeholder="Workspace name"
+      />
+      <Input
+        value={newWorkspaceDescription}
+        onChange={(event) => {
+          setNewWorkspaceDescription(event.target.value);
+        }}
+        placeholder="Optional description"
+      />
+      <div className="flex items-center gap-2">
+        <DisabledReasonTooltip
+          reason={!newWorkspaceName.trim() ? 'Enter a workspace name first' : undefined}
+        >
+          <Button onClick={() => void handleCreate()} disabled={!newWorkspaceName.trim()}>
+            <Plus className="mr-2 h-4 w-4" /> Create workspace
+          </Button>
+        </DisabledReasonTooltip>
+        <HelpIcon targetKey="data-loader.create-workspace.button" label="Create workspace" />
+      </div>
+    </div>
   );
 }

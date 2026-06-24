@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Clipboard, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WorkspaceDataHeader } from './WorkspaceDataHeader';
 import { WorkspaceSelectionTabs } from './WorkspaceSelectionTabs';
@@ -46,20 +46,7 @@ const LoadingState = () => (
 const EmptyState = () => (
   <div className="p-6">
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/50 bg-muted/40 p-6 text-center">
-      <svg
-        className="h-6 w-6 text-muted-foreground"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-        />
-      </svg>
+      <Clipboard className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
       <h3 className="mt-3 text-sm font-semibold text-foreground">No Data Block Selected</h3>
       <p className="mt-1 text-xs text-muted-foreground">
         Select a data block from the graph to view its data.

@@ -8,7 +8,11 @@ import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
 import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
-import { type DispersionDisplayBinCount, type TaggedBinRow } from '../concordanceViewModels';
+import {
+  CONCORDANCE_COMBINED_NODE_KEY,
+  type DispersionDisplayBinCount,
+  type TaggedBinRow,
+} from '../concordanceViewModels';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 import { ConcordanceDispersionNodeBlock } from './ConcordanceDispersionNodeBlock';
@@ -333,7 +337,9 @@ export function ConcordanceResultsPanel({
             >
               {Object.entries(results.data)
                 .filter(([k]) =>
-                  viewMode === 'combined' ? k === '__COMBINED__' : k !== '__COMBINED__',
+                  viewMode === 'combined'
+                    ? k === CONCORDANCE_COMBINED_NODE_KEY
+                    : k !== CONCORDANCE_COMBINED_NODE_KEY,
                 )
                 .map(([nodeName, nodeData]) => {
                   const keyedOrder = Object.keys(results.data);

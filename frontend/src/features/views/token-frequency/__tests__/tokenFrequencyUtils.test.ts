@@ -3,9 +3,13 @@ import type { TokenFrequencyResponse } from '@/api';
 import {
   buildSelectionNameKey,
   buildSelectionNameById,
+  buildNodeIdDisplayNameMap,
+  derivePanelNodeIds,
   deriveBackendTokenLimit,
   deriveBackendStopWords,
   deriveBackendStopWordsKey,
+  deriveStudyNodeOrder,
+  resolveTokenFrequencyDisplayName,
 } from '../tokenFrequencyUtils';
 
 describe('tokenFrequencyUtils', () => {
@@ -63,5 +67,69 @@ describe('tokenFrequencyUtils', () => {
     const panel = [{ id: 'a', name: 'Panel A' }];
 
     expect(buildSelectionNameKey(selected, panel)).toBe('a:Panel A|b:Beta');
+  });
+
+  it('derivePanelNodeIds keeps the first two stable ids with active-id fallback', () => {
+    const panelNodes = [{ id: 'node-a' }, {}, { node_id: 'ignored' }];
+
+    expect(derivePanelNodeIds(panelNodes, ['fallback-a', 'fallback-b', 'fallback-c'])).toEqual([
+      'node-a',
+      'fallback-b',
+    ]);
+  });
+
+  it('deriveStudyNodeOrder defaults to the first node and moves the study node to the comparison end', () => {
+    expect(deriveStudyNodeOrder(['reference', 'study'], null)).toEqual({
+      effectiveStudyNodeId: 'reference',
+      orderedPanelNodeIds: ['study', 'reference'],
+    });
+
+    expect(deriveStudyNodeOrder(['reference', 'study'], 'study')).toEqual({
+      effectiveStudyNodeId: 'study',
+      orderedPanelNodeIds: ['reference', 'study'],
+    });
+  });
+
+  it('buildNodeIdDisplayNameMap falls back from empty names to labels and ids', () => {
+    expect(
+      buildNodeIdDisplayNameMap([
+        { id: 'node-a', name: 'Alpha', label: 'Ignored' },
+        { id: 'node-b', name: '', label: 'Beta' },
+        { id: 'node-c', name: '', label: '' },
+      ]),
+    ).toEqual({
+      'node-a': 'Alpha',
+      'node-b': 'Beta',
+      'node-c': 'node-c',
+    });
+  });
+
+  it('resolveTokenFrequencyDisplayName prefers response names before local fallbacks', () => {
+    expect(
+      resolveTokenFrequencyDisplayName({
+        nodeId: 'node-a',
+        fallbackKey: 'Backend Key',
+        responseOrSelectionNames: { 'node-a': 'Response Name' },
+        nodeIdToName: { 'node-a': 'Local Name' },
+      }),
+    ).toBe('Response Name');
+
+    expect(
+      resolveTokenFrequencyDisplayName({
+        nodeId: 'node-b',
+        fallbackKey: 'Backend Key',
+        responseOrSelectionNames: {},
+        nodeIdToName: { 'node-b': 'Local Name' },
+      }),
+    ).toBe('Local Name');
+
+    expect(
+      resolveTokenFrequencyDisplayName({
+        nodeId: 'node-c',
+        fallbackKey: 'Backend Key',
+        responseOrSelectionNames: {},
+        nodeIdToName: {},
+      }),
+    ).toBe('Backend Key');
   });
 });

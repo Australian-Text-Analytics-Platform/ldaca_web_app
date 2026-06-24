@@ -306,6 +306,18 @@ describe('DataLoaderFeature citation UI', () => {
     });
   });
 
+  it('clears the folder-name draft when the create-folder dialog closes', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DataLoaderFeature />);
+
+    fireEvent.click(getVisibleMatch(screen.getAllByRole('button', { name: /add root folder/i })));
+    await user.type(screen.getByLabelText(/folder name/i), 'Draft Folder');
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    fireEvent.click(getVisibleMatch(screen.getAllByRole('button', { name: /add root folder/i })));
+
+    expect(screen.getByLabelText(/folder name/i)).toHaveValue('');
+  });
+
   it('creates a subfolder from a directory row action', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DataLoaderFeature />);
@@ -448,9 +460,7 @@ describe('DataLoaderFeature citation UI', () => {
     const user = userEvent.setup();
     renderWithProviders(<DataLoaderFeature />);
 
-    await user.click(
-      getVisibleMatch(screen.getAllByRole('button', { name: /import from ldaca/i })),
-    );
+    await user.click(screen.getByRole('button', { name: /^import from ldaca$/i }));
     expect(await screen.findByRole('heading', { name: 'Import from LDaCA' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /add your own token/i }));
@@ -495,9 +505,7 @@ describe('DataLoaderFeature citation UI', () => {
 
     renderWithProviders(<DataLoaderFeature />);
 
-    await user.click(
-      getVisibleMatch(screen.getAllByRole('button', { name: /import from ldaca/i })),
-    );
+    await user.click(screen.getByRole('button', { name: /^import from ldaca$/i }));
 
     const titleLink = await screen.findByRole('link', {
       name: 'A COrpus of Oz Early English (COOEE)',

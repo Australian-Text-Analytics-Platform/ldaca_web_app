@@ -24,6 +24,18 @@ fs.rmSync(targetRuntime, { recursive: true, force: true });
 fs.mkdirSync(path.dirname(targetRuntime), { recursive: true });
 fs.cpSync(sourceRuntime, targetRuntime, { recursive: true });
 
+// The packaging step vendors one managed CPython directory under
+// managed-python/cpython-*; reuse that lookup for every staging rewrite.
+const findManagedCpythonDir = () => {
+  const managedPythonDir = path.join(targetRuntime, 'managed-python');
+  if (!fs.existsSync(managedPythonDir)) return null;
+  const cpythonDirName = fs.readdirSync(managedPythonDir)
+    .find(name => name.startsWith('cpython-'));
+  return cpythonDirName ? path.join(managedPythonDir, cpythonDirName) : null;
+};
+
+const managedCpythonDir = findManagedCpythonDir();
+
 // ---------------------------------------------------------------------------
 // Copy MSVC C++ runtime DLLs to managed-python so C extension modules
 // (greenlet, etc.) work on machines without VC++ Redistributable installed.
@@ -32,12 +44,7 @@ fs.cpSync(sourceRuntime, targetRuntime, { recursive: true });
 // continues and the app will require VC++ Redistributable on the target machine.
 // ---------------------------------------------------------------------------
 if (process.platform === 'win32') {
-  const managedPythonDir = path.join(targetRuntime, 'managed-python');
-  const cpythonDirs = fs.existsSync(managedPythonDir)
-    ? fs.readdirSync(managedPythonDir).filter(n => n.startsWith('cpython-'))
-    : [];
-  if (cpythonDirs.length > 0) {
-    const cpythonDir = path.join(managedPythonDir, cpythonDirs[0]);
+  if (managedCpythonDir) {
     const msvcDlls = ['msvcp140.dll', 'msvcp140_1.dll', 'concrt140.dll'];
     const systemDirs = [
       path.join(process.env.SYSTEMROOT || 'C:\\Windows', 'System32'),
@@ -73,14 +80,11 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
 // that won't exist on other machines. The Rust launcher sets PYTHONHOME and
 // PYTHONPATH so the real interpreter finds everything it needs.
 if (manifest.python_executable) {
-  const managedPythonDir = path.join(targetRuntime, 'managed-python');
-  const cpythonDirs = fs.existsSync(managedPythonDir)
-    ? fs.readdirSync(managedPythonDir).filter(n => n.startsWith('cpython-'))
-    : [];
-  if (cpythonDirs.length > 0) {
+  if (managedCpythonDir) {
+    const cpythonDirName = path.basename(managedCpythonDir);
     manifest.python_executable = process.platform === 'win32'
-      ? `managed-python/${cpythonDirs[0]}/python.exe`
-      : `managed-python/${cpythonDirs[0]}/bin/python3`;
+      ? `managed-python/${cpythonDirName}/python.exe`
+      : `managed-python/${cpythonDirName}/bin/python3`;
   } else {
     // Fallback if managed-python not found
     manifest.python_executable = process.platform === 'win32'
@@ -97,18 +101,11 @@ console.log('Rewrote runtime-manifest.json with relative paths');
 const pyvenvCfg = path.join(targetRuntime, 'python', 'pyvenv.cfg');
 if (fs.existsSync(pyvenvCfg)) {
   let cfg = fs.readFileSync(pyvenvCfg, 'utf-8');
-  // Find the managed-python cpython directory that was shipped
-  const managedPythonDir = path.join(targetRuntime, 'managed-python');
-  if (fs.existsSync(managedPythonDir)) {
-    const cpythonDirs = fs.readdirSync(managedPythonDir)
-      .filter(name => name.startsWith('cpython-'));
-    if (cpythonDirs.length > 0) {
-      const cpythonDir = path.join(managedPythonDir, cpythonDirs[0]);
-      // Replace the absolute home path with the actual co-shipped location
-      cfg = cfg.replace(/^home\s*=\s*.+$/m, `home = ${cpythonDir}`);
-      fs.writeFileSync(pyvenvCfg, cfg, 'utf-8');
-      console.log(`Rewrote pyvenv.cfg home to: ${cpythonDir}`);
-    }
+  if (managedCpythonDir) {
+    // Replace the absolute home path with the actual co-shipped location
+    cfg = cfg.replace(/^home\s*=\s*.+$/m, `home = ${managedCpythonDir}`);
+    fs.writeFileSync(pyvenvCfg, cfg, 'utf-8');
+    console.log(`Rewrote pyvenv.cfg home to: ${managedCpythonDir}`);
   }
 }
 

@@ -398,7 +398,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
  * paths on a stop-word keystroke — d3-cloud's spiral layout runs inside
  * ``<Wordcloud>`` on every render, which is 50-200 ms for 50-100 words.
  * With every prop now referentially stable across keystrokes
- * (``useCallback`` on the handlers in ``TokenFrequencyFeature``,
+ * (``useCallback`` on the handlers in token-frequency feature hooks,
  * ``useMemo`` on the derived collections), the default shallow compare
  * is enough to skip the re-render entirely when only ``stopWords``
  * (which this component doesn't take) changed.

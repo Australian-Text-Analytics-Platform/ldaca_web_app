@@ -294,10 +294,10 @@ function DataLoaderFeature() {
         <div
           {...splitterProps}
           aria-label="Resize data loader sections"
-          className="bg-border hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:ring-ring my-1 flex h-2 shrink-0 cursor-row-resize items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="group focus-visible:ring-ring my-2 flex h-3 shrink-0 cursor-row-resize items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
           title="Drag to resize. Double-click to reset."
         >
-          <div className="bg-muted-foreground/40 h-1 w-12 rounded-full" />
+          <div className="bg-muted-foreground/30 group-hover:bg-primary/50 group-focus-visible:bg-primary/50 h-1 w-12 rounded-full transition-colors" />
         </div>
 
         <div
@@ -336,7 +336,7 @@ function DataLoaderFeature() {
                     <Upload className="mr-2 h-4 w-4" />{' '}
                     {uploading || uploadingFiles ? 'Uploading…' : 'Upload files'}
                   </Button>
-                  <HelpIcon targetKey="data-loader.upload.button" label="Upload files" />
+                  <HelpIcon targetKey="data-loader.upload.button" label="About upload files" />
                 </div>
                 <div className="flex items-center gap-1">
                   <SampleDataPanel
@@ -347,7 +347,7 @@ function DataLoaderFeature() {
                   />
                   <HelpIcon
                     targetKey="data-loader.import-sample.button"
-                    label="Import sample data"
+                    label="About import sample data"
                   />
                 </div>
                 <div className="flex items-center gap-1">
@@ -360,7 +360,10 @@ function DataLoaderFeature() {
                   >
                     <DownloadIcon className="mr-2 h-4 w-4" /> Import from LDaCA
                   </Button>
-                  <HelpIcon targetKey="data-loader.import-ldaca.button" label="Import from LDaCA" />
+                  <HelpIcon
+                    targetKey="data-loader.import-ldaca.button"
+                    label="About import from LDaCA"
+                  />
                 </div>
                 <input
                   ref={fileInputRef}

@@ -1,5 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
+import {
+  aggregateBuilderUiReducer,
+  createAggregateBuilderUiState,
+  type AggregateDropIndicator,
+} from './aggregateBuilderUiState';
+import {
+  type AggregateBuilderToken,
+  buildAggregateExpressionRequest,
+  normalizeSmartCharacters,
+  tokensToPolarsExpression,
+} from './aggregateExpressionModel';
 import { insertItemAt, moveItemTo, removeItemAt } from './tokenIndexMath';
+import { useAggregateBuilderDragHandlers } from './useAggregateBuilderDrag';
 
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
@@ -13,46 +25,12 @@ import {
   type ColumnInfo,
 } from '@/features/workspace/data-view/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
+import {
+  buildSingleNodeSelectionPanelModel,
+  buildWorkspaceNodeMap,
+  getNodeKey,
+} from '../../utils/nodeMetadata';
 import type { PreviewPagination, PreviewRow } from '../../types';
-
-const SINGLE_NODE_PALETTE = ['#2563eb'];
-
-const SMART_CHAR_MAP: Record<string, string> = {
-  '\u201C': '"', // "
-  '\u201D': '"', // "
-  '\u201E': '"', // „
-  '\u201F': '"', // ‟
-  '\u2018': "'", // '
-  '\u2019': "'", // '
-  '\u201A': "'", // ‚
-  '\u201B': "'", // ‛
-};
-
-/**
- * Normalizes smart quotes before expressions reach the backend parser. Builder
- * inputs and column-name fields use this so pasted prose does not break Polars
- * code unexpectedly.
- * Used by: local callers in preprocessing/useAggregateSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
-const normalizeSmartCharacters = (input: string): string =>
-  input.replace(
-    /[\u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B]/g,
-    (char) => SMART_CHAR_MAP[char] ?? char,
-  );
-
-type BasicToken =
-  | { id: string; kind: 'column'; column: string; dtype: string; operations: string[] }
-  | { id: string; kind: 'custom'; value: string };
-
-interface DropIndicator {
-  tokenId: string;
-  position: 'before' | 'after';
-}
-
-type DragPayload =
-  | { source: 'palette'; kind: 'column'; column: string; dtype: string }
-  | { source: 'palette'; kind: 'custom' }
-  | { source: 'existing'; id: string };
 
 export interface AggregateSubTabProps {
   selectedNodeId: string | null;
@@ -95,10 +73,10 @@ interface ExpressionConfig {
 }
 
 interface BasicBuilderConfig {
-  tokens: BasicToken[];
+  tokens: AggregateBuilderToken[];
   disabled: boolean;
   dragActive: boolean;
-  dropIndicator: DropIndicator | null;
+  dropIndicator: AggregateDropIndicator | null;
   editingTokenId: string | null;
   customDraft: string;
   expressionPreview: string;
@@ -181,10 +159,11 @@ const createTokenId = (): string => {
  * Owns computed-column state for the Aggregate sub-tab. The component consumes
  * this hook for node selection, token-builder behavior, preview data, and apply
  * controls.
- * Used by: tokenIndexMath hook, AggregateSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by: AggregateSubTab module because the rendered sub-tab needs one
+ * boundary that coordinates selection, expression, preview, and apply state.
  * Flow: derive the active node and available columns, synchronize builder tokens with
- * expression text, handle drag/drop editing, run preview/apply requests, and return grouped
- * configs for the tab component.
+ * expression text, delegate builder drag/drop behavior, run preview/apply
+ * requests, and return grouped configs for the tab component.
  */
 export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSubTabResult => {
   const {
@@ -198,17 +177,14 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     refreshNodeSchema,
   } = props;
 
+  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
+
   const effectiveNodes = (() => {
     if (selectedNodes.length) {
       return takeMostRecent(selectedNodes, 1);
     }
     if (selectedNodeId) {
-      const fallback = workspaceNodes.find((node, idx) => {
-        // Empty-string ids fall through to the next candidate, so keep `||`.
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        const identifier = node.id || node.node_id || `node-${String(idx)}`;
-        return identifier === selectedNodeId;
-      });
+      const fallback = workspaceNodeMap.get(selectedNodeId);
       if (fallback) {
         return [fallback];
       }
@@ -219,45 +195,36 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const limitedNodeId = (() => {
     const first = effectiveNodes[0];
     if (!first) return null;
-    // Empty-string ids fall through to the next candidate, so keep `||`.
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    return first.id || first.node_id || null;
+    return getNodeKey(first, selectedNodeId ?? '') || null;
   })();
 
   const [expression, setExpression] = useState('');
   const [columnName, setColumnName] = useState('new_column');
   const [applyLoading, setApplyLoading] = useState(false);
   const [lastAppliedExpression, setLastAppliedExpression] = useState<string | null>(null);
-  const [basicTokens, setBasicTokens] = useState<BasicToken[]>([]);
-  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
-  const [basicDragActive, setBasicDragActive] = useState(false);
-  const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
-  const [customDraft, setCustomDraft] = useState('');
+  const [basicTokens, setBasicTokens] = useState<AggregateBuilderToken[]>([]);
+  const [builderUiState, dispatchBuilderUi] = useReducer(
+    aggregateBuilderUiReducer,
+    createAggregateBuilderUiState(),
+  );
   const [committedExpression, setCommittedExpression] = useState('');
   const [committedColumnName, setCommittedColumnName] = useState('');
+  const {
+    dragActive: basicDragActive,
+    dropIndicator,
+    editingTokenId,
+    customDraft,
+  } = builderUiState;
 
-  const customOriginalRef = useRef<string>('');
   const dropZoneRef = useRef<HTMLDivElement | null>(null);
   const latestExpressionRef = useRef('');
   const latestColumnNameRef = useRef('new_column');
-  const lastDragPayloadRef = useRef<DragPayload | null>(null);
 
-  const workspaceNodeMap = (() => {
-    const map = new Map<string, WorkspaceNodeLike>();
-    workspaceNodes.forEach((node, idx) => {
-      // Empty-string ids fall through to the next candidate, so keep `||`.
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      const id = node.id || node.node_id || `node-${String(idx)}`;
-      if (id) map.set(id, node);
-    });
-    return map;
-  })();
-
-  const effectiveSelectedNodes = (() => {
-    if (!limitedNodeId) return [] as WorkspaceNodeLike[];
-    const node = workspaceNodeMap.get(limitedNodeId);
-    return node ? [node] : [];
-  })();
+  const selectionPanelModel = buildSingleNodeSelectionPanelModel({
+    nodeId: limitedNodeId,
+    workspaceNodes,
+  });
+  const effectiveSelectedNodes = selectionPanelModel.selectedNodes;
 
   const activeNodeId = (() => {
     return limitedNodeId ?? selectedNodeId ?? null;
@@ -274,51 +241,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       (info) => typeof info.name === 'string' && info.name.length > 0,
     );
   })();
-
-  /**
-   * Escapes custom literal text before embedding it into generated Polars code.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const escapeLiteralValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
-  /**
-   * Converts one visual builder token into a Polars expression fragment.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   * Steps: escape column names, append selected operations, and serialize literal custom
-   * tokens as strings or numeric values.
-   */
-  const tokenToPolars = (token: BasicToken): string => {
-    if (token.kind === 'column') {
-      const safe = token.column.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      let expr = `pl.col("${safe}")`;
-      for (const op of token.operations) {
-        expr += `.${op}()`;
-      }
-      return expr;
-    }
-    // custom token → pl.lit(...)
-    const raw = token.value;
-    if (!raw.length) return 'pl.lit("")';
-    const trimmed = raw.trim();
-    // If it looks like an already-quoted string, respect it
-    if (
-      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      (trimmed.startsWith("'") && trimmed.endsWith("'"))
-    ) {
-      return `pl.lit(${trimmed})`;
-    }
-    // Numeric literals
-    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-      return `pl.lit(${trimmed})`;
-    }
-    return `pl.lit("${escapeLiteralValue(raw)}")`;
-  };
-
-  /**
-   * Joins all builder tokens into the expression shown in the code preview.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const tokensToExpression = (tokens: BasicToken[]) => tokens.map(tokenToPolars).join(' + ');
 
   /**
    * Updates the text expression and its latest ref together so debounced commit
@@ -338,13 +260,15 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
    * Steps: run the token updater, rebuild the expression preview, preserve no-op token
    * references, and mark expression state dirty when needed.
    */
-  const applyBasicTokenUpdate = (updater: (prev: BasicToken[]) => BasicToken[]) => {
+  const applyBasicTokenUpdate = (
+    updater: (prev: AggregateBuilderToken[]) => AggregateBuilderToken[],
+  ) => {
     setBasicTokens((prev) => {
       const next = updater(prev);
       if (next === prev) return prev;
       const sameOrder =
         next.length === prev.length && next.every((token, idx) => token === prev[idx]);
-      const nextExpression = tokensToExpression(next);
+      const nextExpression = tokensToPolarsExpression(next);
       if (sameOrder && nextExpression === trimmedExpression) {
         return prev;
       }
@@ -358,19 +282,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
    * and apply paths use the same alias-wrapping behavior.
    * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const buildRequest = (): PolarsExpressionRequest => {
-    const expressionValue = latestExpressionRef.current.trim();
-    const columnValue = latestColumnNameRef.current.trim();
-    let code = expressionValue;
-    if (columnValue.length > 0) {
-      const safeName = columnValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      code = `(${code}).alias("${safeName}")`;
-    }
-    return {
-      context: 'with_columns',
-      expressions: [{ code }],
-    };
-  };
+  const buildRequest = (): PolarsExpressionRequest =>
+    buildAggregateExpressionRequest(latestExpressionRef.current, latestColumnNameRef.current);
 
   /**
    * Commits the current expression/name into the debounced preview payload.
@@ -411,15 +324,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const operationPayload: PolarsExpressionRequest | null = (() => {
     if (committedExpression.length === 0) return null;
-    let code = committedExpression;
-    if (committedColumnName.length > 0) {
-      const safeName = committedColumnName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      code = `(${code}).alias("${safeName}")`;
-    }
-    return {
-      context: 'with_columns',
-      expressions: [{ code }],
-    };
+    return buildAggregateExpressionRequest(committedExpression, committedColumnName);
   })();
 
   const {
@@ -479,9 +384,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     applyBasicTokenUpdate((prev) =>
       insertItemAt(prev, index, { id: tokenId, kind: 'custom', value: '' }),
     );
-    setEditingTokenId(tokenId);
-    setCustomDraft('');
-    customOriginalRef.current = '';
+    dispatchBuilderUi({ type: 'startCustomEdit', tokenId, draft: '' });
   };
 
   /**
@@ -558,33 +461,31 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   };
 
   /**
-   * Opens a custom token for editing while preserving the original value for
-   * Escape/cancel.
+   * Opens a custom token for editing with a normalized draft. Escape/cancel
+   * only discards the draft, leaving the token's stored value unchanged.
    * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const startEditingCustomToken = (tokenId: string) => {
     if (basicDisabled) return;
     const target = basicTokens.find(
-      (token): token is Extract<BasicToken, { kind: 'custom' }> =>
+      (token): token is Extract<AggregateBuilderToken, { kind: 'custom' }> =>
         token.id === tokenId && token.kind === 'custom',
     );
     if (!target) return;
     const normalizedValue = normalizeSmartCharacters(target.value);
-    setEditingTokenId(tokenId);
-    setCustomDraft(normalizedValue);
-    customOriginalRef.current = normalizedValue;
+    dispatchBuilderUi({ type: 'startCustomEdit', tokenId, draft: normalizedValue });
   };
 
   /**
    * Commits or cancels the custom-token draft. Keyboard and blur handlers use
    * this shared path.
    * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   * Steps: apply committed text when requested, restore the original draft on cancel,
+   * Steps: apply committed text when requested, discard the draft on cancel,
    * schedule preview updates, and clear edit state.
    */
   const finishCustomEdit = (commit: boolean) => {
     if (!editingTokenId) {
-      setCustomDraft('');
+      dispatchBuilderUi({ type: 'clearCustomEdit' });
       return;
     }
     if (commit) {
@@ -601,11 +502,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         }),
       );
       scheduleCommit();
-    } else {
-      setCustomDraft(customOriginalRef.current);
     }
-    setEditingTokenId(null);
-    setCustomDraft('');
+    dispatchBuilderUi({ type: 'clearCustomEdit' });
   };
 
   /**
@@ -623,254 +521,18 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     scheduleCommit();
   };
 
-  /**
-   * Reads a drag payload from browser drag metadata, with a ref fallback for
-   * environments that strip custom MIME data during dragover/drop.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   * Steps: try custom, JSON, and plain-text drag payloads, then fall back to the last
-   * in-memory payload for WebView compatibility.
-   */
-  const parseDragPayload = (event: React.DragEvent): DragPayload | null => {
-    /**
-     * Decodes one serialized drag payload candidate.
-     * Called by: parseDragPayload internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
-    const decode = (raw: string | null | undefined): DragPayload | null => {
-      if (!raw) return null;
-      try {
-        const candidate = JSON.parse(raw) as DragPayload;
-        // candidate is untrusted JSON.parse output, so validate it is an object.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        return candidate && typeof candidate === 'object' ? candidate : null;
-      } catch {
-        return null;
-      }
-    };
-
-    const dt = event.dataTransfer;
-    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (dt) {
-      const BASIC_TOKEN_MIME = 'application/x-ldaca-builder-token';
-      const direct = decode(dt.getData(BASIC_TOKEN_MIME));
-      if (direct) return direct;
-
-      const jsonDecoded = decode(dt.getData('application/json'));
-      if (jsonDecoded) return jsonDecoded;
-
-      const plainDecoded = decode(dt.getData('text/plain'));
-      if (plainDecoded) return plainDecoded;
-    }
-
-    return lastDragPayloadRef.current;
-  };
-
-  /**
-   * Writes drag payloads in several MIME slots so browser/WebView drag behavior
-   * stays compatible across the desktop and web builds.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const setDragPayload = (
-    dataTransfer: DataTransfer,
-    payload: DragPayload,
-    plainText: string,
-  ): void => {
-    const BASIC_TOKEN_MIME = 'application/x-ldaca-builder-token';
-    const encoded = JSON.stringify(payload);
-    try {
-      dataTransfer.setData(BASIC_TOKEN_MIME, encoded);
-    } catch {
-      /* WebViews may reject custom MIME types */
-    }
-    try {
-      dataTransfer.setData('application/json', encoded);
-    } catch {
-      /* Some environments disallow registering JSON mime types */
-    }
-    try {
-      dataTransfer.setData('text/plain', plainText);
-    } catch {
-      /* Ignore environments that disallow overriding text/plain */
-    }
-  };
-
-  /**
-   * Starts dragging a source-column palette token into the builder.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   * Flow: block disabled drags, build a column payload, cache it for fallback reads, write transfer data, and mark copy drag active.
-   */
-  const handleColumnDragStart = (
-    event: React.DragEvent<HTMLButtonElement>,
-    column: string,
-    dtype: string,
-  ) => {
-    if (basicDisabled) {
-      event.preventDefault();
-      return;
-    }
-    const dt = event.dataTransfer;
-    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!dt) return;
-    const payload: DragPayload = { source: 'palette', kind: 'column', column, dtype };
-    lastDragPayloadRef.current = payload;
-    setDragPayload(dt, payload, column);
-    dt.effectAllowed = 'copy';
-    setBasicDragActive(true);
-  };
-
-  /**
-   * Starts dragging a blank custom-literal palette token into the builder.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const handleCustomDragStart = (event: React.DragEvent<HTMLButtonElement>) => {
-    if (basicDisabled) {
-      event.preventDefault();
-      return;
-    }
-    const dt = event.dataTransfer;
-    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!dt) return;
-    const payload: DragPayload = { source: 'palette', kind: 'custom' };
-    lastDragPayloadRef.current = payload;
-    setDragPayload(dt, payload, 'Custom token');
-    dt.effectAllowed = 'copy';
-    setBasicDragActive(true);
-  };
-
-  /**
-   * Starts moving an existing token, committing any active custom edit first so
-   * the drag payload reflects stable token state.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   * Flow: prevent disabled drags, finish pending custom edits, create an existing-token payload, write transfer data, and mark move drag active.
-   */
-  const handleExistingTokenDragStart = (
-    event: React.DragEvent<HTMLDivElement>,
-    tokenId: string,
-  ) => {
-    if (basicDisabled) {
-      event.preventDefault();
-      return;
-    }
-    if (editingTokenId) {
-      finishCustomEdit(true);
-    }
-    const dt = event.dataTransfer;
-    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!dt) return;
-    const payload: DragPayload = { source: 'existing', id: tokenId };
-    lastDragPayloadRef.current = payload;
-    setDragPayload(dt, payload, 'Column token');
-    dt.effectAllowed = 'move';
-    setBasicDragActive(true);
-  };
-
-  /**
-   * Clears builder drag state after dragging an existing token ends.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const handleExistingTokenDragEnd = () => {
-    setBasicDragActive(false);
-    setDropIndicator(null);
-  };
-
-  /**
-   * Clears builder drag state after dragging a palette token ends.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const handlePaletteDragEnd = () => {
-    setBasicDragActive(false);
-    setDropIndicator(null);
-  };
-
-  /**
-   * Updates the before/after insertion indicator when dragging over a token.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const handleTokenDragOver = (tokenId: string, event: React.DragEvent<HTMLDivElement>) => {
-    if (basicDisabled) return;
-    event.preventDefault();
-    const rect = event.currentTarget.getBoundingClientRect();
-    const isBefore = event.clientX < rect.left + rect.width / 2;
-    setDropIndicator({ tokenId, position: isBefore ? 'before' : 'after' });
-  };
-
-  /**
-   * Keeps the builder drop zone active and sets the browser copy/move cue while
-   * a valid token is dragged over it.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const handleBuilderDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    if (basicDisabled) return;
-    event.preventDefault();
-    const dt = event.dataTransfer;
-    // React types dataTransfer as non-null, but it can be null at runtime (DOM).
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (dt) {
-      dt.dropEffect = dt.effectAllowed === 'move' ? 'move' : 'copy';
-    }
-    setBasicDragActive(true);
-  };
-
-  /**
-   * Clears drop-zone state only when the drag leaves the entire builder surface.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
-  const handleBuilderDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
-    if (!dropZoneRef.current) return;
-    const related = event.relatedTarget as Node | null;
-    if (related && dropZoneRef.current.contains(related)) return;
-    setBasicDragActive(false);
-    setDropIndicator(null);
-  };
-
-  /**
-   * Inserts, creates, or reorders builder tokens after a drop. The visual drop
-   * zone and token rows share this handler.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   * Steps: clear drag state, resolve the insertion index, distinguish palette from existing
-   * tokens, then delegate to add/move helpers.
-   */
-  const handleBuilderDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    if (basicDisabled) return;
-    event.preventDefault();
-    setBasicDragActive(false);
-    const payload = parseDragPayload(event);
-    const indicator = dropIndicator;
-    setDropIndicator(null);
-    if (!payload) {
-      lastDragPayloadRef.current = null;
-      return;
-    }
-    let insertIndex = basicTokens.length;
-    if (indicator) {
-      const targetIdx = basicTokens.findIndex((token) => token.id === indicator.tokenId);
-      if (targetIdx !== -1) {
-        insertIndex = indicator.position === 'before' ? targetIdx : targetIdx + 1;
-      }
-    }
-
-    if (payload.source === 'palette') {
-      if (payload.kind === 'column') {
-        addColumnToken(payload.column, payload.dtype, insertIndex);
-        // payload comes from untrusted JSON.parse; keep the explicit kind check.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      } else if (payload.kind === 'custom') {
-        addCustomToken(insertIndex);
-      }
-      lastDragPayloadRef.current = null;
-      return;
-    }
-
-    // payload comes from untrusted JSON.parse; keep the explicit source check.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (payload.source === 'existing') {
-      moveBasicToken(payload.id, insertIndex);
-    }
-    lastDragPayloadRef.current = null;
-  };
+  const builderDragHandlers = useAggregateBuilderDragHandlers({
+    disabled: basicDisabled,
+    tokens: basicTokens,
+    dropIndicator,
+    dropZoneRef,
+    editingTokenId,
+    finishCustomEdit,
+    addColumnToken,
+    addCustomToken,
+    moveToken: moveBasicToken,
+    dispatchBuilderUi,
+  });
 
   /**
    * Applies the current expression to the active node, refreshes schema, and
@@ -921,7 +583,10 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
    * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const handleCustomDraftChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomDraft(normalizeSmartCharacters(event.target.value));
+    dispatchBuilderUi({
+      type: 'setCustomDraft',
+      draft: normalizeSmartCharacters(event.target.value),
+    });
   };
 
   /**
@@ -939,28 +604,18 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }
   };
 
-  const basicExpressionPreview = tokensToExpression(basicTokens);
+  const basicExpressionPreview = tokensToPolarsExpression(basicTokens);
   const currentExpressionMatchesApplied =
     lastAppliedExpression && lastAppliedExpression === trimmedExpression;
-
-  const nodeColumnSelections = limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : [];
-
-  const nodeColors = (
-    limitedNodeId
-      ? // SINGLE_NODE_PALETTE is a non-empty module constant, so index 0 exists.
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        { [limitedNodeId]: SINGLE_NODE_PALETTE[0]! }
-      : {}
-  ) as Record<string, string>;
 
   return {
     activeNodeId,
     hasSelection,
     nodeSelection: {
       effectiveNodes: effectiveSelectedNodes,
-      nodeColumnSelections,
-      nodeColors,
-      defaultPalette: SINGLE_NODE_PALETTE,
+      nodeColumnSelections: selectionPanelModel.nodeColumnSelections,
+      nodeColors: selectionPanelModel.nodeColors,
+      defaultPalette: selectionPanelModel.defaultPalette,
       originalCount: selectedNodes.length,
     },
     expression: {
@@ -992,15 +647,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       handlers: {
         customDraftChange: handleCustomDraftChange,
         customInputKeyDown: handleCustomInputKeyDown,
-        columnDragStart: handleColumnDragStart,
-        customDragStart: handleCustomDragStart,
-        existingTokenDragStart: handleExistingTokenDragStart,
-        existingTokenDragEnd: handleExistingTokenDragEnd,
-        paletteDragEnd: handlePaletteDragEnd,
-        tokenDragOver: handleTokenDragOver,
-        builderDragOver: handleBuilderDragOver,
-        builderDragLeave: handleBuilderDragLeave,
-        builderDrop: handleBuilderDrop,
+        ...builderDragHandlers,
       },
     },
     preview: {

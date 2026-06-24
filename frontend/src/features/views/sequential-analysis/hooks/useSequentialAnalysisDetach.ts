@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { detachSequentialAnalysisTask } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
-import type { SequentialAnalysisDatum } from './useSequentialAnalysisTaskFlow';
+import type { SequentialAnalysisDatum } from './sequentialChartModel';
 
 interface SequentialAnalysisDetachNode {
   id?: string;

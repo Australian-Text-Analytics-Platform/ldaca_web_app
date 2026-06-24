@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useReducer } from 'react';
 import { importLdacaDataset, listLdacaFeaturedCollections, searchLdacaCollections } from '@/api';
-import type { OniSearchRequest, OniSearchResult as LdacaSearchResult } from '@/api';
+import type { OniSearchRequest } from '@/api';
+import {
+  initialLdacaImportState,
+  ldacaImportReducer,
+  type LdacaSearchMethod,
+} from './ldacaImportState';
 
 const LDACA_API_TOKEN_HEADER = 'X-LDACA-API-Token';
-
-type LdacaSearchMethod = Extract<NonNullable<OniSearchRequest['method']>, 'keyword' | 'identifier'>;
 
 type LdacaSearchRequest = Omit<OniSearchRequest, 'method' | 'query'> & {
   method: LdacaSearchMethod;
@@ -47,19 +50,7 @@ export function useLdacaImport({
   refetchFiles,
   notify,
 }: UseLdacaImportParams) {
-  const [ldacaImportOpen, updateLdacaImportOpen] = useState(false);
-  const [searchMethod, setSearchMethod] = useState<LdacaSearchMethod>('keyword');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [collectionFilter, setCollectionFilter] = useState('all');
-  const [fileFormatFilter, setFileFormatFilter] = useState('all');
-  const [featuredRecords, setFeaturedRecords] = useState<LdacaSearchResult[]>([]);
-  const [searchResults, setSearchResults] = useState<LdacaSearchResult[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [featuredLoaded, setFeaturedLoaded] = useState(false);
-  const [featuredLoading, setFeaturedLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [importingId, setImportingId] = useState<string | undefined>(undefined);
-  const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
+  const [state, dispatch] = useReducer(ldacaImportReducer, initialLdacaImportState);
 
   /**
    * Lazily loads staff-picked collections for the import dialog, with an
@@ -69,23 +60,19 @@ export function useLdacaImport({
    * results, and surface load errors through the dialog state.
    */
   const loadFeaturedRecords = async (tokenOverride = ldacaApiToken, force = false) => {
-    if (featuredLoading || (!force && featuredLoaded)) return;
+    if (state.featuredLoading || (!force && state.featuredLoaded)) return;
 
-    setFeaturedLoading(true);
-    setErrorMessage(undefined);
+    dispatch({ type: 'featuredStarted' });
     try {
       const { data: response } = await listLdacaFeaturedCollections({
         headers: withLdacaApiToken(authHeaders, tokenOverride),
         throwOnError: true,
       });
-      setFeaturedRecords(response.data);
-      setFeaturedLoaded(true);
+      dispatch({ type: 'featuredSucceeded', records: response.data });
     } catch (error) {
       const message = (error as Error).message || 'Failed to load LDaCA staff picks.';
-      setErrorMessage(message);
+      dispatch({ type: 'featuredFailed', message });
       notify('error', message);
-    } finally {
-      setFeaturedLoading(false);
     }
   };
 
@@ -95,7 +82,7 @@ export function useLdacaImport({
    * Called by: useLdacaImport internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const reloadFeaturedRecords = async (tokenOverride = ldacaApiToken) => {
-    setFeaturedLoaded(false);
+    dispatch({ type: 'featuredInvalidated' });
     await loadFeaturedRecords(tokenOverride, true);
   };
 
@@ -105,10 +92,26 @@ export function useLdacaImport({
    * Called by: useLdacaImport internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setLdacaImportOpen = (open: boolean) => {
-    updateLdacaImportOpen(open);
+    dispatch({ type: 'setOpen', open });
     if (open) {
       void loadFeaturedRecords();
     }
+  };
+
+  const setSearchMethod = (method: LdacaSearchMethod) => {
+    dispatch({ type: 'setSearchMethod', method });
+  };
+
+  const setSearchQuery = (query: string) => {
+    dispatch({ type: 'setSearchQuery', query });
+  };
+
+  const setCollectionFilter = (value: string) => {
+    dispatch({ type: 'setCollectionFilter', value });
+  };
+
+  const setFileFormatFilter = (value: string) => {
+    dispatch({ type: 'setFileFormatFilter', value });
   };
 
   /**
@@ -119,18 +122,13 @@ export function useLdacaImport({
    * results or an error message for DataLoaderDialogs.
    */
   const handleLdacaSearch = async () => {
-    const trimmedQuery = searchQuery.trim();
+    const trimmedQuery = state.searchQuery.trim();
     if (!trimmedQuery) return;
 
-    setSearching(true);
-    setHasSearched(true);
-    setSearchResults([]);
-    setCollectionFilter('all');
-    setFileFormatFilter('all');
-    setErrorMessage(undefined);
+    dispatch({ type: 'searchStarted' });
     try {
       const request: LdacaSearchRequest = {
-        method: searchMethod,
+        method: state.searchMethod,
         query: trimmedQuery,
         limit: 25,
         offset: 0,
@@ -140,13 +138,11 @@ export function useLdacaImport({
         headers: withLdacaApiToken(authHeaders, ldacaApiToken),
         throwOnError: true,
       });
-      setSearchResults(response.data);
+      dispatch({ type: 'searchSucceeded', records: response.data });
     } catch (error) {
       const message = (error as Error).message || 'Failed to search LDaCA.';
-      setErrorMessage(message);
+      dispatch({ type: 'searchFailed', message });
       notify('error', message);
-    } finally {
-      setSearching(false);
     }
   };
 
@@ -160,10 +156,10 @@ export function useLdacaImport({
   const handleLdacaImport = async (recordId?: string) => {
     // an empty recordId should fall through to the typed search query
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    const target = (recordId || searchQuery).trim();
+    const target = (recordId || state.searchQuery).trim();
     if (!target) return;
 
-    setImportingId(target);
+    dispatch({ type: 'importStarted', importingId: target });
     try {
       const { data: response } = await importLdacaDataset({
         body: { url: target },
@@ -172,38 +168,35 @@ export function useLdacaImport({
       });
 
       notify('success', response.message || 'LDaCA import started in background.');
-      setSearchQuery('');
-      setSearchResults([]);
-      setHasSearched(false);
-      updateLdacaImportOpen(false);
+      dispatch({ type: 'importSucceeded' });
       await refetchFiles();
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to start LDaCA import.');
     } finally {
-      setImportingId(undefined);
+      dispatch({ type: 'importFinished' });
     }
   };
 
   return {
-    ldacaImportOpen,
+    ldacaImportOpen: state.ldacaImportOpen,
     setLdacaImportOpen,
-    searchMethod,
+    searchMethod: state.searchMethod,
     setSearchMethod,
-    searchQuery,
+    searchQuery: state.searchQuery,
     setSearchQuery,
-    collectionFilter,
+    collectionFilter: state.collectionFilter,
     setCollectionFilter,
-    fileFormatFilter,
+    fileFormatFilter: state.fileFormatFilter,
     setFileFormatFilter,
-    featuredRecords,
-    featuredLoading,
+    featuredRecords: state.featuredRecords,
+    featuredLoading: state.featuredLoading,
     reloadFeaturedRecords,
-    searchResults,
-    hasSearched,
-    searching,
-    importingId,
-    ldacaImporting: Boolean(importingId),
-    errorMessage,
+    searchResults: state.searchResults,
+    hasSearched: state.hasSearched,
+    searching: state.searching,
+    importingId: state.importingId,
+    ldacaImporting: Boolean(state.importingId),
+    errorMessage: state.errorMessage,
     handleLdacaSearch,
     handleLdacaImport,
   };

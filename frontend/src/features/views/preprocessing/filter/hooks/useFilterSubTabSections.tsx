@@ -1,26 +1,19 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { describeColumn, getColumnUniqueValues } from '@/api';
+import { useState, type ReactNode } from 'react';
+import { describeColumn } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
 } from '@/features/views/common/nodeSelectionTypes';
-import { DateTimePickerField } from '../../utils/dateTimeUtils';
-import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from '../../utils/typeUtils';
-import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';
+import { normalizeTypeName, getOperatorsForType } from '../../utils/typeUtils';
 import { buildFilterAutoNodeName } from '../../utils/autoNodeNames';
+import { buildSingleNodeSelectionPanelModel } from '../../utils/nodeMetadata';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import { buildFilterRequestPayload, isConditionComplete } from '../utils/serializers';
-import { FilterValueChecklist } from '../components/FilterValueChecklist';
-import type { FilterChecklistOption } from '../components/FilterValueChecklist';
+import { applyFilterConditionFieldChange, createFilterCondition } from '../utils/conditionState';
+import { FilterConditionValueInput } from '../components/FilterConditionValueInput';
+import { useFilterCategoricalOptions } from './useFilterCategoricalOptions';
 import type {
   ConditionRange,
   ConditionValue,
@@ -83,11 +76,8 @@ interface FilterConditionBuilderConfig {
     field: Key,
     value: FilterConditionWithId[Key],
   ) => void;
-  renderValueInput: (condition: FilterConditionWithId, disabled: boolean) => React.ReactNode;
-  renderConditionMetadata: (
-    condition: FilterConditionWithId,
-    rowDisabled: boolean,
-  ) => React.ReactNode;
+  renderValueInput: (condition: FilterConditionWithId, disabled: boolean) => ReactNode;
+  renderConditionMetadata: (condition: FilterConditionWithId, rowDisabled: boolean) => ReactNode;
   shouldHideOperatorSelect: (condition: FilterConditionWithId) => boolean;
   getOperatorOptions: (condition: FilterConditionWithId) => ReturnType<typeof getOperatorsForType>;
 }
@@ -130,99 +120,12 @@ export interface UseFilterSubTabSectionsResult {
   selectedNodesOriginalCount: number;
 }
 
-type CategoricalPrimitive = string | number | boolean | null;
-
-interface CategoricalOptionEntry {
-  key: string;
-  value: CategoricalPrimitive;
-  label: string;
-  isNull: boolean;
-}
-
-const NULL_OPTION_KEY = '__LDACA_NULL__';
-
-/**
- * Normalizes backend unique values into primitives the checklist can compare.
- * Used by: local callers in preprocessing/useFilterSubTabSections module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
-const toCategoricalPrimitive = (value: unknown): CategoricalPrimitive => {
-  if (value === null) return null;
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return value;
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  // value is a non-primitive object here; String() is the intended last resort.
-  // eslint-disable-next-line @typescript-eslint/no-base-to-string
-  return String(value);
-};
-
-/**
- * Creates collision-resistant keys for categorical checklist selections.
- * Used by: local callers in preprocessing/useFilterSubTabSections module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
-const getCategoricalOptionKey = (value: CategoricalPrimitive): string => {
-  if (value === null) return NULL_OPTION_KEY;
-  return `${typeof value}::${String(value)}`;
-};
-
-/**
- * Picks the first supported operator for a column type when rows are created.
- * Used by: local callers in preprocessing/useFilterSubTabSections module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
-const getDefaultOperatorForType = (dataType: string): FilterCondition['operator'] => {
-  const operators = getOperatorsForType(dataType);
-  return (operators[0]?.value as FilterCondition['operator'] | undefined) ?? 'eq';
-};
-
-/**
- * Builds deduplicated checklist options from `getColumnUniqueValues`. The
- * categorical renderer uses these entries to preserve null handling and labels.
- * Used by: local callers in preprocessing/useFilterSubTabSections module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- * Steps: convert backend unique values to comparable primitives, deduplicate by type-aware key,
- * prepend null when present, and preserve display labels.
- */
-const buildCategoricalOptionEntries = (
-  rawValues: unknown[],
-  hasNullFromResponse: boolean,
-): CategoricalOptionEntry[] => {
-  const uniqueEntries = new Map<string, CategoricalOptionEntry>();
-
-  rawValues.forEach((value) => {
-    const primitive = toCategoricalPrimitive(value);
-    if (primitive === null) {
-      return;
-    }
-
-    const optionKey = getCategoricalOptionKey(primitive);
-    if (!uniqueEntries.has(optionKey)) {
-      uniqueEntries.set(optionKey, {
-        key: optionKey,
-        value: primitive,
-        label: formatPreviewValue(primitive),
-        isNull: false,
-      });
-    }
-  });
-
-  const optionList: CategoricalOptionEntry[] = [];
-  if (hasNullFromResponse) {
-    optionList.push({
-      key: NULL_OPTION_KEY,
-      value: null,
-      label: 'Null (no value)',
-      isNull: true,
-    });
-  }
-  optionList.push(...uniqueEntries.values());
-  return optionList;
-};
-
 /**
  * Owns the Filter sub-tab state and backend request wiring. `FilterSubTab`
  * consumes this hook for condition editing, preview fallback, and apply state.
- * Used by: FilterValueChecklist component, FilterSubTab module, ConditionBuilder component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by: FilterSubTab, ConditionBuilder, and FilterConditionValueInput because
+ * those callers need shared filter state, backend option loading, preview
+ * payloads, and apply behavior without owning the hook internals.
  * Flow: derive selected nodes/schema, manage condition rows and categorical options, prefill
  * typed inputs, request previews, and apply complete filter payloads.
  */
@@ -254,22 +157,25 @@ export const useFilterSubTabSections = (
     },
   ]);
   const [logic, setLogic] = useState<'and' | 'or'>('and');
-  const [newNodeName, setNewNodeName] = useState('');
+  const [newNodeNameState, setNewNodeNameState] = useState<{
+    nodeId: string | null;
+    value: string;
+  }>({ nodeId: selectedNodeId, value: '' });
   const [isFiltering, setIsFiltering] = useState(false);
-  const [categoricalOptions, setCategoricalOptions] = useState<
-    Record<
-      string,
-      {
-        options: CategoricalOptionEntry[];
-        hasNull: boolean;
-        loading: boolean;
-        error: string | null;
-      }
-    >
-  >({});
-  const [optionSearchQueries, setOptionSearchQueries] = useState<Record<string, string>>({});
-  const categoricalOptionsRef = useRef(categoricalOptions);
-  categoricalOptionsRef.current = categoricalOptions;
+  const {
+    categoricalOptions,
+    optionSearchQueries,
+    getCategoricalKey,
+    ensureCategoricalOptions,
+    setOptionSearchQuery,
+    resetOptionSearchQuery,
+    removeOptionSearchQuery,
+  } = useFilterCategoricalOptions({
+    currentWorkspaceId,
+    selectedNodeId,
+    conditions,
+    getAuthHeaders,
+  });
 
   const availableColumns = (() => {
     const columns: ConditionColumnOption[] = [];
@@ -303,106 +209,14 @@ export const useFilterSubTabSections = (
   const isSchemaLoading = hasSelection && !hasSchema && (isLoading.nodeData || isLoading.graph);
   const isConfigDisabled = !hasSelection || !hasSchema;
 
-  const workspaceNodeMap = (() => {
-    const map = new Map<string, WorkspaceNodeLike>();
-    workspaceNodes.forEach((node: WorkspaceNodeLike) => {
-      const key = node.id ?? ((node as Record<string, unknown>).node_id as string | undefined);
-      if (key) {
-        map.set(key, node);
-      }
-    });
-    return map;
-  })();
-
-  const filterSelectedNodesForPanel = (() => {
-    if (!selectedNodeId) return [];
-    const node = workspaceNodeMap.get(selectedNodeId);
-    return node ? [node] : [];
-  })();
-
-  /** Keys cached categorical options by workspace, node, and column. */
-  const getCategoricalKey = useCallback(
-    (column: string) => `${currentWorkspaceId ?? 'none'}::${selectedNodeId ?? 'none'}::${column}`,
-    [currentWorkspaceId, selectedNodeId],
-  );
-
-  /**
-   * Loads categorical/list-string values on demand for checklist conditions.
-   * Condition changes and retry buttons call this to populate option state.
-   */
-  const ensureCategoricalOptions = useCallback(
-    async (column: string, dataType: string) => {
-      if (!currentWorkspaceId || !selectedNodeId || !column) {
-        return;
-      }
-
-      const key = getCategoricalKey(column);
-      setCategoricalOptions((prev) => {
-        const existing = prev[key];
-        if (existing?.loading) {
-          return prev;
-        }
-        return {
-          ...prev,
-          [key]: {
-            options: existing?.options ?? [],
-            hasNull: existing?.hasNull ?? false,
-            loading: true,
-            error: null,
-          },
-        };
-      });
-
-      try {
-        const { data: response } = await getColumnUniqueValues({
-          headers: getAuthHeaders(),
-          path: { column_name: column, node_id: selectedNodeId },
-          throwOnError: true,
-        });
-        // response is the typed API body; guard defensively against a null payload.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        const rawValues: unknown[] = Array.isArray(response?.unique_values)
-          ? response.unique_values
-          : [];
-        const includeNullOption = dataType === 'categorical';
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        const hasNullFromResponse = includeNullOption && response?.has_null;
-        const optionList = buildCategoricalOptionEntries(rawValues, hasNullFromResponse);
-
-        setCategoricalOptions((prev) => ({
-          ...prev,
-          [key]: {
-            options: optionList,
-            hasNull: hasNullFromResponse,
-            loading: false,
-            error: null,
-          },
-        }));
-      } catch (error) {
-        setCategoricalOptions((prev) => ({
-          ...prev,
-          [key]: {
-            options: [],
-            hasNull: false,
-            loading: false,
-            error: error instanceof Error ? error.message : 'Failed to load categories',
-          },
-        }));
-      }
-    },
-    [getCategoricalKey, currentWorkspaceId, selectedNodeId, getAuthHeaders],
-  );
-
-  const filterDefaultPalette = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'];
-
-  const filterNodeColors = (() => {
-    if (!selectedNodeId) return {} as Record<string, string>;
-    return { [selectedNodeId]: filterDefaultPalette[0] ?? '#2563eb' };
-  })();
-
-  const filterNodeSelections: NodeColumnSelection[] = selectedNodeId
-    ? [{ nodeId: selectedNodeId, column: '' }]
-    : [];
+  const selectionPanelModel = buildSingleNodeSelectionPanelModel({
+    nodeId: selectedNodeId,
+    workspaceNodes,
+  });
+  const newNodeName = newNodeNameState.nodeId === selectedNodeId ? newNodeNameState.value : '';
+  const setNewNodeName = (value: string) => {
+    setNewNodeNameState({ nodeId: selectedNodeId, value });
+  };
 
   /**
    * Placeholder color handler because the filter panel uses one fixed color.
@@ -414,35 +228,6 @@ export const useFilterSubTabSections = (
    * Called by: useFilterSubTabSections internal event, effect, or helper flow.
    */
   const handleFilterColumnChange = () => undefined;
-
-  useEffect(() => {
-    setCategoricalOptions({});
-    setOptionSearchQueries({});
-  }, [currentWorkspaceId, selectedNodeId]);
-
-  useEffect(() => {
-    if (!currentWorkspaceId || !selectedNodeId) {
-      return;
-    }
-
-    conditions.forEach((condition) => {
-      if (
-        (condition.dataType === 'categorical' ||
-          condition.dataType === 'list[string]' ||
-          condition.dataType === 'tmdist') &&
-        condition.column
-      ) {
-        const key = getCategoricalKey(condition.column);
-        if (!categoricalOptionsRef.current[key]) {
-          void ensureCategoricalOptions(condition.column, condition.dataType);
-        }
-      }
-    });
-  }, [conditions, currentWorkspaceId, selectedNodeId, getCategoricalKey, ensureCategoricalOptions]);
-
-  useEffect(() => {
-    setNewNodeName('');
-  }, [selectedNodeId]);
 
   const autoNodeName = buildFilterAutoNodeName({
     // Empty node name should fall back to the id, so keep `||`.
@@ -491,19 +276,7 @@ export const useFilterSubTabSections = (
    */
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
-    const defaultOperator = firstColumn ? getDefaultOperatorForType(firstColumn.dataType) : 'eq';
-    const defaultValue: ConditionValue = defaultOperator === 'in' ? [] : '';
-    const newCondition: FilterConditionWithId = {
-      id: Date.now().toString(),
-      column: firstColumn ? firstColumn.name : '',
-      operator: defaultOperator,
-      value: defaultValue,
-      dataType: firstColumn ? firstColumn.dataType : 'string',
-      negate: false,
-      regex: false,
-      caseSensitive: false,
-    };
-    setConditions([...conditions, newCondition]);
+    setConditions([...conditions, createFilterCondition(Date.now().toString(), firstColumn)]);
   };
 
   /**
@@ -513,10 +286,7 @@ export const useFilterSubTabSections = (
   const handleRemoveCondition = (id: string) => {
     if (conditions.length > 1) {
       setConditions(conditions.filter((c) => c.id !== id));
-      setOptionSearchQueries((prev) => {
-        const { [id]: _, ...next } = prev;
-        return next;
-      });
+      removeOptionSearchQuery(id);
     }
   };
 
@@ -532,112 +302,46 @@ export const useFilterSubTabSections = (
     field: Key,
     value: FilterConditionWithId[Key],
   ) => {
-    let nextCategoricalColumnToLoad: string | null = null;
+    const targetCondition = conditions.find((condition) => condition.id === id);
+    if (!targetCondition) return;
+
+    const { condition, checklistLoadRequest, prefillRequest, shouldResetSearch } =
+      applyFilterConditionFieldChange({
+        condition: targetCondition,
+        field,
+        value,
+        availableColumns,
+      });
 
     setConditions(
-      conditions.map((c) => {
-        if (c.id !== id) return c;
-
-        const updated = { ...c, [field]: value };
-
-        if (field === 'column') {
-          const columnInfo = availableColumns.find((col) => col.name === value);
-          if (columnInfo) {
-            updated.dataType = columnInfo.dataType;
-            const nextOperator = getDefaultOperatorForType(columnInfo.dataType);
-            updated.operator = nextOperator;
-            if (columnInfo.dataType === 'tmdist') {
-              // Topic-distribution filter: default to "topic 0 ≥ 5%".
-              updated.value = { topic_id: 0, threshold: 0.05 };
-            } else {
-              updated.value = nextOperator === 'in' ? [] : '';
-            }
-            updated.regex = false;
-            updated.caseSensitive = false;
-
-            if (
-              columnInfo.dataType === 'categorical' ||
-              columnInfo.dataType === 'list[string]' ||
-              columnInfo.dataType === 'tmdist'
-            ) {
-              nextCategoricalColumnToLoad = columnInfo.name;
-            }
-
-            if (
-              columnInfo.dataType === 'datetime' &&
-              selectedNodeId &&
-              currentWorkspaceId &&
-              nextOperator !== 'is_null'
-            ) {
-              void prefillDatetimeValue(id, columnInfo.name, nextOperator);
-            } else if (
-              (columnInfo.dataType === 'integer' || columnInfo.dataType === 'float') &&
-              selectedNodeId &&
-              currentWorkspaceId &&
-              (nextOperator === 'gte' || nextOperator === 'lte')
-            ) {
-              void prefillNumericValue(id, columnInfo.name, nextOperator);
-            }
-          }
-        }
-
-        if (field === 'operator') {
-          if (value === 'in') {
-            updated.value = Array.isArray(updated.value) ? updated.value : [];
-            if (
-              (updated.dataType === 'categorical' || updated.dataType === 'list[string]') &&
-              updated.column
-            ) {
-              nextCategoricalColumnToLoad = updated.column;
-            }
-          } else if (updated.dataType === 'categorical' && Array.isArray(updated.value)) {
-            updated.value = updated.value[0] ?? '';
-          }
-
-          if (
-            updated.dataType === 'datetime' &&
-            updated.column &&
-            selectedNodeId &&
-            currentWorkspaceId
-          ) {
-            updated.value = '';
-            if (value !== 'is_null') {
-              void prefillDatetimeValue(id, updated.column, value as FilterCondition['operator']);
-            }
-          } else if (
-            (updated.dataType === 'integer' || updated.dataType === 'float') &&
-            updated.column &&
-            selectedNodeId &&
-            currentWorkspaceId &&
-            (value === 'gte' || value === 'lte')
-          ) {
-            void prefillNumericValue(id, updated.column, value);
-          }
-        }
-
-        return updated;
+      conditions.map((entry) => {
+        if (entry.id !== id) return entry;
+        return condition;
       }),
     );
 
-    if (field === 'column' || field === 'operator') {
-      setOptionSearchQueries((prev) => ({ ...prev, [id]: '' }));
+    if (shouldResetSearch) {
+      resetOptionSearchQuery(id);
     }
 
-    // nextCategoricalColumnToLoad is mutated inside the setConditions updater
-    // above; TS cannot track the closure mutation, so keep this runtime check.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (nextCategoricalColumnToLoad) {
-      const targetCondition = conditions.find((entry) => entry.id === id);
-      const targetType =
-        field === 'column'
-          ? availableColumns.find((entry) => entry.name === value)?.dataType
-          : targetCondition?.dataType;
-      void ensureCategoricalOptions(
-        nextCategoricalColumnToLoad,
-        targetType === 'categorical' || targetType === 'list[string]' || targetType === 'tmdist'
-          ? targetType
-          : 'categorical',
-      );
+    if (prefillRequest && selectedNodeId && currentWorkspaceId) {
+      if (prefillRequest.kind === 'datetime') {
+        void prefillDatetimeValue(
+          prefillRequest.conditionId,
+          prefillRequest.column,
+          prefillRequest.operator,
+        );
+      } else {
+        void prefillNumericValue(
+          prefillRequest.conditionId,
+          prefillRequest.column,
+          prefillRequest.operator,
+        );
+      }
+    }
+
+    if (checklistLoadRequest) {
+      void ensureCategoricalOptions(checklistLoadRequest.column, checklistLoadRequest.dataType);
     }
   };
 
@@ -816,342 +520,24 @@ export const useFilterSubTabSections = (
   };
 
   /**
-   * Renders the value editor matching the condition's column type. The shared
-   * ConditionBuilder calls this hook callback for each condition row.
-   * Rendered by: useFilterSubTabSections JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
-   * Flow: choose the control for categorical, range, datetime, boolean, regex, or scalar
-   * conditions, then connect each control to condition updates.
+   * Renders the value editor matching the condition's column type.
+   * Rendered by: ConditionBuilder via the Filter hook so value-editor UI stays
+   * in `FilterConditionValueInput` while this hook keeps data loading and form
+   * state ownership.
    */
-  const renderConditionValueInput = (condition: FilterConditionWithId, disabled: boolean) => {
-    if (disabled) {
-      return (
-        <input
-          type="text"
-          // condition.value is a primitive in this branch; String() coerces it.
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string
-          value={condition.operator === 'between' ? '' : String(condition.value ?? '')}
-          disabled
-          placeholder={
-            hasSelection ? 'Select a column' : 'Select a data block to configure filters'
-          }
-          className="flex-1 rounded-md border border-border/70 bg-muted px-2 py-1 text-sm text-muted-foreground"
-        />
-      );
-    }
-
-    // Empty dataType should fall back to 'string', so keep `||`.
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    const dataType = condition.dataType || 'string';
-
-    if (dataType === 'tmdist') {
-      // Topic-distribution column: render [topic dropdown] [operator] [value %].
-      // The generic operator select is hidden for tmdist (see
-      // shouldHideOperatorSelect) so the topic dropdown can sit first. Topic
-      // options come from the column's distinct topic ids (loaded like
-      // categorical options); threshold is stored as a 0..1 fraction.
-      const current =
-        condition.value && typeof condition.value === 'object' && 'topic_id' in condition.value
-          ? condition.value
-          : { topic_id: 0, threshold: 0.05 };
-      const patch = (next: Partial<{ topic_id: number; threshold: number }>) => {
-        handleConditionChange(condition.id, 'value', { ...current, ...next });
-      };
-
-      const key = condition.column ? getCategoricalKey(condition.column) : null;
-      const optionState = key ? categoricalOptions[key] : undefined;
-      const topicIds = (optionState?.options ?? [])
-        .map((opt) => Number(opt.value))
-        .filter((n) => Number.isFinite(n))
-        .sort((a, b) => a - b);
-      const operatorOptions = getOperatorsForType('tmdist');
-
-      return (
-        <div className="flex flex-1 flex-wrap items-center gap-1.5">
-          <Select
-            value={String(current.topic_id)}
-            onValueChange={(v) => {
-              patch({ topic_id: Number(v) });
-            }}
-            disabled={topicIds.length === 0}
-          >
-            <SelectTrigger className="w-32" aria-label="Topic">
-              <SelectValue placeholder={optionState?.loading ? 'Loading…' : 'Topic'} />
-            </SelectTrigger>
-            <SelectContent>
-              {topicIds.map((tid) => (
-                <SelectItem key={tid} value={String(tid)}>
-                  Topic {tid}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={condition.operator}
-            onValueChange={(v) => {
-              handleConditionChange(
-                condition.id,
-                'operator',
-                v as FilterConditionWithId['operator'],
-              );
-            }}
-            disabled={disabled}
-          >
-            <SelectTrigger className="w-20" aria-label="Comparison operator">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {operatorOptions.map((op) => (
-                <SelectItem key={op.value} value={op.value}>
-                  {op.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={1}
-            aria-label="Proportion percentage"
-            // current.threshold comes from form state and may be missing at runtime.
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-            value={Math.round((current.threshold ?? 0) * 100)}
-            onChange={(e) => {
-              const pct = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-              patch({ threshold: pct / 100 });
-            }}
-            className="w-20 rounded-md border border-input px-2 py-1 text-right text-sm text-foreground"
-            disabled={disabled}
-          />
-          <span className="text-sm text-muted-foreground">%</span>
-        </div>
-      );
-    }
-
-    if (dataType === 'categorical' || dataType === 'list[string]') {
-      const column = condition.column;
-      const key = column ? getCategoricalKey(column) : null;
-      const optionState = key ? categoricalOptions[key] : undefined;
-      const optionEntries = optionState?.options ?? [];
-      const searchQuery = optionSearchQueries[condition.id] ?? '';
-      const selectedValues = Array.isArray(condition.value)
-        ? (condition.value as unknown[]).map(toCategoricalPrimitive)
-        : [];
-      const selectedKeys = new Set(selectedValues.map((entry) => getCategoricalOptionKey(entry)));
-      const isLoadingOptions = optionState?.loading ?? false;
-      const optionError = optionState?.error ?? null;
-
-      /**
-       * Writes checklist selections back into the condition value field.
-       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-       */
-      const updateSelections = (nextSelections: CategoricalPrimitive[]) => {
-        handleConditionChange(condition.id, 'value', nextSelections);
-      };
-
-      /**
-       * Toggles one categorical/list-string option in the condition value.
-       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-       */
-      const toggleValue = (entry: FilterChecklistOption, nextChecked: boolean) => {
-        if (nextChecked) {
-          if (selectedKeys.has(entry.key)) return;
-          updateSelections([...selectedValues, toCategoricalPrimitive(entry.value)]);
-        } else {
-          updateSelections(
-            selectedValues.filter((current) => getCategoricalOptionKey(current) !== entry.key),
-          );
-        }
-      };
-
-      /**
-       * Selects all loaded options for the current checklist condition.
-       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-       */
-      const handleSelectAll = () => {
-        updateSelections(optionEntries.map((entry) => entry.value));
-      };
-
-      /**
-       * Adds only the currently visible search results to the selection.
-       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-       */
-      const handleSelectVisible = (visibleOptions: FilterChecklistOption[]) => {
-        const merged = new Map<string, CategoricalPrimitive>(
-          selectedValues.map((entry) => [getCategoricalOptionKey(entry), entry]),
-        );
-        visibleOptions.forEach((entry) => {
-          merged.set(entry.key, toCategoricalPrimitive(entry.value));
-        });
-        updateSelections(Array.from(merged.values()));
-      };
-
-      /**
-       * Clears all selected values for the current checklist condition.
-       * Called by: renderConditionValueInput internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-       */
-      const handleClearAll = () => {
-        updateSelections([]);
-      };
-
-      const onSelectAllForMode =
-        searchQuery.trim().length > 0
-          ? handleSelectVisible
-          : () => {
-              handleSelectAll();
-            };
-
-      return (
-        <FilterValueChecklist
-          idPrefix={condition.id}
-          options={optionEntries}
-          selectedKeys={selectedKeys}
-          disabled={disabled}
-          loading={isLoadingOptions}
-          error={optionError}
-          searchQuery={searchQuery}
-          onSearchQueryChange={(query) => {
-            setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query }));
-          }}
-          onToggleOption={toggleValue}
-          onSelectAll={onSelectAllForMode}
-          onClearAll={handleClearAll}
-          onRetry={
-            column
-              ? () => {
-                  void ensureCategoricalOptions(column, dataType);
-                }
-              : undefined
-          }
-        />
-      );
-    }
-
-    if (dataType === 'boolean') {
-      return (
-        <Select
-          // condition.value is a boolean in this branch; String() coerces it.
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string
-          value={String(condition.value)}
-          onValueChange={(value) => {
-            handleConditionChange(condition.id, 'value', value === 'true');
-          }}
-          disabled={disabled}
-        >
-          <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Select value" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="true">True</SelectItem>
-            <SelectItem value="false">False</SelectItem>
-          </SelectContent>
-        </Select>
-      );
-    }
-
-    if (dataType === 'datetime') {
-      if (condition.operator === 'between') {
-        const rangeValue: ConditionRange =
-          condition.value && typeof condition.value === 'object' && 'start' in condition.value
-            ? condition.value
-            : { start: null, end: null };
-        const startStr =
-          typeof rangeValue.start === 'string'
-            ? rangeValue.start
-            : rangeValue.start instanceof Date
-              ? rangeValue.start.toISOString()
-              : '';
-        const endStr =
-          typeof rangeValue.end === 'string'
-            ? rangeValue.end
-            : rangeValue.end instanceof Date
-              ? rangeValue.end.toISOString()
-              : '';
-        return (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex-none">
-              <DateTimePickerField
-                value={startStr}
-                onChange={(v) => {
-                  handleConditionChange(condition.id, 'value', {
-                    start: v,
-                    end: rangeValue.end ?? null,
-                  });
-                }}
-                placeholder={ISO_PLACEHOLDER}
-              />
-            </div>
-            <div className="flex-none">
-              <DateTimePickerField
-                value={endStr}
-                onChange={(v) => {
-                  handleConditionChange(condition.id, 'value', {
-                    start: rangeValue.start ?? null,
-                    end: v,
-                  });
-                }}
-                placeholder={ISO_PLACEHOLDER}
-              />
-            </div>
-          </div>
-        );
-      }
-      const singleVal =
-        typeof condition.value === 'string'
-          ? condition.value
-          : condition.value instanceof Date
-            ? condition.value.toISOString()
-            : '';
-      return (
-        <DateTimePickerField
-          value={singleVal}
-          onChange={(v) => {
-            handleConditionChange(condition.id, 'value', v);
-          }}
-          placeholder={ISO_PLACEHOLDER}
-        />
-      );
-    }
-
-    if (dataType === 'integer' || dataType === 'float') {
-      return (
-        <input
-          type="number"
-          step={dataType === 'float' ? 'any' : '1'}
-          // condition.value is a primitive in this branch; String() coerces it.
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string
-          value={condition.value === null ? '' : String(condition.value)}
-          onChange={(e) => {
-            const raw = e.target.value;
-            if (raw === '') {
-              handleConditionChange(condition.id, 'value', '');
-              return;
-            }
-            const parsed = dataType === 'integer' ? parseInt(raw, 10) : parseFloat(raw);
-            handleConditionChange(condition.id, 'value', Number.isNaN(parsed) ? '' : parsed);
-          }}
-          placeholder="Enter number"
-          className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
-          disabled={disabled}
-        />
-      );
-    }
-
-    return (
-      <input
-        type="text"
-        // condition.value is a primitive in this branch; String() coerces it.
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string
-        value={String(condition.value)}
-        onChange={(e) => {
-          handleConditionChange(condition.id, 'value', e.target.value);
-        }}
-        placeholder="Enter value"
-        className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
-        disabled={disabled}
-      />
-    );
-  };
+  const renderConditionValueInput = (condition: FilterConditionWithId, disabled: boolean) => (
+    <FilterConditionValueInput
+      condition={condition}
+      disabled={disabled}
+      hasSelection={hasSelection}
+      categoricalOptions={categoricalOptions}
+      optionSearchQueries={optionSearchQueries}
+      getCategoricalKey={getCategoricalKey}
+      ensureCategoricalOptions={ensureCategoricalOptions}
+      onOptionSearchQueryChange={setOptionSearchQuery}
+      onConditionChange={handleConditionChange}
+    />
+  );
 
   /**
    * Validates and applies the configured filter as a new workspace node.
@@ -1211,13 +597,13 @@ export const useFilterSubTabSections = (
 
   return {
     selectionPanel: {
-      selectedNodes: filterSelectedNodesForPanel,
-      nodeColumnSelections: filterNodeSelections,
-      nodeColors: filterNodeColors,
-      defaultPalette: filterDefaultPalette,
+      selectedNodes: selectionPanelModel.selectedNodes,
+      nodeColumnSelections: selectionPanelModel.nodeColumnSelections,
+      nodeColors: selectionPanelModel.nodeColors,
+      defaultPalette: selectionPanelModel.defaultPalette,
       onColumnChange: handleFilterColumnChange,
       onColorChange: handleFilterColorChange,
-      disabled: filterSelectedNodesForPanel.length === 0,
+      disabled: selectionPanelModel.disabled,
     },
     schemaState: {
       hasSelection,

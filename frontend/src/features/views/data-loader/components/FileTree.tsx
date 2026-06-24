@@ -233,7 +233,7 @@ export function FileTree({
         handleDirectoryDragLeave(`file:${file.path}`, event);
       }}
       onDrop={(event) => void handleDirectoryDrop(parentDirectoryPath, event)}
-      className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 ${
+      className={`group flex flex-wrap items-start gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 sm:flex-nowrap sm:items-center ${
         selectedFile === file.path ? 'bg-muted/50' : ''
       } ${
         isFileMoveTargetActive(`file:${file.path}`, parentDirectoryPath)
@@ -242,7 +242,7 @@ export function FileTree({
       }`}
     >
       <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 flex-[1_1_14rem] flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-medium text-foreground">{file.name}</span>
@@ -251,7 +251,7 @@ export function FileTree({
             <span>{formatBytes(file.size)}</span>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 sm:flex-nowrap">
           <Button
             size="sm"
             variant="ghost"
@@ -332,7 +332,7 @@ export function FileTree({
         }}
       >
         <div
-          className={`flex items-center gap-1 rounded-md pr-1 hover:bg-accent/50 ${
+          className={`flex flex-wrap items-center gap-1 rounded-md pr-1 hover:bg-accent/50 ${
             isFileMoveTargetActive(`folder:${node.path}`, node.path)
               ? 'bg-primary/10 ring-1 ring-primary/30'
               : ''
@@ -350,7 +350,7 @@ export function FileTree({
           }}
           onDrop={(event) => void handleDirectoryDrop(node.path, event)}
         >
-          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md">
+          <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-1 rounded-md">
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
@@ -406,7 +406,7 @@ export function FileTree({
             {fileCount}
           </Badge>
         </div>
-        <CollapsibleContent className="ml-5">
+        <CollapsibleContent className="ml-3 sm:ml-5">
           <div className="flex flex-col gap-0.5 border-l border-border/40 pl-2">
             {visibleChildren.map((child) => renderNode(child))}
           </div>

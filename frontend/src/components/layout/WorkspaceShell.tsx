@@ -143,11 +143,15 @@ export function WorkspaceShell() {
                 </header>
 
                 <div className="flex flex-1 flex-col overflow-hidden">
-                  <div className="relative flex flex-1 overflow-hidden" ref={layoutRef}>
+                  {/* Below md, stack panes so desktop resize widths cannot force horizontal overflow. */}
+                  <div
+                    className="relative flex flex-1 overflow-hidden max-md:flex-col max-md:overflow-y-auto"
+                    ref={layoutRef}
+                  >
                     <InsetCard
                       ref={mainRef}
                       role="main"
-                      className={`relative h-full p-2 pl-1 pr-1 ${
+                      className={`relative h-full p-2 pl-1 pr-1 max-md:h-auto max-md:min-h-[calc(100dvh-3.5rem)] max-md:!w-full max-md:!min-w-0 ${
                         isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'
                       }`}
                       style={{
@@ -188,7 +192,7 @@ export function WorkspaceShell() {
                       className={`relative flex h-full flex-col bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
                         isRightCollapsed
                           ? 'min-w-0 w-0 overflow-visible flex-none'
-                          : 'min-w-[320px] overflow-hidden'
+                          : 'min-w-[320px] overflow-hidden max-md:h-[70dvh] max-md:!w-full max-md:!min-w-0 max-md:flex-none'
                       }`}
                       style={
                         isRightCollapsed

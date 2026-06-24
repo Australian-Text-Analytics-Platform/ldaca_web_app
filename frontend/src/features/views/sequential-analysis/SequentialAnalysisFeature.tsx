@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { sequentialAnalysisTaskRequest, sequentialAnalysisTaskResult } from '@/api';
-import type { AnalysisTabInput, SequentialAnalysisRequestInput } from '@/api';
+import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -14,82 +14,41 @@ import { fetchNodeInfo } from '@/lib/nodeInfo';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
 import {
-  normalizeStringArray,
-  normalizeUnknownStringArray,
   useLastRunRequest,
   useAnalysisFeature,
   useSafeResult,
   executeAnalysisRerun,
 } from '../common';
-import { useTabNodeInputs } from '../common/nodeInputs';
+import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import {
   useSequentialAnalysisTaskFlow,
-  isChartTypeOption,
-  getPaletteColor,
-  type ChartTypeOption,
 } from './hooks/useSequentialAnalysisTaskFlow';
 import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
 import { useSequentialResultSummary } from './hooks/useSequentialResultSummary';
+import { deriveSequentialResultVisibility } from './hooks/sequentialResultVisibility';
+import { buildSequentialChartExportMetadata } from './hooks/sequentialChartExport';
+import { isChartTypeOption, type ChartTypeOption } from './hooks/sequentialChartModel';
+import {
+  deriveSequentialParameterValues,
+  readSequentialServerParams,
+  useSequentialAnalysisParameters,
+  type SequentialHydratedParams,
+} from './hooks/useSequentialAnalysisParameters';
+import { useSequentialChartControls } from './hooks/useSequentialChartControls';
 import { SequentialAnalysisParameterPanel } from './components/panels/SequentialAnalysisParameterPanel';
 import { SequentialAnalysisResultsPanel } from './components/panels/SequentialAnalysisResultsPanel';
-import type { SequentialXAxisType } from './components/SequentialChart';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   downloadChartAs,
   findSvgInContainer,
   type ChartImageFormat,
-  type ChartExportHeaderItem,
-  type ChartExportLegendItem,
 } from '@/lib/chartExport';
-
-const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
-  'seconds',
-  'minutes',
-  'hours',
-  'days',
-  'weeks',
-];
-type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
-type SequentialCustomIntervalUnit = NonNullable<
-  SequentialAnalysisRequestInput['custom_interval_unit']
->;
-
-// Narrows persisted request values to the custom interval units accepted by the form.
-/**
- * Called by: SequentialAnalysisFeature analysis panel during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
- */
-const isCustomIntervalUnit = (value: unknown): value is SequentialCustomIntervalUnit =>
-  typeof value === 'string' &&
-  VALID_CUSTOM_INTERVAL_UNITS.includes(value as SequentialCustomIntervalUnit);
 
 const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
 const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
-
-// Parses optional numeric inputs while preserving null for empty or invalid entries.
-/**
- * Called by: SequentialAnalysisFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
- */
-const parseNumericInput = (value: string): number | null => {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed.length) return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-// Parses custom interval values that must be positive whole numbers.
-/**
- * Called by: SequentialAnalysisFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
- */
-const parsePositiveIntegerInput = (value: string): number | null => {
-  const parsed = parseNumericInput(value);
-  if (parsed === null) return null;
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-};
 
 /** Renders the sequential-analysis workflow for live trends and result exploration. */
 /**
@@ -137,11 +96,7 @@ const SequentialAnalysisFeature = ({
   const activeNodeId = nodeInputs.resolvedNodes[0]?.id ?? '';
   const selectedNode = nodeInputs.resolvedNodes[0]?.node ?? null;
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(
-      selections
-        .filter((selection) => selection.nodeId)
-        .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null })),
-    );
+    onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
   const { serverRequest } = useLastRunRequest({
     analysisType: 'sequential_analysis',
@@ -150,23 +105,37 @@ const SequentialAnalysisFeature = ({
     taskId: tabTaskId ?? null,
   });
 
-  const [timeColumn, setTimeColumn] = useState('');
-  const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
-  const [frequency, setFrequency] = useState<SequentialFrequency>('daily');
+  const sequentialParameters = useSequentialAnalysisParameters();
+  const {
+    timeColumn,
+    setTimeColumn,
+    groupByColumns,
+    frequency,
+    setFrequency,
+    caseSensitive,
+    setCaseSensitive,
+    numericOriginInput,
+    setNumericOriginInput,
+    numericIntervalInput,
+    setNumericIntervalInput,
+    customIntervalValueInput,
+    setCustomIntervalValueInput,
+    customIntervalUnit,
+    setCustomIntervalUnit,
+  } = sequentialParameters;
   const [chartType, setChartType] = useState<ChartTypeOption>('line');
-  const [xAxisType, setXAxisType] = useState<SequentialXAxisType>('category');
-  const [caseSensitive, setCaseSensitive] = useState(true);
-  const [numericOriginInput, setNumericOriginInput] = useState<string>('');
-  const [numericIntervalInput, setNumericIntervalInput] = useState<string>('1');
-  const [customIntervalValueInput, setCustomIntervalValueInput] = useState<string>('1');
-  const [customIntervalUnit, setCustomIntervalUnit] =
-    useState<SequentialCustomIntervalUnit>('minutes');
-  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
-  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
-  const [selectedPeriodIndices, setSelectedPeriodIndices] = useState<Set<number>>(new Set());
-  const [detachNodeName, setDetachNodeName] = useState('');
+  const chartControls = useSequentialChartControls();
+  const {
+    xAxisType,
+    setXAxisType,
+    hiddenKeys,
+    downloadDialogOpen,
+    setDownloadDialogOpen,
+    selectedPeriodIndices,
+    detachNodeName,
+    setDetachNodeName,
+  } = chartControls;
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
-  const lastClickedIndexRef = useRef<number | null>(null);
 
   // Use schema management hook
   const { setLockedSchema, availableColumns, lockCurrentSchema, currentSchemaRef } =
@@ -182,17 +151,7 @@ const SequentialAnalysisFeature = ({
   const [liveResults, resultRef, setResultSafely, setResults] =
     useSafeResult<Record<string, unknown>>();
   const [hydratingSelection, setHydratingSelection] = useState(false);
-  const hydratedParamsRef = useRef<{
-    timeColumn: string;
-    groupByColumns: string[];
-    frequency: SequentialFrequency;
-    columnType: 'datetime' | 'numeric';
-    numericOrigin: number | null;
-    numericInterval: number | null;
-    customIntervalValue: number | null;
-    customIntervalUnit: SequentialCustomIntervalUnit | null;
-    caseSensitive: boolean;
-  } | null>(null);
+  const hydratedParamsRef = useRef<SequentialHydratedParams | null>(null);
 
   const {
     resolveTaskId,
@@ -236,9 +195,7 @@ const SequentialAnalysisFeature = ({
     // Applies freshly fetched task results to chart state after lifecycle polling completes.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onResultFetched: (resultData) => {
-      setDetachNodeName('');
-      setSelectedPeriodIndices(new Set());
-      lastClickedIndexRef.current = null;
+      chartControls.resetResultSelection();
       const resolvedChartType = isChartTypeOption(resultData.chart_type)
         ? resultData.chart_type
         : chartType;
@@ -256,9 +213,7 @@ const SequentialAnalysisFeature = ({
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedResult: (resultPayload) => {
       if (!resultPayload) return;
-      setDetachNodeName('');
-      setSelectedPeriodIndices(new Set());
-      lastClickedIndexRef.current = null;
+      chartControls.resetResultSelection();
       const hydratedParams = hydratedParamsRef.current;
       const enriched = {
         ...resultPayload,
@@ -294,88 +249,15 @@ const SequentialAnalysisFeature = ({
       > | null;
       if (!req) return;
       setHydratingSelection(true);
-      const nodeIdStr = (req.node_id ?? req.nodeId ?? '') as string;
-      const reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
-      const reqColumnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
-      const lockedNumericOrigin =
-        reqColumnType === 'numeric' && typeof req.numeric_origin === 'number'
-          ? req.numeric_origin
-          : null;
-      const lockedNumericInterval =
-        reqColumnType === 'numeric' && typeof req.numeric_interval === 'number'
-          ? req.numeric_interval
-          : null;
-      if (reqColumnType === 'numeric') {
-        setNumericOriginInput(lockedNumericOrigin != null ? String(lockedNumericOrigin) : '');
-        setNumericIntervalInput(
-          lockedNumericInterval != null ? String(lockedNumericInterval) : '1',
-        );
-      } else {
-        setNumericOriginInput('');
-        setNumericIntervalInput('1');
-      }
+      const hydrated = sequentialParameters.applyHydratedRequest(req);
+      const nodeIdStr = hydrated.nodeId;
+      const reqTimeColumn = hydrated.state.timeColumn;
       if (nodeIdStr && reqTimeColumn) {
         if (!tabInputs || tabInputs.length === 0) {
           applyInputsFromSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
         }
-        setTimeColumn(reqTimeColumn);
       }
-      const normalizedGroups = Array.isArray(req.group_by_columns)
-        ? req.group_by_columns.filter(
-            (col: unknown): col is string => typeof col === 'string' && col.trim() !== '',
-          )
-        : [];
-      setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
-      const validFrequencies: SequentialFrequency[] = [
-        'hourly',
-        'daily',
-        'weekly',
-        'monthly',
-        'quarterly',
-        'yearly',
-        'custom',
-      ];
-      const reqFrequency =
-        typeof req.frequency === 'string' ? (req.frequency as SequentialFrequency) : undefined;
-      const lockedFrequency =
-        reqFrequency && validFrequencies.includes(reqFrequency) ? reqFrequency : frequency;
-      setFrequency(lockedFrequency);
-      const lockedCustomIntervalValue =
-        reqColumnType === 'datetime' &&
-        lockedFrequency === 'custom' &&
-        typeof req.custom_interval_value === 'number' &&
-        Number.isInteger(req.custom_interval_value) &&
-        req.custom_interval_value > 0
-          ? req.custom_interval_value
-          : null;
-      const lockedCustomIntervalUnit =
-        reqColumnType === 'datetime' &&
-        lockedFrequency === 'custom' &&
-        isCustomIntervalUnit(req.custom_interval_unit)
-          ? req.custom_interval_unit
-          : null;
-      if (lockedFrequency === 'custom' && reqColumnType === 'datetime') {
-        setCustomIntervalValueInput(
-          lockedCustomIntervalValue != null ? String(lockedCustomIntervalValue) : '1',
-        );
-        setCustomIntervalUnit(lockedCustomIntervalUnit ?? 'minutes');
-      } else {
-        setCustomIntervalValueInput('1');
-        setCustomIntervalUnit('minutes');
-      }
-      const reqCaseSensitive = typeof req.case_sensitive === 'boolean' ? req.case_sensitive : true;
-      setCaseSensitive(reqCaseSensitive);
-      hydratedParamsRef.current = {
-        timeColumn: reqTimeColumn,
-        groupByColumns: normalizedGroups.length ? [...normalizedGroups] : [],
-        frequency: lockedFrequency,
-        columnType: reqColumnType,
-        numericOrigin: lockedNumericOrigin,
-        numericInterval: lockedNumericInterval,
-        customIntervalValue: lockedCustomIntervalValue,
-        customIntervalUnit: lockedCustomIntervalUnit,
-        caseSensitive: reqCaseSensitive,
-      };
+      hydratedParamsRef.current = hydrated.hydratedParams;
       if (nodeIdStr && currentWorkspaceId) {
         try {
           const info = await fetchNodeInfo({
@@ -400,10 +282,7 @@ const SequentialAnalysisFeature = ({
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onCleared: (_, options) => {
       setResultSafely(null);
-      setHiddenKeys(new Set());
-      setDetachNodeName('');
-      setSelectedPeriodIndices(new Set());
-      lastClickedIndexRef.current = null;
+      chartControls.resetAfterClear();
       if (options?.preserveLocalState) {
         return;
       }
@@ -412,11 +291,7 @@ const SequentialAnalysisFeature = ({
       onTabTaskChange?.(null);
       setLockedSchema(null);
       setChartType('line');
-      setCaseSensitive(true);
-      setNumericOriginInput('');
-      setNumericIntervalInput('1');
-      setCustomIntervalValueInput('1');
-      setCustomIntervalUnit('minutes');
+      sequentialParameters.resetAfterClear();
     },
     // Finds task ids embedded in result metadata for status recovery.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -475,57 +350,15 @@ const SequentialAnalysisFeature = ({
   const derivedColumnType: 'datetime' | 'numeric' = NUMERIC_TYPE_SET.has(activeColumnType)
     ? 'numeric'
     : 'datetime';
-  const numericOriginValue =
-    derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null;
-  const numericIntervalValue =
-    derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null;
-  const isCustomDatetime = derivedColumnType === 'datetime' && frequency === 'custom';
-  const customIntervalValue = isCustomDatetime
-    ? parsePositiveIntegerInput(customIntervalValueInput)
-    : null;
-  const customIntervalUnitValue: SequentialCustomIntervalUnit | null = isCustomDatetime
-    ? customIntervalUnit
-    : null;
+  const {
+    numericOriginValue,
+    numericIntervalValue,
+    customIntervalValue,
+    customIntervalUnitValue,
+    currentSequentialParams,
+  } = deriveSequentialParameterValues(sequentialParameters, derivedColumnType);
 
   const lastRunRequest = serverRequest ?? null;
-  const currentSequentialParams = {
-    frequency,
-    group_by_columns: normalizeStringArray(groupByColumns),
-    column_type: derivedColumnType,
-    numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : null,
-    numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
-    custom_interval_value: isCustomDatetime ? customIntervalValue : null,
-    custom_interval_unit: isCustomDatetime ? customIntervalUnitValue : null,
-    case_sensitive: caseSensitive,
-  };
-  const sequentialServerParams = (request: Record<string, unknown>) => {
-    const serverColumnType =
-      typeof request.column_type === 'string' ? request.column_type : 'datetime';
-    const serverFrequency = typeof request.frequency === 'string' ? request.frequency : 'year';
-    const serverIsCustomDatetime = serverColumnType === 'datetime' && serverFrequency === 'custom';
-    return {
-      frequency: serverFrequency,
-      group_by_columns: normalizeUnknownStringArray(request.group_by_columns),
-      column_type: serverColumnType,
-      numeric_origin:
-        serverColumnType === 'numeric' && request.numeric_origin != null
-          ? Number(request.numeric_origin)
-          : null,
-      numeric_interval:
-        serverColumnType === 'numeric' && request.numeric_interval != null
-          ? Number(request.numeric_interval)
-          : null,
-      custom_interval_value:
-        serverIsCustomDatetime && typeof request.custom_interval_value === 'number'
-          ? request.custom_interval_value
-          : null,
-      custom_interval_unit:
-        serverIsCustomDatetime && isCustomIntervalUnit(request.custom_interval_unit)
-          ? request.custom_interval_unit
-          : null,
-      case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true,
-    };
-  };
   const serverNodeId = lastRunRequest
     ? ((lastRunRequest.node_id ?? lastRunRequest.nodeId ?? '') as string)
     : '';
@@ -533,7 +366,7 @@ const SequentialAnalysisFeature = ({
   const hasLastRun = Boolean(lastRunRequest);
   const hasParamsChanged = !lastRunRequest
     ? true
-    : hasParameterDiff(currentSequentialParams, sequentialServerParams(lastRunRequest)) ||
+    : hasParameterDiff(currentSequentialParams, readSequentialServerParams(lastRunRequest)) ||
       hasNodeSelectionChanged(
         nodeColumnSelections,
         serverNodeId ? [serverNodeId] : [],
@@ -564,51 +397,14 @@ const SequentialAnalysisFeature = ({
         cancelAnimationFrame(id);
       };
     }
-  }, [hydratingSelection, activeNodeId, timeColumnOptions, nodeColumnSelections, timeColumn]);
-
-  // Adds a blank grouping control up to the supported three-column limit.
-  /**
-   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleAddGroupByColumn = () => {
-    if (groupByColumns.length < 3) {
-      setGroupByColumns([...groupByColumns, '']);
-    }
-  };
-
-  // Removes one grouping control while preserving the order of the remaining groups.
-  /**
-   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleRemoveGroupByColumn = (index: number) => {
-    setGroupByColumns(groupByColumns.filter((_, i) => i !== index));
-  };
-
-  // Updates the selected column for one grouping slot.
-  /**
-   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleGroupByColumnChange = (index: number, value: string) => {
-    const newColumns = [...groupByColumns];
-    newColumns[index] = value;
-    setGroupByColumns(newColumns);
-  };
-
-  // Toggles chart series visibility without losing the underlying result rows.
-  /**
-   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleToggleKey = (key: string) => {
-    setHiddenKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
+  }, [
+    hydratingSelection,
+    activeNodeId,
+    timeColumnOptions,
+    nodeColumnSelections,
+    timeColumn,
+    setTimeColumn,
+  ]);
 
   const {
     // Toggles or range-selects chart periods for the add-to-workspace detach flow.
@@ -663,45 +459,6 @@ const SequentialAnalysisFeature = ({
   const chartConfig = liveChartConfig;
   const groupPointCounts = liveGroupPointCounts;
 
-  // Toggles or range-selects chart periods for the add-to-workspace detach flow.
-  /**
-   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: ignore out-of-range clicks, add shift-click ranges from the last anchor or toggle a single period, then store the updated selection set.
-   */
-  const handlePeriodClick = (index: number, shiftHeld: boolean) => {
-    if (index < 0 || index >= chartData.length) return;
-
-    setSelectedPeriodIndices((prev) => {
-      const next = new Set(prev);
-
-      if (shiftHeld && lastClickedIndexRef.current !== null) {
-        const lower = Math.min(lastClickedIndexRef.current, index);
-        const upper = Math.max(lastClickedIndexRef.current, index);
-        for (let cursor = lower; cursor <= upper; cursor += 1) {
-          next.add(cursor);
-        }
-      } else {
-        if (next.has(index)) {
-          next.delete(index);
-        } else {
-          next.add(index);
-        }
-        lastClickedIndexRef.current = index;
-      }
-
-      return next;
-    });
-  };
-
-  // Clears selected chart periods and the anchor used for shift-click range selection.
-  /**
-   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   */
-  const clearPeriodSelection = () => {
-    setSelectedPeriodIndices(new Set());
-    lastClickedIndexRef.current = null;
-  };
-
   // Runs a fresh trends analysis or updates a locked task after parameter changes.
   /**
    * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
@@ -739,28 +496,6 @@ const SequentialAnalysisFeature = ({
     ? (results.data as Record<string, unknown>[])
     : [];
 
-  const effectiveGroupBy = summaryGroupBy;
-  // Normalizes group values for visibility checks.
-  /**
-   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   */
-  const foldGroupValue = (raw: unknown): string => {
-    const str = String((raw as string | number | boolean | null | undefined) ?? '');
-    return str;
-  };
-
-  // Builds the visible-series key for one raw result row.
-  /**
-   * Called by: SequentialAnalysisFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   */
-  const getGroupKey = (row: Record<string, unknown>) =>
-    effectiveGroupBy.map((column) => foldGroupValue(row[column])).join(' - ');
-
-  // Only the user-toggled legend entries hide a series. There is no
-  // automatic minimum-size filtering: the user sees every group their
-  // analysis produced.
-  const invisibleGroupKeys = hiddenKeys;
-
   const canDetach =
     selectedPeriodIndices.size > 0 &&
     selectedPeriodIndices.size < chartData.length &&
@@ -773,61 +508,28 @@ const SequentialAnalysisFeature = ({
     panelSelectedNodes,
     chartData,
     results,
-    excludedGroupKeys: invisibleGroupKeys,
+    excludedGroupKeys: hiddenKeys,
     selectedPeriodIndices,
     requestedNodeName: detachNodeName,
     queryClient,
   });
 
-  // Checks whether one raw row belongs to a currently visible chart series.
-  /**
-   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   */
-  const isRowVisible = (row: Record<string, unknown>) => {
-    if (!effectiveGroupBy.length) return true;
-    return !invisibleGroupKeys.has(getGroupKey(row));
-  };
-
-  // Produces the bucket id used to match selected chart points back to raw rows.
-  /**
-   * Called by: SequentialAnalysisFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   */
-  const getTimeBucketKey = (row: Record<string, unknown>) =>
-    String(
-      (row.time_period_formatted as string | number | undefined) ??
-        (row.time_period as string | number | undefined) ??
-        '',
-    );
-
-  const selectedTimeBucketKeys = new Set(
-    Array.from(selectedPeriodIndices)
-      .map((index) => String((chartData[index]?.time_period as string | number | undefined) ?? ''))
-      .filter((value) => value.length > 0),
-  );
-
-  // Sums sequential document counts across raw rows for summary metrics.
-  /**
-   * Called by: SequentialAnalysisFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   */
-  const sumSequentialDocs = (rows: Record<string, unknown>[]) =>
-    rows.reduce((total, row) => {
-      const count = row.sequential_count;
-      return total + (typeof count === 'number' ? count : Number(count ?? 0));
-    }, 0);
-
-  const shownRows = rawResultRows.filter(isRowVisible);
-  const chosenRows = shownRows.filter((row) => selectedTimeBucketKeys.has(getTimeBucketKey(row)));
-
-  const totalPointCount =
-    typeof results?.total_records === 'number' ? results.total_records : rawResultRows.length;
-  const totalDocumentCount =
-    typeof panelSelectedNodes[0]?.shape?.[0] === 'number'
-      ? panelSelectedNodes[0].shape[0]
-      : sumSequentialDocs(rawResultRows);
-  const shownPointCount = shownRows.length;
-  const shownDocumentCount = sumSequentialDocs(shownRows);
-  const chosenPointCount = selectedPeriodIndices.size > 0 ? chosenRows.length : 0;
-  const chosenDocumentCount = selectedPeriodIndices.size > 0 ? sumSequentialDocs(chosenRows) : 0;
+  const {
+    totalPointCount,
+    totalDocumentCount,
+    shownPointCount,
+    shownDocumentCount,
+    chosenPointCount,
+    chosenDocumentCount,
+  } = deriveSequentialResultVisibility({
+    rows: rawResultRows,
+    groupByColumns: summaryGroupBy,
+    hiddenKeys,
+    chartData,
+    selectedPeriodIndices,
+    resultTotalRecords: results?.total_records,
+    sourceDocumentCount: panelSelectedNodes[0]?.shape?.[0],
+  });
 
   const resultsSummary = summaryTimeColumn
     ? summaryColumnType === 'numeric'
@@ -851,21 +553,24 @@ const SequentialAnalysisFeature = ({
       return;
     }
     const nodeName = panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data';
-    const header: ChartExportHeaderItem[] = [
-      { label: 'Data Block', value: nodeName },
-      { label: 'Time Column', value: summaryTimeColumn || '—' },
-      { label: 'Frequency', value: summaryFrequency },
-      { label: 'Total', value: `${String(totalPointCount)}/${String(totalDocumentCount)}` },
-      { label: 'Shown', value: `${String(shownPointCount)}/${String(shownDocumentCount)}` },
-      { label: 'Chosen', value: `${String(chosenPointCount)}/${String(chosenDocumentCount)}` },
-      { label: 'Groups', value: summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None' },
-    ];
-    const legend: ChartExportLegendItem[] = groupKeys.map((key, idx) => ({
-      label: chartConfig[key]?.label ?? key,
-      color: chartConfig[key]?.color ?? getPaletteColor(idx) ?? '#888888',
-      type: chartType === 'line' ? 'line' : chartType === 'bar' ? 'bar' : 'area',
-      hidden: hiddenKeys.has(key),
-    }));
+    const { header, legend } = buildSequentialChartExportMetadata({
+      nodeName,
+      timeColumn: summaryTimeColumn,
+      frequencyDisplay: summaryFrequency,
+      groupByColumns: summaryGroupBy,
+      chartType,
+      chartConfig,
+      groupKeys,
+      hiddenKeys,
+      counts: {
+        totalPointCount,
+        totalDocumentCount,
+        shownPointCount,
+        shownDocumentCount,
+        chosenPointCount,
+        chosenDocumentCount,
+      },
+    });
     try {
       await downloadChartAs(svg, {
         nodeName,
@@ -951,9 +656,9 @@ const SequentialAnalysisFeature = ({
           onNumericIntervalChange={setNumericIntervalInput}
           availableColumns={availableColumns}
           groupByColumns={groupByColumns}
-          onAddGroupByColumn={handleAddGroupByColumn}
-          onRemoveGroupByColumn={handleRemoveGroupByColumn}
-          onGroupByColumnChange={handleGroupByColumnChange}
+          onAddGroupByColumn={sequentialParameters.addGroupByColumn}
+          onRemoveGroupByColumn={sequentialParameters.removeGroupByColumn}
+          onGroupByColumnChange={sequentialParameters.changeGroupByColumn}
           caseSensitive={caseSensitive}
           onCaseSensitiveChange={setCaseSensitive}
         />
@@ -1005,9 +710,11 @@ const SequentialAnalysisFeature = ({
           selectedPeriodIndices={selectedPeriodIndices}
           canDetach={canDetach}
           isDetaching={isDetaching}
-          onToggleKey={handleToggleKey}
-          onPeriodClick={handlePeriodClick}
-          onClearSelection={clearPeriodSelection}
+          onToggleKey={chartControls.toggleKey}
+          onPeriodClick={(index, shiftHeld) => {
+            chartControls.selectPeriod(index, shiftHeld, chartData.length);
+          }}
+          onClearSelection={chartControls.clearPeriodSelection}
           detachNodeName={detachNodeName}
           detachNodeNamePlaceholder={defaultNodeName}
           onDetachNodeNameChange={setDetachNodeName}

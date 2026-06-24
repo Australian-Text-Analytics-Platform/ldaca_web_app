@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useReducer, useState } from 'react';
 import { getRawFile, moveFile } from '@/api';
 import type { FileTreeDirectory } from '@/features/views/data-loader/types';
+import {
+  createFileBrowserCitationState,
+  fileBrowserCitationReducer,
+} from './fileBrowserCitationState';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -22,10 +26,11 @@ export function useFileBrowserActions({
   refetchFiles,
   notify,
 }: UseFileBrowserActionsParams) {
-  const [citationDirectory, setCitationDirectory] = useState<FileTreeDirectory | null>(null);
-  const [citationPath, setCitationPath] = useState<string | null>(null);
-  const [citationContent, setCitationContent] = useState<string | null>(null);
-  const [citationLoading, setCitationLoading] = useState(false);
+  const [citation, dispatchCitation] = useReducer(
+    fileBrowserCitationReducer,
+    undefined,
+    createFileBrowserCitationState,
+  );
   const [refreshingFiles, setRefreshingFiles] = useState(false);
 
   /**
@@ -73,16 +78,11 @@ export function useFileBrowserActions({
    */
   const openCitation = async (directory: FileTreeDirectory, readmePath: string | null) => {
     if (!readmePath) {
-      setCitationDirectory(directory);
-      setCitationPath(null);
-      setCitationContent(null);
+      dispatchCitation({ type: 'openWithoutReadme', directory });
       return;
     }
 
-    setCitationDirectory(directory);
-    setCitationPath(readmePath);
-    setCitationContent(null);
-    setCitationLoading(true);
+    dispatchCitation({ type: 'startLoading', directory, path: readmePath });
     try {
       const { data } = await getRawFile({
         headers: authHeaders,
@@ -91,11 +91,10 @@ export function useFileBrowserActions({
         throwOnError: true,
       });
       const rawContent = data as string;
-      setCitationContent(rawContent);
+      dispatchCitation({ type: 'loaded', content: rawContent });
     } catch (error) {
+      dispatchCitation({ type: 'failed' });
       notify('error', (error as Error).message || 'Failed to load citation.');
-    } finally {
-      setCitationLoading(false);
     }
   };
 
@@ -104,17 +103,14 @@ export function useFileBrowserActions({
    * Called by: useFileBrowserActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const closeCitation = () => {
-    setCitationDirectory(null);
-    setCitationPath(null);
-    setCitationContent(null);
-    setCitationLoading(false);
+    dispatchCitation({ type: 'close' });
   };
 
   return {
-    citationDirectory,
-    citationPath,
-    citationContent,
-    citationLoading,
+    citationDirectory: citation.directory,
+    citationPath: citation.path,
+    citationContent: citation.content,
+    citationLoading: citation.loading,
     refreshingFiles,
     handleRefreshFiles,
     handleMoveFile,

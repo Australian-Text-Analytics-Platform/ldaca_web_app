@@ -19,6 +19,7 @@
 import {
   useCallback,
   useEffect,
+  useReducer,
   useRef,
   useState,
   type KeyboardEvent,
@@ -34,6 +35,10 @@ import {
   moveInOrder,
   TAB_MAX_WIDTH,
 } from './chromeTabsLayout';
+import {
+  chromeTabsInteractionReducer,
+  createChromeTabsInteractionState,
+} from './chromeTabsInteractionState';
 
 export interface ChromeTabItem {
   id: string;
@@ -98,19 +103,16 @@ export function ChromeTabs({
 }: ChromeTabsProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-
-  // Transient drag preview order; null when not dragging. While set it overrides
-  // the prop order so siblings can slide before the parent persists the change.
-  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
-  const [dragTabId, setDragTabId] = useState<string | null>(null);
-  const [dragDeltaX, setDragDeltaX] = useState(0);
-  // Slot left-offset of the dragged tab at drag start; kept in state (not the
-  // ref) so the render-time ``translateX`` never reads a ref during render.
-  const [dragHomeLeft, setDragHomeLeft] = useState(0);
+  const [interactionState, dispatchInteraction] = useReducer(
+    chromeTabsInteractionReducer,
+    undefined,
+    createChromeTabsInteractionState,
+  );
+  const {
+    drag: { order: dragOrder, tabId: dragTabId, deltaX: dragDeltaX, homeLeft: dragHomeLeft },
+    rename: { id: renamingId, draftTitle },
+  } = interactionState;
   const dragRef = useRef<DragState | null>(null);
-
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState('');
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   // Per-tab title measurement. ``titleRefs`` points at each rendered title span;
@@ -206,29 +208,24 @@ export function ChromeTabs({
   }, [titlesKey, widthsKey, containerWidth]);
 
   const finishRename = useCallback(() => {
-    setRenamingId((current) => {
-      if (current) {
-        const trimmed = draftTitle.trim();
-        if (trimmed) onRename?.(current, trimmed);
-      }
-      return null;
-    });
-  }, [draftTitle, onRename]);
+    if (renamingId) {
+      const trimmed = draftTitle.trim();
+      if (trimmed) onRename?.(renamingId, trimmed);
+    }
+    dispatchInteraction({ type: 'renameCancelled' });
+  }, [draftTitle, onRename, renamingId]);
 
   const cancelRename = useCallback(() => {
-    setRenamingId(null);
+    dispatchInteraction({ type: 'renameCancelled' });
   }, []);
 
   const beginRename = useCallback((tab: ChromeTabItem) => {
-    setRenamingId(tab.id);
-    setDraftTitle(tab.title);
+    dispatchInteraction({ type: 'renameStarted', tabId: tab.id, title: tab.title });
   }, []);
 
   const clearDrag = useCallback(() => {
     dragRef.current = null;
-    setDragTabId(null);
-    setDragDeltaX(0);
-    setDragOrder(null);
+    dispatchInteraction({ type: 'dragCleared' });
   }, []);
 
   const handlePointerDown = (tab: ChromeTabItem, event: ReactPointerEvent<HTMLDivElement>) => {
@@ -248,22 +245,27 @@ export function ChromeTabs({
     const drag = dragRef.current;
     if (drag?.pointerId !== event.pointerId) return;
     const delta = event.clientX - drag.startX;
+    const wasMoved = drag.moved;
 
-    if (!drag.moved) {
+    if (!wasMoved) {
       if (Math.abs(delta) < DRAG_THRESHOLD || !onReorder) return;
       drag.moved = true;
-      setDragTabId(drag.tabId);
-      setDragHomeLeft(drag.homeLeft);
-      setDragOrder(orderIds);
+      dispatchInteraction({
+        type: 'dragStarted',
+        tabId: drag.tabId,
+        order: orderIds,
+        homeLeft: drag.homeLeft,
+      });
       onActivate(drag.tabId);
     }
 
-    setDragDeltaX(delta);
-    setDragOrder((current) => {
-      const order = current ?? orderIds;
-      const fromIndex = order.indexOf(drag.tabId);
-      const destIndex = closestIndex(drag.homeLeft + delta, positions);
-      return moveInOrder(order, fromIndex, destIndex);
+    const order = wasMoved ? (dragOrder ?? orderIds) : orderIds;
+    const fromIndex = order.indexOf(drag.tabId);
+    const destIndex = closestIndex(drag.homeLeft + delta, positions);
+    dispatchInteraction({
+      type: 'dragMoved',
+      deltaX: delta,
+      order: moveInOrder(order, fromIndex, destIndex),
     });
   };
 
@@ -350,7 +352,10 @@ export function ChromeTabs({
                   ref={renameInputRef}
                   value={draftTitle}
                   onChange={(event) => {
-                    setDraftTitle(event.target.value);
+                    dispatchInteraction({
+                      type: 'renameDraftChanged',
+                      title: event.target.value,
+                    });
                   }}
                   onBlur={finishRename}
                   onKeyDown={handleRenameKeyDown}

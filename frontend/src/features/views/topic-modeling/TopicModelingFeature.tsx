@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -16,20 +16,21 @@ import {
   vizColorMapForNodes,
   executeAnalysisRerun,
 } from '../common';
-import { useTabNodeInputs } from '../common/nodeInputs';
+import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
-import {
-  TopicModelingParameterPanel,
-  type CorpusSample,
-} from './components/panels/TopicModelingParameterPanel';
+import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
+import {
+  DEFAULT_TOPIC_SIZE_VALUE,
+  normalizeTopicSampleFractions,
+  useTopicModelingParameters,
+} from './hooks/useTopicModelingParameters';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
-
-const DEFAULT_TOPIC_SIZE_VALUE = 10;
+import { useTopicModelingResultControls } from './hooks/useTopicModelingResultControls';
 
 /** Renders the topic-modeling workflow for live BERTopic runs and result exploration. */
 /**
@@ -71,12 +72,13 @@ function TopicModelingFeature({
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeIds = nodeInputs.resolvedNodes.map((node) => node.id);
+  const panelNodeIds = panelSelectedNodes
+    .slice(0, 2)
+    .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
+    .filter((id): id is string => Boolean(id));
+  const panelNodeIdsKey = panelNodeIds.join('|');
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(
-      selections
-        .filter((selection) => selection.nodeId)
-        .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null })),
-    );
+    onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
   const { serverRequest } = useLastRunRequest({
     analysisType: 'topic_modeling',
@@ -95,6 +97,7 @@ function TopicModelingFeature({
     min_topic_size?: number;
     random_seed?: number;
     representative_words_count?: number;
+    sample_fractions?: (number | null)[];
   } | null;
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
@@ -104,28 +107,40 @@ function TopicModelingFeature({
 
   const result: TopicModelingResponse | null = liveResult;
 
-  const [corpusSamples, setCorpusSamples] = useState<CorpusSample[]>([]);
-  // Sample values reset on data-block change (auto-populate) but persist
-  // through Clear Results if the user explicitly touched them, so the user
-  // doesn't lose tuned sampling when re-running on the same corpora.
-  const [corpusSamplesUserSet, setCorpusSamplesUserSet] = useState(false);
-  // "Minimum topic size" = HDBSCAN min_cluster_size: the smallest group of
-  // chunks that counts as a topic. The topic count is whatever emerges (the
-  // only native topic-count control; there is no post-fit merge to a target).
-  const [topicSizeValue, setTopicSizeValue] = useState(DEFAULT_TOPIC_SIZE_VALUE);
-  const [topicSizeUserSet, setTopicSizeUserSet] = useState(false);
-  const [randomSeed, setRandomSeed] = useState(42);
-  const [randomSeedUserSet, setRandomSeedUserSet] = useState(false);
-  const [representativeWordsCount, setRepresentativeWordsCount] = useState(15);
-  const [representativeWordsCountUserSet, setRepresentativeWordsCountUserSet] = useState(false);
-  const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
-  const [tooltip, setTooltip] = useState<{
-    x: number;
-    y: number;
-    topic: TopicModelingTopic | null;
-  }>({ x: 0, y: 0, topic: null });
-  const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
-  const [topicSearchQuery, setTopicSearchQuery] = useState('');
+  const {
+    corpusSamples,
+    updateCorpusSample,
+    topicSizeValue,
+    topicSizeUserSet,
+    setTopicSizeValueFromUser,
+    randomSeed,
+    randomSeedUserSet,
+    setRandomSeedFromUser,
+    representativeWordsCount,
+    representativeWordsCountUserSet,
+    setRepresentativeWordsCountFromUser,
+    nodeDocCounts,
+    topicSizeWarning,
+    showSamplingWarning,
+    sampleFractionsForRequest,
+    hasAnySampling,
+    hydrateParameters,
+    resetAfterClear,
+  } = useTopicModelingParameters({
+    panelSelectedNodes,
+    panelNodeIdsKey,
+  });
+  const {
+    hoveredTopicId,
+    setHoveredTopicId,
+    tooltip,
+    setTooltip,
+    selectedTopicIds,
+    topicSearchQuery,
+    setTopicSearchQuery,
+    handleToggleTopicSelection,
+    handleClearTopicSelection,
+  } = useTopicModelingResultControls();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(800);
@@ -209,13 +224,7 @@ function TopicModelingFeature({
       if (!tabInputs || tabInputs.length === 0) {
         applyInputsFromSelections(sels);
       }
-      setRandomSeed(Number(req.random_seed ?? 42));
-      setRandomSeedUserSet(true);
-      setRepresentativeWordsCount(Number(req.representative_words_count ?? 15));
-      setRepresentativeWordsCountUserSet(true);
-      const hydratedTopicSizeValue = Number(req.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE);
-      setTopicSizeValue(hydratedTopicSizeValue);
-      setTopicSizeUserSet(true);
+      hydrateParameters(req);
     },
     // Clears topic-specific result and error state after the shared lifecycle deletes results.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -245,19 +254,6 @@ function TopicModelingFeature({
     isResultRunning: (r) => r?.state === 'running',
   });
 
-  // Computes default per-corpus sampling controls from selected node row counts.
-  /**
-   * Called by: TopicModelingFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   * Flow: read the first two selected node row counts, compute a rounded sample percent capped at 100, then enable sampling only below full corpus.
-   */
-  const computeDefaultCorpusSamples = (): CorpusSample[] =>
-    panelSelectedNodes.slice(0, 2).map((node) => {
-      const nDocs = (node as { shape?: number[] }).shape?.[0] ?? 0;
-      const autoPercent =
-        nDocs > 0 ? Math.min(100, Math.ceil(((4000 / nDocs) * 100) / 10) * 10) : 100;
-      return { percent: String(autoPercent), enabled: autoPercent < 100 };
-    });
-
   // Clears live topic results while preserving user-tuned sampling only when explicitly set.
   /**
    * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
@@ -265,58 +261,13 @@ function TopicModelingFeature({
   const handleClear = async () => {
     setIsClearing(true);
     await clearResults();
-    setSelectedTopicIds(new Set());
+    handleClearTopicSelection();
     setTopicSearchQuery('');
-    // Only reset sampling defaults when the user hasn't customized them — if
-    // they have, the same corpora deserve the same tuned sampling on the
-    // next run. The node-change effect below still resets these when the
-    // selected blocks differ.
-    if (!corpusSamplesUserSet) {
-      setCorpusSamples(computeDefaultCorpusSamples());
-    }
-    setTopicSizeValue(DEFAULT_TOPIC_SIZE_VALUE);
-    setTopicSizeUserSet(false);
-    setRandomSeedUserSet(false);
-    setRepresentativeWordsCountUserSet(false);
+    resetAfterClear();
     setIsClearing(false);
   };
 
-  // Records the next-run minimum topic size (HDBSCAN min_cluster_size).
-  /**
-   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleTopicSizeValueChange = (value: number) => {
-    setTopicSizeValue(value);
-    setTopicSizeUserSet(true);
-  };
-
-  // Toggles topics selected for detach/export workflows.
-  /**
-   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleToggleTopicSelection = (id: number) => {
-    setSelectedTopicIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  // Clears the current topic selection set.
-  /**
-   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleClearTopicSelection = () => {
-    setSelectedTopicIds(new Set());
-  };
-
   const topicRunningTask = taskStatus.runningTask;
-  const panelNodeIds = panelSelectedNodes
-    .slice(0, 2)
-    .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
-    .filter((id): id is string => Boolean(id));
-  const panelNodeIdsKey = panelNodeIds.join('|');
 
   // Observe container width for responsive sizing
   useEffect(() => {
@@ -369,36 +320,15 @@ function TopicModelingFeature({
     return !selection?.column;
   });
 
-  // sample_fractions diff: server stores `null` (or absent) when sampling
-  // is disabled per corpus; mirror that shape so the comparison is stable
-  // across "no sampling specified" vs "explicit 100%".
-  /**
-   * Called by: TopicModelingFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   */
-  const normalizeSampleFractions = (raw: unknown, nodeCount: number): (number | null)[] => {
-    const list: unknown[] = Array.isArray(raw) ? raw : [];
-    return Array.from({ length: nodeCount }, (_, idx) => {
-      const value = list[idx];
-      if (typeof value === 'number' && value > 0 && value < 1) return value;
-      return null;
-    });
-  };
-
-  const currentSampleFractions = corpusSamples.slice(0, panelNodeIds.length).map((s) => {
-    if (!s.enabled) return null;
-    const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
-    return pct >= 100 ? null : pct / 100;
-  });
-
   const currentTopicParams = {
     random_seed: randomSeed,
     min_topic_size: topicSizeValue,
-    sample_fractions: normalizeSampleFractions(currentSampleFractions, panelNodeIds.length),
+    sample_fractions: sampleFractionsForRequest,
   };
   const serverTopicParams = (request: Record<string, unknown>) => ({
     random_seed: Number(request.random_seed),
     min_topic_size: Number(request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
-    sample_fractions: normalizeSampleFractions(
+    sample_fractions: normalizeTopicSampleFractions(
       (request as unknown as { sample_fractions?: unknown }).sample_fractions,
       panelNodeIds.length,
     ),
@@ -422,19 +352,6 @@ function TopicModelingFeature({
     hasResults: Boolean(result),
   });
 
-  // Color assignment now handled by stack allocator - no auto-fill effect needed
-
-  // Auto-populate sampling fractions when selected nodes change, and treat
-  // these auto-values as not-user-set so Clear Results can re-derive them.
-  useEffect(() => {
-    const samples = computeDefaultCorpusSamples();
-    void Promise.resolve().then(() => {
-      setCorpusSamples(samples);
-      setCorpusSamplesUserSet(false);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelNodeIdsKey]);
-
   // Updates a node's selected text column and persists it as the document column preference.
   /**
    * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
@@ -444,54 +361,12 @@ function TopicModelingFeature({
     void persistDocumentColumn(nodeId, column);
   };
 
-  const nodeDocCounts = useMemo(
-    () => panelSelectedNodes.slice(0, 2).map((n) => (n as { shape?: number[] }).shape?.[0] ?? 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panelNodeIdsKey],
-  );
-
-  const effectiveDocCounts = useMemo(
-    () =>
-      nodeDocCounts.map((n, idx) => {
-        const s = corpusSamples[idx];
-        if (!s?.enabled) return n;
-        const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
-        return Math.max(1, Math.round((n * pct) / 100));
-      }),
-    [nodeDocCounts, corpusSamples],
-  );
-
-  const combinedEffective = effectiveDocCounts.reduce((a, b) => a + b, 0);
-
-  // "Minimum topic size" is the HDBSCAN min_cluster_size, i.e. the floor on
-  // documents (chunks) per topic. A very small floor produces noisy/unstable
-  // micro-topics, so warn as it drops below readable thresholds.
-  const topicSizeWarning: 'orange' | 'red' | null = useMemo(() => {
-    if (combinedEffective <= 0 || topicSizeValue <= 0) return null;
-    if (topicSizeValue < 3) return 'red';
-    if (topicSizeValue < 10) return 'orange';
-    return null;
-  }, [topicSizeValue, combinedEffective]);
-
-  const showSamplingWarning = combinedEffective > 0 && combinedEffective < 5 * topicSizeValue;
-
-  const sampleFractionsForRequest = useMemo(
-    () =>
-      corpusSamples.slice(0, panelNodeIds.length).map((s) => {
-        if (!s.enabled) return null;
-        const pct = Math.min(100, Math.max(1, Number(s.percent) || 100));
-        return pct >= 100 ? null : pct / 100;
-      }),
-    [corpusSamples, panelNodeIds.length],
-  );
-  const hasAnySampling = sampleFractionsForRequest.some((f) => f !== null);
-
   const rawTopics: TopicModelingTopic[] = result?.data?.topics ?? [];
   // Rebuild each topic's label from its representative_words sliced to the
   // current "Words per topic" display cap, so changing that input updates
   // the bottom list without a rerun. Falls back to the server-built label
   // when representative_words is missing.
-  const topics: TopicModelingTopic[] = useMemo(() => {
+  const topics: TopicModelingTopic[] = (() => {
     const cap = Math.max(1, Math.floor(representativeWordsCount));
     const filtered: TopicModelingTopic[] = [];
     for (const topic of rawTopics) {
@@ -504,8 +379,7 @@ function TopicModelingFeature({
       filtered.push(sliced ? { ...topic, label: sliced } : { ...topic });
     }
     return filtered;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, representativeWordsCount]);
+  })();
 
   // Task-flow hook is intentionally placed after ``topics`` so it can
   // receive the already-filtered display list as ``displayedTopics`` —
@@ -632,34 +506,21 @@ function TopicModelingFeature({
         actionState={actionState}
         corpusSamples={corpusSamples}
         nodeDocCounts={nodeDocCounts}
-        onCorpusSampleChange={(idx, update) => {
-          setCorpusSamplesUserSet(true);
-          setCorpusSamples((prev) => {
-            const next = [...prev];
-            next[idx] = { ...(next[idx] ?? { percent: '100', enabled: false }), ...update };
-            return next;
-          });
-        }}
+        onCorpusSampleChange={updateCorpusSample}
         topicSizeValue={topicSizeValue}
         topicSizeUserSet={topicSizeUserSet}
         topicSizeWarning={topicSizeWarning}
-        onTopicSizeValueChange={handleTopicSizeValueChange}
+        onTopicSizeValueChange={setTopicSizeValueFromUser}
         showSamplingWarning={showSamplingWarning}
         randomSeed={randomSeed}
         randomSeedUserSet={randomSeedUserSet}
-        onRandomSeedChange={(v) => {
-          setRandomSeed(v);
-          setRandomSeedUserSet(true);
-        }}
+        onRandomSeedChange={setRandomSeedFromUser}
         representativeWordsCount={representativeWordsCount}
         representativeWordsCountUserSet={representativeWordsCountUserSet}
         representativeWordsCountServerMax={
           typedServerRequest ? Number(typedServerRequest.representative_words_count) || null : null
         }
-        onRepresentativeWordsCountChange={(v) => {
-          setRepresentativeWordsCount(v);
-          setRepresentativeWordsCountUserSet(true);
-        }}
+        onRepresentativeWordsCountChange={setRepresentativeWordsCountFromUser}
         isRunning={isRunning}
         isStopping={isStopping}
         isClearing={isClearing}

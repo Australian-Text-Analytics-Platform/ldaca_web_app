@@ -7,8 +7,12 @@ import type {
 } from '@/features/views/common/nodeSelectionTypes';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
-import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';
-import { buildWorkspaceNodeMap, deriveNodeLabel } from '../../utils/nodeMetadata';
+import {
+  buildSingleNodeSelectionPanelModel,
+  buildWorkspaceNodeMap,
+  deriveNodeLabel,
+} from '../../utils/nodeMetadata';
+import { buildSlicePayload, deriveSliceFormModel, type SamplingMode } from './sliceFormModel';
 
 interface SliceOperationResult {
   success?: boolean;
@@ -20,8 +24,6 @@ interface SliceOperationResult {
     data_type?: string;
   };
 }
-
-type SamplingMode = 'slice' | 'random_sample';
 
 export interface SliceSubTabProps {
   selectedNodeId: string | null;
@@ -134,7 +136,6 @@ export interface UseSliceSubTabResult {
   showActivityTag: boolean;
 }
 
-const SINGLE_NODE_PALETTE = ['#2563eb'];
 const PREVIEW_DEBOUNCE_MS = 400;
 const DEFAULT_RANDOM_SEED = '42';
 const DEFAULT_SLICE_FORM_VALUES: SliceFormValues = {
@@ -145,53 +146,6 @@ const DEFAULT_SLICE_FORM_VALUES: SliceFormValues = {
   randomSeedInput: DEFAULT_RANDOM_SEED,
   noRandomSeed: false,
   newNodeName: '',
-};
-
-/**
- * Serializes slice/random-sample form values into the backend request shape.
- * Preview and apply paths both use this helper to stay in sync.
- * Used by: local callers in preprocessing/useSliceSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- * Steps: branch between deterministic slice and random-sample modes, coerce numeric inputs, and
- * include seed/fraction only when relevant.
- */
-const buildSlicePayload = ({
-  mode,
-  offset,
-  lengthValue,
-  sampleSizeValue,
-  randomSeedValue,
-  isFullShuffle,
-}: {
-  mode: SamplingMode;
-  offset: number;
-  lengthValue?: number;
-  sampleSizeValue?: number;
-  randomSeedValue?: number;
-  isFullShuffle?: boolean;
-}): SliceRequestPayload => {
-  if (mode === 'random_sample') {
-    if (isFullShuffle) {
-      const payload: SliceRequestPayload = { mode: 'shuffle' };
-      if (typeof randomSeedValue === 'number') {
-        payload.random_seed = randomSeedValue;
-      }
-      return payload;
-    }
-    const payload: SliceRequestPayload = { mode };
-    if (typeof sampleSizeValue === 'number') {
-      payload.sample_size = sampleSizeValue;
-    }
-    if (typeof randomSeedValue === 'number') {
-      payload.random_seed = randomSeedValue;
-    }
-    return payload;
-  }
-  const payload: SliceRequestPayload = { mode };
-  payload.offset = offset;
-  if (typeof lengthValue === 'number') {
-    payload.length = lengthValue;
-  }
-  return payload;
 };
 
 /**
@@ -299,79 +253,49 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     return typeof rows === 'number' && Number.isFinite(rows) && rows >= 0 ? Math.round(rows) : null;
   })();
 
-  const sliceSelectedNodesForPanel = activeNode ? [activeNode] : [];
+  const selectionPanelModel = buildSingleNodeSelectionPanelModel({
+    nodeId: selectedNodeId,
+    workspaceNodes,
+    selectedNode: activeNode,
+  });
 
-  const sliceNodeSelections: NodeColumnSelection[] = selectedNodeId
-    ? [{ nodeId: selectedNodeId, column: '' }]
-    : [];
-
-  // SINGLE_NODE_PALETTE is a non-empty module constant, so index 0 exists.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: SINGLE_NODE_PALETTE[0]! } : {};
-
-  const hasSelection = Boolean(selectedNodeId);
-
-  const trimmedOffset = offsetInput.trim();
-  const offsetNumber = Number(trimmedOffset);
-  const offsetValid =
-    trimmedOffset.length > 0 && Number.isInteger(offsetNumber) && offsetNumber >= 0;
-
-  const trimmedLength = lengthInput.trim();
-  const lengthNumber = trimmedLength.length > 0 ? Number(trimmedLength) : null;
-  const lengthValid = lengthNumber !== null && Number.isInteger(lengthNumber) && lengthNumber >= 1;
-  const lengthValue = lengthNumber ?? undefined;
-
-  const trimmedSampleSize = sampleSizeInput.trim();
-  const sampleSizeNumber = trimmedSampleSize.length > 0 ? Number(trimmedSampleSize) : null;
-  const sampleSizeValid =
-    sampleSizeNumber !== null &&
-    Number.isFinite(sampleSizeNumber) &&
-    sampleSizeNumber > 0 &&
-    (sampleSizeNumber < 1 || Number.isInteger(sampleSizeNumber));
-  const sampleSizeValue = sampleSizeValid ? sampleSizeNumber : undefined;
-
-  const sampleSizeHint: string | null = (() => {
-    if (trimmedSampleSize.length === 0 || sampleSizeValid) return null;
-    if (sampleSizeNumber !== null && sampleSizeNumber >= 1 && !Number.isInteger(sampleSizeNumber)) {
-      return 'Values ≥ 1 must be whole numbers (e.g. 25, not 25.5).';
-    }
-    return 'Enter a fraction (0–1) or an integer row count (≥ 1).';
-  })();
-
-  const trimmedRandomSeed = randomSeedInput.trim();
-  const randomSeedNumber = trimmedRandomSeed.length > 0 ? Number(trimmedRandomSeed) : null;
-  const randomSeedValid = noRandomSeed
-    ? true
-    : trimmedRandomSeed.length > 0 &&
-      randomSeedNumber !== null &&
-      Number.isInteger(randomSeedNumber) &&
-      randomSeedNumber >= 0;
-  const randomSeedValue = noRandomSeed
-    ? undefined
-    : randomSeedValid
-      ? (randomSeedNumber ?? undefined)
-      : undefined;
-
-  const hasOperation =
-    mode === 'slice' ? offsetValid && lengthValid : sampleSizeValid && randomSeedValid;
-
-  const isFullShuffle =
-    mode === 'random_sample' &&
-    nodeRowCount !== null &&
-    sampleSizeValid &&
-    Number.isInteger(sampleSizeNumber) &&
-    sampleSizeNumber >= nodeRowCount;
-
-  const formSignature = [
-    selectedNodeId ?? '',
+  const sliceModel = deriveSliceFormModel({
+    selectedNodeId,
+    selectedNodeLabel,
+    nodeRowCount,
     mode,
     offsetInput,
     lengthInput,
     sampleSizeInput,
     randomSeedInput,
-    noRandomSeed ? 'no-random-seed' : 'seeded',
-  ].join('\0');
-  const resultSignature = [selectedNodeId ?? '', selectedNodeLabel, mode].join('\0');
+    noRandomSeed,
+    isSlicing,
+    isOperationsLoading: isLoading.operations,
+  });
+  const {
+    offsetNumber,
+    offsetValid,
+    lengthNumber,
+    lengthValid,
+    lengthValue,
+    sampleSizeNumber,
+    sampleSizeValid,
+    sampleSizeValue,
+    sampleSizeHint,
+    randomSeedValid,
+    randomSeedValue,
+    hasSelection,
+    isFullShuffle,
+    formSignature,
+    resultSignature,
+    autoNodeName,
+    rangeSummary,
+    previewReady,
+    previewReadyMessage,
+    operationPayload,
+    applyDisabled,
+    applyDisabledReason,
+  } = sliceModel;
   const inlineError =
     inlineErrorState?.signature === formSignature ? inlineErrorState.message : null;
   const lastResult = lastResultState?.signature === resultSignature ? lastResultState.result : null;
@@ -382,53 +306,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const setCurrentInlineError = (message: string | null) => {
     setInlineErrorState(message ? { signature: formSignature, message } : null);
   };
-
-  const autoNodeName = buildSamplingAutoNodeName({
-    baseName: selectedNodeLabel || selectedNodeId,
-    mode,
-    offset: offsetValid ? offsetNumber : undefined,
-    length: lengthValid ? lengthValue : undefined,
-    sampleSize: sampleSizeValid ? sampleSizeValue : undefined,
-    randomSeed: randomSeedValid ? randomSeedValue : undefined,
-    noRandomSeed,
-    isFullShuffle,
-  });
-
-  const rangeSummary = (() => {
-    if (!hasSelection) {
-      return 'Select a data block to configure sampling.';
-    }
-    if (mode === 'slice') {
-      if (!offsetValid) {
-        return 'Offset must be a non-negative integer (zero-based row index).';
-      }
-      if (!lengthValid) {
-        return 'Length is required – enter the number of rows to include in the slice.';
-      }
-      if (lengthValue === 0) {
-        return `Slice starting at row ${String(offsetNumber)} returning zero rows (length = 0).`;
-      }
-      const endRow = offsetNumber + (lengthValue ?? 0) - 1;
-      return `Rows ${String(offsetNumber)}–${String(endRow)} inclusive (${String(lengthValue)} total).`;
-    }
-
-    if (!sampleSizeValid) {
-      return 'Enter a fraction (0–1) or an integer row count (≥ 1).';
-    }
-    if (!randomSeedValid) {
-      return 'Random seed must be a non-negative integer.';
-    }
-    if (sampleSizeValue !== undefined && sampleSizeValue < 1) {
-      if (randomSeedValue === undefined) {
-        return `Random sample using fraction ${String(sampleSizeValue)}.`;
-      }
-      return `Random sample using fraction ${String(sampleSizeValue)} with seed ${String(randomSeedValue)}.`;
-    }
-    if (randomSeedValue === undefined) {
-      return `Random sample of ${String(sampleSizeValue)} rows.`;
-    }
-    return `Random sample of ${String(sampleSizeValue)} rows with seed ${String(randomSeedValue)}.`;
-  })();
 
   const lastResultSummary = (() => {
     if (!lastResult) {
@@ -455,19 +332,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     return `Last slice “${lastResult.nodeName}” (rows ${String(lastOffset)}–${String(endRow)}).`;
   })();
 
-  const previewReady = hasSelection && (mode === 'slice' ? offsetValid : true);
-
-  const operationPayload: SliceRequestPayload | null = hasOperation
-    ? buildSlicePayload({
-        mode,
-        offset: offsetNumber,
-        lengthValue,
-        sampleSizeValue,
-        randomSeedValue,
-        isFullShuffle,
-      })
-    : null;
-
   const {
     data: previewData,
     columns: previewColumns,
@@ -489,18 +353,12 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
 
-  const previewReadyMessage = !hasSelection
-    ? 'Select a data block to preview output rows.'
-    : mode === 'slice'
-      ? 'Showing original data. Enter offset and length to preview sliced rows.'
-      : 'Showing original data. Enter a fraction or row count and optional seed to preview sampled rows.';
-
   /**
    * Clamps slice length after editing so preview/apply receives a valid range.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const handleLengthBlur = () => {
-    if (trimmedLength.length === 0) return;
+    if (lengthInput.trim().length === 0) return;
     if (lengthNumber === null || !Number.isInteger(lengthNumber)) return;
     if (lengthNumber < 1) {
       sliceForm.setFieldValue('lengthInput', '1');
@@ -514,37 +372,16 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const handleSampleSizeBlur = () => {
-    if (trimmedSampleSize.length === 0 || !sampleSizeValid) return;
+    if (sampleSizeInput.trim().length === 0 || !sampleSizeValid) return;
     if (
       nodeRowCount !== null &&
+      sampleSizeNumber !== null &&
       Number.isInteger(sampleSizeNumber) &&
       sampleSizeNumber >= nodeRowCount
     ) {
       sliceForm.setFieldValue('sampleSizeInput', String(nodeRowCount));
     }
   };
-
-  const applyDisabled = !hasSelection || !hasOperation || isSlicing || isLoading.operations;
-
-  const applyDisabledReason: string | undefined = (() => {
-    if (isSlicing || isLoading.operations) return undefined;
-    if (!hasSelection) return 'Select a data block first';
-    if (mode === 'slice') {
-      if (!lengthValid) {
-        return trimmedLength.length === 0
-          ? 'Enter a length (number of rows to include)'
-          : 'Length must be a whole number ≥ 1';
-      }
-    } else {
-      if (!sampleSizeValid) {
-        return trimmedSampleSize.length === 0
-          ? 'Enter a sample size'
-          : 'Enter a valid sample size — a fraction (0–1) or a whole number ≥ 1';
-      }
-      if (!randomSeedValid) return 'Enter a valid random seed (non-negative integer)';
-    }
-    return undefined;
-  })();
 
   /**
    * Validates and applies the current slice/sample as a new workspace node.
@@ -640,11 +477,11 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   return {
     selectionPanel: {
-      selectedNodes: sliceSelectedNodesForPanel,
-      nodeColumnSelections: sliceNodeSelections,
-      nodeColors: sliceNodeColors,
-      defaultPalette: SINGLE_NODE_PALETTE,
-      disabled: sliceSelectedNodesForPanel.length === 0,
+      selectedNodes: selectionPanelModel.selectedNodes,
+      nodeColumnSelections: selectionPanelModel.nodeColumnSelections,
+      nodeColors: selectionPanelModel.nodeColors,
+      defaultPalette: selectionPanelModel.defaultPalette,
+      disabled: selectionPanelModel.disabled,
       originalCount: selectedNodes.length,
       /**
        * Satisfies the shared panel API; slice mode never edits source columns.

@@ -1,50 +1,28 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api';
 import type { AnalysisTabInput, TokenFrequencyResponse } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 
-import {
-  DEFAULT_TOKEN_LIMIT,
-  parseAnalysisNodeRequest,
-  getNodeIdentifier,
-  useLastRunRequest,
-} from '../common';
-import { useTabNodeInputs } from '../common/nodeInputs';
+import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest, useLastRunRequest } from '../common';
+import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
+import { deriveTokenizerModelsByNode } from '../common/tokenizerModelPreferences';
 import {
-  buildResponseDisplayNameHints,
-  computeAnalysisNodeIds,
-  deriveNodeDisplayResults,
-  normalizeNodeResults,
-} from './tokenFrequencyAdapters';
-import {
+  buildNodeIdDisplayNameMap,
   buildSelectionNameById,
+  derivePanelNodeIds,
   deriveBackendStopWordsKey,
   deriveBackendTokenLimit,
+  deriveStudyNodeOrder,
   type NodeNameEntry,
 } from './tokenFrequencyUtils';
-import {
-  buildTokenFrequencyZipFilename,
-  buildFrequencyExportFile,
-  buildStopWordsExportFile,
-  buildWordCloudExportFile,
-  downloadExportBundleAsZip,
-  downloadFrequencyRowsAs,
-  downloadStopWordsAsTxt,
-  downloadWordCloudAs,
-  type FrequencyFormat,
-  type WordCloudFormat,
-} from './tokenFrequencyExport';
-import {
-  TokenFrequencyDownloadDialog,
-  type DownloadDialogMode,
-} from './components/TokenFrequencyDownloadDialog';
+import { TokenFrequencyDownloadDialog } from './components/TokenFrequencyDownloadDialog';
 import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
+import { useTokenFrequencyResultModel } from './hooks/useTokenFrequencyResultModel';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
 import { useAnalysisFeature, useSafeResult, VIZ_PALETTE, vizColorMapForNodes } from '../common';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
@@ -109,11 +87,7 @@ const TokenFrequencyFeature = ({
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeIds = nodeInputs.resolvedNodes.map((r) => r.id);
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(
-      selections
-        .filter((selection) => selection.nodeId)
-        .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null })),
-    );
+    onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
   const { selectNodes } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
@@ -130,28 +104,11 @@ const TokenFrequencyFeature = ({
   const lastCompareNodeIds = liveLastCompareNodeIds;
   const studyNodeId = liveStudyNodeId;
 
-  const panelNodeIds = useMemo(
-    () =>
-      panelSelectedNodes
-        .slice(0, 2)
-        .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
-        .filter((id): id is string => Boolean(id)),
-    [panelSelectedNodes, activeNodeIds],
+  const panelNodeIds = derivePanelNodeIds(panelSelectedNodes, activeNodeIds);
+  const { effectiveStudyNodeId, orderedPanelNodeIds } = deriveStudyNodeOrder(
+    panelNodeIds,
+    studyNodeId,
   );
-
-  const effectiveStudyNodeId = useMemo(
-    () =>
-      studyNodeId && panelNodeIds.includes(studyNodeId) ? studyNodeId : (panelNodeIds[0] ?? null),
-    [studyNodeId, panelNodeIds],
-  );
-
-  const orderedPanelNodeIds = useMemo(() => {
-    if (!effectiveStudyNodeId) return panelNodeIds;
-    return [
-      ...panelNodeIds.filter((nodeId) => nodeId !== effectiveStudyNodeId),
-      effectiveStudyNodeId,
-    ];
-  }, [effectiveStudyNodeId, panelNodeIds]);
 
   // Per-source chart colours derived locally from a static palette by
   // selection position. There is no node-colour store or picker anymore;
@@ -159,9 +116,6 @@ const TokenFrequencyFeature = ({
   const tokenActiveNodeIds = panelNodeIds.slice(0, 2);
   const defaultPalette = VIZ_PALETTE;
   const nodeColors = vizColorMapForNodes(tokenActiveNodeIds);
-
-  const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
-  const unifiedCloudContainerRef = useRef<HTMLDivElement | null>(null);
 
   const isActiveTab = currentView === 'token-frequency';
   const { serverRequest } = useLastRunRequest({
@@ -300,17 +254,11 @@ const TokenFrequencyFeature = ({
   const effectiveTokenizerModelsByNode = useMemo(() => {
     // Seed with models persisted to the backend from previous sessions,
     // then apply any live overrides the user has made in this session.
-    const fromNodes: Record<string, string> = {};
-    for (const sel of effectiveNodeColumnSelections) {
-      if (!sel.column) continue;
-      const node = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
-        const ids = [n.id, n.node_id];
-        return ids.some((id) => typeof id === 'string' && id === sel.nodeId);
-      });
-      const stored = node?.tokenizer_models?.[sel.column];
-      if (stored) fromNodes[sel.nodeId] = stored;
-    }
-    return { ...fromNodes, ...liveTokenizerModelsByNode };
+    return deriveTokenizerModelsByNode(
+      effectiveNodeColumnSelections,
+      panelSelectedNodes,
+      liveTokenizerModelsByNode,
+    );
   }, [effectiveNodeColumnSelections, panelSelectedNodes, liveTokenizerModelsByNode]);
 
   // useCallback so the section components below stay React.memo-stable
@@ -374,16 +322,10 @@ const TokenFrequencyFeature = ({
     [panelSelectedNodes],
   );
 
-  const nodeIdToName = useMemo(() => {
-    const map: Record<string, string> = {};
-    panelSelectedNodes.forEach((node) => {
-      const nodeId = typeof node.id === 'string' ? node.id : '';
-      if (!nodeId) return;
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty name/label should fall back to the next display source, not render blank
-      map[nodeId] = node.name || node.label || nodeId;
-    });
-    return map;
-  }, [panelSelectedNodes]);
+  const nodeIdToName = useMemo(
+    () => buildNodeIdDisplayNameMap(panelSelectedNodes),
+    [panelSelectedNodes],
+  );
 
   const { handleAnalyze, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
     state: {
@@ -424,197 +366,28 @@ const TokenFrequencyFeature = ({
     },
   });
 
-  const responseDisplayNameHints = useMemo(() => buildResponseDisplayNameHints(results), [results]);
-
-  const displayNameMap = useMemo(
-    () => ({
-      ...responseDisplayNameHints,
-      ...lockedNodeNameMap,
-    }),
-    [responseDisplayNameHints, lockedNodeNameMap],
-  );
-
-  // ``useCallback`` keeps this referentially stable across keystrokes so the
-  // ``normalizeNodeResults`` memo below doesn't bust on every render of the
-  // parent (e.g. typing in the stop-words textarea). Without it, the heavy
-  // ``normalizeNodeResults`` + ``deriveNodeDisplayResults`` adapters re-run
-  // on every character — both walk every row in every node.
-  const computeDisplayName = useCallback(
-    (nodeId: string, fallbackKey?: string) => {
-      if (displayNameMap[nodeId]) return displayNameMap[nodeId];
-      if (nodeIdToName[nodeId]) return nodeIdToName[nodeId];
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty fallbackKey/nodeId should fall back to the next display source, not render blank
-      return fallbackKey || nodeId || 'Unknown node';
-    },
-    [displayNameMap, nodeIdToName],
-  );
-
-  const analysisNodeIds = useMemo(
-    () =>
-      computeAnalysisNodeIds(
-        results?.analysis_params?.node_ids,
-        lastCompareNodeIds,
-        effectiveNodeColumnSelections,
-      ),
-    [results, lastCompareNodeIds, effectiveNodeColumnSelections],
-  );
-
-  const normalizedNodeResults = useMemo(
-    () => normalizeNodeResults(results?.data, analysisNodeIds, computeDisplayName),
-    [results, analysisNodeIds, computeDisplayName],
-  );
-
-  const nodeDisplayResults = useMemo(
-    () => deriveNodeDisplayResults(normalizedNodeResults, appliedStopSet, effectiveTokenLimit),
-    [normalizedNodeResults, appliedStopSet, effectiveTokenLimit],
-  );
-
-  const registerWordCloudRef = useCallback((nodeKey: string, element: SVGSVGElement | null) => {
-    if (!element) {
-      Reflect.deleteProperty(wordCloudRefs.current, nodeKey);
-      return;
-    }
-    wordCloudRefs.current[nodeKey] = element;
-  }, []);
-
-  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
-  const [downloadDialogMode, setDownloadDialogMode] = useState<DownloadDialogMode>('wordcloud');
-  const pendingDownloadRef = useRef<{
-    mode: DownloadDialogMode;
-    nodeKey?: string;
-    displayName?: string;
-    rows?: unknown[];
-    label?: string;
-  } | null>(null);
-
-  const handleDownloadWordCloud = useCallback((nodeKey: string, displayName: string) => {
-    pendingDownloadRef.current = { mode: 'wordcloud', nodeKey, displayName };
-    setDownloadDialogMode('wordcloud');
-    setDownloadDialogOpen(true);
-  }, []);
-
-  const renameStatisticsKeysForExport = useCallback(
-    (rows: unknown[]): unknown[] => {
-      if (analysisNodeIds.length !== 2) return rows;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length === 2 checked above guarantees indices 0 and 1 exist
-      const referenceName = computeDisplayName(analysisNodeIds[0]!, 'reference');
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length === 2 checked above guarantees indices 0 and 1 exist
-      const studyName = computeDisplayName(analysisNodeIds[1]!, 'study');
-      const keyMap: Record<string, string> = {
-        freq_reference: `OR_${referenceName}`,
-        freq_study: `OS_${studyName}`,
-        percent_reference: `%R_${referenceName}`,
-        percent_study: `%S_${studyName}`,
-        expected_reference: `E_${referenceName}`,
-        expected_study: `E_${studyName}`,
-        reference_total: `Total_${referenceName}`,
-        study_total: `Total_${studyName}`,
-        overuse: 'Overuse',
-        signed_ll: 'Signed_LL',
-      };
-      return rows.map((row) => {
-        if (!row || typeof row !== 'object') return row;
-        const source = row as Record<string, unknown>;
-        const renamed: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(source)) {
-          renamed[keyMap[key] ?? key] = value;
-        }
-        return renamed;
-      });
-    },
-    [analysisNodeIds, computeDisplayName],
-  );
-
-  const handleDownloadFrequencyCsv = useCallback(
-    (label: string, rows: unknown[]) => {
-      const exportRows = label === 'token-keyness' ? renameStatisticsKeysForExport(rows) : rows;
-      pendingDownloadRef.current = { mode: 'frequencies', label, rows: exportRows };
-      setDownloadDialogMode('frequencies');
-      setDownloadDialogOpen(true);
-    },
-    [renameStatisticsKeysForExport],
-  );
-
-  /** Completes the download dialog action by exporting the pending cloud, rows, or stop words. */
-  /**
-   * Called by: TokenFrequencyFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
-   */
-  const handleDownloadConfirm = async ({
-    format,
-    includeStopWords,
-  }: {
-    format: string;
-    includeStopWords: boolean;
-  }) => {
-    const ctx = pendingDownloadRef.current;
-    if (!ctx) return;
-
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty label/displayName/nodeKey should fall back to the next archive name source, not produce an empty filename
-    const archiveLabel = ctx.label || ctx.displayName || ctx.nodeKey || 'analysis';
-    const shouldBundleStopWords = includeStopWords && Boolean(stopWords);
-    const comparisonArchiveLabels = analysisNodeIds
-      .slice(0, 2)
-      .map((nodeId, index) => computeDisplayName(nodeId, `node-${String(index + 1)}`));
-
-    try {
-      if (ctx.mode === 'wordcloud' && ctx.nodeKey) {
-        const svg = wordCloudRefs.current[ctx.nodeKey];
-        if (svg) {
-          if (shouldBundleStopWords) {
-            const primaryFile = await buildWordCloudExportFile(svg, {
-              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty displayName should fall back to the nodeKey, not render blank
-              displayName: ctx.displayName || ctx.nodeKey,
-              fallbackKey: ctx.nodeKey,
-              format: format as WordCloudFormat,
-              scale: 3,
-            });
-
-            const zipFilename =
-              ctx.nodeKey === 'unified'
-                ? buildTokenFrequencyZipFilename(comparisonArchiveLabels)
-                : buildTokenFrequencyZipFilename([archiveLabel]);
-
-            await downloadExportBundleAsZip(zipFilename, [
-              primaryFile,
-              buildStopWordsExportFile(stopWords, archiveLabel),
-            ]);
-          } else {
-            downloadWordCloudAs(svg, {
-              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty displayName should fall back to the nodeKey, not render blank
-              displayName: ctx.displayName || ctx.nodeKey,
-              fallbackKey: ctx.nodeKey,
-              format: format as WordCloudFormat,
-              scale: 3,
-            });
-          }
-        }
-      } else if (ctx.mode === 'frequencies' && ctx.rows) {
-        if (shouldBundleStopWords) {
-          await downloadExportBundleAsZip(buildTokenFrequencyZipFilename([archiveLabel]), [
-            buildFrequencyExportFile(
-              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty label should fall back to the default 'frequencies' name
-              ctx.label || 'frequencies',
-              ctx.rows as Record<string, unknown>[],
-              format as FrequencyFormat,
-            ),
-            buildStopWordsExportFile(stopWords, archiveLabel),
-          ]);
-        } else {
-          downloadFrequencyRowsAs(
-            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty label should fall back to the default 'frequencies' name
-            ctx.label || 'frequencies',
-            ctx.rows as Record<string, unknown>[],
-            format as FrequencyFormat,
-          );
-        }
-      } else if (shouldBundleStopWords) {
-        downloadStopWordsAsTxt(stopWords, archiveLabel);
-      }
-    } finally {
-      pendingDownloadRef.current = null;
-    }
-  };
+  const {
+    computeDisplayName,
+    normalizedNodeResults,
+    nodeDisplayResults,
+    downloadDialogOpen,
+    setDownloadDialogOpen,
+    downloadDialogMode,
+    unifiedCloudContainerRef,
+    registerWordCloudRef,
+    openWordCloudDownload,
+    openFrequencyDownload,
+    confirmDownload,
+  } = useTokenFrequencyResultModel({
+    results,
+    lastCompareNodeIds,
+    nodeColumnSelections: effectiveNodeColumnSelections,
+    lockedNodeNameMap,
+    nodeIdToName,
+    appliedStopSet,
+    effectiveTokenLimit,
+    stopWords,
+  });
 
   /** Applies the textarea stop-word list to the displayed result filters. */
   /**
@@ -771,14 +544,14 @@ const TokenFrequencyFeature = ({
         defaultTokenLimit={DEFAULT_TOKEN_LIMIT}
         computeDisplayName={computeDisplayName}
         getColorForNode={getColorForNode}
-        onDownloadWordCloud={handleDownloadWordCloud}
+        onDownloadWordCloud={openWordCloudDownload}
         onTokenClick={handleTokenClick}
         onTokenRightClick={handleTokenRightClick}
         unifiedCloudWidth={UNIFIED_WORDCLOUD_WIDTH}
         unifiedCloudHeight={UNIFIED_WORDCLOUD_HEIGHT}
         unifiedCloudContainerRef={unifiedCloudContainerRef}
         registerWordCloudRef={registerWordCloudRef}
-        onDownloadFrequencyCsv={handleDownloadFrequencyCsv}
+        onDownloadFrequencyCsv={openFrequencyDownload}
       />
 
       <TokenFrequencyDownloadDialog
@@ -786,7 +559,7 @@ const TokenFrequencyFeature = ({
         onOpenChange={setDownloadDialogOpen}
         mode={downloadDialogMode}
         onConfirm={(options) => {
-          void handleDownloadConfirm(options);
+          void confirmDownload(options);
         }}
       />
 

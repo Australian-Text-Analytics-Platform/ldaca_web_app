@@ -15,8 +15,6 @@ import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import {
   usePolarsExpressionSubTab,
-  blankExpression,
-  blankSortExpression,
   type PolarsExpressionSubTabProps,
 } from './hooks/usePolarsExpressionSubTab';
 
@@ -56,6 +54,67 @@ function CodeHint({ context }: { context: string }) {
   );
 }
 
+interface ExpressionListEditorProps {
+  items: { id: string; code: string }[];
+  placeholder: string;
+  addLabel: string;
+  disabled: boolean;
+  onBlur: () => void;
+  onCodeChange: (id: string, value: string) => void;
+  onRemove: (id: string) => void;
+  onAdd: () => void;
+}
+
+/**
+ * Renders the repeated "one or more Polars expressions" editor pattern.
+ * Rendered by: PolarsExpressionSubTab for With Columns, Select, and Group By
+ * aggregation lists so those contexts share add/remove/editor chrome.
+ */
+function ExpressionListEditor({
+  items,
+  placeholder,
+  addLabel,
+  disabled,
+  onBlur,
+  onCodeChange,
+  onRemove,
+  onAdd,
+}: ExpressionListEditorProps) {
+  return (
+    <>
+      {items.map((item) => (
+        <div key={item.id} className="flex gap-2">
+          <CodeEditor
+            className="flex-1"
+            value={item.code}
+            onChange={(value) => {
+              onCodeChange(item.id, value);
+            }}
+            onBlur={onBlur}
+            disabled={disabled}
+            placeholder={placeholder}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mt-1 shrink-0"
+            disabled={items.length <= 1}
+            onClick={() => {
+              onRemove(item.id);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={onAdd} disabled={disabled}>
+        <Plus className="mr-1 h-3.5 w-3.5" />
+        {addLabel}
+      </Button>
+    </>
+  );
+}
+
 /**
  * Renders the general Polars-expression preprocessing tab. It delegates request
  * serialization, preview, and apply behavior to `usePolarsExpressionSubTab`.
@@ -80,13 +139,17 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
     filterCode,
     setFilterCode,
     withColumns,
-    setWithColumns,
     selectExpressions,
-    setSelectExpressions,
     sortItems,
-    setSortItems,
     groupByState,
-    setGroupByState,
+    updateExpressionCode,
+    addExpression,
+    removeExpression,
+    setGroupByKeyCode,
+    updateSortCode,
+    updateSortDescending,
+    addSortExpression,
+    removeSortExpression,
 
     evalExpressions,
     applyExpression,
@@ -163,91 +226,43 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
             {/* With Columns */}
             <TabsContent value="with_columns" className="space-y-2">
               <CodeHint context="with_columns" />
-              {withColumns.map((item) => (
-                <div key={item.id} className="flex gap-2">
-                  <CodeEditor
-                    className="flex-1"
-                    value={item.code}
-                    onChange={(val) => {
-                      setWithColumns((prev) =>
-                        prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)),
-                      );
-                    }}
-                    onBlur={() => {
-                      evalExpressions();
-                    }}
-                    disabled={!hasNode}
-                    placeholder='b = pl.col("a").cast(pl.Utf8)'
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="mt-1 shrink-0"
-                    disabled={withColumns.length <= 1}
-                    onClick={() => {
-                      setWithColumns((prev) => prev.filter((it) => it.id !== item.id));
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setWithColumns((prev) => [...prev, blankExpression()]);
-                }}
+              <ExpressionListEditor
+                items={withColumns}
+                placeholder='b = pl.col("a").cast(pl.Utf8)'
+                addLabel="Add expression"
                 disabled={!hasNode}
-              >
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                Add expression
-              </Button>
+                onBlur={evalExpressions}
+                onCodeChange={(id, value) => {
+                  updateExpressionCode('withColumns', id, value);
+                }}
+                onRemove={(id) => {
+                  removeExpression('withColumns', id);
+                }}
+                onAdd={() => {
+                  addExpression('withColumns');
+                }}
+              />
             </TabsContent>
 
             {/* Select */}
             <TabsContent value="select" className="space-y-2">
               <CodeHint context="select" />
-              {selectExpressions.map((item) => (
-                <div key={item.id} className="flex gap-2">
-                  <CodeEditor
-                    className="flex-1"
-                    value={item.code}
-                    onChange={(val) => {
-                      setSelectExpressions((prev) =>
-                        prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)),
-                      );
-                    }}
-                    onBlur={() => {
-                      evalExpressions();
-                    }}
-                    disabled={!hasNode}
-                    placeholder='pl.col("a"), pl.col("b")'
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="mt-1 shrink-0"
-                    disabled={selectExpressions.length <= 1}
-                    onClick={() => {
-                      setSelectExpressions((prev) => prev.filter((it) => it.id !== item.id));
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSelectExpressions((prev) => [...prev, blankExpression()]);
-                }}
+              <ExpressionListEditor
+                items={selectExpressions}
+                placeholder='pl.col("a"), pl.col("b")'
+                addLabel="Add expression"
                 disabled={!hasNode}
-              >
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                Add expression
-              </Button>
+                onBlur={evalExpressions}
+                onCodeChange={(id, value) => {
+                  updateExpressionCode('selectExpressions', id, value);
+                }}
+                onRemove={(id) => {
+                  removeExpression('selectExpressions', id);
+                }}
+                onAdd={() => {
+                  addExpression('selectExpressions');
+                }}
+              />
             </TabsContent>
 
             {/* Sort */}
@@ -259,9 +274,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                     className="flex-1"
                     value={item.code}
                     onChange={(val) => {
-                      setSortItems((prev) =>
-                        prev.map((it) => (it.id === item.id ? { ...it, code: val } : it)),
-                      );
+                      updateSortCode(item.id, val);
                     }}
                     onBlur={() => {
                       evalExpressions();
@@ -280,11 +293,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                       id={`sort-desc-${item.id}`}
                       checked={item.descending}
                       onCheckedChange={(checked) => {
-                        setSortItems((prev) =>
-                          prev.map((it) =>
-                            it.id === item.id ? { ...it, descending: Boolean(checked) } : it,
-                          ),
-                        );
+                        updateSortDescending(item.id, Boolean(checked));
                       }}
                       disabled={!hasNode}
                     />
@@ -295,7 +304,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                     className="mt-1 shrink-0"
                     disabled={sortItems.length <= 1}
                     onClick={() => {
-                      setSortItems((prev) => prev.filter((it) => it.id !== item.id));
+                      removeSortExpression(item.id);
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -306,7 +315,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setSortItems((prev) => [...prev, blankSortExpression()]);
+                  addSortExpression();
                 }}
                 disabled={!hasNode}
               >
@@ -323,7 +332,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
                 <CodeEditor
                   value={groupByState.keyCode}
                   onChange={(val) => {
-                    setGroupByState({ ...groupByState, keyCode: val });
+                    setGroupByKeyCode(val);
                   }}
                   onBlur={() => {
                     evalExpressions();
@@ -334,55 +343,22 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Aggregation expressions</Label>
-                {groupByState.aggExpressions.map((item) => (
-                  <div key={item.id} className="flex gap-2">
-                    <CodeEditor
-                      className="flex-1"
-                      value={item.code}
-                      onChange={(val) => {
-                        setGroupByState((prev) => ({
-                          ...prev,
-                          aggExpressions: prev.aggExpressions.map((it) =>
-                            it.id === item.id ? { ...it, code: val } : it,
-                          ),
-                        }));
-                      }}
-                      onBlur={() => {
-                        evalExpressions();
-                      }}
-                      disabled={!hasNode}
-                      placeholder='total = pl.col("value").sum()'
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="mt-1 shrink-0"
-                      disabled={groupByState.aggExpressions.length <= 1}
-                      onClick={() => {
-                        setGroupByState((prev) => ({
-                          ...prev,
-                          aggExpressions: prev.aggExpressions.filter((it) => it.id !== item.id),
-                        }));
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setGroupByState((prev) => ({
-                      ...prev,
-                      aggExpressions: [...prev.aggExpressions, blankExpression()],
-                    }));
-                  }}
+                <ExpressionListEditor
+                  items={groupByState.aggExpressions}
+                  placeholder='total = pl.col("value").sum()'
+                  addLabel="Add aggregation"
                   disabled={!hasNode}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  Add aggregation
-                </Button>
+                  onBlur={evalExpressions}
+                  onCodeChange={(id, value) => {
+                    updateExpressionCode('groupByAgg', id, value);
+                  }}
+                  onRemove={(id) => {
+                    removeExpression('groupByAgg', id);
+                  }}
+                  onAdd={() => {
+                    addExpression('groupByAgg');
+                  }}
+                />
               </div>
             </TabsContent>
           </Tabs>

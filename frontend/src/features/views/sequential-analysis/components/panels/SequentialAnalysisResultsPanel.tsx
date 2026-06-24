@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 
 import { SequentialChart, type SequentialXAxisType } from '../SequentialChart';
-import type { ChartTypeOption } from '../../hooks/useSequentialAnalysisTaskFlow';
+import type { ChartTypeOption } from '../../hooks/sequentialChartModel';
 
 interface ResultsSummary {
   timeColumn: string;

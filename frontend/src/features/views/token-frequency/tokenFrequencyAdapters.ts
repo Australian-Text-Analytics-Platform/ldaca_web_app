@@ -78,7 +78,7 @@ const maxBy = <T>(items: T[], selector: (item: T) => number, fallback: number): 
 
 /** Builds node display-name hints from response metadata before UI-level fallback naming runs. */
 /**
- * Used by: TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: useTokenFrequencyResultModel because token-frequency result panels and exports need the same display-name hints before rendering.
  * Flow: read metadata node_display_names, scan per-node result metadata for node/display-name pairs, then return the hint map.
  */
 export const buildResponseDisplayNameHints = (
@@ -113,7 +113,7 @@ export const buildResponseDisplayNameHints = (
 
 /** Resolves the node ordering that downstream adapters should use for result display. */
 /**
- * Used by: TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: useTokenFrequencyResultModel because result display needs a stable node order before normalizing backend rows.
  * Flow: combine request node_ids, previous comparison ids, and selected node ids, then keep first nonempty occurrence of each id.
  */
 export const computeAnalysisNodeIds = (
@@ -141,7 +141,7 @@ export const computeAnalysisNodeIds = (
 
 /** Normalizes backend result maps into stable per-node view models for panels and exports. */
 /**
- * Used by: TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: useTokenFrequencyResultModel because result panels and downloads need stable per-node row models before applying display filters.
  * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
  */
 export const normalizeNodeResults = (
@@ -206,7 +206,7 @@ export const normalizeNodeResults = (
 
 /** Applies stop-word and display-limit projections to normalized node result rows. */
 /**
- * Used by: useTokenFrequencyPreferences.ts, TokenFrequencyFeature.tsx, tokenFrequencyAdapters.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: useTokenFrequencyPreferences.ts, useTokenFrequencyResultModel, tokenFrequencyAdapters.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
  * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
  */
 export const deriveNodeDisplayResults = (

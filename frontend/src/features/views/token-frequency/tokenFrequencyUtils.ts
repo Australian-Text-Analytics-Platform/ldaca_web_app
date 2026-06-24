@@ -1,9 +1,15 @@
 import type { TokenFrequencyResponse } from '@/api';
-import { isNonEmptyString } from '../common';
+import { getNodeIdentifier, isNonEmptyString } from '../common';
+import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 
 export interface NodeNameEntry {
   id: string;
   name?: string | null;
+}
+
+export interface TokenFrequencyStudyNodeOrder {
+  effectiveStudyNodeId: string | null;
+  orderedPanelNodeIds: string[];
 }
 
 /** Builds a node-id to display-name lookup from selection sources. */
@@ -47,6 +53,88 @@ export const buildSelectionNameKey = (
     .sort()
     .map((nodeId) => `${nodeId}:${String(mapping[nodeId])}`)
     .join('|');
+};
+
+/** Resolves the selected token-frequency node ids used for ordering and submission. */
+/**
+ * Used by: TokenFrequencyFeature.tsx and tokenFrequencyUtils.test.ts because the tab input panel exposes backend nodes with id/node_id variants while analysis requests need stable ids.
+ * Flow: cap the panel selection to two nodes, prefer each node's stable backend id, fall back to the resolved tab input id, and discard empty values.
+ */
+export const derivePanelNodeIds = (
+  panelSelectedNodes: WorkspaceNodeLike[],
+  activeNodeIds: string[],
+): string[] =>
+  panelSelectedNodes
+    .slice(0, 2)
+    .map((node, idx) => {
+      if (isNonEmptyString(node.id)) return node.id;
+      if (isNonEmptyString(node.node_id)) return node.node_id;
+      return activeNodeIds[idx] ?? getNodeIdentifier(node, idx);
+    })
+    .filter((id): id is string => Boolean(id));
+
+/** Derives the study-corpus id and backend comparison order for token-frequency runs. */
+/**
+ * Used by: TokenFrequencyFeature.tsx and tokenFrequencyUtils.test.ts because pairwise keyness treats the study corpus as the final request node while the UI lets users choose either selected node.
+ * Flow: keep a valid explicit study id, otherwise default to the first panel node, then move that study node to the end of the request order.
+ */
+export const deriveStudyNodeOrder = (
+  panelNodeIds: string[],
+  studyNodeId: string | null,
+): TokenFrequencyStudyNodeOrder => {
+  const effectiveStudyNodeId =
+    studyNodeId && panelNodeIds.includes(studyNodeId) ? studyNodeId : (panelNodeIds[0] ?? null);
+  if (!effectiveStudyNodeId) {
+    return { effectiveStudyNodeId: null, orderedPanelNodeIds: panelNodeIds };
+  }
+  return {
+    effectiveStudyNodeId,
+    orderedPanelNodeIds: [
+      ...panelNodeIds.filter((nodeId) => nodeId !== effectiveStudyNodeId),
+      effectiveStudyNodeId,
+    ],
+  };
+};
+
+/** Builds the node-id display-name map used by token-click handoffs and result fallbacks. */
+/**
+ * Used by: TokenFrequencyFeature.tsx and tokenFrequencyUtils.test.ts because handoffs to concordance and result labels need the same name/label/id fallback order.
+ * Flow: scan selected nodes, keep entries with stable ids, and choose name, label, then id as the display value.
+ */
+export const buildNodeIdDisplayNameMap = (
+  panelSelectedNodes: WorkspaceNodeLike[],
+): Record<string, string> => {
+  const map: Record<string, string> = {};
+  panelSelectedNodes.forEach((node) => {
+    const nodeId = typeof node.id === 'string' ? node.id : '';
+    if (!nodeId) return;
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty name/label should fall back to the next display source, not render blank
+    map[nodeId] = node.name || node.label || nodeId;
+  });
+  return map;
+};
+
+/** Resolves the label shown for a token-frequency node in result panels and exports. */
+/**
+ * Used by: useTokenFrequencyResultModel and tokenFrequencyUtils.test.ts because
+ * result rendering, downloads, and concordance handoffs need the same
+ * response-name, selection-name, backend-key, and node-id fallback order.
+ */
+export const resolveTokenFrequencyDisplayName = ({
+  nodeId,
+  fallbackKey,
+  responseOrSelectionNames,
+  nodeIdToName,
+}: {
+  nodeId: string;
+  fallbackKey?: string;
+  responseOrSelectionNames: Record<string, string>;
+  nodeIdToName: Record<string, string>;
+}): string => {
+  if (responseOrSelectionNames[nodeId]) return responseOrSelectionNames[nodeId];
+  if (nodeIdToName[nodeId]) return nodeIdToName[nodeId];
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty fallbackKey/nodeId should fall back to the next display source, not render blank
+  return fallbackKey || nodeId || 'Unknown node';
 };
 
 /** Reads the backend's persisted token display limit from all supported response locations. */

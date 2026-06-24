@@ -457,6 +457,86 @@ describe('useWorkspaceNodeMutations', () => {
     });
   });
 
+  describe('combined-node mutations', () => {
+    it('selects the node_id returned by joinNodes', async () => {
+      const queryClient = createTestClient();
+      const setSelectedNodes = mkSetSelectedNodes();
+      const clearSelection = mkClearSelection();
+      workspaceSdkMock.joinNodes.mockResolvedValue({
+        data: { node_id: 'joined-node' },
+        error: undefined,
+      });
+
+      const { result } = renderHook(
+        () =>
+          useWorkspaceNodeMutations(
+            buildHookArgs(queryClient, { clearSelection, setSelectedNodes }),
+          ),
+        { wrapper: wrapWithClient(queryClient) },
+      );
+
+      await act(async () => {
+        await result.current.actions.joinNodes(
+          'left-node',
+          'right-node',
+          'inner',
+          ['left_id'],
+          ['right_id'],
+          'Joined',
+        );
+      });
+
+      expect(workspaceSdkMock.joinNodes).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        query: {
+          left_node_id: 'left-node',
+          right_node_id: 'right-node',
+          left_on: 'left_id',
+          right_on: 'right_id',
+          how: 'inner',
+          new_node_name: 'Joined',
+        },
+        throwOnError: true,
+      });
+      expect(clearSelection).toHaveBeenCalled();
+      expect(setSelectedNodes).toHaveBeenCalledWith(['joined-node']);
+    });
+
+    it('selects the id returned by concatNodes', async () => {
+      const queryClient = createTestClient();
+      const setSelectedNodes = mkSetSelectedNodes();
+      const clearSelection = mkClearSelection();
+      workspaceSdkMock.concatNodes.mockResolvedValue({
+        data: { id: 'concat-node' },
+        error: undefined,
+      });
+
+      const { result } = renderHook(
+        () =>
+          useWorkspaceNodeMutations(
+            buildHookArgs(queryClient, { clearSelection, setSelectedNodes }),
+          ),
+        { wrapper: wrapWithClient(queryClient) },
+      );
+
+      await act(async () => {
+        await result.current.actions.concatNodes(['node-a', 'node-b'], 'Combined', true);
+      });
+
+      expect(workspaceSdkMock.concatNodes).toHaveBeenCalledWith({
+        body: {
+          node_ids: ['node-a', 'node-b'],
+          new_node_name: 'Combined',
+          deduplicate: true,
+        },
+        headers: { Authorization: 'Bearer test' },
+        throwOnError: true,
+      });
+      expect(clearSelection).toHaveBeenCalled();
+      expect(setSelectedNodes).toHaveBeenCalledWith(['concat-node']);
+    });
+  });
+
   describe('text-analysis actions', () => {
     it('detachConcordance synchronously throws when no workspace is selected', () => {
       // ensureWorkspaceSelected runs while building the mutateAsync args, so

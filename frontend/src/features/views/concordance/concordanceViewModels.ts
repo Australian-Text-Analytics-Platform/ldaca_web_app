@@ -329,6 +329,334 @@ export type TaggedBinRow = ConcordanceDispersionBinRow & {
   __source_node?: string;
 };
 
+export const CONCORDANCE_COMBINED_NODE_KEY = '__COMBINED__';
+
+interface ConcordanceNodeIdentity {
+  id?: string;
+  node_id?: string;
+  name?: string;
+  label?: string;
+  data?: unknown;
+}
+
+interface ConcordanceMaterializedLookupOptions {
+  selectedNodes: ConcordanceNodeIdentity[];
+  labelToNodeId: Record<string, string> | null;
+  materializedPaths: Record<string, string>;
+  materializedBins?: Record<string, ConcordanceDispersionBinRow[]>;
+}
+
+/**
+ * Normalizes backend `analysis_params.label_to_node_map` into a strict
+ * label->node-id map.
+ * Used by: useConcordanceResultViewModel before rendering result blocks because
+ * the generated API type keeps analysis params loose while downstream lookup
+ * helpers need only valid string pairs.
+ */
+export function normalizeConcordanceLabelToNodeMap(
+  analysisParams: unknown,
+): Record<string, string> | null {
+  if (!analysisParams || typeof analysisParams !== 'object') return null;
+  const params = analysisParams as Record<string, unknown>;
+  const mapping = params.label_to_node_map;
+  if (!mapping || typeof mapping !== 'object') return null;
+
+  const normalized: Record<string, string> = {};
+  for (const [label, value] of Object.entries(mapping)) {
+    if (typeof label === 'string' && label && typeof value === 'string' && value) {
+      normalized[label] = value;
+    }
+  }
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+/**
+ * Assigns deterministic visual colours to each selected concordance node id
+ * variant.
+ * Used by: useConcordanceResultViewModel and metadata-column grouping because
+ * combined result rows can refer to either `id` or `node_id`, and both variants
+ * should resolve to the same source colour.
+ */
+export function buildConcordanceNodeColorMap(
+  nodes: readonly ConcordanceNodeIdentity[],
+  palette: readonly string[],
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (palette.length === 0) return map;
+
+  nodes.forEach((node, index) => {
+    const colour = palette[index % palette.length] ?? '';
+    for (const candidate of [node.id, node.node_id]) {
+      if (typeof candidate === 'string' && candidate) {
+        map[candidate] = colour;
+      }
+    }
+  });
+  return map;
+}
+
+const getNodeDataLabelCandidates = (node: ConcordanceNodeIdentity): string[] => {
+  const data =
+    typeof node.data === 'object' && node.data !== null
+      ? (node.data as Record<string, unknown>)
+      : undefined;
+  return [data?.name, data?.label].filter(
+    (value): value is string => typeof value === 'string' && value.trim().length > 0,
+  );
+};
+
+/**
+ * Builds the lower-case label lookup used to colour combined-result table rows.
+ * Used by: useConcordanceResultViewModel so source-label, id, node_id, and
+ * nested node metadata aliases all share the same palette assignment.
+ */
+export function buildConcordanceSourceColorMap(
+  nodes: readonly ConcordanceNodeIdentity[],
+  nodeColors: Record<string, string>,
+  palette: readonly string[],
+): Record<string, string> {
+  const map: Record<string, string> = {};
+
+  nodes.forEach((node, index) => {
+    const candidateIds = [node.id, node.node_id].filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    );
+    const primaryId = candidateIds[0] ?? `node-${String(index)}`;
+    const assigned = nodeColors[primaryId] ?? palette[index % palette.length] ?? '';
+    const variants = new Set<string>([
+      primaryId,
+      ...candidateIds,
+      ...(typeof node.name === 'string' ? [node.name] : []),
+      ...(typeof node.label === 'string' ? [node.label] : []),
+      ...getNodeDataLabelCandidates(node),
+    ]);
+
+    variants.forEach((value) => {
+      const trimmed = value.trim();
+      if (trimmed) map[trimmed.toLowerCase()] = assigned;
+    });
+  });
+
+  return map;
+}
+
+/**
+ * Finds the selected source node represented by a rendered combined-result label.
+ * Used by: Concordance table and dispersion blocks when a combined-view row is
+ * clicked, because those rows carry a source label rather than the stable
+ * workspace node id needed to open row details.
+ */
+export function findConcordanceSourceNode<T extends ConcordanceNodeIdentity>(
+  nodes: readonly T[],
+  sourceLabel: unknown,
+): T | undefined {
+  if (!sourceLabel) return undefined;
+
+  const normalizedSource = toCellText(sourceLabel).toLowerCase();
+  if (!normalizedSource) return undefined;
+
+  return nodes.find((node) => {
+    const data =
+      typeof node.data === 'object' && node.data !== null
+        ? (node.data as Record<string, unknown>)
+        : undefined;
+    const dataName = typeof data?.name === 'string' ? data.name : undefined;
+    const dataLabel = typeof data?.label === 'string' ? data.label : undefined;
+    const candidates = [node.id, node.node_id, node.name, dataName, node.label, dataLabel]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+    return candidates.includes(normalizedSource);
+  });
+}
+
+/**
+ * Resolves the row background colour for a combined concordance source label.
+ * Used by: Concordance table and dispersion blocks so exact map lookup, loose
+ * fallback lookup, and deterministic palette fallback stay identical across
+ * table and chart-oriented result views.
+ */
+export function getConcordanceSourceColor(
+  sourceLabel: unknown,
+  sourceColorMap: Record<string, string>,
+  defaultPalette: readonly string[],
+): string {
+  if (!sourceLabel) return '#ffffff';
+
+  const labelText = toCellText(sourceLabel);
+  const normalized = labelText.toLowerCase();
+  const exact = sourceColorMap[normalized];
+  if (exact) return exact;
+
+  const looseMatch = Object.entries(sourceColorMap).find(([key]) => key.includes(normalized));
+  if (looseMatch?.[1]) return looseMatch[1];
+
+  if (defaultPalette.length === 0) return '#ffffff';
+  const hash = Array.from(labelText).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return defaultPalette[hash % defaultPalette.length] ?? '#ffffff';
+}
+
+/**
+ * Resolves a rendered concordance result key back to a backend node id.
+ * Used by: ConcordanceFeature, metadata-column derivation, and materialized
+ * dispersion helpers because result blocks can be keyed by node id, node name,
+ * backend label, or a request-provided label-to-node map.
+ */
+export function resolveConcordanceNodeIdForKey(
+  nodeKey: string,
+  selectedNodes: ConcordanceNodeIdentity[],
+  labelToNodeId: Record<string, string> | null,
+): string | null {
+  if (nodeKey === CONCORDANCE_COMBINED_NODE_KEY) return null;
+  const direct = selectedNodes.find((node) => {
+    const data =
+      typeof node.data === 'object' && node.data !== null
+        ? (node.data as Record<string, unknown>)
+        : undefined;
+    const dataName = typeof data?.name === 'string' ? data.name : undefined;
+    return (
+      node.id === nodeKey ||
+      node.node_id === nodeKey ||
+      node.name === nodeKey ||
+      node.label === nodeKey ||
+      dataName === nodeKey
+    );
+  });
+  if (direct?.id) return direct.id;
+  if (typeof direct?.node_id === 'string' && direct.node_id) return direct.node_id;
+  const mapped = labelToNodeId?.[nodeKey];
+  return mapped ?? null;
+}
+
+/**
+ * Resolves a rendered concordance result block to every source node id behind it.
+ * Used by: ConcordanceFeature and materialized dispersion helpers so the
+ * combined view can require/process all backing nodes while separated blocks
+ * target only their own source node.
+ */
+export function getConcordanceNodeIdsForKey(
+  nodeKey: string,
+  selectedNodes: ConcordanceNodeIdentity[],
+  labelToNodeId: Record<string, string> | null,
+): string[] {
+  if (nodeKey === CONCORDANCE_COMBINED_NODE_KEY) {
+    return selectedNodes
+      .map((node) => node.id ?? node.node_id)
+      .filter((id: string | undefined): id is string => Boolean(id));
+  }
+  const id = resolveConcordanceNodeIdForKey(nodeKey, selectedNodes, labelToNodeId);
+  return id ? [id] : [];
+}
+
+/**
+ * Reports whether a result block has materialized paths for every backing node.
+ * Used by: Concordance table and dispersion blocks to decide whether
+ * whole-corpus paging/bins are available for a separated or combined result.
+ */
+export function isConcordanceBlockMaterialized(
+  nodeKey: string,
+  { selectedNodes, labelToNodeId, materializedPaths }: ConcordanceMaterializedLookupOptions,
+): boolean {
+  const ids = getConcordanceNodeIdsForKey(nodeKey, selectedNodes, labelToNodeId);
+  return ids.length > 0 && ids.every((id) => id in materializedPaths);
+}
+
+/**
+ * Combines cached server-bin rows for every materialized node behind a result block.
+ * Used by: ConcordanceFeature before rendering dispersion charts because
+ * combined-view charts need one tagged row stream while separated charts still
+ * need the same all-nodes-present guard.
+ */
+export function getMaterializedBinsForConcordanceKey(
+  nodeKey: string,
+  {
+    selectedNodes,
+    labelToNodeId,
+    materializedPaths,
+    materializedBins = {},
+  }: ConcordanceMaterializedLookupOptions,
+): TaggedBinRow[] | undefined {
+  const ids = getConcordanceNodeIdsForKey(nodeKey, selectedNodes, labelToNodeId);
+  if (ids.length === 0) return undefined;
+  if (!ids.every((id) => id in materializedPaths)) return undefined;
+  if (!ids.every((id) => id in materializedBins)) return undefined;
+
+  const tagged: TaggedBinRow[] = [];
+  for (const id of ids) {
+    const node = selectedNodes.find((entry) => entry.id === id || entry.node_id === id);
+    const sourceLabel = node?.name ?? node?.label ?? id;
+    const bins = materializedBins[id];
+    if (!bins) continue;
+    for (const row of bins) {
+      tagged.push({ ...row, __source_node: sourceLabel });
+    }
+  }
+  return tagged;
+}
+
+export interface CollectConcordanceMatchedTextsOptions {
+  getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
+  lowercaseMatches: boolean;
+}
+
+/**
+ * Collects the unique matched-text series names used by coloured dispersion charts.
+ * Used by: ConcordanceFeature because the feature shell needs one tested helper
+ * to derive chart series from either cached server bins or the current page's
+ * raw concordance rows before assigning stable colours.
+ *
+ * Flow:
+ * - Walk each result block in display order.
+ * - Prefer materialized server-bin rows when available so whole-corpus charts
+ *   and current-page charts label series the same way.
+ * - Fall back to grouped page rows for non-materialized results, normalize
+ *   case according to the active concordance setting, and return sorted unique
+ *   labels for deterministic colour assignment.
+ */
+export function collectConcordanceMatchedTexts(
+  resultsData: Record<string, ConcordanceNodeResult> | undefined,
+  { getMaterializedBinsForKey, lowercaseMatches }: CollectConcordanceMatchedTextsOptions,
+): string[] {
+  if (!resultsData) return [];
+
+  const seen = new Set<string>();
+  for (const [nodeKey, nodeData] of Object.entries(resultsData)) {
+    const binRows = getMaterializedBinsForKey(nodeKey);
+    if (binRows) {
+      for (const row of binRows) {
+        const rawText = row.matched_text ?? '';
+        if (rawText) seen.add(lowercaseMatches ? rawText.toLowerCase() : rawText);
+      }
+      continue;
+    }
+
+    for (const group of nodeData.data) {
+      for (const hit of group) {
+        const rawText = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);
+        if (rawText) seen.add(lowercaseMatches ? rawText.toLowerCase() : rawText);
+      }
+    }
+  }
+
+  return [...seen].sort();
+}
+
+/**
+ * Assigns stable colours to matched-text series by cycling through a palette.
+ * Used by: ConcordanceFeature so chart and row-rendering surfaces receive the
+ * same text-to-colour lookup without duplicating palette logic in the feature
+ * component.
+ */
+export function buildMatchedTextColorMap(
+  matchedTexts: readonly string[],
+  palette: readonly string[],
+): Record<string, string> {
+  if (palette.length === 0) return {};
+
+  return Object.fromEntries(
+    matchedTexts.map((text, index) => [text, palette[index % palette.length] ?? '']),
+  );
+}
+
 /** The fixed source-bin resolution returned by the `/bins` endpoint. */
 const DISPERSION_SERVER_BIN_COUNT = 100;
 

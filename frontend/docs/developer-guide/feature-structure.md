@@ -55,6 +55,11 @@ component.
 Auth gating (login screen, blocking screen, refresh banner) is owned by
 `features/auth/`.
 
+`WorkspaceShell` keeps the desktop app as a resizable sidebar/main/workspace
+split, but stacks the main feature pane above the workspace pane below the `md`
+breakpoint. Keep resize-only inline widths behind responsive overrides so mobile
+screens do not inherit the desktop split and create horizontal overflow.
+
 ## Views — Sidebar-Tab Features
 
 `src/features/views/` holds every tab rendered in the left sidebar. Each
@@ -80,6 +85,9 @@ Shared code used by multiple views lives in `views/common/`:
   `useDetachColumnsState`, `useMaterializeLifecycle`, etc.).
 - `common/tabs/` — Chrome-style analysis tab host and `tabs.json` sidecar
   bridge. Each tab owns an optional `task_id` and an `inputs` node set.
+  The reusable strip lives in `src/components/tabs/`: `chromeTabsLayout.ts`
+  keeps DOM-free geometry helpers, while `chromeTabsInteractionState.ts` owns
+  the coupled drag-preview and inline-rename reducer state.
 - `common/nodeInputs/` — add-node-as-needed input resolution, validation, and
   persistence helpers used by analysis tabs and preprocessing subtabs.
 - `common/utils/` — shared utilities (`datetimeFormatInfer`).
@@ -89,6 +97,23 @@ Shared code used by multiple views lives in `views/common/`:
 New views should start their shared code in `views/common/` before introducing
 view-local task, visualization-colour, or result hydration logic.
 
+### Data Loader
+
+`views/data-loader/` is the workspace and file-ingestion surface. The feature
+component wires workspace/file hooks and passes modal state to
+`DataLoaderDialogs`, while hook modules own the workflows. LDaCA Oni import
+state is centralized in `useLdacaImport` and its reducer so staff picks, search
+filters, row-level import progress, and error state transition together instead
+of being split across independent dialog state cells. The import search UI,
+record cards, filters, and user-token subdialog live in
+`components/LdacaImportDialog.tsx`; `DataLoaderDialogs` should stay the
+top-level modal collector. Folder creation follows the same rule:
+`useFolderCreation` owns the selected parent, draft name, submit state, and
+invalid-name alert, while `DataLoaderDialogs` only renders that state.
+File-browser citation preview state follows the same pattern:
+`hooks/fileBrowserCitationState.ts` owns open/loading/content/close transitions,
+and `useFileBrowserActions` only performs the README fetch side effect.
+
 ### Preprocessing Tab
 
 `views/preprocessing/` is unusual: it hosts the `DataPreprocessingFeature` tab
@@ -96,6 +121,13 @@ component AND all the reusable sub-tab implementations (filter, slice, join,
 concat, replace, aggregate, expression). Sub-tabs own their form state and
 preview/apply hooks, then delegate actual workspace mutations to
 `useWorkspaceActions()`.
+
+Shared preview loading, cancellation, pagination, and refresh behavior belongs
+in `hooks/usePreprocessingPreview.ts`; its reducer state lives in
+`hooks/preprocessingPreviewState.ts`. Single-node tabs that need a raw-data
+fallback before a valid operation payload exists should route through
+`hooks/useNodePreviewWithRawFallback.ts` instead of rebuilding disabled/raw/json
+signature branches locally.
 
 Preprocessing uses the same `NodeInputsPanel` as task-backed analysis views,
 but persists inputs per `(workspaceId, subtab)` in `preprocessingInputsStore`
@@ -110,6 +142,48 @@ The Polars expression subtab is the only preprocessing path that needs
 CodeMirror. Keep it behind the lazy `PolarsExpressionSubTab` boundary in
 `DataPreprocessingFeature.tsx` so the common filter/sample/join/stack/find/create
 paths do not pay for the editor bundle until users open the expression tab.
+Expression draft transitions and request serialization belong in
+`expression/hooks/polarsExpressionDraftState.ts` so editor row add/remove/update
+behavior and backend payload rules stay testable without rendering CodeMirror.
+
+The Aggregate subtab keeps its visual builder helpers under
+`views/preprocessing/aggregate/hooks/`. `aggregateExpressionModel.ts` owns
+token-to-Polars serialization and request shaping, while
+`aggregateBuilderUiState.ts` owns coupled drag/drop and inline custom-token UI
+state. Browser drag payload transport and drop-index routing live in
+`useAggregateBuilderDrag.ts`, so `useAggregateSubTab` remains the orchestration
+layer for node selection, preview, expression, and apply flows.
+
+Single-node preprocessing tabs share `utils/nodeMetadata.ts` for node lookup and
+the fixed one-node `NodeInputsPanel` model. Node identity there accepts both
+`id` and `node_id` backend shapes, so subtab hooks should reuse
+`buildWorkspaceNodeMap()`, `getNodeKey()`, and
+`buildSingleNodeSelectionPanelModel()` instead of rebuilding palette, color,
+empty-column selection state, or id fallback rules locally.
+
+The Slice subtab keeps numeric parsing, validation copy, preview readiness, and
+slice/random-sample payload shaping in `slice/hooks/sliceFormModel.ts`.
+`useSliceSubTab` should stay focused on form-store wiring, preview fetching, and
+the apply mutation. Reuse `deriveSliceFormModel()` when adding Sample Rows UI
+state so preview and Add to Workspace continue to share the same request rules.
+
+The Filter subtab keeps branchy condition value controls in
+`filter/components/FilterConditionValueInput.tsx`, while
+`useFilterSubTabSections` owns condition state, preview, and apply behavior.
+`filter/hooks/useFilterCategoricalOptions.ts` owns lazy checklist option
+loading, per-condition option search text, and workspace/node cache resets.
+Categorical/list/topic unique-value normalization lives in
+`filter/utils/categoricalOptions.ts`; reuse that helper when adding new
+checklist-backed filter modes instead of rebuilding keys in the hook.
+Pure filter row transition rules live in `filter/utils/conditionState.ts`.
+Keep operator/value defaulting, checklist-load decisions, and stat-prefill
+requests there so `useFilterSubTabSections` can stay focused on state updates
+and async effects.
+
+The Find subtab keeps backend payload rules in
+`replace/hooks/replaceRequestModel.ts`. Preview and Add-to-Data-Block actions
+must both use `buildReplaceRequest()` so output-column defaulting, match-count
+translation, and extract connector handling cannot drift.
 
 ## Workspace Features
 

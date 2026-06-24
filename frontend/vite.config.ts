@@ -48,7 +48,7 @@ const serverConfig = {
     unhandledErrors: true,
     logLevels: ['warn', 'error'],
   },
-} as unknown as ServerOptions;
+} satisfies ServerOptions;
 
 export default defineConfig({
   base: './',

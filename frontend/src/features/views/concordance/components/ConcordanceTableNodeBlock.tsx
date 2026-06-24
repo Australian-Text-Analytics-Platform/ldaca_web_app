@@ -1,18 +1,8 @@
-import type { ColumnDef } from '@tanstack/react-table';
-import { flexRender } from '@tanstack/react-table';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
-import { AnalysisTableScrollArea } from '@/features/views/common/components/AnalysisTableScrollArea';
+import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
@@ -24,70 +14,19 @@ import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { SortableHeader } from './SortableHeader';
 import {
-  CONCORDANCE_COLUMN_KEYS,
-  CONCORDANCE_CORE_COLUMNS,
-  CONCORDANCE_FREQ_COLUMNS,
-} from '../../common/generatedColumns';
-import {
+  CONCORDANCE_COMBINED_NODE_KEY,
   batchProcessedCount,
-  flattenConcordanceGroups,
-  toCellText,
+  findConcordanceSourceNode,
+  getConcordanceSourceColor,
 } from '../concordanceViewModels';
+import { ConcordancePlainHeader, ConcordanceRowsTable } from './ConcordanceRowsTable';
+import {
+  buildConcordanceTableModel,
+  type ConcordanceGroupedRow,
+  type ConcordanceRow,
+} from './concordanceTableModel';
 
-type ConcordanceRow = Record<string, unknown>;
-type ConcordanceGroupedRow = ConcordanceRow[];
-
-/** Used by: the concordance tables for per-column alignment because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
- *
- * Classic KWIC ("key word in context") layout:
- *   - left-context: right-aligned so its rightmost character anchors to
- *     the matched-text column;
- *   - matched-text: centered so the keyword forms a vertical stripe the
- *     user can scan top-to-bottom;
- *   - right-context: left-aligned (table default) for the same anchoring
- *     on the other side.
- * Other columns stay left-aligned.
- */
-function alignmentClassForColumn(columnKey: string): string {
-  if (columnKey === CONCORDANCE_COLUMN_KEYS.leftContext) return 'text-right';
-  if (columnKey === CONCORDANCE_COLUMN_KEYS.matchedText) return 'text-center';
-  return '';
-}
-
-const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
-const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];
-const ALL_CONC_COLS_SET = new Set<string>([...CORE_COLS, ...FREQ_COLS]);
 const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
-
-/** Used by: the concordance tables' display-column assembly to remove repeated concordance/metadata keys because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
-const dedupeColumns = (cols: string[]): string[] => {
-  const seen = new Set<string>();
-  return cols.filter((col) => {
-    if (seen.has(col)) {
-      return false;
-    }
-    seen.add(col);
-    return true;
-  });
-};
-
-/**
- * Builds the TanStack column defs for a concordance table. Cells emit the plain
- * string value; the KWIC alignment is applied on the surrounding header/cell
- * wrappers via {@link alignmentClassForColumn}.
- * Used by: CombinedConcordanceTable and PerNodeConcordanceTable because both
- * paths need identical cell rendering driven off the display columns.
- */
-function buildConcordanceColumns(displayColumns: string[]): ColumnDef<ConcordanceRow>[] {
-  return displayColumns.map((columnKey) => ({
-    id: columnKey,
-    accessorFn: (row) => row[columnKey],
-    cell: ({ getValue }) => {
-      const value = getValue();
-      return toCellText(value);
-    },
-  }));
-}
 
 export interface ConcordanceTableNodeBlockProps {
   nodeKey: string;
@@ -156,7 +95,7 @@ export interface ConcordanceTableNodeBlockProps {
  * have different row models, headers, and footer actions).
  */
 export function ConcordanceTableNodeBlock(props: ConcordanceTableNodeBlockProps) {
-  if (props.nodeKey === '__COMBINED__') {
+  if (props.nodeKey === CONCORDANCE_COMBINED_NODE_KEY) {
     return <CombinedConcordanceTable {...props} />;
   }
   return <PerNodeConcordanceTable {...props} />;
@@ -198,22 +137,11 @@ function CombinedConcordanceTable({
   openDetachDialog,
   readOnly = false,
 }: ConcordanceTableNodeBlockProps) {
-  const groupedRows = nodeData.data;
-  const rows = flattenConcordanceGroups(groupedRows);
-  const allColumns = nodeData.columns;
-  const metaCols = nodeData.metadata.metadata_columns;
-  const concCols = nodeData.metadata.concordance_columns.length
-    ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
-    : CORE_COLS;
-  const visibleMetaCols = selectedMetadataColumns.filter((columnName) =>
-    metaCols.includes(columnName),
-  );
-  const rawDisplayColumns = showMetadata
-    ? [...concCols.filter((c) => allColumns.includes(c)), ...visibleMetaCols]
-    : concCols.filter((c) => allColumns.includes(c));
-  const displayColumns = dedupeColumns(rawDisplayColumns);
-
-  const columns = buildConcordanceColumns(displayColumns);
+  const { rows, tableColumns, columns } = buildConcordanceTableModel({
+    nodeData,
+    showMetadata,
+    selectedMetadataColumns,
+  });
   const table = useServerTable<ConcordanceRow>({
     data: rows,
     columns,
@@ -238,6 +166,49 @@ function CombinedConcordanceTable({
   const isAnyCombinedMaterializing = combinedNodeIds.some((id) => Boolean(nodeMaterializing[id]));
   const allCombinedMaterialized =
     combinedNodeIds.length > 0 && combinedNodeIds.every((id) => Boolean(materializedPaths[id]));
+  const combinedPageSizeSummary = nodeData.materialized ? (
+    Object.keys(materializeSummaries).length > 0 ? (
+      <GroupedResultsPageSizeSummary
+        groups={[]}
+        totalInstances={Object.values(materializeSummaries).reduce(
+          (sum, s) => sum + s.recordCount,
+          0,
+        )}
+        totalDocuments={Object.values(materializeSummaries).reduce(
+          (sum, s) => sum + s.uniqueDocuments,
+          0,
+        )}
+        totalProcessed={Object.values(materializeSummaries).reduce(
+          (sum, s) => sum + s.totalDocuments,
+          0,
+        )}
+      />
+    ) : null
+  ) : (
+    <GroupedResultsPageSizeSummary
+      groups={nodeData.data}
+      totalProcessed={batchProcessedCount(nodeData.pagination)}
+    />
+  );
+  const combinedBelowTable = (
+    <>
+      {combinedPageSizeSummary ? (
+        <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+          {combinedPageSizeSummary}
+        </div>
+      ) : null}
+      <ServerPaginationFooter
+        table={table}
+        pageIndex={combinedPage - 1}
+        pageSize={globalPageSize}
+        rowCount={nodeData.pagination.total_source_rows}
+        pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per batch'}
+        pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
+        loading={combinedLoading}
+        showPageSize={!readOnly}
+      />
+    </>
+  );
 
   return (
     <div className="mb-6">
@@ -320,151 +291,34 @@ function CombinedConcordanceTable({
           </DisabledReasonTooltip>
         </div>
       </div>
-      <div className="rounded-lg border border-border bg-card">
-        <AnalysisTableScrollArea maxHeightClass="max-h-100">
-          <Table className="min-w-180" disableContainer>
-            <TableHeader className="bg-gray-50 sticky top-0 z-10">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead
-                      key={header.id}
-                      className={`px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 ${alignmentClassForColumn(header.column.id) || 'text-left'}`}
-                    >
-                      {header.column.id}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    className="h-24 text-center text-muted-foreground"
-                    colSpan={displayColumns.length || 1}
-                  >
-                    No matching rows on this page for &quot;{searchWord}&quot;. Source rows without
-                    matches are omitted.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                table.getRowModel().rows.map((tableRow) => {
-                  const row = tableRow.original;
-                  const rawSrc = row.__source_node;
-                  const normalized = rawSrc ? toCellText(rawSrc).toLowerCase() : undefined;
-                  let color = normalized ? sourceColorMap[normalized] : undefined;
-                  if (!color && rawSrc && normalized) {
-                    // Fallback: loose match (substring) when exact lookup fails.
-                    const entry = Object.entries(sourceColorMap).find(([k]) =>
-                      k.includes(normalized),
-                    );
-                    color = entry ? entry[1] : undefined;
-                  }
-                  if (!color) {
-                    // Final fallback: deterministic by hashing the source string.
-                    if (rawSrc) {
-                      const chars = Array.from(toCellText(rawSrc));
-                      const hash = chars.reduce((a, c) => a + c.charCodeAt(0), 0);
-                      color = defaultPalette[hash % defaultPalette.length];
-                    } else {
-                      color = '#ffffff';
-                    }
-                  }
-                  const bg = `${String(color)}20`;
-                  return (
-                    <TableRow
-                      key={tableRow.id}
-                      className="cursor-pointer"
-                      style={{ backgroundColor: bg }}
-                      onClick={() => {
-                        if (rawSrc) {
-                          const nodeObj = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
-                            const candidates = [
-                              n.id,
-                              n.name,
-                              (n as Record<string, unknown>).data &&
-                              typeof (n as Record<string, unknown>).data === 'object'
-                                ? ((n as Record<string, unknown>).data as Record<string, unknown>)
-                                    .name
-                                : undefined,
-                              n.label,
-                              (n as Record<string, unknown>).data &&
-                              typeof (n as Record<string, unknown>).data === 'object'
-                                ? ((n as Record<string, unknown>).data as Record<string, unknown>)
-                                    .label
-                                : undefined,
-                            ]
-                              .filter(Boolean)
-                              .map((v) => String(v).toLowerCase());
-                            return candidates.includes(toCellText(rawSrc).toLowerCase());
-                          });
-                          const sel =
-                            nodeObj &&
-                            effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
-                          if (nodeObj && sel?.column) {
-                            handleRowClick(row, nodeObj.id ?? '', sel.column);
-                          }
-                        }
-                      }}
-                    >
-                      {tableRow.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className={alignmentClassForColumn(cell.column.id)}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </AnalysisTableScrollArea>
-        {(() => {
-          const summary = nodeData.materialized ? (
-            Object.keys(materializeSummaries).length > 0 ? (
-              <GroupedResultsPageSizeSummary
-                groups={[]}
-                totalInstances={Object.values(materializeSummaries).reduce(
-                  (sum, s) => sum + s.recordCount,
-                  0,
-                )}
-                totalDocuments={Object.values(materializeSummaries).reduce(
-                  (sum, s) => sum + s.uniqueDocuments,
-                  0,
-                )}
-                totalProcessed={Object.values(materializeSummaries).reduce(
-                  (sum, s) => sum + s.totalDocuments,
-                  0,
-                )}
-              />
-            ) : null
-          ) : (
-            <GroupedResultsPageSizeSummary
-              groups={nodeData.data}
-              totalProcessed={batchProcessedCount(nodeData.pagination)}
-            />
-          );
-          return summary ? (
-            <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
-              {summary}
-            </div>
-          ) : null;
-        })()}
-        <ServerPaginationFooter
+      <AnalysisTableFrame maxHeightClass="max-h-100" belowTable={combinedBelowTable}>
+        <ConcordanceRowsTable
           table={table}
-          pageIndex={combinedPage - 1}
-          pageSize={globalPageSize}
-          rowCount={nodeData.pagination.total_source_rows}
-          pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per batch'}
-          pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
-          loading={combinedLoading}
-          showPageSize={!readOnly}
+          rows={rows}
+          tableColumns={tableColumns}
+          searchWord={searchWord}
+          renderHeader={(header) => <ConcordancePlainHeader key={header.id} header={header} />}
+          getRowClassName={() => 'cursor-pointer'}
+          getRowStyle={(row) => {
+            const color = getConcordanceSourceColor(
+              row.__source_node,
+              sourceColorMap,
+              defaultPalette,
+            );
+            return { backgroundColor: `${color}20` };
+          }}
+          onRowClick={(row) => {
+            const rawSrc = row.__source_node;
+            if (!rawSrc) return;
+            const nodeObj = findConcordanceSourceNode(panelSelectedNodes, rawSrc);
+            const sel =
+              nodeObj && effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
+            if (nodeObj && sel?.column) {
+              handleRowClick(row, nodeObj.id ?? '', sel.column);
+            }
+          }}
         />
-      </div>
+      </AnalysisTableFrame>
     </div>
   );
 }
@@ -510,32 +364,19 @@ function PerNodeConcordanceTable({
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const effectiveNodeId = actualNodeId || requestNodeId;
   const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
-  const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';
+  const canDetach = Boolean(detachNodeId) && detachNodeId !== CONCORDANCE_COMBINED_NODE_KEY;
 
-  const groupedRows = nodeData.data;
-  const rows = flattenConcordanceGroups(groupedRows);
-  const allCols = nodeData.columns;
-  const metaCols = nodeData.metadata.metadata_columns;
-  const concCols = nodeData.metadata.concordance_columns.length
-    ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
-    : CORE_COLS;
-  const visibleMetaCols = selectedMetadataColumns.filter((columnName) =>
-    metaCols.includes(columnName),
-  );
-  const rawDisplayColumns = showMetadata
-    ? [
-        ...concCols.filter((c) => allCols.includes(c)),
-        ...visibleMetaCols.filter((c) => allCols.includes(c)),
-      ]
-    : concCols.filter((c) => allCols.includes(c));
-  const displayColumns = dedupeColumns(rawDisplayColumns);
-  const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
+  const { rows, tableColumns, columns } = buildConcordanceTableModel({
+    nodeData,
+    showMetadata,
+    selectedMetadataColumns,
+    fallbackToAllColumns: true,
+  });
 
   const currentNodePagination = nodePagination[paginationKey];
   const currentPage = currentNodePagination?.currentPage ?? 1;
   const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
 
-  const columns = buildConcordanceColumns(tableColumns);
   const table = useServerTable<ConcordanceRow>({
     data: rows,
     columns,
@@ -578,118 +419,28 @@ function PerNodeConcordanceTable({
     processTargetIds.length > 0 && processTargetIds.every((id) => Boolean(materializedPaths[id]));
 
   const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
-
-  return (
-    <div className="mb-6">
-      {showNodeIndicator && (
-        <div className="mb-2 flex items-center gap-2">
-          <span
-            className="inline-block h-3 w-3 shrink-0 rounded-full"
-            style={{ backgroundColor: context.nodeColor }}
-          />
-          <h3 className="text-sm font-medium text-foreground">
-            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key */}
-            {context.displayName || nodeKey}
-          </h3>
-        </div>
-      )}
-      <div
-        className="rounded-lg border border-border bg-card"
-        style={
-          showNodeIndicator
-            ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor }
-            : undefined
-        }
-      >
-        <AnalysisTableScrollArea maxHeightClass="max-h-100">
-          <Table className="min-w-180" disableContainer>
-            <TableHeader className="bg-gray-50 sticky top-0 z-10">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    // Every displayed column is sortable: the backend's
-                    // materialised path honours sort_by for any column in the
-                    // parquet schema (including CONC_*). The non-materialised
-                    // path silently drops CONC_* sorts (those columns are
-                    // computed post-slice), but metadata-column sorts still
-                    // apply — and pre-materialise the user typically only sees
-                    // metadata values to sort by anyway.
-                    <SortableHeader
-                      key={header.id}
-                      columnKey={header.column.id}
-                      label={header.column.id}
-                      paginationKey={paginationKey}
-                      requestNodeId={requestNodeId}
-                      nodePagination={nodePagination}
-                      onSort={handleSort}
-                    />
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    className="h-24 text-center text-muted-foreground"
-                    colSpan={tableColumns.length || 1}
-                  >
-                    No matching rows on this page for &quot;{searchWord}&quot;. Source rows without
-                    matches are omitted.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                table.getRowModel().rows.map((tableRow, index) => {
-                  const row = tableRow.original;
-                  return (
-                    <TableRow
-                      key={tableRow.id}
-                      className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                      onClick={() => {
-                        handleRowClick(row, effectiveNodeId, column);
-                      }}
-                    >
-                      {tableRow.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className={alignmentClassForColumn(cell.column.id)}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </AnalysisTableScrollArea>
+  // Prefer the per-node materialised summary when it's available. Before the
+  // SSE materialization event arrives, fall back to counting from
+  // ``nodeData.data`` + pagination, matching the combined branch.
+  const pageSizeSummary =
+    nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId] ? (
+      <GroupedResultsPageSizeSummary
+        groups={[]}
+        totalInstances={materializeSummaries[detachNodeId].recordCount}
+        totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
+        totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
+      />
+    ) : (
+      <GroupedResultsPageSizeSummary
+        groups={nodeData.data}
+        totalProcessed={batchProcessedCount(nodeData.pagination)}
+      />
+    );
+  const belowTable = (
+    <>
+      <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+        {pageSizeSummary}
       </div>
-
-      {(() => {
-        // Prefer the per-node materialised summary when it's available.
-        // Before the SSE materialization event arrives, fall back to counting
-        // from ``nodeData.data`` + pagination, matching the combined branch.
-        const summary =
-          nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId] ? (
-            <GroupedResultsPageSizeSummary
-              groups={[]}
-              totalInstances={materializeSummaries[detachNodeId].recordCount}
-              totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
-              totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
-            />
-          ) : (
-            <GroupedResultsPageSizeSummary
-              groups={nodeData.data}
-              totalProcessed={batchProcessedCount(nodeData.pagination)}
-            />
-          );
-        return (
-          <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
-            {summary}
-          </div>
-        );
-      })()}
       <ServerPaginationFooter
         table={table}
         pageIndex={currentPage - 1}
@@ -787,6 +538,61 @@ function PerNodeConcordanceTable({
           </Button>
         </DisabledReasonTooltip>
       </ServerPaginationFooter>
+    </>
+  );
+
+  return (
+    <div className="mb-6">
+      {showNodeIndicator && (
+        <div className="mb-2 flex items-center gap-2">
+          <span
+            className="inline-block h-3 w-3 shrink-0 rounded-full"
+            style={{ backgroundColor: context.nodeColor }}
+          />
+          <h3 className="text-sm font-medium text-foreground">
+            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key */}
+            {context.displayName || nodeKey}
+          </h3>
+        </div>
+      )}
+      <AnalysisTableFrame
+        maxHeightClass="max-h-100"
+        belowTable={belowTable}
+        style={
+          showNodeIndicator
+            ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor }
+            : undefined
+        }
+      >
+        <ConcordanceRowsTable
+          table={table}
+          rows={rows}
+          tableColumns={tableColumns}
+          searchWord={searchWord}
+          renderHeader={(header) => (
+            // Every displayed column is sortable: the backend's materialised
+            // path honours sort_by for any column in the parquet schema
+            // (including CONC_*). The non-materialised path silently drops
+            // CONC_* sorts because those columns are computed post-slice, but
+            // metadata-column sorts still apply.
+            <SortableHeader
+              key={header.id}
+              columnKey={header.column.id}
+              label={header.column.id}
+              paginationKey={paginationKey}
+              requestNodeId={requestNodeId}
+              nodePagination={nodePagination}
+              onSort={handleSort}
+            />
+          )}
+          getRowClassName={(_row, index) =>
+            `cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`
+          }
+          onRowClick={(row) => {
+            handleRowClick(row, effectiveNodeId, column);
+          }}
+        />
+      </AnalysisTableFrame>
     </div>
   );
 }

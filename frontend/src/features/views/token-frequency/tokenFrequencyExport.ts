@@ -68,7 +68,7 @@ const toArchiveNameSegment = (label: string, maxLength = 20) => {
 
 /** Names token-frequency zip bundles from selected corpus labels and capture time. */
 /**
- * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by: useTokenFrequencyDownloads and tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 export const buildTokenFrequencyZipFilename = (labels: string[], date: Date = new Date()) => {
   const segments = labels.map((label) => toArchiveNameSegment(label)).filter(Boolean);
@@ -306,7 +306,7 @@ const renderWordCloudBitmap = (
 
 /** Builds a word-cloud export file in the requested image format. */
 /**
- * Used by: TokenFrequencyFeature.tsx because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by: useTokenFrequencyDownloads because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  * Flow: serialize the SVG and dimensions, return raw SVG when requested, otherwise render a bitmap blob and build the export filename.
  */
 export const buildWordCloudExportFile = async (
@@ -336,7 +336,7 @@ export const buildWordCloudExportFile = async (
 
 /** Builds a frequency-table export file for either CSV or Markdown delivery. */
 /**
- * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by: useTokenFrequencyDownloads and tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 export const buildFrequencyExportFile = (
   label: string,
@@ -358,7 +358,7 @@ export const buildFrequencyExportFile = (
 
 /** Builds a plain-text stop-word export to accompany analysis downloads. */
 /**
- * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by: useTokenFrequencyDownloads and tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 export const buildStopWordsExportFile = (
   stopWordsText: string,
@@ -377,7 +377,7 @@ export const buildStopWordsExportFile = (
 
 /** Downloads multiple prepared files as a zip bundle, or a single file directly. */
 /**
- * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by: useTokenFrequencyDownloads and tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 export const downloadExportBundleAsZip = async (
   zipFilename: string,
@@ -432,7 +432,7 @@ const serializeSvg = (svg: SVGSVGElement): { svgString: string; width: number; h
 
 /** Downloads a word cloud as SVG directly or as a rendered bitmap file. */
 /**
- * Used by: TokenFrequencyFeature.tsx, tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by: useTokenFrequencyDownloads and tokenFrequencyExport.test.ts because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  * Flow: no-op outside browsers, download serialized SVG directly for SVG format, otherwise render a bitmap export and trigger the file download.
  */
 export const downloadWordCloudAs = (
@@ -467,7 +467,7 @@ export const downloadWordCloudAs = (
 
 /** Downloads frequency rows using the user-selected text export format. */
 /**
- * Used by: tokenFrequencyExport.test.ts, TokenFrequencyFeature.tsx because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by: tokenFrequencyExport.test.ts and useTokenFrequencyDownloads because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 export const downloadFrequencyRowsAs = (
   label: string,
@@ -483,7 +483,7 @@ export const downloadFrequencyRowsAs = (
 
 /** Downloads the active stop-word list as a standalone text file. */
 /**
- * Used by: TokenFrequencyFeature.tsx because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by: useTokenFrequencyDownloads because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
  */
 export const downloadStopWordsAsTxt = (stopWordsText: string, label: string) => {
   if (typeof window === 'undefined') return;

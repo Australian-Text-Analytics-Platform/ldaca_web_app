@@ -4,29 +4,16 @@ import type {
   QuotationAnalysisResponse,
   QuotationRequestInput,
   QuotationResultQuery,
-  QuotationEngineConfigInput,
   QuotationDetachRequest,
   QuotationMaterializeRequest,
   AnalysisTaskActionResponse,
 } from '@/api';
 import { getNodeIdentifier, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
+import type { QuotationEngineRequestPayload } from './useQuotationEngineSettings';
 
 const DEFAULT_PAGE_SIZE = 50;
 type QuotationRequest = QuotationRequestInput;
-type QuotationEngineConfig = QuotationEngineConfigInput;
-
-type EngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
-
-type ResolvedEnginePayload =
-  | { type: 'local' }
-  | {
-      type: 'remote';
-      rawUrl: string;
-      normalizedUrl: string;
-      isValid: boolean;
-      failureReason: string | null;
-    };
 
 /** Extracts the most useful backend error detail for quotation dialogs. */
 /**
@@ -60,13 +47,10 @@ interface QuotationState {
   activeSelections: NodeColumnSelection[];
   nodeState: Record<string, NodePaginationState>;
   originalColumnsByNode: Record<string, string[]>;
-  resolvedEnginePayload: ResolvedEnginePayload;
-  engineConfigUrl: string;
+  buildEngineRequest: () => QuotationEngineRequestPayload | null;
 }
 
 interface QuotationActions {
-  setEngineError: (error: string | null) => void;
-  updateRemoteUrl: (url: string) => void;
   setIsLoadingQuotations: (value: boolean) => void;
   setHasLoaded: (value: boolean) => void;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
@@ -119,12 +103,9 @@ export function useQuotationTaskFlow({
     activeSelections,
     nodeState,
     originalColumnsByNode,
-    resolvedEnginePayload,
-    engineConfigUrl,
+    buildEngineRequest,
   },
   actions: {
-    setEngineError,
-    updateRemoteUrl,
     setIsLoadingQuotations,
     setHasLoaded,
     setNodeDetaching,
@@ -161,38 +142,6 @@ export function useQuotationTaskFlow({
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const rawLabel = match?.name || match?.label || match?.id || nodeId;
     return rawLabel;
-  };
-  // Converts the UI engine selection into the backend request shape, validating remote URLs first.
-  /**
-   * Called by: useQuotationTaskFlow as a local helper in this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-   * Flow: validate remote engine URLs, normalize and persist corrected URLs, clear or set engine errors, then return local or remote engine payloads.
-   */
-  const buildEngineRequest = (): EngineRequestPayload | null => {
-    if (resolvedEnginePayload.type === 'remote') {
-      const rawUrl = resolvedEnginePayload.rawUrl;
-      if (!rawUrl.length) {
-        setEngineError('Provide a quotation service URL.');
-        return null;
-      }
-      if (!resolvedEnginePayload.isValid) {
-        if (resolvedEnginePayload.failureReason === 'empty') {
-          setEngineError('Provide a quotation service URL.');
-        } else if (resolvedEnginePayload.failureReason === 'protocol') {
-          setEngineError('Remote engines must use http:// or https:// URLs.');
-        } else {
-          setEngineError('Enter a valid URL including http:// or https://');
-        }
-        return null;
-      }
-      const normalizedUrl = resolvedEnginePayload.normalizedUrl;
-      if (engineConfigUrl.trim() !== normalizedUrl) {
-        updateRemoteUrl(normalizedUrl);
-      }
-      setEngineError(null);
-      return { type: 'remote', url: normalizedUrl };
-    }
-    setEngineError(null);
-    return { type: 'local' };
   };
 
   // Locates the locked node and column that should receive stored-result updates.
@@ -261,17 +210,15 @@ export function useQuotationTaskFlow({
       return null;
     }
 
-    const engineConfigForRequest: QuotationEngineConfig =
-      enginePayload.type === 'remote'
-        ? { type: 'remote', url: enginePayload.url }
-        : { type: 'local' };
-
     const requestPayload: QuotationRequest = {
       column,
       page,
       sort_by: sortBy ?? undefined,
       descending,
-      engine: engineConfigForRequest,
+      engine:
+        enginePayload.type === 'remote'
+          ? { type: 'remote', url: enginePayload.url }
+          : { type: 'local' },
     };
     if (pageSize !== undefined) {
       requestPayload.page_size = pageSize;
@@ -289,9 +236,8 @@ export function useQuotationTaskFlow({
         page_size: requestPayload.page_size,
         sort_by: requestPayload.sort_by ?? null,
         descending: requestPayload.descending,
-        engine_type: engineConfigForRequest.type,
-        engine_url:
-          engineConfigForRequest.type === 'remote' ? (engineConfigForRequest.url ?? '') : null,
+        engine_type: enginePayload.type,
+        engine_url: enginePayload.type === 'remote' ? enginePayload.url : null,
       };
     } catch (error: unknown) {
       console.error('Failed to fetch quotations', error);
@@ -528,7 +474,6 @@ export function useQuotationTaskFlow({
   };
 
   return {
-    buildEngineRequest,
     resolveLockedNodeContext,
     persistContextLengthPreference,
     fetchQuotations,

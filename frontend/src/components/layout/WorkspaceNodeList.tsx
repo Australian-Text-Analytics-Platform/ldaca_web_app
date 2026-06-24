@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { SidebarWorkspaceNode } from './sidebar/types';
 import {
   AlertDialog,
@@ -32,20 +33,68 @@ interface WorkspaceNodeListProps {
 }
 
 /**
- * Called by: WorkspaceNodeList row rendering to build data-block tooltips because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
- * Flow: read shape from node data or top-level payload, format numeric row/column parts, then fall back to unknown markers.
+ * Renders a data-block name with a left-edge fade and right-aligned text.
+ * Used by: WorkspaceNodeList rows because long path-like node names are more
+ * useful when their suffix stays visible and leading row actions fade over the
+ * clipped prefix instead of forcing an ellipsis at the right edge.
+ * Flow: measure text overflow, use RTL clipping only when the name exceeds the
+ * row width, and show the left fade while clipped or while leading actions are
+ * visible on hover/focus.
  */
-const formatShapeLabel = (node: SidebarWorkspaceNode): string => {
-  const rawShape = node.data?.shape ?? (node as { shape?: [number | null, number | null] }).shape;
-  if (!rawShape) {
-    return '—';
-  }
-  const [rows, cols] = rawShape;
-  /** Called by: formatShapeLabel for row and column tooltip fragments because the caller needs one documented boundary for the lookup, event, or state handoff step. */
-  const formatPart = (value: number | null | undefined) =>
-    typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
-  return `${formatPart(rows)} × ${formatPart(cols)}`;
-};
+function NodeRowName({ name }: { name: string }) {
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const text = textRef.current;
+    if (!wrap || !text) return;
+
+    const measure = () => {
+      setOverflowing(text.offsetWidth > wrap.clientWidth + 1);
+    };
+
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    observer.observe(text);
+    return () => {
+      observer.disconnect();
+    };
+  }, [name]);
+
+  return (
+    <span
+      ref={wrapRef}
+      dir={overflowing ? 'rtl' : 'ltr'}
+      className={cn(
+        'relative min-w-0 flex-1 overflow-hidden',
+        overflowing ? 'block' : 'flex justify-end text-right',
+      )}
+    >
+      <span
+        ref={textRef}
+        dir="ltr"
+        className="block w-max whitespace-nowrap text-right text-xs font-medium text-foreground"
+      >
+        {name}
+      </span>
+      <span
+        data-testid="node-name-left-fade"
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background via-background/90 to-transparent group-hover/row:w-32',
+          overflowing ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
+        )}
+      />
+    </span>
+  );
+}
 
 /** Called by: WorkspaceNodeList sorting and row labels because the caller needs one documented boundary for the lookup, event, or state handoff step. */
 const getNodeDisplayName = (node: SidebarWorkspaceNode): string =>
@@ -181,101 +230,102 @@ function WorkspaceNodeList({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <div className="relative">
+      <TooltipProvider delayDuration={120} skipDelayDuration={0}>
+        <div className="relative">
         {nodes.length ? (
           <div className="space-y-1.5 pr-1">
             {orderedNodes.map((node) => {
               const displayName = getNodeDisplayName(node) || 'Untitled data block';
-              const shape = formatShapeLabel(node);
               const checked = selectedNodeIds?.includes(node.id) ?? false;
-              const tooltip = `${displayName}\nShape: ${shape}`;
               const isFresh = freshIds.has(node.id);
               const isPinned = pinnedIdSet.has(node.id);
               const pinnedRowAction = isPinned ? renderPinnedRowAction?.(node) : null;
               const rowActions = renderRowActions?.(node);
 
               return (
-                <div
-                  key={node.id}
-                  onClick={() => {
-                    handleToggle(node.id);
-                  }}
-                  onKeyDown={(event) => {
-                    if (!isActivationKey(event)) {
-                      return;
-                    }
-                    event.preventDefault();
-                    handleToggle(node.id);
-                  }}
-                  title={tooltip}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={checked}
-                  aria-label={`${checked ? 'Deselect' : 'Select'} ${displayName}`}
-                  className="group/row relative block w-full rounded-md text-left focus-visible:outline-hidden"
-                >
-                  {/* Inner box carries the border/background. */}
-                  <div
-                    className={cn(
-                      'relative flex items-center gap-2 overflow-visible rounded-md border bg-background/70 px-2 py-1 text-xs transition-colors duration-150 ease-out group-focus-visible/row:ring-1 group-focus-visible/row:ring-ring',
-                      isPinned && pinnedRowAction && 'pl-8',
-                      rowActions && 'pr-20',
-                      checked
-                        ? 'border-primary/70 bg-primary/10 ring-1 ring-primary/20'
-                        : 'border-border/60 group-hover/row:border-border group-hover/row:bg-accent/60',
-                    )}
-                  >
-                    {pinnedRowAction && (
+                <Tooltip key={node.id}>
+                  <TooltipTrigger asChild>
+                    <div
+                      onClick={() => {
+                        handleToggle(node.id);
+                      }}
+                      onKeyDown={(event) => {
+                        if (!isActivationKey(event)) {
+                          return;
+                        }
+                        event.preventDefault();
+                        handleToggle(node.id);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={checked}
+                      aria-label={`${checked ? 'Deselect' : 'Select'} ${displayName}`}
+                      className="group/row relative block w-full rounded-md text-left focus-visible:outline-hidden"
+                    >
+                      {/* Inner box carries the border/background. */}
                       <div
-                        data-testid="pinned-row-pin-action"
-                        className="absolute top-1/2 left-1 z-10 flex -translate-y-1/2 items-center opacity-100 group-hover/row:pointer-events-none group-hover/row:opacity-0"
-                        onPointerDown={(event) => {
-                          event.stopPropagation();
-                        }}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                        }}
-                        onKeyDown={(event) => {
-                          event.stopPropagation();
-                        }}
+                        className={cn(
+                          'relative flex items-center gap-2 overflow-visible rounded-md border bg-background/70 px-2 py-1 text-xs transition-colors duration-150 ease-out group-focus-visible/row:ring-1 group-focus-visible/row:ring-ring',
+                          isPinned && pinnedRowAction && 'pl-8',
+                          checked
+                            ? 'border-primary/70 bg-primary/10 ring-1 ring-primary/20'
+                            : 'border-border/60 group-hover/row:border-border group-hover/row:bg-accent/60',
+                        )}
                       >
-                        {pinnedRowAction}
+                        {pinnedRowAction && (
+                          <div
+                            data-testid="pinned-row-pin-action"
+                            className="absolute top-1/2 left-1 z-10 flex -translate-y-1/2 items-center opacity-100 group-hover/row:pointer-events-none group-hover/row:opacity-0"
+                            onPointerDown={(event) => {
+                              event.stopPropagation();
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                            }}
+                            onKeyDown={(event) => {
+                              event.stopPropagation();
+                            }}
+                          >
+                            {pinnedRowAction}
+                          </div>
+                        )}
+                        <NodeRowName name={displayName} />
+                        {isFresh && (
+                          <span
+                            className="pointer-events-none h-2 w-2 shrink-0 rounded-full bg-red-500 transition-opacity duration-150 group-hover/row:opacity-0"
+                            title="New data block"
+                            aria-label="New data block"
+                          />
+                        )}
+                        {rowActions && (
+                          // Hover-revealed leading actions, absolutely positioned
+                          // so the row keeps one stable height while names fade.
+                          // Stop row-toggle when interacting with the actions.
+                          <div
+                            className="absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 pointer-events-none"
+                            onPointerDown={(event) => {
+                              event.stopPropagation();
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                            }}
+                            onKeyDown={(event) => {
+                              event.stopPropagation();
+                            }}
+                            role="toolbar"
+                            tabIndex={-1}
+                            aria-label={`Actions for ${displayName}`}
+                          >
+                            {rowActions}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <span className="min-w-0 flex-1 truncate text-left text-xs font-medium text-foreground">
-                      {displayName}
-                    </span>
-                    {isFresh && (
-                      <span
-                        className="pointer-events-none h-2 w-2 shrink-0 rounded-full bg-red-500 transition-opacity duration-150 group-hover/row:opacity-0"
-                        title="New data block"
-                        aria-label="New data block"
-                      />
-                    )}
-                    {rowActions && (
-                      // Hover-revealed trailing actions, absolutely positioned
-                      // so the row keeps one stable height while names truncate.
-                      // Stop row-toggle when interacting with the actions.
-                      <div
-                        className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 pointer-events-none"
-                        onPointerDown={(event) => {
-                          event.stopPropagation();
-                        }}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                        }}
-                        onKeyDown={(event) => {
-                          event.stopPropagation();
-                        }}
-                        role="toolbar"
-                        tabIndex={-1}
-                        aria-label={`Actions for ${displayName}`}
-                      >
-                        {rowActions}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" align="center" className="max-w-80 wrap-break-word">
+                    {displayName}
+                  </TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
@@ -284,7 +334,8 @@ function WorkspaceNodeList({
             No data blocks
           </div>
         )}
-      </div>
+        </div>
+      </TooltipProvider>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useReducer, useRef, useSyncExternalStore } from 'react';
 import {
   type NodeProps,
   Handle,
@@ -38,8 +38,86 @@ interface CustomNodeData extends Record<string, unknown> {
   onAddToSelection?: (nodeId: string) => void;
 }
 
-const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
+const COMPACT_NODE_ZOOM_THRESHOLD = 0.6;
 const TOOLBAR_HIDE_DELAY_MS = 350;
+
+interface CustomNodeUiState {
+  showMenu: boolean;
+  isRenaming: boolean;
+  newName: string;
+  copied: boolean;
+  isHovered: boolean;
+  isToolbarHovered: boolean;
+  showDeleteConfirm: boolean;
+}
+
+type CustomNodeUiAction =
+  | { type: 'set-menu'; showMenu: boolean }
+  | { type: 'start-rename'; name: string }
+  | { type: 'set-rename-name'; name: string }
+  | { type: 'cancel-rename' }
+  | { type: 'copy-id' }
+  | { type: 'copy-id-reset' }
+  | { type: 'show-toolbar' }
+  | { type: 'set-toolbar-hovered'; isToolbarHovered: boolean }
+  | { type: 'hide-toolbar' }
+  | { type: 'open-delete-confirm' }
+  | { type: 'set-delete-confirm'; showDeleteConfirm: boolean };
+
+const initialCustomNodeUiState: CustomNodeUiState = {
+  showMenu: false,
+  isRenaming: false,
+  newName: '',
+  copied: false,
+  isHovered: false,
+  isToolbarHovered: false,
+  showDeleteConfirm: false,
+};
+
+/**
+ * Keeps CustomNode's transient interaction modes in one reducer.
+ * Used by: CustomNode because menu, rename, copy feedback, hover toolbar, and
+ * delete confirmation are mutually related UI modes for the same graph card.
+ * Flow: menu actions can enter rename/delete, rename owns the draft name until
+ * submit/cancel, hover actions reveal or hide the floating toolbar, and copy id
+ * toggles short-lived feedback without affecting graph selection.
+ */
+function customNodeUiReducer(
+  state: CustomNodeUiState,
+  action: CustomNodeUiAction,
+): CustomNodeUiState {
+  switch (action.type) {
+    case 'set-menu':
+      return { ...state, showMenu: action.showMenu };
+    case 'start-rename':
+      return {
+        ...state,
+        showMenu: false,
+        isRenaming: true,
+        newName: action.name,
+      };
+    case 'set-rename-name':
+      return { ...state, newName: action.name };
+    case 'cancel-rename':
+      return { ...state, isRenaming: false, newName: '' };
+    case 'copy-id':
+      return { ...state, copied: true };
+    case 'copy-id-reset':
+      return { ...state, copied: false };
+    case 'show-toolbar':
+      return { ...state, isHovered: true };
+    case 'set-toolbar-hovered':
+      return { ...state, isToolbarHovered: action.isToolbarHovered };
+    case 'hide-toolbar':
+      return { ...state, isHovered: false, isToolbarHovered: false };
+    case 'open-delete-confirm':
+      return { ...state, showMenu: false, showDeleteConfirm: true };
+    case 'set-delete-confirm':
+      return { ...state, showDeleteConfirm: action.showDeleteConfirm };
+    default:
+      return state;
+  }
+}
 
 /**
  * Module-level singleton tracking which node currently owns the visible hover
@@ -94,13 +172,9 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   // Selection is the only visual state now (no per-node colours): a node
   // is either selected (React Flow ``selected``) or not.
   const isSelected = selected;
-  const [showMenu, setShowMenu] = useState(false);
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isToolbarHovered, setIsToolbarHovered] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [uiState, dispatchUi] = useReducer(customNodeUiReducer, initialCustomNodeUiState);
+  const { showMenu, isRenaming, newName, copied, isHovered, isToolbarHovered, showDeleteConfirm } =
+    uiState;
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const toolbarHideTimeoutRef = useRef<number | null>(null);
@@ -132,7 +206,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    * other node's hover toolbar hides at once. Called on node mouse-enter. */
   const showToolbar = () => {
     cancelToolbarHide();
-    setIsHovered(true);
+    dispatchUi({ type: 'show-toolbar' });
     setActiveToolbarOwner(id);
   };
 
@@ -141,8 +215,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    * bridge in that direction, so the toolbar should vanish at once. */
   const hideToolbarImmediately = () => {
     cancelToolbarHide();
-    setIsHovered(false);
-    setIsToolbarHovered(false);
+    dispatchUi({ type: 'hide-toolbar' });
     if (activeToolbarNodeId === id) setActiveToolbarOwner(null);
   };
 
@@ -153,8 +226,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const scheduleToolbarHide = () => {
     cancelToolbarHide();
     toolbarHideTimeoutRef.current = window.setTimeout(() => {
-      setIsHovered(false);
-      setIsToolbarHovered(false);
+      dispatchUi({ type: 'hide-toolbar' });
       if (activeToolbarNodeId === id) setActiveToolbarOwner(null);
       toolbarHideTimeoutRef.current = null;
     }, TOOLBAR_HIDE_DELAY_MS);
@@ -179,7 +251,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
      */
     const handlePointerDown = (event: Event) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
+        dispatchUi({ type: 'set-menu', showMenu: false });
       }
     };
     document.addEventListener('pointerdown', handlePointerDown, { capture: true });
@@ -195,8 +267,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowMenu(false);
-    setShowDeleteConfirm(true);
+    dispatchUi({ type: 'open-delete-confirm' });
   };
 
   /**
@@ -208,7 +279,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     if (node.node_id) {
       onDelete(node.node_id);
     }
-    setShowDeleteConfirm(false);
+    dispatchUi({ type: 'set-delete-confirm', showDeleteConfirm: false });
   };
 
   /**
@@ -218,9 +289,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleRenameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowMenu(false);
-    setNewName(node.name || '');
-    setIsRenaming(true);
+    dispatchUi({ type: 'start-rename', name: node.name || '' });
     setTimeout(() => {
       renameInputRef.current?.focus();
       renameInputRef.current?.select();
@@ -238,8 +307,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     if (onRename && node.node_id && newName.trim()) {
       onRename(node.node_id, newName.trim());
     }
-    setIsRenaming(false);
-    setNewName('');
+    dispatchUi({ type: 'cancel-rename' });
   };
 
   /**
@@ -248,8 +316,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleRenameCancel = () => {
-    setIsRenaming(false);
-    setNewName('');
+    dispatchUi({ type: 'cancel-rename' });
   };
 
   /**
@@ -270,7 +337,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleCopyNode = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowMenu(false);
+    dispatchUi({ type: 'set-menu', showMenu: false });
     if (onCopy && node.node_id) {
       onCopy(node.node_id);
     }
@@ -283,7 +350,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleUndoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowMenu(false);
+    dispatchUi({ type: 'set-menu', showMenu: false });
     if (onUndo && node.node_id && node.can_undo) {
       onUndo(node.node_id);
     }
@@ -296,7 +363,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleRedoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowMenu(false);
+    dispatchUi({ type: 'set-menu', showMenu: false });
     if (onRedo && node.node_id && node.can_redo) {
       onRedo(node.node_id);
     }
@@ -311,9 +378,9 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     e.stopPropagation();
     if (node.node_id) {
       void navigator.clipboard.writeText(node.node_id);
-      setCopied(true);
+      dispatchUi({ type: 'copy-id' });
       setTimeout(() => {
-        setCopied(false);
+        dispatchUi({ type: 'copy-id-reset' });
       }, 2000);
     }
   };
@@ -375,7 +442,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       className="nodrag nopan flex items-center gap-1 rounded-lg border border-border bg-white/95 p-1 shadow-lg"
       onMouseEnter={() => {
         cancelToolbarHide();
-        setIsToolbarHovered(true);
+        dispatchUi({ type: 'set-toolbar-hovered', isToolbarHovered: true });
         setActiveToolbarOwner(id);
       }}
       onMouseLeave={hideToolbarImmediately}
@@ -389,7 +456,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
           onMouseDown={stopGraphControlEvent}
           onClick={(e) => {
             e.stopPropagation();
-            setShowMenu(!showMenu);
+            dispatchUi({ type: 'set-menu', showMenu: !showMenu });
             setActiveToolbarOwner(id);
           }}
           className={menuButtonClassName}
@@ -455,7 +522,12 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   );
 
   const deleteDialog = (
-    <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+    <AlertDialog
+      open={showDeleteConfirm}
+      onOpenChange={(open) => {
+        dispatchUi({ type: 'set-delete-confirm', showDeleteConfirm: open });
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="break-all">
@@ -563,7 +635,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
                 type="text"
                 value={newName}
                 onChange={(e) => {
-                  setNewName(e.target.value);
+                  dispatchUi({ type: 'set-rename-name', name: e.target.value });
                 }}
                 onBlur={handleRenameCancel}
                 onKeyDown={handleRenameKeyDown}

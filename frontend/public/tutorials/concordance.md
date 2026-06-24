@@ -18,6 +18,10 @@ Use the data-block selector to choose which corpus (or corpora) to search. You c
 
 Type the word or phrase you want to study. The search is case-insensitive by default (enable **Case Sensitive** to override). Each match is shown with the surrounding left and right context.
 
+<h4 id="help-concordance-search-mode">Search mode</h4>
+
+Use **Token** mode when you want matches to follow the tokenizer model chosen for each selected data block. Use **Regex** mode for literal text, word-boundary, or pattern searches against the original text column. Token mode is only available after the selected data blocks have compatible tokenization settings.
+
 **Regular expressions**
 
 Enable **Use Regular Expression** to search using pattern matching. This lets you find word variants, multiple terms at once, or complex patterns.

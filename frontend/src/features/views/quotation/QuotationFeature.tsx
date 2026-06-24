@@ -1,12 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { quotationDetachOptions, quotationTaskRequest, quotationTaskResult } from '@/api';
+import { useEffect, useRef, useState } from 'react';
+import { quotationTaskRequest, quotationTaskResult } from '@/api';
 import type {
   QuotationAnalysisResponse,
   AnalysisTabInput,
   QuotationEngineConfigInput,
-  QuotationMetadata,
 } from '@/api';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -15,10 +13,6 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import HelpIcon from '@/components/help/HelpIcon';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,135 +22,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Plus } from 'lucide-react';
 import {
   getNodeIdentifier,
   getServerEngineConfig,
   useLastRunRequest,
   useAnalysisFeature,
   executeAnalysisRerun,
-  type NodePaginationState,
 } from '../common';
-import { useTabNodeInputs } from '../common/nodeInputs';
+import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
-import { toCellText } from './quotationCellText';
 import { hasParameterDiff } from '../common/parameterComparison';
 
-import { useMaterializeLifecycle } from '../common/hooks/useMaterializeLifecycle';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
-import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../common/generatedColumns';
-import {
-  DEFAULT_CONTEXT_LENGTH,
-  MAX_CONTEXT_LENGTH,
-  clampContextLength,
-} from './quotationTextClip';
+import { useQuotationContextPreference } from './hooks/useQuotationContextPreference';
+import { useQuotationDetachDialog } from './hooks/useQuotationDetachDialog';
+import { useQuotationEngineSettings } from './hooks/useQuotationEngineSettings';
+import { useQuotationMaterializeLifecycle } from './hooks/useQuotationMaterializeLifecycle';
+import { useQuotationResultControls } from './hooks/useQuotationResultControls';
+import { useQuotationRowDetail } from './hooks/useQuotationRowDetail';
 import { normalizeRemoteUrl } from './quotationRemoteUrl';
 import { QuotationDetachDialog } from './components/QuotationDetachDialog';
 import { QuotationEngineSettingsFields } from './components/QuotationEngineSettingsFields';
 import { type QuotationHoverState } from './components/QuotationHighlightedCell';
-import { QuotationNodeBlock } from './components/QuotationNodeBlock';
-import type { DetachDialogNodeOption } from '../common/components/DetachColumnsDialog';
-import { MetadataColumnSelector } from '../common/components/MetadataColumnSelector';
-import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
+import { QuotationResultsPanel } from './components/QuotationResultsPanel';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
-import { PAGE_SIZE_OPTIONS_DEFAULT } from '../common/constants';
-import { useDetachColumnsState } from '../common/hooks/useDetachColumnsState';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
-import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
-import { renderQuotationDetailText } from './components/quotationDetailText';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
-
-interface QuotationResultState {
-  groupedRows: QuotationGroupedRow[];
-  rows: QuotationHitRow[];
-  columns: string[];
-  metadata: QuotationMetadata;
-  pagination: {
-    page: number;
-    page_size: number;
-    total_source_rows: number;
-    total_source_pages: number;
-    result_count: number;
-    has_next: boolean;
-    has_prev: boolean;
-  };
-  sorting: {
-    sort_by?: string | null;
-    descending: boolean;
-  };
-  column: string;
-}
-
-type QuotationEngineConfig = QuotationEngineConfigInput;
-type QuotationHitRow = Record<string, unknown>;
-type QuotationGroupedRow = QuotationHitRow[];
-
-type QuotationDisplayRow = QuotationHitRow & {
-  __spans: { start: number; end: number; type: string }[];
-};
-
-/** Normalize a ``QuotationAnalysisResponse`` into the result-state
- * shape the table view consumes. Hoisted to module scope so the task
- * hydration flow can share it with result-fetch handlers without
- * closing over component state. */
-/**
- * Called by: QuotationFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
- * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
- */
-function buildQuotationResultState(
-  result: QuotationAnalysisResponse,
-  column: string,
-): QuotationResultState {
-  const groupedRows = result.data;
-  const rows = groupedRows
-    .flatMap((group) => group)
-    .map((row) => {
-      const spans: { start: number; end: number; type: string }[] = [];
-      // Collects backend span offsets into the display row shape used by highlighted cells.
-      /**
-       * Called by: buildQuotationResultState during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-       */
-      const addSpan = (start?: unknown, end?: unknown, type?: string) => {
-        if (!type) return;
-        const s = Number(start);
-        const e = Number(end);
-        if (Number.isFinite(s) && Number.isFinite(e) && s < e) {
-          spans.push({ start: s, end: e, type });
-        }
-      };
-      addSpan(
-        row[QUOTATION_COLUMN_KEYS.speakerStartIdx],
-        row[QUOTATION_COLUMN_KEYS.speakerEndIdx],
-        'speaker',
-      );
-      addSpan(
-        row[QUOTATION_COLUMN_KEYS.quoteStartIdx],
-        row[QUOTATION_COLUMN_KEYS.quoteEndIdx],
-        'quote',
-      );
-      addSpan(
-        row[QUOTATION_COLUMN_KEYS.verbStartIdx],
-        row[QUOTATION_COLUMN_KEYS.verbEndIdx],
-        'verb',
-      );
-      return { ...row, __spans: spans };
-    }) as QuotationDisplayRow[];
-
-  const metadata = result.metadata;
-  const columns = metadata.all_columns.slice();
-  const pagination = result.pagination;
-  const sorting = result.sorting;
-
-  return {
-    groupedRows,
-    rows,
-    columns,
-    metadata,
-    pagination,
-    sorting,
-    column,
-  };
-}
 
 /** Renders the quotation extraction workflow, including live runs and result materialisation. */
 /**
@@ -203,11 +94,7 @@ function QuotationFeature({
   const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
   const activeSelections = nodeColumnSelections;
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(
-      selections
-        .filter((selection) => selection.nodeId)
-        .map((selection) => ({ node_id: selection.nodeId, column: selection.column ?? null })),
-    );
+    onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
   const { serverRequest } = useLastRunRequest({
     analysisType: 'quotation_analysis',
@@ -220,28 +107,47 @@ function QuotationFeature({
     getAuthHeaders,
   });
 
-  const [engineConfig, setEngineConfig] = useState<QuotationEngineConfig>({ type: 'local' });
-  const [lastRemoteUrl, setLastRemoteUrl] = useState('');
-  const [engineError, setEngineError] = useState<string | null>(null);
+  const {
+    engineConfig,
+    lastRemoteUrl,
+    engineError,
+    resolvedEnginePayload,
+    engineReady,
+    setTaskEngineConfig,
+    updateRemoteUrl,
+    hydrateEngineConfig,
+    buildEngineRequest,
+  } = useQuotationEngineSettings();
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
-  // Metadata visibility derives from the selected columns: any selection
-  // shows the corresponding metadata columns in the results table.
-  const showMetadata = selectedMetadataColumns.length > 0;
   const [liveHasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [contextLengthInput, setContextLengthInput] = useState(String(DEFAULT_CONTEXT_LENGTH));
-  const [contextLength, setContextLength] = useState(DEFAULT_CONTEXT_LENGTH);
-  const [contextLengthError, setContextLengthError] = useState<string | null>(null);
-  const [isSavingContextLength, setIsSavingContextLength] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
+  const persistContextPreferenceRef = useRef<(value: number) => Promise<unknown>>(() =>
+    Promise.resolve(undefined),
+  );
+  const {
+    contextLength,
+    contextLengthInput,
+    contextLengthError,
+    isSavingContextLength,
+    setContextLengthInput,
+    handleContextLengthBlur,
+    handleContextLengthKeyDown,
+    applyPreferenceFromResult: applyContextLengthPreferenceFromResult,
+  } = useQuotationContextPreference({
+    currentWorkspaceId,
+    hasLoaded: liveHasLoaded,
+    persistPreference: (value) => persistContextPreferenceRef.current(value),
+  });
   const {
     detailPayload,
     detailOpen,
     setDetailOpen,
-    openDetail: openRowDetail,
-  } = useRowDetailDialog();
+    quotationCustomization,
+    handleRowClick: handleQuotationRowClick,
+  } = useQuotationRowDetail();
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
@@ -250,37 +156,6 @@ function QuotationFeature({
     });
     return map;
   })();
-
-  /** Called by: quotation task parameter controls and task hydration because engine choice belongs to this analysis run, not global user preferences. */
-  const setTaskEngineConfig = (config: QuotationEngineConfig) => {
-    setEngineConfig(config);
-    if (config.type === 'remote' && config.url) {
-      setLastRemoteUrl(config.url);
-    }
-  };
-
-  /** Called by: remote endpoint input and request normalization because the per-task engine form needs to preserve the endpoint while the Remote radio is selected. */
-  const updateRemoteUrl = (url: string) => {
-    setLastRemoteUrl(url);
-    setEngineConfig((current) => (current.type === 'remote' ? { type: 'remote', url } : current));
-  };
-
-  const resolvedEnginePayload = (() => {
-    if (engineConfig.type === 'remote') {
-      const rawUrl = (engineConfig.url ?? '').trim();
-      const { normalized, valid, reason } = normalizeRemoteUrl(rawUrl);
-      return {
-        type: 'remote' as const,
-        rawUrl,
-        normalizedUrl: normalized,
-        isValid: valid,
-        failureReason: reason,
-      };
-    }
-    return { type: 'local' as const };
-  })();
-
-  const engineReady = resolvedEnginePayload.type === 'local' ? true : resolvedEnginePayload.isValid;
 
   // Opens the shared error dialog with a fallback message for unexpected quotation failures.
   /**
@@ -292,13 +167,22 @@ function QuotationFeature({
     setErrorDialogOpen(true);
   };
 
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      setEngineError(null);
-    });
-  }, [engineConfig.type, engineConfig.url]);
-
   const quotationResultRef = useRef<QuotationAnalysisResponse | null>(null);
+  const {
+    nodeState,
+    nodeDetaching,
+    setNodeDetaching,
+    nodeMaterializing,
+    setNodeMaterializing,
+    materializeTaskIds,
+    setMaterializeTaskIds,
+    materializedPaths,
+    materializeSummary,
+    resultsByNode,
+    updateResultState,
+    applyMaterializedRequest,
+    resetAfterClear,
+  } = useQuotationResultControls();
 
   const {
     resolveTaskId,
@@ -377,44 +261,24 @@ function QuotationFeature({
       const nodeId = (requestData.node_id || requestData.nodeId || '') as string;
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
       const column = (requestData.column || '') as string;
-      const reqEngine = (requestData.engine as QuotationEngineConfig | null) ?? null;
       if (!nodeId) return;
-      if (reqEngine?.type === 'remote') {
-        const trimmed = (reqEngine.url ?? '').trim();
-        if (trimmed.length) {
-          const { normalized, valid } = normalizeRemoteUrl(trimmed);
-          const appliedUrl = valid ? normalized : trimmed;
-          updateRemoteUrl(appliedUrl);
-          setTaskEngineConfig({ type: 'remote', url: appliedUrl });
-        }
-      } else if (reqEngine?.type === 'local') {
-        setTaskEngineConfig({ type: 'local' });
-      }
+      hydrateEngineConfig((requestData.engine as QuotationEngineConfigInput | null) ?? null);
       if (!tabInputs || tabInputs.length === 0) {
         applyInputsFromSelections([{ nodeId, column }]);
       }
       setSelectedMetadataColumns([]);
-      const matPath = requestData.materialized_path;
-      if (typeof matPath === 'string' && matPath) {
-        setMaterializedPaths((prev) => ({ ...prev, [nodeId]: matPath }));
-      }
-      const matSummary = requestData.materialize_summary as Record<string, unknown> | undefined;
-      if (matSummary) {
-        setMaterializeSummary({
-          recordCount: Number(matSummary.record_count) || 0,
-          uniqueDocuments: Number(matSummary.unique_documents_with_hits) || 0,
-          totalDocuments: Number(matSummary.total_source_documents) || 0,
-        });
-      }
+      applyMaterializedRequest(
+        nodeId,
+        requestData.materialized_path,
+        requestData.materialize_summary as Record<string, unknown> | undefined,
+      );
     },
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     onCleared: (_, options) => {
       setIsClearing(false);
       setHasLoaded(false);
-      setResultsByNode({});
-      setNodeState({});
-      setMaterializeSummary(null);
+      resetAfterClear();
       if (options?.preserveLocalState) {
         return;
       }
@@ -423,81 +287,6 @@ function QuotationFeature({
       onTabTaskChange?.(null);
     },
   });
-
-  // Applies persisted context-length preferences returned with quotation task results.
-  /**
-   * Called by: QuotationFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   */
-  const applyContextLengthPreferenceFromResult = (
-    payload: QuotationAnalysisResponse | Record<string, unknown>,
-  ) => {
-    const prefs = payload.preferences as Record<string, unknown> | undefined;
-    const prefValue = Number(prefs?.context_length ?? prefs?.contextLength);
-    if (!Number.isFinite(prefValue)) {
-      return;
-    }
-    const normalized = clampContextLength(prefValue);
-    setContextLength(normalized);
-    setContextLengthInput(String(normalized));
-  };
-
-  // Validates and optionally persists the context-length input used by quotation text clipping.
-  /**
-   * Called by: QuotationFeature as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
-   */
-  const applyContextLengthInput = async () => {
-    const trimmed = contextLengthInput.trim();
-    if (!trimmed.length) {
-      setContextLengthError('Enter a non-negative number.');
-      return;
-    }
-    const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      setContextLengthError('Enter a non-negative number.');
-      return;
-    }
-    const normalized = clampContextLength(parsed);
-    setContextLength(normalized);
-    setContextLengthInput(String(normalized));
-    setContextLengthError(null);
-
-    const shouldPersist = Boolean(
-      liveHasLoaded && currentWorkspaceId && normalized !== contextLength,
-    );
-    if (!shouldPersist) {
-      return;
-    }
-
-    try {
-      setIsSavingContextLength(true);
-      await persistContextLengthPreference(normalized);
-    } catch (error) {
-      console.error('Failed to save context length preference', error);
-      setContextLengthError('Failed to save preference. Please try again.');
-    } finally {
-      setIsSavingContextLength(false);
-    }
-  };
-
-  // Commits context-length edits when focus leaves the input.
-  /**
-   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleContextLengthBlur = () => {
-    void applyContextLengthInput();
-  };
-
-  // Lets Enter commit context-length edits without submitting surrounding controls.
-  /**
-   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleContextLengthKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      void applyContextLengthInput();
-    }
-  };
 
   const hasIncompleteSelections =
     !displayedNodes.length ||
@@ -513,34 +302,7 @@ function QuotationFeature({
     !hasIncompleteSelections &&
     engineReady;
 
-  // Per-node pagination and sorting state
-  const [liveNodeState, setNodeState] = useState<Record<string, NodePaginationState>>({});
-  const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
-  const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
-  const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
-  const [liveMaterializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
-  const [liveMaterializeSummary, setMaterializeSummary] = useState<{
-    recordCount: number;
-    uniqueDocuments: number;
-    totalDocuments: number;
-  } | null>(null);
-  const [detachDialogOpen, setDetachDialogOpen] = useState(false);
-  const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
-  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
-  const {
-    selectedDetachColumns,
-    setSelectedDetachColumns,
-    toggleDetachColumn,
-    selectAllDetachColumns,
-    deselectAllDetachColumns,
-  } = useDetachColumnsState(detachNodeOptions);
-  const [liveResultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
-
-  const nodeState = liveNodeState;
   const hasLoaded = liveHasLoaded;
-  const materializedPaths = liveMaterializedPaths;
-  const materializeSummary = liveMaterializeSummary;
-  const resultsByNode = liveResultsByNode;
 
   const lastRunRequest = serverRequest ?? null;
   const currentQuotationParams = {
@@ -599,30 +361,6 @@ function QuotationFeature({
 
   const [hoverState, setHoverState] = useState<QuotationHoverState | null>(null);
 
-  // Stores normalized quotation results and matching pagination/sort state for one node.
-  /**
-   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   */
-  const updateResultState = (
-    nodeId: string,
-    column: string,
-    result: QuotationAnalysisResponse,
-  ): QuotationResultState => {
-    const normalized = buildQuotationResultState(result, column);
-    setResultsByNode((prev) => ({ ...prev, [nodeId]: normalized }));
-    setNodeState((prev) => ({
-      ...prev,
-      [nodeId]: {
-        currentPage: normalized.pagination.page,
-        pageSize: normalized.pagination.page_size,
-        sortBy: normalized.sorting.sort_by ?? undefined,
-        descending: normalized.sorting.descending,
-      },
-    }));
-    return normalized;
-    // Saves a validated engine configuration from the dialog before closing it.
-  };
-
   const {
     persistContextLengthPreference,
     handleSearchAll,
@@ -639,12 +377,9 @@ function QuotationFeature({
       activeSelections,
       nodeState,
       originalColumnsByNode,
-      resolvedEnginePayload,
-      engineConfigUrl: engineConfig.url ?? '',
+      buildEngineRequest,
     },
     actions: {
-      setEngineError,
-      updateRemoteUrl,
       setIsLoadingQuotations,
       setHasLoaded,
       setNodeDetaching,
@@ -671,109 +406,28 @@ function QuotationFeature({
     },
   });
 
-  // Watch quotation_materialize task status: on success, refresh the parent
-  // request to learn materialized_path, reset page_size to the default 20,
-  // and refetch the current page (which now slices from the cached parquet
-  // with occurrence-row semantics).
-  const handleQuotationMaterializeSuccess = useCallback(
-    async (nodeId: string, _taskId: string) => {
-      void _taskId;
-      try {
-        const headers = getAuthHeaders();
-        const parentTaskId = await resolveTaskId();
-        if (parentTaskId) {
-          const { data: req } = await quotationTaskRequest({
-            headers,
-            path: { task_id: parentTaskId },
-            throwOnError: true,
-          });
-          // defensive against a malformed API response that returns a non-object request body
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          const reqObj = (req as Record<string, unknown>) ?? {};
-          const path =
-            typeof reqObj.materialized_path === 'string' ? reqObj.materialized_path : null;
-          if (path) {
-            setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
-          }
-          const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
-          if (summary) {
-            setMaterializeSummary({
-              recordCount: Number(summary.record_count) || 0,
-              uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
-              totalDocuments: Number(summary.total_source_documents) || 0,
-            });
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to refresh quotation task request after materialize', error);
-      }
+  useEffect(() => {
+    persistContextPreferenceRef.current = persistContextLengthPreference;
+  }, [persistContextLengthPreference]);
 
-      try {
-        void handlePageSizeChange(20);
-      } catch (error) {
-        console.warn('Failed to reset quotation page size after materialize', error);
-      }
-    },
-    [getAuthHeaders, resolveTaskId, handlePageSizeChange],
-  );
-
-  useMaterializeLifecycle({
-    taskType: 'quotation_materialize',
+  useQuotationMaterializeLifecycle({
     materializeTaskIds,
     setNodeMaterializing,
     setMaterializeTaskIds,
-    onTerminalSuccess: handleQuotationMaterializeSuccess,
+    getAuthHeaders,
+    resolveTaskId,
+    handlePageSizeChange,
+    applyMaterializedRequest,
   });
 
-  // Loads available detach-column options before showing the quotation detach dialog.
-  /**
-   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
-   */
-  const openDetachDialog = async (nodeId: string) => {
-    const selection = activeSelections.find((item) => item.nodeId === nodeId);
-    if (!selection?.column) return;
-
-    try {
-      const { data: response } = await quotationDetachOptions({
-        headers: getAuthHeaders(),
-        path: { node_id: nodeId },
-        query: { column: selection.column },
-        throwOnError: true,
-      });
-      const nodes = response.data?.nodes ?? [];
-      const initialSelections: Record<string, string[]> = {};
-      nodes.forEach((node) => {
-        initialSelections[node.node_id] = [];
-      });
-      setPendingDetachNodeId(nodeId);
-      setDetachNodeOptions(nodes);
-      setSelectedDetachColumns(initialSelections);
-      setDetachDialogOpen(true);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to load quotation detach options';
-      showErrorDialog(message);
-    }
-  };
-
-  // Confirms the pending detach operation with the user's selected source columns.
-  /**
-   * Called by: QuotationFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
-  const handleDetachConfirm = async () => {
-    if (!pendingDetachNodeId) return;
-    const selectedColumns = selectedDetachColumns[pendingDetachNodeId] ?? [];
-    await handleDetach(
-      pendingDetachNodeId,
-      selectedColumns,
-      materializedPaths[pendingDetachNodeId] ?? null,
-    );
-    setDetachDialogOpen(false);
-    setPendingDetachNodeId(null);
-    setDetachNodeOptions([]);
-    setSelectedDetachColumns({});
-  };
+  const { openDetachDialog, detachDialog } = useQuotationDetachDialog({
+    activeSelections,
+    getAuthHeaders,
+    handleDetach,
+    materializedPaths,
+    nodeDetaching,
+    showErrorDialog,
+  });
 
   // Runs a fresh quotation analysis or updates a locked task depending on parameter changes.
   /**
@@ -812,44 +466,6 @@ function QuotationFeature({
   const effHandleSort = (nodeId: string, columnName: string) => {
     void handleSort(nodeId, columnName);
   };
-
-  const quotationMetadataColumns = (() => {
-    const nodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '';
-    if (!nodeId) {
-      return [] as string[];
-    }
-
-    const resultState = resultsByNode[nodeId];
-    if (!resultState) {
-      return [] as string[];
-    }
-
-    const baseColumns = resultState.metadata.metadata_columns.filter(
-      (column) => !column.startsWith('__'),
-    );
-    const generatedMetadataColumns = [
-      QUOTATION_COLUMN_KEYS.quote,
-      QUOTATION_COLUMN_KEYS.speaker,
-      QUOTATION_COLUMN_KEYS.speakerStartIdx,
-      QUOTATION_COLUMN_KEYS.speakerEndIdx,
-      QUOTATION_COLUMN_KEYS.quoteStartIdx,
-      QUOTATION_COLUMN_KEYS.quoteEndIdx,
-      QUOTATION_COLUMN_KEYS.verb,
-      QUOTATION_COLUMN_KEYS.verbStartIdx,
-      QUOTATION_COLUMN_KEYS.verbEndIdx,
-      QUOTATION_COLUMN_KEYS.quoteType,
-      QUOTATION_COLUMN_KEYS.quoteTokenCount,
-      QUOTATION_COLUMN_KEYS.isFloatingQuote,
-      QUOTATION_COLUMN_KEYS.quoteRowIdx,
-    ].filter((column) => resultState.metadata.quotation_columns.includes(column));
-
-    return Array.from(new Set([...baseColumns, ...generatedMetadataColumns]));
-  })();
-  // No auto-selection: only honour columns the user has explicitly picked,
-  // filtered against the columns currently available from the result.
-  const resolvedMetadataColumns = selectedMetadataColumns.filter((column) =>
-    quotationMetadataColumns.includes(column),
-  );
 
   return (
     <>
@@ -938,207 +554,36 @@ function QuotationFeature({
         )}
 
         {hasLoaded && displayedNodes.length > 0 && (
-          <Card>
-            <CardHeader className="space-y-4">
-              <div className="space-y-1">
-                <CardTitle className="flex items-center gap-2">
-                  Search Results
-                  <HelpIcon
-                    targetKey="analysis.quotation.results"
-                    label="Quotation results"
-                    tooltip="Review extracted quotations, toggle metadata, and adjust context length."
-                  />
-                </CardTitle>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex flex-wrap items-center gap-4">
-                  <MetadataColumnSelector
-                    availableColumns={quotationMetadataColumns}
-                    selectedColumns={resolvedMetadataColumns}
-                    onSelectedColumnsChange={setSelectedMetadataColumns}
-                  />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2">
-                      <label
-                        htmlFor="quotation-context-length"
-                        className="text-sm font-medium text-foreground"
-                      >
-                        Context length (words per side)
-                      </label>
-                      <HelpIcon
-                        targetKey="analysis.quotation.context-length"
-                        label="Quotation context length"
-                      />
-                    </div>
-                    <Input
-                      id="quotation-context-length"
-                      aria-label="Context length in words"
-                      type="number"
-                      min={0}
-                      max={MAX_CONTEXT_LENGTH}
-                      step={1}
-                      value={contextLengthInput}
-                      onChange={(event) => {
-                        setContextLengthInput(event.target.value);
-                        if (contextLengthError) setContextLengthError(null);
-                      }}
-                      onBlur={handleContextLengthBlur}
-                      onKeyDown={handleContextLengthKeyDown}
-                      className="h-9 w-24 text-right"
-                      inputMode="numeric"
-                      disabled={isSavingContextLength}
-                    />
-                    {isSavingContextLength && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>Saving…</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <span
-                  className={`text-xs ${contextLengthError ? 'text-destructive' : 'text-muted-foreground'}`}
-                >
-                  {contextLengthError ??
-                    `Enter a whole number between 0 and ${String(MAX_CONTEXT_LENGTH)}.`}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              {displayedNodes.map((node, idx) => {
-                const nodeId = getNodeIdentifier(node, idx);
-                const selection = activeSelections.find((s) => s.nodeId === nodeId);
-                const textCol = selection?.column ?? '';
-
-                const resultState = resultsByNode[nodeId];
-                const rowsWithQuotes = (resultState?.rows ?? []).filter(
-                  (row) => row[QUOTATION_COLUMN_KEYS.quote],
-                );
-                const visibleMetadataColumns = showMetadata ? resolvedMetadataColumns : [];
-
-                const cols = (() => {
-                  const ordered: string[] = [QUOTATION_DOCUMENT_COLUMN];
-                  if (showMetadata) {
-                    ordered.push(...visibleMetadataColumns);
-                  }
-                  return Array.from(new Set(ordered));
-                })();
-
-                return (
-                  <QuotationNodeBlock
-                    key={nodeId}
-                    nodeId={nodeId}
-                    textCol={textCol}
-                    cols={cols}
-                    rows={rowsWithQuotes}
-                    pagination={resultState?.pagination}
-                    sortBy={resultState?.sorting.sort_by}
-                    contextLength={contextLength}
-                    hoverState={hoverState}
-                    onHoverChange={setHoverState}
-                    onSort={effHandleSort}
-                    onPageChange={effHandlePageChange}
-                    onPageSizeChange={effHandlePageSizeChange}
-                    onRowClick={(row) => {
-                      const record = { ...row };
-                      const rawFullText = record[textCol];
-                      const fullText = rawFullText == null ? undefined : toCellText(rawFullText);
-                      const quotationGeneratedCols = Object.values(QUOTATION_COLUMN_KEYS);
-                      openRowDetail({
-                        record,
-                        textColumn: textCol,
-                        fullText,
-                        excludeMetadataColumns: [...quotationGeneratedCols, '__spans'],
-                      });
-                    }}
-                    pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
-                    pageSizeSummary={
-                      materializedPaths[nodeId] ? (
-                        materializeSummary ? (
-                          <GroupedResultsPageSizeSummary
-                            groups={[]}
-                            totalInstances={materializeSummary.recordCount}
-                            totalDocuments={materializeSummary.uniqueDocuments}
-                            totalProcessed={materializeSummary.totalDocuments}
-                          />
-                        ) : (
-                          // Materialise summary not yet hydrated (e.g. the
-                          // task-request fetch is mid-flight after Process All).
-                          // Fall back to the pagination total — it's the same
-                          // total hit count the summary's ``recordCount`` would
-                          // report, so the line is correct, just missing the
-                          // document breakdown until the summary lands.
-                          <>
-                            (Found{' '}
-                            {(resultState?.pagination.total_source_rows ?? 0).toLocaleString()}{' '}
-                            {(resultState?.pagination.total_source_rows ?? 0) === 1
-                              ? 'quotation'
-                              : 'quotations'}{' '}
-                            across the materialised corpus.)
-                          </>
-                        )
-                      ) : (
-                        <GroupedResultsPageSizeSummary
-                          groups={resultState?.groupedRows ?? []}
-                          totalProcessed={resultState?.pagination.page_size}
-                        />
-                      )
-                    }
-                  >
-                    <DisabledReasonTooltip reason={undefined}>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleMaterialize(nodeId)}
-                        disabled={
-                          Boolean(nodeMaterializing[nodeId]) ||
-                          Boolean(materializedPaths[nodeId]) ||
-                          Boolean(nodeDetaching[nodeId])
-                        }
-                        className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                        title={
-                          'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
-                        }
-                      >
-                        {nodeMaterializing[nodeId] ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Processing…
-                          </>
-                        ) : materializedPaths[nodeId] ? (
-                          <>Processed</>
-                        ) : (
-                          <>Process All</>
-                        )}
-                      </Button>
-                    </DisabledReasonTooltip>
-                    <DisabledReasonTooltip reason={undefined}>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => void openDetachDialog(nodeId)}
-                        disabled={Boolean(nodeDetaching[nodeId])}
-                        className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                      >
-                        {nodeDetaching[nodeId] ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Adding to Workspace…
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add to Workspace
-                          </>
-                        )}
-                      </Button>
-                    </DisabledReasonTooltip>
-                  </QuotationNodeBlock>
-                );
-              })}
-            </CardContent>
-          </Card>
+          <QuotationResultsPanel
+            displayedNodes={displayedNodes}
+            activeSelections={activeSelections}
+            resultsByNode={resultsByNode}
+            selectedMetadataColumns={selectedMetadataColumns}
+            onSelectedMetadataColumnsChange={setSelectedMetadataColumns}
+            contextLength={contextLength}
+            contextLengthInput={contextLengthInput}
+            contextLengthError={contextLengthError}
+            isSavingContextLength={isSavingContextLength}
+            onContextLengthInputChange={setContextLengthInput}
+            onContextLengthBlur={handleContextLengthBlur}
+            onContextLengthKeyDown={handleContextLengthKeyDown}
+            hoverState={hoverState}
+            onHoverChange={setHoverState}
+            materializedPaths={materializedPaths}
+            materializeSummary={materializeSummary}
+            nodeMaterializing={nodeMaterializing}
+            nodeDetaching={nodeDetaching}
+            onSort={effHandleSort}
+            onPageChange={effHandlePageChange}
+            onPageSizeChange={effHandlePageSizeChange}
+            onRowClick={handleQuotationRowClick}
+            onMaterialize={(nodeId) => {
+              void handleMaterialize(nodeId);
+            }}
+            onOpenDetachDialog={(nodeId) => {
+              void openDetachDialog(nodeId);
+            }}
+          />
         )}
       </div>
 
@@ -1163,49 +608,22 @@ function QuotationFeature({
       </AlertDialog>
 
       <QuotationDetachDialog
-        open={detachDialogOpen}
-        onOpenChange={setDetachDialogOpen}
-        isDetaching={Boolean(pendingDetachNodeId && nodeDetaching[pendingDetachNodeId])}
-        detachNodeOptions={detachNodeOptions}
-        selectedDetachColumns={selectedDetachColumns}
-        toggleDetachColumn={toggleDetachColumn}
-        selectAllDetachColumns={selectAllDetachColumns}
-        deselectAllDetachColumns={deselectAllDetachColumns}
-        handleDetachConfirm={handleDetachConfirm}
+        open={detachDialog.open}
+        onOpenChange={detachDialog.onOpenChange}
+        isDetaching={detachDialog.isDetaching}
+        detachNodeOptions={detachDialog.detachNodeOptions}
+        selectedDetachColumns={detachDialog.selectedDetachColumns}
+        toggleDetachColumn={detachDialog.toggleDetachColumn}
+        selectAllDetachColumns={detachDialog.selectAllDetachColumns}
+        deselectAllDetachColumns={detachDialog.deselectAllDetachColumns}
+        handleDetachConfirm={detachDialog.handleDetachConfirm}
       />
 
       <RowDetailPanel
         open={detailOpen}
         onOpenChange={setDetailOpen}
         payload={detailPayload}
-        customization={
-          detailPayload
-            ? {
-                label: 'Quotation',
-                summaryFields: [
-                  {
-                    label: 'Quote Type',
-                    value: toCellText(detailPayload.record[QUOTATION_COLUMN_KEYS.quoteType]),
-                  },
-                  {
-                    label: 'Speaker',
-                    value: toCellText(detailPayload.record[QUOTATION_COLUMN_KEYS.speaker]),
-                  },
-                  {
-                    label: 'Verb',
-                    value: toCellText(detailPayload.record[QUOTATION_COLUMN_KEYS.verb]),
-                  },
-                  {
-                    label: 'Quote',
-                    value: toCellText(detailPayload.record[QUOTATION_COLUMN_KEYS.quote]),
-                  },
-                ],
-                // Reuses the quotation detail renderer to show highlighted source text in the row panel.
-                // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-                renderDocumentText: (text, record) => renderQuotationDetailText(text, record),
-              }
-            : undefined
-        }
+        customization={quotationCustomization}
       />
     </>
   );

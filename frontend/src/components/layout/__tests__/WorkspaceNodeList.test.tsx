@@ -143,11 +143,11 @@ describe('WorkspaceNodeList', () => {
 
     expect(within(pinVisibility).getByRole('button', { name: 'Unpin Beta' })).toBeInTheDocument();
     expect(hoverToolbar).toHaveClass('opacity-0');
-    expect(hoverToolbar).toHaveClass('right-1');
-    expect(hoverToolbar).not.toHaveClass('left-1');
+    expect(hoverToolbar).toHaveClass('left-1');
+    expect(hoverToolbar).not.toHaveClass('right-1');
   });
 
-  it('keeps long data-block names left-to-right instead of reversing clipped text', () => {
+  it('right-aligns long data-block names and fades the left edge for leading actions', () => {
     render(
       <WorkspaceNodeList
         nodes={[{ id: 'node-long', data: { nodeName: longNodeName } }]}
@@ -164,9 +164,12 @@ describe('WorkspaceNodeList', () => {
     const row = screen.getByRole('button', { name: `Select ${longNodeName}` });
     const label = within(row).getByText(longNodeName);
 
-    expect(label).toHaveClass('truncate');
-    expect(label).toHaveClass('text-left');
-    expect(label).not.toHaveAttribute('dir', 'rtl');
+    expect(label).toHaveClass('text-right');
+    expect(label).not.toHaveClass('truncate');
+
+    const fade = within(row).getByTestId('node-name-left-fade');
+    expect(fade).toHaveClass('left-0');
+    expect(fade).toHaveClass('group-hover/row:w-32');
   });
 
   it('shows a graph-style selection header and batch-deletes selected rows', async () => {

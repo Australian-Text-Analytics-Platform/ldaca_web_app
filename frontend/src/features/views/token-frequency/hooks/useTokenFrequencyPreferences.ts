@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { updateTokenFrequenciesTaskResult } from '@/api';
 import type { TokenFrequencyResponse } from '@/api';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
-
-// Multi-language "Apply Stop Words" pours per-language groups into the
-// textarea separated by blank lines so users can see which words come
-// from which corpus. The parser accepts both commas and newlines as
-// separators so that grouped paste / hand edits both survive a round
-// trip through ``applyStopSetFromText``. Module-scoped so the regex
-// identity is stable across renders.
-const STOPWORD_SEPARATOR_RE = /[,\n\r]+/;
+import {
+  formatStopWords,
+  mergeStopWordsText,
+  parseStopWordsText,
+} from '../tokenFrequencyStopWords';
+import {
+  createTokenFrequencyPreferenceState,
+  tokenFrequencyPreferenceReducer,
+} from './tokenFrequencyPreferenceState';
 
 interface UseTokenFrequencyPreferencesParams {
   currentWorkspaceId: string | null;
@@ -41,13 +42,28 @@ export const useTokenFrequencyPreferences = ({
   maxTokenLimitInput,
   persistEnabled = true,
 }: UseTokenFrequencyPreferencesParams) => {
-  const [stopWords, setStopWords] = useState<string>('');
-  const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
-  const [appliedStopSet, setAppliedStopSet] = useState<Set<string>>(new Set());
-  const [tokenLimitOverride, setTokenLimitOverride] = useState<number | null>(null);
-  const [tokenLimitInput, setTokenLimitInput] = useState<string>('');
-  const [tokenLimitError, setTokenLimitError] = useState<string | null>(null);
-  const [isApplyingTokenLimit, setIsApplyingTokenLimit] = useState(false);
+  const [preferenceState, dispatchPreference] = useReducer(
+    tokenFrequencyPreferenceReducer,
+    undefined,
+    createTokenFrequencyPreferenceState,
+  );
+  const {
+    stopWords,
+    isLoadingStopWords,
+    appliedStopSet,
+    tokenLimitOverride,
+    tokenLimitInput,
+    tokenLimitError,
+    isApplyingTokenLimit,
+  } = preferenceState;
+
+  const setStopWords = useCallback((value: React.SetStateAction<string>) => {
+    dispatchPreference({ type: 'stopWordsChanged', value });
+  }, []);
+
+  const setAppliedStopSet = useCallback((value: React.SetStateAction<Set<string>>) => {
+    dispatchPreference({ type: 'appliedStopSetChanged', value });
+  }, []);
 
   // Identity stability: used in useEffect dependency array
   const applyTokenLimitState = useCallback(
@@ -58,9 +74,7 @@ export const useTokenFrequencyPreferences = ({
           : DEFAULT_TOKEN_LIMIT;
       const { limit: normalizedLimit } = clampDisplayTokenLimit(target);
       const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
-      setTokenLimitOverride(inputLimit);
-      setTokenLimitInput(String(inputLimit));
-      setTokenLimitError(null);
+      dispatchPreference({ type: 'tokenLimitStateApplied', limit: inputLimit });
     },
     [maxTokenLimitInput],
   );
@@ -92,13 +106,11 @@ export const useTokenFrequencyPreferences = ({
 
     void Promise.resolve().then(() => {
       if (!results) {
-        setStopWords('');
-        setAppliedStopSet(new Set());
+        dispatchPreference({ type: 'stopWordsReset' });
         return;
       }
 
-      setStopWords(normalized.join(', '));
-      setAppliedStopSet(new Set(normalized));
+      dispatchPreference({ type: 'stopWordsApplied', words: normalized });
     });
   }, [backendStopWordsKey, results]);
 
@@ -211,23 +223,33 @@ export const useTokenFrequencyPreferences = ({
   const applyTokenLimitWithValidation = async () => {
     const parsed = toFiniteNumber(tokenLimitInput);
     if (parsed === null) {
-      setTokenLimitError('Enter a whole number greater than zero.');
+      dispatchPreference({
+        type: 'tokenLimitErrorChanged',
+        error: 'Enter a whole number greater than zero.',
+      });
       return;
     }
 
     const normalized = Math.floor(parsed);
     if (!Number.isFinite(normalized) || normalized <= 0) {
-      setTokenLimitError('Enter a whole number greater than zero.');
+      dispatchPreference({
+        type: 'tokenLimitErrorChanged',
+        error: 'Enter a whole number greater than zero.',
+      });
       return;
     }
 
     const { limit: normalizedLimit } = clampDisplayTokenLimit(normalized);
     const targetLimit = Math.min(normalizedLimit, maxTokenLimitInput);
     if (normalizedLimit > maxTokenLimitInput) {
-      setTokenLimitInput(String(maxTokenLimitInput));
+      dispatchPreference({
+        type: 'tokenLimitInputChanged',
+        input: String(maxTokenLimitInput),
+        clearError: true,
+      });
     }
 
-    setTokenLimitError(null);
+    dispatchPreference({ type: 'tokenLimitErrorChanged', error: null });
 
     const limitChanged = targetLimit !== effectiveTokenLimit;
     if (!results || !limitChanged) {
@@ -235,16 +257,19 @@ export const useTokenFrequencyPreferences = ({
       return;
     }
 
-    setIsApplyingTokenLimit(true);
+    dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
     try {
       await persistTokenPreferences({ token_limit: targetLimit });
       updateResultsPreferencesLocally({ tokenLimit: targetLimit });
       applyTokenLimitState(targetLimit);
     } catch (error) {
       console.error('Failed to update token limit', error);
-      setTokenLimitError('Failed to update token limit. Please try again.');
+      dispatchPreference({
+        type: 'tokenLimitErrorChanged',
+        error: 'Failed to update token limit. Please try again.',
+      });
     } finally {
-      setIsApplyingTokenLimit(false);
+      dispatchPreference({ type: 'tokenLimitApplyingChanged', active: false });
     }
   };
 
@@ -273,15 +298,11 @@ export const useTokenFrequencyPreferences = ({
 
   const applyStopSetFromText = useCallback(
     (text: string) => {
-      const words = text
-        .split(STOPWORD_SEPARATOR_RE)
-        .map((word) => word.trim().toLowerCase())
-        .filter(Boolean);
-      setStopWords(words.join(', '));
-      setAppliedStopSet(new Set(words));
+      const words = parseStopWordsText(text);
+      dispatchPreference({ type: 'stopWordsApplied', words });
       void saveStopWordsToBackendRef.current(words);
     },
-    [setStopWords, setAppliedStopSet],
+    [],
   );
 
   /** Sorts the current stop-word text so users can review and export a stable list. */
@@ -289,14 +310,9 @@ export const useTokenFrequencyPreferences = ({
    * Called by: useTokenFrequencyPreferences during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
    */
   const sortStopWords = () => {
-    const words = stopWords
-      .split(STOPWORD_SEPARATOR_RE)
-      .map((word) => word.trim().toLowerCase())
-      .filter(Boolean);
+    const words = parseStopWordsText(stopWords);
     words.sort((a, b) => a.localeCompare(b));
-    const sorted = words.join(', ');
-    setStopWords(sorted);
-    setAppliedStopSet(new Set(words));
+    dispatchPreference({ type: 'stopWordsApplied', words });
     void saveStopWordsToBackend(words);
   };
 
@@ -309,8 +325,7 @@ export const useTokenFrequencyPreferences = ({
     const raw = event.target.value;
 
     if (!raw) {
-      setTokenLimitInput(raw);
-      if (tokenLimitError) setTokenLimitError(null);
+      dispatchPreference({ type: 'tokenLimitInputChanged', input: raw, clearError: true });
       return;
     }
 
@@ -318,14 +333,16 @@ export const useTokenFrequencyPreferences = ({
     if (parsed !== null) {
       const floored = Math.floor(parsed);
       if (Number.isFinite(floored) && floored > maxTokenLimitInput) {
-        setTokenLimitInput(String(maxTokenLimitInput));
-        if (tokenLimitError) setTokenLimitError(null);
+        dispatchPreference({
+          type: 'tokenLimitInputChanged',
+          input: String(maxTokenLimitInput),
+          clearError: true,
+        });
         return;
       }
     }
 
-    setTokenLimitInput(raw);
-    if (tokenLimitError) setTokenLimitError(null);
+    dispatchPreference({ type: 'tokenLimitInputChanged', input: raw, clearError: true });
   };
 
   /** Applies token-limit validation when the numeric input loses focus. */
@@ -348,8 +365,11 @@ export const useTokenFrequencyPreferences = ({
     if (!Number.isFinite(value) || value <= 0) return;
     const { limit: normalizedLimit } = clampDisplayTokenLimit(Math.floor(value));
     const targetLimit = Math.min(normalizedLimit, maxTokenLimitInput);
-    setTokenLimitInput(String(targetLimit));
-    setTokenLimitError(null);
+    dispatchPreference({
+      type: 'tokenLimitInputChanged',
+      input: String(targetLimit),
+      clearError: true,
+    });
     if (targetLimit === effectiveTokenLimit) {
       applyTokenLimitState(targetLimit);
       return;
@@ -358,16 +378,19 @@ export const useTokenFrequencyPreferences = ({
       applyTokenLimitState(targetLimit);
       return;
     }
-    setIsApplyingTokenLimit(true);
+    dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
     try {
       await persistTokenPreferences({ token_limit: targetLimit });
       updateResultsPreferencesLocally({ tokenLimit: targetLimit });
       applyTokenLimitState(targetLimit);
     } catch (error) {
       console.error('Failed to update token limit', error);
-      setTokenLimitError('Failed to update token limit. Please try again.');
+      dispatchPreference({
+        type: 'tokenLimitErrorChanged',
+        error: 'Failed to update token limit. Please try again.',
+      });
     } finally {
-      setIsApplyingTokenLimit(false);
+      dispatchPreference({ type: 'tokenLimitApplyingChanged', active: false });
     }
   };
 
@@ -386,7 +409,7 @@ export const useTokenFrequencyPreferences = ({
       console.error('Default stop words require a language selection');
       return;
     }
-    setIsLoadingStopWords(true);
+    dispatchPreference({ type: 'stopWordsLoadingChanged', active: true });
     try {
       const { merged } = await loadMergedStopwords({
         languages: [language],
@@ -395,15 +418,11 @@ export const useTokenFrequencyPreferences = ({
         console.error('Default stop words returned an empty list');
         return;
       }
-      const combined = [stopWords, merged.join(', ')]
-        .filter((part) => part.trim().length > 0)
-        .join(', ');
-
-      applyStopSetFromText(combined);
+      applyStopSetFromText(formatStopWords(mergeStopWordsText(stopWords, merged)));
     } catch (error) {
       console.error('Error getting default stop words:', error);
     } finally {
-      setIsLoadingStopWords(false);
+      dispatchPreference({ type: 'stopWordsLoadingChanged', active: false });
     }
   };
 
@@ -412,7 +431,7 @@ export const useTokenFrequencyPreferences = ({
    * Called by: useTokenFrequencyPreferences as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
    */
   const resetPreferenceUiState = () => {
-    setTokenLimitError(null);
+    dispatchPreference({ type: 'preferenceErrorsReset' });
   };
 
   return {

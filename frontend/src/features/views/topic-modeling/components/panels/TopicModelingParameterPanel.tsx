@@ -8,11 +8,7 @@ import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisC
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { VIZ_PALETTE } from '@/features/views/common';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
-
-export interface CorpusSample {
-  percent: string;
-  enabled: boolean;
-}
+import type { CorpusSample } from '../../hooks/useTopicModelingParameters';
 
 interface NumericInputDraft {
   source: number;

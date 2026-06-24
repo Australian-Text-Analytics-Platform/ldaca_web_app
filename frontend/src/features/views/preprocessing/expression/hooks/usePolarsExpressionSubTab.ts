@@ -1,62 +1,29 @@
-import { useState } from 'react';
+import { useReducer, useState } from 'react';
 
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import type {
   FilterPreviewResponse,
   PolarsExpressionRequest,
   PolarsExpressionApplyResponse,
-  PolarsExpressionContext,
 } from '@/api';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
-import { deriveNodeLabel } from '../../utils/nodeMetadata';
+import { buildWorkspaceNodeMap, deriveNodeLabel, getNodeKey } from '../../utils/nodeMetadata';
+import {
+  buildPolarsExpressionRequest,
+  createPolarsExpressionDraftState,
+  polarsExpressionDraftReducer,
+  type ExpressionContextTab,
+  type ExpressionListTarget,
+} from './polarsExpressionDraftState';
 
-export type ExpressionContextTab = PolarsExpressionContext;
-
-/**
- * Each user-mutable expression entry carries its own opaque `id` so React
- * can use it for the list `key`. Using array index keys here was the B8
- * bug — adding/removing an item mid-list re-attributed the CodeEditor
- * focus to the wrong row.
- */
-export interface ExpressionItem {
-  id: string;
-  code: string;
-}
-
-export interface SortExpressionItem extends ExpressionItem {
-  descending: boolean;
-}
-
-export interface GroupByAggState {
-  keyCode: string;
-  aggExpressions: ExpressionItem[];
-}
-
-/**
- * Generates stable expression row ids for React list keys and focus tracking.
- * Used by: local callers in preprocessing/usePolarsExpressionSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
-const newId = () =>
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${String(Date.now())}-${Math.random().toString(36).slice(2)}`;
-
-/**
- * Creates an empty expression row with a stable id for React list keys.
- * Used by: PolarsExpressionSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
- */
-export const blankExpression = (): ExpressionItem => ({ id: newId(), code: '' });
-/**
- * Creates an empty sort expression row with a stable id and default direction.
- * Used by: PolarsExpressionSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
- */
-export const blankSortExpression = (): SortExpressionItem => ({
-  id: newId(),
-  code: '',
-  descending: false,
-});
+export {
+  buildPolarsExpressionRequest,
+  type ExpressionContextTab,
+  type ExpressionItem,
+  type SortExpressionItem,
+} from './polarsExpressionDraftState';
 
 export interface PolarsExpressionSubTabProps {
   selectedNodeId: string | null;
@@ -89,37 +56,41 @@ const DEFAULT_PALETTE = ['#2563eb'];
  */
 export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const {
+    selectedNodeId,
     selectedNodes,
+    workspaceNodes,
     onAlert,
     polarsExpressionPreview,
     polarsExpressionApply,
     refreshNodeSchema,
   } = props;
 
-  const effectiveNode = takeMostRecent(selectedNodes, 1)[0] ?? null;
-  const nodeId = effectiveNode?.id ?? null;
+  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
+  const effectiveNode =
+    takeMostRecent(selectedNodes, 1)[0] ??
+    (selectedNodeId ? (workspaceNodeMap.get(selectedNodeId) ?? null) : null);
+  const nodeId = effectiveNode ? getNodeKey(effectiveNode, selectedNodeId ?? '') || null : null;
 
-  const [activeContext, setActiveContext] = useState<ExpressionContextTab>('filter');
+  const [draftState, dispatchDraft] = useReducer(
+    polarsExpressionDraftReducer,
+    undefined,
+    createPolarsExpressionDraftState,
+  );
   const [newNodeName, setNewNodeName] = useState('');
   const [isApplying, setIsApplying] = useState(false);
+  const {
+    activeContext,
+    filterCode,
+    withColumns,
+    selectExpressions,
+    sortItems,
+    groupByState,
+  } = draftState;
 
   const newNodeNamePlaceholder = buildExpressionAutoNodeName({
     baseName: deriveNodeLabel(effectiveNode),
     context: activeContext,
   });
-
-  // Per-context state. Lists carry stable `id`s so React keys survive
-  // add/remove/reorder without losing CodeEditor focus on the wrong row.
-  const [filterCode, setFilterCode] = useState('');
-  const [withColumns, setWithColumns] = useState<ExpressionItem[]>(() => [blankExpression()]);
-  const [selectExpressions, setSelectExpressions] = useState<ExpressionItem[]>(() => [
-    blankExpression(),
-  ]);
-  const [sortItems, setSortItems] = useState<SortExpressionItem[]>(() => [blankSortExpression()]);
-  const [groupByState, setGroupByState] = useState<GroupByAggState>(() => ({
-    keyCode: '',
-    aggExpressions: [blankExpression()],
-  }));
 
   // Serialized expressions (after eval)
   const [serializedRequest, setSerializedRequest] = useState<PolarsExpressionRequest | null>(null);
@@ -127,7 +98,89 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   // DEFAULT_PALETTE is a non-empty module constant, so index 0 exists.
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const nodeColors = { [effectiveNode?.id ?? '']: DEFAULT_PALETTE[0]! };
+  const nodeColors = { [nodeId ?? '']: DEFAULT_PALETTE[0]! };
+
+  /**
+   * Switches which expression context is visible. The reducer owns this with
+   * the draft lists so request serialization always reads a single state shape.
+   * Called by: PolarsExpressionSubTab tab triggers.
+   */
+  const setActiveContext = (context: ExpressionContextTab) => {
+    dispatchDraft({ type: 'setActiveContext', context });
+  };
+
+  /**
+   * Updates the single filter expression draft.
+   * Called by: PolarsExpressionSubTab filter editor.
+   */
+  const setFilterCode = (code: string) => {
+    dispatchDraft({ type: 'setFilterCode', code });
+  };
+
+  /**
+   * Updates one row in a list-backed expression context.
+   * Called by: PolarsExpressionSubTab list editors for With Columns, Select,
+   * and Group By aggregation rows.
+   */
+  const updateExpressionCode = (target: ExpressionListTarget, id: string, code: string) => {
+    dispatchDraft({ type: 'updateExpressionCode', target, id, code });
+  };
+
+  /**
+   * Adds one empty row to a list-backed expression context.
+   * Called by: PolarsExpressionSubTab list-editor Add buttons.
+   */
+  const addExpression = (target: ExpressionListTarget) => {
+    dispatchDraft({ type: 'addExpression', target });
+  };
+
+  /**
+   * Removes one expression row by id.
+   * Called by: PolarsExpressionSubTab list-editor delete buttons.
+   */
+  const removeExpression = (target: ExpressionListTarget, id: string) => {
+    dispatchDraft({ type: 'removeExpression', target, id });
+  };
+
+  /**
+   * Updates the group-by key expression.
+   * Called by: PolarsExpressionSubTab group-by key editor.
+   */
+  const setGroupByKeyCode = (code: string) => {
+    dispatchDraft({ type: 'setGroupByKeyCode', code });
+  };
+
+  /**
+   * Updates one sort expression row.
+   * Called by: PolarsExpressionSubTab sort CodeEditor rows.
+   */
+  const updateSortCode = (id: string, code: string) => {
+    dispatchDraft({ type: 'updateSortCode', id, code });
+  };
+
+  /**
+   * Updates one sort direction checkbox.
+   * Called by: PolarsExpressionSubTab sort descending controls.
+   */
+  const updateSortDescending = (id: string, descending: boolean) => {
+    dispatchDraft({ type: 'updateSortDescending', id, descending });
+  };
+
+  /**
+   * Adds an empty sort expression row.
+   * Called by: PolarsExpressionSubTab sort Add button.
+   */
+  const addSortExpression = () => {
+    dispatchDraft({ type: 'addSortExpression' });
+  };
+
+  /**
+   * Removes one sort expression row.
+   * Called by: PolarsExpressionSubTab sort row delete buttons.
+   */
+  const removeSortExpression = (id: string) => {
+    dispatchDraft({ type: 'removeSortExpression', id });
+  };
 
   /**
    * Serializes the currently active context into a PolarsExpressionRequest for
@@ -141,42 +194,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     setSerializedRequest(null);
 
     try {
-      // Build the request from raw code strings — backend validates via AST
-      let request: PolarsExpressionRequest;
-      if (activeContext === 'group_by_agg') {
-        request = {
-          context: 'group_by_agg',
-          expressions: groupByState.aggExpressions
-            .filter((it) => it.code.trim())
-            .map((it) => ({ code: it.code.trim() })),
-          group_by_keys: [{ code: groupByState.keyCode.trim() }],
-        };
-      } else if (activeContext === 'sort') {
-        request = {
-          context: 'sort',
-          expressions: sortItems
-            .filter((it) => it.code.trim())
-            .map((it) => ({ code: it.code.trim(), descending: it.descending })),
-        };
-      } else if (activeContext === 'filter') {
-        request = { context: 'filter', expressions: [{ code: filterCode.trim() }] };
-      } else if (activeContext === 'with_columns') {
-        request = {
-          context: 'with_columns',
-          expressions: withColumns
-            .filter((it) => it.code.trim())
-            .map((it) => ({ code: it.code.trim() })),
-        };
-      } else {
-        request = {
-          context: 'select',
-          expressions: selectExpressions
-            .filter((it) => it.code.trim())
-            .map((it) => ({ code: it.code.trim() })),
-        };
-      }
-
-      setSerializedRequest(request);
+      setSerializedRequest(buildPolarsExpressionRequest(draftState));
     } catch (err) {
       setEvalError(err instanceof Error ? err.message : String(err));
     }
@@ -232,13 +250,17 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     filterCode,
     setFilterCode,
     withColumns,
-    setWithColumns,
     selectExpressions,
-    setSelectExpressions,
     sortItems,
-    setSortItems,
     groupByState,
-    setGroupByState,
+    updateExpressionCode,
+    addExpression,
+    removeExpression,
+    setGroupByKeyCode,
+    updateSortCode,
+    updateSortDescending,
+    addSortExpression,
+    removeSortExpression,
 
     evalExpressions,
     applyExpression,

@@ -3,44 +3,16 @@ import { runSequentialAnalysis, updateSequentialAnalysisTaskResult } from '@/api
 import type { SequentialAnalysisRequestInput } from '@/api';
 import { type ChartConfig } from '@/components/ui/chart';
 import { extractAndSetTaskId } from '../../common';
+import {
+  getSequentialPaletteColor,
+  isChartTypeOption,
+  type ChartTypeOption,
+  type SequentialAnalysisDatum,
+} from './sequentialChartModel';
 
 type SequentialAnalysisRequest = SequentialAnalysisRequestInput;
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
-
-// Callers may rely on period_start and period_end being present on chart rows.
-export type SequentialAnalysisDatum = Record<string, unknown>;
-
-export type ChartTypeOption = 'line' | 'bar' | 'area';
-
-const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
-
-// Narrows stored or server-provided chart type values to the supported UI options.
-/**
- * Used by: SequentialAnalysisFeature.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- */
-export const isChartTypeOption = (value: unknown): value is ChartTypeOption =>
-  typeof value === 'string' && CHART_TYPE_OPTIONS.includes(value as ChartTypeOption);
-
-const SEQUENTIAL_ANALYSIS_PALETTE = [
-  '#2563eb',
-  '#16a34a',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#14b8a6',
-  '#f97316',
-  '#ec4899',
-  '#0ea5e9',
-  '#22c55e',
-] as const;
-
-// Provides deterministic colours for generated chart series.
-/**
- * Used by: SequentialChart.tsx, SequentialAnalysisFeature.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- */
-export const getPaletteColor = (index: number) =>
-  SEQUENTIAL_ANALYSIS_PALETTE[index % SEQUENTIAL_ANALYSIS_PALETTE.length];
 
 const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_end']);
 
@@ -67,31 +39,6 @@ const comparePeriodBounds = (left: unknown, right: unknown): number => {
   return String((left as string | number | boolean | null | undefined) ?? '').localeCompare(
     String((right as string | number | boolean | null | undefined) ?? ''),
   );
-};
-
-// Formats sequential chart x-axis labels for timestamps while preserving raw non-date values.
-/**
- * Used by: SequentialChart.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
- * Flow: return a placeholder for empty values, format parseable dates with month/year/day detail, then preserve raw non-date labels.
- */
-export const formatTimeLabel = (value?: string | number) => {
-  if (value === undefined || value === '') return '—';
-  // Numeric input is interpreted as epoch-milliseconds (this is what the
-  // linear x-axis passes in for datetime columns). Pass it to Date
-  // directly — stringifying first would yield e.g. `"846764800000"`,
-  // which `Date.parse` doesn't recognise as a date and falls through to
-  // the raw number, putting epoch-ms on the axis ticks.
-  const parsed = typeof value === 'number' ? new Date(value) : new Date(value);
-  if (!Number.isNaN(parsed.getTime())) {
-    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short' };
-    if (
-      !(parsed.getUTCDate() === 1 && parsed.getUTCHours() === 0 && parsed.getUTCMinutes() === 0)
-    ) {
-      options.day = 'numeric';
-    }
-    return parsed.toLocaleString(undefined, options);
-  }
-  return String(value);
 };
 
 interface SequentialAnalysisState {
@@ -431,11 +378,11 @@ export function useSequentialAnalysisTaskFlow({
   const chartConfig = (() => {
     if (!groupKeys.length || (groupKeys.length === 1 && groupKeys[0] === 'sequential_count')) {
       return {
-        sequential_count: { label: 'Sequential Count', color: getPaletteColor(0) },
+        sequential_count: { label: 'Sequential Count', color: getSequentialPaletteColor(0) },
       };
     }
     return groupKeys.reduce<ChartConfig>((acc, key, index) => {
-      acc[key] = { label: key, color: getPaletteColor(index) };
+      acc[key] = { label: key, color: getSequentialPaletteColor(index) };
       return acc;
     }, {});
   })();

@@ -65,8 +65,7 @@ export interface WorkspaceGraphViewModel {
  * Flow: workspace graph data is laid out and converted into React Flow nodes (selected/unselected state + fresh-node markers) before handlers update selection and navigation.
  */
 export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
-  const { workspaceGraph } = useWorkspaceData();
-  const { currentWorkspaceId } = useWorkspaceData();
+  const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const {

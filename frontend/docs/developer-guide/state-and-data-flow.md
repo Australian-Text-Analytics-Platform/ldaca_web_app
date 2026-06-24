@@ -67,6 +67,13 @@ views, a workspace is loaded. The default `data-loader` view is omitted from the
 URL. Keep this as search state rather than path routes so static backend and
 Tauri builds continue to reload correctly.
 
+`ViewRouteSync` is also the single owner of invalid-view fallback. If a shared
+URL names a workspace view before the workspace id is available, the sync layer
+keeps that URL view pending while rendering Data Loader, then adopts it after
+the workspace loads. Do not add sidebar-level effects that reset
+`currentView`; they can race direct links and leave the URL and rendered view
+out of sync.
+
 ## Auth Bootstrap
 
 `hooks/useAuth.ts` is the React-facing auth hook. It delegates to `authStore`,

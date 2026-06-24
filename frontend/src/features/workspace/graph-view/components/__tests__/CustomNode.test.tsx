@@ -182,6 +182,7 @@ describe('CustomNode', () => {
     );
 
     await user.hover(screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets'));
+    expect(screen.queryByText(/Shape:/)).not.toBeInTheDocument();
     expect(getLatestNodeSettingsButton()).toBeInTheDocument();
 
     fireEvent.click(getLatestNodeSettingsButton());

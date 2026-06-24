@@ -5,16 +5,13 @@ import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils
 import { type FilterPreviewResponse, type ReplaceApplyResponse, type ReplaceRequest } from '@/api';
 import { mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
-
-/**
- * Resolves a stable node id from workspace node shapes that may expose either
- * `id` or `node_id`.
- * Used by: local callers in preprocessing/useReplaceSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
-const getNodeId = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
-  // Empty-string ids fall through to the next candidate, so keep `||`.
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  node.id || node.node_id || `node-${String(fallbackIndex)}`;
+import { buildWorkspaceNodeMap, getNodeKey } from '../../utils/nodeMetadata';
+import {
+  buildReplaceRequest,
+  resolveReplaceOutputColumnName,
+  type ReplaceMode,
+  type ReplaceRequestDraft,
+} from './replaceRequestModel';
 
 export interface ReplaceSubTabProps {
   selectedNodeId: string | null;
@@ -56,17 +53,17 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     replaceText,
     refreshNodeSchema,
   } = props;
+  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
+
   const effectiveNodes = (() => {
     if (selectedNodes.length > 0) return takeMostRecent(selectedNodes, 1);
     if (!selectedNodeId) return [];
-    const fallback = workspaceNodes.find(
-      (node, index) => getNodeId(node, index) === selectedNodeId,
-    );
+    const fallback = workspaceNodeMap.get(selectedNodeId);
     return fallback ? [fallback] : [];
   })();
 
   const activeNode = effectiveNodes[0] ?? null;
-  const activeNodeId = activeNode ? getNodeId(activeNode, 0) : null;
+  const activeNodeId = activeNode ? getNodeKey(activeNode, 'node-0') : null;
   const stringColumns = activeNode
     ? mapColumnsToInfo(activeNode)
         .filter((column) => column.dataType === 'string')
@@ -78,34 +75,28 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     activeNodeId && stringColumns.includes(inputSelectedColumn)
       ? inputSelectedColumn
       : firstStringColumn;
-  const [mode, setMode] = useState<'replace' | 'extract'>('replace');
+  const [mode, setMode] = useState<ReplaceMode>('replace');
   const [n, setN] = useState<number | null>(null);
-  const count = n !== null ? 'first' : 'all';
   const [pattern, setPattern] = useState('');
   const [replacement, setReplacement] = useState('');
   const [connector, setConnector] = useState('');
   const [outputColumnName, setOutputColumnName] = useState('');
   const [applyLoading, setApplyLoading] = useState(false);
 
-  const connectorValue = connector === '' ? undefined : connector;
+  const replaceDraft: ReplaceRequestDraft = {
+    selectedColumn,
+    pattern,
+    replacement,
+    outputColumnName,
+    mode,
+    n,
+    connector,
+  };
 
-  const previewColumnName = outputColumnName.trim() || selectedColumn;
+  const previewColumnName = resolveReplaceOutputColumnName(replaceDraft);
 
   const hasSelection = Boolean(activeNodeId);
-  const hasOperation = Boolean(selectedColumn && pattern.length > 0);
-
-  const operationPayload: ReplaceRequest | null = hasOperation
-    ? {
-        source_column: selectedColumn,
-        pattern,
-        replacement,
-        output_column_name: previewColumnName,
-        mode,
-        count,
-        n: count === 'first' ? (n ?? 1) : undefined,
-        connector: mode === 'extract' ? connectorValue : undefined,
-      }
-    : null;
+  const operationPayload = buildReplaceRequest(replaceDraft);
 
   const {
     data: previewData,
@@ -149,19 +140,10 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
    * and clear apply loading.
    */
   const handleApply = async () => {
-    if (!activeNodeId || !selectedColumn || pattern.length === 0) return;
+    const request = buildReplaceRequest(replaceDraft);
+    if (!activeNodeId || !request) return;
     setApplyLoading(true);
     try {
-      const request: ReplaceRequest = {
-        source_column: selectedColumn,
-        pattern,
-        replacement,
-        output_column_name: previewColumnName,
-        mode,
-        count,
-        n: count === 'first' ? (n ?? 1) : undefined,
-        connector: mode === 'extract' ? connectorValue : undefined,
-      };
       const response = await replaceText(activeNodeId, request);
       onAlert(response.message || `Updated column ${response.column_name}`);
       await refreshNodeSchema(activeNodeId);
@@ -184,7 +166,6 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     selectedColumn,
     mode,
     setMode,
-    count,
     n,
     setN,
     pattern,

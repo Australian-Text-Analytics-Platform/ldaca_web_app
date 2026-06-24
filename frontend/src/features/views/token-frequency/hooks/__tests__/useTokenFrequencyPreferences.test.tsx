@@ -81,4 +81,30 @@ describe('useTokenFrequencyPreferences', () => {
     });
     expect(result.current.stopWords).toContain('about');
   });
+
+  it('clamps the backend token limit into the editable input', async () => {
+    const { result } = renderHook(() =>
+      useTokenFrequencyPreferences({ ...baseArgs, backendTokenLimit: 500 }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.tokenLimitInput).toBe('100');
+      expect(result.current.effectiveTokenLimit).toBe(100);
+    });
+  });
+
+  it('reports token-limit validation errors through the public blur handler', async () => {
+    const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
+
+    act(() => {
+      result.current.handleTokenLimitInputChange({
+        target: { value: 'not a number' },
+      } as React.ChangeEvent<HTMLInputElement>);
+      result.current.handleTokenLimitBlur();
+    });
+
+    await waitFor(() => {
+      expect(result.current.tokenLimitError).toBe('Enter a whole number greater than zero.');
+    });
+  });
 });

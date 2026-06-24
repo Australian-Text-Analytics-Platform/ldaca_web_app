@@ -8,7 +8,7 @@ import {
   type SetStateAction,
 } from 'react';
 import type { ConcordanceAnalysisResponse, ConcordanceResultQuery } from '@/api';
-import { buildCombinedSlice } from '../concordanceViewModels';
+import { buildCombinedSlice, CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceViewModels';
 
 interface Params {
   viewMode: 'separated' | 'combined';
@@ -48,8 +48,8 @@ export interface UseConcordanceViewModeSwapResult {
  * The Combined view is synthesized entirely on the client: there is no backend
  * "combined" mode anymore. Entering Combined (or paging within it) fetches
  * BOTH nodes at the same page via scoped per-node result queries, then folds
- * them into a single `__COMBINED__` block via `buildCombinedSlice`. Next/prev
- * in Combined view is therefore equivalent to next/prev on both nodes at once.
+ * them into a single combined block via `buildCombinedSlice`. Next/prev in
+ * Combined view is therefore equivalent to next/prev on both nodes at once.
  *
  * The scroll-preservation logic anchors to `resultsRef` (the results card),
  * grabs `getBoundingClientRect().top` before the swap, and restores it after
@@ -73,7 +73,7 @@ export function useConcordanceViewModeSwap({
   const lastCombinedQueryRef = useRef<string | null>(null);
 
   /**
-   * Fetches both source nodes at `page` and rebuilds the `__COMBINED__` block.
+   * Fetches both source nodes at `page` and rebuilds the combined block.
    *
    * Called by: the combined-page effect and `handleViewModeChange` because
    * entering Combined view or paging within it must re-page both nodes and
@@ -83,12 +83,12 @@ export function useConcordanceViewModeSwap({
    * = backend node order = left/right), issue two scoped per-node queries with
    * `mergeNodeData` so each node slice refreshes independently (preserving Bug
    * #2's per-table isolation), then interleave the returned slices into a fresh
-   * `__COMBINED__` entry.
+   * combined entry.
    */
   const refetchCombined = useCallback(
     async (page: number) => {
       const nodeKeys = results?.data
-        ? Object.keys(results.data).filter((key) => key !== '__COMBINED__')
+        ? Object.keys(results.data).filter((key) => key !== CONCORDANCE_COMBINED_NODE_KEY)
         : [];
       if (nodeKeys.length < 2) {
         return;
@@ -119,7 +119,9 @@ export function useConcordanceViewModeSwap({
 
         const combined = buildCombinedSlice(leftSlice, rightSlice, page, globalPageSize);
         setResults((prev) =>
-          prev?.data ? { ...prev, data: { ...prev.data, __COMBINED__: combined } } : prev,
+          prev?.data
+            ? { ...prev, data: { ...prev.data, [CONCORDANCE_COMBINED_NODE_KEY]: combined } }
+            : prev,
         );
       } finally {
         setCombinedLoading(false);

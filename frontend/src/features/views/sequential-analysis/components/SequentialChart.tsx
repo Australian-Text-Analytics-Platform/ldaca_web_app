@@ -13,8 +13,8 @@ import { acceptPlaceholderOnTab } from '@/features/views/preprocessing/utils/pla
 import type {
   SequentialAnalysisDatum,
   ChartTypeOption,
-} from '../hooks/useSequentialAnalysisTaskFlow';
-import { getPaletteColor, formatTimeLabel } from '../hooks/useSequentialAnalysisTaskFlow';
+} from '../hooks/sequentialChartModel';
+import { getSequentialPaletteColor, formatSequentialTimeLabel } from '../hooks/sequentialChartModel';
 
 export type SequentialXAxisType = 'category' | 'number';
 
@@ -51,7 +51,7 @@ const formatNumericTick = (value: unknown): string => {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return '';
   if (Math.abs(n) >= TIMESTAMP_HEURISTIC_THRESHOLD) {
-    return formatTimeLabel(n);
+    return formatSequentialTimeLabel(n);
   }
   return String(n);
 };
@@ -191,7 +191,7 @@ export function SequentialChart({
   }
 
   const series: MultiSeriesChartSeries[] = visibleKeys.map((key, idx) => {
-    const color = String(chartConfig[key]?.color ?? getPaletteColor(idx));
+    const color = String(chartConfig[key]?.color ?? getSequentialPaletteColor(idx));
     const label = chartConfig[key]?.label ?? key;
     return {
       key,
@@ -232,7 +232,7 @@ export function SequentialChart({
           shadcn: true,
           className: 'min-w-50',
           indicator: chartType === 'line' ? 'line' : 'dot',
-          labelFormatter: (useNumericAxis ? formatNumericTick : formatTimeLabel) as never,
+          labelFormatter: (useNumericAxis ? formatNumericTick : formatSequentialTimeLabel) as never,
         }}
         selection={{
           selectedIndices: selectedPeriodIndices,

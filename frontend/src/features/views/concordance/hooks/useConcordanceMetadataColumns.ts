@@ -4,6 +4,7 @@ import type {
 } from '@/api';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
+import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceViewModels';
 
 interface Section {
   columns: string[];
@@ -53,7 +54,7 @@ export function useConcordanceMetadataColumns({
   const resultEntries = results?.data ?? {};
   const perBlock: { nodeKey: string; columns: string[] }[] = [];
   for (const [nodeKey, entry] of Object.entries(resultEntries)) {
-    if (nodeKey === '__COMBINED__') continue;
+    if (nodeKey === CONCORDANCE_COMBINED_NODE_KEY) continue;
     const nodeEntry: ConcordanceResultEntry = entry;
     const cols = nodeEntry.metadata.metadata_columns.filter((c) => c && c !== '__source_node');
     perBlock.push({ nodeKey, columns: cols });

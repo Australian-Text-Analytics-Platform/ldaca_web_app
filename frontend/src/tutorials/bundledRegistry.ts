@@ -338,6 +338,11 @@ const tutorial = {
     anchor: 'help-concordance-search-term',
     label: 'Concordance search term',
   },
+  'analysis.concordance.search-mode': {
+    file: 'tutorials/concordance.md',
+    anchor: 'help-concordance-search-mode',
+    label: 'Concordance search mode',
+  },
   'analysis.concordance.regex-toggle': {
     file: 'tutorials/concordance.md',
     anchor: 'help-concordance-regex-toggle',

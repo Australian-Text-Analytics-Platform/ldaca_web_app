@@ -204,19 +204,6 @@ function Sidebar() {
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
   const visibleNavItems = NAV_ITEMS.filter(({ id }) => visibleViews.includes(id));
-  const fallbackVisibleView = visibleNavItems[0]?.id ?? 'data-loader';
-
-  React.useEffect(() => {
-    if (!isWorkspaceLoaded && currentView !== 'data-loader') {
-      setCurrentView('data-loader');
-    }
-  }, [currentView, isWorkspaceLoaded, setCurrentView]);
-
-  React.useEffect(() => {
-    if (!visibleViews.includes(currentView)) {
-      setCurrentView(fallbackVisibleView);
-    }
-  }, [currentView, fallbackVisibleView, setCurrentView, visibleViews]);
 
   /**
    * Called by: Sidebar's Views section body renderer because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
