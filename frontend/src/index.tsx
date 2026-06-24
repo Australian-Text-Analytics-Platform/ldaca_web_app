@@ -5,6 +5,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import { router } from './router';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { initSentry } from './lib/sentry';
+import { getRuntimeGoogleClientId } from './lib/backend/env';
 
 initSentry();
 
@@ -29,11 +30,11 @@ if (typeof window !== 'undefined') {
 }
 
 // Resolve Google Client ID in priority order:
-//   1. window.__GOOGLE_CLIENT_ID__ (injected by backend at runtime)
+//   1. window.__WORDFLOW_CONFIG__.googleClientId (runtime-injected)
 //   2. VITE_GOOGLE_CLIENT_ID (build-time env)
 //   3. Development fallback (LDaCA shared dev client)
 const INJECTED_GOOGLE_CLIENT_ID =
-  typeof window !== 'undefined' ? window.__GOOGLE_CLIENT_ID__ : undefined;
+  typeof window !== 'undefined' ? getRuntimeGoogleClientId() : undefined;
 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty/whitespace client IDs should fall through to the next fallback, not only null/undefined */
 const GOOGLE_CLIENT_ID =
   INJECTED_GOOGLE_CLIENT_ID?.trim() ||

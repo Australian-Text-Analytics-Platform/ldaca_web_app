@@ -9,7 +9,7 @@ import { BACKEND_PORT, BACKEND_API_BASE } from '@/config/env';
  *  1. Explicit override via function argument (tests)
  *  2. Tauri: window.__BACKEND_URL__ (injected by Rust)
  *  3. Vite env var: VITE_BACKEND_API_BASE (full URL override)
- *  4. Server-injected window.__BASE_PATH__ (works for any reverse proxy)
+ *  4. Runtime config injection (window.__WORDFLOW_CONFIG__.basePath)
  *  5. Vite dev: localhost/127.0.0.1 -> backend at configured port
  *  6. Default: same-origin /api
  */
@@ -17,7 +17,10 @@ import { BACKEND_PORT, BACKEND_API_BASE } from '@/config/env';
 declare global {
   interface Window {
     __BACKEND_URL__?: string;
-    __BASE_PATH__?: string;
+    __WORDFLOW_CONFIG__?: {
+      basePath?: string;
+      googleClientId?: string;
+    };
   }
 }
 
@@ -33,6 +36,19 @@ function getBackendPort(): string {
   const port = BACKEND_PORT.trim();
   if (port) return port;
   return '8001';
+}
+
+function getRuntimeConfig() {
+  if (typeof window === 'undefined') return undefined;
+  return window.__WORDFLOW_CONFIG__;
+}
+
+export function getRuntimeBasePath(): string | undefined {
+  return getRuntimeConfig()?.basePath;
+}
+
+export function getRuntimeGoogleClientId(): string | undefined {
+  return getRuntimeConfig()?.googleClientId;
 }
 
 /**
@@ -58,12 +74,10 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
 
   if (typeof window === 'undefined') return '/api';
 
-  // 4. Server-injected base path (handles any reverse proxy generically).
-  //    The backend always injects `window.__BASE_PATH__` as a string (even "")
-  //    when it serves the frontend, so its *presence* (not truthiness) means
-  //    "same-origin" — no port redirect needed.
-  if (typeof window.__BASE_PATH__ === 'string') {
-    return `${window.location.origin}${window.__BASE_PATH__}/api`;
+  // 4. Runtime config base path (handles reverse proxy serving).
+  const runtimeBasePath = getRuntimeBasePath();
+  if (typeof runtimeBasePath === 'string') {
+    return `${window.location.origin}${runtimeBasePath}/api`;
   }
 
   const loc = options.windowLocation ?? window.location;

@@ -28,9 +28,9 @@ interface ImportMeta {
 }
 
 interface Window {
-  __BASE_PATH__?: string;
   __BACKEND_URL__?: string;
-  __GOOGLE_CLIENT_ID__?: string;
-  __MULTI_USER__?: boolean;
-  __CILOGON_CLIENT_ID__?: string;
+  __WORDFLOW_CONFIG__?: {
+    basePath?: string;
+    googleClientId?: string;
+  };
 }

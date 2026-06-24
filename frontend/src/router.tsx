@@ -1,12 +1,7 @@
 import { Outlet, createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
 import App from './App';
 import { ALL_VIEWS, type ViewType } from './stores/uiStore';
-
-declare global {
-  interface Window {
-    __BASE_PATH__?: string;
-  }
-}
+import { getRuntimeBasePath } from '@/lib/backend/env';
 
 const rootRoute = createRootRoute({
   /** Keeps TanStack Router happy while all real view switching stays Zustand-driven. */
@@ -48,10 +43,12 @@ export const appRoute = indexRoute;
 
 const routeTree = rootRoute.addChildren([indexRoute]);
 
+const runtimeBasePath = typeof window !== 'undefined' ? getRuntimeBasePath() : undefined;
+const normalizedBasePath = runtimeBasePath === '' ? '/' : runtimeBasePath ?? '/';
+
 export const router = createRouter({
   routeTree,
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- treat an empty base path as unset and fall back to '/', not only null/undefined
-  basepath: (typeof window !== 'undefined' && window.__BASE_PATH__) || '/',
+  basepath: normalizedBasePath,
 });
 
 declare module '@tanstack/react-router' {
