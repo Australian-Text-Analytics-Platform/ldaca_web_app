@@ -12,6 +12,7 @@ import type { ResolvedPreset } from '../nodeInputs/useTabNodeInputs';
 import { NodeColumnSelector } from './NodeColumnSelector';
 import { NodeSelectionList, type NodeSelectionRenderArgs } from './NodeSelectionList';
 import { VIZ_PALETTE } from '../vizPalette';
+import { NodeColorPicker } from './NodeColorPicker';
 
 const CLEAR_COLUMN_VALUE = '__ldaca__clear__';
 
@@ -44,9 +45,12 @@ export interface NodeInputsPanelProps {
   onClear: () => void;
   /** Change a node's chosen column. */
   onColumnChange: (nodeId: string, column: string) => void;
-  /** Palette used to assign each node card a stable colour by position
-   * (for chart legends / metadata slots). Defaults to the shared viz palette. */
+  /** Palette used to assign fallback colours by position when a node lacks Node.color. */
   defaultPalette?: string[];
+  /** Effective per-node colours for analyses that colour results by selected source node. */
+  nodeColors?: Record<string, string>;
+  /** Optional persisted colour change handler rendered inside selected-node cards. */
+  onNodeColorChange?: (nodeId: string, color: string) => void;
   showColumnPicker?: boolean;
   showAddControls?: boolean;
   showRemoveButtons?: boolean;
@@ -94,6 +98,8 @@ export function NodeInputsPanel({
   onClear,
   onColumnChange,
   defaultPalette = VIZ_PALETTE,
+  nodeColors,
+  onNodeColorChange,
   showColumnPicker = true,
   showAddControls = true,
   showRemoveButtons = true,
@@ -166,6 +172,7 @@ export function NodeInputsPanel({
     const label = typeof columnLabel === 'function' ? columnLabel(args) : columnLabel;
     const selector = (
       <NodeColumnSelector
+        key="column"
         columns={columns}
         value={value}
         preserveValue={resolved?.column}
@@ -179,13 +186,34 @@ export function NodeInputsPanel({
       />
     );
     const addon = renderColumnAddon?.({ ...args, column: resolved?.column ?? '', columns });
-    if (!addon) return selector;
-    return (
-      <div className="grid items-end gap-2 md:grid-cols-2">
-        {selector}
-        <div className="min-w-0">{addon}</div>
-      </div>
-    );
+    const colorControl = onNodeColorChange ? (
+      <NodeColorPicker
+        key="color"
+        nodeName={getNodeDisplayName(args.node, nodeId)}
+        color={args.color}
+        presets={defaultPalette}
+        disabled={disabled}
+        onChange={(nextColor) => {
+          onNodeColorChange(nodeId, nextColor);
+        }}
+      />
+    ) : null;
+    const controls = [
+      selector,
+      ...(addon ? [<div key="addon" className="min-w-0">{addon}</div>] : []),
+      ...(colorControl ? [colorControl] : []),
+    ];
+    if (controls.length === 1) return selector;
+    let columnLayout = 'md:grid-cols-3';
+    if (colorControl) {
+      columnLayout =
+        controls.length === 2
+          ? 'md:grid-cols-[minmax(0,1fr)_auto]'
+          : 'md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]';
+    } else if (controls.length === 2) {
+      columnLayout = 'md:grid-cols-2';
+    }
+    return <div className={cn('grid items-end gap-2', columnLayout)}>{controls}</div>;
   };
 
   const count = originalCount ?? resolvedNodes.length;
@@ -391,6 +419,7 @@ export function NodeInputsPanel({
           nodes={nodes}
           nodeIds={nodeIds}
           palette={defaultPalette}
+          nodeColors={nodeColors}
           maxCompare={maxNodes ?? nodes.length}
           onRemoveNode={showRemoveButtons && !disabled ? onRemoveNode : undefined}
           renderNodeMeta={renderNodeMeta}

@@ -20,6 +20,9 @@ export interface ConcordanceParameterPanelProps {
   // Selection (add-node-as-needed)
   nodeInputs: UseTabNodeInputsResult;
   handleColumnChange: (nodeId: string, column: string) => void;
+  nodeColors?: Record<string, string>;
+  onNodeColorChange?: (nodeId: string, color: string) => void;
+  defaultPalette?: string[];
 
   // Search params
   searchWord: string;
@@ -60,6 +63,9 @@ export interface ConcordanceParameterPanelProps {
 export function ConcordanceParameterPanel({
   nodeInputs,
   handleColumnChange,
+  nodeColors,
+  onNodeColorChange,
+  defaultPalette,
   searchWord,
   setSearchWord,
   numLeftTokens,
@@ -124,6 +130,9 @@ export function ConcordanceParameterPanel({
           onRemoveNode={nodeInputs.removeNode}
           onClear={nodeInputs.clear}
           onColumnChange={handleColumnChange}
+          defaultPalette={defaultPalette}
+          nodeColors={nodeColors}
+          onNodeColorChange={onNodeColorChange}
           renderColumnAddon={renderTokenizerModelSelector}
         />
 

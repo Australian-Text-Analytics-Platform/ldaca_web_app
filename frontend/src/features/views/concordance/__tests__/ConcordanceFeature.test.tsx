@@ -342,6 +342,14 @@ vi.mock('../../common', async () => {
       }, [result, setResult]);
       return [result, ref, vi.fn(), setResult];
     },
+    /** Supplies deterministic source colours for feature tests that mock the shared analysis module. */
+    useNodeColorControls: () => ({
+      defaultPalette: ['#000000'],
+      nodeColors: { 'node-1': '#000000' },
+      nodeColorOverrides: {},
+      ensureNodeColors: vi.fn(),
+      setNodeColor: vi.fn(),
+    }),
     VIZ_PALETTE: ['#000000'],
     executeAnalysisRerun: vi.fn(
       async ({

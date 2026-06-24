@@ -90,10 +90,13 @@ Feature-specific caps are enforced through `NodeInputConstraints`:
 - export remains graph-selection based because it acts on workspace nodes rather
   than an analysis tab.
 
-Analysis visualizations derive source colours locally from
-`views/common/vizPalette.ts`. There is no shared node-colour store or picker:
-selected source nodes receive deterministic palette colours by position for
-charts, tables, legends, and metadata selectors.
+Analysis visualizations derive fallback source colours from
+`views/common/vizPalette.ts`. Analysis tabs that colour results by selected
+source node read the node's persisted `Node.color`; when a selected node has no
+stored colour yet, the tab assigns the deterministic palette default and posts
+it to the workspace before starting the analysis. User picker changes are sent
+through the node-colour endpoint immediately, not bundled into analysis
+requests.
 
 ## Token Frequency
 

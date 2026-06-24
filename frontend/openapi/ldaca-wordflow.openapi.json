@@ -3339,6 +3339,21 @@
         "title": "NodeActionResponse",
         "type": "object"
       },
+      "NodeColorUpdateRequest": {
+        "description": "Request schema used by API routes and generated clients for node colour updates.\n\nUsed by:\n- backend API routes and frontend node selectors because source-node visualisation\n  colours are durable workspace-node metadata.\n\nFlow: validate one CSS hex colour string before the node route normalizes and\npersists it on the selected workspace node.",
+        "properties": {
+          "color": {
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Color",
+            "type": "string"
+          }
+        },
+        "required": [
+          "color"
+        ],
+        "title": "NodeColorUpdateRequest",
+        "type": "object"
+      },
       "NodeDataFiltering": {
         "description": "API schema used by routes and generated clients for node data filtering.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
@@ -7291,6 +7306,17 @@
             },
             "title": "Child Ids",
             "type": "array"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
           },
           "columns": {
             "items": {
@@ -12272,6 +12298,76 @@
           }
         },
         "summary": "Clone Node",
+        "tags": [
+          "workspace_management",
+          "nodes"
+        ]
+      }
+    },
+    "/api/workspaces/nodes/{node_id}/color": {
+      "post": {
+        "description": "Set the persistent visualization colour on a workspace node.",
+        "operationId": "set_node_color",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeColorUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Node Color",
         "tags": [
           "workspace_management",
           "nodes"

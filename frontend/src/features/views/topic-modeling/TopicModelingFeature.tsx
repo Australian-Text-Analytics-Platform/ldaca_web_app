@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { topicModelingTaskRequest, topicModelingTaskResult } from '@/api';
 import type { AnalysisTabInput, TopicModelingResponse, TopicModelingTopic } from '@/api';
@@ -11,9 +12,8 @@ import {
   getNodeIdentifier,
   useLastRunRequest,
   useAnalysisFeature,
+  useNodeColorControls,
   useSafeResult,
-  VIZ_PALETTE,
-  vizColorMapForNodes,
   executeAnalysisRerun,
 } from '../common';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
@@ -57,6 +57,7 @@ function TopicModelingFeature({
   onTabInputsChange,
 }: TopicModelingFeatureProps = {}) {
   const { currentWorkspaceId } = useWorkspaceData();
+  const { setNodeColor: persistNodeColor } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
   const nodeInputs = useTabNodeInputs({
@@ -305,13 +306,14 @@ function TopicModelingFeature({
     };
   }, []);
 
-  const defaultPalette = VIZ_PALETTE;
-
-  // Per-source bubble-chart colours derived locally from a static palette by
-  // selection position. No node-colour store or picker; colours are
-  // deterministic and used only for the bubble chart's per-source grouping.
+  // Per-source bubble-chart colours come from persisted node metadata, with
+  // palette defaults written before a run when a selected node has no colour yet.
   const topicActiveNodeIds = panelNodeIds.slice(0, 2);
-  const nodeColors = vizColorMapForNodes(topicActiveNodeIds);
+  const { defaultPalette, nodeColors, setNodeColor, ensureNodeColors } = useNodeColorControls({
+    nodeIds: topicActiveNodeIds,
+    nodes: panelSelectedNodes,
+    persistNodeColor,
+  });
 
   const effectiveNodeColumnSelections = nodeColumnSelections;
 
@@ -488,6 +490,7 @@ function TopicModelingFeature({
    * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleRunOrUpdate = async () => {
+    await ensureNodeColors();
     await executeAnalysisRerun({
       hasUnrunChanges: hasTopicChanges,
       clearResults,
@@ -531,6 +534,11 @@ function TopicModelingFeature({
         onClear={handleClear}
         hasMissingColumns={panelHasMissingColumns}
         resultState={result?.state}
+        nodeColors={nodeColors}
+        onNodeColorChange={(nodeId, color) => {
+          void setNodeColor(nodeId, color);
+        }}
+        defaultPalette={defaultPalette}
       />
 
       {shouldShowResultsPanel && (

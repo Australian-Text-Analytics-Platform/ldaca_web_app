@@ -255,6 +255,19 @@ describe('concordance source display helpers', () => {
     });
   });
 
+  it('applies node colour overrides across id and node_id aliases', () => {
+    expect(
+      buildConcordanceNodeColorMap(
+        [{ id: 'node-1', node_id: 'legacy-1', name: 'Left Corpus' }],
+        ['red'],
+        { 'node-1': '#123456' },
+      ),
+    ).toEqual({
+      'node-1': '#123456',
+      'legacy-1': '#123456',
+    });
+  });
+
   it('finds the selected source node represented by a rendered source label', () => {
     expect(findConcordanceSourceNode(sourceNodes, 'left corpus')?.id).toBe('node-1');
     expect(findConcordanceSourceNode(sourceNodes, 'Nested Corpus')?.id).toBe('node-2');

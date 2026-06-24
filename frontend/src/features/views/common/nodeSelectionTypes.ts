@@ -5,6 +5,7 @@ export interface WorkspaceNodeLike extends Record<string, unknown> {
   node_id?: string;
   name?: string;
   label?: string;
+  color?: string | null;
   shape?: [number | null, number | null] | number[];
   columns?: string[];
   schema?: Record<string, unknown>;

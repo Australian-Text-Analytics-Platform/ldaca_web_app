@@ -1,6 +1,7 @@
 export * from './utils';
 export * from './hooks/useLastRunRequest';
 export * from './hooks/useAnalysisFeature';
+export * from './hooks/useNodeColorControls';
 export * from './hooks/useMaterializeLifecycle';
 export * from './parameterComparison';
 export * from './nodeSelectionTypes';

@@ -24,7 +24,7 @@ import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog'
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyResultModel } from './hooks/useTokenFrequencyResultModel';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
-import { useAnalysisFeature, useSafeResult, VIZ_PALETTE, vizColorMapForNodes } from '../common';
+import { useAnalysisFeature, useNodeColorControls, useSafeResult } from '../common';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
@@ -89,7 +89,7 @@ const TokenFrequencyFeature = ({
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
-  const { selectNodes } = useWorkspaceActions();
+  const { selectNodes, setNodeColor: persistNodeColor } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
@@ -110,12 +110,14 @@ const TokenFrequencyFeature = ({
     studyNodeId,
   );
 
-  // Per-source chart colours derived locally from a static palette by
-  // selection position. There is no node-colour store or picker anymore;
-  // colours are deterministic and used only for chart legends/series.
+  // Per-source chart colours come from persisted node metadata, with palette
+  // defaults written before a run when a selected node has no colour yet.
   const tokenActiveNodeIds = panelNodeIds.slice(0, 2);
-  const defaultPalette = VIZ_PALETTE;
-  const nodeColors = vizColorMapForNodes(tokenActiveNodeIds);
+  const { defaultPalette, nodeColors, setNodeColor, ensureNodeColors } = useNodeColorControls({
+    nodeIds: tokenActiveNodeIds,
+    nodes: panelSelectedNodes,
+    persistNodeColor,
+  });
 
   const isActiveTab = currentView === 'token-frequency';
   const { serverRequest } = useLastRunRequest({
@@ -366,6 +368,11 @@ const TokenFrequencyFeature = ({
     },
   });
 
+  const handleAnalyzeWithNodeColors = async () => {
+    await ensureNodeColors();
+    await handleAnalyze();
+  };
+
   const {
     computeDisplayName,
     normalizedNodeResults,
@@ -483,7 +490,7 @@ const TokenFrequencyFeature = ({
         isAnalyzing={isRunning}
         isStopping={isStopping}
         onAnalyze={() => {
-          void handleAnalyze();
+          void handleAnalyzeWithNodeColors();
         }}
         onStop={() => {
           void stopTask();
@@ -492,7 +499,6 @@ const TokenFrequencyFeature = ({
           void clearResults();
         }}
         hasIncompleteSelections={hasIncompleteSelections}
-        appliedStopCount={appliedStopSet.size}
         hasResults={Boolean(results)}
         runLabel={actionState.runLabel}
         studyNodeId={effectiveStudyNodeId}
@@ -500,6 +506,10 @@ const TokenFrequencyFeature = ({
           setStudyNodeId(nodeId);
         }}
         getColorForNode={getColorForNode}
+        nodeColors={nodeColors}
+        onNodeColorChange={(nodeId, color) => {
+          void setNodeColor(nodeId, color);
+        }}
         computeDisplayName={computeDisplayName}
         renderTokenizerModelSelector={({ nodeId, column }) => (
           <TokenizerModelSelector

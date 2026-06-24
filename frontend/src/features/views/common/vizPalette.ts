@@ -3,10 +3,10 @@
  * concordance dispersion plot's matched-term colours and the combined
  * results table's per-source colours).
  *
- * This is intentionally NOT the old per-node "node colour" system — there
- * is no store, no persistence, and no user picker. Callers index into this
- * array by position (term index / source index) to get a stable, repeatable
- * colour for a chart or table without any cross-tab state.
+ * Callers index into this array by position (term index / source index) to get
+ * a stable, repeatable fallback colour for a chart or table. Analysis tabs
+ * that expose source-node colour controls write user choices to ``Node.color``
+ * and use this palette only when a selected node does not yet have a colour.
  *
  * Used by: concordance/ConcordanceFeature.tsx for matched-term and
  * per-source colour maps.
@@ -27,11 +27,9 @@ export const VIZ_PALETTE: string[] = [
 ];
 
 /**
- * Build a stable ``nodeId → colour`` map by assigning each id a palette
- * colour by its position. Replaces the old per-node colour store for chart
- * legends/series in the functional analysis tabs (token frequency, topic
- * modeling, trends): colours are deterministic and repeatable per selection
- * order, with no persistence or user picker.
+ * Build default ``nodeId → colour`` assignments by selected-node position.
+ * Used as the fallback map for chart legends/series in analysis tabs before
+ * caller-owned ``Node.color`` values are layered over the defaults.
  *
  * Used by: analysis feature tabs that colour chart series by source node.
  */

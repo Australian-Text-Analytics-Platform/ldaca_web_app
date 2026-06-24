@@ -3,12 +3,90 @@ import {
   type NodeInputColumnAddonArgs,
 } from '@/features/views/common/components/NodeInputsPanel';
 import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import { Label } from '@/components/ui/label';
 import HelpIcon from '@/components/help/HelpIcon';
+import { cn } from '@/lib/utils';
+import { Check } from 'lucide-react';
+
+interface StudyNodeOption {
+  id: string;
+  label: string;
+  color: string;
+}
+
+/**
+ * Study-corpus selector shown immediately under the selected-node cards.
+ * Rendered by: TokenFrequencyParameterPanel when two nodes are selected because
+ * keyword statistics need one node marked as the study corpus while preserving
+ * the selected-node card layout for column/tokenizer/color parameters.
+ * Flow: resolve the effective study id, render a compact segmented swatch
+ * group, mark the active swatch with a check icon, and notify the feature when
+ * the user switches the study block.
+ */
+function StudyDataBlockToggle({
+  nodeOptions,
+  studyNodeId,
+  onStudyNodeChange,
+}: {
+  nodeOptions: StudyNodeOption[];
+  studyNodeId: string | null;
+  onStudyNodeChange: (nodeId: string) => void;
+}) {
+  if (nodeOptions.length < 2) return null;
+  const activeNodeId = studyNodeId ?? nodeOptions[0]?.id ?? null;
+
+  return (
+    <div className="px-3 pt-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+        <Label className="whitespace-nowrap text-sm font-medium">Study Data Block</Label>
+        <div
+          role="radiogroup"
+          aria-label="Study Data Block"
+          className="inline-flex items-center gap-1 rounded-lg bg-muted p-1"
+        >
+          {nodeOptions.map((option) => {
+            const isActive = activeNodeId === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={isActive}
+                aria-label={`Use ${option.label} as study data block`}
+                title={option.label}
+                className={cn(
+                  'relative inline-flex size-8 items-center justify-center rounded-md p-0.5 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
+                  isActive ? 'bg-background shadow-sm' : 'hover:bg-background/70',
+                )}
+                onClick={() => {
+                  onStudyNodeChange(option.id);
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="block size-full rounded-sm shadow-sm"
+                  style={{ backgroundColor: option.color }}
+                >
+                  {isActive ? (
+                    <Check className="absolute inset-0 m-auto h-4 w-4 text-white drop-shadow" />
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <HelpIcon
+          targetKey="analysis.token-frequency.reference"
+          label="Study Data Block"
+          tooltip="The study block is treated as Corpus 2 (O2/%2) in the keyword statistics; the other block is the reference (Corpus 1). Switching it flips the direction of measures like LogRatio."
+        />
+      </div>
+    </div>
+  );
+}
 
 interface TokenFrequencyParameterPanelProps {
   nodeInputs: UseTabNodeInputsResult;
@@ -25,12 +103,13 @@ interface TokenFrequencyParameterPanelProps {
   isStopping?: boolean;
   onClearResults: () => void;
   hasIncompleteSelections: boolean;
-  appliedStopCount: number;
   hasResults: boolean;
   runLabel?: string;
   studyNodeId: string | null;
   onStudyNodeChange: (nodeId: string) => void;
   getColorForNode: (nodeId: string, index?: number) => string;
+  nodeColors?: Record<string, string>;
+  onNodeColorChange?: (nodeId: string, color: string) => void;
   computeDisplayName: (nodeId: string) => string;
   renderTokenizerModelSelector?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
 }
@@ -49,12 +128,13 @@ export const TokenFrequencyParameterPanel = ({
   isStopping,
   onClearResults,
   hasIncompleteSelections,
-  appliedStopCount,
   hasResults,
   runLabel,
   studyNodeId,
   onStudyNodeChange,
   getColorForNode,
+  nodeColors,
+  onNodeColorChange,
   computeDisplayName,
   renderTokenizerModelSelector,
 }: TokenFrequencyParameterPanelProps) => {
@@ -102,58 +182,6 @@ export const TokenFrequencyParameterPanel = ({
         runLabel,
         runHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },
         clearHelp: { targetKey: 'analysis.token-frequency.clear-results', label: 'Clear results' },
-        extraContent: (
-          <>
-            {appliedStopCount > 0 ? (
-              <span className="text-xs text-muted-foreground">
-                Active filter: {appliedStopCount} word{appliedStopCount === 1 ? '' : 's'}
-              </span>
-            ) : null}
-            {hasMultipleNodes && nodeOptions.length > 1 ? (
-              <div className="ml-auto flex items-center gap-2">
-                <Label className="whitespace-nowrap text-base font-medium">Study Data Block</Label>
-                <div className="inline-flex items-center gap-1">
-                  {nodeOptions.map((option) => {
-                    const isActive = (studyNodeId ?? nodeOptions[0]?.id) === option.id;
-                    return (
-                      <DisabledReasonTooltip key={option.id} reason={undefined}>
-                        <label
-                          className="inline-flex cursor-pointer items-center justify-center rounded-full p-1 transition-colors"
-                          title={option.label}
-                          aria-label={option.label}
-                        >
-                          <input
-                            type="radio"
-                            name="study-node"
-                            value={option.id}
-                            checked={isActive}
-                            onChange={() => {
-                              onStudyNodeChange(option.id);
-                            }}
-                            className="sr-only"
-                          />
-                          <span
-                            className="inline-block h-5 w-5 rounded-full border-2 transition-colors"
-                            style={{
-                              borderColor: option.color,
-                              backgroundColor: isActive ? option.color : 'transparent',
-                            }}
-                            aria-hidden="true"
-                          />
-                        </label>
-                      </DisabledReasonTooltip>
-                    );
-                  })}
-                </div>
-                <HelpIcon
-                  targetKey="analysis.token-frequency.reference"
-                  label="Study Data Block"
-                  tooltip="The study block is treated as Corpus 2 (O2/%2) in the keyword statistics; the other block is the reference (Corpus 1). Switching it flips the direction of measures like LogRatio."
-                />
-              </div>
-            ) : null}
-          </>
-        ),
       }}
     >
       <NodeInputsPanel
@@ -168,8 +196,17 @@ export const TokenFrequencyParameterPanel = ({
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}
+        nodeColors={nodeColors}
+        onNodeColorChange={onNodeColorChange}
         renderColumnAddon={renderTokenizerModelSelector}
       />
+      {hasMultipleNodes ? (
+        <StudyDataBlockToggle
+          nodeOptions={nodeOptions}
+          studyNodeId={studyNodeId}
+          onStudyNodeChange={onStudyNodeChange}
+        />
+      ) : null}
       <TokensColumnMismatchNotice
         nodes={panelSelectedNodes}
         selections={effectiveNodeColumnSelections}

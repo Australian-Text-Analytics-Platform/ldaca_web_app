@@ -23,6 +23,7 @@ interface Params {
   proportionalDispersionBars: boolean;
   colourMatches: boolean;
   lowercaseMatches: boolean;
+  nodeColorOverrides?: Record<string, string>;
   getAuthHeaders: () => Record<string, string>;
 }
 
@@ -65,6 +66,7 @@ export function useConcordanceResultViewModel({
   proportionalDispersionBars,
   colourMatches,
   lowercaseMatches,
+  nodeColorOverrides = {},
   getAuthHeaders,
 }: Params): Result {
   const [materializedBins, setMaterializedBins] = useState<
@@ -79,7 +81,11 @@ export function useConcordanceResultViewModel({
 
   const labelToNodeId = normalizeConcordanceLabelToNodeMap(results?.analysis_params);
   const defaultPalette = VIZ_PALETTE;
-  const nodeColors = buildConcordanceNodeColorMap(panelSelectedNodes, defaultPalette);
+  const nodeColors = buildConcordanceNodeColorMap(
+    panelSelectedNodes,
+    defaultPalette,
+    nodeColorOverrides,
+  );
   const sourceColorMap = buildConcordanceSourceColorMap(
     panelSelectedNodes,
     nodeColors,

@@ -14,6 +14,7 @@ import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskB
 import {
   useLastRunRequest,
   useAnalysisFeature,
+  useNodeColorControls,
   useSafeResult,
   executeAnalysisRerun,
 } from '../common';
@@ -79,8 +80,13 @@ function ConcordanceFeature({
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
-  const { detachConcordance, detachConcordanceDispersion, materializeConcordance, selectNodes } =
-    useWorkspaceActions();
+  const {
+    detachConcordance,
+    detachConcordanceDispersion,
+    materializeConcordance,
+    selectNodes,
+    setNodeColor: persistNodeColor,
+  } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'concordance';
   const { getColumnInfos } = useNodeColumnInfos({
@@ -134,6 +140,11 @@ function ConcordanceFeature({
   } as ReturnType<typeof useTabNodeInputs>;
   // Add-node-as-needed model has no lock; ids derive from the inputs.
   const activeNodeIds = inputResolvedNodes.map((r) => r.id);
+  const { nodeColorOverrides, setNodeColor, ensureNodeColors } = useNodeColorControls({
+    nodeIds: activeNodeIds,
+    nodes: panelSelectedNodes,
+    persistNodeColor,
+  });
   // Last-run request, used only to compute the Run vs Re-run button state.
   const { serverRequest } = useLastRunRequest({
     analysisType: 'concordance_analysis',
@@ -223,6 +234,7 @@ function ConcordanceFeature({
     proportionalDispersionBars,
     colourMatches,
     lowercaseMatches,
+    nodeColorOverrides,
     getAuthHeaders,
   });
 
@@ -647,6 +659,7 @@ function ConcordanceFeature({
    * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
    */
   const handleRunOrUpdate = async () => {
+    await ensureNodeColors();
     await executeAnalysisRerun({
       hasUnrunChanges: hasChanges,
       clearResults: handleClearResults,
@@ -672,6 +685,11 @@ function ConcordanceFeature({
       <ConcordanceParameterPanel
         nodeInputs={nodeInputs}
         handleColumnChange={handleColumnChange}
+        nodeColors={nodeColors}
+        onNodeColorChange={(nodeId, color) => {
+          void setNodeColor(nodeId, color);
+        }}
+        defaultPalette={defaultPalette}
         searchWord={searchWord}
         setSearchWord={setSearchWord}
         numLeftTokens={numLeftTokens}

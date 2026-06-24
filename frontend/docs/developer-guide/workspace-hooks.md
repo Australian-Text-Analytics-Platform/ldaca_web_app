@@ -39,8 +39,10 @@ slice they need.
     helpers used by those groups.
 
 `useWorkspaceUiStateSync()` hydrates and persists backend-owned workspace UI
-state through `ui_state.json`; source-node visualization colours are now derived
-locally from deterministic palettes inside the analysis views.
+state through `ui_state.json`; source-node visualization colours are durable
+node metadata instead. Analysis views use deterministic palette colours as
+defaults, then persist missing or user-picked values through the workspace
+node-colour mutation.
 
 ## Query Keys And Invalidations
 

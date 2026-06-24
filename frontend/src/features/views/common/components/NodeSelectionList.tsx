@@ -16,6 +16,7 @@ export interface NodeSelectionListProps {
   nodes?: WorkspaceNodeLike[];
   nodeIds?: string[];
   palette: string[];
+  nodeColors?: Record<string, string>;
   maxCompare: number;
   /** When provided, each card shows an × button that removes that node from the inputs. */
   onRemoveNode?: (nodeId: string) => void;
@@ -32,7 +33,8 @@ export interface NodeSelectionListProps {
  * Displays the selected analysis data blocks as horizontally scrollable cards,
  * with feature-provided per-node content slots. Each card is assigned a stable
  * palette colour by position so chart legends and metadata slots stay
- * consistent; there is no per-node colour store or picker.
+ * consistent; callers can use the render slots to place matching controls in
+ * the card body.
  * Used by: NodeInputsPanel and shared node-selection tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
@@ -40,6 +42,7 @@ export function NodeSelectionList({
   nodes = [],
   nodeIds,
   palette,
+  nodeColors,
   maxCompare,
   onRemoveNode,
   renderNodeMeta,
@@ -83,7 +86,8 @@ export function NodeSelectionList({
         const nodeId = derivedNodeIds[index];
         if (!nodeId) return null;
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- palette index is always in range with the '#000000' fallback
-        const color = (palette.length ? palette[index % palette.length] : '#000000')!;
+        const fallbackColor = (palette.length ? palette[index % palette.length] : '#000000')!;
+        const color = nodeColors?.[nodeId] ?? fallbackColor;
         const title = getNodeTitle(node, nodeId, index);
         return (
           <Card
@@ -111,7 +115,7 @@ export function NodeSelectionList({
             )}
             <CardHeader className={cn('space-y-1 px-3 pb-1.5 pt-2.5')}>
               <div
-                className="max-w-full wrap-break-word pr-2 text-sm font-semibold leading-snug text-foreground"
+                className="max-w-full wrap-break-word pr-6 text-sm font-semibold leading-snug text-foreground"
                 title={title}
               >
                 {title}

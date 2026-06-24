@@ -2536,6 +2536,25 @@ export type NodeActionResponse = {
 };
 
 /**
+ * NodeColorUpdateRequest
+ *
+ * Request schema used by API routes and generated clients for node colour updates.
+ *
+ * Used by:
+ * - backend API routes and frontend node selectors because source-node visualisation
+ * colours are durable workspace-node metadata.
+ *
+ * Flow: validate one CSS hex colour string before the node route normalizes and
+ * persists it on the selected workspace node.
+ */
+export type NodeColorUpdateRequest = {
+    /**
+     * Color
+     */
+    color: string;
+};
+
+/**
  * NodeDataFiltering
  *
  * API schema used by routes and generated clients for node data filtering.
@@ -5309,6 +5328,10 @@ export type WorkspaceNodeInfo = {
      */
     child_ids?: Array<string>;
     /**
+     * Color
+     */
+    color?: string | null;
+    /**
      * Columns
      */
     columns?: Array<string>;
@@ -8072,6 +8095,42 @@ export type CloneNodeResponses = {
 };
 
 export type CloneNodeResponse = CloneNodeResponses[keyof CloneNodeResponses];
+
+export type SetNodeColorData = {
+    body: NodeColorUpdateRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/nodes/{node_id}/color';
+};
+
+export type SetNodeColorErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetNodeColorError = SetNodeColorErrors[keyof SetNodeColorErrors];
+
+export type SetNodeColorResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type SetNodeColorResponse = SetNodeColorResponses[keyof SetNodeColorResponses];
 
 export type DeleteNodeColumnData = {
     body?: never;

@@ -371,25 +371,29 @@ export function normalizeConcordanceLabelToNodeMap(
 }
 
 /**
- * Assigns deterministic visual colours to each selected concordance node id
- * variant.
+ * Assigns visual colours to each selected concordance node id variant.
  * Used by: useConcordanceResultViewModel and metadata-column grouping because
  * combined result rows can refer to either `id` or `node_id`, and both variants
  * should resolve to the same source colour.
+ * Flow: start from deterministic palette colours by selected-node order, then
+ * apply the effective ``Node.color`` map supplied by the selected-node controls.
  */
 export function buildConcordanceNodeColorMap(
   nodes: readonly ConcordanceNodeIdentity[],
   palette: readonly string[],
+  nodeColorOverrides: Record<string, string> = {},
 ): Record<string, string> {
   const map: Record<string, string> = {};
   if (palette.length === 0) return map;
 
   nodes.forEach((node, index) => {
-    const colour = palette[index % palette.length] ?? '';
-    for (const candidate of [node.id, node.node_id]) {
-      if (typeof candidate === 'string' && candidate) {
-        map[candidate] = colour;
-      }
+    const candidateIds = [node.id, node.node_id].filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    );
+    const override = candidateIds.map((candidate) => nodeColorOverrides[candidate]).find(Boolean);
+    const colour = override ?? palette[index % palette.length] ?? '';
+    for (const candidate of candidateIds) {
+      map[candidate] = colour;
     }
   });
   return map;

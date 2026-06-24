@@ -10,6 +10,7 @@ import {
   joinNodes,
   redoNodeOperation,
   reorderWorkspaceNodes,
+  setNodeColor as setNodeColorRequest,
   undoNodeOperation,
   updateNodeName,
 } from '@/api';
@@ -94,6 +95,29 @@ export const useWorkspaceGraphMutations = ({
     onError: (error: Error) => {
       setOperationError('copyNode', error.message);
       endOperation('copyNode');
+    },
+  });
+
+  const setNodeColorMutation = useMutation({
+    mutationFn: ({ nodeId, color }: { nodeId: string; color: string }) =>
+      setNodeColorRequest({
+        body: { color },
+        headers: authHeaders,
+        path: { node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => data),
+    onMutate: () => {
+      startOperation('setNodeColor');
+    },
+    onSuccess: (_data, { nodeId }) => {
+      invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {
+        includeNodeInfo: true,
+      });
+      endOperation('setNodeColor');
+    },
+    onError: (error: Error) => {
+      setOperationError('setNodeColor', error.message);
+      endOperation('setNodeColor');
     },
   });
 
@@ -364,6 +388,8 @@ export const useWorkspaceGraphMutations = ({
       undoNode: (nodeId: string) => undoNodeMutation.mutateAsync({ nodeId }),
       redoNode: (nodeId: string) => redoNodeMutation.mutateAsync({ nodeId }),
       copyNode: (nodeId: string) => copyNodeMutation.mutateAsync({ nodeId }),
+      setNodeColor: (nodeId: string, color: string) =>
+        setNodeColorMutation.mutateAsync({ nodeId, color }),
       deleteNode: (nodeId: string) => deleteNodeMutation.mutateAsync({ nodeId }),
       reorderNodes: (orderedIds: string[]) => reorderNodesMutation.mutateAsync({ orderedIds }),
       createNodeFromFile: (filename: string, sheetName?: string) =>
