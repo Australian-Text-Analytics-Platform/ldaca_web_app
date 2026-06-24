@@ -16,7 +16,7 @@ describe('useConcordanceDispersionControls', () => {
     expect(result.current.hiddenMatchedTexts.size).toBe(0);
     expect(result.current.binCount).toBe(DISPERSION_DEFAULT_BIN_COUNT);
     expect(result.current.combinedSourceMode).toBe('aggregate');
-    expect(result.current.dispersionChartType).toBe('line');
+    expect(result.current.dispersionChartMode).toBe('density');
     expect(result.current.selectedBinIndices).toEqual({});
   });
 
@@ -56,5 +56,23 @@ describe('useConcordanceDispersionControls', () => {
     });
 
     expect(Array.from(result.current.selectedBinIndices['node-a'] ?? [])).toEqual([10]);
+  });
+
+  it('replaces the active selection with a dragged bin range and supports shift extension', () => {
+    const { result } = renderHook(() => useConcordanceDispersionControls());
+
+    act(() => {
+      result.current.handleBinRangeSelect('node-a', 4, 2, false);
+    });
+
+    expect(Array.from(result.current.selectedBinIndices['node-a'] ?? [])).toEqual([2, 3, 4]);
+
+    act(() => {
+      result.current.handleBinRangeSelect('node-a', 7, 8, true);
+    });
+
+    expect(Array.from(result.current.selectedBinIndices['node-a'] ?? [])).toEqual([
+      2, 3, 4, 7, 8,
+    ]);
   });
 });

@@ -1,6 +1,6 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { MultiSeriesChartType } from '@/features/views/common/components/MultiSeriesChart';
 import {
+  type ConcordanceDispersionChartMode,
   DISPERSION_DEFAULT_BIN_COUNT,
   type DispersionDisplayBinCount,
 } from '../concordanceViewModels';
@@ -21,10 +21,16 @@ export interface UseConcordanceDispersionControlsResult {
   setBinCount: (value: DispersionDisplayBinCount) => void;
   combinedSourceMode: 'aggregate' | 'split';
   setCombinedSourceMode: Dispatch<SetStateAction<'aggregate' | 'split'>>;
-  dispersionChartType: MultiSeriesChartType;
-  setDispersionChartType: Dispatch<SetStateAction<MultiSeriesChartType>>;
+  dispersionChartMode: ConcordanceDispersionChartMode;
+  setDispersionChartMode: Dispatch<SetStateAction<ConcordanceDispersionChartMode>>;
   selectedBinIndices: Record<string, Set<number>>;
   handleBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
+  handleBinRangeSelect: (
+    blockKey: string,
+    startIndex: number,
+    endIndex: number,
+    shiftHeld: boolean,
+  ) => void;
   handleClearBinSelection: (blockKey: string) => void;
 }
 
@@ -50,7 +56,8 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     DISPERSION_DEFAULT_BIN_COUNT,
   );
   const [combinedSourceMode, setCombinedSourceMode] = useState<'aggregate' | 'split'>('aggregate');
-  const [dispersionChartType, setDispersionChartType] = useState<MultiSeriesChartType>('line');
+  const [dispersionChartMode, setDispersionChartMode] =
+    useState<ConcordanceDispersionChartMode>('density');
   const [selectedBinIndices, setSelectedBinIndices] = useState<Record<string, Set<number>>>({});
   const lastSelectedBinRef = useRef<Record<string, number | null>>({});
 
@@ -72,6 +79,24 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
       return { ...prev, [blockKey]: next };
     });
     lastSelectedBinRef.current[blockKey] = index;
+  };
+
+  /** Replaces or extends a block's bin set from a chart drag-selection range. */
+  // Called by: ConcordanceDispersionSummary drag gestures because chart drag-selection should select every bin between the pointer-down and pointer-up locations in one state update.
+  const handleBinRangeSelect = (
+    blockKey: string,
+    startIndex: number,
+    endIndex: number,
+    shiftHeld: boolean,
+  ) => {
+    const [from, to] =
+      startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+    setSelectedBinIndices((prev) => {
+      const next = shiftHeld ? new Set(prev[blockKey] ?? []) : new Set<number>();
+      for (let index = from; index <= to; index++) next.add(index);
+      return { ...prev, [blockKey]: next };
+    });
+    lastSelectedBinRef.current[blockKey] = endIndex;
   };
 
   /** Clears one block's selected bins while preserving other block selections. */
@@ -112,10 +137,11 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     setBinCount,
     combinedSourceMode,
     setCombinedSourceMode,
-    dispersionChartType,
-    setDispersionChartType,
+    dispersionChartMode,
+    setDispersionChartMode,
     selectedBinIndices,
     handleBinSelect,
+    handleBinRangeSelect,
     handleClearBinSelection,
   };
 }

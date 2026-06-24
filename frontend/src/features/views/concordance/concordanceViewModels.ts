@@ -670,6 +670,8 @@ const DISPERSION_SERVER_BIN_COUNT = 100;
 export const DISPERSION_DISPLAY_BIN_COUNTS = [4, 5, 10, 20, 25, 50, 100] as const;
 export type DispersionDisplayBinCount = (typeof DISPERSION_DISPLAY_BIN_COUNTS)[number];
 export const DISPERSION_DEFAULT_BIN_COUNT: DispersionDisplayBinCount = 20;
+export const CONCORDANCE_DISPERSION_CHART_MODES = ['density', 'cumulative'] as const;
+export type ConcordanceDispersionChartMode = (typeof CONCORDANCE_DISPERSION_CHART_MODES)[number];
 
 /** Guards user or persisted preferences before re-binning server dispersion data. */
 /**

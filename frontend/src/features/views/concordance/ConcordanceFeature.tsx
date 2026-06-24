@@ -196,10 +196,11 @@ function ConcordanceFeature({
     setBinCount,
     combinedSourceMode,
     setCombinedSourceMode,
-    dispersionChartType,
-    setDispersionChartType,
+    dispersionChartMode,
+    setDispersionChartMode,
     selectedBinIndices,
     handleBinSelect,
+    handleBinRangeSelect,
     handleClearBinSelection,
   } = useConcordanceDispersionControls();
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
@@ -759,10 +760,11 @@ function ConcordanceFeature({
           setProportionalDispersionBars={setProportionalDispersionBars}
           combinedSourceMode={combinedSourceMode}
           setCombinedSourceMode={setCombinedSourceMode}
-          dispersionChartType={dispersionChartType}
-          setDispersionChartType={setDispersionChartType}
+          dispersionChartMode={dispersionChartMode}
+          setDispersionChartMode={setDispersionChartMode}
           selectedBinIndices={selectedBinIndices}
           onBinSelect={handleBinSelect}
+          onBinRangeSelect={handleBinRangeSelect}
           onClearBinSelection={handleClearBinSelection}
           colourMatches={colourMatches}
           setColourMatches={setColourMatches}

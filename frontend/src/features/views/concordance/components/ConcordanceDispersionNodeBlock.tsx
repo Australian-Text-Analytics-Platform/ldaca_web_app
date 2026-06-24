@@ -20,12 +20,12 @@ import {
   findConcordanceSourceNode,
   getDispersionHits,
   getConcordanceSourceColor,
+  type ConcordanceDispersionChartMode,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
 } from '../concordanceViewModels';
 import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
-import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
 import { ConcordanceDispersionRowsTable } from './ConcordanceDispersionRowsTable';
 import { buildConcordanceDispersionTableModel } from './concordanceDispersionTableModel';
 import {
@@ -98,10 +98,16 @@ export interface ConcordanceDispersionNodeBlockProps {
   binCount: DispersionDisplayBinCount;
   onBinCountChange: (value: DispersionDisplayBinCount) => void;
   combinedSourceMode: 'aggregate' | 'split';
-  dispersionChartType: MultiSeriesChartType;
-  onDispersionChartTypeChange: (value: MultiSeriesChartType) => void;
+  dispersionChartMode: ConcordanceDispersionChartMode;
+  onDispersionChartModeChange: (value: ConcordanceDispersionChartMode) => void;
   selectedBinIndices: Record<string, Set<number>>;
   onBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
+  onBinRangeSelect: (
+    blockKey: string,
+    startIndex: number,
+    endIndex: number,
+    shiftHeld: boolean,
+  ) => void;
   onClearBinSelection: (blockKey: string) => void;
   allMatchedTexts: string[];
   matchedTextColorMap: Record<string, string>;
@@ -167,10 +173,11 @@ export function ConcordanceDispersionNodeBlock({
   binCount,
   onBinCountChange,
   combinedSourceMode,
-  dispersionChartType,
-  onDispersionChartTypeChange,
+  dispersionChartMode,
+  onDispersionChartModeChange,
   selectedBinIndices,
   onBinSelect,
+  onBinRangeSelect,
   onClearBinSelection,
   allMatchedTexts,
   matchedTextColorMap,
@@ -473,8 +480,9 @@ export function ConcordanceDispersionNodeBlock({
                 materialisedBins={materialisedBins}
                 materialised={materialised}
                 aggregateAll={!colourMatches}
-                chartType={dispersionChartType}
-                onChartTypeChange={onDispersionChartTypeChange}
+                sourceColors={sourceColorMap}
+                chartMode={dispersionChartMode}
+                onChartModeChange={onDispersionChartModeChange}
                 onBinCountChange={onBinCountChange}
                 selection={{
                   selectedIndices:
@@ -484,6 +492,15 @@ export function ConcordanceDispersionNodeBlock({
                   /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
                   onSelect: (index, shiftHeld) => {
                     onBinSelect(CONCORDANCE_COMBINED_NODE_KEY, index, shiftHeld);
+                  },
+                  /** Used by: ConcordanceDispersionSummary selection prop to route combined chart drag ranges because callers need one state update for the full selected bin span. */
+                  onSelectRange: (startIndex, endIndex, shiftHeld) => {
+                    onBinRangeSelect(
+                      CONCORDANCE_COMBINED_NODE_KEY,
+                      startIndex,
+                      endIndex,
+                      shiftHeld,
+                    );
                   },
                   /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
                   onClear: () => {
@@ -760,8 +777,9 @@ export function ConcordanceDispersionNodeBlock({
               materialisedBins={materialisedBins}
               materialised={materialised}
               aggregateAll={!colourMatches}
-              chartType={dispersionChartType}
-              onChartTypeChange={onDispersionChartTypeChange}
+              sourceColor={context.nodeColor}
+              chartMode={dispersionChartMode}
+              onChartModeChange={onDispersionChartModeChange}
               onBinCountChange={onBinCountChange}
               selection={{
                 selectedIndices:
@@ -770,6 +788,10 @@ export function ConcordanceDispersionNodeBlock({
                 /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
                 onSelect: (index, shiftHeld) => {
                   onBinSelect(nodeKey, index, shiftHeld);
+                },
+                /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart drag ranges because callers need one state update for the full selected bin span. */
+                onSelectRange: (startIndex, endIndex, shiftHeld) => {
+                  onBinRangeSelect(nodeKey, startIndex, endIndex, shiftHeld);
                 },
                 /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
                 onClear: () => {

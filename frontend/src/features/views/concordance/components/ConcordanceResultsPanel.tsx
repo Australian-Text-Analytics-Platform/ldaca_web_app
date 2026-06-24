@@ -7,9 +7,9 @@ import type { ConcordanceAnalysisResponse } from '@/api';
 import type { NodeColumnSelection } from '../../common';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
-import type { MultiSeriesChartType } from '../../common/components/MultiSeriesChart';
 import {
   CONCORDANCE_COMBINED_NODE_KEY,
+  type ConcordanceDispersionChartMode,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
 } from '../concordanceViewModels';
@@ -51,10 +51,16 @@ export interface ConcordanceResultsPanelProps {
   setProportionalDispersionBars: Dispatch<SetStateAction<boolean>>;
   combinedSourceMode: 'aggregate' | 'split';
   setCombinedSourceMode: Dispatch<SetStateAction<'aggregate' | 'split'>>;
-  dispersionChartType: MultiSeriesChartType;
-  setDispersionChartType: Dispatch<SetStateAction<MultiSeriesChartType>>;
+  dispersionChartMode: ConcordanceDispersionChartMode;
+  setDispersionChartMode: Dispatch<SetStateAction<ConcordanceDispersionChartMode>>;
   selectedBinIndices: Record<string, Set<number>>;
   onBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
+  onBinRangeSelect: (
+    blockKey: string,
+    startIndex: number,
+    endIndex: number,
+    shiftHeld: boolean,
+  ) => void;
   onClearBinSelection: (blockKey: string) => void;
   colourMatches: boolean;
   setColourMatches: Dispatch<SetStateAction<boolean>>;
@@ -148,10 +154,11 @@ export function ConcordanceResultsPanel({
   setProportionalDispersionBars,
   combinedSourceMode,
   setCombinedSourceMode,
-  dispersionChartType,
-  setDispersionChartType,
+  dispersionChartMode,
+  setDispersionChartMode,
   selectedBinIndices,
   onBinSelect,
+  onBinRangeSelect,
   onClearBinSelection,
   colourMatches,
   setColourMatches,
@@ -425,10 +432,11 @@ export function ConcordanceResultsPanel({
                       binCount={binCount}
                       onBinCountChange={setBinCount}
                       combinedSourceMode={combinedSourceMode}
-                      dispersionChartType={dispersionChartType}
-                      onDispersionChartTypeChange={setDispersionChartType}
+                      dispersionChartMode={dispersionChartMode}
+                      onDispersionChartModeChange={setDispersionChartMode}
                       selectedBinIndices={selectedBinIndices}
                       onBinSelect={onBinSelect}
+                      onBinRangeSelect={onBinRangeSelect}
                       onClearBinSelection={onClearBinSelection}
                       allMatchedTexts={allMatchedTexts}
                       matchedTextColorMap={matchedTextColorMap}
